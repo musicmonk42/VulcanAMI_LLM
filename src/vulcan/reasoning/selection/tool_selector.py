@@ -1446,6 +1446,30 @@ class ToolSelector:
                 request, features, safe_candidates, prior_dist
             )
 
+            # Step 7.5: Apply post-semantic safety checks
+            # This respects the semantic_boost_applied flag from prior computation
+            if self.config.get("safety_enabled") and candidates:
+                semantic_boost_applied = prior_dist.metadata.get('semantic_boost_applied', False)
+                candidate_tools = [c['tool'] for c in candidates]
+                
+                # Build context for safety check with semantic boost flag
+                safety_context_dict = {
+                    'semantic_boost_applied': semantic_boost_applied,
+                    'problem': request.problem,
+                    'query': prior_context.get('query', ''),
+                    'constraints': request.constraints,
+                }
+                
+                # Apply safety checks that respect semantic selection
+                final_tools = self.safety_governor.apply_safety_checks(
+                    candidate_tools, safety_context_dict
+                )
+                
+                # Filter candidates to only include tools that passed safety
+                candidates = [c for c in candidates if c['tool'] in final_tools]
+                
+                logger.info(f"[ToolSelector] Tool selection complete: tools={final_tools}")
+
             # Step 8: Select execution strategy
             strategy = self._select_strategy(request, candidates)
 
@@ -1584,7 +1608,12 @@ class ToolSelector:
         )
 
     def _safety_precheck(self, context: SafetyContext) -> List[str]:
-        """Pre-check which tools are safe to use"""
+        """Pre-check which tools are safe to use.
+        
+        This uses critical-only safety checks to allow semantic matching
+        to consider all viable tools. Resource constraints are checked
+        after semantic matching selects tools.
+        """
 
         if not self.config.get("safety_enabled"):
             return self.tool_names
@@ -1594,7 +1623,8 @@ class ToolSelector:
 
             for tool_name in self.tool_names:
                 context.tool_name = tool_name
-                action, reason = self.safety_governor.check_safety(context)
+                # Use critical-only check for initial filtering
+                action, reason = self.safety_governor.check_critical_safety_only(context)
 
                 if action.value in ["allow", "sanitize", "log_and_allow"]:
                     safe_tools.append(tool_name)

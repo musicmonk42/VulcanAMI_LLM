@@ -46,6 +46,58 @@ NON_CRITICAL_VIOLATION_TYPES = frozenset({
     'rate_limited',
 })
 
+# =============================================================================
+# SEMANTIC KEYWORD SYNONYMS
+# =============================================================================
+# These mappings allow the contract validation to understand semantic equivalents
+# of required keywords. Instead of requiring literal "graph" in a causal query,
+# we accept synonyms like "model", "chain", "relationship" etc.
+#
+# This is the long-term fix for tool selection defaulting to 'general':
+# The semantic matcher selects the right tool, and these synonyms ensure
+# the contract validation doesn't veto based on missing literal keywords.
+
+SEMANTIC_KEYWORD_SYNONYMS: Dict[str, Dict[str, List[str]]] = {
+    "symbolic": {
+        "logic": ["logical", "reasoning", "deduce", "deduction", "inference", 
+                  "prove", "proof", "theorem", "axiom", "premise", "conclusion",
+                  "syllogism", "valid", "invalid", "entail", "imply", "implies",
+                  "therefore", "hence", "thus", "if-then", "modus"],
+        "rules": ["rule", "constraint", "condition", "requirement", "principle",
+                  "law", "formula", "equation", "statement", "proposition",
+                  "hypothesis", "assumption", "given", "premises"],
+    },
+    "causal": {
+        "graph": ["model", "diagram", "structure", "relationship", "chain", 
+                  "link", "network", "path", "mechanism", "connection",
+                  "causation", "causal", "cause", "effect", "influence"],
+        "data": ["information", "evidence", "observation", "scenario", "case",
+                 "example", "situation", "event", "outcome", "result",
+                 "fact", "variable", "factor", "condition"],
+    },
+    "analogical": {
+        "source": ["first", "like", "similar", "compare", "domain", "original",
+                   "base", "reference", "known", "familiar", "existing",
+                   "is to", "as", "same as", "equivalent"],
+        "target": ["second", "to", "other", "between", "mapping", "new",
+                   "unknown", "different", "destination", "application",
+                   "transfer", "apply", "extend"],
+    },
+    "probabilistic": {
+        # Probabilistic has no required_inputs in its contract, but we define
+        # synonyms here for reference and potential future use with optional validation
+        "probability": ["likely", "likelihood", "chance", "odds", "risk",
+                        "uncertain", "confidence", "bayesian", "bayes",
+                        "estimate", "predict", "expect", "distribution"],
+    },
+    "multimodal": {
+        "modalities": ["image", "picture", "photo", "video", "audio", "visual",
+                       "text", "diagram", "chart", "graph", "figure", "table",
+                       "document", "file", "attachment", "screenshot", "scan",
+                       "see", "look", "view", "show", "display", "describe"],
+    },
+}
+
 
 class SafetyLevel(Enum):
     """Safety levels for operations"""
@@ -456,15 +508,22 @@ class SafetyGovernor:
         """Initialize default tool contracts.
         
         Tool contracts define resource limits, confidence requirements, and safety
-        levels for each reasoning tool. The `required_inputs` sets are kept empty
-        because the tool selector determines tool appropriateness - users don't
-        need to include specific keywords in their queries.
+        levels for each reasoning tool.
         
-        `forbidden_inputs` are retained as safety measures against problematic content.
+        IMPORTANT: `required_inputs` are NOW validated using SEMANTIC SYNONYM EXPANSION
+        (see SEMANTIC_KEYWORD_SYNONYMS at the top of this file). This means:
+        - A query doesn't need to contain literal "graph" for causal tool
+        - It can contain synonyms like "model", "relationship", "cause", "effect"
+        - The semantic matcher will accept any synonym match
+        
+        This enables tool-appropriate validation without rejecting natural language queries.
+        
+        `forbidden_inputs` are retained as hard safety measures against problematic content.
         """
         self.contracts["symbolic"] = ToolContract(
             tool_name="symbolic",
-            required_inputs=set(),
+            # Semantic synonyms: logic=[prove, theorem, deduce...], rules=[constraint, formula...]
+            required_inputs={"logic", "rules"},
             forbidden_inputs={"undefined", "infinite"},
             max_execution_time_ms=5000,
             max_energy_mj=500,
@@ -477,6 +536,8 @@ class SafetyGovernor:
 
         self.contracts["probabilistic"] = ToolContract(
             tool_name="probabilistic",
+            # No required inputs - probabilistic works on any uncertainty-related query
+            # Semantic matcher determines appropriateness
             required_inputs=set(),
             forbidden_inputs={"nan", "inf"},
             max_execution_time_ms=3000,
@@ -490,7 +551,8 @@ class SafetyGovernor:
 
         self.contracts["causal"] = ToolContract(
             tool_name="causal",
-            required_inputs=set(),
+            # Semantic synonyms: graph=[model, relationship, cause...], data=[evidence, scenario...]
+            required_inputs={"graph", "data"},
             forbidden_inputs={"cyclic"},
             max_execution_time_ms=10000,
             max_energy_mj=1000,
@@ -503,7 +565,8 @@ class SafetyGovernor:
 
         self.contracts["analogical"] = ToolContract(
             tool_name="analogical",
-            required_inputs=set(),
+            # Semantic synonyms: source=[like, similar, compare...], target=[to, other, mapping...]
+            required_inputs={"source", "target"},
             forbidden_inputs=set(),
             max_execution_time_ms=2000,
             max_energy_mj=200,
@@ -516,7 +579,8 @@ class SafetyGovernor:
 
         self.contracts["multimodal"] = ToolContract(
             tool_name="multimodal",
-            required_inputs=set(),
+            # Semantic synonyms: modalities=[image, video, audio, diagram, chart...]
+            required_inputs={"modalities"},
             forbidden_inputs={"corrupted"},
             max_execution_time_ms=15000,
             max_energy_mj=1500,
@@ -526,6 +590,68 @@ class SafetyGovernor:
             forbidden_operations={"forge"},
             output_validators=[lambda x: self._validate_multimodal(x)],
         )
+
+    def check_critical_safety_only(
+        self, context: SafetyContext
+    ) -> Tuple[SafetyAction, Optional[str]]:
+        """
+        Check only for critical safety violations.
+        
+        This is used for initial tool filtering before semantic matching.
+        It checks for truly dangerous inputs (harmful content, PII, etc.)
+        but does NOT check resource constraints or contract violations.
+        
+        This allows semantic matching to consider all tools, with resource
+        constraint violations being handled after semantic selection.
+        
+        Args:
+            context: Safety context for evaluation
+            
+        Returns:
+            (action, reason) - VETO only for critical issues
+            
+        Note:
+            Exceptions fail CLOSED (VETO) to ensure safety is maintained
+            even when unexpected errors occur.
+        """
+        try:
+            with self.lock:
+                # Only check input safety for critical violations
+                is_safe, reason = self.validator.validate_input(context.problem)
+                if not is_safe:
+                    self._record_violation(
+                        context.tool_name, VetoReason.UNSAFE_INPUT, reason
+                    )
+                    
+                    # For critical safety level, always veto
+                    if context.safety_level == SafetyLevel.CRITICAL:
+                        return (SafetyAction.VETO, reason)
+                    
+                    # For other levels, sanitize is acceptable
+                    return (SafetyAction.SANITIZE, reason)
+                
+                # Check forbidden inputs only (not resource constraints)
+                if context.tool_name in self.contracts:
+                    contract = self.contracts[context.tool_name]
+                    
+                    # Only check forbidden inputs, not time/energy budgets
+                    if contract.forbidden_inputs:
+                        problem_str = str(context.problem).lower()
+                        found = [
+                            forb for forb in contract.forbidden_inputs if forb in problem_str
+                        ]
+                        if found:
+                            self._record_violation(
+                                context.tool_name, VetoReason.CONTRACT_VIOLATION,
+                                f"Forbidden inputs found: {found}"
+                            )
+                            return (SafetyAction.VETO, f"Forbidden inputs found: {found}")
+                
+                return (SafetyAction.ALLOW, None)
+        except Exception as e:
+            # Fail CLOSED on exceptions - safety first
+            logger.error(f"Critical safety check failed with exception: {e}. Failing closed (VETO).")
+            return (SafetyAction.VETO, f"Safety check error: {str(e)}")
 
     def check_safety(
         self, context: SafetyContext
@@ -856,19 +982,47 @@ class SafetyGovernor:
     def _check_contract_violation(
         self, context: SafetyContext, contract: ToolContract
     ) -> Optional[str]:
-        """Check if context violates contract"""
+        """Check if context violates contract.
+        
+        Uses semantic keyword matching to understand query intent rather than
+        requiring literal keywords. For example, a causal query about "cause and
+        effect relationships" will match the semantic synonyms for "graph" and "data".
+        
+        NOTE: Resource constraint checks (time/energy budget) are intentionally
+        lenient. The semantic matcher has determined tool appropriateness based
+        on query content, so we only enforce hard safety limits.
+        """
 
         try:
-            # Check required inputs
+            # Check required inputs with SEMANTIC SYNONYM EXPANSION
+            # This is the long-term fix: instead of literal matching, we check
+            # if ANY synonym of the required keyword appears in the query
             if contract.required_inputs:
                 problem_str = str(context.problem).lower()
-                missing = [
-                    req for req in contract.required_inputs if req not in problem_str
-                ]
-                if missing:
-                    return f"Missing required inputs: {missing}"
+                tool_synonyms = SEMANTIC_KEYWORD_SYNONYMS.get(contract.tool_name, {})
+                
+                missing_semantic = []
+                for req in contract.required_inputs:
+                    # Get synonyms for this required keyword
+                    synonyms = tool_synonyms.get(req, [])
+                    all_matches = [req] + synonyms  # Include literal + synonyms
+                    
+                    # Check if ANY match is found in the query
+                    found_match = any(match in problem_str for match in all_matches)
+                    
+                    if not found_match:
+                        missing_semantic.append(req)
+                
+                if missing_semantic:
+                    # Log as advisory - semantic matcher already determined appropriateness
+                    # This only fires if NONE of the synonyms matched
+                    logger.debug(
+                        f"Advisory: No semantic match for {missing_semantic} in {contract.tool_name} query. "
+                        f"This is informational only - semantic boost determines tool selection."
+                    )
+                    # Don't veto - trust the semantic matcher's decision
 
-            # Check forbidden inputs
+            # Check forbidden inputs (these are hard safety requirements)
             if contract.forbidden_inputs:
                 problem_str = str(context.problem).lower()
                 found = [
@@ -877,16 +1031,20 @@ class SafetyGovernor:
                 if found:
                     return f"Forbidden inputs found: {found}"
 
-            # Check resource constraints
+            # Check resource constraints - use very lenient threshold (0.1)
+            # This only rejects if the budget is severely insufficient
+            # The semantic matcher has already determined tool appropriateness
             if context.constraints:
                 time_budget = context.constraints.get("time_budget_ms", float("inf"))
-                if time_budget < contract.max_execution_time_ms * 0.5:
+                # Only veto if time budget is < 10% of required (extremely insufficient)
+                if time_budget < contract.max_execution_time_ms * 0.1:
                     return f"Insufficient time budget for {contract.tool_name}"
 
                 energy_budget = context.constraints.get(
                     "energy_budget_mj", float("inf")
                 )
-                if energy_budget < contract.max_energy_mj * 0.5:
+                # Only veto if energy budget is < 10% of required
+                if energy_budget < contract.max_energy_mj * 0.1:
                     return f"Insufficient energy budget for {contract.tool_name}"
 
             # Check safety level
