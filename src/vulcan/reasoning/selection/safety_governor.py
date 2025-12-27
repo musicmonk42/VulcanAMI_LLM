@@ -638,6 +638,75 @@ class SafetyGovernor:
 
         return filtered
 
+    def apply_safety_checks(
+        self,
+        selected_tools: List[str],
+        context: Dict[str, Any],
+    ) -> List[str]:
+        """
+        Apply safety checks to selected tools, preserving semantic selections for non-critical violations.
+        
+        This method is designed to integrate with semantic tool matching, where semantic
+        boost has already identified the most appropriate tools. Non-critical safety
+        violations should not override these selections.
+        
+        Args:
+            selected_tools: List of selected tool names
+            context: Selection context including 'semantic_boost_applied' flag
+            
+        Returns:
+            Potentially modified list of tools (unchanged for non-critical violations
+            when semantic boost was applied)
+        """
+        if not selected_tools:
+            return selected_tools
+        
+        semantic_boost_applied = context.get('semantic_boost_applied', False)
+        
+        # Check each selected tool for violations
+        adjusted_tools = list(selected_tools)
+        
+        for tool in selected_tools:
+            # Build safety context for tool check
+            problem = context.get('problem', context.get('query', ''))
+            safety_context = SafetyContext(
+                problem=problem,
+                tool_name=tool,
+                features=context.get('features'),
+                constraints=context.get('constraints', {}),
+                user_context=context,
+                safety_level=SafetyLevel.MEDIUM,
+            )
+            
+            action, reason = self.check_safety(safety_context)
+            
+            if action == SafetyAction.VETO:
+                # Check if this is a critical violation (based on safety level required)
+                is_critical = False
+                if tool in self.contracts:
+                    contract = self.contracts[tool]
+                    is_critical = getattr(contract, 'required_safety_level', None) == SafetyLevel.CRITICAL
+                
+                if is_critical:
+                    logger.error(f"[SafetyGovernor] CRITICAL violation for '{tool}': {reason} - overriding selection")
+                    if tool in adjusted_tools:
+                        adjusted_tools.remove(tool)
+                elif semantic_boost_applied:
+                    # Non-critical: log warning but preserve semantic selection
+                    logger.info(f"[SafetyGovernor] Non-critical warning ({reason}) - preserving semantic selection for '{tool}'")
+                else:
+                    # No semantic boost, apply normal safety override
+                    logger.warning(f"[SafetyGovernor] Safety violation for '{tool}': {reason} - adjusting selection")
+                    if tool in adjusted_tools:
+                        adjusted_tools.remove(tool)
+        
+        # If all tools were removed, return a safe fallback
+        if not adjusted_tools and selected_tools:
+            logger.warning("[SafetyGovernor] All tools removed by safety checks - using 'general' fallback")
+            return ['general']
+        
+        return adjusted_tools
+
     def validate_output(
         self, tool_name: str, output: Any, context: SafetyContext
     ) -> Tuple[bool, Optional[str]]:

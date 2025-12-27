@@ -70,10 +70,30 @@ class ContinualMetrics:
 class ContinualLearner:
     """Original continual learner for backward compatibility"""
 
-    def __init__(self):
+    def __init__(self, memory=None):
+        self.enabled = True
         self.ewc_importance = {}
         self.task_models = {}
         self.experience_buffer = deque(maxlen=1000)  # Added for update method
+        self.learning_history = []
+        self.slow_routing_patterns = []
+        self.tool_success_rates = {}
+        
+        # Try to use HierarchicalMemory, fall back to simple dict
+        if memory:
+            self.memory = memory
+            logger.info("[ContinualLearner] Using provided memory instance")
+        else:
+            try:
+                from .hierarchical import HierarchicalMemory
+                self.memory = HierarchicalMemory()
+                logger.info("[ContinualLearner] Using HierarchicalMemory")
+            except Exception as e:
+                logger.warning(f"[ContinualLearner] HierarchicalMemory unavailable: {e}")
+                self.memory = {'patterns': [], 'weights': {}, 'history': []}
+                logger.info("[ContinualLearner] Using dict fallback memory - learning still enabled")
+        
+        logger.info("[ContinualLearner] Initialized and ready for learning")
 
     def process_experience(self, experience: Dict[str, Any]) -> Dict[str, Any]:
         """Basic experience processing"""
@@ -120,6 +140,52 @@ class ContinualLearner:
         logger.info("Consolidating knowledge in basic ContinualLearner...")
         # In a real scenario, this would update EWC importance, etc.
         self.experience_buffer.clear()
+
+    async def learn_from_outcome(self, outcome: Dict[str, Any]) -> None:
+        """
+        Process an outcome and extract learnable patterns.
+        
+        This method is called by the UnifiedLearningSystem when an outcome
+        is recorded via the OutcomeBridge.
+        
+        Args:
+            outcome: Dictionary containing query outcome data:
+                - query_id: Unique query identifier
+                - status: Query status ("success", "error", "timeout")
+                - routing_ms: Time spent routing
+                - total_ms: Total processing time
+                - complexity: Query complexity score
+                - query_type: Type of query
+                - tools: List of tools used
+                - timestamp: Time of the outcome
+        """
+        query_id = outcome.get('query_id', 'unknown')
+        logger.info(f"[ContinualLearner] Learning from: {query_id}")
+        
+        # Track tool success rates
+        tools = outcome.get('tools', [])
+        status = outcome.get('status', 'unknown')
+        for tool in tools:
+            if tool not in self.tool_success_rates:
+                self.tool_success_rates[tool] = {'success': 0, 'total': 0}
+            self.tool_success_rates[tool]['total'] += 1
+            if status == 'success':
+                self.tool_success_rates[tool]['success'] += 1
+        
+        # Detect slow routing patterns
+        routing_ms = outcome.get('routing_ms', 0)
+        if routing_ms > 5000:
+            pattern = {
+                'query_type': outcome.get('query_type'),
+                'tools': tools,
+                'routing_ms': routing_ms,
+                'timestamp': outcome.get('timestamp')
+            }
+            self.slow_routing_patterns.append(pattern)
+            logger.warning(f"[ContinualLearner] Recorded slow routing pattern: {routing_ms}ms for {tools}")
+        
+        self.learning_history.append(outcome)
+        logger.info(f"[ContinualLearner] History size: {len(self.learning_history)}, slow patterns: {len(self.slow_routing_patterns)}")
 
 
 # ============================================================

@@ -459,6 +459,9 @@ class BayesianMemoryPrior:
                             key=lambda x: x[1]
                         )[0]
                     prior.metadata['semantic_boost_applied'] = True
+                    # Also set flag in context so SafetyGovernor can see it
+                    if isinstance(context, dict):
+                        context['semantic_boost_applied'] = True
                     # Log semantic boost for debugging tool selection issues
                     new_top = max(prior.tool_probs.items(), key=lambda x: x[1]) if prior.tool_probs else None
                     if new_top:

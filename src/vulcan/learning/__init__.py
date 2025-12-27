@@ -17,6 +17,15 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
+# =============================================================================
+# Learning Weight Adjustment Constants
+# =============================================================================
+# These constants control how much tool weights are adjusted based on outcomes.
+# Positive adjustment for success encourages using successful tools.
+# Smaller negative adjustment for failure prevents over-penalizing tools.
+WEIGHT_ADJUSTMENT_SUCCESS = 0.01
+WEIGHT_ADJUSTMENT_FAILURE = -0.005
+
 # Make torch import conditional to allow module import even without torch
 try:
     import torch
@@ -151,6 +160,15 @@ class UnifiedLearningSystem:
         self.stats_history = []
         self._shutdown_requested = threading.Event()
         self._shutdown_event = threading.Event()  # ADDED: For external threads
+        
+        # Learning from outcomes
+        self.slow_routing_threshold_ms = 5000
+        self.tool_weight_adjustments: Dict[str, float] = {}
+        
+        # MetaLearner reference (if available)
+        self.meta_learner = None
+        if self.continual_learner and hasattr(self.continual_learner, 'meta_learner'):
+            self.meta_learner = self.continual_learner.meta_learner
 
         logger.info(
             f"UnifiedLearningSystem initialized with {self._count_components()} active components"
@@ -174,6 +192,89 @@ class UnifiedLearningSystem:
             logger.warning(
                 "Could not connect metacognitive monitor - no general optimizer found"
             )
+
+    async def process_outcome(self, outcome: Dict[str, Any]) -> None:
+        """
+        Main entry point for learning from query outcomes.
+        
+        This method is called by OutcomeBridge when a query outcome is recorded.
+        It coordinates learning across all subsystems: ContinualLearner, MetaLearner,
+        and tool weight adjustments.
+        
+        Args:
+            outcome: Dictionary containing query outcome data:
+                - query_id: Unique query identifier
+                - status: Query status ("success", "error", "timeout")
+                - routing_ms: Time spent routing
+                - total_ms: Total processing time
+                - complexity: Query complexity score
+                - query_type: Type of query
+                - tools: List of tools used
+                - timestamp: Time of the outcome
+        """
+        query_id = outcome.get('query_id', 'unknown')
+        routing_ms = outcome.get('routing_ms', 0)
+        status = outcome.get('status', 'unknown')
+        tools = outcome.get('tools', [])
+        query_type = outcome.get('query_type', 'unknown')
+        
+        logger.info(f"[Learning] Processing outcome: {query_id}, type={query_type}, tools={tools}")
+        
+        # 1. Feed to ContinualLearner if available
+        if self.continual_learner:
+            try:
+                # Use the basic ContinualLearner's learn_from_outcome if available
+                if hasattr(self.continual_learner, 'learn_from_outcome'):
+                    await self.continual_learner.learn_from_outcome(outcome)
+            except Exception as e:
+                logger.error(f"[Learning] ContinualLearner error: {e}")
+        
+        # 2. Detect and log slow routing
+        if routing_ms > self.slow_routing_threshold_ms:
+            logger.warning(f"[Learning] SLOW ROUTING DETECTED: {routing_ms}ms (threshold: {self.slow_routing_threshold_ms}ms)")
+            logger.warning(f"[Learning] Slow query details: type={query_type}, tools={tools}")
+            
+            # Feed to MetaLearner for strategy adjustment
+            if self.meta_learner:
+                try:
+                    if hasattr(self.meta_learner, 'record_slow_routing'):
+                        await self.meta_learner.record_slow_routing(query_type, tools, routing_ms)
+                except Exception as e:
+                    logger.error(f"[Learning] MetaLearner slow routing error: {e}")
+        
+        # 3. Update tool weights based on success/failure
+        weight_delta = WEIGHT_ADJUSTMENT_SUCCESS if status == 'success' else WEIGHT_ADJUSTMENT_FAILURE
+        for tool in tools:
+            if tool not in self.tool_weight_adjustments:
+                self.tool_weight_adjustments[tool] = 0.0
+            self.tool_weight_adjustments[tool] += weight_delta
+            logger.info(f"[Learning] Tool '{tool}' weight adjustment: {weight_delta:+.3f} (cumulative: {self.tool_weight_adjustments[tool]:+.3f})")
+        
+        # 4. Feed to MetaLearner for pattern detection
+        if self.meta_learner:
+            try:
+                if hasattr(self.meta_learner, 'update_from_outcome'):
+                    await self.meta_learner.update_from_outcome(outcome)
+                    logger.info(f"[MetaLearner] Processed outcome {query_id}")
+            except Exception as e:
+                logger.error(f"[Learning] MetaLearner error: {e}")
+        
+        logger.info(f"[Learning] Outcome processing complete for {query_id}")
+
+    def get_tool_weight_adjustment(self, tool: str) -> float:
+        """
+        Get cumulative weight adjustment for a tool.
+        
+        This is used by ToolSelector to apply learned weight adjustments
+        to tool selection probabilities.
+        
+        Args:
+            tool: Tool name
+            
+        Returns:
+            Cumulative weight adjustment (positive = more successful, negative = less successful)
+        """
+        return self.tool_weight_adjustments.get(tool, 0.0)
 
     def _create_integrated_difficulty_estimator(self):
         """Create difficulty estimator that uses continual learner's knowledge"""

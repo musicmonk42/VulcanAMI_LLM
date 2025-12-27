@@ -149,6 +149,13 @@ except ImportError:
 SUCCESS_CONFIDENCE_THRESHOLD = 0.5  # Minimum confidence for success
 MAX_SUCCESS_TIME_MS = 10000  # Maximum execution time (ms) for success
 
+# ==============================================================================
+# Embedding Timeout Configuration
+# ==============================================================================
+# Increased from 2.0s to handle CPU load on Railway and other cloud platforms
+# Production logs showed embedding times ranging from 3-11s under load
+EMBEDDING_TIMEOUT = 15.0
+
 
 # ==============================================================================
 # 1. Full Implementation for StochasticCostModel
@@ -574,7 +581,7 @@ class MultiTierFeatureExtractor:
             return (text_embedding + modal_hint) / 2.0
         return self.extract_tier3(problem)
 
-    def extract_tier3_with_timeout(self, problem: Any, timeout: float = 5.0) -> np.ndarray:
+    def extract_tier3_with_timeout(self, problem: Any, timeout: float = EMBEDDING_TIMEOUT) -> np.ndarray:
         """Extract semantic features with timeout protection.
         
         This prevents indefinite blocking when embedding operations take too long
@@ -593,7 +600,7 @@ class MultiTierFeatureExtractor:
             )
             return future.result(timeout=timeout)
         except FuturesTimeoutError:
-            logger.warning(f"[Embedding] Timeout after {timeout}s, falling back to tier1 features")
+            logger.warning(f"[Embedding] Timeout after {timeout}s - falling back to keyword matching. Consider increasing timeout or optimizing embeddings.")
             return self.extract_tier1(problem)
         except Exception as e:
             logger.error(f"[Embedding] Failed: {e}, falling back to tier1")
@@ -610,11 +617,11 @@ class MultiTierFeatureExtractor:
         ):  # Fast path for simple problems
             return self.extract_tier1(problem)
         elif time_budget < 1000:
-            # Medium budget - use timeout protection
-            return self.extract_tier3_with_timeout(problem, timeout=2.0)
+            # Medium budget - use timeout protection with reduced timeout
+            return self.extract_tier3_with_timeout(problem, timeout=min(5.0, EMBEDDING_TIMEOUT))
         else:
-            # Higher budget - allow more time but still protect
-            return self.extract_tier3_with_timeout(problem, timeout=5.0)
+            # Higher budget - allow full timeout
+            return self.extract_tier3_with_timeout(problem, timeout=EMBEDDING_TIMEOUT)
 
 
 # ==============================================================================
@@ -1408,6 +1415,30 @@ class ToolSelector:
             prior_dist = self.memory_prior.compute_prior(
                 features, safe_candidates, prior_context
             )
+            
+            # Apply learned weight adjustments from learning system
+            if self.learning_system and hasattr(prior_dist, 'tool_probs') and isinstance(prior_dist.tool_probs, dict):
+                for tool in prior_dist.tool_probs:
+                    adjustment = self.learning_system.get_tool_weight_adjustment(tool)
+                    if adjustment != 0:
+                        prior_dist.tool_probs[tool] += adjustment
+                        logger.info(f"[ToolSelector] Applied learned adjustment to '{tool}': {adjustment:+.3f}")
+                # Ensure no negative probabilities and renormalize
+                for tool in prior_dist.tool_probs:
+                    if prior_dist.tool_probs[tool] < 0:
+                        prior_dist.tool_probs[tool] = 0.0
+                total = sum(prior_dist.tool_probs.values())
+                if total > 0:
+                    prior_dist.tool_probs = {k: v / total for k, v in prior_dist.tool_probs.items()}
+                else:
+                    # All weights were zero/negative, reset to uniform
+                    n_tools = len(prior_dist.tool_probs)
+                    if n_tools > 0:
+                        uniform_prob = 1.0 / n_tools
+                        prior_dist.tool_probs = {k: uniform_prob for k in prior_dist.tool_probs}
+                # Update most likely tool
+                if prior_dist.tool_probs:
+                    prior_dist.most_likely_tool = max(prior_dist.tool_probs.items(), key=lambda x: x[1])[0]
 
             # Step 7: Generate candidate tools with utilities
             candidates = self._generate_candidates(

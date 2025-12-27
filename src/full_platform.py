@@ -1395,6 +1395,17 @@ async def lifespan(app: FastAPI):
                     # Store reference for other components
                     vulcan_deployment.learning_system = unified_learning
                     vulcan_module.app.state.learning_system = unified_learning
+                    
+                    # Wire OutcomeBridge to UnifiedLearningSystem for feedback loop
+                    try:
+                        from vulcan.curiosity_engine.outcome_bridge import get_outcome_bridge
+                        outcome_bridge = get_outcome_bridge()
+                        outcome_bridge.set_learning_system(unified_learning)
+                        logger.info("✓ OutcomeBridge connected to UnifiedLearningSystem - feedback loop ACTIVE")
+                    except ImportError as e:
+                        logger.warning(f"OutcomeBridge not available: {e}")
+                    except Exception as e:
+                        logger.warning(f"⚠️ Could not connect OutcomeBridge to LearningSystem - no feedback loop: {e}")
                 except ImportError as e:
                     logger.warning(f"UnifiedLearningSystem not available: {e}")
                 except Exception as e:
