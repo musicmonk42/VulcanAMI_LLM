@@ -295,15 +295,25 @@ class SemanticToolMatcher:
                     cls._model_load_attempted = True
                     
                     # First, try to use MultiTierFeatureExtractor's model (same all-MiniLM-L6-v2)
+                    # Import outside try block to distinguish import errors from method call errors
+                    MultiTierFeatureExtractor = None
                     try:
-                        from .tool_selector import MultiTierFeatureExtractor
-                        shared = MultiTierFeatureExtractor._get_shared_model()
-                        if shared is not None:
-                            cls._shared_model = shared
-                            logger.info("[SemanticToolMatcher] Using shared model from MultiTierFeatureExtractor")
-                            return cls._shared_model
-                    except (ImportError, AttributeError) as e:
-                        logger.debug(f"[SemanticToolMatcher] Could not share model with MultiTierFeatureExtractor: {e}")
+                        from .tool_selector import MultiTierFeatureExtractor as MTFE
+                        MultiTierFeatureExtractor = MTFE
+                    except ImportError as e:
+                        logger.debug(f"[SemanticToolMatcher] Cannot import MultiTierFeatureExtractor: {e}")
+                    
+                    if MultiTierFeatureExtractor is not None:
+                        try:
+                            shared = MultiTierFeatureExtractor._get_shared_model()
+                            if shared is not None:
+                                cls._shared_model = shared
+                                logger.info("[SemanticToolMatcher] Using shared model from MultiTierFeatureExtractor")
+                                return cls._shared_model
+                        except AttributeError as e:
+                            logger.debug(f"[SemanticToolMatcher] MultiTierFeatureExtractor._get_shared_model() not available: {e}")
+                        except Exception as e:
+                            logger.debug(f"[SemanticToolMatcher] Error getting shared model: {e}")
                     
                     # Fallback: load our own model
                     try:
