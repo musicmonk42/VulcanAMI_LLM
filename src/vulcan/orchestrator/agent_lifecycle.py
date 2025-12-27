@@ -566,7 +566,7 @@ class JobProvenance:
         self.resource_consumption.update(resources)
 
     def get_summary(self) -> Dict[str, Any]:
-        """Get summary of job provenance"""
+        """Get summary of job provenance including result data"""
         summary = {
             "job_id": self.job_id,
             "agent_id": self.agent_id,
@@ -574,6 +574,8 @@ class JobProvenance:
             "start_time": self.start_time,
             "end_time": self.end_time,
             "outcome": self.outcome,
+            "status": self.outcome,  # Alias for backwards compatibility
+            "result": self.result,  # Include full result for reasoning output access
             "duration": self.get_duration(),
             "execution_duration": self.get_execution_duration(),
             "queue_time": self.queue_time,
