@@ -21,9 +21,6 @@ from vulcan.reasoning.selection.embedding_circuit_breaker import (
     get_embedding_circuit_breaker,
     reset_embedding_circuit_breaker,
     get_circuit_breaker_stats,
-    DEFAULT_LATENCY_THRESHOLD_MS,
-    DEFAULT_FAILURE_THRESHOLD,
-    DEFAULT_RESET_TIMEOUT_S,
 )
 
 

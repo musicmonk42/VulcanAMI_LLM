@@ -301,7 +301,6 @@ class EmbeddingCircuitBreaker:
     
     def _transition_to(self, new_state: CircuitState) -> None:
         """Transition to a new circuit state"""
-        old_state = self._state
         self._state = new_state
         self._last_state_change = time.time()
         
