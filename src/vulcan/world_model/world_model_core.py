@@ -2159,10 +2159,10 @@ class WorldModel:
                     # Intent clarity: inverse of uncertainty
                     "metrics.intent_clarity_score": lambda d=metrics_data: 1.0 - d.get("gauges", {}).get("current_uncertainty", 0.12),
                     
-                    # Policy violations (not directly available, return 0)
+                    # TODO: Policy violations require policy enforcement tracking (not yet implemented)
                     "policies.non_judgmental.violations_per_1k": lambda: 0.0,
                     
-                    # Disparity at k (fairness metric, not directly available)
+                    # TODO: Disparity at k requires fairness tracking across groups (not yet implemented)
                     "metrics.disparity_at_k": lambda: 0.0,
                     
                     # Calibration gap: identity drift as proxy

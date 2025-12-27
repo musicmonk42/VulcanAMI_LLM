@@ -7959,8 +7959,6 @@ def _create_main_csiu_metrics_provider():
     Returns:
         Callable that takes a dotted metric key and returns a float value
     """
-    from typing import Optional
-    
     # Helper functions defined at outer scope to avoid closure issues
     def _calc_success_rate(data):
         """Calculate success rate from metrics data with bounds checking."""
@@ -8006,12 +8004,15 @@ def _create_main_csiu_metrics_provider():
             except Exception:
                 pass
             
-            # Get metrics from EnhancedMetricsCollector
+            # Get metrics from EnhancedMetricsCollector via global app
+            # NOTE: 'app' is defined at module level in main.py
             metrics_data = {}
             try:
-                if hasattr(app, 'state') and hasattr(app.state, 'deployment'):
-                    if hasattr(app.state.deployment, 'metrics_collector'):
-                        metrics_data = app.state.deployment.metrics_collector.export_metrics()
+                # Access the global app variable safely
+                global_app = globals().get('app')
+                if global_app and hasattr(global_app, 'state') and hasattr(global_app.state, 'deployment'):
+                    if hasattr(global_app.state.deployment, 'metrics_collector'):
+                        metrics_data = global_app.state.deployment.metrics_collector.export_metrics()
             except Exception:
                 pass
             
@@ -8020,7 +8021,9 @@ def _create_main_csiu_metrics_provider():
                 "metrics.alignment_coherence_idx": lambda d=metrics_data: _calc_success_rate(d),
                 "metrics.communication_entropy": lambda d=metrics_data: _calc_error_rate(d) * 0.5,
                 "metrics.intent_clarity_score": lambda d=metrics_data: 1.0 - d.get("gauges", {}).get("current_uncertainty", 0.12),
+                # TODO: These metrics require policy enforcement tracking (not yet implemented)
                 "policies.non_judgmental.violations_per_1k": lambda: 0.0,
+                # TODO: These metrics require fairness/calibration tracking (not yet implemented)
                 "metrics.disparity_at_k": lambda: 0.0,
                 "metrics.calibration_gap": lambda d=metrics_data: abs(d.get("gauges", {}).get("identity_drift", 0.0)),
                 "metrics.empathy_index": lambda m=meta_state: m.get("average_feedback_score", 0.6),
