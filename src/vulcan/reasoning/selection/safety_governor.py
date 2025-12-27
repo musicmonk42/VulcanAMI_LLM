@@ -84,8 +84,8 @@ SEMANTIC_KEYWORD_SYNONYMS: Dict[str, Dict[str, List[str]]] = {
                    "transfer", "apply", "extend"],
     },
     "probabilistic": {
-        # Currently empty - probabilistic has no required_inputs
-        # Adding semantic equivalents for potential future use
+        # Probabilistic has no required_inputs in its contract, but we define
+        # synonyms here for reference and potential future use with optional validation
         "probability": ["likely", "likelihood", "chance", "odds", "risk",
                         "uncertain", "confidence", "bayesian", "bayes",
                         "estimate", "predict", "expect", "distribution"],
@@ -508,15 +508,22 @@ class SafetyGovernor:
         """Initialize default tool contracts.
         
         Tool contracts define resource limits, confidence requirements, and safety
-        levels for each reasoning tool. The `required_inputs` sets are kept empty
-        because the tool selector determines tool appropriateness - users don't
-        need to include specific keywords in their queries.
+        levels for each reasoning tool.
         
-        `forbidden_inputs` are retained as safety measures against problematic content.
+        IMPORTANT: `required_inputs` are NOW validated using SEMANTIC SYNONYM EXPANSION
+        (see SEMANTIC_KEYWORD_SYNONYMS at the top of this file). This means:
+        - A query doesn't need to contain literal "graph" for causal tool
+        - It can contain synonyms like "model", "relationship", "cause", "effect"
+        - The semantic matcher will accept any synonym match
+        
+        This enables tool-appropriate validation without rejecting natural language queries.
+        
+        `forbidden_inputs` are retained as hard safety measures against problematic content.
         """
         self.contracts["symbolic"] = ToolContract(
             tool_name="symbolic",
-            required_inputs=set(),
+            # Semantic synonyms: logic=[prove, theorem, deduce...], rules=[constraint, formula...]
+            required_inputs={"logic", "rules"},
             forbidden_inputs={"undefined", "infinite"},
             max_execution_time_ms=5000,
             max_energy_mj=500,
@@ -529,6 +536,8 @@ class SafetyGovernor:
 
         self.contracts["probabilistic"] = ToolContract(
             tool_name="probabilistic",
+            # No required inputs - probabilistic works on any uncertainty-related query
+            # Semantic matcher determines appropriateness
             required_inputs=set(),
             forbidden_inputs={"nan", "inf"},
             max_execution_time_ms=3000,
@@ -542,7 +551,8 @@ class SafetyGovernor:
 
         self.contracts["causal"] = ToolContract(
             tool_name="causal",
-            required_inputs=set(),
+            # Semantic synonyms: graph=[model, relationship, cause...], data=[evidence, scenario...]
+            required_inputs={"graph", "data"},
             forbidden_inputs={"cyclic"},
             max_execution_time_ms=10000,
             max_energy_mj=1000,
@@ -555,7 +565,8 @@ class SafetyGovernor:
 
         self.contracts["analogical"] = ToolContract(
             tool_name="analogical",
-            required_inputs=set(),
+            # Semantic synonyms: source=[like, similar, compare...], target=[to, other, mapping...]
+            required_inputs={"source", "target"},
             forbidden_inputs=set(),
             max_execution_time_ms=2000,
             max_energy_mj=200,
@@ -568,7 +579,8 @@ class SafetyGovernor:
 
         self.contracts["multimodal"] = ToolContract(
             tool_name="multimodal",
-            required_inputs=set(),
+            # Semantic synonyms: modalities=[image, video, audio, diagram, chart...]
+            required_inputs={"modalities"},
             forbidden_inputs={"corrupted"},
             max_execution_time_ms=15000,
             max_energy_mj=1500,
