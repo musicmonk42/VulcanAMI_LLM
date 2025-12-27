@@ -53,6 +53,17 @@ try:
 except ImportError:
     SEMANTIC_MATCHER_AVAILABLE = False
 
+try:
+    from .embedding_circuit_breaker import (
+        EmbeddingCircuitBreaker,
+        get_embedding_circuit_breaker,
+        get_circuit_breaker_stats,
+        reset_embedding_circuit_breaker,
+    )
+    CIRCUIT_BREAKER_AVAILABLE = True
+except ImportError:
+    CIRCUIT_BREAKER_AVAILABLE = False
+
 
 __all__ = [
     # Main Orchestrator
@@ -85,6 +96,7 @@ __all__ = [
     # Availability Flags
     "BANDIT_AVAILABLE",
     "SEMANTIC_MATCHER_AVAILABLE",
+    "CIRCUIT_BREAKER_AVAILABLE",
 ]
 
 # Add optional components to __all__ if they were imported successfully
@@ -93,3 +105,11 @@ if BANDIT_AVAILABLE:
 
 if SEMANTIC_MATCHER_AVAILABLE:
     __all__.extend(["SemanticToolMatcher", "TOOL_DESCRIPTIONS", "TOOL_KEYWORDS"])
+
+if CIRCUIT_BREAKER_AVAILABLE:
+    __all__.extend([
+        "EmbeddingCircuitBreaker",
+        "get_embedding_circuit_breaker",
+        "get_circuit_breaker_stats",
+        "reset_embedding_circuit_breaker",
+    ])
