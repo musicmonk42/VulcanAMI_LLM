@@ -342,11 +342,17 @@ class ToolMonitor:
 
         # EMA-based cost model calibration
         # Start with reasonable defaults based on typical tool execution times
+        # FIX Issue #11: CPU-only defaults are much higher than GPU defaults
+        # to reduce massive prediction errors during cold-start
         self._predictions: Dict[str, float] = {
-            "generator": 5000,    # Start at 5s, not 220ms!
-            "evolver": 3000,
-            "optimizer": 2000,
-            "agent_pool": 500,
+            "generator": 30000,    # Start at 30s for CPU-only ML inference
+            "visualizer": 30000,   # Start at 30s for CPU-only ML inference
+            "evolver": 10000,      # Start at 10s for CPU-only
+            "optimizer": 5000,     # Start at 5s for CPU-only
+            "agent_pool": 1000,    # Start at 1s
+            "symbolic": 2000,      # Symbolic reasoning
+            "causal": 3000,        # Causal inference
+            "probabilistic": 5000, # Probabilistic reasoning (can be slow)
         }
         self._sample_counts: Dict[str, int] = defaultdict(int)
         self._alpha = config.get("ema_alpha", 0.3)  # EMA decay factor
@@ -367,7 +373,7 @@ class ToolMonitor:
         Returns:
             Predicted execution time in milliseconds
         """
-        return self._predictions.get(tool_name, 5000)  # Default 5s if unknown
+        return self._predictions.get(tool_name, 10000)  # Default 10s for unknown tools (CPU-safe)
 
     def record_execution(
         self,
@@ -387,7 +393,7 @@ class ToolMonitor:
         timestamp = time.time()
 
         # EMA-based cost model calibration
-        old_prediction = self._predictions.get(tool_name, 5000)
+        old_prediction = self._predictions.get(tool_name, 10000)  # Default 10s for unknown tools
         self._sample_counts[tool_name] += 1
 
         # EMA update: new = alpha * actual + (1 - alpha) * old
@@ -921,11 +927,17 @@ class ToolMonitor:
             tool_name: If provided, reset only predictions for this tool.
                       If None, reset all tool predictions to defaults.
         """
+        # FIX Issue #11: CPU-only defaults are much higher than GPU defaults
+        # to reduce massive prediction errors during cold-start
         default_predictions = {
-            "generator": 5000,    # Start at 5s
-            "evolver": 3000,
-            "optimizer": 2000,
-            "agent_pool": 500,
+            "generator": 30000,    # Start at 30s for CPU-only ML inference
+            "visualizer": 30000,   # Start at 30s for CPU-only ML inference
+            "evolver": 10000,      # Start at 10s for CPU-only
+            "optimizer": 5000,     # Start at 5s for CPU-only
+            "agent_pool": 1000,    # Start at 1s
+            "symbolic": 2000,      # Symbolic reasoning
+            "causal": 3000,        # Causal inference
+            "probabilistic": 5000, # Probabilistic reasoning (can be slow)
         }
         
         if tool_name:

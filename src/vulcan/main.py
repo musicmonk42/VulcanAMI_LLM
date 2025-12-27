@@ -5350,6 +5350,53 @@ async def health_check():
         return {"status": "unhealthy", "error": str(e), "timestamp": time.time()}
 
 
+@app.get("/health/live")
+async def liveness_check():
+    """
+    Lightweight liveness check endpoint.
+    
+    FIX Issue #41: The main /health endpoint was taking 5+ seconds due to
+    collecting comprehensive status from multiple subsystems. This endpoint
+    provides a fast (<100ms) liveness check suitable for Kubernetes probes.
+    
+    Returns 200 OK if the application is running and can handle requests.
+    """
+    return {
+        "status": "ok",
+        "timestamp": time.time(),
+    }
+
+
+@app.get("/health/ready")  
+async def readiness_check():
+    """
+    Fast readiness check endpoint.
+    
+    FIX Issue #41: Provides a quick readiness check that only validates
+    essential components without collecting full system metrics.
+    
+    Returns 200 OK if the application is ready to handle requests.
+    """
+    try:
+        has_deployment = hasattr(app.state, "deployment")
+        has_llm = hasattr(app.state, "llm")
+        
+        ready = has_deployment and has_llm
+        
+        return {
+            "status": "ready" if ready else "not_ready",
+            "deployment_initialized": has_deployment,
+            "llm_initialized": has_llm,
+            "timestamp": time.time(),
+        }
+    except Exception as e:
+        return {
+            "status": "not_ready",
+            "error": str(e),
+            "timestamp": time.time(),
+        }
+
+
 @app.get("/v1/llm/config")
 async def get_llm_config():
     """
