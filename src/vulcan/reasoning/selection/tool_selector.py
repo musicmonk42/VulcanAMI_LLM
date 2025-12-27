@@ -143,6 +143,23 @@ except ImportError:
         logger.debug("Outcome bridge not available - implicit feedback disabled")
 
 
+# Import embedding circuit breaker for latency protection
+try:
+    from .embedding_circuit_breaker import (
+        EmbeddingCircuitBreaker,
+        get_embedding_circuit_breaker,
+        get_circuit_breaker_stats,
+    )
+    CIRCUIT_BREAKER_AVAILABLE = True
+    logger.info("Embedding circuit breaker imported successfully")
+except ImportError as e:
+    logger.warning(f"Embedding circuit breaker not available: {e}")
+    CIRCUIT_BREAKER_AVAILABLE = False
+    EmbeddingCircuitBreaker = None
+    get_embedding_circuit_breaker = None
+    get_circuit_breaker_stats = None
+
+
 # ==============================================================================
 # Constants for Implicit Feedback Recording
 # ==============================================================================
@@ -583,28 +600,71 @@ class MultiTierFeatureExtractor:
         return self.extract_tier3(problem)
 
     def extract_tier3_with_timeout(self, problem: Any, timeout: float = EMBEDDING_TIMEOUT) -> np.ndarray:
-        """Extract semantic features with timeout protection.
+        """Extract semantic features with timeout protection and circuit breaker.
         
         This prevents indefinite blocking when embedding operations take too long
-        (observed 12-24s under CPU contention).
+        (observed 12-24s under CPU contention). The circuit breaker pattern
+        automatically skips embeddings when latency degrades consistently.
+        
+        Circuit Breaker Logic:
+        1. CLOSED: Normal operation, embeddings allowed
+        2. OPEN: Skip embeddings entirely (latency too high), use keyword fallback
+        3. HALF_OPEN: Test if embeddings have recovered
         
         Args:
             problem: Problem to extract features from
             timeout: Maximum time in seconds to wait for embedding
             
         Returns:
-            Feature vector (falls back to tier1 on timeout)
+            Feature vector (falls back to tier1 on timeout or circuit open)
         """
+        # PERFORMANCE FIX: Check circuit breaker first
+        if CIRCUIT_BREAKER_AVAILABLE and get_embedding_circuit_breaker is not None:
+            circuit_breaker = get_embedding_circuit_breaker()
+            if circuit_breaker.should_skip_embedding():
+                logger.warning(
+                    f"[Embedding] Circuit breaker OPEN - skipping embedding, "
+                    f"using keyword fallback"
+                )
+                return self.extract_tier1(problem)
+        
+        start_time = time.perf_counter()
         try:
             future = MultiTierFeatureExtractor._embedding_executor.submit(
                 self.extract_tier3, problem
             )
-            return future.result(timeout=timeout)
+            result = future.result(timeout=timeout)
+            
+            # Record successful latency to circuit breaker
+            elapsed_ms = (time.perf_counter() - start_time) * 1000
+            if CIRCUIT_BREAKER_AVAILABLE and get_embedding_circuit_breaker is not None:
+                circuit_breaker = get_embedding_circuit_breaker()
+                circuit_breaker.record_latency(elapsed_ms)
+            
+            return result
         except FuturesTimeoutError:
-            logger.warning(f"[Embedding] Timeout after {timeout}s - semantic matching skipped, falling back to keywords")
+            elapsed_ms = (time.perf_counter() - start_time) * 1000
+            logger.warning(
+                f"[Embedding] Timeout after {timeout}s ({elapsed_ms:.0f}ms) - "
+                f"semantic matching skipped, falling back to keywords"
+            )
+            
+            # Record timeout as a failure/slow operation
+            if CIRCUIT_BREAKER_AVAILABLE and get_embedding_circuit_breaker is not None:
+                circuit_breaker = get_embedding_circuit_breaker()
+                # Record the timeout as latency (it's at least timeout * 1000 ms)
+                circuit_breaker.record_latency(timeout * 1000)
+            
             return self.extract_tier1(problem)
         except Exception as e:
-            logger.error(f"[Embedding] Failed: {e}, falling back to tier1")
+            elapsed_ms = (time.perf_counter() - start_time) * 1000
+            logger.error(f"[Embedding] Failed after {elapsed_ms:.0f}ms: {e}, falling back to tier1")
+            
+            # Record failure to circuit breaker
+            if CIRCUIT_BREAKER_AVAILABLE and get_embedding_circuit_breaker is not None:
+                circuit_breaker = get_embedding_circuit_breaker()
+                circuit_breaker.record_failure()
+            
             return self.extract_tier1(problem)
 
     def extract_adaptive(self, problem: Any, time_budget: float) -> np.ndarray:
