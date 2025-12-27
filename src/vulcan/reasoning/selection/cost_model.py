@@ -338,11 +338,30 @@ class StochasticCostModel:
         )
         self.drift_detection = bool(cfg.get("drift_detection", True))
 
-        # Cold-start priors
-        self.default_time_ms = float(cfg.get("default_time_ms", 120.0))
+        # Cold-start priors - increased defaults for CPU-intensive operations
+        # Issue #51: Default 120ms was causing 16,401% prediction errors for Arena agents
+        # Production logs show visualizer taking 30-60s on CPU load
+        self.default_time_ms = float(cfg.get("default_time_ms", 5000.0))  # 5 seconds default
         self.default_energy_mj = float(cfg.get("default_energy_mj", 2.5))
         self.default_quality = float(cfg.get("default_quality", 0.72))
         self.default_risk = float(cfg.get("default_risk", 0.12))
+        
+        # Tool-specific time priors (ms) for better cold-start prediction
+        # Arena agents are CPU-intensive and can take 30-60s under load
+        self.tool_time_priors = cfg.get("tool_time_priors", {
+            "visualizer": 45000.0,      # 45s - rendering is CPU-intensive
+            "generator": 30000.0,       # 30s - graph generation takes time
+            "evolver": 40000.0,         # 40s - evolution requires iterations
+            "photonic_optimizer": 60000.0,  # 60s - hardware optimization is slow
+            "automl_optimizer": 50000.0,    # 50s - model tuning is expensive
+            "symbolic": 500.0,          # 0.5s - symbolic reasoning is fast
+            "probabilistic": 800.0,     # 0.8s - inference is moderately fast
+            "causal": 2000.0,           # 2s - causal analysis takes time
+            "neural": 1500.0,           # 1.5s - neural inference
+            "hybrid": 3000.0,           # 3s - combination of methods
+            "general": 1000.0,          # 1s - general fallback
+        })
+
 
         # Bounds
         self.min_quality = float(cfg.get("min_quality", 0.0))
@@ -410,6 +429,16 @@ class StochasticCostModel:
         """Create fresh EWMA trackers for a tool-mode pair."""
         return {
             "time_ms": EWMA(self.ewma_alpha, self.default_time_ms),
+            "energy_mj": EWMA(self.ewma_alpha, self.default_energy_mj),
+            "quality": EWMA(self.ewma_alpha, self.default_quality),
+            "risk": EWMA(self.ewma_alpha, self.default_risk),
+        }
+    
+    def _create_ewma_track_for_tool(self, tool_name: str) -> Dict[str, EWMA]:
+        """Create EWMA trackers with tool-specific priors for better cold-start."""
+        time_prior = self.tool_time_priors.get(tool_name, self.default_time_ms)
+        return {
+            "time_ms": EWMA(self.ewma_alpha, time_prior),
             "energy_mj": EWMA(self.ewma_alpha, self.default_energy_mj),
             "quality": EWMA(self.ewma_alpha, self.default_quality),
             "risk": EWMA(self.ewma_alpha, self.default_risk),
@@ -515,8 +544,11 @@ class StochasticCostModel:
             # Extract features
             features = self.feature_extractor.extract(tool_name, ctx)
 
-            # Get EWMA statistics for this tool-mode
+            # Get EWMA statistics for this tool-mode (use tool-specific priors)
             key = self._key(tool_name, ctx)
+            if key not in self.ewma_stats:
+                # Initialize with tool-specific priors for better cold-start
+                self.ewma_stats[key] = self._create_ewma_track_for_tool(tool_name)
             ewma = self.ewma_stats[key]
 
             # Determine if we should use ML or EWMA

@@ -165,6 +165,7 @@ class Clause:
     literals: List[Literal]
     confidence: float = 1.0
     metadata: Dict[str, Any] = field(default_factory=dict)
+    is_goal: bool = False  # Marks this clause as a goal/query clause
 
     def is_horn_clause(self) -> bool:
         """
