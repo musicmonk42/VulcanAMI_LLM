@@ -1125,7 +1125,7 @@ class UnifiedReasoner:
 
                     utility = self.utility_model.compute_utility(
                         quality=estimated_quality,
-                        time_ms=estimated_time,
+                        time=estimated_time,
                         energy=estimated_energy,
                         risk=0.2,
                         context=task.utility_context,
@@ -2267,7 +2267,7 @@ class UnifiedReasoner:
 
             return self.utility_model.compute_utility(
                 quality=result.confidence,
-                time_ms=execution_time_ms,
+                time=execution_time_ms,
                 energy=energy_mj,
                 risk=1 - result.confidence,
                 context=context,
