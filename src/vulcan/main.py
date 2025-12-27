@@ -3437,6 +3437,12 @@ CHARS_PER_TOKEN_ESTIMATE = 3  # Conservative estimate for token calculation
 SLOW_PHASE_THRESHOLD_MS = 1000  # Log warning if phase takes longer than this
 SLOW_REQUEST_THRESHOLD_MS = 5000  # Include timing breakdown for requests slower than this
 
+# REASONING OUTPUT FORMATTING: Limits for formatting reasoning results
+# These prevent context overflow while keeping meaningful output
+MAX_REASONING_RESULT_LENGTH = 1500  # Maximum characters per reasoning result
+MAX_ANALOGIES_TO_SHOW = 5  # Maximum analogies to include in formatted output
+MAX_LIST_ITEMS_TO_SHOW = 10  # Maximum list items to show before truncation
+
 
 def _truncate_history(
     history: List[Dict[str, str]],
@@ -3559,9 +3565,8 @@ def _format_reasoning_results(reasoning_results: Dict[str, Any]) -> str:
             result_text = str(result)
         
         # Truncate very long results to avoid context overflow
-        max_result_length = 1500
-        if len(result_text) > max_result_length:
-            result_text = result_text[:max_result_length] + "... [truncated]"
+        if len(result_text) > MAX_REASONING_RESULT_LENGTH:
+            result_text = result_text[:MAX_REASONING_RESULT_LENGTH] + "... [truncated]"
         
         formatted_sections.append(f"[{section_header} ANALYSIS]\n{result_text}")
     
@@ -3626,7 +3631,7 @@ def _format_dict_result(reasoning_type: str, result: Dict[str, Any]) -> str:
         analogies = result["analogies"]
         if isinstance(analogies, list):
             lines.append("Analogies Found:")
-            for i, a in enumerate(analogies[:5], 1):  # Limit to 5
+            for i, a in enumerate(analogies[:MAX_ANALOGIES_TO_SHOW], 1):
                 lines.append(f"  {i}. {a}")
     
     if "source_domain" in result and "target_domain" in result:
@@ -3636,8 +3641,8 @@ def _format_dict_result(reasoning_type: str, result: Dict[str, Any]) -> str:
     if not lines:
         for key, value in result.items():
             if value is not None:
-                if isinstance(value, (list, tuple)) and len(value) > 5:
-                    value_str = str(value[:5]) + f"... ({len(value)} total)"
+                if isinstance(value, (list, tuple)) and len(value) > MAX_ANALOGIES_TO_SHOW:
+                    value_str = str(value[:MAX_ANALOGIES_TO_SHOW]) + f"... ({len(value)} total)"
                 else:
                     value_str = str(value)
                 lines.append(f"{key}: {value_str}")
@@ -3652,19 +3657,19 @@ def _format_list_result(reasoning_type: str, result: list) -> str:
     
     # Check if items are simple or complex
     if all(isinstance(item, str) for item in result):
-        return "\n".join(f"- {item}" for item in result[:10])
+        return "\n".join(f"- {item}" for item in result[:MAX_LIST_ITEMS_TO_SHOW])
     
     # Handle list of dicts or complex objects
     lines = []
-    for i, item in enumerate(result[:10], 1):  # Limit to 10 items
+    for i, item in enumerate(result[:MAX_LIST_ITEMS_TO_SHOW], 1):
         if isinstance(item, dict):
             item_str = ", ".join(f"{k}={v}" for k, v in item.items() if v is not None)
             lines.append(f"{i}. {item_str}")
         else:
             lines.append(f"{i}. {item}")
     
-    if len(result) > 10:
-        lines.append(f"... and {len(result) - 10} more items")
+    if len(result) > MAX_LIST_ITEMS_TO_SHOW:
+        lines.append(f"... and {len(result) - MAX_LIST_ITEMS_TO_SHOW} more items")
     
     return "\n".join(lines)
 
