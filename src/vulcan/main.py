@@ -958,6 +958,31 @@ async def lifespan(app: FastAPI):
         await get_http_session()
         logger.info("✓ Global HTTP connection pool initialized")
 
+    # PERFORMANCE FIX (Issue #30): Preload BERT model at startup to avoid 3.5s+ load during first request
+    # Only load if SKIP_BERT_EMBEDDINGS is not enabled (i.e., not in simple mode)
+    # Import outside try block to distinguish import failures from loading failures
+    from vulcan.simple_mode import SKIP_BERT_EMBEDDINGS
+    if not SKIP_BERT_EMBEDDINGS:
+        try:
+            from vulcan.processing import GraphixTransformer
+            # Use singleton pattern - this ensures BERT is loaded once at startup
+            transformer = GraphixTransformer.get_instance()
+            # Check if model is properly loaded (not just non-None but has expected attributes)
+            if transformer and hasattr(transformer, 'model') and transformer.model is not None:
+                # Verify it's a proper model by checking for encode method (BERT models have this)
+                if hasattr(transformer.model, 'encode') or hasattr(transformer.model, '__call__'):
+                    logger.info("✓ BERT model preloaded at startup (singleton pattern)")
+                else:
+                    logger.info("✓ BERT model instance created but may not be fully initialized")
+            else:
+                logger.info("✓ BERT model loading deferred (fallback mode or SKIP_BERT_EMBEDDINGS active)")
+        except ImportError as e:
+            logger.warning(f"GraphixTransformer import failed: {e}")
+        except Exception as e:
+            logger.warning(f"BERT model preload failed (will load on first request): {e}")
+    else:
+        logger.info("BERT model loading skipped (SKIP_BERT_EMBEDDINGS=true)")
+
     # Initialize SelfOptimizer for autonomous performance tuning
     if SELF_OPTIMIZER_AVAILABLE:
         try:
