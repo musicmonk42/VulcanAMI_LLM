@@ -281,7 +281,8 @@ class ProcessPoolManager:
         with self.lock:
             try:
                 if self.process_pool is not None:
-                    logger.warning("Process pool already initialized")
+                    # Expected behavior for idempotent initialization - use DEBUG level
+                    logger.debug("Process pool already initialized")
                     return True
 
                 # Create process pool with specified workers
