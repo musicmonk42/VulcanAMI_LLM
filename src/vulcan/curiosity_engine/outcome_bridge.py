@@ -318,11 +318,13 @@ class OutcomeBridge:
         Returns:
             True if recording and learning system update succeeded
         """
-        # Log the outcome
+        tools = tools if tools is not None else []
+        
+        # Log the outcome with tools
         logger.info(
             f"[QueryOutcome] Recorded: {query_id}, status={status}, "
             f"routing={routing_ms:.0f}ms, total={total_ms:.0f}ms, "
-            f"complexity={complexity:.2f}, type={query_type}"
+            f"complexity={complexity:.2f}, type={query_type}, tools={tools}"
         )
         
         # Create outcome object
@@ -333,7 +335,7 @@ class OutcomeBridge:
             'total_ms': total_ms,
             'complexity': complexity,
             'query_type': query_type,
-            'tools': tools or [],
+            'tools': tools,
             'timestamp': time.time(),
         }
         

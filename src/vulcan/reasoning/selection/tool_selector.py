@@ -153,8 +153,9 @@ MAX_SUCCESS_TIME_MS = 10000  # Maximum execution time (ms) for success
 # Embedding Timeout Configuration
 # ==============================================================================
 # Increased from 2.0s to handle CPU load on Railway and other cloud platforms
-# Production logs showed embedding times ranging from 3-11s under load
-EMBEDDING_TIMEOUT = 15.0
+# Production logs showed embedding times ranging from 10-15s under load
+# Setting to 30s to ensure semantic matching is not skipped due to timeout
+EMBEDDING_TIMEOUT = 30.0  # CPU embeddings take 10-15s under load
 
 
 # ==============================================================================
@@ -600,7 +601,7 @@ class MultiTierFeatureExtractor:
             )
             return future.result(timeout=timeout)
         except FuturesTimeoutError:
-            logger.warning(f"[Embedding] Timeout after {timeout}s - falling back to keyword matching. Consider increasing timeout or optimizing embeddings.")
+            logger.warning(f"[Embedding] Timeout after {timeout}s - semantic matching skipped, falling back to keywords")
             return self.extract_tier1(problem)
         except Exception as e:
             logger.error(f"[Embedding] Failed: {e}, falling back to tier1")
