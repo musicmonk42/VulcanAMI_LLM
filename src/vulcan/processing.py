@@ -581,6 +581,7 @@ class DynamicModelManager:
     _lock = threading.RLock()
     _creation_lock = threading.Lock()
     _device_map = {}  # Maps models to devices (CPU/GPU/Photonic)
+    _explicit_shutdown = False  # PERFORMANCE FIX: Track explicit shutdown
 
     def __new__(cls):
         # FIXED: Double-checked locking pattern for thread safety
@@ -921,28 +922,62 @@ class DynamicModelManager:
                 return False
 
     @classmethod
-    def cleanup(cls):
-        """Clean up all loaded models."""
+    def cleanup(cls, force: bool = False):
+        """Clean up all loaded models.
+        
+        PERFORMANCE FIX: Only clears models during explicit shutdown to prevent
+        aggressive cleanup that causes model reloads (6+ seconds per query).
+        
+        Args:
+            force: If True, forces cleanup even without explicit shutdown flag.
+                   Use only during application termination.
+        """
+        # PERFORMANCE FIX: Skip cleanup unless explicitly requested
+        # This prevents the singleton's __del__ from clearing models when
+        # references are dropped, which was causing 6+ second reload times
+        if not force and not cls._explicit_shutdown:
+            logger.debug("Skipping model cleanup - not an explicit shutdown")
+            return
+            
         with cls._lock:
+            model_count = len(cls._models)
             cls._models.clear()
             cls._processors.clear()
             cls._tokenizers.clear()
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
             gc.collect()
-            logger.info("Cleaned up all cached models")
+            if model_count > 0:
+                logger.info(f"Cleaned up {model_count} cached models (explicit shutdown)")
+            else:
+                logger.debug("Cleanup called but no models were cached")
 
     def shutdown(self):
         """Shutdown model manager gracefully."""
+        # Mark explicit shutdown to allow cleanup
+        DynamicModelManager._explicit_shutdown = True
         self._shutdown_event.set()
         if self._monitor_thread.is_alive():
             self._monitor_thread.join(timeout=5)
-        self.cleanup()
+        self.cleanup(force=True)
 
     def __del__(self):
-        """Destructor to ensure cleanup."""
+        """Destructor to ensure cleanup.
+        
+        PERFORMANCE FIX: Only performs cleanup if explicit shutdown was requested.
+        This prevents model cache from being cleared when singleton references
+        are dropped during normal operation.
+        """
         try:
-            self.shutdown()
+            # PERFORMANCE FIX: Don't call full shutdown in destructor
+            # Just stop the monitor thread, don't clear models
+            if hasattr(self, '_shutdown_event'):
+                self._shutdown_event.set()
+                if hasattr(self, '_monitor_thread') and self._monitor_thread.is_alive():
+                    self._monitor_thread.join(timeout=2)
+            # Only cleanup if explicit shutdown was requested
+            if DynamicModelManager._explicit_shutdown:
+                self.cleanup(force=True)
         except Exception as e:
             # Destructor failures in ModelManager should be logged at debug level
             logger.debug(f"ModelManager cleanup in destructor failed: {e}")
@@ -1400,7 +1435,8 @@ class ModelManager:
 
     @classmethod
     def cleanup(cls):
-        cls._instance.cleanup()
+        """Explicit cleanup - forces model cache clear."""
+        cls._instance.cleanup(force=True)
 
 
 # ============================================================
@@ -2357,10 +2393,17 @@ class AdaptiveMultimodalProcessor(nn.Module):
             return hashlib.md5(str(data).encode(), usedforsecurity=False).hexdigest()
 
     def cleanup(self):
-        """Cleanup resources."""
+        """Cleanup resources.
+        
+        PERFORMANCE FIX: Does NOT call model_manager.shutdown() to prevent
+        clearing the shared model cache. Model cleanup should only happen
+        during application termination.
+        """
         self.cache.clear()
         self.data_logger.shutdown()
-        self.model_manager.shutdown()
+        # PERFORMANCE FIX: Don't shutdown the model_manager singleton
+        # It's shared across all instances and clearing it causes 6+ second reloads
+        # self.model_manager.shutdown()  # REMOVED
 
         with self._cache_key_lock:
             self._cache_key_cache.clear()
@@ -2371,12 +2414,31 @@ class AdaptiveMultimodalProcessor(nn.Module):
         gc.collect()
 
     def __del__(self):
-        """Destructor to ensure cleanup."""
+        """Destructor to ensure cleanup.
+        
+        PERFORMANCE FIX: Does not clear the model_manager to prevent
+        expensive model reloads during normal operation.
+        """
         try:
-            self.cleanup()
+            # Only clean up local resources, not the shared model manager
+            if hasattr(self, 'cache'):
+                self.cache.clear()
+            if hasattr(self, '_cache_key_lock') and hasattr(self, '_cache_key_cache'):
+                with self._cache_key_lock:
+                    self._cache_key_cache.clear()
+            if hasattr(self, 'thread_executor'):
+                try:
+                    self.thread_executor.shutdown(wait=False)
+                except Exception:
+                    pass
+            if hasattr(self, 'process_executor'):
+                try:
+                    self.process_executor.shutdown(wait=False)
+                except Exception:
+                    pass
         except Exception as e:
-            # Destructor failures in EmbeddingCache should be logged at debug level
-            logger.debug(f"EmbeddingCache cleanup in destructor failed: {e}")
+            # Destructor failures should be logged at debug level
+            logger.debug(f"Processor cleanup in destructor failed: {e}")
 
 
 # ============================================================
@@ -2647,7 +2709,12 @@ class MultimodalProcessor(AdaptiveMultimodalProcessor):
             self._cache_key_cache.clear()
 
     def cleanup(self):
-        """Clean up all resources."""
+        """Clean up all resources.
+        
+        PERFORMANCE FIX: Does NOT call DynamicModelManager.cleanup() to prevent
+        clearing the shared model cache. Model cleanup should only happen
+        during explicit application termination.
+        """
         super().cleanup()
 
         if self.workload_manager:
@@ -2656,15 +2723,30 @@ class MultimodalProcessor(AdaptiveMultimodalProcessor):
         if self.streaming_processor:
             self.streaming_processor.cleanup()
 
-        DynamicModelManager.cleanup()
+        # PERFORMANCE FIX: Don't cleanup the model manager - it's shared
+        # DynamicModelManager.cleanup()  # REMOVED - causes 6+ second reloads
         gc.collect()
 
     def __del__(self):
-        """Destructor to ensure cleanup."""
+        """Destructor to ensure cleanup.
+        
+        PERFORMANCE FIX: Does not clear the model cache to prevent
+        expensive model reloads (6+ seconds) during normal operation.
+        """
         try:
-            self.cleanup()
+            # Only clean up local resources, not the shared model manager
+            if hasattr(self, 'workload_manager') and self.workload_manager:
+                try:
+                    self.workload_manager.shutdown()
+                except Exception:
+                    pass
+            if hasattr(self, 'streaming_processor') and self.streaming_processor:
+                try:
+                    self.streaming_processor.cleanup()
+                except Exception:
+                    pass
         except Exception as e:
-            # Destructor failures in AdaptiveMultimodalProcessor should be logged at debug level
+            # Destructor failures should be logged at debug level
             logger.debug(
                 f"AdaptiveMultimodalProcessor cleanup in destructor failed: {e}"
             )
