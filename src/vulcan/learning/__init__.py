@@ -215,7 +215,9 @@ class UnifiedLearningSystem:
         query_id = outcome.get('query_id', 'unknown')
         routing_ms = outcome.get('routing_ms', 0)
         status = outcome.get('status', 'unknown')
-        tools = outcome.get('tools', [])
+        # Check for 'tools' first, then fall back to 'capabilities_used' (from QueryOutcome)
+        # Use explicit None check to avoid unexpected fallback when tools is empty list
+        tools = outcome.get('tools') if outcome.get('tools') is not None else outcome.get('capabilities_used', [])
         query_type = outcome.get('query_type', 'unknown')
         
         logger.info(f"[Learning] Processing outcome: {query_id}, type={query_type}, tools={tools}")
