@@ -7948,6 +7948,100 @@ def run_production_server(config: AgentConfig, host: str = None, port: int = Non
 # ============================================================
 
 
+def _create_main_csiu_metrics_provider():
+    """
+    Create a metrics provider function for CSIU telemetry integration in main.py.
+    
+    This is used when SelfImprovementDrive is initialized outside of WorldModel.
+    Maps dotted metric keys to actual system measurements from TelemetryRecorder
+    and EnhancedMetricsCollector.
+    
+    Returns:
+        Callable that takes a dotted metric key and returns a float value
+    """
+    from typing import Optional
+    
+    # Helper functions defined at outer scope to avoid closure issues
+    def _calc_success_rate(data):
+        """Calculate success rate from metrics data with bounds checking."""
+        counters = data.get("counters", {})
+        success = counters.get("successful_actions", 0)
+        failed = counters.get("failed_actions", 0)
+        total = success + failed
+        if total == 0:
+            return 0.85  # Default if no data
+        return min(1.0, max(0.0, success / total))
+    
+    def _calc_error_rate(data):
+        """Calculate error rate from metrics data with bounds checking."""
+        counters = data.get("counters", {})
+        success = counters.get("successful_actions", 0)
+        failed = counters.get("failed_actions", 0)
+        total = success + failed
+        if total == 0:
+            return 0.02  # Default if no data
+        return min(1.0, max(0.0, failed / total))
+    
+    def _calc_satisfaction(data):
+        """Calculate satisfaction from success rate and latency with bounds checking."""
+        success_rate = _calc_success_rate(data)
+        histograms = data.get("histograms", {})
+        durations = histograms.get("step_duration_ms", [])
+        if durations:
+            avg_latency = sum(durations) / len(durations)
+            latency_factor = min(1.0, 100.0 / max(avg_latency, 1.0))
+        else:
+            latency_factor = 0.8
+        return min(1.0, max(0.0, success_rate * 0.7 + latency_factor * 0.3))
+    
+    def metrics_provider(dotted_key: str) -> Optional[float]:
+        """Retrieve metric value by dotted key."""
+        try:
+            # Get metrics from TelemetryRecorder
+            meta_state = {}
+            try:
+                from vulcan.routing.telemetry_recorder import get_telemetry_recorder
+                recorder = get_telemetry_recorder()
+                meta_state = recorder.get_meta_state() if recorder else {}
+            except Exception:
+                pass
+            
+            # Get metrics from EnhancedMetricsCollector
+            metrics_data = {}
+            try:
+                if hasattr(app, 'state') and hasattr(app.state, 'deployment'):
+                    if hasattr(app.state.deployment, 'metrics_collector'):
+                        metrics_data = app.state.deployment.metrics_collector.export_metrics()
+            except Exception:
+                pass
+            
+            # Metric mapping - use default args to capture current values
+            mapping = {
+                "metrics.alignment_coherence_idx": lambda d=metrics_data: _calc_success_rate(d),
+                "metrics.communication_entropy": lambda d=metrics_data: _calc_error_rate(d) * 0.5,
+                "metrics.intent_clarity_score": lambda d=metrics_data: 1.0 - d.get("gauges", {}).get("current_uncertainty", 0.12),
+                "policies.non_judgmental.violations_per_1k": lambda: 0.0,
+                "metrics.disparity_at_k": lambda: 0.0,
+                "metrics.calibration_gap": lambda d=metrics_data: abs(d.get("gauges", {}).get("identity_drift", 0.0)),
+                "metrics.empathy_index": lambda m=meta_state: m.get("average_feedback_score", 0.6),
+                "metrics.user_satisfaction": lambda d=metrics_data: _calc_satisfaction(d),
+                "metrics.miscommunication_rate": lambda d=metrics_data: _calc_error_rate(d),
+                "context.profile_quality": lambda m=meta_state: m.get("context_quality", 0.6),
+                "context.history_depth": lambda m=meta_state: min(1.0, m.get("entries_count", 0) / 100.0),
+            }
+            
+            if dotted_key in mapping:
+                return mapping[dotted_key]()
+            
+            return None
+            
+        except Exception as e:
+            logger.debug(f"CSIU metrics provider error for {dotted_key}: {e}")
+            return None
+    
+    return metrics_provider
+
+
 def main():
     """Main entry point for VULCAN-AGI."""
     parser = argparse.ArgumentParser(
@@ -8118,6 +8212,19 @@ def main():
                 except Exception as e:
                     self_improvement_drive = MagicMock()
                     logger.error(f"Failed: {e}")
+
+            # Wire CSIU metrics provider for real telemetry integration
+            if self_improvement_drive and not isinstance(self_improvement_drive, MagicMock):
+                try:
+                    metrics_provider = _create_main_csiu_metrics_provider()
+                    self_improvement_drive.set_metrics_provider(metrics_provider)
+                    verification = self_improvement_drive.verify_metrics_provider()
+                    if verification.get("working"):
+                        logger.info(f"✓ CSIU metrics provider wired: {verification.get('message')}")
+                    else:
+                        logger.warning(f"⚠ CSIU metrics provider status: {verification.get('message')}")
+                except Exception as e:
+                    logger.warning(f"Failed to wire CSIU metrics provider: {e}")
 
             # Store reference globally for later access
             _initialized_components["self_improvement_drive"] = self_improvement_drive

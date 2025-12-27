@@ -1889,6 +1889,22 @@ class WorldModel:
                 self.improvement_thread = None
                 self.improvement_running = False
 
+                # Wire metrics provider for CSIU (latent drive) telemetry
+                # This connects real system metrics to the self-improvement drive
+                metrics_provider = self._create_csiu_metrics_provider()
+                self.self_improvement_drive.set_metrics_provider(metrics_provider)
+                
+                # Verify metrics provider is working
+                verification = self.self_improvement_drive.verify_metrics_provider()
+                if verification.get("working"):
+                    logger.info(
+                        f"✓ CSIU metrics provider wired: {verification.get('message')}"
+                    )
+                else:
+                    logger.warning(
+                        f"⚠ CSIU metrics provider not fully working: {verification.get('message')}"
+                    )
+
                 logger.info("✓ Self-improvement drive initialized")
             except Exception as e:
                 logger.error(
@@ -2040,6 +2056,159 @@ class WorldModel:
                 f"Safety validator missing required methods: {missing}. "
                 f"Some safety checks will be skipped."
             )
+
+    def _create_csiu_metrics_provider(self):
+        """
+        Create a metrics provider function for CSIU (Collective Self-Improvement 
+        via Human Understanding) telemetry integration.
+        
+        This wires real system metrics to the SelfImprovementDrive, replacing
+        the hardcoded defaults (0.85, 0.06, 0.88) with actual runtime data.
+        
+        The provider maps dotted metric keys to actual system measurements:
+        - metrics.alignment_coherence_idx -> success rate from metrics collector
+        - metrics.communication_entropy -> normalized error rate
+        - metrics.intent_clarity_score -> 1 - uncertainty
+        - metrics.empathy_index -> user feedback score
+        - metrics.user_satisfaction -> derived from success rate and latency
+        - metrics.miscommunication_rate -> error rate
+        
+        Returns:
+            Callable that takes a dotted metric key and returns a float value
+        """
+        # Helper functions defined at outer scope to avoid closure issues
+        def _calc_success_rate(data):
+            """Calculate success rate from metrics data."""
+            counters = data.get("counters", {})
+            success = counters.get("successful_actions", 0)
+            failed = counters.get("failed_actions", 0)
+            total = success + failed
+            if total == 0:
+                return 0.85  # Default if no data
+            return min(1.0, max(0.0, success / total))
+        
+        def _calc_error_rate(data):
+            """Calculate error rate from metrics data."""
+            counters = data.get("counters", {})
+            success = counters.get("successful_actions", 0)
+            failed = counters.get("failed_actions", 0)
+            total = success + failed
+            if total == 0:
+                return 0.02  # Default if no data
+            return min(1.0, max(0.0, failed / total))
+        
+        def _calc_satisfaction(data):
+            """Calculate satisfaction from success rate and latency."""
+            success_rate = _calc_success_rate(data)
+            
+            # Get average latency
+            histograms = data.get("histograms", {})
+            durations = histograms.get("step_duration_ms", [])
+            if durations:
+                avg_latency = sum(durations) / len(durations)
+                # Latency factor: 1.0 at 100ms, decreases for higher latency
+                latency_factor = min(1.0, 100.0 / max(avg_latency, 1.0))
+            else:
+                latency_factor = 0.8
+            
+            return min(1.0, max(0.0, success_rate * 0.7 + latency_factor * 0.3))
+        
+        def metrics_provider(dotted_key: str) -> Optional[float]:
+            """
+            Retrieve metric value by dotted key.
+            
+            Args:
+                dotted_key: Metric path like "metrics.alignment_coherence_idx"
+                
+            Returns:
+                Float value or None if not available
+            """
+            try:
+                # Try to get metrics from TelemetryRecorder first
+                meta_state = {}
+                try:
+                    from vulcan.routing.telemetry_recorder import get_telemetry_recorder
+                    recorder = get_telemetry_recorder()
+                    meta_state = recorder.get_meta_state() if recorder else {}
+                except Exception:
+                    pass
+                
+                # Try to get metrics from EnhancedMetricsCollector via deployment
+                metrics_data = {}
+                try:
+                    import sys
+                    main_module = sys.modules.get('vulcan.main')
+                    if main_module and hasattr(main_module, 'app'):
+                        app = main_module.app
+                        if hasattr(app, 'state') and hasattr(app.state, 'deployment'):
+                            deployment = app.state.deployment
+                            if hasattr(deployment, 'metrics_collector'):
+                                metrics_data = deployment.metrics_collector.export_metrics()
+                except Exception:
+                    pass
+                
+                # Map dotted keys to actual metrics - capture metrics_data in lambdas
+                # by passing it as default argument to avoid closure issues
+                mapping = {
+                    # Alignment coherence: derived from success rate
+                    "metrics.alignment_coherence_idx": lambda d=metrics_data: _calc_success_rate(d),
+                    
+                    # Communication entropy: higher error rate = higher entropy
+                    "metrics.communication_entropy": lambda d=metrics_data: _calc_error_rate(d) * 0.5,
+                    
+                    # Intent clarity: inverse of uncertainty
+                    "metrics.intent_clarity_score": lambda d=metrics_data: 1.0 - d.get("gauges", {}).get("current_uncertainty", 0.12),
+                    
+                    # Policy violations (not directly available, return 0)
+                    "policies.non_judgmental.violations_per_1k": lambda: 0.0,
+                    
+                    # Disparity at k (fairness metric, not directly available)
+                    "metrics.disparity_at_k": lambda: 0.0,
+                    
+                    # Calibration gap: identity drift as proxy
+                    "metrics.calibration_gap": lambda d=metrics_data: abs(d.get("gauges", {}).get("identity_drift", 0.0)),
+                    
+                    # Empathy index: from user feedback or default
+                    "metrics.empathy_index": lambda m=meta_state: m.get("average_feedback_score", 0.6),
+                    
+                    # User satisfaction: composite of success and latency
+                    "metrics.user_satisfaction": lambda d=metrics_data: _calc_satisfaction(d),
+                    
+                    # Miscommunication rate: error rate
+                    "metrics.miscommunication_rate": lambda d=metrics_data: _calc_error_rate(d),
+                    
+                    # Context profile quality (from telemetry)
+                    "context.profile_quality": lambda m=meta_state: m.get("context_quality", 0.6),
+                    
+                    # Context history depth (from telemetry)
+                    "context.history_depth": lambda m=meta_state: min(1.0, m.get("entries_count", 0) / 100.0),
+                }
+                
+                # Look up the metric
+                if dotted_key in mapping:
+                    return mapping[dotted_key]()
+                
+                # Fallback: try to find in raw metrics
+                parts = dotted_key.split(".")
+                if len(parts) >= 2:
+                    category = parts[0]
+                    metric_name = ".".join(parts[1:])
+                    
+                    if category == "metrics":
+                        # Check gauges
+                        if metric_name in metrics_data.get("gauges", {}):
+                            return metrics_data["gauges"][metric_name]
+                        # Check counters
+                        if metric_name in metrics_data.get("counters", {}):
+                            return float(metrics_data["counters"][metric_name])
+                
+                return None
+                
+            except Exception as e:
+                logger.debug(f"CSIU metrics provider error for {dotted_key}: {e}")
+                return None
+        
+        return metrics_provider
 
     def start_autonomous_improvement(self):
         """Start the autonomous self-improvement background thread"""
