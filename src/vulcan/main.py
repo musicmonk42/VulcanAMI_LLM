@@ -3516,6 +3516,179 @@ def _truncate_history(
     return truncated_history
 
 
+def _format_reasoning_results(reasoning_results: Dict[str, Any]) -> str:
+    """
+    Format reasoning engine outputs into a structured text for LLM context.
+    
+    This is critical for ensuring the LLM actually USES the reasoning output
+    rather than generating generic responses. The formatting provides:
+    1. Clear labeling of which reasoning engine produced each result
+    2. Structured presentation of the analysis
+    3. Explicit instruction on how to use the results
+    
+    Args:
+        reasoning_results: Dictionary mapping reasoning type to result
+                          e.g., {'symbolic': {...}, 'causal': {...}}
+    
+    Returns:
+        Formatted string ready to be inserted into LLM prompt
+    """
+    if not reasoning_results:
+        return ""
+    
+    formatted_sections = []
+    
+    for reasoning_type, result in reasoning_results.items():
+        if result is None:
+            continue
+            
+        section_header = reasoning_type.upper().replace("_", " ")
+        
+        # Format based on reasoning type and result structure
+        if isinstance(result, dict):
+            # Handle structured results from reasoning engines
+            result_text = _format_dict_result(reasoning_type, result)
+        elif isinstance(result, (list, tuple)):
+            # Handle list results (e.g., analogies, proof steps)
+            result_text = _format_list_result(reasoning_type, result)
+        elif hasattr(result, "__dict__"):
+            # Handle object results with attributes
+            result_text = _format_object_result(reasoning_type, result)
+        else:
+            # Fallback to string representation
+            result_text = str(result)
+        
+        # Truncate very long results to avoid context overflow
+        max_result_length = 1500
+        if len(result_text) > max_result_length:
+            result_text = result_text[:max_result_length] + "... [truncated]"
+        
+        formatted_sections.append(f"[{section_header} ANALYSIS]\n{result_text}")
+    
+    if not formatted_sections:
+        return ""
+    
+    # Build the complete reasoning context with explicit instruction
+    reasoning_context = "\n\n".join(formatted_sections)
+    
+    return f"""
+=== REASONING ENGINE OUTPUTS ===
+The following analysis was produced by VULCAN's specialized reasoning engines.
+YOU MUST incorporate these structured results into your response.
+Do NOT generate generic answers - USE the specific analysis below.
+
+{reasoning_context}
+
+=== END REASONING ENGINE OUTPUTS ===
+"""
+
+
+def _format_dict_result(reasoning_type: str, result: Dict[str, Any]) -> str:
+    """Format a dictionary result from a reasoning engine."""
+    lines = []
+    
+    # Handle common result keys
+    if "conclusion" in result:
+        lines.append(f"Conclusion: {result['conclusion']}")
+    
+    if "premises" in result:
+        premises = result["premises"]
+        if isinstance(premises, list):
+            lines.append("Premises:")
+            for i, p in enumerate(premises, 1):
+                lines.append(f"  {i}. {p}")
+    
+    if "proof_steps" in result:
+        steps = result["proof_steps"]
+        if isinstance(steps, list):
+            lines.append("Proof Steps:")
+            for i, step in enumerate(steps, 1):
+                lines.append(f"  {i}. {step}")
+    
+    if "probability" in result:
+        lines.append(f"Probability: {result['probability']}")
+    
+    if "confidence" in result:
+        lines.append(f"Confidence: {result['confidence']}")
+    
+    if "causal_path" in result:
+        path = result["causal_path"]
+        if isinstance(path, list):
+            lines.append(f"Causal Path: {' → '.join(str(p) for p in path)}")
+    
+    if "intervention" in result:
+        lines.append(f"Intervention: {result['intervention']}")
+    
+    if "counterfactual" in result:
+        lines.append(f"Counterfactual: {result['counterfactual']}")
+    
+    if "analogies" in result:
+        analogies = result["analogies"]
+        if isinstance(analogies, list):
+            lines.append("Analogies Found:")
+            for i, a in enumerate(analogies[:5], 1):  # Limit to 5
+                lines.append(f"  {i}. {a}")
+    
+    if "source_domain" in result and "target_domain" in result:
+        lines.append(f"Mapping: {result['source_domain']} → {result['target_domain']}")
+    
+    # If no specific keys matched, format all key-value pairs
+    if not lines:
+        for key, value in result.items():
+            if value is not None:
+                if isinstance(value, (list, tuple)) and len(value) > 5:
+                    value_str = str(value[:5]) + f"... ({len(value)} total)"
+                else:
+                    value_str = str(value)
+                lines.append(f"{key}: {value_str}")
+    
+    return "\n".join(lines) if lines else str(result)
+
+
+def _format_list_result(reasoning_type: str, result: list) -> str:
+    """Format a list result from a reasoning engine."""
+    if not result:
+        return "No results"
+    
+    # Check if items are simple or complex
+    if all(isinstance(item, str) for item in result):
+        return "\n".join(f"- {item}" for item in result[:10])
+    
+    # Handle list of dicts or complex objects
+    lines = []
+    for i, item in enumerate(result[:10], 1):  # Limit to 10 items
+        if isinstance(item, dict):
+            item_str = ", ".join(f"{k}={v}" for k, v in item.items() if v is not None)
+            lines.append(f"{i}. {item_str}")
+        else:
+            lines.append(f"{i}. {item}")
+    
+    if len(result) > 10:
+        lines.append(f"... and {len(result) - 10} more items")
+    
+    return "\n".join(lines)
+
+
+def _format_object_result(reasoning_type: str, result: Any) -> str:
+    """Format an object result from a reasoning engine."""
+    # Try common methods
+    if hasattr(result, "to_dict"):
+        return _format_dict_result(reasoning_type, result.to_dict())
+    
+    if hasattr(result, "to_string"):
+        return result.to_string()
+    
+    if hasattr(result, "__str__") and result.__str__ != object.__str__:
+        return str(result)
+    
+    # Fall back to formatting __dict__
+    if hasattr(result, "__dict__"):
+        obj_dict = {k: v for k, v in result.__dict__.items() if not k.startswith("_")}
+        return _format_dict_result(reasoning_type, obj_dict)
+    
+    return str(result)
+
+
 @app.post("/v1/chat")
 async def unified_chat(request: UnifiedChatRequest):
     """
@@ -4516,15 +4689,6 @@ async def unified_chat(request: UnifiedChatRequest):
                     except Exception:
                         memory_str = ""
 
-                reasoning_str = ""
-                if reasoning_results:
-                    try:
-                        reasoning_str = (
-                            f"\nReasoning Insights: {str(reasoning_results)}"
-                        )
-                    except Exception:
-                        reasoning_str = ""
-
                 plan_str = ""
                 if plan_result:
                     try:
@@ -4532,10 +4696,46 @@ async def unified_chat(request: UnifiedChatRequest):
                     except Exception:
                         plan_str = ""
 
-                enhanced_prompt = f"""You are VULCAN, an advanced AI assistant powered by a comprehensive cognitive architecture.
+                # CRITICAL FIX: Use proper formatting for reasoning results
+                # This ensures the LLM actually USES the reasoning engine output
+                # instead of generating generic responses
+                reasoning_str = ""
+                if reasoning_results:
+                    try:
+                        reasoning_str = _format_reasoning_results(reasoning_results)
+                    except Exception as e:
+                        logger.warning(f"Failed to format reasoning results: {e}")
+                        # Fallback to simple formatting
+                        reasoning_str = f"\nReasoning Insights: {str(reasoning_results)}"
+
+                # Build enhanced prompt with explicit instruction to USE reasoning output
+                # The prompt structure is critical for getting the LLM to incorporate
+                # the structured reasoning analysis rather than ignoring it
+                if reasoning_str:
+                    # When reasoning output is available, use it as the primary source
+                    enhanced_prompt = f"""You are VULCAN, an advanced AI assistant powered by specialized reasoning engines.
 
 User Query: {user_message}
-{memory_str}{reasoning_str}{plan_str}
+{memory_str}
+{reasoning_str}
+{plan_str}
+
+IMPORTANT: The reasoning analysis above was produced by specialized reasoning engines.
+Your response MUST:
+1. Directly incorporate the conclusions from the reasoning analysis
+2. Present the structured analysis in a clear, user-friendly format
+3. NOT generate generic explanations - use the SPECIFIC results provided
+4. If the reasoning shows a logical proof, present the proof steps
+5. If the reasoning shows probabilities, include the specific numbers
+6. If the reasoning shows causal analysis, explain the causal relationships found
+
+Provide your response based on the reasoning analysis above:"""
+                else:
+                    # Fallback when no reasoning output is available
+                    enhanced_prompt = f"""You are VULCAN, an advanced AI assistant powered by a comprehensive cognitive architecture.
+
+User Query: {user_message}
+{memory_str}{plan_str}
 
 Provide a helpful, accurate, and comprehensive response to the user's query. Be concise but thorough."""
 
@@ -4550,11 +4750,19 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
                 )
 
                 try:
+                    # Build system prompt that emphasizes using reasoning output
+                    system_prompt = (
+                        "You are VULCAN, an advanced AI assistant powered by specialized reasoning engines. "
+                        "When reasoning analysis is provided in the prompt, you MUST incorporate it directly into your response. "
+                        "Do NOT ignore or paraphrase away the specific conclusions, probabilities, proofs, or causal analyses provided. "
+                        "Present the reasoning results clearly and explain how they answer the user's question."
+                    )
+                    
                     llm_result = await hybrid_executor.execute(
                         prompt=enhanced_prompt,
                         max_tokens=request.max_tokens,
                         temperature=0.7,
-                        system_prompt="You are VULCAN, an advanced AI assistant powered by a comprehensive cognitive architecture. Provide helpful, accurate, and comprehensive responses.",
+                        system_prompt=system_prompt,
                     )
 
                     response_text = llm_result.get("text", "")
