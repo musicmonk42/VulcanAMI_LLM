@@ -1468,14 +1468,76 @@ class GraphixArena:
             keyword in task.lower() for keyword in reasoning_task_keywords
         )
         
-        if (is_reasoning_agent or is_reasoning_task) and REASONING_AVAILABLE:
+        # CRITICAL FIX: Also check for selected_tools in data payload
+        # This enables reasoning when QueryRouter selects reasoning tools
+        # even if the agent_id is "generator"
+        selected_tools = (
+            data.get("parameters", {}).get("selected_tools", []) or
+            data.get("properties", {}).get("selected_tools", []) or
+            data.get("selected_tools", []) or
+            []
+        )
+        
+        # Check if selected_tools contains reasoning engines
+        reasoning_tool_names = {
+            "causal", "symbolic", "analogical", "probabilistic",
+            "counterfactual", "deductive", "inductive", "abductive",
+            "multimodal", "bayesian", "hybrid", "ensemble"
+        }
+        has_reasoning_tools = any(
+            tool.lower() in reasoning_tool_names for tool in selected_tools
+        ) if selected_tools else False
+        
+        # Also check query_type from payload
+        query_type_from_payload = (
+            data.get("parameters", {}).get("query_type", "") or
+            data.get("properties", {}).get("query_type", "") or
+            ""
+        ).lower()
+        is_reasoning_query_type = query_type_from_payload in ("reasoning", "causal", "inference")
+        
+        # Invoke reasoning if ANY of these conditions are true
+        should_invoke_reasoning = (
+            is_reasoning_agent or 
+            is_reasoning_task or 
+            has_reasoning_tools or
+            is_reasoning_query_type
+        )
+        
+        if should_invoke_reasoning and REASONING_AVAILABLE:
+            # Build trigger reason for logging
+            trigger_reasons = []
+            if is_reasoning_agent:
+                trigger_reasons.append(f"agent_type={agent_id}")
+            if is_reasoning_task:
+                trigger_reasons.append("reasoning_keywords_in_task")
+            if has_reasoning_tools:
+                trigger_reasons.append(f"selected_tools={selected_tools}")
+            if is_reasoning_query_type:
+                trigger_reasons.append(f"query_type={query_type_from_payload}")
+            
             logger.info(
-                f"🧠 Agent '{agent_id}' invoking reasoning engine for task: {task[:100]}..."
+                f"🧠 Agent '{agent_id}' invoking reasoning engine for task: {task[:100]}... "
+                f"(triggers: {', '.join(trigger_reasons)})"
             )
             
             try:
-                # Extract query from task and data
-                query = data.get("query") or data.get("input") or task
+                # Extract query from task and data - check multiple locations
+                # GraphSpec format: data.parameters.goal
+                # GraphixIRGraph format: data.nodes[0].properties.text
+                query = (
+                    data.get("parameters", {}).get("goal") or
+                    data.get("query") or 
+                    data.get("input") or 
+                    task
+                )
+                
+                # Also check nodes for query text (GraphixIRGraph format)
+                if not query or query == task:
+                    nodes = data.get("nodes", [])
+                    if nodes and isinstance(nodes, list) and len(nodes) > 0:
+                        query = nodes[0].get("properties", {}).get("text") or query
+                
                 context = data.get("context", {})
                 
                 # Calculate complexity based on data size
@@ -1487,7 +1549,7 @@ class GraphixArena:
                     )
                 )
                 
-                # Determine reasoning type from agent_id
+                # Determine reasoning type from agent_id or selected_tools
                 reasoning_type_map = {
                     "causal": "causal",
                     "symbolic": "symbolic",
@@ -1500,10 +1562,20 @@ class GraphixArena:
                 }
                 
                 query_type = "reasoning"  # default
-                for key, value in reasoning_type_map.items():
-                    if key in agent_id.lower():
-                        query_type = value
-                        break
+                
+                # First check selected_tools from payload (most reliable)
+                if selected_tools:
+                    for tool in selected_tools:
+                        tool_lower = tool.lower()
+                        if tool_lower in reasoning_type_map:
+                            query_type = reasoning_type_map[tool_lower]
+                            break
+                else:
+                    # Fall back to checking agent_id
+                    for key, value in reasoning_type_map.items():
+                        if key in agent_id.lower():
+                            query_type = value
+                            break
                 
                 # Apply reasoning via the integration layer
                 integration_result = apply_reasoning(
