@@ -243,12 +243,15 @@ class UnifiedLearningSystem:
                     logger.error(f"[Learning] MetaLearner slow routing error: {e}")
         
         # 3. Update tool weights based on success/failure
-        weight_delta = WEIGHT_ADJUSTMENT_SUCCESS if status == 'success' else WEIGHT_ADJUSTMENT_FAILURE
-        for tool in tools:
-            if tool not in self.tool_weight_adjustments:
-                self.tool_weight_adjustments[tool] = 0.0
-            self.tool_weight_adjustments[tool] += weight_delta
-            logger.info(f"[Learning] Tool '{tool}' weight adjustment: {weight_delta:+.3f} (cumulative: {self.tool_weight_adjustments[tool]:+.3f})")
+        if tools:  # Only if tools were recorded
+            weight_delta = WEIGHT_ADJUSTMENT_SUCCESS if status == 'success' else WEIGHT_ADJUSTMENT_FAILURE
+            for tool in tools:
+                if tool not in self.tool_weight_adjustments:
+                    self.tool_weight_adjustments[tool] = 0.0
+                self.tool_weight_adjustments[tool] += weight_delta
+                logger.info(f"[Learning] Tool '{tool}' weight adjustment: {weight_delta:+.3f} (cumulative: {self.tool_weight_adjustments[tool]:+.3f})")
+        else:
+            logger.warning(f"[Learning] No tools recorded for {query_id} - cannot learn from selection")
         
         # 4. Feed to MetaLearner for pattern detection
         if self.meta_learner:

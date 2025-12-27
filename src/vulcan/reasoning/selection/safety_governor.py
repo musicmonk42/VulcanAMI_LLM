@@ -23,6 +23,29 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
+# Critical violation types that MUST override semantic selections
+# These represent serious safety concerns that cannot be ignored
+CRITICAL_VIOLATION_TYPES = frozenset({
+    'harmful_content',
+    'security_breach',
+    'pii_exposure',
+    'illegal_activity',
+    'dangerous_instruction',
+    'unsafe_input',
+    'unsafe_output',
+    'forbidden_operation',
+})
+
+# Non-critical violation types that can be ignored when semantic boost is applied
+# These are warnings that don't pose immediate safety risks
+NON_CRITICAL_VIOLATION_TYPES = frozenset({
+    'inconsistent_output',
+    'contract_violation',
+    'confidence_too_low',
+    'resource_exceeded',
+    'rate_limited',
+})
+
 
 class SafetyLevel(Enum):
     """Safety levels for operations"""
@@ -658,13 +681,18 @@ class SafetyGovernor:
             Potentially modified list of tools (unchanged for non-critical violations
             when semantic boost was applied)
         """
+        if context is None:
+            context = {}
+            
         if not selected_tools:
             return selected_tools
         
         semantic_boost_applied = context.get('semantic_boost_applied', False)
+        original_selection = list(selected_tools)
         
         # Check each selected tool for violations
         adjusted_tools = list(selected_tools)
+        has_critical_violation = False
         
         for tool in selected_tools:
             # Build safety context for tool check
@@ -681,26 +709,51 @@ class SafetyGovernor:
             action, reason = self.check_safety(safety_context)
             
             if action == SafetyAction.VETO:
-                # Check if this is a critical violation (based on safety level required)
+                # Normalize violation type for comparison
+                violation_type = reason.lower().replace(' ', '_') if reason else 'unknown'
+                
+                # Check if this is a critical violation based on:
+                # 1. Contract safety level requirement
+                # 2. Violation type matching CRITICAL_VIOLATION_TYPES
                 is_critical = False
+                
+                # Check contract safety level
                 if tool in self.contracts:
                     contract = self.contracts[tool]
-                    is_critical = getattr(contract, 'required_safety_level', None) == SafetyLevel.CRITICAL
+                    if getattr(contract, 'required_safety_level', None) == SafetyLevel.CRITICAL:
+                        is_critical = True
+                
+                # Check if violation type is in critical set
+                if any(crit in violation_type for crit in CRITICAL_VIOLATION_TYPES):
+                    is_critical = True
                 
                 if is_critical:
-                    logger.error(f"[SafetyGovernor] CRITICAL violation for '{tool}': {reason} - overriding selection")
+                    has_critical_violation = True
+                    logger.error(f"[SafetyGovernor] CRITICAL: {violation_type} for '{tool}' - overriding selection")
                     if tool in adjusted_tools:
                         adjusted_tools.remove(tool)
                 elif semantic_boost_applied:
-                    # Non-critical: log warning but preserve semantic selection
-                    logger.info(f"[SafetyGovernor] Non-critical warning ({reason}) - preserving semantic selection for '{tool}'")
+                    # Non-critical + semantic boost = just warn, don't override
+                    logger.info(f"[SafetyGovernor] Non-critical ({violation_type}) - preserving semantic selection: {original_selection}")
                 else:
-                    # No semantic boost, apply normal safety override
-                    logger.warning(f"[SafetyGovernor] Safety violation for '{tool}': {reason} - adjusting selection")
+                    # Non-critical + no semantic boost = normal adjustment
+                    logger.warning(f"[SafetyGovernor] WARNING: {violation_type} for '{tool}' - adjusting selection")
                     if tool in adjusted_tools:
                         adjusted_tools.remove(tool)
         
-        # If all tools were removed, return a safe fallback
+        # Only override for critical violations
+        if has_critical_violation:
+            if not adjusted_tools:
+                logger.warning("[SafetyGovernor] All tools removed by critical safety checks - using 'general' fallback")
+                return ['general']
+            return adjusted_tools
+        
+        # Preserve semantic selection if it was applied and no critical violations
+        if semantic_boost_applied:
+            logger.info(f"[SafetyGovernor] Semantic selection preserved: {original_selection}")
+            return original_selection
+        
+        # If all tools were removed without semantic boost, return a safe fallback
         if not adjusted_tools and selected_tools:
             logger.warning("[SafetyGovernor] All tools removed by safety checks - using 'general' fallback")
             return ['general']
