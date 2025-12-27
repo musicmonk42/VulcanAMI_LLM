@@ -1585,7 +1585,6 @@ class QueryAnalyzer:
         # Detect reasoning keywords/tools in query to bypass threshold for
         # queries that would benefit from multi-agent reasoning evaluation
         # ================================================================
-        reasoning_tools = {'causal', 'symbolic', 'probabilistic', 'analogical'}
         reasoning_keywords = (
             'cause', 'effect', 'why', 'reason', 'infer', 'deduce', 'logic',
             'probability', 'likely', 'chance', 'symbol', 'analogy', 'similar to',

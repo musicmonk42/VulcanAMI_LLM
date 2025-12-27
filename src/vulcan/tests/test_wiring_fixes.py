@@ -320,16 +320,16 @@ class TestArenaContextInjection(unittest.TestCase):
 class TestExplicitReasoningInvocation(unittest.TestCase):
     """Tests for explicit reasoning invocation when selected_tools present."""
     
-    def test_reasoning_invoked_with_selected_tools(self):
-        """Test that reasoning is invoked when selected_tools are present."""
+    def test_reasoning_invoked_with_selected_tools_when_reasoning_unavailable(self):
+        """Test that reasoning is invoked when selected_tools are present and REASONING_AVAILABLE=False."""
         # Simulate the new explicit reasoning invocation logic
         is_reasoning_task = True
         selected_tools = ['causal', 'probabilistic']
         node_results = {}
         REASONING_AVAILABLE = False  # Main imports failed
         
-        # This simulates the fix: even with REASONING_AVAILABLE=False,
-        # we should still attempt reasoning if selected_tools are present
+        # This simulates the fix: only attempt explicit invocation when
+        # REASONING_AVAILABLE=False and selected_tools are present
         should_attempt_explicit_invocation = (
             is_reasoning_task and 
             selected_tools and 
@@ -339,7 +339,26 @@ class TestExplicitReasoningInvocation(unittest.TestCase):
         
         self.assertTrue(
             should_attempt_explicit_invocation,
-            "Should attempt explicit reasoning invocation when selected_tools present"
+            "Should attempt explicit reasoning invocation when selected_tools present and REASONING_AVAILABLE=False"
+        )
+    
+    def test_explicit_invocation_skipped_when_reasoning_available(self):
+        """Test that explicit invocation is skipped when REASONING_AVAILABLE=True."""
+        is_reasoning_task = True
+        selected_tools = ['causal', 'probabilistic']
+        node_results = {}
+        REASONING_AVAILABLE = True  # Main reasoning system is working
+        
+        should_attempt_explicit_invocation = (
+            is_reasoning_task and 
+            selected_tools and 
+            not node_results and
+            not REASONING_AVAILABLE
+        )
+        
+        self.assertFalse(
+            should_attempt_explicit_invocation,
+            "Should NOT attempt explicit invocation when REASONING_AVAILABLE=True"
         )
     
     def test_explicit_invocation_returns_reasoning_invoked_true(self):

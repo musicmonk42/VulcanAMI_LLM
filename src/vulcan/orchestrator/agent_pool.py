@@ -2295,11 +2295,10 @@ class AgentPoolManager:
             # This handles cases where REASONING_AVAILABLE=False but we still
             # have reasoning tools selected from QueryRouter
             # ============================================================
-            if is_reasoning_task and selected_tools and not node_results:
+            if is_reasoning_task and selected_tools and not node_results and not REASONING_AVAILABLE:
                 logger.info(f"[REASONING] INVOKING engines for task {task_id}, tools={selected_tools}")
                 try:
                     from vulcan.reasoning.unified_reasoning import UnifiedReasoner as DirectUnifiedReasoner
-                    from vulcan.reasoning.reasoning_integration import apply_reasoning as direct_apply_reasoning
                     
                     # Get or create reasoning instance
                     reasoning = DirectUnifiedReasoner()
