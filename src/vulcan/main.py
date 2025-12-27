@@ -2980,13 +2980,19 @@ async def chat(request: ChatRequest):
                     fitness_scores = [r.get("confidence", 0.5) for r in all_agent_results]
                     proposals = [r.get("reasoning_output", {}) for r in all_agent_results]
                     
-                    # Simple embedding function based on reasoning type
+                    # Simple deterministic embedding function for tournament diversity calculation
+                    # Uses 128-dimensional vectors matching TournamentManager's default dimension
+                    # This is a lightweight fallback when no semantic embedder is available
+                    # For production, consider using SentenceTransformer embeddings
+                    EMBEDDING_DIM = 128  # Standard dimension for lightweight embeddings
+                    ASCII_MAX = 255.0  # Normalize ASCII values to [0, 1]
+                    
                     def simple_embedding(proposal):
-                        # Create deterministic embedding based on proposal content
+                        """Create deterministic embedding based on proposal content for diversity scoring."""
                         content = str(proposal)
-                        embedding = np.zeros(128, dtype=np.float32)
-                        for i, char in enumerate(content[:128]):
-                            embedding[i] = ord(char) / 255.0
+                        embedding = np.zeros(EMBEDDING_DIM, dtype=np.float32)
+                        for i, char in enumerate(content[:EMBEDDING_DIM]):
+                            embedding[i] = ord(char) / ASCII_MAX
                         return embedding
                     
                     # Run tournament to select best result
