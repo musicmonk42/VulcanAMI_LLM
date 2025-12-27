@@ -2291,6 +2291,56 @@ class AgentPoolManager:
                     is_reasoning_task = False
 
             # ============================================================
+            # FIX: EXPLICIT REASONING INVOCATION when selected_tools present
+            # This handles cases where REASONING_AVAILABLE=False but we still
+            # have reasoning tools selected from QueryRouter
+            # ============================================================
+            if is_reasoning_task and selected_tools and not node_results and not REASONING_AVAILABLE:
+                logger.info(f"[REASONING] INVOKING engines for task {task_id}, tools={selected_tools}")
+                try:
+                    from vulcan.reasoning.unified_reasoning import UnifiedReasoner as DirectUnifiedReasoner
+                    
+                    # Get or create reasoning instance
+                    reasoning = DirectUnifiedReasoner()
+                    
+                    # Extract query from parameters
+                    query = parameters.get("prompt", "") or parameters.get("query", "")
+                    
+                    # Invoke actual reasoning
+                    reasoning_result = reasoning.reason(
+                        query=query,
+                        reasoning_types=selected_tools,
+                        context=parameters
+                    )
+                    
+                    # Mark nodes as processed with reasoning
+                    for i, node in enumerate(nodes):
+                        node_id = node.get("id", f"node_{i}")
+                        node_type = node.get("type", "unknown")
+                        node_results[node_id] = {
+                            "status": "completed",
+                            "node_type": node_type,
+                            "reasoning_applied": True,
+                            "selected_tools": selected_tools,
+                        }
+                    
+                    # Return reasoning result directly
+                    return {
+                        "status": "completed",
+                        "reasoning_invoked": True,
+                        "reasoning_output": reasoning_result,
+                        "tools_used": selected_tools,
+                        "execution_time": time.time() - start_time,
+                        "agent_id": agent_id,
+                        "task_id": task_id,
+                        "nodes_processed": len(nodes),
+                        "node_results": node_results,
+                    }
+                except Exception as e:
+                    logger.error(f"[REASONING] Invocation FAILED: {e}", exc_info=True)
+                    # Fall through to generic execution
+
+            # ============================================================
             # GRAPH-BASED EXECUTION - For non-reasoning tasks or fallback
             # ============================================================
             if not is_reasoning_task or not node_results:
