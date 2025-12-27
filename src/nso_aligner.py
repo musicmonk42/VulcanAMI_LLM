@@ -1400,9 +1400,10 @@ class NSOAligner:
         final_score = max(ml_score, rule_score)
 
         # Determine detection and patterns
-        # FIX: Lower the rule-based threshold for 'detected' to ensure tests pass
-        # when patterns are present but the ML model is unavailable/fails.
-        detected = final_score > 0.15
+        # FIX: Increased threshold from 0.15 to 0.30 to reduce false positives
+        # Production logs showed legitimate operations being quarantined at 0.20 score
+        # Set to 0.30 to balance between security and operational reliability
+        detected = final_score > 0.30
         detected_patterns = []
 
         if ml_score > 0.6:
