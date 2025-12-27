@@ -317,7 +317,9 @@ CLEANUP_CACHE_CAPACITY_THRESHOLD = 0.9  # Trigger cleanup at 90% cache capacity
 CLEANUP_MISS_INTERVAL = 100  # Trigger cleanup every N cache misses
 
 # Multimodal tool configuration
-MULTIMODAL_TIME_BUDGET_MULTIPLIER = 1.5  # Allow multimodal more time headroom
+# CPU OPTIMIZATION: Increased from 1.5 to 3.0 to allow multimodal operations
+# sufficient time headroom under CPU-only execution
+MULTIMODAL_TIME_BUDGET_MULTIPLIER = 3.0  # Allow multimodal more time headroom
 
 
 class MultiTierFeatureExtractor:

@@ -138,11 +138,18 @@ try:
         logger.debug(f"EnhancedSymbolicReasoner not available: {e}")
         EnhancedSymbolicReasoner = None
 
+    try:
+        from .symbolic.reasoner import HybridReasoner
+    except (ImportError, AttributeError) as e:
+        logger.debug(f"HybridReasoner not available: {e}")
+        HybridReasoner = None
+
 except ImportError as e:
     logger.error(f"Symbolic reasoning import failed: {e}")
     SymbolicReasoner = None
     BayesianReasoner = None
     EnhancedSymbolicReasoner = None
+    HybridReasoner = None
     Clause = None
     Literal = None
     Constant = None
@@ -153,6 +160,7 @@ except Exception as e:
     SymbolicReasoner = None
     BayesianReasoner = None
     EnhancedSymbolicReasoner = None
+    HybridReasoner = None
     Clause = None
     Literal = None
     Constant = None
@@ -285,6 +293,7 @@ __all__ = [
     "SymbolicReasoner",
     "BayesianReasoner",
     "EnhancedSymbolicReasoner",
+    "HybridReasoner",  # ADDED: Export HybridReasoner for hybrid reasoning support
     "AnalogicalReasoningEngine",
     "AnalogicalReasoner",
     "MultiModalReasoningEngine",
