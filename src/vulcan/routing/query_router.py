@@ -299,6 +299,29 @@ CREATIVE_INDICATORS: Tuple[str, ...] = (
     "authentic", "genuine", "heartfelt", "personal", "intimate",
 )
 
+# Reasoning complexity indicators (FIX: Reasoning tasks need semantic tool selection)
+# Queries containing these terms require proper tool selection, not fast-path bypass.
+# Without this boost, reasoning-heavy queries get low complexity scores and hit the
+# fast-path in reasoning_integration.py, bypassing the ToolSelector entirely.
+REASONING_COMPLEXITY_INDICATORS: Tuple[str, ...] = (
+    # Causal reasoning (including verb forms)
+    "causal", "cause", "causes", "caused", "causing",
+    "effect", "effects", "affected", "affecting",
+    "intervention", "counterfactual",
+    "do-calculus", "confound", "mediator", "collider",
+    # Probabilistic reasoning
+    "probability", "bayesian", "likelihood", "posterior", "prior",
+    "conditional", "marginal", "inference",
+    # Analogical reasoning
+    "analogy", "analogous", "similar to", "like a", "mapping",
+    "corresponds to", "parallels",
+    # Symbolic reasoning
+    "prove", "theorem", "logic", "deduce", "axiom",
+    "if and only if", "necessary", "sufficient",
+    # General reasoning
+    "implies", "therefore", "conclude", "infer", "reason about",
+)
+
 # Uncertainty indicators (triggers arena tournament)
 UNCERTAINTY_INDICATORS: Tuple[str, ...] = (
     "best approach", "which method", "optimal", "should I",
@@ -1412,6 +1435,15 @@ class QueryAnalyzer:
             # Higher weight for creative tasks - they need actual agent reasoning
             score += min(0.5, creative_count * 0.15)
             logger.debug(f"[Creative Task] Detected {creative_count} creative indicators, boosting complexity")
+        
+        # Reasoning indicators (FIX: Reasoning tasks need semantic tool selection)
+        # Without this boost, reasoning-heavy queries (causal, probabilistic, analogical)
+        # get low complexity scores and hit the fast-path in reasoning_integration.py,
+        # bypassing the ToolSelector entirely.
+        reasoning_count = sum(1 for ind in REASONING_COMPLEXITY_INDICATORS if ind in query_lower)
+        if reasoning_count > 0:
+            score += min(0.4, reasoning_count * 0.15)
+            logger.debug(f"[Reasoning Task] Detected {reasoning_count} reasoning indicators, boosting complexity")
         
         # Multiple questions or sentences
         question_count = query_lower.count("?")
