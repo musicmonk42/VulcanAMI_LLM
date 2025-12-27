@@ -17,6 +17,15 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
+# =============================================================================
+# Learning Weight Adjustment Constants
+# =============================================================================
+# These constants control how much tool weights are adjusted based on outcomes.
+# Positive adjustment for success encourages using successful tools.
+# Smaller negative adjustment for failure prevents over-penalizing tools.
+WEIGHT_ADJUSTMENT_SUCCESS = 0.01
+WEIGHT_ADJUSTMENT_FAILURE = -0.005
+
 # Make torch import conditional to allow module import even without torch
 try:
     import torch
@@ -234,7 +243,7 @@ class UnifiedLearningSystem:
                     logger.error(f"[Learning] MetaLearner slow routing error: {e}")
         
         # 3. Update tool weights based on success/failure
-        weight_delta = 0.01 if status == 'success' else -0.005
+        weight_delta = WEIGHT_ADJUSTMENT_SUCCESS if status == 'success' else WEIGHT_ADJUSTMENT_FAILURE
         for tool in tools:
             if tool not in self.tool_weight_adjustments:
                 self.tool_weight_adjustments[tool] = 0.0

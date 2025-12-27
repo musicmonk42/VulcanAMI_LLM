@@ -369,24 +369,34 @@ class OutcomeBridge:
             logger.error(f"{LOG_PREFIX} Learning processing failed: {e}")
     
     def _send_to_learning_sync(self, outcome: Dict[str, Any]) -> None:
-        """Sync send outcome to learning system (when not in async context)."""
+        """Sync send outcome to learning system (when not in async context).
+        
+        Note: This method handles the case where we need to call an async
+        method from a sync context. It uses asyncio.run() when possible
+        for proper event loop lifecycle management.
+        """
         try:
             if hasattr(self.learning_system, 'process_outcome'):
                 # Check if process_outcome is a coroutine function before calling
                 if asyncio.iscoroutinefunction(self.learning_system.process_outcome):
-                    # Create a new event loop for this thread if needed
-                    try:
-                        loop = asyncio.get_event_loop()
-                        if loop.is_closed():
-                            loop = asyncio.new_event_loop()
-                            asyncio.set_event_loop(loop)
-                    except RuntimeError:
-                        # No running loop in this thread, create one
-                        loop = asyncio.new_event_loop()
-                        asyncio.set_event_loop(loop)
-                    
                     coro = self.learning_system.process_outcome(outcome)
-                    loop.run_until_complete(coro)
+                    # Use asyncio.run() for proper event loop lifecycle management
+                    # This is cleaner than manually creating/managing event loops
+                    try:
+                        asyncio.run(coro)
+                    except RuntimeError as e:
+                        # asyncio.run() can fail if called from inside a running loop
+                        # In that case, fall back to manual loop management
+                        if "cannot be called from a running event loop" in str(e):
+                            logger.debug(f"{LOG_PREFIX} asyncio.run() failed, using loop.run_until_complete()")
+                            loop = asyncio.new_event_loop()
+                            try:
+                                coro = self.learning_system.process_outcome(outcome)
+                                loop.run_until_complete(coro)
+                            finally:
+                                loop.close()
+                        else:
+                            raise
                 else:
                     # Not a coroutine, call directly
                     self.learning_system.process_outcome(outcome)
