@@ -2009,6 +2009,29 @@ async def chat(request: ChatRequest):
             )
             arena_result = {"status": "error", "error": str(arena_err)}
 
+    # FIX: Inject Arena reasoning output into reasoning_insights when available
+    # This ensures Arena's reasoning analysis is included in LLM context even when
+    # Arena doesn't return a complete response (e.g., partial success, fallback)
+    if arena_result and arena_result.get("status") == "success":
+        arena_output = arena_result.get("result", {})
+        if isinstance(arena_output, dict):
+            # Extract reasoning information from Arena result
+            arena_reasoning = {
+                "agent_id": arena_result.get("agent_id"),
+                "reasoning_invoked": arena_output.get("reasoning_invoked", False),
+                "selected_tools": arena_output.get("selected_tools", []),
+                "reasoning_strategy": arena_output.get("reasoning_strategy"),
+                "confidence": arena_output.get("confidence"),
+            }
+            # Only add if Arena actually invoked reasoning
+            if arena_reasoning.get("reasoning_invoked") or arena_reasoning.get("selected_tools"):
+                reasoning_insights["arena_reasoning"] = arena_reasoning
+                logger.info(
+                    f"[VULCAN] Arena reasoning injected into context: "
+                    f"tools={arena_reasoning.get('selected_tools')}, "
+                    f"strategy={arena_reasoning.get('reasoning_strategy')}"
+                )
+
     # ================================================================
     # STEP 0: INPUT GATEKEEPER - Validate query before processing
     # ================================================================
@@ -2125,8 +2148,18 @@ async def chat(request: ChatRequest):
                     f"[VULCAN] Using routing plan tasks: {len(routing_plan.agent_tasks)} tasks from plan {routing_plan.query_id}"
                 )
 
+                # FIX: Extract selected_tools from routing plan telemetry data
+                # This enables reasoning engine invocation based on QueryRouter's tool selection
+                routing_selected_tools = []
+                if routing_plan and hasattr(routing_plan, 'telemetry_data'):
+                    routing_selected_tools = routing_plan.telemetry_data.get("selected_tools", []) or []
+                    if routing_selected_tools:
+                        logger.info(
+                            f"[VULCAN] Routing plan selected tools: {routing_selected_tools}"
+                        )
+
                 # PERFORMANCE FIX: Define async helper function for parallel task submission
-                async def submit_single_task(agent_task, pool, capability_map, timeout, max_tokens):
+                async def submit_single_task(agent_task, pool, capability_map, timeout, max_tokens, selected_tools_from_router):
                     """Submit a single task to agent pool asynchronously."""
                     capability = capability_map.get(
                         agent_task.capability, AgentCapability.REASONING
@@ -2184,7 +2217,8 @@ async def chat(request: ChatRequest):
 
                     logger.info(
                         f"[VULCAN] Submitting routing task to agent pool: "
-                        f"task_id={agent_task.task_id}, capability={agent_task.capability}, priority={agent_task.priority}"
+                        f"task_id={agent_task.task_id}, capability={agent_task.capability}, priority={agent_task.priority}, "
+                        f"selected_tools={selected_tools_from_router}"
                     )
 
                     try:
@@ -2202,6 +2236,8 @@ async def chat(request: ChatRequest):
                                         "is_primary", True
                                     ),
                                     "selected_tool": selected_tool,  # Priority 2: Pass selected tool
+                                    # FIX: Pass selected_tools from QueryRouter to enable reasoning invocation
+                                    "selected_tools": selected_tools_from_router,
                                     **agent_task.parameters,
                                 },
                                 priority=agent_task.priority,
@@ -2236,7 +2272,8 @@ async def chat(request: ChatRequest):
                         collective.agent_pool,
                         capability_map,
                         agent_pool_timeout,
-                        request.max_tokens
+                        request.max_tokens,
+                        routing_selected_tools  # FIX: Pass selected_tools from router
                     )
                     for agent_task in routing_plan.agent_tasks
                 ]
@@ -2887,8 +2924,11 @@ async def chat(request: ChatRequest):
     # STEP 5.5: Collect Reasoning Results from Agent Pool Jobs
     # CRITICAL FIX: Inject agent-based reasoning output into LLM context
     # This ensures reasoning engines invoked via agent_pool feed into response
+    # FIX: Now uses TournamentManager for multi-agent selection when available
     # ================================================================
     agent_reasoning_output = None
+    all_agent_results = []  # FIX: Collect ALL agent results for tournament selection
+    
     if submitted_jobs and collective and hasattr(collective, "agent_pool") and collective.agent_pool:
         try:
             # Give jobs a brief moment to complete (non-blocking check)
@@ -2902,17 +2942,99 @@ async def chat(request: ChatRequest):
                         # Check for reasoning_output from agent execution
                         if isinstance(result_data, dict):
                             reasoning_out = result_data.get("reasoning_output")
-                            if reasoning_out:
-                                agent_reasoning_output = reasoning_out
+                            reasoning_invoked = result_data.get("reasoning_invoked", False)
+                            
+                            # FIX: Collect all results for tournament selection
+                            if reasoning_out or reasoning_invoked:
+                                agent_result = {
+                                    "job_id": job_id,
+                                    "reasoning_output": reasoning_out,
+                                    "reasoning_invoked": reasoning_invoked,
+                                    "confidence": reasoning_out.get("confidence", 0.5) if reasoning_out else 0.5,
+                                    "reasoning_type": reasoning_out.get("reasoning_type", "unknown") if reasoning_out else "unknown",
+                                }
+                                all_agent_results.append(agent_result)
                                 logger.info(
-                                    f"[VULCAN] Collected reasoning output from agent job {job_id}: "
-                                    f"type={reasoning_out.get('reasoning_type', 'unknown')}, "
-                                    f"confidence={reasoning_out.get('confidence', 0)}"
+                                    f"[VULCAN] Collected reasoning result from job {job_id}: "
+                                    f"reasoning_invoked={reasoning_invoked}, "
+                                    f"confidence={agent_result['confidence']}"
                                 )
-                                systems_used.append("agent_reasoning_engine")
-                                break  # Use first valid reasoning output
                 except Exception as job_err:
                     logger.debug(f"[VULCAN] Could not get job {job_id} provenance: {job_err}")
+            
+            # FIX: Use TournamentManager for multi-agent selection when multiple results
+            if len(all_agent_results) > 1:
+                try:
+                    from src.tournament_manager import TournamentManager
+                    import numpy as np
+                    
+                    # Initialize tournament manager for selection
+                    tournament_mgr = TournamentManager(
+                        similarity_threshold=0.8,
+                        diversity_penalty=0.2,
+                        min_winners=1,
+                        winner_percentage=0.3,
+                    )
+                    
+                    # Extract fitness scores (confidence values)
+                    fitness_scores = [r.get("confidence", 0.5) for r in all_agent_results]
+                    proposals = [r.get("reasoning_output", {}) for r in all_agent_results]
+                    
+                    # Simple deterministic embedding function for tournament diversity calculation
+                    # Uses 128-dimensional vectors matching TournamentManager's default dimension
+                    # This is a lightweight fallback when no semantic embedder is available
+                    # For production, consider using SentenceTransformer embeddings
+                    EMBEDDING_DIM = 128  # Standard dimension for lightweight embeddings
+                    ASCII_MAX = 255.0  # Normalize ASCII values to [0, 1]
+                    
+                    def simple_embedding(proposal):
+                        """Create deterministic embedding based on proposal content for diversity scoring."""
+                        content = str(proposal)
+                        embedding = np.zeros(EMBEDDING_DIM, dtype=np.float32)
+                        for i, char in enumerate(content[:EMBEDDING_DIM]):
+                            embedding[i] = ord(char) / ASCII_MAX
+                        return embedding
+                    
+                    # Run tournament to select best result
+                    winner_indices = tournament_mgr.run_adaptive_tournament(
+                        proposals=proposals,
+                        fitness=fitness_scores,
+                        embedding_func=simple_embedding,
+                    )
+                    
+                    if winner_indices:
+                        winner_idx = winner_indices[0]
+                        agent_reasoning_output = all_agent_results[winner_idx].get("reasoning_output")
+                        logger.info(
+                            f"[VULCAN] TournamentManager selected winner: job={all_agent_results[winner_idx]['job_id']}, "
+                            f"confidence={all_agent_results[winner_idx]['confidence']}, "
+                            f"from {len(all_agent_results)} candidates"
+                        )
+                        systems_used.append("tournament_manager")
+                    else:
+                        # Fallback to highest confidence
+                        best_result = max(all_agent_results, key=lambda x: x.get("confidence", 0))
+                        agent_reasoning_output = best_result.get("reasoning_output")
+                        logger.info(f"[VULCAN] Tournament returned no winners, using highest confidence result")
+                        
+                except ImportError:
+                    logger.debug("[VULCAN] TournamentManager not available, using highest confidence result")
+                    if all_agent_results:
+                        best_result = max(all_agent_results, key=lambda x: x.get("confidence", 0))
+                        agent_reasoning_output = best_result.get("reasoning_output")
+                except Exception as tournament_err:
+                    logger.warning(f"[VULCAN] Tournament selection failed: {tournament_err}")
+                    if all_agent_results:
+                        best_result = max(all_agent_results, key=lambda x: x.get("confidence", 0))
+                        agent_reasoning_output = best_result.get("reasoning_output")
+            elif len(all_agent_results) == 1:
+                # Single result - use it directly
+                agent_reasoning_output = all_agent_results[0].get("reasoning_output")
+                logger.info(f"[VULCAN] Single agent result collected from job {all_agent_results[0]['job_id']}")
+            
+            if agent_reasoning_output:
+                systems_used.append("agent_reasoning_engine")
+                
         except Exception as e:
             logger.debug(f"[VULCAN] Agent reasoning collection failed: {e}")
 
@@ -4000,8 +4122,17 @@ async def unified_chat(request: UnifiedChatRequest):
                         f"[VULCAN/v1/chat] Submitting {len(routing_plan.agent_tasks)} tasks to agent pool"
                     )
 
+                    # FIX: Extract selected_tools from routing plan for reasoning invocation
+                    v1_routing_selected_tools = []
+                    if routing_plan and hasattr(routing_plan, 'telemetry_data'):
+                        v1_routing_selected_tools = routing_plan.telemetry_data.get("selected_tools", []) or []
+                        if v1_routing_selected_tools:
+                            logger.info(
+                                f"[VULCAN/v1/chat] Routing plan selected tools: {v1_routing_selected_tools}"
+                            )
+
                     # PERFORMANCE FIX: Define async helper function for parallel task submission
-                    async def submit_single_task_v1(agent_task, agent_pool, cap_map, max_tok):
+                    async def submit_single_task_v1(agent_task, agent_pool, cap_map, max_tok, selected_tools_from_router):
                         """Submit a single task to agent pool asynchronously."""
                         capability = cap_map.get(
                             agent_task.capability, AgentCapability.REASONING
@@ -4044,6 +4175,8 @@ async def unified_chat(request: UnifiedChatRequest):
                                     parameters={
                                         "prompt": agent_task.prompt,
                                         "task_type": agent_task.task_type,
+                                        # FIX: Pass selected_tools from QueryRouter to enable reasoning
+                                        "selected_tools": selected_tools_from_router,
                                     },
                                     priority=agent_task.priority,
                                     capability_required=capability,
@@ -4074,7 +4207,8 @@ async def unified_chat(request: UnifiedChatRequest):
                             agent_task,
                             pool,
                             capability_map,
-                            request.max_tokens
+                            request.max_tokens,
+                            v1_routing_selected_tools  # FIX: Pass selected_tools
                         )
                         for agent_task in routing_plan.agent_tasks
                     ]

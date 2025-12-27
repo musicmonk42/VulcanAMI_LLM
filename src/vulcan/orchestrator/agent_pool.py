@@ -2163,13 +2163,33 @@ class AgentPoolManager:
             nodes = graph.get("nodes", [])
             edges = graph.get("edges", [])
             task_type = graph.get("type", "general").lower()
+            
+            # FIX: Normalize task_type by stripping common suffixes like "_task", "_support"
+            # QueryRouter creates tasks with types like "reasoning_task", "perception_support"
+            # but the reasoning check expects base types like "reasoning", "perception"
+            normalized_task_type = task_type
+            for suffix in ("_task", "_support"):
+                if normalized_task_type.endswith(suffix):
+                    normalized_task_type = normalized_task_type[:-len(suffix)]
+                    break
 
             # Determine if this is a reasoning task
             reasoning_task_types = {
                 "reasoning", "causal", "symbolic", "analogical", "probabilistic",
                 "counterfactual", "multimodal", "deductive", "inductive", "abductive"
             }
-            is_reasoning_task = task_type in reasoning_task_types
+            is_reasoning_task = normalized_task_type in reasoning_task_types
+            
+            # FIX: Also check selected_tools passed from QueryRouter
+            # selected_tools contains reasoning engine names like ['causal', 'probabilistic']
+            selected_tools = parameters.get("selected_tools", []) or parameters.get("tools", []) or []
+            if not is_reasoning_task and selected_tools:
+                # Check if any selected tool is a reasoning type
+                if any(tool in reasoning_task_types for tool in selected_tools):
+                    is_reasoning_task = True
+                    logger.info(
+                        f"Agent {agent_id} task {task_id}: reasoning triggered by selected_tools={selected_tools}"
+                    )
 
             # Also check capability - REASONING capability agents should invoke reasoning
             if metadata.capability == AgentCapability.REASONING:
