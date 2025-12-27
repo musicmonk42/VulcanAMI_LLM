@@ -26,7 +26,7 @@ except ImportError:
 
 # FIX 602: Add import guard for HierarchicalMemory
 try:
-    from .hierarchical import HierarchicalMemory
+    from ..memory.hierarchical import HierarchicalMemory
 
     HIERARCHICAL_AVAILABLE = True
 except ImportError:
