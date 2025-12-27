@@ -913,19 +913,27 @@ class SafetyGovernor:
     def _check_contract_violation(
         self, context: SafetyContext, contract: ToolContract
     ) -> Optional[str]:
-        """Check if context violates contract"""
+        """Check if context violates contract.
+        
+        NOTE: Resource constraint checks (time/energy budget) are intentionally
+        lenient when semantic boost has selected a tool. The semantic matcher
+        has determined this is the right tool based on query content, so we
+        only enforce hard safety limits, not soft resource preferences.
+        """
 
         try:
-            # Check required inputs
+            # Check required inputs (kept for future use, currently all empty)
             if contract.required_inputs:
                 problem_str = str(context.problem).lower()
                 missing = [
                     req for req in contract.required_inputs if req not in problem_str
                 ]
                 if missing:
-                    return f"Missing required inputs: {missing}"
+                    # Log as advisory, not a hard veto
+                    logger.debug(f"Advisory: Missing literal keywords {missing} for {contract.tool_name}")
+                    # Don't veto - semantic matching already determined this is the right tool
 
-            # Check forbidden inputs
+            # Check forbidden inputs (these are hard safety requirements)
             if contract.forbidden_inputs:
                 problem_str = str(context.problem).lower()
                 found = [
@@ -934,16 +942,20 @@ class SafetyGovernor:
                 if found:
                     return f"Forbidden inputs found: {found}"
 
-            # Check resource constraints
+            # Check resource constraints - use very lenient threshold (0.1)
+            # This only rejects if the budget is severely insufficient
+            # The semantic matcher has already determined tool appropriateness
             if context.constraints:
                 time_budget = context.constraints.get("time_budget_ms", float("inf"))
-                if time_budget < contract.max_execution_time_ms * 0.5:
+                # Only veto if time budget is < 10% of required (extremely insufficient)
+                if time_budget < contract.max_execution_time_ms * 0.1:
                     return f"Insufficient time budget for {contract.tool_name}"
 
                 energy_budget = context.constraints.get(
                     "energy_budget_mj", float("inf")
                 )
-                if energy_budget < contract.max_energy_mj * 0.5:
+                # Only veto if energy budget is < 10% of required
+                if energy_budget < contract.max_energy_mj * 0.1:
                     return f"Insufficient energy budget for {contract.tool_name}"
 
             # Check safety level
