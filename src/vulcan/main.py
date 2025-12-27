@@ -1847,6 +1847,10 @@ async def chat(request: ChatRequest):
     }
     MIN_MEANINGFUL_RESPONSE_LENGTH = 10
     MOCK_RESPONSE_MARKER = "Mock response"
+    
+    # Agent reasoning collection constants
+    AGENT_REASONING_POLL_DELAY_SEC = 0.1  # Brief wait for jobs to complete
+    MAX_AGENT_REASONING_JOBS_TO_CHECK = 3  # Limit jobs to check for reasoning output
 
     if not hasattr(app.state, "deployment") or app.state.deployment is None:
         raise HTTPException(status_code=503, detail="VULCAN deployment not initialized")
@@ -2880,6 +2884,53 @@ async def chat(request: ChatRequest):
         logger.debug(f"Meta-reasoning task failed: {parallel_results[3]}")
 
     # ================================================================
+    # STEP 5.5: Collect Reasoning Results from Agent Pool Jobs
+    # CRITICAL FIX: Inject agent-based reasoning output into LLM context
+    # This ensures reasoning engines invoked via agent_pool feed into response
+    # ================================================================
+    agent_reasoning_output = None
+    if submitted_jobs and collective and hasattr(collective, "agent_pool") and collective.agent_pool:
+        try:
+            # Give jobs a brief moment to complete (non-blocking check)
+            await asyncio.sleep(AGENT_REASONING_POLL_DELAY_SEC)
+            
+            for job_id in submitted_jobs[:MAX_AGENT_REASONING_JOBS_TO_CHECK]:
+                try:
+                    provenance = collective.agent_pool.get_job_provenance(job_id)
+                    if provenance and provenance.get("status") == "success":
+                        result_data = provenance.get("result", {})
+                        # Check for reasoning_output from agent execution
+                        if isinstance(result_data, dict):
+                            reasoning_out = result_data.get("reasoning_output")
+                            if reasoning_out:
+                                agent_reasoning_output = reasoning_out
+                                logger.info(
+                                    f"[VULCAN] Collected reasoning output from agent job {job_id}: "
+                                    f"type={reasoning_out.get('reasoning_type', 'unknown')}, "
+                                    f"confidence={reasoning_out.get('confidence', 0)}"
+                                )
+                                systems_used.append("agent_reasoning_engine")
+                                break  # Use first valid reasoning output
+                except Exception as job_err:
+                    logger.debug(f"[VULCAN] Could not get job {job_id} provenance: {job_err}")
+        except Exception as e:
+            logger.debug(f"[VULCAN] Agent reasoning collection failed: {e}")
+
+    # Merge agent reasoning output into reasoning_insights (preserving existing data)
+    if agent_reasoning_output:
+        # Add agent-based reasoning as a distinct category (merges with existing insights)
+        reasoning_insights["agent_reasoning"] = {
+            "conclusion": agent_reasoning_output.get("conclusion"),
+            "confidence": agent_reasoning_output.get("confidence"),
+            "reasoning_type": agent_reasoning_output.get("reasoning_type"),
+            "explanation": agent_reasoning_output.get("explanation"),
+        }
+        logger.info(
+            f"[VULCAN] Agent reasoning injected into context: "
+            f"type={agent_reasoning_output.get('reasoning_type')}"
+        )
+
+    # ================================================================
     # STEP 6: Build Context from ALL Vulcan's Cognitive Systems
     # ================================================================
     context_parts = []
@@ -3748,6 +3799,10 @@ async def unified_chat(request: UnifiedChatRequest):
         "planning_engaged": False,
         "causal_analysis": False,
     }
+    
+    # Agent reasoning collection constants (same as /chat endpoint)
+    AGENT_REASONING_POLL_DELAY_SEC = 0.1  # Brief wait for jobs to complete
+    MAX_AGENT_REASONING_JOBS_TO_CHECK = 3  # Limit jobs to check for reasoning output
     
     phase_start = start_time
 
@@ -4643,6 +4698,53 @@ async def unified_chat(request: UnifiedChatRequest):
             systems_used.extend(semantic_systems)
         else:
             logger.debug(f"Semantic bridge task failed: {parallel_results[4]}")
+
+        # ================================================================
+        # STEP 6.5: Collect Reasoning Results from Agent Pool Jobs
+        # CRITICAL FIX: Inject agent-based reasoning output into LLM context
+        # This ensures reasoning engines invoked via agent_pool feed into response
+        # ================================================================
+        agent_reasoning_output = None
+        if submitted_jobs and pool:
+            try:
+                # Give jobs a brief moment to complete (non-blocking check)
+                await asyncio.sleep(AGENT_REASONING_POLL_DELAY_SEC)
+                
+                for job_id in submitted_jobs[:MAX_AGENT_REASONING_JOBS_TO_CHECK]:
+                    try:
+                        provenance = pool.get_job_provenance(job_id)
+                        if provenance and provenance.get("status") == "success":
+                            result_data = provenance.get("result", {})
+                            # Check for reasoning_output from agent execution
+                            if isinstance(result_data, dict):
+                                reasoning_out = result_data.get("reasoning_output")
+                                if reasoning_out:
+                                    agent_reasoning_output = reasoning_out
+                                    logger.info(
+                                        f"[VULCAN/v1/chat] Collected reasoning output from agent job {job_id}: "
+                                        f"type={reasoning_out.get('reasoning_type', 'unknown')}, "
+                                        f"confidence={reasoning_out.get('confidence', 0)}"
+                                    )
+                                    systems_used.append("agent_reasoning_engine")
+                                    break  # Use first valid reasoning output
+                    except Exception as job_err:
+                        logger.debug(f"[VULCAN/v1/chat] Could not get job {job_id} provenance: {job_err}")
+            except Exception as e:
+                logger.debug(f"[VULCAN/v1/chat] Agent reasoning collection failed: {e}")
+
+        # Merge agent reasoning output into reasoning_results (preserving existing data)
+        if agent_reasoning_output:
+            # Add agent-based reasoning as a distinct category (merges with existing results)
+            reasoning_results["agent_reasoning"] = {
+                "conclusion": agent_reasoning_output.get("conclusion"),
+                "confidence": agent_reasoning_output.get("confidence"),
+                "reasoning_type": agent_reasoning_output.get("reasoning_type"),
+                "explanation": agent_reasoning_output.get("explanation"),
+            }
+            logger.info(
+                f"[VULCAN/v1/chat] Agent reasoning injected into context: "
+                f"type={agent_reasoning_output.get('reasoning_type')}"
+            )
 
         # ================================================================
         # STEP 7: Generate Response using LLM with full context
