@@ -2285,7 +2285,9 @@ class UnifiedReasoner:
                 return self._execute_reasoner(reasoner, task)
             elif task.task_type == ReasoningType.HYBRID:
                 # HYBRID reasoning: delegate to PROBABILISTIC reasoner as the most general-purpose
-                # fallback, since HYBRID represents combined/integrated reasoning approaches
+                # fallback, since HYBRID represents combined/integrated reasoning approaches.
+                # Note: PROBABILISTIC is chosen as the default fallback because it can handle
+                # uncertainty quantification across multiple reasoning modalities.
                 if ReasoningType.PROBABILISTIC in self.reasoners:
                     fallback_task = ReasoningTask(
                         task_id=task.task_id,
