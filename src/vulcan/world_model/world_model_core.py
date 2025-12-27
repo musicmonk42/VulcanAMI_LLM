@@ -2113,6 +2113,49 @@ class WorldModel:
             
             return min(1.0, max(0.0, success_rate * 0.7 + latency_factor * 0.3))
         
+        def _calc_policy_violations_per_1k(data):
+            """Calculate policy violations per 1000 actions from governance logger."""
+            try:
+                from vulcan.routing.governance_logger import get_governance_logger
+                gov_logger = get_governance_logger()
+                stats = gov_logger.get_statistics()
+                
+                # Get policy violation count and total actions
+                violation_count = stats.get("policy_violation_count", 0)
+                counters = data.get("counters", {})
+                total_actions = counters.get("successful_actions", 0) + counters.get("failed_actions", 0)
+                
+                if total_actions == 0:
+                    return 0.0
+                
+                # Calculate violations per 1000 actions
+                return min(1.0, (violation_count / total_actions) * 1000.0)
+            except Exception:
+                return 0.0
+        
+        def _calc_disparity_at_k(data):
+            """Calculate disparity at k from bias scores in safety validator."""
+            try:
+                # Try to get bias scores from safety validator
+                from vulcan.safety.safety_validator import EnhancedSafetyValidator
+                
+                # Check for bias scores in metrics data
+                aggregates = data.get("aggregates", {})
+                if "bias_scores" in aggregates:
+                    bias_scores = aggregates["bias_scores"]
+                    if isinstance(bias_scores, dict) and bias_scores:
+                        # Calculate average disparity from demographic and representation bias
+                        demo_bias = bias_scores.get("demographic", 0.0)
+                        rep_bias = bias_scores.get("representation", 0.0)
+                        return min(1.0, max(0.0, (demo_bias + rep_bias) / 2.0))
+                
+                # Fallback: use identity drift as proxy for disparity
+                gauges = data.get("gauges", {})
+                identity_drift = gauges.get("identity_drift", 0.0)
+                return min(1.0, max(0.0, abs(identity_drift)))
+            except Exception:
+                return 0.0
+        
         def metrics_provider(dotted_key: str) -> Optional[float]:
             """
             Retrieve metric value by dotted key.
@@ -2159,11 +2202,11 @@ class WorldModel:
                     # Intent clarity: inverse of uncertainty
                     "metrics.intent_clarity_score": lambda d=metrics_data: 1.0 - d.get("gauges", {}).get("current_uncertainty", 0.12),
                     
-                    # TODO: Policy violations require policy enforcement tracking (not yet implemented)
-                    "policies.non_judgmental.violations_per_1k": lambda: 0.0,
+                    # Policy violations: from governance logger
+                    "policies.non_judgmental.violations_per_1k": lambda d=metrics_data: _calc_policy_violations_per_1k(d),
                     
-                    # TODO: Disparity at k requires fairness tracking across groups (not yet implemented)
-                    "metrics.disparity_at_k": lambda: 0.0,
+                    # Disparity at k: from bias scores or identity drift
+                    "metrics.disparity_at_k": lambda d=metrics_data: _calc_disparity_at_k(d),
                     
                     # Calibration gap: identity drift as proxy
                     "metrics.calibration_gap": lambda d=metrics_data: abs(d.get("gauges", {}).get("identity_drift", 0.0)),
@@ -2687,9 +2730,20 @@ class WorldModel:
             return 1024.0
 
     def _get_low_activity_duration(self) -> float:
-        """Get duration of low activity in minutes"""
-        # TODO: Implement actual activity tracking
-        return 0.0
+        """Get duration of low activity in minutes.
+        
+        Calculates how long since the last observation was processed.
+        This is used for self-improvement triggers that activate during idle periods.
+        
+        Returns:
+            Duration in minutes since last observation, or 0.0 if no observations yet
+        """
+        if self.last_observation_time is None:
+            return 0.0
+        
+        current_time = time.time()
+        elapsed_seconds = current_time - self.last_observation_time
+        return elapsed_seconds / 60.0  # Convert to minutes
 
     def process_observation(self, observation: Observation, constraints=None):
         """Main entrypoint from the rest of the system."""

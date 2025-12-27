@@ -7992,6 +7992,41 @@ def _create_main_csiu_metrics_provider():
             latency_factor = 0.8
         return min(1.0, max(0.0, success_rate * 0.7 + latency_factor * 0.3))
     
+    def _calc_policy_violations_per_1k(data):
+        """Calculate policy violations per 1000 actions from governance logger."""
+        try:
+            from vulcan.routing.governance_logger import get_governance_logger
+            gov_logger = get_governance_logger()
+            stats = gov_logger.get_statistics()
+            
+            violation_count = stats.get("policy_violation_count", 0)
+            counters = data.get("counters", {})
+            total_actions = counters.get("successful_actions", 0) + counters.get("failed_actions", 0)
+            
+            if total_actions == 0:
+                return 0.0
+            
+            return min(1.0, (violation_count / total_actions) * 1000.0)
+        except Exception:
+            return 0.0
+    
+    def _calc_disparity_at_k(data):
+        """Calculate disparity at k from bias scores or identity drift."""
+        try:
+            aggregates = data.get("aggregates", {})
+            if "bias_scores" in aggregates:
+                bias_scores = aggregates["bias_scores"]
+                if isinstance(bias_scores, dict) and bias_scores:
+                    demo_bias = bias_scores.get("demographic", 0.0)
+                    rep_bias = bias_scores.get("representation", 0.0)
+                    return min(1.0, max(0.0, (demo_bias + rep_bias) / 2.0))
+            
+            gauges = data.get("gauges", {})
+            identity_drift = gauges.get("identity_drift", 0.0)
+            return min(1.0, max(0.0, abs(identity_drift)))
+        except Exception:
+            return 0.0
+    
     def metrics_provider(dotted_key: str) -> Optional[float]:
         """Retrieve metric value by dotted key."""
         try:
@@ -8021,10 +8056,10 @@ def _create_main_csiu_metrics_provider():
                 "metrics.alignment_coherence_idx": lambda d=metrics_data: _calc_success_rate(d),
                 "metrics.communication_entropy": lambda d=metrics_data: _calc_error_rate(d) * 0.5,
                 "metrics.intent_clarity_score": lambda d=metrics_data: 1.0 - d.get("gauges", {}).get("current_uncertainty", 0.12),
-                # TODO: These metrics require policy enforcement tracking (not yet implemented)
-                "policies.non_judgmental.violations_per_1k": lambda: 0.0,
-                # TODO: These metrics require fairness/calibration tracking (not yet implemented)
-                "metrics.disparity_at_k": lambda: 0.0,
+                # Policy violations: from governance logger
+                "policies.non_judgmental.violations_per_1k": lambda d=metrics_data: _calc_policy_violations_per_1k(d),
+                # Disparity at k: from bias scores or identity drift
+                "metrics.disparity_at_k": lambda d=metrics_data: _calc_disparity_at_k(d),
                 "metrics.calibration_gap": lambda d=metrics_data: abs(d.get("gauges", {}).get("identity_drift", 0.0)),
                 "metrics.empathy_index": lambda m=meta_state: m.get("average_feedback_score", 0.6),
                 "metrics.user_satisfaction": lambda d=metrics_data: _calc_satisfaction(d),
