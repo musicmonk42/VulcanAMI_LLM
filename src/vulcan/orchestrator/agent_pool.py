@@ -78,6 +78,41 @@ except ImportError:
     )
 
 # ============================================================
+# REASONING INTEGRATION - Wire reasoning engines into task execution
+# ============================================================
+# Import UnifiedReasoner and reasoning integration for actual reasoning invocation
+try:
+    from src.vulcan.reasoning import (
+        UnifiedReasoner,
+        ReasoningType,
+        ReasoningResult,
+        UNIFIED_AVAILABLE,
+        create_unified_reasoner,
+    )
+    from src.vulcan.reasoning.reasoning_integration import (
+        apply_reasoning,
+        get_reasoning_integration,
+        ReasoningResult as IntegrationReasoningResult,
+    )
+    REASONING_AVAILABLE = UNIFIED_AVAILABLE
+    logging.getLogger(__name__).info(
+        "Reasoning integration loaded successfully - reasoning engines will be invoked"
+    )
+except ImportError as e:
+    UnifiedReasoner = None
+    ReasoningType = None
+    ReasoningResult = None
+    UNIFIED_AVAILABLE = False
+    create_unified_reasoner = None
+    apply_reasoning = None
+    get_reasoning_integration = None
+    IntegrationReasoningResult = None
+    REASONING_AVAILABLE = False
+    logging.getLogger(__name__).warning(
+        f"Reasoning integration not available: {e}. Tasks will use placeholder execution."
+    )
+
+# ============================================================
 # CONSTANTS
 # ============================================================
 
@@ -2090,11 +2125,18 @@ class AgentPoolManager:
         self, agent_id: str, task: Dict[str, Any], metadata: AgentMetadata
     ) -> Any:
         """
-        Execute task on agent
+        Execute task on agent with ACTUAL reasoning engine invocation.
 
-        FIXED: Actually processes the task graph and parameters instead of
-        just simulating. Extracts relevant information from the graph and
-        produces meaningful results.
+        CRITICAL FIX: This method now properly invokes UnifiedReasoning.reason()
+        for reasoning tasks instead of just creating placeholder results.
+
+        For reasoning tasks (reasoning, symbolic, causal, analogical, etc.):
+        - Invokes the actual reasoning engines via ReasoningIntegration
+        - Routes to appropriate reasoning type based on task type
+        - Returns real reasoning results with confidence scores
+
+        For non-reasoning tasks:
+        - Falls back to graph-based execution
 
         Args:
             agent_id: Agent identifier
@@ -2102,7 +2144,7 @@ class AgentPoolManager:
             metadata: Agent metadata
 
         Returns:
-            Task result dictionary
+            Task result dictionary with actual reasoning output
 
         Raises:
             Exception: If task execution fails
@@ -2120,24 +2162,133 @@ class AgentPoolManager:
             graph_id = graph.get("id", "unknown")
             nodes = graph.get("nodes", [])
             edges = graph.get("edges", [])
-            task_type = graph.get("type", "general")
+            task_type = graph.get("type", "general").lower()
 
-            # Process task based on graph structure
-            # This is where actual task-specific logic would go
+            # Determine if this is a reasoning task
+            reasoning_task_types = {
+                "reasoning", "causal", "symbolic", "analogical", "probabilistic",
+                "counterfactual", "multimodal", "deductive", "inductive", "abductive"
+            }
+            is_reasoning_task = task_type in reasoning_task_types
+
+            # Also check capability - REASONING capability agents should invoke reasoning
+            if metadata.capability == AgentCapability.REASONING:
+                is_reasoning_task = True
+
+            # Extract query/input from graph or parameters
+            query = parameters.get("query", "")
+            input_data = parameters.get("input_data") or parameters.get("input", "")
+            context = parameters.get("context", {})
+            
+            # Try to extract query from nodes if not in parameters
+            if not query and nodes:
+                for node in nodes:
+                    if node.get("type") in ("input", "query", "InputNode"):
+                        query = node.get("data", {}).get("value", "") or node.get("params", {}).get("query", "")
+                        input_data = input_data or node.get("data", {}).get("input", "")
+                        break
+
+            # ============================================================
+            # REASONING TASK EXECUTION - Invoke actual reasoning engines
+            # ============================================================
+            reasoning_result = None
             node_results = {}
-            for node in nodes:
-                node_id = node.get("id", "unknown")
-                node_type = node.get("type", "unknown")
-                node_params = node.get("params", {})
 
-                # Execute node based on type
-                # For now, create a result placeholder with proper structure
-                node_results[node_id] = {
-                    "status": "completed",
-                    "node_type": node_type,
-                    "params_processed": list(node_params.keys()),
-                }
-                logger.debug(f"Agent {agent_id} processed node {node_id} ({node_type})")
+            if is_reasoning_task and REASONING_AVAILABLE:
+                logger.info(
+                    f"Agent {agent_id} invoking reasoning engine for task {task_id} "
+                    f"(type={task_type}, capability={metadata.capability.value})"
+                )
+                
+                try:
+                    # Map task type to reasoning type
+                    reasoning_type = self._map_task_to_reasoning_type(task_type)
+                    
+                    # Calculate complexity from graph structure
+                    complexity = self._calculate_task_complexity(graph, parameters)
+                    
+                    # Apply reasoning via the integration layer
+                    integration_result = apply_reasoning(
+                        query=query or str(input_data) or f"Process task {task_id}",
+                        query_type=task_type,
+                        complexity=complexity,
+                        context=context,
+                    )
+                    
+                    logger.info(
+                        f"Agent {agent_id} reasoning selection complete: "
+                        f"tools={integration_result.selected_tools}, "
+                        f"strategy={integration_result.reasoning_strategy}, "
+                        f"confidence={integration_result.confidence:.2f}"
+                    )
+                    
+                    # If UnifiedReasoner is available, invoke actual reasoning
+                    if UnifiedReasoner is not None and create_unified_reasoner is not None:
+                        try:
+                            # Get or create unified reasoner
+                            reasoner = create_unified_reasoner(
+                                config={"enable_learning": True, "enable_safety": True},
+                                enable_learning=True,
+                                enable_safety=True,
+                            )
+                            
+                            if reasoner is not None:
+                                # Invoke the actual reasoning engine
+                                reasoning_result = reasoner.reason(
+                                    input_data=input_data or query,
+                                    query={"query": query, "context": context, "task_type": task_type},
+                                    reasoning_type=reasoning_type,
+                                )
+                                
+                                logger.info(
+                                    f"Agent {agent_id} reasoning execution complete: "
+                                    f"type={reasoning_result.reasoning_type if hasattr(reasoning_result, 'reasoning_type') else 'unknown'}, "
+                                    f"confidence={reasoning_result.confidence if hasattr(reasoning_result, 'confidence') else 'N/A'}"
+                                )
+                        except Exception as reasoning_error:
+                            logger.warning(
+                                f"Agent {agent_id} UnifiedReasoner invocation failed: {reasoning_error}. "
+                                f"Using integration result only."
+                            )
+                    
+                    # Build node results from reasoning
+                    for i, node in enumerate(nodes):
+                        node_id = node.get("id", f"node_{i}")
+                        node_type = node.get("type", "unknown")
+                        node_results[node_id] = {
+                            "status": "completed",
+                            "node_type": node_type,
+                            "reasoning_applied": True,
+                            "selected_tools": integration_result.selected_tools,
+                            "reasoning_strategy": integration_result.reasoning_strategy,
+                        }
+                        
+                except Exception as reasoning_error:
+                    logger.warning(
+                        f"Agent {agent_id} reasoning integration failed: {reasoning_error}. "
+                        f"Falling back to graph execution."
+                    )
+                    # Fall through to graph execution below
+                    is_reasoning_task = False
+
+            # ============================================================
+            # GRAPH-BASED EXECUTION - For non-reasoning tasks or fallback
+            # ============================================================
+            if not is_reasoning_task or not node_results:
+                logger.debug(f"Agent {agent_id} using graph-based execution for task {task_id}")
+                for node in nodes:
+                    node_id = node.get("id", "unknown")
+                    node_type = node.get("type", "unknown")
+                    node_params = node.get("params", {})
+
+                    # Execute node based on type
+                    node_results[node_id] = {
+                        "status": "completed",
+                        "node_type": node_type,
+                        "params_processed": list(node_params.keys()),
+                        "reasoning_applied": False,
+                    }
+                    logger.debug(f"Agent {agent_id} processed node {node_id} ({node_type})")
 
             # Create comprehensive result
             duration = time.time() - start_time
@@ -2154,7 +2305,17 @@ class AgentPoolManager:
                 "node_results": node_results,
                 "parameters_used": list(parameters.keys()) if parameters else [],
                 "capability": metadata.capability.value,
+                "reasoning_invoked": is_reasoning_task and REASONING_AVAILABLE,
             }
+            
+            # Add reasoning-specific results if available
+            if reasoning_result is not None:
+                result["reasoning_output"] = {
+                    "conclusion": getattr(reasoning_result, "conclusion", None),
+                    "confidence": getattr(reasoning_result, "confidence", None),
+                    "reasoning_type": str(getattr(reasoning_result, "reasoning_type", "unknown")),
+                    "explanation": getattr(reasoning_result, "explanation", None),
+                }
 
             # Update agent metadata
             metadata.record_task_completion(success=True, duration_s=duration)
@@ -2181,7 +2342,7 @@ class AgentPoolManager:
 
             logger.info(
                 f"Agent {agent_id} completed task {task_id} in {duration:.3f}s "
-                f"(processed {len(nodes)} nodes)"
+                f"(processed {len(nodes)} nodes, reasoning_invoked={result['reasoning_invoked']})"
             )
             return result
 
@@ -2291,6 +2452,125 @@ class AgentPoolManager:
             # Also remove from pending executions if queued
             with self._pending_executions_lock:
                 self._pending_executions.pop(task_id, None)
+
+    # ============================================================
+    # REASONING INTEGRATION HELPERS
+    # ============================================================
+    
+    def _map_task_to_reasoning_type(self, task_type: str):
+        """
+        Map task type string to ReasoningType enum.
+        
+        This enables proper routing of tasks to the appropriate reasoning engine.
+        
+        Args:
+            task_type: Task type string (e.g., "causal", "symbolic", "reasoning")
+            
+        Returns:
+            ReasoningType enum value, or None if not available
+        """
+        if ReasoningType is None:
+            return None
+            
+        # Mapping from task type strings to ReasoningType enum values
+        task_to_reasoning_map = {
+            "causal": ReasoningType.CAUSAL,
+            "symbolic": ReasoningType.SYMBOLIC,
+            "analogical": ReasoningType.ANALOGICAL,
+            "probabilistic": ReasoningType.PROBABILISTIC,
+            "counterfactual": ReasoningType.COUNTERFACTUAL,
+            "multimodal": ReasoningType.MULTIMODAL,
+            "deductive": ReasoningType.DEDUCTIVE,
+            "inductive": ReasoningType.INDUCTIVE,
+            "abductive": ReasoningType.ABDUCTIVE,
+            "reasoning": ReasoningType.HYBRID,  # Generic reasoning -> hybrid
+            "general": ReasoningType.UNKNOWN,
+        }
+        
+        return task_to_reasoning_map.get(task_type.lower(), ReasoningType.UNKNOWN)
+    
+    def _calculate_task_complexity(
+        self, 
+        graph: Dict[str, Any], 
+        parameters: Dict[str, Any]
+    ) -> float:
+        """
+        Calculate task complexity score from graph structure and parameters.
+        
+        Complexity affects reasoning strategy selection:
+        - Low complexity (< 0.3): Fast path, simple reasoning
+        - Medium complexity (0.3 - 0.7): Balanced reasoning
+        - High complexity (> 0.7): Full reasoning pipeline
+        
+        Args:
+            graph: Task graph with nodes and edges
+            parameters: Task parameters
+            
+        Returns:
+            Complexity score between 0.0 and 1.0
+        """
+        complexity = 0.3  # Base complexity
+        
+        nodes = graph.get("nodes", [])
+        edges = graph.get("edges", [])
+        
+        # Factor 1: Number of nodes (more nodes = more complex)
+        node_count = len(nodes)
+        if node_count > 10:
+            complexity += 0.2
+        elif node_count > 5:
+            complexity += 0.1
+        elif node_count > 2:
+            complexity += 0.05
+        
+        # Factor 2: Number of edges (more connections = more complex)
+        edge_count = len(edges)
+        if edge_count > 15:
+            complexity += 0.15
+        elif edge_count > 8:
+            complexity += 0.1
+        elif edge_count > 3:
+            complexity += 0.05
+        
+        # Factor 3: Parameter complexity
+        param_count = len(parameters)
+        if param_count > 10:
+            complexity += 0.1
+        elif param_count > 5:
+            complexity += 0.05
+        
+        # Factor 4: Nested structures in parameters
+        def count_depth(obj, current_depth=0):
+            if isinstance(obj, dict):
+                if not obj:
+                    return current_depth
+                return max(count_depth(v, current_depth + 1) for v in obj.values())
+            elif isinstance(obj, list):
+                if not obj:
+                    return current_depth
+                return max(count_depth(v, current_depth + 1) for v in obj)
+            return current_depth
+        
+        depth = count_depth(parameters)
+        if depth > 3:
+            complexity += 0.1
+        elif depth > 2:
+            complexity += 0.05
+        
+        # Factor 5: Special node types that indicate complex reasoning
+        complex_node_types = {
+            "reasoning", "causal", "symbolic", "inference", "meta",
+            "planning", "counterfactual", "analogical", "multimodal"
+        }
+        has_complex_nodes = any(
+            node.get("type", "").lower() in complex_node_types
+            for node in nodes
+        )
+        if has_complex_nodes:
+            complexity += 0.15
+        
+        # Clamp to [0.0, 1.0]
+        return min(1.0, max(0.0, complexity))
 
     def _archive_old_provenance(self):
         """Archive old provenance records to disk.

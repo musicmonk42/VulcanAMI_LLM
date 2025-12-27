@@ -360,6 +360,44 @@ except ImportError:
     RAY_AVAILABLE = False
     ray = None  # type: ignore
 
+# ============================================================
+# REASONING INTEGRATION - Wire reasoning engines into Arena execution
+# ============================================================
+# Import UnifiedReasoner and reasoning integration for actual reasoning invocation
+# This enables Arena to invoke reasoning engines for reasoning-type tasks
+try:
+    from vulcan.reasoning import (
+        UnifiedReasoner,
+        ReasoningType,
+        ReasoningResult as VulcanReasoningResult,
+        UNIFIED_AVAILABLE,
+        create_unified_reasoner,
+    )
+    from vulcan.reasoning.reasoning_integration import (
+        apply_reasoning,
+        get_reasoning_integration,
+        ReasoningResult as IntegrationReasoningResult,
+    )
+    REASONING_AVAILABLE = UNIFIED_AVAILABLE
+    logger_init = logging.getLogger("GraphixArena")
+    logger_init.info(
+        "✅ Reasoning integration loaded successfully - reasoning engines will be invoked"
+    )
+except ImportError as e:
+    UnifiedReasoner = None
+    ReasoningType = None
+    VulcanReasoningResult = None
+    UNIFIED_AVAILABLE = False
+    create_unified_reasoner = None
+    apply_reasoning = None
+    get_reasoning_integration = None
+    IntegrationReasoningResult = None
+    REASONING_AVAILABLE = False
+    logger_init = logging.getLogger("GraphixArena")
+    logger_init.warning(
+        f"⚠️ Reasoning integration not available: {e}. Tasks will use subprocess execution."
+    )
+
 
 # Configure logging
 logging.basicConfig(
@@ -1385,7 +1423,10 @@ class GraphixArena:
 
     async def _run_agent(self, agent_id: str, task: str, data: Dict) -> Dict:
         """
-        Run agent task with validation and error handling.
+        Run agent task with validation, reasoning engine invocation, and error handling.
+
+        CRITICAL FIX: Now invokes reasoning engines for reasoning-type agents
+        instead of just using subprocess LLM calls.
 
         Args:
             agent_id: Agent identifier
@@ -1398,6 +1439,147 @@ class GraphixArena:
         # Validate agent_id
         if not re.match(r"^[a-zA-Z][a-zA-Z0-9_-]*$", agent_id):
             raise ValueError(f"Invalid agent_id format: {agent_id}")
+
+        # ============================================================
+        # REASONING ENGINE INVOCATION (Critical Fix)
+        # ============================================================
+        # Check if this is a reasoning-type agent that should invoke reasoning engines
+        reasoning_agent_types = {
+            "reasoner", "causal", "symbolic", "analogical", "probabilistic",
+            "counterfactual", "multimodal", "deductive", "inductive", "abductive",
+            "planner", "inference"
+        }
+        
+        is_reasoning_agent = any(
+            r_type in agent_id.lower() for r_type in reasoning_agent_types
+        )
+        
+        # Also check task description for reasoning keywords
+        reasoning_task_keywords = [
+            "reason", "causal", "why", "because", "infer", "deduce",
+            "analyze", "logic", "symbolic", "probabilistic"
+        ]
+        is_reasoning_task = any(
+            keyword in task.lower() for keyword in reasoning_task_keywords
+        )
+        
+        if (is_reasoning_agent or is_reasoning_task) and REASONING_AVAILABLE:
+            logger.info(
+                f"🧠 Agent '{agent_id}' invoking reasoning engine for task: {task[:100]}..."
+            )
+            
+            try:
+                # Extract query from task and data
+                query = data.get("query") or data.get("input") or task
+                context = data.get("context", {})
+                
+                # Calculate complexity based on data size
+                complexity = min(1.0, max(0.3, len(json.dumps(data)) / 10000))
+                
+                # Determine reasoning type from agent_id
+                reasoning_type_map = {
+                    "causal": "causal",
+                    "symbolic": "symbolic",
+                    "analogical": "analogical",
+                    "probabilistic": "probabilistic",
+                    "counterfactual": "counterfactual",
+                    "deductive": "reasoning",
+                    "inductive": "reasoning",
+                    "abductive": "reasoning",
+                }
+                
+                query_type = "reasoning"  # default
+                for key, value in reasoning_type_map.items():
+                    if key in agent_id.lower():
+                        query_type = value
+                        break
+                
+                # Apply reasoning via the integration layer
+                integration_result = apply_reasoning(
+                    query=str(query)[:2000],  # Limit query length
+                    query_type=query_type,
+                    complexity=complexity,
+                    context=context,
+                )
+                
+                logger.info(
+                    f"🧠 Reasoning selection complete for '{agent_id}': "
+                    f"tools={integration_result.selected_tools}, "
+                    f"strategy={integration_result.reasoning_strategy}, "
+                    f"confidence={integration_result.confidence:.2f}"
+                )
+                
+                # If UnifiedReasoner is available, invoke actual reasoning
+                reasoning_output = None
+                if UnifiedReasoner is not None and create_unified_reasoner is not None:
+                    try:
+                        reasoner = create_unified_reasoner(
+                            config={"enable_learning": True, "enable_safety": True},
+                            enable_learning=True,
+                            enable_safety=True,
+                        )
+                        
+                        if reasoner is not None:
+                            # Map query_type to ReasoningType enum
+                            reasoning_type = ReasoningType.HYBRID
+                            if ReasoningType is not None:
+                                type_map = {
+                                    "causal": ReasoningType.CAUSAL,
+                                    "symbolic": ReasoningType.SYMBOLIC,
+                                    "analogical": ReasoningType.ANALOGICAL,
+                                    "probabilistic": ReasoningType.PROBABILISTIC,
+                                    "counterfactual": ReasoningType.COUNTERFACTUAL,
+                                    "reasoning": ReasoningType.HYBRID,
+                                }
+                                reasoning_type = type_map.get(query_type, ReasoningType.HYBRID)
+                            
+                            # Invoke the actual reasoning engine
+                            reasoning_result = reasoner.reason(
+                                input_data=str(query),
+                                query={"query": str(query), "context": context, "task": task},
+                                reasoning_type=reasoning_type,
+                            )
+                            
+                            reasoning_output = {
+                                "conclusion": getattr(reasoning_result, "conclusion", None),
+                                "confidence": getattr(reasoning_result, "confidence", None),
+                                "reasoning_type": str(getattr(reasoning_result, "reasoning_type", "unknown")),
+                                "explanation": getattr(reasoning_result, "explanation", None),
+                            }
+                            
+                            logger.info(
+                                f"🧠 Reasoning execution complete for '{agent_id}': "
+                                f"type={reasoning_output.get('reasoning_type')}, "
+                                f"confidence={reasoning_output.get('confidence')}"
+                            )
+                    except Exception as reasoning_error:
+                        logger.warning(
+                            f"UnifiedReasoner invocation failed for '{agent_id}': {reasoning_error}. "
+                            f"Using integration result only."
+                        )
+                
+                # Build result with reasoning output
+                return {
+                    "status": "success",
+                    "agent_id": agent_id,
+                    "reasoning_invoked": True,
+                    "selected_tools": integration_result.selected_tools,
+                    "reasoning_strategy": integration_result.reasoning_strategy,
+                    "confidence": integration_result.confidence,
+                    "rationale": integration_result.rationale,
+                    "reasoning_output": reasoning_output,
+                    "output": (
+                        reasoning_output.get("conclusion") if reasoning_output 
+                        else f"Reasoning applied via {integration_result.reasoning_strategy}"
+                    ),
+                }
+                
+            except Exception as reasoning_error:
+                logger.warning(
+                    f"Reasoning integration failed for '{agent_id}': {reasoning_error}. "
+                    f"Falling back to subprocess execution."
+                )
+                # Fall through to standard execution below
 
         # vLLM distributed inference path
         if (
