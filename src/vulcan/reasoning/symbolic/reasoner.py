@@ -204,6 +204,7 @@ class SymbolicReasoner:
         - Complex operators: ->, <=>, forall, exists
         - Parenthesized expressions
         - Quantifiers with variables
+        - Empty input (returns empty clause)
 
         Args:
             formula_str: Formula string
@@ -211,6 +212,11 @@ class SymbolicReasoner:
         Returns:
             Clause object
         """
+        # Handle empty or whitespace-only input gracefully
+        if not formula_str or not formula_str.strip():
+            logger.debug("Empty formula string received, returning empty clause")
+            return Clause(literals=[], is_goal=False)
+
         try:
             # Tokenize using the imported Lexer
             # Note: The Lexer and Parser logic is now in parsing.py
