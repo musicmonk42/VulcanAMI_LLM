@@ -56,7 +56,7 @@ class CircuitState(Enum):
 # Configuration constants
 # CPU OPTIMIZATION: Increased thresholds to match actual embedding performance
 # Production logs showed embeddings taking 10-15s under CPU load
-DEFAULT_LATENCY_THRESHOLD_MS = 15000.0  # 15 seconds - matches observed CPU embedding times
+DEFAULT_LATENCY_THRESHOLD_MS = 20000.0  # 20 seconds - increased from 15s for more headroom
 DEFAULT_FAILURE_THRESHOLD = 5  # Number of slow operations before opening circuit (increased from 3)
 DEFAULT_RESET_TIMEOUT_S = 60.0  # Time before trying half-open state
 DEFAULT_SUCCESS_THRESHOLD = 2  # Successes needed in half-open to close

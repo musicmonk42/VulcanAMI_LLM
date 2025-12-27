@@ -557,6 +557,7 @@ def record_query_outcome(
     tasks: int = 1,
     error_type: Optional[str] = None,
     db_path: Optional[Path] = None,
+    tools: Optional[List[str]] = None,
 ) -> bool:
     """
     Record a query outcome to shared storage.
@@ -591,6 +592,8 @@ def record_query_outcome(
             Helps categorize and analyze failure patterns.
         db_path: Optional path to database file.
             Defaults to DEFAULT_DB_PATH.
+        tools: List of tools used for the query.
+            Enables learning system to track tool selection patterns.
     
     Returns:
         True if recording succeeded, False otherwise.
@@ -603,6 +606,7 @@ def record_query_outcome(
         ...     total_time_ms=2500.0,
         ...     complexity=0.45,
         ...     query_type="reasoning",
+        ...     tools=["probabilistic", "causal"],
         ... )
         >>> if success:
         ...     print("Outcome recorded")
@@ -642,7 +646,7 @@ def record_query_outcome(
         logger.info(
             f"[QueryOutcome] Recorded: {query_id}, status={status}, "
             f"routing={routing_time_ms:.0f}ms, total={total_time_ms:.0f}ms, "
-            f"complexity={complexity:.2f}, type={query_type}"
+            f"complexity={complexity:.2f}, type={query_type}, tools={tools or []}"
         )
         
         # Also send to learning system via OutcomeBridge
@@ -655,6 +659,7 @@ def record_query_outcome(
                 total_ms=total_time_ms,
                 complexity=complexity,
                 query_type=query_type,
+                tools=tools,
             )
         except Exception as e:
             logger.debug(f"{LOG_PREFIX} OutcomeBridge record failed (non-critical): {e}")

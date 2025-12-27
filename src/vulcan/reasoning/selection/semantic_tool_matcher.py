@@ -284,11 +284,28 @@ class SemanticToolMatcher:
     
     @classmethod
     def _get_shared_model(cls):
-        """Get or create the shared embedding model (singleton pattern)"""
+        """Get or create the shared embedding model (singleton pattern).
+        
+        PERFORMANCE FIX: First try to use MultiTierFeatureExtractor's model
+        to avoid loading the same model twice (saves 3-5s and 500MB RAM).
+        """
         if cls._shared_model is None and not cls._model_load_attempted:
             with cls._shared_model_lock:
                 if cls._shared_model is None and not cls._model_load_attempted:
                     cls._model_load_attempted = True
+                    
+                    # First, try to use MultiTierFeatureExtractor's model (same all-MiniLM-L6-v2)
+                    try:
+                        from .tool_selector import MultiTierFeatureExtractor
+                        shared = MultiTierFeatureExtractor._get_shared_model()
+                        if shared is not None:
+                            cls._shared_model = shared
+                            logger.info("[SemanticToolMatcher] Using shared model from MultiTierFeatureExtractor")
+                            return cls._shared_model
+                    except (ImportError, AttributeError) as e:
+                        logger.debug(f"[SemanticToolMatcher] Could not share model with MultiTierFeatureExtractor: {e}")
+                    
+                    # Fallback: load our own model
                     try:
                         from sentence_transformers import SentenceTransformer
                         logger.info("[SemanticToolMatcher] Loading embedding model...")

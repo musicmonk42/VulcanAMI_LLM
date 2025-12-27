@@ -2106,6 +2106,7 @@ class ToolSelector:
                 query_type=f"reasoning_{result.selected_tool}",
                 tasks=1,
                 error_type=error_type,
+                tools=[result.selected_tool] if result.selected_tool else [],
             )
             
             logger.debug(
