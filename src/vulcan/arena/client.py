@@ -328,9 +328,11 @@ async def execute_via_arena(query: str, routing_plan, arena_base_url: str = None
     logger.info(f"[ARENA] Executing via {agent_id}: {url}")
     t0 = time.perf_counter()
     
-    # Issue #52: Wrap entire request in asyncio.wait_for to enforce hard timeout
-    # The aiohttp.ClientTimeout only covers the HTTP transport, but background
-    # processing can extend beyond that. wait_for ensures a hard cutoff.
+    # Issue #52: Two-layer timeout strategy:
+    # 1. Inner: aiohttp.ClientTimeout handles HTTP transport-level timeout
+    # 2. Outer: asyncio.wait_for provides hard cutoff for entire async operation
+    # The outer timeout is slightly longer to allow clean aiohttp timeout handling
+    # but ensures we never exceed the configured limit + buffer
     async def _execute_request():
         session = await get_http_session()
         async with session.post(
@@ -347,6 +349,7 @@ async def execute_via_arena(query: str, routing_plan, arena_base_url: str = None
                 return {"status": resp.status, "error": error_text}
     
     try:
+        # Outer timeout: hard limit = configured timeout + buffer for clean handling
         response = await asyncio.wait_for(_execute_request(), timeout=timeout + TIMEOUT_BUFFER_SECONDS)
         elapsed = time.perf_counter() - t0
         
