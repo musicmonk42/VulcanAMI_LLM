@@ -426,17 +426,16 @@ class StochasticCostModel:
         )
 
     def _create_ewma_track(self) -> Dict[str, EWMA]:
-        """Create fresh EWMA trackers for a tool-mode pair."""
-        return {
-            "time_ms": EWMA(self.ewma_alpha, self.default_time_ms),
-            "energy_mj": EWMA(self.ewma_alpha, self.default_energy_mj),
-            "quality": EWMA(self.ewma_alpha, self.default_quality),
-            "risk": EWMA(self.ewma_alpha, self.default_risk),
-        }
+        """Create fresh EWMA trackers for a tool-mode pair using default time prior."""
+        return self._create_ewma_track_with_time_prior(self.default_time_ms)
     
     def _create_ewma_track_for_tool(self, tool_name: str) -> Dict[str, EWMA]:
         """Create EWMA trackers with tool-specific priors for better cold-start."""
         time_prior = self.tool_time_priors.get(tool_name, self.default_time_ms)
+        return self._create_ewma_track_with_time_prior(time_prior)
+    
+    def _create_ewma_track_with_time_prior(self, time_prior: float) -> Dict[str, EWMA]:
+        """Create EWMA trackers with specified time prior."""
         return {
             "time_ms": EWMA(self.ewma_alpha, time_prior),
             "energy_mj": EWMA(self.ewma_alpha, self.default_energy_mj),

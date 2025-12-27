@@ -25,6 +25,14 @@ __author__ = "VULCAN-AGI Team"
 logger = logging.getLogger(__name__)
 
 # ============================================================
+# CONSTANTS
+# ============================================================
+
+# Issue #52: Hard timeout buffer for asyncio.wait_for wrapper
+# Adds small buffer beyond aiohttp timeout to catch edge cases
+TIMEOUT_BUFFER_SECONDS = 5.0
+
+# ============================================================
 # IMPORTS
 # ============================================================
 
@@ -339,7 +347,7 @@ async def execute_via_arena(query: str, routing_plan, arena_base_url: str = None
                 return {"status": resp.status, "error": error_text}
     
     try:
-        response = await asyncio.wait_for(_execute_request(), timeout=timeout + 5.0)
+        response = await asyncio.wait_for(_execute_request(), timeout=timeout + TIMEOUT_BUFFER_SECONDS)
         elapsed = time.perf_counter() - t0
         
         if response["status"] == 200:
