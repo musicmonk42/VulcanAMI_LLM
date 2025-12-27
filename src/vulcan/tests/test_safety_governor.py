@@ -897,6 +897,99 @@ class TestSemanticBoostPreservation:
         assert isinstance(result, list)
 
 
+class TestSemanticKeywordSynonyms:
+    """Test semantic keyword synonym matching in contract validation"""
+
+    @pytest.fixture
+    def governor(self):
+        """Create safety governor for testing"""
+        return SafetyGovernor()
+
+    def test_causal_query_matches_semantic_synonyms(self, governor):
+        """Test causal query with semantic synonyms passes contract check"""
+        # This query has "cause", "effect", "model" which are synonyms for "graph" and "data"
+        context = SafetyContext(
+            problem="A butterfly flaps its wings causing a tornado. What does this imply about our causal model?",
+            tool_name="causal",
+            features=None,
+            constraints={"time_budget_ms": 5000, "energy_budget_mj": 1000},
+            user_context={},
+            safety_level=SafetyLevel.MEDIUM,
+        )
+
+        action, reason = governor.check_safety(context)
+
+        # Should ALLOW because semantic synonyms match
+        assert action in [SafetyAction.ALLOW, SafetyAction.LOG_AND_ALLOW]
+
+    def test_analogical_query_matches_semantic_synonyms(self, governor):
+        """Test analogical query with semantic synonyms passes contract check"""
+        # This query has "like", "compare", "similar" which are synonyms for "source" and "target"
+        context = SafetyContext(
+            problem="How is a CPU like a brain? Compare their similar functions.",
+            tool_name="analogical",
+            features=None,
+            constraints={"time_budget_ms": 5000, "energy_budget_mj": 1000},
+            user_context={},
+            safety_level=SafetyLevel.MEDIUM,
+        )
+
+        action, reason = governor.check_safety(context)
+
+        # Should ALLOW because semantic synonyms match
+        assert action in [SafetyAction.ALLOW, SafetyAction.LOG_AND_ALLOW]
+
+    def test_symbolic_query_matches_semantic_synonyms(self, governor):
+        """Test symbolic query with semantic synonyms passes contract check"""
+        # This query has "prove", "theorem", "logical" which are synonyms for "logic" and "rules"
+        context = SafetyContext(
+            problem="Prove this theorem using logical deduction from the given premises.",
+            tool_name="symbolic",
+            features=None,
+            constraints={"time_budget_ms": 5000, "energy_budget_mj": 1000},
+            user_context={},
+            safety_level=SafetyLevel.HIGH,
+        )
+
+        action, reason = governor.check_safety(context)
+
+        # Should ALLOW because semantic synonyms match
+        assert action in [SafetyAction.ALLOW, SafetyAction.LOG_AND_ALLOW]
+
+    def test_probabilistic_query_no_required_inputs(self, governor):
+        """Test probabilistic query passes (has no required_inputs)"""
+        context = SafetyContext(
+            problem="What is the probability that someone has the disease given a positive test?",
+            tool_name="probabilistic",
+            features=None,
+            constraints={"time_budget_ms": 5000, "energy_budget_mj": 1000},
+            user_context={},
+            safety_level=SafetyLevel.MEDIUM,
+        )
+
+        action, reason = governor.check_safety(context)
+
+        # Should ALLOW - probabilistic has no required_inputs
+        assert action in [SafetyAction.ALLOW, SafetyAction.LOG_AND_ALLOW]
+
+    def test_multimodal_query_matches_semantic_synonyms(self, governor):
+        """Test multimodal query with semantic synonyms passes contract check"""
+        # This query has "image", "diagram", "describe" which are synonyms for "modalities"
+        context = SafetyContext(
+            problem="Describe what you see in this image and analyze the diagram.",
+            tool_name="multimodal",
+            features=None,
+            constraints={"time_budget_ms": 5000, "energy_budget_mj": 1000},
+            user_context={},
+            safety_level=SafetyLevel.LOW,
+        )
+
+        action, reason = governor.check_safety(context)
+
+        # Should ALLOW because semantic synonyms match
+        assert action in [SafetyAction.ALLOW, SafetyAction.LOG_AND_ALLOW]
+
+
 # Run tests
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "--tb=short"])
