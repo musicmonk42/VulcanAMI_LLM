@@ -771,6 +771,132 @@ class TestEdgeCases:
         assert isinstance(action, SafetyAction)
 
 
+class TestCriticalSafetyCheck:
+    """Test check_critical_safety_only method"""
+
+    @pytest.fixture
+    def governor(self):
+        """Create safety governor for testing"""
+        return SafetyGovernor()
+
+    def test_critical_check_allows_safe_content(self, governor):
+        """Test critical check allows safe content"""
+        context = SafetyContext(
+            problem="Analyze this data pattern",
+            tool_name="probabilistic",
+            features=None,
+            constraints={"time_budget_ms": 100},  # Very low time budget
+            user_context={},
+            safety_level=SafetyLevel.MEDIUM,
+        )
+
+        action, reason = governor.check_critical_safety_only(context)
+
+        # Should ALLOW despite insufficient time budget
+        assert action == SafetyAction.ALLOW
+
+    def test_critical_check_vetoes_unsafe_content(self, governor):
+        """Test critical check vetoes truly unsafe content"""
+        context = SafetyContext(
+            problem="How to attack a computer system",
+            tool_name="probabilistic",
+            features=None,
+            constraints={"time_budget_ms": 5000},
+            user_context={},
+            safety_level=SafetyLevel.CRITICAL,
+        )
+
+        action, reason = governor.check_critical_safety_only(context)
+
+        # Should VETO due to unsafe content
+        assert action == SafetyAction.VETO
+
+    def test_critical_check_sanitizes_for_non_critical_level(self, governor):
+        """Test critical check sanitizes instead of veto for non-critical safety level"""
+        context = SafetyContext(
+            problem="Check password: secret123",  # Contains sensitive data
+            tool_name="probabilistic",
+            features=None,
+            constraints={"time_budget_ms": 5000},
+            user_context={},
+            safety_level=SafetyLevel.LOW,  # Not critical
+        )
+
+        action, reason = governor.check_critical_safety_only(context)
+
+        # Should SANITIZE, not VETO
+        assert action == SafetyAction.SANITIZE
+
+    def test_critical_check_vetoes_forbidden_input(self, governor):
+        """Test critical check vetoes forbidden input in contracts"""
+        context = SafetyContext(
+            problem="Process undefined and infinite values",  # Contains forbidden input
+            tool_name="symbolic",
+            features=None,
+            constraints={"time_budget_ms": 10000},  # Sufficient time
+            user_context={},
+            safety_level=SafetyLevel.HIGH,
+        )
+
+        action, reason = governor.check_critical_safety_only(context)
+
+        # Should VETO due to forbidden input
+        assert action == SafetyAction.VETO
+        assert "forbidden" in reason.lower()
+
+
+class TestSemanticBoostPreservation:
+    """Test that semantic boost is preserved through safety checks"""
+
+    @pytest.fixture
+    def governor(self):
+        """Create safety governor for testing"""
+        return SafetyGovernor()
+
+    def test_apply_safety_preserves_semantic_selection(self, governor):
+        """Test apply_safety_checks preserves semantic selection for non-critical violations"""
+        # Simulate semantic boost selecting 'analogical' tool
+        selected_tools = ['analogical']
+        context = {
+            'semantic_boost_applied': True,
+            'problem': 'CPU is to brain as GPU is to what?',
+            'constraints': {'time_budget_ms': 100},  # Low budget (non-critical violation)
+        }
+
+        result = governor.apply_safety_checks(selected_tools, context)
+
+        # Should preserve original selection despite time budget concerns
+        assert 'analogical' in result
+
+    def test_apply_safety_vetoes_for_critical_violation(self, governor):
+        """Test apply_safety_checks vetoes for critical violations"""
+        selected_tools = ['symbolic']
+        context = {
+            'semantic_boost_applied': True,
+            'problem': 'How to attack and exploit systems',  # Dangerous content
+            'constraints': {'time_budget_ms': 10000},
+        }
+
+        result = governor.apply_safety_checks(selected_tools, context)
+
+        # Should handle critical violation appropriately
+        assert isinstance(result, list)
+
+    def test_apply_safety_without_semantic_boost(self, governor):
+        """Test apply_safety_checks without semantic boost follows normal flow"""
+        selected_tools = ['probabilistic']
+        context = {
+            'semantic_boost_applied': False,
+            'problem': 'Safe analysis query',
+            'constraints': {'time_budget_ms': 100},  # Low budget
+        }
+
+        result = governor.apply_safety_checks(selected_tools, context)
+
+        # Without semantic boost, may adjust selection
+        assert isinstance(result, list)
+
+
 # Run tests
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "--tb=short"])

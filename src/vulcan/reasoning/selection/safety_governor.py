@@ -527,6 +527,63 @@ class SafetyGovernor:
             output_validators=[lambda x: self._validate_multimodal(x)],
         )
 
+    def check_critical_safety_only(
+        self, context: SafetyContext
+    ) -> Tuple[SafetyAction, Optional[str]]:
+        """
+        Check only for critical safety violations.
+        
+        This is used for initial tool filtering before semantic matching.
+        It checks for truly dangerous inputs (harmful content, PII, etc.)
+        but does NOT check resource constraints or contract violations.
+        
+        This allows semantic matching to consider all tools, with resource
+        constraint violations being handled after semantic selection.
+        
+        Args:
+            context: Safety context for evaluation
+            
+        Returns:
+            (action, reason) - VETO only for critical issues
+        """
+        try:
+            with self.lock:
+                # Only check input safety for critical violations
+                is_safe, reason = self.validator.validate_input(context.problem)
+                if not is_safe:
+                    self._record_violation(
+                        context.tool_name, VetoReason.UNSAFE_INPUT, reason
+                    )
+                    
+                    # For critical safety level, always veto
+                    if context.safety_level == SafetyLevel.CRITICAL:
+                        return (SafetyAction.VETO, reason)
+                    
+                    # For other levels, sanitize is acceptable
+                    return (SafetyAction.SANITIZE, reason)
+                
+                # Check forbidden inputs only (not resource constraints)
+                if context.tool_name in self.contracts:
+                    contract = self.contracts[context.tool_name]
+                    
+                    # Only check forbidden inputs, not time/energy budgets
+                    if contract.forbidden_inputs:
+                        problem_str = str(context.problem).lower()
+                        found = [
+                            forb for forb in contract.forbidden_inputs if forb in problem_str
+                        ]
+                        if found:
+                            self._record_violation(
+                                context.tool_name, VetoReason.CONTRACT_VIOLATION,
+                                f"Forbidden inputs found: {found}"
+                            )
+                            return (SafetyAction.VETO, f"Forbidden inputs found: {found}")
+                
+                return (SafetyAction.ALLOW, None)
+        except Exception as e:
+            logger.error(f"Critical safety check failed: {e}")
+            return (SafetyAction.ALLOW, None)  # Fail open for initial filtering
+
     def check_safety(
         self, context: SafetyContext
     ) -> Tuple[SafetyAction, Optional[str]]:
