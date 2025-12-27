@@ -594,7 +594,7 @@ class ProductionDeployment:
             components["safety_validator"] = EnhancedSafetyValidator(config=None)
             components["governance"] = GovernanceOrchestrator()
             # FIX: Use singleton pattern to prevent model reloading on every request
-            components["nso_aligner"] = get_nso_aligner() if get_nso_aligner else NSOAligner()
+            components["nso_aligner"] = get_nso_aligner() if get_nso_aligner is not None else NSOAligner()
             components["explainer"] = ExplainabilityNode()
 
             logger.info("Safety components loaded successfully")

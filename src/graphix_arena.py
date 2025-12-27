@@ -1073,7 +1073,7 @@ class GraphixArena:
         # FIX: Use singleton pattern for NSOAligner to prevent reloading models on every request
         # get_nso_aligner() caches the instance and avoids expensive model initialization
         self.nso_aligner = (
-            get_nso_aligner() if NSO_ALIGNER_AVAILABLE and (get_nso_aligner is not None) else None
+            get_nso_aligner() if get_nso_aligner is not None else None
         )
         self.obs_manager = (
             ObservabilityManager()

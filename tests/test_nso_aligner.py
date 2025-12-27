@@ -869,6 +869,85 @@ class TestCreativeTaskFalsePositives:
         assert taxonomy["toxicity"] is False, "Isolated 'attack' without context should not trigger"
 
 
+class TestSingletonPattern:
+    """Test the get_nso_aligner singleton pattern."""
+
+    def test_singleton_returns_same_instance(self, temp_dir):
+        """Test that get_nso_aligner returns the same instance."""
+        from nso_aligner import get_nso_aligner, reset_nso_aligner
+        
+        # Reset first to ensure clean state
+        reset_nso_aligner()
+        
+        try:
+            instance1 = get_nso_aligner(log_dir=temp_dir)
+            instance2 = get_nso_aligner()  # Should return cached instance
+            
+            assert instance1 is instance2, "get_nso_aligner should return same instance"
+        finally:
+            # Clean up
+            reset_nso_aligner()
+    
+    def test_reset_creates_new_instance(self, temp_dir):
+        """Test that reset_nso_aligner clears the singleton."""
+        from nso_aligner import get_nso_aligner, reset_nso_aligner
+        
+        # Reset first to ensure clean state
+        reset_nso_aligner()
+        
+        try:
+            instance1 = get_nso_aligner(log_dir=temp_dir)
+            
+            # Reset the singleton
+            reset_nso_aligner()
+            
+            # Should create new instance
+            instance2 = get_nso_aligner(log_dir=temp_dir)
+            
+            assert instance1 is not instance2, "After reset, should create new instance"
+        finally:
+            # Clean up
+            reset_nso_aligner()
+    
+    def test_singleton_thread_safety(self, temp_dir):
+        """Test that singleton is thread-safe."""
+        import threading
+        from nso_aligner import get_nso_aligner, reset_nso_aligner
+        
+        # Reset first to ensure clean state
+        reset_nso_aligner()
+        
+        instances = []
+        errors = []
+        
+        def get_instance():
+            try:
+                inst = get_nso_aligner(log_dir=temp_dir)
+                instances.append(inst)
+            except Exception as e:
+                errors.append(e)
+        
+        try:
+            # Create multiple threads trying to get instance
+            threads = [threading.Thread(target=get_instance) for _ in range(5)]
+            
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+            
+            assert len(errors) == 0, f"Thread safety errors: {errors}"
+            assert len(instances) == 5, "All threads should get an instance"
+            
+            # All instances should be the same
+            first = instances[0]
+            for inst in instances[1:]:
+                assert inst is first, "All threads should get same singleton instance"
+        finally:
+            # Clean up
+            reset_nso_aligner()
+
+
 if __name__ == "__main__":
     # Note: Running with pytest directly is usually preferred over this block
     pytest.main([__file__, "-v", "--tb=short"])

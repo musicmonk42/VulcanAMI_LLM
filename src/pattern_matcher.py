@@ -155,7 +155,7 @@ class PatternMatcher:
         self.strict_mode = strict_mode
 
         # Initialize NSO Aligner using singleton pattern to avoid model reloading
-        self.nso_aligner = get_nso_aligner() if get_nso_aligner else NSOAligner()
+        self.nso_aligner = get_nso_aligner() if get_nso_aligner is not None else NSOAligner()
 
         # Statistics tracking
         self.stats = MatchingStats()
