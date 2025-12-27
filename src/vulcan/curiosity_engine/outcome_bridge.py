@@ -372,9 +372,8 @@ class OutcomeBridge:
         """Sync send outcome to learning system (when not in async context)."""
         try:
             if hasattr(self.learning_system, 'process_outcome'):
-                # If process_outcome is a coroutine, run it in a new event loop
-                coro = self.learning_system.process_outcome(outcome)
-                if asyncio.iscoroutine(coro):
+                # Check if process_outcome is a coroutine function before calling
+                if asyncio.iscoroutinefunction(self.learning_system.process_outcome):
                     # Create a new event loop for this thread if needed
                     try:
                         loop = asyncio.get_event_loop()
@@ -382,9 +381,15 @@ class OutcomeBridge:
                             loop = asyncio.new_event_loop()
                             asyncio.set_event_loop(loop)
                     except RuntimeError:
+                        # No running loop in this thread, create one
                         loop = asyncio.new_event_loop()
                         asyncio.set_event_loop(loop)
+                    
+                    coro = self.learning_system.process_outcome(outcome)
                     loop.run_until_complete(coro)
+                else:
+                    # Not a coroutine, call directly
+                    self.learning_system.process_outcome(outcome)
         except Exception as e:
             logger.error(f"{LOG_PREFIX} Learning processing failed: {e}")
 

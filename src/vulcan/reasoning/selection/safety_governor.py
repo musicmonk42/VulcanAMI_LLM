@@ -685,18 +685,20 @@ class SafetyGovernor:
                 is_critical = False
                 if tool in self.contracts:
                     contract = self.contracts[tool]
-                    is_critical = contract.required_safety_level == SafetyLevel.CRITICAL
+                    is_critical = getattr(contract, 'required_safety_level', None) == SafetyLevel.CRITICAL
                 
                 if is_critical:
                     logger.error(f"[SafetyGovernor] CRITICAL violation for '{tool}': {reason} - overriding selection")
-                    adjusted_tools.remove(tool)
+                    if tool in adjusted_tools:
+                        adjusted_tools.remove(tool)
                 elif semantic_boost_applied:
                     # Non-critical: log warning but preserve semantic selection
                     logger.info(f"[SafetyGovernor] Non-critical warning ({reason}) - preserving semantic selection for '{tool}'")
                 else:
                     # No semantic boost, apply normal safety override
                     logger.warning(f"[SafetyGovernor] Safety violation for '{tool}': {reason} - adjusting selection")
-                    adjusted_tools.remove(tool)
+                    if tool in adjusted_tools:
+                        adjusted_tools.remove(tool)
         
         # If all tools were removed, return a safe fallback
         if not adjusted_tools and selected_tools:

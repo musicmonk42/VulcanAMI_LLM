@@ -1417,16 +1417,25 @@ class ToolSelector:
             )
             
             # Apply learned weight adjustments from learning system
-            if self.learning_system and hasattr(prior_dist, 'tool_probs'):
+            if self.learning_system and hasattr(prior_dist, 'tool_probs') and isinstance(prior_dist.tool_probs, dict):
                 for tool in prior_dist.tool_probs:
                     adjustment = self.learning_system.get_tool_weight_adjustment(tool)
                     if adjustment != 0:
                         prior_dist.tool_probs[tool] += adjustment
                         logger.info(f"[ToolSelector] Applied learned adjustment to '{tool}': {adjustment:+.3f}")
-                # Renormalize after adjustments
+                # Ensure no negative probabilities and renormalize
+                for tool in prior_dist.tool_probs:
+                    if prior_dist.tool_probs[tool] < 0:
+                        prior_dist.tool_probs[tool] = 0.0
                 total = sum(prior_dist.tool_probs.values())
                 if total > 0:
                     prior_dist.tool_probs = {k: v / total for k, v in prior_dist.tool_probs.items()}
+                else:
+                    # All weights were zero/negative, reset to uniform
+                    n_tools = len(prior_dist.tool_probs)
+                    if n_tools > 0:
+                        uniform_prob = 1.0 / n_tools
+                        prior_dist.tool_probs = {k: uniform_prob for k in prior_dist.tool_probs}
                 # Update most likely tool
                 if prior_dist.tool_probs:
                     prior_dist.most_likely_tool = max(prior_dist.tool_probs.items(), key=lambda x: x[1])[0]
