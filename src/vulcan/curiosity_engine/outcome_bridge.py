@@ -76,12 +76,14 @@ Error Handling:
     handled gracefully to prevent cascading failures.
 """
 
+import asyncio
 import logging
 import os
 import sqlite3
 import statistics as stats_module
 import tempfile
 import threading
+import time
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -239,6 +241,157 @@ class DetectedGap:
             "evidence": self.evidence,
             "suggested_action": self.suggested_action,
         }
+
+
+# =============================================================================
+# OutcomeBridge Class for Learning System Integration
+# =============================================================================
+
+class OutcomeBridge:
+    """
+    Bridge between query outcomes and the learning system.
+    
+    This class provides the connection between recorded query outcomes
+    and the UnifiedLearningSystem for feedback-driven learning.
+    """
+    
+    _instance = None
+    _lock = threading.Lock()
+    
+    def __new__(cls):
+        """Singleton pattern for OutcomeBridge."""
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+                    cls._instance._initialized = False
+        return cls._instance
+    
+    def __init__(self):
+        if self._initialized:
+            return
+        
+        self.learning_system = None
+        self._outcome_queue: List[Dict[str, Any]] = []
+        self._initialized = True
+        logger.info(f"{LOG_PREFIX} OutcomeBridge initialized")
+    
+    def set_learning_system(self, learning_system: Any) -> None:
+        """
+        Connect to learning system for feedback loop.
+        
+        Args:
+            learning_system: The UnifiedLearningSystem instance
+        """
+        self.learning_system = learning_system
+        logger.info(f"{LOG_PREFIX} Connected to UnifiedLearningSystem")
+        
+        # Process any queued outcomes
+        if self._outcome_queue:
+            logger.info(f"{LOG_PREFIX} Processing {len(self._outcome_queue)} queued outcomes")
+            for outcome in self._outcome_queue:
+                self._send_to_learning_sync(outcome)
+            self._outcome_queue.clear()
+    
+    def record(
+        self,
+        query_id: str,
+        status: str,
+        routing_ms: float,
+        total_ms: float,
+        complexity: float,
+        query_type: str,
+        tools: Optional[List[str]] = None,
+    ) -> bool:
+        """
+        Record a query outcome and send to learning system.
+        
+        Args:
+            query_id: Unique query identifier
+            status: Query status ("success", "error", "timeout")
+            routing_ms: Time spent routing in milliseconds
+            total_ms: Total processing time in milliseconds
+            complexity: Query complexity score (0.0 to 1.0)
+            query_type: Type of query (reasoning, perception, etc.)
+            tools: List of tools used for the query
+            
+        Returns:
+            True if recording and learning system update succeeded
+        """
+        # Log the outcome
+        logger.info(
+            f"[QueryOutcome] Recorded: {query_id}, status={status}, "
+            f"routing={routing_ms:.0f}ms, total={total_ms:.0f}ms, "
+            f"complexity={complexity:.2f}, type={query_type}"
+        )
+        
+        # Create outcome object
+        outcome = {
+            'query_id': query_id,
+            'status': status,
+            'routing_ms': routing_ms,
+            'total_ms': total_ms,
+            'complexity': complexity,
+            'query_type': query_type,
+            'tools': tools or [],
+            'timestamp': time.time(),
+        }
+        
+        # Send to learning system
+        if self.learning_system:
+            try:
+                # Use asyncio if in async context, otherwise call sync
+                try:
+                    loop = asyncio.get_running_loop()
+                    # We're in an async context, schedule the task
+                    asyncio.create_task(self._send_to_learning_async(outcome))
+                    logger.info(f"[QueryOutcome] Sent to learning system for processing")
+                except RuntimeError:
+                    # No running loop, use sync method
+                    self._send_to_learning_sync(outcome)
+                    logger.info(f"[QueryOutcome] Sent to learning system for processing")
+                return True
+            except Exception as e:
+                logger.warning(f"[QueryOutcome] Failed to send to learning: {e}")
+                self._outcome_queue.append(outcome)  # Queue for retry
+                return False
+        else:
+            logger.debug(f"[QueryOutcome] No learning system connected - outcome not processed for learning")
+            self._outcome_queue.append(outcome)  # Queue for later
+            return True  # Still return True since SQLite recording worked
+    
+    async def _send_to_learning_async(self, outcome: Dict[str, Any]) -> None:
+        """Async send outcome to learning system."""
+        try:
+            if hasattr(self.learning_system, 'process_outcome'):
+                await self.learning_system.process_outcome(outcome)
+        except Exception as e:
+            logger.error(f"{LOG_PREFIX} Learning processing failed: {e}")
+    
+    def _send_to_learning_sync(self, outcome: Dict[str, Any]) -> None:
+        """Sync send outcome to learning system (when not in async context)."""
+        try:
+            if hasattr(self.learning_system, 'process_outcome'):
+                # If process_outcome is a coroutine, run it in a new event loop
+                coro = self.learning_system.process_outcome(outcome)
+                if asyncio.iscoroutine(coro):
+                    # Create a new event loop for this thread if needed
+                    try:
+                        loop = asyncio.get_event_loop()
+                        if loop.is_closed():
+                            loop = asyncio.new_event_loop()
+                            asyncio.set_event_loop(loop)
+                    except RuntimeError:
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                    loop.run_until_complete(coro)
+        except Exception as e:
+            logger.error(f"{LOG_PREFIX} Learning processing failed: {e}")
+
+
+def get_outcome_bridge() -> OutcomeBridge:
+    """Get the singleton OutcomeBridge instance."""
+    return OutcomeBridge()
 
 
 # =============================================================================
@@ -474,6 +627,21 @@ def record_query_outcome(
             f"routing={routing_time_ms:.0f}ms, total={total_time_ms:.0f}ms, "
             f"complexity={complexity:.2f}, type={query_type}"
         )
+        
+        # Also send to learning system via OutcomeBridge
+        try:
+            bridge = get_outcome_bridge()
+            bridge.record(
+                query_id=query_id,
+                status=status,
+                routing_ms=routing_time_ms,
+                total_ms=total_time_ms,
+                complexity=complexity,
+                query_type=query_type,
+            )
+        except Exception as e:
+            logger.debug(f"{LOG_PREFIX} OutcomeBridge record failed (non-critical): {e}")
+        
         return True
         
     except sqlite3.Error as e:
