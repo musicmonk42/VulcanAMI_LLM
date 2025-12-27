@@ -2390,9 +2390,11 @@ async def lifespan(app: FastAPI):
         
         try:
             # 2. Pre-load QueryAnalyzer singleton (includes safety validators)
+            # Note: This may have already been initialized if unified_learning is available,
+            # but we ensure it's always pre-loaded regardless of learning system status
             logger.info("Pre-loading QueryAnalyzer...")
             from vulcan.routing.query_router import get_query_analyzer
-            _ = get_query_analyzer()  # Force singleton initialization
+            _ = get_query_analyzer()  # Force singleton initialization (no-op if already created)
             logger.info("  ✅ QueryAnalyzer pre-loaded")
             components_status["QueryAnalyzer"] = True
         except Exception as e:
