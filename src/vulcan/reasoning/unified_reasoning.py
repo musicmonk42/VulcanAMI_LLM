@@ -537,8 +537,12 @@ class UnifiedReasoner:
                 logger.warning(f"Error initializing learner: {e}")
 
         # Runtime integration - PRODUCTION FIX: Skip heavy runtime in test environments
+        # unless VULCAN_FORCE_PRODUCTION_REASONING is set to 'true'
         self.runtime = None
         if "UnifiedRuntime" in optional_components:
+            # Check for environment variable to force production reasoning
+            force_production = os.getenv("VULCAN_FORCE_PRODUCTION_REASONING", "").lower() == "true"
+            
             # Auto-detect if we're in a test environment
             import sys
 
@@ -549,17 +553,23 @@ class UnifiedReasoner:
                 or config.get("skip_runtime", False)
             )
 
-            if not in_test:
+            # Initialize runtime if not in test OR if force_production is enabled
+            if force_production or not in_test:
                 try:
                     self.runtime = optional_components["UnifiedRuntime"]()
                     # DAEMON FIX: Make runtime threads daemon
                     self._daemonize_component_threads(self.runtime)
+                    if force_production and in_test:
+                        logger.info(
+                            "UnifiedRuntime initialized (forced via VULCAN_FORCE_PRODUCTION_REASONING)"
+                        )
                 except Exception as e:
                     logger.warning(f"Error initializing runtime: {e}")
                     self.runtime = None
             else:
                 logger.info(
-                    "Skipping UnifiedRuntime initialization (test environment detected)"
+                    "Skipping UnifiedRuntime initialization (test environment detected). "
+                    "Set VULCAN_FORCE_PRODUCTION_REASONING=true to override."
                 )
 
         # Processor for multimodal inputs

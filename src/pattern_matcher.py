@@ -21,11 +21,12 @@ except ImportError:
 
 # --- Ethical Check Import ---
 try:
-    from nso_aligner import NSOAligner
+    from nso_aligner import NSOAligner, get_nso_aligner
 
     NSO_ALIGNER_AVAILABLE = True
 except ImportError:
     NSO_ALIGNER_AVAILABLE = False
+    get_nso_aligner = None
 
     # Create a fail-safe dummy class that REJECTS by default
     class NSOAligner:
@@ -153,8 +154,8 @@ class PatternMatcher:
         self.enable_validation = enable_validation
         self.strict_mode = strict_mode
 
-        # Initialize NSO Aligner
-        self.nso_aligner = NSOAligner()
+        # Initialize NSO Aligner using singleton pattern to avoid model reloading
+        self.nso_aligner = get_nso_aligner() if get_nso_aligner is not None else NSOAligner()
 
         # Statistics tracking
         self.stats = MatchingStats()

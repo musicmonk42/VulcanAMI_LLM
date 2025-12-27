@@ -640,6 +640,28 @@ class NSOAligner:
         return plan
 
 
+def get_nso_aligner(**kwargs) -> NSOAligner:
+    """
+    Get the singleton NSOAligner instance.
+    
+    This factory function tries to import the full NSOAligner implementation
+    from nso_aligner module and returns a singleton instance to avoid
+    expensive model reloading on every request.
+    
+    Falls back to the base stub class if the full implementation is unavailable.
+    
+    Returns:
+        NSOAligner: The singleton instance (full implementation or stub)
+    """
+    try:
+        # Try to import the full implementation with singleton support
+        from nso_aligner import get_nso_aligner as _get_full_nso_aligner
+        return _get_full_nso_aligner(**kwargs)
+    except ImportError:
+        # Fall back to stub implementation
+        return NSOAligner(kwargs.get("policies"))
+
+
 class ExplainabilityNode:
     """Base interface for explainability generation."""
 

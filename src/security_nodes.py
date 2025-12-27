@@ -27,9 +27,9 @@ except ImportError:
 
 # NSOAligner exists
 try:
-    from .nso_aligner import NSOAligner
+    from .nso_aligner import NSOAligner, get_nso_aligner
 except ImportError:
-    from nso_aligner import NSOAligner
+    from nso_aligner import NSOAligner, get_nso_aligner
 
 # 2025: Add ITU F.748.53 compression, F.748.47/53 policy, photonic audit, Grok-4 kernel, EU2025 ethical_label
 try:
@@ -91,7 +91,8 @@ class EncryptNode:
     def __init__(self, agent_id: str = "security_node_default"):
         # FIXED: KeyManager requires agent_id
         self.key_manager = KeyManager(agent_id)
-        self.nso_aligner = NSOAligner()
+        # FIX: Use singleton pattern to prevent model reloading
+        self.nso_aligner = get_nso_aligner()
         self.compressor = LLMCompressor() if LLMCompressor is not None else None
         self.hardware = HardwareDispatcher() if HardwareDispatcher is not None else None
         self.kernel_audit = GrokKernelAudit() if GrokKernelAudit is not None else None
@@ -401,7 +402,8 @@ class PolicyNode:
     """
 
     def __init__(self):
-        self.nso_aligner = NSOAligner()
+        # FIX: Use singleton pattern to prevent model reloading
+        self.nso_aligner = get_nso_aligner()
         self.compressor = LLMCompressor() if LLMCompressor is not None else None
 
     def _validate_data(self, data: Any) -> None:

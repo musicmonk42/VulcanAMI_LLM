@@ -585,6 +585,7 @@ class ProductionDeployment:
                 ExplainabilityNode,
                 GovernanceOrchestrator,
                 NSOAligner,
+                get_nso_aligner,
             )
             from vulcan.safety.safety_validator import EnhancedSafetyValidator
 
@@ -592,7 +593,8 @@ class ProductionDeployment:
             # EnhancedSafetyValidator will create its own SafetyConfig with defaults
             components["safety_validator"] = EnhancedSafetyValidator(config=None)
             components["governance"] = GovernanceOrchestrator()
-            components["nso_aligner"] = NSOAligner()
+            # FIX: Use singleton pattern to prevent model reloading on every request
+            components["nso_aligner"] = get_nso_aligner() if get_nso_aligner is not None else NSOAligner()
             components["explainer"] = ExplainabilityNode()
 
             logger.info("Safety components loaded successfully")
