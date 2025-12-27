@@ -1125,7 +1125,7 @@ class UnifiedReasoner:
 
                     utility = self.utility_model.compute_utility(
                         quality=estimated_quality,
-                        time_ms=estimated_time,
+                        time=estimated_time,
                         energy=estimated_energy,
                         risk=0.2,
                         context=task.utility_context,
@@ -2267,7 +2267,7 @@ class UnifiedReasoner:
 
             return self.utility_model.compute_utility(
                 quality=result.confidence,
-                time_ms=execution_time_ms,
+                time=execution_time_ms,
                 energy=energy_mj,
                 risk=1 - result.confidence,
                 context=context,
@@ -2283,6 +2283,31 @@ class UnifiedReasoner:
             if task.task_type in self.reasoners:
                 reasoner = self.reasoners[task.task_type]
                 return self._execute_reasoner(reasoner, task)
+            elif task.task_type == ReasoningType.HYBRID:
+                # HYBRID reasoning: delegate to PROBABILISTIC reasoner as the most general-purpose
+                # fallback, since HYBRID represents combined/integrated reasoning approaches.
+                # Note: PROBABILISTIC is chosen as the default fallback because it can handle
+                # uncertainty quantification across multiple reasoning modalities.
+                if ReasoningType.PROBABILISTIC in self.reasoners:
+                    fallback_task = ReasoningTask(
+                        task_id=task.task_id,
+                        task_type=ReasoningType.PROBABILISTIC,
+                        input_data=task.input_data,
+                        query=task.query,
+                        constraints=task.constraints,
+                        utility_context=task.utility_context,
+                    )
+                    result = self._execute_reasoner(
+                        self.reasoners[ReasoningType.PROBABILISTIC], fallback_task
+                    )
+                    # Update result to reflect HYBRID reasoning type
+                    result.reasoning_type = ReasoningType.HYBRID
+                    return result
+                else:
+                    logger.warning(
+                        f"No reasoner for type {task.task_type} and no PROBABILISTIC fallback available"
+                    )
+                    return self._create_empty_result()
             else:
                 logger.warning(f"No reasoner for type {task.task_type}")
                 return self._create_empty_result()

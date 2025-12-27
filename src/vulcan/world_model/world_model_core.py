@@ -1889,6 +1889,22 @@ class WorldModel:
                 self.improvement_thread = None
                 self.improvement_running = False
 
+                # Wire metrics provider for CSIU (latent drive) telemetry
+                # This connects real system metrics to the self-improvement drive
+                metrics_provider = self._create_csiu_metrics_provider()
+                self.self_improvement_drive.set_metrics_provider(metrics_provider)
+                
+                # Verify metrics provider is working
+                verification = self.self_improvement_drive.verify_metrics_provider()
+                if verification.get("working"):
+                    logger.info(
+                        f"✓ CSIU metrics provider wired: {verification.get('message')}"
+                    )
+                else:
+                    logger.warning(
+                        f"⚠ CSIU metrics provider not fully working: {verification.get('message')}"
+                    )
+
                 logger.info("✓ Self-improvement drive initialized")
             except Exception as e:
                 logger.error(
@@ -2040,6 +2056,202 @@ class WorldModel:
                 f"Safety validator missing required methods: {missing}. "
                 f"Some safety checks will be skipped."
             )
+
+    def _create_csiu_metrics_provider(self):
+        """
+        Create a metrics provider function for CSIU (Collective Self-Improvement 
+        via Human Understanding) telemetry integration.
+        
+        This wires real system metrics to the SelfImprovementDrive, replacing
+        the hardcoded defaults (0.85, 0.06, 0.88) with actual runtime data.
+        
+        The provider maps dotted metric keys to actual system measurements:
+        - metrics.alignment_coherence_idx -> success rate from metrics collector
+        - metrics.communication_entropy -> normalized error rate
+        - metrics.intent_clarity_score -> 1 - uncertainty
+        - metrics.empathy_index -> user feedback score
+        - metrics.user_satisfaction -> derived from success rate and latency
+        - metrics.miscommunication_rate -> error rate
+        
+        Returns:
+            Callable that takes a dotted metric key and returns a float value
+        """
+        # Helper functions defined at outer scope to avoid closure issues
+        def _calc_success_rate(data):
+            """Calculate success rate from metrics data."""
+            counters = data.get("counters", {})
+            success = counters.get("successful_actions", 0)
+            failed = counters.get("failed_actions", 0)
+            total = success + failed
+            if total == 0:
+                return 0.85  # Default if no data
+            return min(1.0, max(0.0, success / total))
+        
+        def _calc_error_rate(data):
+            """Calculate error rate from metrics data."""
+            counters = data.get("counters", {})
+            success = counters.get("successful_actions", 0)
+            failed = counters.get("failed_actions", 0)
+            total = success + failed
+            if total == 0:
+                return 0.02  # Default if no data
+            return min(1.0, max(0.0, failed / total))
+        
+        def _calc_satisfaction(data):
+            """Calculate satisfaction from success rate and latency."""
+            success_rate = _calc_success_rate(data)
+            
+            # Get average latency
+            histograms = data.get("histograms", {})
+            durations = histograms.get("step_duration_ms", [])
+            if durations:
+                avg_latency = sum(durations) / len(durations)
+                # Latency factor: 1.0 at 100ms, decreases for higher latency
+                latency_factor = min(1.0, 100.0 / max(avg_latency, 1.0))
+            else:
+                latency_factor = 0.8
+            
+            return min(1.0, max(0.0, success_rate * 0.7 + latency_factor * 0.3))
+        
+        def _calc_policy_violations_per_1k(data):
+            """Calculate policy violations per 1000 actions from governance logger."""
+            try:
+                from vulcan.routing.governance_logger import get_governance_logger
+                gov_logger = get_governance_logger()
+                stats = gov_logger.get_statistics()
+                
+                # Get policy violation count and total actions
+                violation_count = stats.get("policy_violation_count", 0)
+                counters = data.get("counters", {})
+                total_actions = counters.get("successful_actions", 0) + counters.get("failed_actions", 0)
+                
+                if total_actions == 0:
+                    return 0.0
+                
+                # Calculate violations per 1000 actions
+                return min(1.0, (violation_count / total_actions) * 1000.0)
+            except Exception:
+                return 0.0
+        
+        def _calc_disparity_at_k(data):
+            """Calculate disparity at k from bias scores in safety validator."""
+            try:
+                # Try to get bias scores from safety validator
+                from vulcan.safety.safety_validator import EnhancedSafetyValidator
+                
+                # Check for bias scores in metrics data
+                aggregates = data.get("aggregates", {})
+                if "bias_scores" in aggregates:
+                    bias_scores = aggregates["bias_scores"]
+                    if isinstance(bias_scores, dict) and bias_scores:
+                        # Calculate average disparity from demographic and representation bias
+                        demo_bias = bias_scores.get("demographic", 0.0)
+                        rep_bias = bias_scores.get("representation", 0.0)
+                        return min(1.0, max(0.0, (demo_bias + rep_bias) / 2.0))
+                
+                # Fallback: use identity drift as proxy for disparity
+                gauges = data.get("gauges", {})
+                identity_drift = gauges.get("identity_drift", 0.0)
+                return min(1.0, max(0.0, abs(identity_drift)))
+            except Exception:
+                return 0.0
+        
+        def metrics_provider(dotted_key: str) -> Optional[float]:
+            """
+            Retrieve metric value by dotted key.
+            
+            Args:
+                dotted_key: Metric path like "metrics.alignment_coherence_idx"
+                
+            Returns:
+                Float value or None if not available
+            """
+            try:
+                # Try to get metrics from TelemetryRecorder first
+                meta_state = {}
+                try:
+                    from vulcan.routing.telemetry_recorder import get_telemetry_recorder
+                    recorder = get_telemetry_recorder()
+                    meta_state = recorder.get_meta_state() if recorder else {}
+                except Exception:
+                    pass
+                
+                # Try to get metrics from EnhancedMetricsCollector via deployment
+                metrics_data = {}
+                try:
+                    import sys
+                    main_module = sys.modules.get('vulcan.main')
+                    if main_module and hasattr(main_module, 'app'):
+                        app = main_module.app
+                        if hasattr(app, 'state') and hasattr(app.state, 'deployment'):
+                            deployment = app.state.deployment
+                            if hasattr(deployment, 'metrics_collector'):
+                                metrics_data = deployment.metrics_collector.export_metrics()
+                except Exception:
+                    pass
+                
+                # Map dotted keys to actual metrics - capture metrics_data in lambdas
+                # by passing it as default argument to avoid closure issues
+                mapping = {
+                    # Alignment coherence: derived from success rate
+                    "metrics.alignment_coherence_idx": lambda d=metrics_data: _calc_success_rate(d),
+                    
+                    # Communication entropy: higher error rate = higher entropy
+                    "metrics.communication_entropy": lambda d=metrics_data: _calc_error_rate(d) * 0.5,
+                    
+                    # Intent clarity: inverse of uncertainty
+                    "metrics.intent_clarity_score": lambda d=metrics_data: 1.0 - d.get("gauges", {}).get("current_uncertainty", 0.12),
+                    
+                    # Policy violations: from governance logger
+                    "policies.non_judgmental.violations_per_1k": lambda d=metrics_data: _calc_policy_violations_per_1k(d),
+                    
+                    # Disparity at k: from bias scores or identity drift
+                    "metrics.disparity_at_k": lambda d=metrics_data: _calc_disparity_at_k(d),
+                    
+                    # Calibration gap: identity drift as proxy
+                    "metrics.calibration_gap": lambda d=metrics_data: abs(d.get("gauges", {}).get("identity_drift", 0.0)),
+                    
+                    # Empathy index: from user feedback or default
+                    "metrics.empathy_index": lambda m=meta_state: m.get("average_feedback_score", 0.6),
+                    
+                    # User satisfaction: composite of success and latency
+                    "metrics.user_satisfaction": lambda d=metrics_data: _calc_satisfaction(d),
+                    
+                    # Miscommunication rate: error rate
+                    "metrics.miscommunication_rate": lambda d=metrics_data: _calc_error_rate(d),
+                    
+                    # Context profile quality (from telemetry)
+                    "context.profile_quality": lambda m=meta_state: m.get("context_quality", 0.6),
+                    
+                    # Context history depth (from telemetry)
+                    "context.history_depth": lambda m=meta_state: min(1.0, m.get("entries_count", 0) / 100.0),
+                }
+                
+                # Look up the metric
+                if dotted_key in mapping:
+                    return mapping[dotted_key]()
+                
+                # Fallback: try to find in raw metrics
+                parts = dotted_key.split(".")
+                if len(parts) >= 2:
+                    category = parts[0]
+                    metric_name = ".".join(parts[1:])
+                    
+                    if category == "metrics":
+                        # Check gauges
+                        if metric_name in metrics_data.get("gauges", {}):
+                            return metrics_data["gauges"][metric_name]
+                        # Check counters
+                        if metric_name in metrics_data.get("counters", {}):
+                            return float(metrics_data["counters"][metric_name])
+                
+                return None
+                
+            except Exception as e:
+                logger.debug(f"CSIU metrics provider error for {dotted_key}: {e}")
+                return None
+        
+        return metrics_provider
 
     def start_autonomous_improvement(self):
         """Start the autonomous self-improvement background thread"""
@@ -2518,9 +2730,20 @@ class WorldModel:
             return 1024.0
 
     def _get_low_activity_duration(self) -> float:
-        """Get duration of low activity in minutes"""
-        # TODO: Implement actual activity tracking
-        return 0.0
+        """Get duration of low activity in minutes.
+        
+        Calculates how long since the last observation was processed.
+        This is used for self-improvement triggers that activate during idle periods.
+        
+        Returns:
+            Duration in minutes since last observation, or 0.0 if no observations yet
+        """
+        if self.last_observation_time is None:
+            return 0.0
+        
+        current_time = time.time()
+        elapsed_seconds = current_time - self.last_observation_time
+        return elapsed_seconds / 60.0  # Convert to minutes
 
     def process_observation(self, observation: Observation, constraints=None):
         """Main entrypoint from the rest of the system."""

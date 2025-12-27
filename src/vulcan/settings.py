@@ -166,13 +166,13 @@ class Settings(BaseSettings):
     arena_api_key: Optional[str] = Field(
         default="default-secret-key-for-dev", env="GRAPHIX_API_KEY"
     )
-    # PERFORMANCE FIX: Arena timeout increased to 90s based on production analysis
-    # Evidence from logs shows Arena completes in 55-64s but was timing out at 30s
+    # PERFORMANCE FIX: Arena timeout increased to 120s based on production analysis
+    # Evidence from logs shows Arena completes in 55-64s but can take 90+ seconds under CPU load
     # Example: 15:18:18 [ARENA] generator timeout after 31.53s
     #          15:18:43 POST /arena/api/run/generator [200] 55.602s (COMPLETED)
     # The 30s timeout wasted 55-64s of completed Arena work due to premature timeout
-    # Increased to 90s to allow Arena to complete while optimization is in progress
-    arena_timeout: float = Field(default=90.0, env="ARENA_TIMEOUT")
+    # Increased to 120s to handle CPU-heavy loads while allowing Arena to complete
+    arena_timeout: float = Field(default=120.0, env="ARENA_TIMEOUT")
     # Whether to enable Arena routing for complex queries
     arena_enabled: bool = Field(default=True, env="ARENA_ENABLED")
     # PERFORMANCE FIX: Complexity threshold for Arena fast-path skip

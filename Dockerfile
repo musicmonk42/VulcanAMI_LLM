@@ -225,10 +225,10 @@ EXPOSE 8000
 # Switch to non-root user
 USER graphix
 
-# Healthcheck using curl (depends on app exposing /health endpoint)
+# Healthcheck using curl (uses fast /health/live endpoint)
 # Uses PORT env var with default of 8000 if not set
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-    CMD curl -fsS http://localhost:${PORT:-8000}/health || exit 1
+    CMD curl -fsS http://localhost:${PORT:-8000}/health/live || exit 1
 
 # Entrypoint ensures runtime secrets are provided securely
 ENTRYPOINT ["/app/entrypoint.sh"]

@@ -754,9 +754,11 @@ class AgentPoolManager:
         # Initialize minimum agents
         self._initialize_agent_pool()
 
+        # Log actual configured values (self.min_agents/max_agents) not function params
+        # This fixes misleading log output when values are overridden
         logger.info(
             f"AgentPoolManager initialized: "
-            f"min_agents={min_agents}, max_agents={max_agents}, "
+            f"min_agents={self.min_agents}, max_agents={self.max_agents}, "
             f"queue_type={task_queue_type}, "
             f"cachetools_available={CACHETOOLS_AVAILABLE}"
         )
@@ -832,13 +834,19 @@ class AgentPoolManager:
     @property
     def provenance_records(self) -> List[Dict[str, Any]]:
         """
-        Exposes the working memory buffer as a list for backward compatibility 
+        Exposes provenance records for backward compatibility 
         with SemanticBridge and other components.
         
         Returns:
-            List of provenance records from the working memory buffer.
+            List of provenance records from the internal deque.
+            
+        Note:
+            FIX Issue #43: Previously returned self.working_memory.buffer which
+            was empty because provenance is stored via _set_provenance_by_job_id()
+            into _provenance_records deque, not working_memory.
         """
-        return list(self.working_memory.buffer)
+        with self._sync_provenance_lock:
+            return list(self._provenance_records)
     
     def _extract_job_id(self, record: Any) -> Optional[str]:
         """

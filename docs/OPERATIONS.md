@@ -93,7 +93,12 @@ docker compose -f docker-compose.dev.yml logs -f
 | Registry API | `curl http://localhost:5000/health` | `{"status": "healthy"}` |
 | Arena API | `curl http://localhost:8000/health` | `{"status": "healthy"}` |
 | Unified Platform | `curl http://localhost:8080/health` | Component status |
+| **Fast Liveness** | `curl http://localhost:8000/health/live` | `{"status": "alive"}` |
+| **Fast Readiness** | `curl http://localhost:8000/health/ready` | `{"status": "ready"}` |
 | Metrics | `curl http://localhost:8000/metrics` | Prometheus payload |
+
+> **Note:** Use `/health/live` and `/health/ready` for Kubernetes liveness/readiness probes.
+> These endpoints are faster (<100ms) than the comprehensive `/health` endpoint.
 
 ### 2.4 Smoke Tests
 

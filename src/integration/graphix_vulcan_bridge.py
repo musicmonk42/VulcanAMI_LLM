@@ -519,7 +519,8 @@ class GraphixVulcanBridge:
         if the object is retrieved a second time.
         """
         if getattr(self, "_initialized", False):
-            log.warning(
+            # Expected singleton behavior - use DEBUG level to reduce log noise
+            log.debug(
                 "GraphixVulcanBridge accessed (already initialized). Returning existing instance."
             )
             return

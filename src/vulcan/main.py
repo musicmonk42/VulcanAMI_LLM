@@ -958,6 +958,31 @@ async def lifespan(app: FastAPI):
         await get_http_session()
         logger.info("✓ Global HTTP connection pool initialized")
 
+    # PERFORMANCE FIX (Issue #30): Preload BERT model at startup to avoid 3.5s+ load during first request
+    # Only load if SKIP_BERT_EMBEDDINGS is not enabled (i.e., not in simple mode)
+    # Import outside try block to distinguish import failures from loading failures
+    from vulcan.simple_mode import SKIP_BERT_EMBEDDINGS
+    if not SKIP_BERT_EMBEDDINGS:
+        try:
+            from vulcan.processing import GraphixTransformer
+            # Use singleton pattern - this ensures BERT is loaded once at startup
+            transformer = GraphixTransformer.get_instance()
+            # Check if model is properly loaded (not just non-None but has expected attributes)
+            if transformer and hasattr(transformer, 'model') and transformer.model is not None:
+                # Verify it's a proper model by checking for encode method (BERT models have this)
+                if hasattr(transformer.model, 'encode') or hasattr(transformer.model, '__call__'):
+                    logger.info("✓ BERT model preloaded at startup (singleton pattern)")
+                else:
+                    logger.info("✓ BERT model instance created but may not be fully initialized")
+            else:
+                logger.info("✓ BERT model loading deferred (fallback mode or SKIP_BERT_EMBEDDINGS active)")
+        except ImportError as e:
+            logger.warning(f"GraphixTransformer import failed: {e}")
+        except Exception as e:
+            logger.warning(f"BERT model preload failed (will load on first request): {e}")
+    else:
+        logger.info("BERT model loading skipped (SKIP_BERT_EMBEDDINGS=true)")
+
     # Initialize SelfOptimizer for autonomous performance tuning
     if SELF_OPTIMIZER_AVAILABLE:
         try:
@@ -5325,6 +5350,53 @@ async def health_check():
         return {"status": "unhealthy", "error": str(e), "timestamp": time.time()}
 
 
+@app.get("/health/live")
+async def liveness_check():
+    """
+    Lightweight liveness check endpoint.
+    
+    FIX Issue #41: The main /health endpoint was taking 5+ seconds due to
+    collecting comprehensive status from multiple subsystems. This endpoint
+    provides a fast (<100ms) liveness check suitable for Kubernetes probes.
+    
+    Returns 200 OK if the application is running and can handle requests.
+    """
+    return {
+        "status": "ok",
+        "timestamp": time.time(),
+    }
+
+
+@app.get("/health/ready")  
+async def readiness_check():
+    """
+    Fast readiness check endpoint.
+    
+    FIX Issue #41: Provides a quick readiness check that only validates
+    essential components without collecting full system metrics.
+    
+    Returns 200 OK if the application is ready to handle requests.
+    """
+    try:
+        has_deployment = hasattr(app.state, "deployment")
+        has_llm = hasattr(app.state, "llm")
+        
+        ready = has_deployment and has_llm
+        
+        return {
+            "status": "ready" if ready else "not_ready",
+            "deployment_initialized": has_deployment,
+            "llm_initialized": has_llm,
+            "timestamp": time.time(),
+        }
+    except Exception as e:
+        return {
+            "status": "not_ready",
+            "error": str(e),
+            "timestamp": time.time(),
+        }
+
+
 @app.get("/v1/llm/config")
 async def get_llm_config():
     """
@@ -7923,6 +7995,138 @@ def run_production_server(config: AgentConfig, host: str = None, port: int = Non
 # ============================================================
 
 
+def _create_main_csiu_metrics_provider():
+    """
+    Create a metrics provider function for CSIU telemetry integration in main.py.
+    
+    This is used when SelfImprovementDrive is initialized outside of WorldModel.
+    Maps dotted metric keys to actual system measurements from TelemetryRecorder
+    and EnhancedMetricsCollector.
+    
+    Returns:
+        Callable that takes a dotted metric key and returns a float value
+    """
+    # Helper functions defined at outer scope to avoid closure issues
+    def _calc_success_rate(data):
+        """Calculate success rate from metrics data with bounds checking."""
+        counters = data.get("counters", {})
+        success = counters.get("successful_actions", 0)
+        failed = counters.get("failed_actions", 0)
+        total = success + failed
+        if total == 0:
+            return 0.85  # Default if no data
+        return min(1.0, max(0.0, success / total))
+    
+    def _calc_error_rate(data):
+        """Calculate error rate from metrics data with bounds checking."""
+        counters = data.get("counters", {})
+        success = counters.get("successful_actions", 0)
+        failed = counters.get("failed_actions", 0)
+        total = success + failed
+        if total == 0:
+            return 0.02  # Default if no data
+        return min(1.0, max(0.0, failed / total))
+    
+    def _calc_satisfaction(data):
+        """Calculate satisfaction from success rate and latency with bounds checking."""
+        success_rate = _calc_success_rate(data)
+        histograms = data.get("histograms", {})
+        durations = histograms.get("step_duration_ms", [])
+        if durations:
+            avg_latency = sum(durations) / len(durations)
+            latency_factor = min(1.0, 100.0 / max(avg_latency, 1.0))
+        else:
+            latency_factor = 0.8
+        return min(1.0, max(0.0, success_rate * 0.7 + latency_factor * 0.3))
+    
+    def _calc_policy_violations_per_1k(data):
+        """Calculate policy violations per 1000 actions from governance logger."""
+        try:
+            from vulcan.routing.governance_logger import get_governance_logger
+            gov_logger = get_governance_logger()
+            stats = gov_logger.get_statistics()
+            
+            violation_count = stats.get("policy_violation_count", 0)
+            counters = data.get("counters", {})
+            total_actions = counters.get("successful_actions", 0) + counters.get("failed_actions", 0)
+            
+            if total_actions == 0:
+                return 0.0
+            
+            return min(1.0, (violation_count / total_actions) * 1000.0)
+        except Exception:
+            return 0.0
+    
+    def _calc_disparity_at_k(data):
+        """Calculate disparity at k from bias scores or identity drift."""
+        try:
+            aggregates = data.get("aggregates", {})
+            if "bias_scores" in aggregates:
+                bias_scores = aggregates["bias_scores"]
+                if isinstance(bias_scores, dict) and bias_scores:
+                    demo_bias = bias_scores.get("demographic", 0.0)
+                    rep_bias = bias_scores.get("representation", 0.0)
+                    return min(1.0, max(0.0, (demo_bias + rep_bias) / 2.0))
+            
+            gauges = data.get("gauges", {})
+            identity_drift = gauges.get("identity_drift", 0.0)
+            return min(1.0, max(0.0, abs(identity_drift)))
+        except Exception:
+            return 0.0
+    
+    def metrics_provider(dotted_key: str) -> Optional[float]:
+        """Retrieve metric value by dotted key."""
+        try:
+            # Get metrics from TelemetryRecorder
+            meta_state = {}
+            try:
+                from vulcan.routing.telemetry_recorder import get_telemetry_recorder
+                recorder = get_telemetry_recorder()
+                meta_state = recorder.get_meta_state() if recorder else {}
+            except Exception:
+                pass
+            
+            # Get metrics from EnhancedMetricsCollector via global app
+            # NOTE: 'app' is defined at module level in main.py
+            metrics_data = {}
+            try:
+                # Access the global app variable safely
+                global_app = globals().get('app')
+                if global_app and hasattr(global_app, 'state') and hasattr(global_app.state, 'deployment'):
+                    if hasattr(global_app.state.deployment, 'metrics_collector'):
+                        metrics_data = global_app.state.deployment.metrics_collector.export_metrics()
+            except Exception:
+                pass
+            
+            # Metric mapping - use default args to capture current values
+            mapping = {
+                "metrics.alignment_coherence_idx": lambda d=metrics_data: _calc_success_rate(d),
+                "metrics.communication_entropy": lambda d=metrics_data: _calc_error_rate(d) * 0.5,
+                "metrics.intent_clarity_score": lambda d=metrics_data: 1.0 - d.get("gauges", {}).get("current_uncertainty", 0.12),
+                # Policy violations: from governance logger
+                "policies.non_judgmental.violations_per_1k": lambda d=metrics_data: _calc_policy_violations_per_1k(d),
+                # Disparity at k: from bias scores or identity drift
+                "metrics.disparity_at_k": lambda d=metrics_data: _calc_disparity_at_k(d),
+                "metrics.calibration_gap": lambda d=metrics_data: abs(d.get("gauges", {}).get("identity_drift", 0.0)),
+                "metrics.empathy_index": lambda m=meta_state: m.get("average_feedback_score", 0.6),
+                "metrics.user_satisfaction": lambda d=metrics_data: _calc_satisfaction(d),
+                "metrics.miscommunication_rate": lambda d=metrics_data: _calc_error_rate(d),
+                "context.profile_quality": lambda m=meta_state: m.get("context_quality", 0.6),
+                "context.history_depth": lambda m=meta_state: min(1.0, m.get("entries_count", 0) / 100.0),
+            }
+            
+            if dotted_key in mapping:
+                return mapping[dotted_key]()
+            
+            return None
+            
+        except Exception as e:
+            logger.debug(f"CSIU metrics provider error for {dotted_key}: {e}")
+            return None
+    
+    return metrics_provider
+
+
 def main():
     """Main entry point for VULCAN-AGI."""
     parser = argparse.ArgumentParser(
@@ -8093,6 +8297,19 @@ def main():
                 except Exception as e:
                     self_improvement_drive = MagicMock()
                     logger.error(f"Failed: {e}")
+
+            # Wire CSIU metrics provider for real telemetry integration
+            if self_improvement_drive and not isinstance(self_improvement_drive, MagicMock):
+                try:
+                    metrics_provider = _create_main_csiu_metrics_provider()
+                    self_improvement_drive.set_metrics_provider(metrics_provider)
+                    verification = self_improvement_drive.verify_metrics_provider()
+                    if verification.get("working"):
+                        logger.info(f"✓ CSIU metrics provider wired: {verification.get('message')}")
+                    else:
+                        logger.warning(f"⚠ CSIU metrics provider status: {verification.get('message')}")
+                except Exception as e:
+                    logger.warning(f"Failed to wire CSIU metrics provider: {e}")
 
             # Store reference globally for later access
             _initialized_components["self_improvement_drive"] = self_improvement_drive

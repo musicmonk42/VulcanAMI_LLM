@@ -112,9 +112,10 @@ class VULCANAGICollective:
         self._shutdown_event = threading.Event()
 
         # Initialize agent pool
+        # CPU OPTIMIZATION: Default reduced from min=10/max=100 to min=5/max=10
         self.agent_pool = AgentPoolManager(
-            max_agents=getattr(config, "max_agents", 100),
-            min_agents=getattr(config, "min_agents", 10),
+            max_agents=getattr(config, "max_agents", 10),
+            min_agents=getattr(config, "min_agents", 5),
             task_queue_type=getattr(config, "task_queue_type", "custom"),
         )
 
