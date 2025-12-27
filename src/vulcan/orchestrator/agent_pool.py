@@ -2225,9 +2225,8 @@ class AgentPoolManager:
                     # If UnifiedReasoner is available, invoke actual reasoning
                     if UnifiedReasoner is not None and create_unified_reasoner is not None:
                         try:
-                            # Get or create unified reasoner
+                            # Get or create unified reasoner with learning and safety enabled
                             reasoner = create_unified_reasoner(
-                                config={"enable_learning": True, "enable_safety": True},
                                 enable_learning=True,
                                 enable_safety=True,
                             )
@@ -2540,15 +2539,18 @@ class AgentPoolManager:
             complexity += 0.05
         
         # Factor 4: Nested structures in parameters
-        def count_depth(obj, current_depth=0):
+        # Note: max_depth limit prevents stack overflow on deeply nested data
+        def count_depth(obj, current_depth=0, max_depth=10):
+            if current_depth >= max_depth:
+                return current_depth
             if isinstance(obj, dict):
                 if not obj:
                     return current_depth
-                return max(count_depth(v, current_depth + 1) for v in obj.values())
+                return max(count_depth(v, current_depth + 1, max_depth) for v in obj.values())
             elif isinstance(obj, list):
                 if not obj:
                     return current_depth
-                return max(count_depth(v, current_depth + 1) for v in obj)
+                return max(count_depth(v, current_depth + 1, max_depth) for v in obj)
             return current_depth
         
         depth = count_depth(parameters)

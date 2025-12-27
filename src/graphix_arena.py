@@ -414,6 +414,11 @@ MAX_NODES = 10000  # FIX: Added max node count for validation
 MAX_REBERT_THRESHOLD = 0.5
 MIN_REBERT_THRESHOLD = 0.0
 
+# Reasoning integration constants
+MAX_REASONING_QUERY_LENGTH = 2000  # Maximum characters for reasoning query input
+REASONING_COMPLEXITY_BASE = 0.3  # Base complexity score
+REASONING_COMPLEXITY_DATA_DIVISOR = 10000  # Divisor for data-based complexity scaling
+
 # GDPR Compliance Constants
 GDPR_RETENTION_POLICY = "session_only"
 GDPR_COMPLIANCE_STANDARD = "gdpr_minimization"
@@ -1474,7 +1479,13 @@ class GraphixArena:
                 context = data.get("context", {})
                 
                 # Calculate complexity based on data size
-                complexity = min(1.0, max(0.3, len(json.dumps(data)) / 10000))
+                complexity = min(
+                    1.0, 
+                    max(
+                        REASONING_COMPLEXITY_BASE, 
+                        len(json.dumps(data)) / REASONING_COMPLEXITY_DATA_DIVISOR
+                    )
+                )
                 
                 # Determine reasoning type from agent_id
                 reasoning_type_map = {
@@ -1496,7 +1507,7 @@ class GraphixArena:
                 
                 # Apply reasoning via the integration layer
                 integration_result = apply_reasoning(
-                    query=str(query)[:2000],  # Limit query length
+                    query=str(query)[:MAX_REASONING_QUERY_LENGTH],
                     query_type=query_type,
                     complexity=complexity,
                     context=context,
@@ -1513,8 +1524,8 @@ class GraphixArena:
                 reasoning_output = None
                 if UnifiedReasoner is not None and create_unified_reasoner is not None:
                     try:
+                        # Get or create unified reasoner with learning and safety enabled
                         reasoner = create_unified_reasoner(
-                            config={"enable_learning": True, "enable_safety": True},
                             enable_learning=True,
                             enable_safety=True,
                         )
