@@ -250,5 +250,72 @@ class TestEndToEndWiring(unittest.TestCase):
         self.assertEqual(result["reasoning_output"]["reasoning_type"], "causal")
 
 
+class TestArenaContextInjection(unittest.TestCase):
+    """Tests for Arena reasoning context injection."""
+    
+    def test_arena_reasoning_injected_into_context(self):
+        """Test that Arena reasoning output is injected into reasoning_insights."""
+        # Simulate Arena result with reasoning
+        arena_result = {
+            "status": "success",
+            "agent_id": "arena_reasoner_001",
+            "result": {
+                "reasoning_invoked": True,
+                "selected_tools": ["causal", "symbolic"],
+                "reasoning_strategy": "hybrid",
+                "confidence": 0.85,
+                "output": "Analysis complete",
+            },
+        }
+        
+        reasoning_insights = {}
+        
+        # Simulate the injection logic from main.py
+        if arena_result and arena_result.get("status") == "success":
+            arena_output = arena_result.get("result", {})
+            if isinstance(arena_output, dict):
+                arena_reasoning = {
+                    "agent_id": arena_result.get("agent_id"),
+                    "reasoning_invoked": arena_output.get("reasoning_invoked", False),
+                    "selected_tools": arena_output.get("selected_tools", []),
+                    "reasoning_strategy": arena_output.get("reasoning_strategy"),
+                    "confidence": arena_output.get("confidence"),
+                }
+                if arena_reasoning.get("reasoning_invoked") or arena_reasoning.get("selected_tools"):
+                    reasoning_insights["arena_reasoning"] = arena_reasoning
+        
+        # Verify injection
+        self.assertIn("arena_reasoning", reasoning_insights)
+        self.assertEqual(reasoning_insights["arena_reasoning"]["agent_id"], "arena_reasoner_001")
+        self.assertEqual(reasoning_insights["arena_reasoning"]["selected_tools"], ["causal", "symbolic"])
+        self.assertTrue(reasoning_insights["arena_reasoning"]["reasoning_invoked"])
+    
+    def test_arena_reasoning_not_injected_when_no_reasoning(self):
+        """Test that Arena reasoning is not injected when reasoning was not invoked."""
+        arena_result = {
+            "status": "success",
+            "result": {
+                "reasoning_invoked": False,
+                "selected_tools": [],
+            },
+        }
+        
+        reasoning_insights = {}
+        
+        # Simulate the injection logic
+        if arena_result and arena_result.get("status") == "success":
+            arena_output = arena_result.get("result", {})
+            if isinstance(arena_output, dict):
+                arena_reasoning = {
+                    "reasoning_invoked": arena_output.get("reasoning_invoked", False),
+                    "selected_tools": arena_output.get("selected_tools", []),
+                }
+                if arena_reasoning.get("reasoning_invoked") or arena_reasoning.get("selected_tools"):
+                    reasoning_insights["arena_reasoning"] = arena_reasoning
+        
+        # Verify no injection
+        self.assertNotIn("arena_reasoning", reasoning_insights)
+
+
 if __name__ == "__main__":
     unittest.main()

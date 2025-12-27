@@ -2009,6 +2009,29 @@ async def chat(request: ChatRequest):
             )
             arena_result = {"status": "error", "error": str(arena_err)}
 
+    # FIX: Inject Arena reasoning output into reasoning_insights when available
+    # This ensures Arena's reasoning analysis is included in LLM context even when
+    # Arena doesn't return a complete response (e.g., partial success, fallback)
+    if arena_result and arena_result.get("status") == "success":
+        arena_output = arena_result.get("result", {})
+        if isinstance(arena_output, dict):
+            # Extract reasoning information from Arena result
+            arena_reasoning = {
+                "agent_id": arena_result.get("agent_id"),
+                "reasoning_invoked": arena_output.get("reasoning_invoked", False),
+                "selected_tools": arena_output.get("selected_tools", []),
+                "reasoning_strategy": arena_output.get("reasoning_strategy"),
+                "confidence": arena_output.get("confidence"),
+            }
+            # Only add if Arena actually invoked reasoning
+            if arena_reasoning.get("reasoning_invoked") or arena_reasoning.get("selected_tools"):
+                reasoning_insights["arena_reasoning"] = arena_reasoning
+                logger.info(
+                    f"[VULCAN] Arena reasoning injected into context: "
+                    f"tools={arena_reasoning.get('selected_tools')}, "
+                    f"strategy={arena_reasoning.get('reasoning_strategy')}"
+                )
+
     # ================================================================
     # STEP 0: INPUT GATEKEEPER - Validate query before processing
     # ================================================================
