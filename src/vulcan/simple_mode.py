@@ -86,8 +86,9 @@ ENABLE_META_REASONING = not _str_to_bool(
 # ============================================================
 
 # Default agent pool sizes
-DEFAULT_MIN_AGENTS = int(os.getenv("MIN_AGENTS", "1" if SIMPLE_MODE else "10"))
-DEFAULT_MAX_AGENTS = int(os.getenv("MAX_AGENTS", "5" if SIMPLE_MODE else "100"))
+# CPU OPTIMIZATION: Reduced from 10/100 to 5/10 to prevent CPU thrashing
+DEFAULT_MIN_AGENTS = int(os.getenv("MIN_AGENTS", "1" if SIMPLE_MODE else "5"))
+DEFAULT_MAX_AGENTS = int(os.getenv("MAX_AGENTS", "5" if SIMPLE_MODE else "10"))
 
 # Agent status check interval (seconds)
 # Increase to 300s (5 minutes) in simple mode to reduce CPU usage

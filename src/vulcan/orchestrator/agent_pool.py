@@ -754,9 +754,11 @@ class AgentPoolManager:
         # Initialize minimum agents
         self._initialize_agent_pool()
 
+        # Log actual configured values (self.min_agents/max_agents) not function params
+        # This fixes misleading log output when values are overridden
         logger.info(
             f"AgentPoolManager initialized: "
-            f"min_agents={min_agents}, max_agents={max_agents}, "
+            f"min_agents={self.min_agents}, max_agents={self.max_agents}, "
             f"queue_type={task_queue_type}, "
             f"cachetools_available={CACHETOOLS_AVAILABLE}"
         )

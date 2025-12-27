@@ -622,13 +622,13 @@ def create_orchestrator(config, sys, deps, variant="basic"):
         return VULCANAGICollective(config, sys, deps)
 
 
-def create_agent_pool(max_agents=100, min_agents=10, task_queue_type="custom"):
+def create_agent_pool(max_agents=10, min_agents=5, task_queue_type="custom"):
     """
     Convenience function to create an agent pool
 
     Args:
-        max_agents: Maximum number of agents
-        min_agents: Minimum number of agents
+        max_agents: Maximum number of agents (default: 10, reduced from 100 for CPU optimization)
+        min_agents: Minimum number of agents (default: 5, reduced from 10 for CPU optimization)
         task_queue_type: Type of task queue ('ray', 'celery', 'custom')
 
     Returns:
@@ -738,7 +738,7 @@ Usage Examples:
 
     4. Agent Pool:
         >>> from orchestrator import create_agent_pool
-        >>> pool = create_agent_pool(max_agents=100, min_agents=10)
+        >>> pool = create_agent_pool(max_agents=10, min_agents=5)
         >>> job_id = pool.submit_job(graph, parameters, priority=0)
         >>> result = pool.get_job_provenance(job_id)
 
