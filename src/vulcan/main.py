@@ -4723,13 +4723,15 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
                 selected_tools = [metadata["tool_selected"]]
             # Fallback to systems_used filtering for reasoning systems
             if not selected_tools:
-                reasoning_prefixes = ["symbolic", "probabilistic", "causal", "analogical", "multimodal", "unified_reasoning_"]
+                reasoning_prefixes = ("symbolic", "probabilistic", "causal", "analogical", "multimodal")
+                unified_prefix = "unified_reasoning_"
+                selected_tools_set = set()
                 for system in systems_used:
-                    for prefix in reasoning_prefixes:
-                        if system.startswith(prefix):
-                            tool_name = system.replace("unified_reasoning_", "") if system.startswith("unified_reasoning_") else system
-                            if tool_name not in selected_tools:
-                                selected_tools.append(tool_name)
+                    if system.startswith(unified_prefix):
+                        selected_tools_set.add(system[len(unified_prefix):])
+                    elif system.startswith(reasoning_prefixes):
+                        selected_tools_set.add(system)
+                selected_tools = list(selected_tools_set)
             # Default to ['general'] if no tools identified
             if not selected_tools:
                 selected_tools = ['general']

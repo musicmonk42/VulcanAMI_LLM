@@ -664,7 +664,7 @@ class SafetyGovernor:
     def apply_safety_checks(
         self,
         selected_tools: List[str],
-        context: Dict[str, Any],
+        context: Optional[Dict[str, Any]] = None,
     ) -> List[str]:
         """
         Apply safety checks to selected tools, preserving semantic selections for non-critical violations.
@@ -710,22 +710,12 @@ class SafetyGovernor:
             
             if action == SafetyAction.VETO:
                 # Normalize violation type for comparison
-                violation_type = reason.lower().replace(' ', '_') if reason else 'unknown'
+                violation_type = self._normalize_violation_type(reason)
                 
                 # Check if this is a critical violation based on:
                 # 1. Contract safety level requirement
                 # 2. Violation type matching CRITICAL_VIOLATION_TYPES
-                is_critical = False
-                
-                # Check contract safety level
-                if tool in self.contracts:
-                    contract = self.contracts[tool]
-                    if getattr(contract, 'required_safety_level', None) == SafetyLevel.CRITICAL:
-                        is_critical = True
-                
-                # Check if violation type is in critical set
-                if any(crit in violation_type for crit in CRITICAL_VIOLATION_TYPES):
-                    is_critical = True
+                is_critical = self._is_critical_violation(tool, violation_type)
                 
                 if is_critical:
                     has_critical_violation = True
@@ -759,6 +749,43 @@ class SafetyGovernor:
             return ['general']
         
         return adjusted_tools
+
+    def _normalize_violation_type(self, reason: Optional[str]) -> str:
+        """
+        Normalize a violation reason to a consistent format for comparison.
+        
+        Args:
+            reason: The raw violation reason string
+            
+        Returns:
+            Normalized violation type string (lowercase, underscores instead of spaces)
+        """
+        if not reason:
+            return 'unknown'
+        return reason.lower().replace(' ', '_')
+
+    def _is_critical_violation(self, tool: str, violation_type: str) -> bool:
+        """
+        Determine if a violation is critical and must override tool selection.
+        
+        Critical violations include security breaches, harmful content, and
+        violations where the tool's contract requires CRITICAL safety level.
+        
+        Args:
+            tool: The tool name being checked
+            violation_type: Normalized violation type string
+            
+        Returns:
+            True if the violation is critical, False otherwise
+        """
+        # Check contract safety level
+        if tool in self.contracts:
+            contract = self.contracts[tool]
+            if getattr(contract, 'required_safety_level', None) == SafetyLevel.CRITICAL:
+                return True
+        
+        # Check if violation type matches any critical violation pattern
+        return any(crit in violation_type for crit in CRITICAL_VIOLATION_TYPES)
 
     def validate_output(
         self, tool_name: str, output: Any, context: SafetyContext
