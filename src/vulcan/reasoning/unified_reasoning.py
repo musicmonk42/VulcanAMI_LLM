@@ -1930,10 +1930,18 @@ class UnifiedReasoner:
             else:
                 weights.append(base_weight * type_weight)
 
+        # Issue #53: Defensive handling for zero weights
+        # If all weights are zero, fall back to uniform weights to prevent np.average error
+        total_weight = sum(weights)
+        if total_weight <= 0:
+            logger.warning("[Ensemble] All weights are zero - using uniform weights")
+            # Ensure weights list matches number of results
+            weights = [1.0 / len(results)] * len(results) if results else [1.0]
+        
         ensemble_conclusion = self._weighted_voting(conclusions, weights)
         ensemble_confidence = (
             np.average([r[1].confidence for r in results], weights=list(weights))
-            if weights
+            if weights and sum(weights) > 0 and len(weights) == len(results)
             else 0.5
         )
 

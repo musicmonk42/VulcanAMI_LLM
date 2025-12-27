@@ -38,12 +38,22 @@ CRITICAL_VIOLATION_TYPES = frozenset({
 
 # Non-critical violation types that can be ignored when semantic boost is applied
 # These are warnings that don't pose immediate safety risks
+# Issue #54: inconsistent_output is expected for causal reasoning (different causal paths)
 NON_CRITICAL_VIOLATION_TYPES = frozenset({
     'inconsistent_output',
     'contract_violation',
     'confidence_too_low',
     'resource_exceeded',
     'rate_limited',
+})
+
+# Tools that can legitimately produce inconsistent outputs due to their nature
+# Issue #54: Causal reasoning explores different causal paths which may produce different results
+TOOLS_WITH_EXPECTED_INCONSISTENCY = frozenset({
+    'causal',
+    'probabilistic',  # Probabilistic reasoning may have variance
+    'analogical',     # Analogies may map differently
+    'neural',         # Neural reasoning may have stochasticity
 })
 
 # =============================================================================
@@ -897,6 +907,9 @@ class SafetyGovernor:
         Critical violations include security breaches, harmful content, and
         violations where the tool's contract requires CRITICAL safety level.
         
+        Issue #54: Tools that legitimately produce varying outputs (like causal reasoning
+        exploring different causal paths) should not be blocked for inconsistent_output.
+        
         Args:
             tool: The tool name being checked
             violation_type: Normalized violation type string
@@ -904,6 +917,12 @@ class SafetyGovernor:
         Returns:
             True if the violation is critical, False otherwise
         """
+        # Issue #54: Don't treat inconsistent_output as critical for tools that 
+        # legitimately produce varying outputs (causal, probabilistic, etc.)
+        if 'inconsistent' in violation_type and tool in TOOLS_WITH_EXPECTED_INCONSISTENCY:
+            logger.info(f"[SafetyGovernor] Allowing inconsistent output for {tool} (expected for this tool type)")
+            return False
+        
         # Check contract safety level
         if tool in self.contracts:
             contract = self.contracts[tool]

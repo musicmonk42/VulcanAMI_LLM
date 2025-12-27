@@ -1196,17 +1196,28 @@ class MultiTierFeatureExtractor:
         )
 
     def extract_tier1(self, problem: Any) -> np.ndarray:
-        """Extract Tier 1 features (fast)"""
+        """Extract Tier 1 features (fast) - with caching"""
+        # Check cache first
+        cache_key = self._compute_cache_key(problem) + "_tier1"
+        if cache_key in self.feature_cache:
+            return self.feature_cache[cache_key]
 
         start_time = time.time()
         features = self.tier1_extractor.extract(problem)
 
         self._update_stats(FeatureTier.TIER1_SYNTACTIC, time.time() - start_time)
+        
+        # Cache the result
+        self._cache_features(cache_key, features)
 
         return features
 
     def extract_tier2(self, problem: Any) -> np.ndarray:
-        """Extract Tier 2 features (medium)"""
+        """Extract Tier 2 features (medium) - with caching"""
+        # Check cache first
+        cache_key = self._compute_cache_key(problem) + "_tier2"
+        if cache_key in self.feature_cache:
+            return self.feature_cache[cache_key]
 
         start_time = time.time()
 
@@ -1217,6 +1228,9 @@ class MultiTierFeatureExtractor:
         features = np.concatenate([tier1_features, tier2_features])
 
         self._update_stats(FeatureTier.TIER2_STRUCTURAL, time.time() - start_time)
+        
+        # Cache the result
+        self._cache_features(cache_key, features)
 
         return features
 

@@ -25,6 +25,14 @@ __author__ = "VULCAN-AGI Team"
 logger = logging.getLogger(__name__)
 
 # ============================================================
+# CONSTANTS
+# ============================================================
+
+# Issue #52: Hard timeout buffer for asyncio.wait_for wrapper
+# Adds small buffer beyond aiohttp timeout to catch edge cases
+TIMEOUT_BUFFER_SECONDS = 5.0
+
+# ============================================================
 # IMPORTS
 # ============================================================
 
@@ -320,7 +328,12 @@ async def execute_via_arena(query: str, routing_plan, arena_base_url: str = None
     logger.info(f"[ARENA] Executing via {agent_id}: {url}")
     t0 = time.perf_counter()
     
-    try:
+    # Issue #52: Two-layer timeout strategy:
+    # 1. Inner: aiohttp.ClientTimeout handles HTTP transport-level timeout
+    # 2. Outer: asyncio.wait_for provides hard cutoff for entire async operation
+    # The outer timeout is slightly longer to allow clean aiohttp timeout handling
+    # but ensures we never exceed the configured limit + buffer
+    async def _execute_request():
         session = await get_http_session()
         async with session.post(
             url,
@@ -328,30 +341,36 @@ async def execute_via_arena(query: str, routing_plan, arena_base_url: str = None
             headers=headers,
             timeout=aiohttp.ClientTimeout(total=timeout)
         ) as resp:
-            elapsed = time.perf_counter() - t0
-            
             if resp.status == 200:
                 result = await resp.json()
-                logger.info(f"[ARENA] {agent_id} completed in {elapsed:.2f}s")
-                
-                return {
-                    "status": "success",
-                    "agent_id": agent_id,
-                    "execution_time": elapsed,
-                    "result": result,
-                    "arena_url": url,
-                }
+                return {"status": 200, "result": result}
             else:
                 error_text = await resp.text()
-                logger.error(f"[ARENA] {agent_id} failed: {resp.status} - {error_text}")
-                
-                return {
-                    "status": "error",
-                    "agent_id": agent_id,
-                    "execution_time": elapsed,
-                    "error": error_text,
-                    "status_code": resp.status,
-                }
+                return {"status": resp.status, "error": error_text}
+    
+    try:
+        # Outer timeout: hard limit = configured timeout + buffer for clean handling
+        response = await asyncio.wait_for(_execute_request(), timeout=timeout + TIMEOUT_BUFFER_SECONDS)
+        elapsed = time.perf_counter() - t0
+        
+        if response["status"] == 200:
+            logger.info(f"[ARENA] {agent_id} completed in {elapsed:.2f}s")
+            return {
+                "status": "success",
+                "agent_id": agent_id,
+                "execution_time": elapsed,
+                "result": response["result"],
+                "arena_url": url,
+            }
+        else:
+            logger.error(f"[ARENA] {agent_id} failed: {response['status']} - {response.get('error', 'Unknown')}")
+            return {
+                "status": "error",
+                "agent_id": agent_id,
+                "execution_time": elapsed,
+                "error": response.get("error", "Unknown error"),
+                "status_code": response["status"],
+            }
                     
     except asyncio.TimeoutError:
         elapsed = time.perf_counter() - t0

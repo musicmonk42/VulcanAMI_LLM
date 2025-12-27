@@ -85,9 +85,9 @@ class ContinualLearner:
             logger.info("[ContinualLearner] Using provided memory instance")
         else:
             try:
-                from .hierarchical import HierarchicalMemory
+                from ..memory.hierarchical import HierarchicalMemory
                 self.memory = HierarchicalMemory()
-                logger.info("[ContinualLearner] Using HierarchicalMemory")
+                logger.info("[ContinualLearner] Hierarchical memory initialized")
             except Exception as e:
                 logger.warning(f"[ContinualLearner] HierarchicalMemory unavailable: {e}")
                 self.memory = {'patterns': [], 'weights': {}, 'history': []}
