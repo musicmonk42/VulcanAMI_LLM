@@ -86,7 +86,14 @@ class ContinualLearner:
         else:
             try:
                 from ..memory.hierarchical import HierarchicalMemory
-                self.memory = HierarchicalMemory()
+                from ..memory.base import MemoryConfig
+                # Create default config for HierarchicalMemory
+                default_config = MemoryConfig(
+                    max_working_memory=50,
+                    max_short_term=1000,
+                    max_long_term=10000,
+                )
+                self.memory = HierarchicalMemory(config=default_config)
                 logger.info("[ContinualLearner] Hierarchical memory initialized")
             except Exception as e:
                 logger.warning(f"[ContinualLearner] HierarchicalMemory unavailable: {e}")

@@ -983,6 +983,29 @@ async def lifespan(app: FastAPI):
     else:
         logger.info("BERT model loading skipped (SKIP_BERT_EMBEDDINGS=true)")
 
+    # PERFORMANCE FIX (Issue #55/#56): Preload ReasoningIntegration and embedding models at startup
+    # This prevents the first query from taking 60+ seconds to load all models
+    try:
+        from vulcan.reasoning.reasoning_integration import get_reasoning_integration
+        reasoning_integration = get_reasoning_integration()
+        # Force initialization of components (ToolSelector, PortfolioExecutor)
+        reasoning_integration._init_components()
+        logger.info("✓ ReasoningIntegration and ToolSelector preloaded at startup")
+        
+        # Also preload the SemanticToolMatcher's embedding model
+        try:
+            from vulcan.reasoning.selection.semantic_tool_matcher import SemanticToolMatcher
+            # Force model loading via the singleton pattern
+            SemanticToolMatcher._get_shared_model()
+            logger.info("✓ SemanticToolMatcher embedding model preloaded at startup")
+        except Exception as e:
+            logger.debug(f"SemanticToolMatcher preload skipped: {e}")
+            
+    except ImportError as e:
+        logger.debug(f"ReasoningIntegration not available for preload: {e}")
+    except Exception as e:
+        logger.warning(f"ReasoningIntegration preload failed (will load on first request): {e}")
+
     # Initialize SelfOptimizer for autonomous performance tuning
     if SELF_OPTIMIZER_AVAILABLE:
         try:
