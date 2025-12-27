@@ -78,9 +78,10 @@ autoscaling:
   targetMemoryUtilizationPercentage: 80
 
 # Health probes (CRITICAL for production)
+# Using fast health endpoints for quicker probe responses
 livenessProbe:
   httpGet:
-    path: /health
+    path: /health/live
     port: 8000
   initialDelaySeconds: 30
   periodSeconds: 10
@@ -89,7 +90,7 @@ livenessProbe:
 
 readinessProbe:
   httpGet:
-    path: /ready
+    path: /health/ready
     port: 8000
   initialDelaySeconds: 10
   periodSeconds: 5

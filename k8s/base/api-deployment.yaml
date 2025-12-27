@@ -154,9 +154,10 @@ spec:
           limits:
             cpu: 2000m
             memory: 4Gi
+        # Using fast health endpoints for quicker probe responses
         livenessProbe:
           httpGet:
-            path: /health
+            path: /health/live
             port: 8000
           initialDelaySeconds: 30
           periodSeconds: 10
@@ -164,7 +165,7 @@ spec:
           failureThreshold: 3
         readinessProbe:
           httpGet:
-            path: /health
+            path: /health/ready
             port: 8000
           initialDelaySeconds: 10
           periodSeconds: 5
