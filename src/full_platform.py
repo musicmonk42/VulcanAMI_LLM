@@ -2368,6 +2368,51 @@ async def lifespan(app: FastAPI):
             components_status["Query Routing Layer"] = False
             logger.error(f"  ❌ Query Routing Layer failed: {e}")
 
+        # ================================================================
+        # PRE-LOAD MODELS TO AVOID FIRST-QUERY LATENCY (Issue #55)
+        # ================================================================
+        # Pre-load BERT and embedding models at startup to prevent
+        # 1.7+ second latency on first query
+        logger.info("=" * 70)
+        logger.info("Pre-loading Models (avoiding first-query latency)")
+        logger.info("=" * 70)
+        
+        try:
+            # 1. Pre-load BERT model (GraphixTransformer singleton)
+            logger.info("Pre-loading BERT model...")
+            from vulcan.processing import GraphixTransformer
+            _ = GraphixTransformer.get_instance()  # Force singleton initialization
+            logger.info("  ✅ BERT model pre-loaded")
+            components_status["BERT Model"] = True
+        except Exception as e:
+            logger.warning(f"  ⚠ BERT model pre-load failed: {e}")
+            components_status["BERT Model"] = False
+        
+        try:
+            # 2. Pre-load QueryAnalyzer singleton (includes safety validators)
+            # Note: This may have already been initialized if unified_learning is available,
+            # but we ensure it's always pre-loaded regardless of learning system status
+            logger.info("Pre-loading QueryAnalyzer...")
+            from vulcan.routing.query_router import get_query_analyzer
+            _ = get_query_analyzer()  # Force singleton initialization (no-op if already created)
+            logger.info("  ✅ QueryAnalyzer pre-loaded")
+            components_status["QueryAnalyzer"] = True
+        except Exception as e:
+            logger.warning(f"  ⚠ QueryAnalyzer pre-load failed: {e}")
+            components_status["QueryAnalyzer"] = False
+        
+        try:
+            # 3. Pre-load DynamicModelManager and essential models
+            logger.info("Pre-loading text embedding model...")
+            from vulcan.processing import DynamicModelManager
+            model_manager = DynamicModelManager()
+            model_manager.preload_essential_models()
+            logger.info("  ✅ Text embedding model pre-loaded")
+            components_status["Text Embedding Model"] = True
+        except Exception as e:
+            logger.warning(f"  ⚠ Text embedding model pre-load failed: {e}")
+            components_status["Text Embedding Model"] = False
+
         # Summary counts
         # Count mounted FastAPI/Flask services (excluding background processes)
         services_mounted = sum(
