@@ -241,19 +241,35 @@ async def execute_via_arena(query: str, routing_plan, arena_base_url: str = None
     else:
         base_url = base_url or "http://localhost:8080/arena"
     
-    # PERFORMANCE FIX: Fast-path skip for low-complexity queries
-    # Queries with complexity < threshold skip Arena entirely for faster response
-    # Default to 0.0 if complexity_score is not available to skip Arena by default
-    # rather than unexpectedly calling Arena when complexity is unknown
-    complexity = getattr(routing_plan, 'complexity_score', 0.0)
-    if complexity < complexity_threshold:
-        logger.info(f"[ARENA] Fast-path skip: complexity {complexity:.2f} < threshold {complexity_threshold:.2f}")
-        return {
-            "status": "skipped",
-            "reason": f"Query complexity ({complexity:.2f}) below threshold ({complexity_threshold:.2f})",
-            "result": None,
-            "execution_time": 0,
-        }
+    # FIX: Improved Arena threshold logic
+    # Previously defaulted complexity to 0.0 which always skipped Arena
+    # Now: If complexity_score is explicitly set AND below threshold, skip
+    #      If complexity_score is not set, proceed with Arena (let it decide)
+    complexity = getattr(routing_plan, 'complexity_score', None)
+    
+    if complexity is not None:
+        if complexity < complexity_threshold:
+            logger.info(f"[ARENA] Fast-path skip: complexity {complexity:.2f} < threshold {complexity_threshold:.2f}")
+            return {
+                "status": "skipped",
+                "reason": f"Query complexity ({complexity:.2f}) below threshold ({complexity_threshold:.2f})",
+                "result": None,
+                "execution_time": 0,
+            }
+        else:
+            logger.info(f"[ARENA] Proceeding: complexity {complexity:.2f} >= threshold {complexity_threshold:.2f}")
+    else:
+        # No complexity score provided - check if arena_participation flag is set
+        arena_flag = getattr(routing_plan, 'arena_participation', False)
+        if not arena_flag:
+            logger.info("[ARENA] Skipping: no complexity_score and arena_participation=False")
+            return {
+                "status": "skipped",
+                "reason": "No complexity_score provided and arena_participation not enabled",
+                "result": None,
+                "execution_time": 0,
+            }
+        logger.info("[ARENA] Proceeding: arena_participation=True (no complexity_score)")
     
     # Select appropriate Arena agent
     agent_id = select_arena_agent(routing_plan)
