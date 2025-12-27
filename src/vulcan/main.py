@@ -2942,7 +2942,8 @@ async def chat(request: ChatRequest):
             # FIX: Use TournamentManager for multi-agent selection when multiple results
             if len(all_agent_results) > 1:
                 try:
-                    from tournament_manager import TournamentManager
+                    from src.tournament_manager import TournamentManager
+                    import numpy as np
                     
                     # Initialize tournament manager for selection
                     tournament_mgr = TournamentManager(
@@ -2958,7 +2959,6 @@ async def chat(request: ChatRequest):
                     
                     # Simple embedding function based on reasoning type
                     def simple_embedding(proposal):
-                        import numpy as np
                         # Create deterministic embedding based on proposal content
                         content = str(proposal)
                         embedding = np.zeros(128, dtype=np.float32)
