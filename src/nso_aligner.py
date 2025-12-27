@@ -3390,6 +3390,74 @@ class ComplianceMapper:
 
 
 # ============================================================
+# SINGLETON PATTERN FOR NSOAligner
+# Prevents reloading models on every request by caching the instance
+# ============================================================
+
+_nso_aligner_instance = None
+_nso_aligner_lock = threading.Lock()
+
+
+def get_nso_aligner(
+    claude_client: Optional[Any] = None,
+    gemini_client: Optional[Any] = None,
+    grok_client: Optional[Any] = None,
+    log_dir: Optional[str] = None,
+    **kwargs
+) -> NSOAligner:
+    """
+    Get the singleton NSOAligner instance.
+    
+    This function ensures that the NSOAligner is only initialized once,
+    preventing the expensive model reloading on every request.
+    
+    Args:
+        claude_client: Optional external LLM client (only used on first init)
+        gemini_client: Optional secondary LLM client (only used on first init)
+        grok_client: Optional third LLM client (only used on first init)
+        log_dir: Directory to write audit logs (only used on first init)
+        **kwargs: Additional arguments passed to NSOAligner (only used on first init)
+    
+    Returns:
+        NSOAligner: The singleton instance
+    """
+    global _nso_aligner_instance
+    
+    if _nso_aligner_instance is None:
+        with _nso_aligner_lock:
+            # Double-check locking pattern
+            if _nso_aligner_instance is None:
+                _nso_aligner_instance = NSOAligner(
+                    claude_client=claude_client,
+                    gemini_client=gemini_client,
+                    grok_client=grok_client,
+                    log_dir=log_dir,
+                    **kwargs
+                )
+                _init_logger.info("NSOAligner singleton instance created")
+    
+    return _nso_aligner_instance
+
+
+def reset_nso_aligner():
+    """
+    Reset the singleton instance. Use for testing or reconfiguration.
+    
+    WARNING: This will shutdown the existing instance if one exists.
+    """
+    global _nso_aligner_instance
+    
+    with _nso_aligner_lock:
+        if _nso_aligner_instance is not None:
+            try:
+                _nso_aligner_instance.shutdown()
+            except Exception as e:
+                _init_logger.warning(f"Error during NSOAligner shutdown: {e}")
+            _nso_aligner_instance = None
+            _init_logger.info("NSOAligner singleton instance reset")
+
+
+# ============================================================
 # DEMO USAGE
 # ============================================================
 

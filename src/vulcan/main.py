@@ -3168,8 +3168,9 @@ Based on your analysis through memory retrieval, multi-modal reasoning, causal m
         # ================================================================
         safety = None
         try:
-            from src.nso_aligner import NSOAligner
-            safety = NSOAligner()
+            from src.nso_aligner import get_nso_aligner
+            # FIX: Use singleton pattern to prevent model reloading
+            safety = get_nso_aligner()
             # multi_model_audit returns "safe", "risky", or "unsafe"
             safety_result = safety.multi_model_audit(
                 {"text": response_text, "_audit_source": "fallback_guard"},

@@ -184,11 +184,12 @@ except ImportError:
     INTERPRETABILITY_AVAILABLE = False
 
 try:
-    from nso_aligner import NSOAligner
+    from nso_aligner import NSOAligner, get_nso_aligner
 
     NSO_ALIGNER_AVAILABLE = True
 except ImportError:
     NSOAligner = None
+    get_nso_aligner = None
     NSO_ALIGNER_AVAILABLE = False
 
 try:
@@ -1069,9 +1070,10 @@ class GraphixArena:
         else:
             logger.warning(f"⚠ InterpretabilityEngine unavailable")
 
-        # FIX: use the correct class symbol 'NSOAligner' guarded by availability
+        # FIX: Use singleton pattern for NSOAligner to prevent reloading models on every request
+        # get_nso_aligner() caches the instance and avoids expensive model initialization
         self.nso_aligner = (
-            NSOAligner() if NSO_ALIGNER_AVAILABLE and (NSOAligner is not None) else None
+            get_nso_aligner() if NSO_ALIGNER_AVAILABLE and (get_nso_aligner is not None) else None
         )
         self.obs_manager = (
             ObservabilityManager()
