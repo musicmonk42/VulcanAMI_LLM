@@ -162,7 +162,10 @@ class UnifiedLearningSystem:
         self._shutdown_event = threading.Event()  # ADDED: For external threads
         
         # Learning from outcomes
-        self.slow_routing_threshold_ms = 5000
+        # PERFORMANCE FIX: Increased threshold to reduce noise from expected slow routing
+        # Production logs showed routing times of 20-70s during complex operations
+        # Set to 10s to flag truly abnormal routing while allowing normal operation
+        self.slow_routing_threshold_ms = 10000
         self.tool_weight_adjustments: Dict[str, float] = {}
         
         # MetaLearner reference (if available)
