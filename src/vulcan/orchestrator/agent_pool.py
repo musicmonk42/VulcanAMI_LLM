@@ -2298,19 +2298,40 @@ class AgentPoolManager:
             if is_reasoning_task and selected_tools and not node_results and not REASONING_AVAILABLE:
                 logger.info(f"[REASONING] INVOKING engines for task {task_id}, tools={selected_tools}")
                 try:
-                    from vulcan.reasoning.unified_reasoning import UnifiedReasoner as DirectUnifiedReasoner
+                    from vulcan.reasoning.unified_reasoning import UnifiedReasoner as DirectUnifiedReasoner, ReasoningStrategy
+                    from vulcan.reasoning.reasoning_types import ReasoningType
                     
                     # Get or create reasoning instance
                     reasoning = DirectUnifiedReasoner()
                     
                     # Extract query from parameters
-                    query = parameters.get("prompt", "") or parameters.get("query", "")
+                    query_text = parameters.get("prompt", "") or parameters.get("query", "")
                     
-                    # Invoke actual reasoning
+                    # Convert first tool name to ReasoningType enum if possible
+                    reasoning_type = None
+                    if selected_tools and len(selected_tools) > 0:
+                        tool_name = selected_tools[0].upper()
+                        try:
+                            reasoning_type = ReasoningType[tool_name]
+                        except KeyError:
+                            # Try matching by value
+                            for rt in ReasoningType:
+                                if rt.value == selected_tools[0].lower():
+                                    reasoning_type = rt
+                                    break
+                    
+                    # Use ADAPTIVE strategy by default, ENSEMBLE when multiple tools selected
+                    strategy = ReasoningStrategy.ADAPTIVE
+                    if selected_tools and len(selected_tools) > 1:
+                        strategy = ReasoningStrategy.ENSEMBLE
+                    
+                    # Invoke actual reasoning with correct signature:
+                    # reason(input_data, query=None, reasoning_type=None, strategy=ADAPTIVE, ...)
                     reasoning_result = reasoning.reason(
-                        query=query,
-                        reasoning_types=selected_tools,
-                        context=parameters
+                        input_data=query_text,
+                        query=parameters,
+                        reasoning_type=reasoning_type,
+                        strategy=strategy
                     )
                     
                     # Mark nodes as processed with reasoning

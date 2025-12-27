@@ -147,6 +147,10 @@ def build_arena_payload(query: str, routing_plan, agent_id: str) -> dict:
     query_type = routing_plan.query_type.value if hasattr(routing_plan.query_type, 'value') else str(routing_plan.query_type)
     complexity = routing_plan.complexity_score if hasattr(routing_plan, 'complexity_score') else 0.5
     
+    # CRITICAL FIX: Extract selected_tools from routing_plan for reasoning invocation
+    # This enables GraphixArena to invoke reasoning engines when selected_tools are present
+    selected_tools = getattr(routing_plan, 'selected_tools', []) or []
+    
     if agent_id == "generator":
         # Generator expects GraphSpec format
         return {
@@ -157,6 +161,7 @@ def build_arena_payload(query: str, routing_plan, agent_id: str) -> dict:
                 "complexity": complexity,
                 "source": "vulcan",
                 "timestamp": time.time(),
+                "selected_tools": selected_tools,  # Pass reasoning tools to Arena
             }
         }
     else:
@@ -180,6 +185,7 @@ def build_arena_payload(query: str, routing_plan, agent_id: str) -> dict:
                 "query_type": query_type,
                 "complexity": complexity,
                 "timestamp": time.time(),
+                "selected_tools": selected_tools,  # Pass reasoning tools to Arena
             }
         }
 
