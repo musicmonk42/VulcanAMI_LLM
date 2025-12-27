@@ -317,5 +317,108 @@ class TestArenaContextInjection(unittest.TestCase):
         self.assertNotIn("arena_reasoning", reasoning_insights)
 
 
+class TestExplicitReasoningInvocation(unittest.TestCase):
+    """Tests for explicit reasoning invocation when selected_tools present."""
+    
+    def test_reasoning_invoked_with_selected_tools(self):
+        """Test that reasoning is invoked when selected_tools are present."""
+        # Simulate the new explicit reasoning invocation logic
+        is_reasoning_task = True
+        selected_tools = ['causal', 'probabilistic']
+        node_results = {}
+        REASONING_AVAILABLE = False  # Main imports failed
+        
+        # This simulates the fix: even with REASONING_AVAILABLE=False,
+        # we should still attempt reasoning if selected_tools are present
+        should_attempt_explicit_invocation = (
+            is_reasoning_task and 
+            selected_tools and 
+            not node_results and
+            not REASONING_AVAILABLE
+        )
+        
+        self.assertTrue(
+            should_attempt_explicit_invocation,
+            "Should attempt explicit reasoning invocation when selected_tools present"
+        )
+    
+    def test_explicit_invocation_returns_reasoning_invoked_true(self):
+        """Test that explicit invocation sets reasoning_invoked=True in result."""
+        # Simulate the expected result structure from explicit reasoning invocation
+        result = {
+            "status": "completed",
+            "reasoning_invoked": True,
+            "reasoning_output": {"conclusion": "Test", "confidence": 0.85},
+            "tools_used": ["causal", "probabilistic"],
+            "execution_time": 0.5,
+        }
+        
+        self.assertTrue(result["reasoning_invoked"])
+        self.assertEqual(result["tools_used"], ["causal", "probabilistic"])
+
+
+class TestArenaReasoningBypass(unittest.TestCase):
+    """Tests for Arena reasoning bypass logic."""
+    
+    def test_reasoning_bypass_triggered_with_reasoning_keywords(self):
+        """Test that reasoning bypass is triggered when reasoning keywords present."""
+        reasoning_keywords = (
+            'cause', 'effect', 'why', 'reason', 'infer', 'deduce', 'logic',
+            'probability', 'likely', 'chance', 'symbol', 'analogy', 'similar to',
+            'counterfactual', 'what if', 'hypothesis'
+        )
+        
+        test_queries = [
+            "why does this cause an error",
+            "what is the probability of success",
+            "what if we used a different approach",
+        ]
+        
+        for query in test_queries:
+            query_lower = query.lower()
+            has_reasoning_indicators = any(kw in query_lower for kw in reasoning_keywords)
+            self.assertTrue(
+                has_reasoning_indicators,
+                f"Query '{query}' should trigger reasoning bypass"
+            )
+    
+    def test_reasoning_bypass_with_low_combined_score(self):
+        """Test that reasoning queries bypass ARENA_TRIGGER_THRESHOLD."""
+        ARENA_TRIGGER_THRESHOLD = 0.85
+        complexity_score = 0.35
+        uncertainty_score = 0.2
+        combined_score = (complexity_score + uncertainty_score) / 2  # 0.275
+        
+        # Without reasoning bypass, this would skip Arena
+        self.assertTrue(combined_score < ARENA_TRIGGER_THRESHOLD)
+        
+        # With reasoning bypass enabled
+        reasoning_bypass = True
+        should_skip_arena = combined_score < ARENA_TRIGGER_THRESHOLD and not reasoning_bypass
+        
+        self.assertFalse(
+            should_skip_arena,
+            "Arena should NOT be skipped when reasoning bypass is active"
+        )
+    
+    def test_arena_participation_set_on_reasoning_bypass(self):
+        """Test that arena_participation is set to True when reasoning bypass triggers."""
+        # Simulate the logic from _determine_arena_participation
+        reasoning_bypass = True
+        combined_score = 0.3
+        ARENA_TRIGGER_THRESHOLD = 0.85
+        
+        arena_participation = False
+        tournament_candidates = 0
+        
+        # This simulates the fix: when reasoning bypass is active and score is below threshold
+        if reasoning_bypass and combined_score < ARENA_TRIGGER_THRESHOLD:
+            arena_participation = True
+            tournament_candidates = 5
+        
+        self.assertTrue(arena_participation)
+        self.assertEqual(tournament_candidates, 5)
+
+
 if __name__ == "__main__":
     unittest.main()

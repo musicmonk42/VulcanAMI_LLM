@@ -1581,19 +1581,48 @@ class QueryAnalyzer:
         collaboration_agents = collaboration_agents or []
         
         # ================================================================
+        # FIX: REASONING TOOL BYPASS - Enable Arena for complex reasoning
+        # Detect reasoning keywords/tools in query to bypass threshold for
+        # queries that would benefit from multi-agent reasoning evaluation
+        # ================================================================
+        reasoning_tools = {'causal', 'symbolic', 'probabilistic', 'analogical'}
+        reasoning_keywords = (
+            'cause', 'effect', 'why', 'reason', 'infer', 'deduce', 'logic',
+            'probability', 'likely', 'chance', 'symbol', 'analogy', 'similar to',
+            'counterfactual', 'what if', 'hypothesis'
+        )
+        has_reasoning_indicators = any(kw in query_lower for kw in reasoning_keywords)
+        is_reasoning_query_type = query_type in (QueryType.REASONING,) if query_type else False
+        
+        # Bypass threshold for reasoning queries with moderate complexity
+        reasoning_bypass = (
+            (has_reasoning_indicators or is_reasoning_query_type) and
+            (complexity_score >= 0.3 or len(query_lower.split()) >= 2)
+        )
+        
+        # ================================================================
         # FIX: MAIN GATE - ARENA_TRIGGER_THRESHOLD (0.85)
         # This gate ensures Arena is only used for truly complex physics/coding
         # tasks. Simpler queries (philosophy, general Q&A) bypass Arena,
         # reducing response times from ~60s to ~5s.
         # ================================================================
         combined_score = (complexity_score + uncertainty_score) / 2
-        if combined_score < ARENA_TRIGGER_THRESHOLD:
+        if combined_score < ARENA_TRIGGER_THRESHOLD and not reasoning_bypass:
             # Quick bypass for simple queries - don't use Arena
             logger.debug(
                 f"[Arena] Query bypassed arena (combined_score={combined_score:.2f} < "
                 f"threshold={ARENA_TRIGGER_THRESHOLD})"
             )
             return False, 0
+        
+        # Log if reasoning bypass was triggered
+        if reasoning_bypass and combined_score < ARENA_TRIGGER_THRESHOLD:
+            logger.info(
+                f"[Arena] Reasoning bypass activated: has_reasoning_indicators={has_reasoning_indicators}, "
+                f"is_reasoning_type={is_reasoning_query_type}, complexity={complexity_score:.2f}"
+            )
+            arena_participation = True
+            tournament_candidates = 5
         
         # ================================================================
         # ARENA ACTIVATION CONDITIONS
