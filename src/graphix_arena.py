@@ -1535,7 +1535,7 @@ class GraphixArena:
                 # Also check nodes for query text (GraphixIRGraph format)
                 if not query or query == task:
                     nodes = data.get("nodes", [])
-                    if nodes and isinstance(nodes, list) and len(nodes) > 0:
+                    if nodes and isinstance(nodes, list):
                         query = nodes[0].get("properties", {}).get("text") or query
                 
                 context = data.get("context", {})

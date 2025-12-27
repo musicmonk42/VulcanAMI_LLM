@@ -2309,7 +2309,7 @@ class AgentPoolManager:
                     
                     # Convert first tool name to ReasoningType enum if possible
                     reasoning_type = None
-                    if selected_tools:
+                    if selected_tools and len(selected_tools) > 0:
                         tool_name = selected_tools[0].upper()
                         try:
                             reasoning_type = ReasoningType[tool_name]
@@ -2320,9 +2320,9 @@ class AgentPoolManager:
                                     reasoning_type = rt
                                     break
                     
-                    # Use ADAPTIVE strategy when multiple tools are selected
+                    # Use ADAPTIVE strategy by default, ENSEMBLE when multiple tools selected
                     strategy = ReasoningStrategy.ADAPTIVE
-                    if len(selected_tools) > 1:
+                    if selected_tools and len(selected_tools) > 1:
                         strategy = ReasoningStrategy.ENSEMBLE
                     
                     # Invoke actual reasoning with correct signature:

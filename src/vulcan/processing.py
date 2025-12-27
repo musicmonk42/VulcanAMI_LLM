@@ -2422,10 +2422,16 @@ class AdaptiveMultimodalProcessor(nn.Module):
         try:
             # Only clean up local resources, not the shared model manager
             if hasattr(self, 'cache'):
-                self.cache.clear()
+                try:
+                    self.cache.clear()
+                except Exception:
+                    pass
             if hasattr(self, '_cache_key_lock') and hasattr(self, '_cache_key_cache'):
-                with self._cache_key_lock:
-                    self._cache_key_cache.clear()
+                try:
+                    with self._cache_key_lock:
+                        self._cache_key_cache.clear()
+                except Exception:
+                    pass
             if hasattr(self, 'thread_executor'):
                 try:
                     self.thread_executor.shutdown(wait=False)
