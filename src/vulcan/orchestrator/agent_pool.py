@@ -1699,6 +1699,7 @@ class AgentPoolManager:
         Assign agent with timeout and proper locking to prevent race conditions
         FIXED: Won't hang if no agents available
         BUG #1 FIX: Triggers cleanup and respawn if all agents are terminated
+        ISSUE #4 FIX: Fixed early return bug that caused agents to remain idle
 
         Args:
             capability: Required capability
@@ -1714,6 +1715,7 @@ class AgentPoolManager:
         retry_count = 0
         last_cleanup_time = 0.0  # Track when last cleanup was attempted
         cleanup_cooldown = 1.0  # Minimum seconds between cleanup attempts
+        at_max_capacity = False  # ISSUE #4 FIX: Track capacity state for early return decision
 
         while time.time() - start_time < timeout_seconds and retry_count < max_retries:
             # FIXED: Check shutdown event
@@ -1729,9 +1731,18 @@ class AgentPoolManager:
 
                 # BUG #1 FIX: Check LIVE agent count using internal method (no re-locking)
                 live_count = self._get_live_agent_count_unsafe()
+                at_max_capacity = live_count >= self.max_agents
+                
+                # ISSUE #4 FIX: Log state for debugging agent pool underutilization
+                idle_count = sum(1 for m in self.agents.values() if m.state == AgentState.IDLE)
+                if retry_count == 0:
+                    logger.debug(
+                        f"[AgentPool] Assignment attempt: capability={capability.value}, "
+                        f"live={live_count}, idle={idle_count}, max={self.max_agents}"
+                    )
                 
                 # Try to spawn if under capacity (using live count)
-                if live_count < self.max_agents:
+                if not at_max_capacity:
                     new_agent = self.spawn_agent(capability)
                     if new_agent:
                         # Give agent a moment to initialize
@@ -1757,8 +1768,11 @@ class AgentPoolManager:
                 if cleaned > 0:
                     logger.info(f"Cleaned up {cleaned} terminated agents, retrying assignment")
                     continue  # Retry immediately after cleanup
-                elif retry_count == 0:
-                    # First attempt with no terminated agents - truly at capacity
+                # ISSUE #4 FIX: Only return early if we're ACTUALLY at max capacity
+                # Previously this returned None even when not at capacity, causing
+                # agents to remain idle while jobs were rejected
+                elif retry_count == 0 and at_max_capacity:
+                    # First attempt with no terminated agents AND at max capacity - truly at capacity
                     logger.warning(
                         f"At max capacity ({self.max_agents}) with no available agents "
                         f"for capability {capability.value}"
