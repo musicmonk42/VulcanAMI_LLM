@@ -1282,13 +1282,22 @@ class CuriosityEngine:
         # FIX Issue #13: Track resolution counts per gap type to detect phantom resolutions
         # key -> list of (timestamp, was_success) tuples
         self._gap_resolution_history: Dict[str, List[Tuple[float, bool]]] = {}
-        self.MAX_GAPS_PER_TYPE = 2  # Maximum gaps of same type
-        self.GAP_COOLDOWN_SECONDS = 300  # Don't re-add same gap for 5 min
+        # ISSUE #3 FIX: Increased MAX_GAPS_PER_TYPE from 2 to 5 to allow more
+        # experiments per learning cycle. The previous limit of 2 was too restrictive
+        # and caused experiments=0 in most cycles.
+        self.MAX_GAPS_PER_TYPE = 5  # Maximum gaps of same type (was 2)
+        # ISSUE #3 FIX: Reduced GAP_COOLDOWN_SECONDS from 300 to 120 to allow
+        # faster re-processing of gaps. 5 minute cooldown was too long.
+        self.GAP_COOLDOWN_SECONDS = 120  # Don't re-add same gap for 2 min (was 5 min)
         self.GAP_RESOLUTION_TTL_SECONDS = 1800  # BUG #14 FIX: Allow re-detection after 30 min if issue persists
         self.RESOLUTION_CLEANUP_INTERVAL = 300  # Only cleanup expired resolutions every 5 minutes
         # FIX Issue #13: Threshold for detecting phantom resolutions
         self.PHANTOM_RESOLUTION_THRESHOLD = 3  # If resolved 3+ times in an hour, it's not really resolved
         self.PHANTOM_RESOLUTION_WINDOW = 3600  # 1 hour window for counting phantom resolutions
+        
+        # ISSUE #3 FIX: Bootstrap experiment constants
+        self.BOOTSTRAP_EXPERIMENT_TIMEOUT_SECONDS = 30.0  # Short timeout for bootstrap experiments
+        self.BOOTSTRAP_MEMORY_LIMIT_BYTES = 128 * 1024 * 1024  # 128MB memory limit for bootstrap
         
         # External gap injection (for OutcomeBridge connection)
         # This allows gaps detected by external systems (e.g., OutcomeBridge)
@@ -2142,6 +2151,11 @@ class CuriosityEngine:
                 results = []
                 experiments_run = 0
                 gaps_with_no_experiments = 0
+                
+                # ISSUE #3 FIX: Track if this is a "cold start" cycle with no priorities
+                # When no gaps/priorities exist, generate bootstrap experiments to 
+                # kickstart the learning system
+                had_initial_priorities = not self.learning_priorities.empty()
 
                 while experiments_run < max_experiments:
                     try:
@@ -2170,6 +2184,27 @@ class CuriosityEngine:
                         result = self.run_experiment_sandboxed(exp)
                         results.append(result)
                         experiments_run += 1
+                
+                # ISSUE #3 FIX: Generate bootstrap experiments when:
+                # 1. No experiments ran at all (true cold start), OR
+                # 2. Very few experiments ran and we had no initial priorities
+                # This ensures the learning system makes progress even without ingested data
+                needs_bootstrap = (
+                    experiments_run == 0 or 
+                    (experiments_run < 2 and not had_initial_priorities)
+                )
+                if needs_bootstrap:
+                    remaining_slots = max_experiments - experiments_run
+                    if remaining_slots > 0:
+                        logger.info(
+                            f"[CuriosityEngine] Cold start detected (ran {experiments_run}/{max_experiments}) "
+                            f"- generating {remaining_slots} bootstrap experiments"
+                        )
+                        bootstrap_experiments = self._generate_bootstrap_experiments(remaining_slots)
+                        for exp in bootstrap_experiments[:remaining_slots]:
+                            result = self.run_experiment_sandboxed(exp)
+                            results.append(result)
+                            experiments_run += 1
 
                 # BUG FIX: Log summary of gaps that generated no experiments
                 if gaps_with_no_experiments > 0:
@@ -2216,6 +2251,128 @@ class CuriosityEngine:
                     "success_rate": 0.0,
                     "error": str(e),
                 }
+    
+    def _generate_bootstrap_experiments(self, max_experiments: int = 3) -> List[Experiment]:
+        """
+        Generate bootstrap experiments for cold-start learning cycles.
+        
+        ISSUE #3 FIX: When no gaps are found (no query data ingested, all gaps
+        in cooldown, or at type limits), generate synthetic exploratory experiments
+        to ensure the learning system makes progress.
+        
+        These experiments focus on:
+        1. Self-diagnostic experiments - test the system's own capabilities
+        2. Baseline performance experiments - establish performance baselines
+        3. Exploratory experiments - discover what capabilities are available
+        
+        Args:
+            max_experiments: Maximum number of bootstrap experiments to generate
+            
+        Returns:
+            List of bootstrap Experiment objects
+        """
+        from .experiment_generator import Constraint, Experiment, ExperimentType
+        from .gap_analyzer import KnowledgeGap
+        
+        experiments = []
+        
+        try:
+            # Generate synthetic gaps for bootstrap experiments
+            bootstrap_gap_configs = [
+                {
+                    "type": "self_diagnostic",
+                    "domain": "system",
+                    "description": "Bootstrap: System self-diagnostic",
+                    "complexity": 0.3,
+                    "experiment_type": ExperimentType.VALIDATION,
+                    "parameters": {
+                        "test_type": "self_diagnostic",
+                        "components": ["memory", "reasoning", "learning"],
+                        "depth": "shallow",
+                    },
+                },
+                {
+                    "type": "baseline",
+                    "domain": "performance", 
+                    "description": "Bootstrap: Establish performance baseline",
+                    "complexity": 0.4,
+                    "experiment_type": ExperimentType.EXPLORATORY,
+                    "parameters": {
+                        "test_type": "baseline",
+                        "metrics": ["latency", "throughput", "accuracy"],
+                        "sample_size": 10,
+                    },
+                },
+                {
+                    "type": "capability_probe",
+                    "domain": "reasoning",
+                    "description": "Bootstrap: Probe available capabilities",
+                    "complexity": 0.3,
+                    "experiment_type": ExperimentType.EXPLORATORY,
+                    "parameters": {
+                        "test_type": "capability_probe",
+                        "probe_depth": "surface",
+                        "capabilities": ["decomposition", "causal", "transfer"],
+                    },
+                },
+            ]
+            
+            for i, config in enumerate(bootstrap_gap_configs[:max_experiments]):
+                # Create synthetic gap
+                gap = KnowledgeGap(
+                    id=f"bootstrap_{config['type']}_{i}",
+                    type=config["type"],
+                    domain=config["domain"],
+                    severity=0.3,  # Low severity for bootstrap
+                    estimated_cost=config["complexity"] * 10,
+                    related_patterns=[],
+                    description=config["description"],
+                    metadata={"bootstrap": True, "auto_generated": True},
+                )
+                
+                # Create experiment
+                experiment = Experiment(
+                    gap=gap,
+                    complexity=config["complexity"],
+                    timeout=self.BOOTSTRAP_EXPERIMENT_TIMEOUT_SECONDS,
+                    success_criteria={
+                        "completion": True,
+                        "no_errors": True,
+                        "min_data_points": 1,
+                    },
+                    safety_constraints=[
+                        Constraint(
+                            "bootstrap_timeout",
+                            "time",
+                            self.BOOTSTRAP_EXPERIMENT_TIMEOUT_SECONDS,
+                            action="abort"
+                        ),
+                        Constraint(
+                            "bootstrap_memory",
+                            "memory",
+                            self.BOOTSTRAP_MEMORY_LIMIT_BYTES,
+                            action="abort"
+                        ),
+                    ],
+                    experiment_type=config["experiment_type"],
+                    parameters=config["parameters"],
+                    metadata={
+                        "bootstrap": True,
+                        "auto_generated": True,
+                        "purpose": "cold_start_initialization",
+                    },
+                )
+                experiments.append(experiment)
+            
+            logger.info(
+                f"[CuriosityEngine] Generated {len(experiments)} bootstrap experiments "
+                f"for cold-start learning cycle"
+            )
+            
+        except Exception as e:
+            logger.error(f"[CuriosityEngine] Error generating bootstrap experiments: {e}")
+        
+        return experiments
 
     def _simplify_gap(self, gap: KnowledgeGap, budget: float) -> KnowledgeGap:
         """Simplify gap to fit budget"""
