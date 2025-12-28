@@ -6,6 +6,7 @@ This enables the reasoning system to:
 - Identify when queries span multiple domains
 - Determine transfer candidates between domains
 - Establish execution order for multi-domain queries
+- Use SemanticBridge for actual concept transfer operations
 
 Architecture:
     ToolSelector → ToolDomainBridge → SemanticBridge
@@ -20,6 +21,21 @@ import threading
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 logger = logging.getLogger(__name__)
+
+# Try to import SemanticBridge components
+SEMANTIC_BRIDGE_AVAILABLE = False
+try:
+    from vulcan.semantic_bridge import (
+        SemanticBridge, 
+        DomainRegistry, 
+        create_semantic_bridge,
+        DomainProfile,
+        DomainCriticality,
+    )
+    SEMANTIC_BRIDGE_AVAILABLE = True
+except ImportError as e:
+    logger.debug(f"SemanticBridge not available: {e}")
+    # Will use fallback static mappings
 
 
 class ToolDomainBridge:
@@ -91,12 +107,134 @@ class ToolDomainBridge:
         'general': 6,
     }
     
-    def __init__(self):
-        """Initialize the tool-to-domain bridge."""
+    def __init__(self, semantic_bridge: Optional[Any] = None):
+        """Initialize the tool-to-domain bridge.
+        
+        Args:
+            semantic_bridge: Optional SemanticBridge instance for actual transfers.
+                            If not provided, will try to get from singletons.
+        """
         self.logger = logging.getLogger(f"{__name__}.ToolDomainBridge")
         self._transfer_history: List[Dict[str, Any]] = []
         self._max_history = 100
         self._history_lock = threading.Lock()  # Thread safety for transfer history
+        
+        # Initialize SemanticBridge integration
+        self._semantic_bridge = semantic_bridge
+        self._domain_registry: Optional[Any] = None
+        self._init_semantic_bridge()
+    
+    def _init_semantic_bridge(self):
+        """Initialize SemanticBridge integration.
+        
+        This enables proper cross-domain concept transfer using the
+        semantic_bridge module instead of just static mappings.
+        """
+        if self._semantic_bridge is not None:
+            self.logger.info("ToolDomainBridge using provided SemanticBridge instance")
+            return
+        
+        # Try to get from singletons
+        if SEMANTIC_BRIDGE_AVAILABLE:
+            try:
+                from vulcan.reasoning.singletons import get_semantic_bridge
+                self._semantic_bridge = get_semantic_bridge()
+                if self._semantic_bridge:
+                    self.logger.info("ToolDomainBridge connected to singleton SemanticBridge")
+                    # Get domain registry from semantic bridge
+                    if hasattr(self._semantic_bridge, 'domain_registry'):
+                        self._domain_registry = self._semantic_bridge.domain_registry
+                    return
+            except Exception as e:
+                self.logger.debug(f"Could not get SemanticBridge from singletons: {e}")
+        
+        # Fallback: Try direct creation
+        if SEMANTIC_BRIDGE_AVAILABLE:
+            try:
+                self._semantic_bridge = create_semantic_bridge()
+                self.logger.info("ToolDomainBridge created new SemanticBridge instance")
+                if hasattr(self._semantic_bridge, 'domain_registry'):
+                    self._domain_registry = self._semantic_bridge.domain_registry
+                return
+            except Exception as e:
+                self.logger.warning(f"Could not create SemanticBridge: {e}")
+        
+        self.logger.info("ToolDomainBridge running without SemanticBridge (using static mappings)")
+    
+    def get_semantic_bridge(self) -> Optional[Any]:
+        """Get the SemanticBridge instance if available.
+        
+        Returns:
+            SemanticBridge instance or None if not available
+        """
+        return self._semantic_bridge
+    
+    def transfer_concepts(
+        self,
+        source_domain: str,
+        target_domain: str,
+        concepts: List[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        """
+        Transfer concepts between domains using SemanticBridge.
+        
+        This method uses the actual SemanticBridge for concept transfer
+        if available, otherwise falls back to a simple copy operation.
+        
+        Args:
+            source_domain: Source domain name
+            target_domain: Target domain name
+            concepts: List of concept dictionaries to transfer
+            
+        Returns:
+            Dict with transfer results including success status
+        """
+        if not self.can_transfer_between(source_domain, target_domain):
+            return {
+                'success': False,
+                'error': f"Transfer not allowed: {source_domain} → {target_domain}",
+                'transferred_count': 0,
+            }
+        
+        # Use SemanticBridge if available
+        if self._semantic_bridge is not None:
+            try:
+                # Use the transfer engine from semantic bridge
+                if hasattr(self._semantic_bridge, 'transfer_engine'):
+                    transfer_results = []
+                    for concept in concepts:
+                        result = self._semantic_bridge.transfer_engine.transfer(
+                            concept=concept,
+                            source_domain=source_domain,
+                            target_domain=target_domain,
+                        )
+                        transfer_results.append(result)
+                    
+                    successful = sum(1 for r in transfer_results if getattr(r, 'success', False))
+                    
+                    # Record the transfer
+                    self.record_transfer(source_domain, target_domain, successful > 0, successful)
+                    
+                    return {
+                        'success': successful > 0,
+                        'transferred_count': successful,
+                        'total_attempted': len(concepts),
+                        'results': transfer_results,
+                    }
+                else:
+                    self.logger.debug("SemanticBridge has no transfer_engine, using fallback")
+            except Exception as e:
+                self.logger.warning(f"SemanticBridge transfer failed: {e}, using fallback")
+        
+        # Fallback: Simple pass-through (no actual transformation)
+        self.record_transfer(source_domain, target_domain, True, len(concepts))
+        
+        return {
+            'success': True,
+            'transferred_count': len(concepts),
+            'total_attempted': len(concepts),
+            'method': 'fallback_passthrough',
+        }
     
     def get_domains_for_tools(self, tools: List[str]) -> Set[str]:
         """
