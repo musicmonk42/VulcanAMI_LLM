@@ -235,17 +235,23 @@ class TestSingletonImportErrors(unittest.TestCase):
         except ImportError:
             pass
 
-    def test_graceful_degradation_on_import_error(self):
-        """Test that singletons return None on import errors."""
-        from vulcan.reasoning import singletons
-
-        # Mock an import error for ToolSelector
-        with patch.dict('sys.modules', {'vulcan.reasoning.selection.tool_selector': None}):
-            with patch('vulcan.reasoning.singletons.logger') as mock_logger:
-                # This should not raise, just return None
-                result = singletons.get_tool_selector()
-                # Result depends on whether ToolSelector is actually available
-                # The important thing is it doesn't crash
+    def test_graceful_degradation_on_factory_error(self):
+        """Test that get_or_create handles factory errors gracefully."""
+        from vulcan.reasoning.singletons import get_or_create, _instances, reset_all
+        
+        reset_all()
+        
+        def failing_factory():
+            raise ValueError("Simulated factory failure")
+        
+        # Should not raise, should return None
+        result = get_or_create("failing_key", failing_factory)
+        
+        # Result should be None due to exception handling
+        self.assertIsNone(result)
+        
+        # Key should not be in instances
+        self.assertNotIn("failing_key", _instances)
 
 
 class TestSingletonIntegration(unittest.TestCase):

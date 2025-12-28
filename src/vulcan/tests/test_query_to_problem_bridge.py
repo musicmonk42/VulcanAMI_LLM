@@ -23,8 +23,23 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 
+# Helper function to check decomposer availability
+def _check_decomposer_available():
+    """Check if ProblemDecomposer is available and return the flag."""
+    try:
+        from vulcan.problem_decomposer import PROBLEM_DECOMPOSER_AVAILABLE
+        return PROBLEM_DECOMPOSER_AVAILABLE
+    except ImportError:
+        return False
+
+
 class TestQueryToProblemBridge(unittest.TestCase):
     """Test cases for the QueryToProblemBridge class."""
+
+    @classmethod
+    def setUpClass(cls):
+        """Check decomposer availability once for the class."""
+        cls.decomposer_available = _check_decomposer_available()
 
     def setUp(self):
         """Set up test fixtures."""
@@ -33,6 +48,13 @@ class TestQueryToProblemBridge(unittest.TestCase):
             self.bridge = QueryToProblemBridge()
         except ImportError as e:
             self.skipTest(f"QueryToProblemBridge not available: {e}")
+
+    def _skip_if_no_decomposer(self, result):
+        """Skip test assertions if decomposer not available."""
+        if not self.decomposer_available:
+            self.assertIsNone(result)
+            return True
+        return False
 
     def test_bridge_initialization(self):
         """Test that bridge initializes correctly."""
@@ -51,14 +73,7 @@ class TestQueryToProblemBridge(unittest.TestCase):
 
         result = self.bridge.convert_to_problem_graph(query, query_analysis)
 
-        # Check if decomposer is available
-        try:
-            from vulcan.problem_decomposer import PROBLEM_DECOMPOSER_AVAILABLE
-            if not PROBLEM_DECOMPOSER_AVAILABLE:
-                self.assertIsNone(result)
-                return
-        except ImportError:
-            self.assertIsNone(result)
+        if self._skip_if_no_decomposer(result):
             return
 
         if result is not None:
@@ -86,13 +101,7 @@ class TestQueryToProblemBridge(unittest.TestCase):
             query, query_analysis, tool_selection
         )
 
-        try:
-            from vulcan.problem_decomposer import PROBLEM_DECOMPOSER_AVAILABLE
-            if not PROBLEM_DECOMPOSER_AVAILABLE:
-                self.assertIsNone(result)
-                return
-        except ImportError:
-            self.assertIsNone(result)
+        if self._skip_if_no_decomposer(result):
             return
 
         if result is not None:

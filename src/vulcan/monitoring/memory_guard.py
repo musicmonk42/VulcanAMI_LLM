@@ -123,7 +123,7 @@ class MemoryGuard:
                     
                     # Check memory after GC
                     memory_after = psutil.virtual_memory()
-                    freed_mb = (memory.used - memory_after.used) / (1024**2)
+                    freed_mb = max(0, (memory.used - memory_after.used) / (1024**2))
                     logger.info(
                         f"[MemoryGuard] GC collected {collected} objects, "
                         f"freed ~{freed_mb:.1f}MB, "

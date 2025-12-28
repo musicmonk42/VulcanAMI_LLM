@@ -276,6 +276,7 @@ class ReasoningIntegration:
                 - min_confidence: Minimum confidence (default: 0.5)
                 - tool_selector_config: Config passed to ToolSelector
                 - enable_decomposition: Enable problem decomposition (default: True)
+                - enable_cross_domain_transfer: Enable cross-domain knowledge transfer (default: True)
         """
         self._config = config or {}
 
@@ -284,6 +285,8 @@ class ReasoningIntegration:
         self._portfolio_executor: Optional[Any] = None
         self._problem_decomposer: Optional[Any] = None
         self._query_bridge: Optional[Any] = None
+        self._semantic_bridge: Optional[Any] = None
+        self._domain_bridge: Optional[Any] = None
 
         # Initialization state with thread safety
         self._initialized = False
@@ -300,10 +303,37 @@ class ReasoningIntegration:
         self._shutdown = False
         self._shutdown_lock = threading.Lock()
         
-        # Decomposition configuration
+        # Feature configuration
         self._decomposition_enabled = self._config.get('enable_decomposition', True)
+        self._cross_domain_enabled = self._config.get('enable_cross_domain_transfer', True)
 
-        logger.info(f"{LOG_PREFIX} Initialized (lazy loading enabled, decomposition={self._decomposition_enabled})")
+        logger.info(
+            f"{LOG_PREFIX} Initialized (lazy loading enabled, "
+            f"decomposition={self._decomposition_enabled}, "
+            f"cross_domain={self._cross_domain_enabled})"
+        )
+
+    def _should_use_decomposition(self, complexity: float) -> bool:
+        """
+        Determine if problem decomposition should be used for a query.
+        
+        Decomposition is used when:
+        - Decomposition is enabled in config
+        - Query complexity is at or above the threshold (0.40)
+        - ProblemDecomposer and QueryBridge are available
+        
+        Args:
+            complexity: Query complexity score (0.0 to 1.0)
+            
+        Returns:
+            True if decomposition should be used, False otherwise
+        """
+        return (
+            self._decomposition_enabled
+            and complexity >= DECOMPOSITION_COMPLEXITY_THRESHOLD
+            and self._problem_decomposer is not None
+            and self._query_bridge is not None
+        )
 
     def _init_components(self) -> None:
         """
@@ -336,6 +366,11 @@ class ReasoningIntegration:
             if self._decomposition_enabled:
                 self._problem_decomposer = self._init_problem_decomposer()
                 self._query_bridge = self._init_query_bridge()
+            
+            # Try to initialize SemanticBridge and DomainBridge (if cross-domain enabled)
+            if self._cross_domain_enabled:
+                self._semantic_bridge = self._init_semantic_bridge()
+                self._domain_bridge = self._init_domain_bridge()
 
             init_time = (time.perf_counter() - init_start) * 1000
 
@@ -345,7 +380,8 @@ class ReasoningIntegration:
                 f"{LOG_PREFIX} Components initialized in {init_time:.1f}ms "
                 f"(ToolSelector: {self._tool_selector is not None}, "
                 f"PortfolioExecutor: {self._portfolio_executor is not None}, "
-                f"ProblemDecomposer: {self._problem_decomposer is not None})"
+                f"ProblemDecomposer: {self._problem_decomposer is not None}, "
+                f"SemanticBridge: {self._semantic_bridge is not None})"
             )
 
     def _init_tool_selector(self) -> Optional[Any]:
@@ -482,6 +518,98 @@ class ReasoningIntegration:
 
         return None
 
+    def _init_semantic_bridge(self) -> Optional[Any]:
+        """
+        Initialize SemanticBridge component with error handling.
+        
+        PERFORMANCE FIX: Uses singleton from singletons.py to ensure SemanticBridge
+        is created exactly ONCE per process.
+
+        Returns:
+            SemanticBridge instance if successful, None otherwise.
+        """
+        try:
+            from vulcan.reasoning.singletons import get_semantic_bridge
+
+            bridge = get_semantic_bridge()
+            if bridge is not None:
+                logger.info(f"{LOG_PREFIX} SemanticBridge obtained from singleton")
+                return bridge
+
+            # Fallback: If singleton fails, try direct creation
+            logger.warning(f"{LOG_PREFIX} Singleton unavailable, creating SemanticBridge directly")
+            from vulcan.semantic_bridge import create_semantic_bridge
+            bridge = create_semantic_bridge()
+            logger.info(f"{LOG_PREFIX} SemanticBridge initialized successfully (fallback)")
+            return bridge
+
+        except ImportError as e:
+            logger.warning(
+                f"{LOG_PREFIX} SemanticBridge not available (missing dependency): {e}"
+            )
+        except Exception as e:
+            logger.error(
+                f"{LOG_PREFIX} SemanticBridge initialization failed: {e}",
+                exc_info=True
+            )
+
+        return None
+
+    def _init_domain_bridge(self) -> Optional[Any]:
+        """
+        Initialize ToolDomainBridge component with error handling.
+
+        Returns:
+            ToolDomainBridge instance if successful, None otherwise.
+        """
+        try:
+            from vulcan.reasoning.tool_domain_bridge import get_tool_domain_bridge
+
+            bridge = get_tool_domain_bridge()
+            logger.info(f"{LOG_PREFIX} ToolDomainBridge initialized successfully")
+            return bridge
+
+        except ImportError as e:
+            logger.warning(
+                f"{LOG_PREFIX} ToolDomainBridge not available (missing dependency): {e}"
+            )
+        except Exception as e:
+            logger.error(
+                f"{LOG_PREFIX} ToolDomainBridge initialization failed: {e}",
+                exc_info=True
+            )
+
+        return None
+
+    def _should_use_cross_domain_transfer(
+        self,
+        selected_tools: List[str],
+    ) -> bool:
+        """
+        Determine if cross-domain knowledge transfer should be used.
+        
+        Cross-domain transfer is used when:
+        - Cross-domain transfer is enabled in config
+        - SemanticBridge and DomainBridge are available
+        - Query uses tools from multiple domains
+        
+        Args:
+            selected_tools: List of selected tool names
+            
+        Returns:
+            True if cross-domain transfer should be used, False otherwise
+        """
+        if not self._cross_domain_enabled:
+            return False
+        
+        if self._semantic_bridge is None or self._domain_bridge is None:
+            return False
+        
+        if len(selected_tools) < 2:
+            return False
+        
+        return self._domain_bridge.is_cross_domain_query(selected_tools)
+
     def apply_reasoning(
         self,
         query: str,
@@ -565,14 +693,7 @@ class ReasoningIntegration:
                 )
 
             # Check if we should use decomposition for complex queries
-            use_decomposition = (
-                self._decomposition_enabled
-                and complexity >= DECOMPOSITION_COMPLEXITY_THRESHOLD
-                and self._problem_decomposer is not None
-                and self._query_bridge is not None
-            )
-            
-            if use_decomposition:
+            if self._should_use_decomposition(complexity):
                 # Use decomposition path for complex queries
                 logger.info(
                     f"{LOG_PREFIX} Using decomposition path (complexity={complexity:.2f} >= "
@@ -1240,6 +1361,271 @@ class ReasoningIntegration:
             self._selection_times.clear()
 
         logger.info(f"{LOG_PREFIX} Statistics reset")
+
+    def apply_cross_domain_transfer(
+        self,
+        query: str,
+        query_analysis: Dict[str, Any],
+        selected_tools: List[str],
+    ) -> Dict[str, Any]:
+        """
+        Apply cross-domain knowledge transfer using SemanticBridge.
+        
+        This method enables knowledge learned in one domain to be applied
+        in related domains, improving reasoning quality for queries that
+        span multiple conceptual areas.
+        
+        Processing Flow:
+            1. Identify domains involved from selected tools
+            2. Determine primary domain based on query type
+            3. Find applicable concepts from SemanticBridge
+            4. Validate transfer compatibility between domains
+            5. Execute transfers for compatible concepts
+            6. Record transfer for learning
+        
+        Args:
+            query: The query string being processed
+            query_analysis: Analysis results with type, complexity, etc.
+            selected_tools: List of tools selected for this query
+            
+        Returns:
+            Dictionary containing:
+                - success: Whether transfer was successful
+                - domains: List of domains involved
+                - primary_domain: Identified primary domain
+                - transferred_concepts: List of transferred concept info
+                - transfer_count: Number of concepts transferred
+                - error: Error message if failed
+                
+        Example:
+            >>> result = integration.apply_cross_domain_transfer(
+            ...     query="What causes X given Y?",
+            ...     query_analysis={'type': 'reasoning', 'complexity': 0.6},
+            ...     selected_tools=['causal', 'probabilistic']
+            ... )
+            >>> print(result['transfer_count'])
+            2
+        """
+        # Ensure components are initialized
+        self._init_components()
+        
+        # Validate prerequisites
+        if self._semantic_bridge is None:
+            logger.debug(f"{LOG_PREFIX} SemanticBridge not available for cross-domain transfer")
+            return {
+                'success': False,
+                'error': 'semantic_bridge_unavailable',
+                'domains': [],
+            }
+        
+        if self._domain_bridge is None:
+            logger.debug(f"{LOG_PREFIX} DomainBridge not available for cross-domain transfer")
+            return {
+                'success': False,
+                'error': 'domain_bridge_unavailable',
+                'domains': [],
+            }
+        
+        transfer_start = time.perf_counter()
+        
+        try:
+            # Step 1: Get domains involved
+            domains = self._domain_bridge.get_domains_for_tools(selected_tools)
+            
+            # Step 2: Identify primary domain
+            query_type = query_analysis.get('type', 'general')
+            primary_domain = self._domain_bridge.identify_primary_domain(
+                selected_tools, query_type
+            )
+            
+            logger.info(
+                f"{LOG_PREFIX} Cross-domain transfer: domains={domains}, "
+                f"primary={primary_domain}"
+            )
+            
+            # Step 3: Get applicable concepts from primary domain
+            applicable_concepts = []
+            try:
+                applicable_concepts = self._semantic_bridge.get_applicable_concepts(
+                    domain=primary_domain,
+                    min_confidence=0.6,
+                )
+            except Exception as e:
+                logger.debug(f"{LOG_PREFIX} Failed to get applicable concepts: {e}")
+            
+            # Step 4: Try to transfer concepts from related domains
+            transferred = []
+            for source_domain in domains:
+                if source_domain == primary_domain:
+                    continue
+                
+                # Check if transfer is possible
+                if not self._domain_bridge.can_transfer_between(source_domain, primary_domain):
+                    continue
+                
+                # Get source domain concepts
+                try:
+                    source_concepts = self._semantic_bridge.get_applicable_concepts(
+                        domain=source_domain,
+                        min_confidence=0.5,
+                    )
+                except Exception as e:
+                    logger.debug(f"{LOG_PREFIX} Failed to get concepts from {source_domain}: {e}")
+                    continue
+                
+                # Validate and transfer each concept (limit to top 3)
+                for concept in source_concepts[:3]:
+                    try:
+                        # Validate compatibility
+                        compatibility = self._semantic_bridge.validate_transfer_compatibility(
+                            concept=concept,
+                            source=source_domain,
+                            target=primary_domain,
+                        )
+                        
+                        if not compatibility.is_compatible():
+                            continue
+                        
+                        # Execute transfer
+                        transferred_concept = self._semantic_bridge.transfer_concept(
+                            concept=concept,
+                            source_domain=source_domain,
+                            target_domain=primary_domain,
+                        )
+                        
+                        if transferred_concept is not None:
+                            concept_id = getattr(concept, 'concept_id', str(concept)[:20])
+                            transferred.append({
+                                'concept_id': concept_id,
+                                'source': source_domain,
+                                'target': primary_domain,
+                                'confidence': compatibility.confidence,
+                            })
+                            logger.debug(
+                                f"{LOG_PREFIX} Transferred concept from "
+                                f"{source_domain} → {primary_domain}"
+                            )
+                            
+                    except Exception as e:
+                        logger.debug(f"{LOG_PREFIX} Concept transfer failed: {e}")
+                        continue
+            
+            # Record transfer in domain bridge
+            if transferred:
+                self._domain_bridge.record_transfer(
+                    source_domain=list(domains - {primary_domain})[0] if len(domains) > 1 else 'unknown',
+                    target_domain=primary_domain,
+                    success=True,
+                    concepts_transferred=len(transferred),
+                )
+            
+            transfer_time_ms = (time.perf_counter() - transfer_start) * 1000
+            
+            logger.info(
+                f"{LOG_PREFIX} Cross-domain transfer complete: "
+                f"transferred={len(transferred)}, time={transfer_time_ms:.1f}ms"
+            )
+            
+            return {
+                'success': True,
+                'domains': list(domains),
+                'primary_domain': primary_domain,
+                'applicable_concepts': len(applicable_concepts),
+                'transferred_concepts': transferred,
+                'transfer_count': len(transferred),
+                'transfer_time_ms': transfer_time_ms,
+            }
+            
+        except Exception as e:
+            logger.warning(f"{LOG_PREFIX} Cross-domain transfer failed: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'domains': list(domains) if 'domains' in dir() else [],
+            }
+
+    def learn_from_outcome(
+        self,
+        query: str,
+        query_analysis: Dict[str, Any],
+        selected_tools: List[str],
+        success: bool,
+        execution_time: float,
+    ) -> None:
+        """
+        Learn from reasoning outcome using SemanticBridge.
+        
+        After successful query execution, this method creates a pattern
+        from the outcome and adds it to the SemanticBridge for future
+        cross-domain transfer.
+        
+        Args:
+            query: Original query string
+            query_analysis: Query analysis results
+            selected_tools: Tools that were used
+            success: Whether execution succeeded
+            execution_time: Total execution time in seconds
+            
+        Example:
+            >>> integration.learn_from_outcome(
+            ...     query="What causes X?",
+            ...     query_analysis={'type': 'reasoning', 'complexity': 0.6},
+            ...     selected_tools=['causal'],
+            ...     success=True,
+            ...     execution_time=1.5
+            ... )
+        """
+        # Only learn from successful outcomes
+        if not success:
+            return
+        
+        # Ensure components are initialized
+        self._init_components()
+        
+        if self._semantic_bridge is None or self._domain_bridge is None:
+            return
+        
+        try:
+            # Get domain information
+            domains = self._domain_bridge.get_domains_for_tools(selected_tools)
+            primary_domain = self._domain_bridge.identify_primary_domain(
+                selected_tools,
+                query_analysis.get('type', 'general'),
+            )
+            
+            # Create pattern outcome for learning
+            from vulcan.semantic_bridge import PatternOutcome
+            
+            outcome = PatternOutcome(
+                pattern_id=f"query_{hash(query) % 10000:04d}",
+                success=success,
+                domain=primary_domain,
+                execution_time=execution_time,
+                tools=selected_tools,
+                complexity=query_analysis.get('complexity', 0.5),
+            )
+            
+            # Create pattern from query characteristics
+            pattern = {
+                'query_type': query_analysis.get('type', 'general'),
+                'complexity': query_analysis.get('complexity', 0.0),
+                'tools': selected_tools,
+                'domains': list(domains),
+            }
+            
+            # Learn concept from pattern
+            concept = self._semantic_bridge.learn_concept_from_pattern(
+                pattern=pattern,
+                outcomes=[outcome],
+            )
+            
+            if concept:
+                logger.debug(
+                    f"{LOG_PREFIX} Learned concept in domain {primary_domain}"
+                )
+                
+        except Exception as e:
+            logger.debug(f"{LOG_PREFIX} Failed to learn from outcome: {e}")
 
     def shutdown(self, timeout: float = 5.0) -> None:
         """

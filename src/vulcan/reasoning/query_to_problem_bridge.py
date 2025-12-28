@@ -233,9 +233,14 @@ class QueryToProblemBridge:
         return problem_graph
     
     def _generate_problem_id(self, query: str) -> str:
-        """Generate a unique problem ID from the query."""
-        # Use first 8 chars of MD5 hash for uniqueness
-        hash_val = hashlib.md5(query.encode(), usedforsecurity=False).hexdigest()[:8]
+        """
+        Generate a unique problem ID from the query.
+        
+        Uses full MD5 hash for better collision resistance.
+        With full 32 hex chars, collision probability is negligible.
+        """
+        # Use full MD5 hash for better collision resistance
+        hash_val = hashlib.md5(query.encode(), usedforsecurity=False).hexdigest()
         return f"query_{hash_val}"
     
     def _score_to_complexity_name(self, score: float) -> str:

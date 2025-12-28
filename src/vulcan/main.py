@@ -3726,6 +3726,9 @@ CHARS_PER_TOKEN_ESTIMATE = 3  # Conservative estimate for token calculation
 SLOW_PHASE_THRESHOLD_MS = 1000  # Log warning if phase takes longer than this
 SLOW_REQUEST_THRESHOLD_MS = 5000  # Include timing breakdown for requests slower than this
 
+# MEMORY MANAGEMENT: GC thresholds
+GC_SIGNIFICANT_CLEANUP_THRESHOLD = 100  # Log GC if collected more than this many objects
+
 # REASONING OUTPUT FORMATTING: Limits for formatting reasoning results
 # These prevent context overflow while keeping meaningful output
 MAX_REASONING_RESULT_LENGTH = 1500  # Maximum characters per reasoning result
@@ -5328,7 +5331,7 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
             try:
                 import gc
                 collected = gc.collect()
-                if collected > 100:  # Only log if significant cleanup occurred
+                if collected > GC_SIGNIFICANT_CLEANUP_THRESHOLD:
                     logger.debug(f"[VULCAN/v1/chat] Post-request GC collected {collected} objects")
             except Exception:
                 pass  # Don't let GC errors affect the response

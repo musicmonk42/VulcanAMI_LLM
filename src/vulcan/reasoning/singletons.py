@@ -35,6 +35,7 @@ _warm_pool: Optional[Any] = None
 _cost_model: Optional[Any] = None
 _semantic_matcher: Optional[Any] = None
 _problem_decomposer: Optional[Any] = None
+_semantic_bridge: Optional[Any] = None
 _singleton_lock = threading.Lock()
 
 
@@ -47,13 +48,17 @@ def get_or_create(key: str, factory: Callable) -> Any:
         factory: Callable that creates the instance
         
     Returns:
-        The singleton instance
+        The singleton instance, or None if factory fails
     """
     if key not in _instances:
         with _lock:
             if key not in _instances:
-                _instances[key] = factory()
-    return _instances[key]
+                try:
+                    _instances[key] = factory()
+                except Exception as e:
+                    logger.error(f"[Singletons] Factory failed for '{key}': {e}")
+                    return None
+    return _instances.get(key)
 
 
 def get_tool_selector():
@@ -183,6 +188,7 @@ def reset_all() -> None:
     global _tool_selector, _reasoning_integration, _portfolio_executor
     global _bayesian_prior, _warm_pool, _cost_model, _semantic_matcher
     global _problem_decomposer
+    global _semantic_bridge
     
     with _singleton_lock:
         _tool_selector = None
@@ -193,6 +199,7 @@ def reset_all() -> None:
         _cost_model = None
         _semantic_matcher = None
         _problem_decomposer = None
+        _semantic_bridge = None
         _instances.clear()
         logger.info("[Singletons] All singletons reset")
 
@@ -361,6 +368,50 @@ def get_problem_decomposer():
             return None
 
 
+def get_semantic_bridge():
+    """
+    Get singleton SemanticBridge instance.
+    
+    The SemanticBridge handles cross-domain knowledge transfer, enabling:
+    - Concept mapping across domains
+    - Transfer validation between domains
+    - Conflict resolution when domains disagree
+    - Learning from successful cross-domain transfers
+    
+    Returns:
+        SemanticBridge instance (singleton).
+    """
+    global _semantic_bridge
+    
+    if _semantic_bridge is not None:
+        logger.debug("[Singletons] Returning cached SemanticBridge")
+        return _semantic_bridge
+    
+    with _singleton_lock:
+        if _semantic_bridge is not None:
+            return _semantic_bridge
+        
+        logger.info("[Singletons] Creating global SemanticBridge (ONCE)")
+        try:
+            from vulcan.semantic_bridge import create_semantic_bridge
+            _semantic_bridge = create_semantic_bridge(
+                world_model=None,  # Will be injected if available
+                vulcan_memory=None,
+                config={
+                    'safety': {'max_risk_score': 0.8, 'require_validation': True},
+                    'transfer': {'full_transfer_threshold': 0.8, 'partial_transfer_threshold': 0.5},
+                }
+            )
+            logger.info("[Singletons] ✓ SemanticBridge created and cached")
+            return _semantic_bridge
+        except ImportError as e:
+            logger.warning(f"[Singletons] SemanticBridge not available: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"[Singletons] Failed to create SemanticBridge: {e}")
+            return None
+
+
 def prewarm_all():
     """
     Pre-initialize all singletons at startup.
@@ -387,6 +438,9 @@ def prewarm_all():
     
     pd = get_problem_decomposer()
     results['problem_decomposer'] = pd is not None
+    
+    sb = get_semantic_bridge()
+    results['semantic_bridge'] = sb is not None
     
     success_count = sum(1 for v in results.values() if v)
     logger.info(f"[Singletons] ✓ All singletons pre-warmed ({success_count}/{len(results)} initialized)")
