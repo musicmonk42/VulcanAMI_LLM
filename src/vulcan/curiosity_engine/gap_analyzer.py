@@ -173,6 +173,9 @@ class Pattern:
             return 0.0
 
 
+_PRIORITY_NOT_SET = object()  # Sentinel value to detect if priority was explicitly set
+
+
 @dataclass
 class KnowledgeGap:
     """Single knowledge gap representation
@@ -185,7 +188,7 @@ class KnowledgeGap:
 
     type: str  # Gap type
     domain: str
-    priority: float = 0.5  # Made optional with default for severity alias support
+    priority: float = 0.5  # Default priority value
     estimated_cost: float = 0.0  # Made optional with default for severity alias support
     missing_capability: Optional[str] = None
     gap_id: Optional[str] = None
@@ -203,9 +206,18 @@ class KnowledgeGap:
     def __post_init__(self):
         """Generate ID if not provided and handle severity alias"""
         # ISSUE FIX: Handle severity as an alias for priority
-        # If severity is provided but priority is still at default, use severity as priority
-        if self.severity is not None and self.priority == 0.5:
-            self.priority = self.severity
+        # If severity is provided and is not None, use it as priority
+        # The caller can override by explicitly providing priority
+        # Since dataclass doesn't provide a way to detect if a default was used,
+        # we use a simple rule: if severity is set but priority is at default (0.5),
+        # use severity. This matches the documented behavior.
+        if self.severity is not None:
+            # Only use severity if it appears priority wasn't explicitly set to a different value
+            # We keep the current value of priority if it differs from default
+            if self.priority == 0.5:  # Default value
+                self.priority = self.severity
+            # Sync severity to match priority for consistency in serialization
+            self.severity = self.priority
         
         if not self.gap_id and not self.id:
             # Generate unique ID
@@ -222,13 +234,12 @@ class KnowledgeGap:
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization"""
-        return {
+        result = {
             "gap_id": self.gap_id,
             "id": self.id,
             "type": self.type,
             "domain": self.domain,
             "priority": self.priority,
-            "severity": self.severity,  # Include severity alias in serialization
             "estimated_cost": self.estimated_cost,
             "missing_capability": self.missing_capability,
             "timestamp": self.timestamp,
@@ -238,6 +249,10 @@ class KnowledgeGap:
             "dependencies": self.dependencies,
             "adjusted_roi": self.adjusted_roi,
         }
+        # Only include severity if it was explicitly set
+        if self.severity is not None:
+            result["severity"] = self.severity
+        return result
 
     def mark_addressed(self):
         """Mark gap as addressed"""
