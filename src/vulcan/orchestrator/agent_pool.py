@@ -2550,15 +2550,18 @@ class AgentPoolManager:
                     provenance.complete("failed", error=str(error))
                     # FIX 3: Only update stats if provenance wasn't already complete
                     # (if complete, _execute_agent_task already updated stats)
+                    # NOTE: We explicitly check provenance.is_complete() to avoid
+                    # double-counting - if provenance was already complete, stats
+                    # were updated by _execute_agent_task.
                     with self.stats_lock:
                         self.stats["total_jobs_failed"] += 1
-                        current_stats = dict(self.stats)
-                    logger.warning(
-                        f"[AgentPool] Job failed (via _handle_task_failure): task={task_id}, "
-                        f"agent={agent_id}. Stats: submitted={current_stats['total_jobs_submitted']}, "
-                        f"completed={current_stats['total_jobs_completed']}, "
-                        f"failed={current_stats['total_jobs_failed']}"
-                    )
+                        # Capture stats INSIDE lock and log INSIDE lock to avoid race
+                        logger.warning(
+                            f"[AgentPool] Job failed (via _handle_task_failure): task={task_id}, "
+                            f"agent={agent_id}. Stats: submitted={self.stats['total_jobs_submitted']}, "
+                            f"completed={self.stats['total_jobs_completed']}, "
+                            f"failed={self.stats['total_jobs_failed']}"
+                        )
 
             # Remove from assignments
             if task_id in self.task_assignments:
