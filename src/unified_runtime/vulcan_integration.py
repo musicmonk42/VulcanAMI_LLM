@@ -169,7 +169,15 @@ class VulcanGraphixBridge:
         self.config = config or VulcanIntegrationConfig()
         self.vulcan_available = VULCAN_AVAILABLE
         self.world_model = None
-        self.semantic_bridge = SemanticBridge() if SemanticBridge else None
+        
+        # BUG FIX Issue #48: Use singleton SemanticBridge to prevent per-query reinitialization.
+        try:
+            from vulcan.reasoning.singletons import get_semantic_bridge
+            self.semantic_bridge = get_semantic_bridge()
+            if self.semantic_bridge is None and SemanticBridge:
+                self.semantic_bridge = SemanticBridge()
+        except ImportError:
+            self.semantic_bridge = SemanticBridge() if SemanticBridge else None
 
         # Initialize motivational driver - NO STUBS
         if VULCAN_AVAILABLE:
@@ -207,7 +215,17 @@ class VulcanGraphixBridge:
                     "self_improvement_state": "data/agent_state.json",
                     "meta_reasoning_config": "configs/intrinsic_drives.json",
                 }
-                self.world_model = WorldModel(config=world_model_config)
+                # BUG FIX Issues #1-4, #45-46: Use singleton WorldModel to prevent
+                # per-query reinitialization that causes ~10-15 second overhead.
+                try:
+                    from vulcan.reasoning.singletons import get_world_model
+                    self.world_model = get_world_model(config=world_model_config)
+                    if self.world_model is None:
+                        # Fallback to direct creation if singleton fails
+                        logger.warning("WorldModel singleton unavailable, creating directly")
+                        self.world_model = WorldModel(config=world_model_config)
+                except ImportError:
+                    self.world_model = WorldModel(config=world_model_config)
                 logger.info("Initializing VULCAN World Model...")
                 if hasattr(self.world_model, "initialize"):
                     if asyncio.iscoroutinefunction(self.world_model.initialize):
@@ -216,14 +234,28 @@ class VulcanGraphixBridge:
                         self.world_model.initialize()
                 logger.info("✓ VULCAN World Model initialized")
 
-                # Re-initialize motivational_driver after world_model is created - NO STUBS
+                # BUG FIX Issues #9, #49: Use existing motivational_introspection from WorldModel
+                # instead of creating a new one to prevent multiple initialization.
+                # The WorldModel already creates MotivationalIntrospection during init.
                 if VULCAN_AVAILABLE:
-                    self.motivational_driver = MotivationalIntrospection(
-                        world_model=self.world_model
+                    # Check if WorldModel already has MotivationalIntrospection initialized
+                    wm_has_mi = (
+                        hasattr(self.world_model, 'motivational_introspection') 
+                        and self.world_model.motivational_introspection is not None
                     )
-                    logger.info(
-                        "✓ VULCAN MotivationalIntrospection re-initialized with WorldModel"
-                    )
+                    if wm_has_mi:
+                        self.motivational_driver = self.world_model.motivational_introspection
+                        logger.info(
+                            "✓ VULCAN MotivationalIntrospection obtained from WorldModel (singleton)"
+                        )
+                    else:
+                        # Only create if WorldModel doesn't have one
+                        self.motivational_driver = MotivationalIntrospection(
+                            world_model=self.world_model
+                        )
+                        logger.info(
+                            "✓ VULCAN MotivationalIntrospection created (WorldModel had none)"
+                        )
             except Exception as e:
                 logger.error(f"❌ Failed to initialize VULCAN World Model: {e}")
                 raise RuntimeError(

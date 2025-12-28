@@ -179,7 +179,17 @@ class ValidationTestSuite:
             # Initialize components
             self.nso = NSOAligner() if NSOAligner else None
             self.obs = ObservabilityManager() if ObservabilityManager else None
-            self.runtime = UnifiedRuntime() if UnifiedRuntime else None
+            # Use singleton for UnifiedRuntime to prevent per-test reinitialization
+            if UnifiedRuntime:
+                try:
+                    from vulcan.reasoning.singletons import get_unified_runtime
+                    self.runtime = get_unified_runtime()
+                    if self.runtime is None:
+                        self.runtime = UnifiedRuntime()
+                except ImportError:
+                    self.runtime = UnifiedRuntime()
+            else:
+                self.runtime = None
             self.audit = SecurityAuditEngine() if SecurityAuditEngine else None
             self.key_manager = KeyManager(agent_id) if KeyManager else None
             self.hardware = HardwareDispatcher() if HardwareDispatcher else None

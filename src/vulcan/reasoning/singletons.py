@@ -41,6 +41,7 @@ _self_improvement_drive: Optional[Any] = None
 _unified_runtime: Optional[Any] = None
 _ai_runtime: Optional[Any] = None
 _multimodal_engine: Optional[Any] = None
+_unified_reasoner: Optional[Any] = None  # BUG FIX: Add singleton for UnifiedReasoner
 _singleton_lock = threading.Lock()
 
 
@@ -159,6 +160,62 @@ def get_portfolio_executor():
             return None
 
 
+# ============================================
+# UNIFIED REASONER SINGLETON
+# ============================================
+
+_unified_reasoner_lock = threading.Lock()
+
+
+def get_unified_reasoner(
+    enable_learning: bool = True,
+    enable_safety: bool = True,
+    config: Optional[dict] = None
+) -> Optional[Any]:
+    """
+    Get singleton UnifiedReasoner instance.
+    
+    BUG FIX: The UnifiedReasoner was being instantiated per-query, causing
+    WarmStartPool, ToolSelector, and MultiModalReasoningEngine to be
+    reinitialized each time. This singleton ensures unified reasoning
+    components are created once at startup.
+    
+    Args:
+        enable_learning: Whether to enable learning (first-time only)
+        enable_safety: Whether to enable safety checks (first-time only)
+        config: Optional config dict (first-time only)
+        
+    Returns:
+        UnifiedReasoner instance (singleton), or None if unavailable.
+    """
+    global _unified_reasoner
+    
+    if _unified_reasoner is not None:
+        logger.debug("[Singletons] Returning cached UnifiedReasoner")
+        return _unified_reasoner
+    
+    with _unified_reasoner_lock:
+        if _unified_reasoner is not None:
+            return _unified_reasoner
+        
+        logger.info("[Singletons] Creating global UnifiedReasoner (ONCE)")
+        try:
+            from vulcan.reasoning.unified_reasoning import UnifiedReasoner
+            _unified_reasoner = UnifiedReasoner(
+                enable_learning=enable_learning,
+                enable_safety=enable_safety,
+                config=config
+            )
+            logger.info("[Singletons] ✓ UnifiedReasoner created and cached")
+            return _unified_reasoner
+        except ImportError as e:
+            logger.warning(f"[Singletons] UnifiedReasoner import failed: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"[Singletons] Failed to create UnifiedReasoner: {e}")
+            return None
+
+
 def initialize_all() -> dict:
     """
     Initialize all singletons at startup.
@@ -196,7 +253,7 @@ def reset_all() -> None:
     global _semantic_bridge
     global _curiosity_engine
     global _world_model, _self_improvement_drive, _unified_runtime
-    global _ai_runtime, _multimodal_engine
+    global _ai_runtime, _multimodal_engine, _unified_reasoner
     
     with _singleton_lock:
         _tool_selector = None
@@ -214,6 +271,7 @@ def reset_all() -> None:
         _unified_runtime = None
         _ai_runtime = None
         _multimodal_engine = None
+        _unified_reasoner = None
         _instances.clear()
         logger.info("[Singletons] All singletons reset")
 
@@ -249,12 +307,22 @@ def get_bayesian_prior():
             return None
 
 
-def get_warm_pool():
+def get_warm_pool(tools: Optional[dict] = None, config: Optional[dict] = None):
     """
     Get singleton WarmStartPool instance.
     
+    BUG FIX Issues #3, #44: The WarmStartPool was being initialized multiple times
+    per query ("Warm pool initialized with 5 tool pools" appearing repeatedly).
+    This singleton ensures the pool is created once at startup.
+    
+    Args:
+        tools: Optional dictionary of tool_name -> tool_instance/factory.
+               Required on first call if pool needs initialization.
+               If None and pool doesn't exist, returns None (safe for early calls).
+        config: Optional configuration dictionary for WarmStartPool.
+        
     Returns:
-        WarmStartPool instance (singleton).
+        WarmStartPool instance (singleton), or None if tools not provided and pool doesn't exist.
     """
     global _warm_pool
     
@@ -266,10 +334,16 @@ def get_warm_pool():
         if _warm_pool is not None:
             return _warm_pool
         
+        # If no tools provided, cannot create WarmStartPool
+        # This is safe - callers that need tools will provide them
+        if tools is None:
+            logger.debug("[Singletons] WarmStartPool not yet initialized (no tools provided)")
+            return None
+        
         logger.info("[Singletons] Creating global WarmStartPool (ONCE)")
         try:
             from vulcan.reasoning.selection.warm_pool import WarmStartPool
-            _warm_pool = WarmStartPool()
+            _warm_pool = WarmStartPool(tools=tools, config=config or {})
             logger.info("[Singletons] ✓ WarmStartPool created and cached")
             return _warm_pool
         except ImportError as e:

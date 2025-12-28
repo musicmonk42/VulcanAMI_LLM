@@ -1207,9 +1207,31 @@ class ToolSelector:
 
         self.cache = SelectionCache(config.get("cache_config", {}))
 
-        self.warm_pool = WarmStartPool(
-            tools=self.tools, config=config.get("warm_pool_config", {})
-        )
+        # BUG FIX Issues #3, #44: Use singleton WarmStartPool to prevent
+        # "Warm pool initialized with 5 tool pools" appearing multiple times.
+        # The singleton is shared across all ToolSelector instances.
+        try:
+            from vulcan.reasoning.singletons import get_warm_pool
+            self.warm_pool = get_warm_pool(
+                tools=self.tools,
+                config=config.get("warm_pool_config", {})
+            )
+            if self.warm_pool is None:
+                # Fallback: Create directly if singleton fails.
+                # Note: This may cause duplicate initialization if called multiple times,
+                # but is necessary for robustness when singletons module has issues.
+                logger.warning(
+                    "WarmStartPool singleton unavailable, creating instance directly. "
+                    "This may result in duplicate initialization if ToolSelector is created multiple times."
+                )
+                self.warm_pool = WarmStartPool(
+                    tools=self.tools, config=config.get("warm_pool_config", {})
+                )
+        except ImportError:
+            # Fallback: Create directly if singletons module not available
+            self.warm_pool = WarmStartPool(
+                tools=self.tools, config=config.get("warm_pool_config", {})
+            )
 
         # Decision components
         self.utility_model = UtilityModel()

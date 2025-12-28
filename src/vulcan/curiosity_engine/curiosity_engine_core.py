@@ -1279,10 +1279,16 @@ class CuriosityEngine:
         self._gap_last_seen: Dict[str, float] = {}  # Track when gap was last added
         self._gap_attempts: Dict[str, int] = {}  # Track experiment attempts per gap
         self._last_resolution_cleanup: float = 0.0  # Last time we cleaned up expired resolutions
+        # FIX Issue #13: Track resolution counts per gap type to detect phantom resolutions
+        # key -> list of (timestamp, was_success) tuples
+        self._gap_resolution_history: Dict[str, List[Tuple[float, bool]]] = {}
         self.MAX_GAPS_PER_TYPE = 2  # Maximum gaps of same type
         self.GAP_COOLDOWN_SECONDS = 300  # Don't re-add same gap for 5 min
         self.GAP_RESOLUTION_TTL_SECONDS = 1800  # BUG #14 FIX: Allow re-detection after 30 min if issue persists
         self.RESOLUTION_CLEANUP_INTERVAL = 300  # Only cleanup expired resolutions every 5 minutes
+        # FIX Issue #13: Threshold for detecting phantom resolutions
+        self.PHANTOM_RESOLUTION_THRESHOLD = 3  # If resolved 3+ times in an hour, it's not really resolved
+        self.PHANTOM_RESOLUTION_WINDOW = 3600  # 1 hour window for counting phantom resolutions
         
         # External gap injection (for OutcomeBridge connection)
         # This allows gaps detected by external systems (e.g., OutcomeBridge)
@@ -1556,20 +1562,111 @@ class CuriosityEngine:
             success: Whether resolution was successful (default True)
         """
         key = self._gap_key(gap)
+        current_time = time.time()
+        
+        # FIX Issue #13: Track resolution history for phantom detection
+        if key not in self._gap_resolution_history:
+            self._gap_resolution_history[key] = []
+        self._gap_resolution_history[key].append((current_time, success))
+        
+        # Clean up old resolution history entries (older than window)
+        self._gap_resolution_history[key] = [
+            (ts, s) for ts, s in self._gap_resolution_history[key]
+            if current_time - ts < self.PHANTOM_RESOLUTION_WINDOW
+        ]
         
         # BUG #14 FIX: Always add to resolved set with timestamp (not just on success)
         # This prevents the same gap from being re-added immediately
-        self._resolved_gaps[key] = time.time()
+        self._resolved_gaps[key] = current_time
         
         # BUG #14 FIX: Reset attempts counter when gap is resolved (success or give-up)
         # This prevents the log showing "after 19 attempts" when it should be "after 3 attempts"
         if key in self._gap_attempts:
             del self._gap_attempts[key]
         
+        # FIX Issue #13: Log warning if this gap keeps getting "resolved"
+        recent_resolutions = len(self._gap_resolution_history[key])
+        if recent_resolutions >= self.PHANTOM_RESOLUTION_THRESHOLD:
+            logger.warning(
+                f"[CuriosityEngine] PHANTOM RESOLUTION: Gap {key} 'resolved' {recent_resolutions}x "
+                f"in last hour - underlying issue likely NOT fixed"
+            )
+        
         if success:
             logger.info(f"[CuriosityEngine] Gap {key} resolved by successful experiment")
         else:
             logger.info(f"[CuriosityEngine] Gap {key} marked resolved after giving up")
+    
+    def _count_recent_resolutions(self, gap_type: str, domain: str = "query_processing", minutes: int = 60) -> int:
+        """
+        Count how many times a gap type has been 'resolved' recently.
+        
+        FIX Issue #13: Helps detect phantom resolutions where gaps keep
+        getting marked as resolved but immediately reappear.
+        
+        Args:
+            gap_type: Type of gap (e.g., 'high_error_rate')
+            domain: Domain of gap (default 'query_processing')
+            minutes: Time window in minutes (default 60)
+            
+        Returns:
+            Number of resolutions in the time window
+        """
+        key = f"{gap_type}:{domain}"
+        if key not in self._gap_resolution_history:
+            return 0
+        
+        cutoff = time.time() - (minutes * 60)
+        return sum(1 for ts, _ in self._gap_resolution_history[key] if ts > cutoff)
+    
+    def _is_gap_truly_resolved(self, gap_type: str, domain: str = "query_processing") -> bool:
+        """
+        Check if gap is actually resolved based on actual success rate, not just marked.
+        
+        FIX Issue #13: A gap should only be considered truly resolved if:
+        1. Recent success rate is > 80%
+        2. It hasn't been "resolved" 3+ times in the last hour (phantom resolution)
+        
+        Args:
+            gap_type: Type of gap (e.g., 'high_error_rate')
+            domain: Domain of gap (default 'query_processing')
+            
+        Returns:
+            True if gap is truly resolved, False if it's a phantom resolution
+        """
+        key = f"{gap_type}:{domain}"
+        
+        # Check for phantom resolution pattern
+        recent_resolution_count = self._count_recent_resolutions(gap_type, domain, minutes=60)
+        if recent_resolution_count >= self.PHANTOM_RESOLUTION_THRESHOLD:
+            logger.debug(
+                f"[CuriosityEngine] Gap {key} has {recent_resolution_count} phantom resolutions - not truly resolved"
+            )
+            return False
+        
+        # Check actual success rate from outcome bridge
+        try:
+            from .outcome_bridge import get_recent_outcomes
+            outcomes = get_recent_outcomes(minutes=10)
+            
+            if not outcomes:
+                # No data to verify - assume not resolved
+                return False
+            
+            success_count = sum(1 for o in outcomes if o.get('status') == 'success')
+            success_rate = success_count / len(outcomes)
+            
+            # Only consider resolved if success rate > 80%
+            if success_rate < 0.8:
+                logger.debug(
+                    f"[CuriosityEngine] Gap {key} success_rate={success_rate:.1%} < 80% - not truly resolved"
+                )
+                return False
+            
+            return True
+        except Exception as e:
+            logger.debug(f"[CuriosityEngine] Could not verify gap resolution: {e}")
+            return False
     
     def _filter_gaps_with_resolution(self, raw_gaps: List[KnowledgeGap]) -> List[KnowledgeGap]:
         """Filter gaps based on resolution status, cooldown, and type limits.
@@ -1581,6 +1678,10 @@ class CuriosityEngine:
         
         BUG #14 FIX: Resolved gaps now have a TTL - they can be re-detected
         after GAP_RESOLUTION_TTL_SECONDS (30 min) if the underlying issue persists.
+        
+        FIX Issue #13: Don't filter gaps that keep reappearing (phantom resolutions).
+        If a gap has been "resolved" 3+ times in the last hour, it's not really
+        resolved and should be kept for further investigation.
         
         Performance: Expired gap cleanup is rate-limited to every RESOLUTION_CLEANUP_INTERVAL
         seconds to avoid overhead on every call.
@@ -1609,8 +1710,23 @@ class CuriosityEngine:
         
         for gap in raw_gaps:
             key = self._gap_key(gap)
+            gap_type = getattr(gap, 'type', 'unknown')
+            domain = getattr(gap, 'domain', 'general')
             
-            # Skip if resolved (and not expired)
+            # FIX Issue #13: Check for phantom resolutions - if gap has been 
+            # "resolved" 3+ times in last hour, it's not really resolved
+            recent_resolution_count = self._count_recent_resolutions(gap_type, domain, minutes=60)
+            if recent_resolution_count >= self.PHANTOM_RESOLUTION_THRESHOLD:
+                # Don't filter this gap - it keeps returning, so the underlying issue isn't fixed
+                logger.warning(
+                    f"[CuriosityEngine] Gap {key} has {recent_resolution_count} phantom resolutions - NOT filtering"
+                )
+                filtered.append(gap)
+                type_counts[gap_type] += 1
+                self._gap_last_seen[key] = current_time
+                continue
+            
+            # Skip if resolved (and not expired) - but only if not a phantom resolution
             if key in self._resolved_gaps:
                 continue
             
@@ -1620,7 +1736,6 @@ class CuriosityEngine:
                 continue
             
             # Skip if too many of this type
-            gap_type = getattr(gap, 'type', 'unknown')
             if type_counts[gap_type] >= self.MAX_GAPS_PER_TYPE:
                 continue
             

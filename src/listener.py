@@ -1583,13 +1583,25 @@ class GraphixListener:
 
             # Initialize runtime - prefer full implementation if available
             if FULL_RUNTIME_AVAILABLE:
+                # Use singleton to prevent per-query reinitialization
+                runtime_initialized = False
                 try:
-                    self.runtime = FullUnifiedRuntime()
-                    logger.info("Using full UnifiedRuntime from src.unified_runtime")
-                except Exception as e:
-                    logger.warning(f"Failed to initialize full UnifiedRuntime: {e}")
-                    self.runtime = ListenerGraphRuntime(db_path=db_path)
-                    logger.info("Using ListenerGraphRuntime (built-in implementation)")
+                    from vulcan.reasoning.singletons import get_unified_runtime
+                    self.runtime = get_unified_runtime()
+                    if self.runtime is not None:
+                        runtime_initialized = True
+                        logger.info("Using full UnifiedRuntime from singleton")
+                except ImportError:
+                    pass
+                
+                if not runtime_initialized:
+                    try:
+                        self.runtime = FullUnifiedRuntime()
+                        logger.info("Using full UnifiedRuntime from src.unified_runtime")
+                    except Exception as e:
+                        logger.warning(f"Failed to initialize full UnifiedRuntime: {e}")
+                        self.runtime = ListenerGraphRuntime(db_path=db_path)
+                        logger.info("Using ListenerGraphRuntime (built-in implementation)")
             else:
                 self.runtime = ListenerGraphRuntime(db_path=db_path)
                 logger.info("Using ListenerGraphRuntime (built-in implementation)")

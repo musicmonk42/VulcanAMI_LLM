@@ -2441,6 +2441,15 @@ class AgentPoolManager:
             # Update statistics
             with self.stats_lock:
                 self.stats["total_jobs_completed"] += 1
+                # FIX Issue #12: Log job completion with stats for monitoring
+                current_stats = dict(self.stats)
+            
+            logger.info(
+                f"[AgentPool] Job completed: task={task_id}, agent={agent_id}. "
+                f"Stats: submitted={current_stats['total_jobs_submitted']}, "
+                f"completed={current_stats['total_jobs_completed']}, "
+                f"failed={current_stats['total_jobs_failed']}"
+            )
             
             # Persist state to Redis
             self._persist_state_to_redis()
@@ -2467,6 +2476,15 @@ class AgentPoolManager:
             # Update statistics
             with self.stats_lock:
                 self.stats["total_jobs_failed"] += 1
+                # FIX Issue #12: Log job failure with stats for monitoring
+                current_stats = dict(self.stats)
+            
+            logger.warning(
+                f"[AgentPool] Job failed: task={task_id}, agent={agent_id}. "
+                f"Stats: submitted={current_stats['total_jobs_submitted']}, "
+                f"completed={current_stats['total_jobs_completed']}, "
+                f"failed={current_stats['total_jobs_failed']}"
+            )
             
             # Persist state to Redis
             self._persist_state_to_redis()

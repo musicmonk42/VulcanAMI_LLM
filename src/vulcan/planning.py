@@ -1934,7 +1934,14 @@ class EnhancedHierarchicalPlanner(HierarchicalGoalSystem):
             }
 
         try:
-            runtime = UnifiedRuntime()
+            # Use singleton to prevent per-call reinitialization
+            try:
+                from vulcan.reasoning.singletons import get_unified_runtime
+                runtime = get_unified_runtime()
+                if runtime is None:
+                    runtime = UnifiedRuntime()
+            except ImportError:
+                runtime = UnifiedRuntime()
             graph = {
                 "nodes": [
                     {"id": step.step_id, "type": step.action, "params": step.metadata}

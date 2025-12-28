@@ -1510,54 +1510,71 @@ class AIRuntime:
 
 
 def create_runtime(**kwargs) -> AIRuntime:
-    """Create an AI runtime with configuration."""
+    """Create or get the singleton AI runtime.
+    
+    BUG FIX Issue #28: Use singleton to prevent duplicate OpenAI provider registration.
+    The kwargs are only used on first creation.
+    
+    Note on resource management: The singleton runtime is designed to be long-lived
+    and should not be shutdown during normal operation. Resources are managed internally
+    by the AIRuntime class with connection pooling and automatic cleanup.
+    Call shutdown_runtime() only during application shutdown.
+    """
+    try:
+        from vulcan.reasoning.singletons import get_ai_runtime
+        runtime = get_ai_runtime(config=kwargs if kwargs else None)
+        if runtime is not None:
+            return runtime
+    except ImportError:
+        pass
+    # Fallback to direct creation
     return AIRuntime(**kwargs)
 
 
 def quick_generate(
     prompt: str, model: str = "gpt-3.5-turbo", provider: str = "openai"
 ) -> str:
-    """Quick text generation helper."""
+    """Quick text generation helper using singleton runtime.
+    
+    Note: Uses singleton runtime which should not be shutdown between calls.
+    """
     runtime = create_runtime()
-    try:
-        task = AITask(
-            operation=OperationType.GENERATE,
-            provider=provider,
-            model=model,
-            payload={"prompt": prompt},
-        )
-        contract = AIContract()
+    task = AITask(
+        operation=OperationType.GENERATE,
+        provider=provider,
+        model=model,
+        payload={"prompt": prompt},
+    )
+    contract = AIContract()
 
-        result = runtime.execute_task(task, contract)
-        if result.status == "SUCCESS":
-            return result.data.get("text", "")
-        else:
-            raise RuntimeError(f"Generation failed: {result.error}")
-    finally:
-        runtime.shutdown_runtime()
+    result = runtime.execute_task(task, contract)
+    if result.status == "SUCCESS":
+        return result.data.get("text", "")
+    else:
+        raise RuntimeError(f"Generation failed: {result.error}")
 
 
 def quick_embed(
     text: str, model: str = "text-embedding-ada-002", provider: str = "openai"
 ) -> List[float]:
-    """Quick embedding helper."""
+    """Quick embedding helper using singleton runtime.
+    
+    Note: Uses singleton runtime which should not be shutdown between calls.
+    """
     runtime = create_runtime()
-    try:
-        task = AITask(
-            operation=OperationType.EMBED,
-            provider=provider,
-            model=model,
-            payload={"text": text},
-        )
-        contract = AIContract()
+    task = AITask(
+        operation=OperationType.EMBED,
+        provider=provider,
+        model=model,
+        payload={"text": text},
+    )
+    contract = AIContract()
 
-        result = runtime.execute_task(task, contract)
-        if result.status == "SUCCESS":
-            return result.data.get("embeddings", [])
-        else:
-            raise RuntimeError(f"Embedding failed: {result.error}")
-    finally:
-        runtime.shutdown_runtime()
+    result = runtime.execute_task(task, contract)
+    if result.status == "SUCCESS":
+        return result.data.get("embeddings", [])
+    else:
+        raise RuntimeError(f"Embedding failed: {result.error}")
 
 
 # --- Example Usage ---

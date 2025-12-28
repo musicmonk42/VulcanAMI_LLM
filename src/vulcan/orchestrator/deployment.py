@@ -218,8 +218,19 @@ class ProductionDeployment:
                 self.unified_runtime = None
                 logger.info("UnifiedRuntime explicitly disabled by config")
             else:
-                self.unified_runtime = UnifiedRuntime()
-                logger.info("UnifiedRuntime initialized")
+                # BUG FIX Issue #27: Use singleton to prevent per-query manifest reloading
+                try:
+                    from vulcan.reasoning.singletons import get_unified_runtime
+                    self.unified_runtime = get_unified_runtime()
+                    if self.unified_runtime:
+                        logger.info("UnifiedRuntime obtained via singleton")
+                    else:
+                        # Fallback to direct instantiation
+                        self.unified_runtime = UnifiedRuntime()
+                        logger.info("UnifiedRuntime initialized (singleton fallback)")
+                except ImportError:
+                    self.unified_runtime = UnifiedRuntime()
+                    logger.info("UnifiedRuntime initialized")
         except ImportError:
             logger.info("UnifiedRuntime not available, using internal orchestrator")
             self.unified_runtime = None
@@ -764,15 +775,30 @@ class ProductionDeployment:
 
         # Semantic Bridge (Core) - Initialize before components that need it
         try:
-            from vulcan.semantic_bridge.semantic_bridge_core import SemanticBridge
-
-            # Pass world model, memory, and safety config
-            components["semantic_bridge"] = SemanticBridge(
-                world_model=components.get("world_model"),
-                vulcan_memory=components.get("am"),  # EpisodicMemory
-                safety_config=None,  # Will use singleton safety validator
-            )
-            logger.info("SemanticBridge initialized successfully")
+            # BUG FIX Issue #48: Use singleton SemanticBridge to prevent per-query reinitialization.
+            try:
+                from vulcan.reasoning.singletons import get_semantic_bridge
+                components["semantic_bridge"] = get_semantic_bridge()
+                if components["semantic_bridge"] is not None:
+                    logger.info("SemanticBridge obtained from singleton")
+                else:
+                    # Fallback to direct instantiation
+                    from vulcan.semantic_bridge.semantic_bridge_core import SemanticBridge
+                    components["semantic_bridge"] = SemanticBridge(
+                        world_model=components.get("world_model"),
+                        vulcan_memory=components.get("am"),
+                        safety_config=None,
+                    )
+                    logger.info("SemanticBridge initialized directly (singleton unavailable)")
+            except ImportError:
+                from vulcan.semantic_bridge.semantic_bridge_core import SemanticBridge
+                # Pass world model, memory, and safety config
+                components["semantic_bridge"] = SemanticBridge(
+                    world_model=components.get("world_model"),
+                    vulcan_memory=components.get("am"),  # EpisodicMemory
+                    safety_config=None,  # Will use singleton safety validator
+                )
+                logger.info("SemanticBridge initialized successfully")
         except ImportError as e:
             logger.error(f"Failed to import SemanticBridge: {e}")
             components["semantic_bridge"] = None
@@ -1150,7 +1176,7 @@ class ProductionDeployment:
                 governed_actions = context
 
             # Execute with unified runtime or orchestrator - FIXED: Use governed_actions
-            if self.unified_runtime:
+            if self.unified_runtime is not None:
                 try:
                     result = asyncio.run(
                         self.unified_runtime.execute_graph(governed_actions)
