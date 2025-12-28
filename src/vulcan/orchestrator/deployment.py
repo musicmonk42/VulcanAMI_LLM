@@ -219,18 +219,17 @@ class ProductionDeployment:
                 logger.info("UnifiedRuntime explicitly disabled by config")
             else:
                 # BUG FIX Issue #27: Use singleton to prevent per-query manifest reloading
+                # ISSUE #5 FIX: Use get_or_create_unified_runtime to prevent repeated init/shutdown
                 try:
-                    from vulcan.reasoning.singletons import get_unified_runtime
-                    self.unified_runtime = get_unified_runtime()
+                    from vulcan.reasoning.singletons import get_or_create_unified_runtime
+                    self.unified_runtime = get_or_create_unified_runtime()
                     if self.unified_runtime:
                         logger.info("UnifiedRuntime obtained via singleton")
                     else:
-                        # Fallback to direct instantiation
-                        self.unified_runtime = UnifiedRuntime()
-                        logger.info("UnifiedRuntime initialized (singleton fallback)")
+                        logger.warning("UnifiedRuntime not available via singleton")
                 except ImportError:
                     self.unified_runtime = UnifiedRuntime()
-                    logger.info("UnifiedRuntime initialized")
+                    logger.info("UnifiedRuntime initialized directly")
         except ImportError:
             logger.info("UnifiedRuntime not available, using internal orchestrator")
             self.unified_runtime = None

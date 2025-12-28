@@ -855,12 +855,11 @@ class GraphixArena:
         self.lock = threading.RLock()
 
         # Initialize runtime with fallback - use singleton to prevent duplicate initialization
+        # ISSUE #5 FIX: Use get_or_create_unified_runtime to prevent repeated init/shutdown
         if UNIFIED_RUNTIME_AVAILABLE and UnifiedRuntime is not None:
             try:
-                from vulcan.reasoning.singletons import get_unified_runtime
-                self.runtime = get_unified_runtime()
-                if self.runtime is None:
-                    self.runtime = UnifiedRuntime()
+                from vulcan.reasoning.singletons import get_or_create_unified_runtime
+                self.runtime = get_or_create_unified_runtime()
             except ImportError:
                 self.runtime = UnifiedRuntime()
         else:

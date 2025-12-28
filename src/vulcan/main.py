@@ -577,15 +577,14 @@ async def lifespan(app: FastAPI):
 
         # BUG FIX Issue #27: Use singleton UnifiedRuntime to prevent manifest reload per-query
         if UNIFIED_RUNTIME_AVAILABLE:
+            # ISSUE #5 FIX: Use get_or_create_unified_runtime to prevent repeated init/shutdown
             try:
-                from vulcan.reasoning.singletons import get_unified_runtime
-                deployment.unified_runtime = get_unified_runtime()
+                from vulcan.reasoning.singletons import get_or_create_unified_runtime
+                deployment.unified_runtime = get_or_create_unified_runtime()
                 if deployment.unified_runtime:
                     logger.info("✓ UnifiedRuntime initialized via singleton")
                 else:
-                    # Fallback to direct instantiation if singleton fails
-                    deployment.unified_runtime = UnifiedRuntime()
-                    logger.info("✓ UnifiedRuntime initialized directly (singleton fallback)")
+                    logger.warning("UnifiedRuntime not available")
             except ImportError:
                 deployment.unified_runtime = UnifiedRuntime()
                 logger.info("✓ UnifiedRuntime initialized directly")
