@@ -13,7 +13,7 @@ import logging
 import re
 import threading
 import time
-from collections import defaultdict, deque
+from collections import Counter, defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -458,7 +458,6 @@ class ConsistencyChecker:
                 all_words.extend(words)
             
             # Count word frequencies across all tools
-            from collections import Counter
             word_counts = Counter(all_words)
             
             # Words appearing in at least half of the tools
@@ -471,11 +470,15 @@ class ConsistencyChecker:
             for tool, words in tool_words.items():
                 if words:
                     overlap = len(words & common_words) / len(words)
-                    overlaps.append(overlap)
+                    overlaps.append(float(overlap))  # Ensure float type
                 else:
                     overlaps.append(0.0)
             
-            avg_overlap = np.mean(overlaps) if overlaps else 0.0
+            # Use nanmean to handle edge cases safely
+            avg_overlap = float(np.nanmean(overlaps)) if overlaps else 0.0
+            # Handle potential NaN from empty or all-NaN overlaps
+            if np.isnan(avg_overlap):
+                avg_overlap = 0.0
             
             # Consistency threshold for text comparison (more lenient than exact match)
             # Bug #2 Fix: 0.3 overlap is acceptable given tools produce different formats

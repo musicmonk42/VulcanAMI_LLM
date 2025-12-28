@@ -210,7 +210,21 @@ class ToolDomainBridge:
                         )
                         transfer_results.append(result)
                     
-                    successful = sum(1 for r in transfer_results if getattr(r, 'success', False))
+                    # Robust success detection - handle various result types
+                    def is_successful_result(r) -> bool:
+                        """Check if a transfer result indicates success."""
+                        if r is None:
+                            return False
+                        # Check for success attribute (TransferDecision objects)
+                        if hasattr(r, 'success'):
+                            return bool(r.success)
+                        # Check for dict with success key
+                        if isinstance(r, dict):
+                            return r.get('success', False) or r.get('transferred', False)
+                        # Non-None result without explicit failure assumed successful
+                        return True
+                    
+                    successful = sum(1 for r in transfer_results if is_successful_result(r))
                     
                     # Record the transfer
                     self.record_transfer(source_domain, target_domain, successful > 0, successful)
