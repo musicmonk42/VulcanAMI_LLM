@@ -526,16 +526,54 @@ class DomainRegistry:
         name: str,
         profile: DomainProfile = None,
         characteristics: Dict[str, Any] = None,
-    ):
+        allow_update: bool = False,
+    ) -> bool:
         """
         Register a new domain - FIXED: Added characteristics parameter for semantic_bridge compatibility
+        
+        Bug #7 Fix: Prevents duplicate registration unless allow_update=True.
 
         Args:
             name: Domain name
             profile: Domain profile (created if not provided)
             characteristics: Optional characteristics dict for compatibility
+            allow_update: If True, update existing domain; otherwise reject duplicate
+            
+        Returns:
+            True if registered/updated, False if rejected (duplicate)
         """
         with self._lock:
+            # Bug #7 Fix: Check for existing domain to prevent duplicates with different values
+            if name in self.domains and not allow_update:
+                existing = self.domains[name]
+                # Check if this is a duplicate with different criticality
+                new_criticality = profile.criticality_score if profile else DomainCriticality.MEDIUM.value
+                if characteristics and "criticality" in characteristics:
+                    criticality_map = {
+                        "low": DomainCriticality.LOW.value,
+                        "medium": DomainCriticality.MEDIUM.value,
+                        "high": DomainCriticality.HIGH.value,
+                        "safety_critical": DomainCriticality.SAFETY_CRITICAL.value,
+                    }
+                    new_criticality = criticality_map.get(
+                        characteristics["criticality"],
+                        DomainCriticality.MEDIUM.value,
+                    )
+                
+                if abs(existing.criticality_score - new_criticality) > 0.01:
+                    logger.warning(
+                        "Domain '%s' already registered with criticality %.2f. "
+                        "Rejecting duplicate with criticality %.2f. "
+                        "Use allow_update=True to update.",
+                        name, existing.criticality_score, new_criticality
+                    )
+                else:
+                    logger.debug(
+                        "Domain '%s' already registered (same criticality) - skipping duplicate",
+                        name
+                    )
+                return False
+
             # SAFETY: Validate domain name
             if self.safety_validator:
                 try:
@@ -547,7 +585,7 @@ class DomainRegistry:
                                 name_check.get("reason", "unknown"),
                             )
                             self.safety_blocks["unsafe_domain_name"] += 1
-                            return
+                            return False
                 except Exception as e:
                     logger.debug("Error validating domain name: %s", e)
 
@@ -584,14 +622,14 @@ class DomainRegistry:
                 self.safety_corrections["criticality_score"] += 1
                 profile.criticality_score = np.clip(profile.criticality_score, 0, 1)
 
-            # FIXED: Enforce domain limit
+            # FIXED: Enforce domain limit (only for new domains, not updates)
             if name not in self.domains:
                 if len(self.domains) >= self.max_domains:
                     self._evict_least_used_domain()
+                self.total_domains += 1
 
             self.domains[name] = profile
             self.domain_graph.add_node(name, profile=profile)
-            self.total_domains += 1
 
             # Clear distance cache when topology changes
             self.distance_cache.clear()
@@ -608,6 +646,7 @@ class DomainRegistry:
                 name,
                 profile.criticality_score,
             )
+            return True
 
     def _link_domain_to_world_model(self, domain_name: str, profile: DomainProfile):
         """
@@ -1039,8 +1078,8 @@ class DomainRegistry:
                 ),
             )
 
-            # Register merged domain
-            self.register_domain(merged_name, merged)
+            # Register merged domain (allow_update=True for merging)
+            self.register_domain(merged_name, merged, allow_update=True)
 
             # Transfer relationships
             for rel in self.relationships:
@@ -1185,7 +1224,7 @@ class DomainRegistry:
         ]
 
         for profile in default_domains:
-            self.register_domain(profile.name, profile)
+            self.register_domain(profile.name, profile, allow_update=True)  # Allow init for defaults
 
         # Add some default relationships
         self.add_domain_relationship("general", "optimization", "specialization", 0.7)
@@ -1235,7 +1274,7 @@ class DomainRegistry:
                         f
                     )  # nosec B301 - Internal data structure
                     for name, profile in loaded_domains.items():
-                        self.register_domain(name, profile)
+                        self.register_domain(name, profile, allow_update=True)  # Allow load
             except Exception as e:
                 logger.warning("Failed to load domains: %s", e)
 

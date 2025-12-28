@@ -236,7 +236,12 @@ class StochasticCostModel:
         self.total_updates = 0
 
     def _initialize_defaults(self):
-        """Initialize default cost distributions"""
+        """Initialize default cost distributions
+        
+        Bug #6 Fix: Added Arena agent defaults with realistic cold-start priors.
+        Production logs show visualizer taking 30-60s under CPU load,
+        so defaults should reflect actual performance, not optimistic estimates.
+        """
 
         default_costs = {
             "symbolic": {
@@ -263,6 +268,33 @@ class StochasticCostModel:
                 CostComponent.TIME_MS: (1500, 300),
                 CostComponent.ENERGY_MJ: (300, 60),
                 CostComponent.MEMORY_MB: (500, 100),
+            },
+            # Bug #6 Fix: Add Arena agent defaults with realistic values
+            # Production logs show these agents take 30-60s under CPU load
+            "visualizer": {
+                CostComponent.TIME_MS: (45000, 20000),  # 45s mean, high variance
+                CostComponent.ENERGY_MJ: (500, 200),
+                CostComponent.MEMORY_MB: (800, 300),
+            },
+            "generator": {
+                CostComponent.TIME_MS: (30000, 15000),  # 30s mean
+                CostComponent.ENERGY_MJ: (400, 150),
+                CostComponent.MEMORY_MB: (600, 200),
+            },
+            "evolver": {
+                CostComponent.TIME_MS: (40000, 18000),  # 40s mean
+                CostComponent.ENERGY_MJ: (450, 180),
+                CostComponent.MEMORY_MB: (700, 250),
+            },
+            "photonic_optimizer": {
+                CostComponent.TIME_MS: (60000, 25000),  # 60s mean - hardware is slow
+                CostComponent.ENERGY_MJ: (600, 250),
+                CostComponent.MEMORY_MB: (500, 150),
+            },
+            "automl_optimizer": {
+                CostComponent.TIME_MS: (50000, 22000),  # 50s mean
+                CostComponent.ENERGY_MJ: (550, 220),
+                CostComponent.MEMORY_MB: (900, 350),
             },
         }
 
