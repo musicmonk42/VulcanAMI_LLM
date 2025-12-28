@@ -354,22 +354,34 @@ class MultiTierFeatureExtractor:
 
     @classmethod
     def _get_shared_model(cls):
-        """Get or create the shared embedding model (singleton pattern)"""
+        """Get or create the shared embedding model (singleton pattern).
+        
+        PERFORMANCE FIX: Uses global model registry to ensure SentenceTransformer
+        is loaded exactly ONCE per process and shared across all components.
+        """
         if cls._shared_embedding_model is None and not cls._model_load_attempted:
             with cls._shared_model_lock:
                 # Double-checked locking
                 if cls._shared_embedding_model is None and not cls._model_load_attempted:
                     cls._model_load_attempted = True
-                    if TRANSFORMERS_AVAILABLE:
-                        try:
-                            logger.info("[TIMING] Loading SentenceTransformer for tool selector (singleton)...")
-                            import time
-                            start = time.perf_counter()
-                            cls._shared_embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
-                            elapsed = time.perf_counter() - start
-                            logger.info(f"[TIMING] SentenceTransformer loaded in {elapsed:.2f}s (tool selector singleton)")
-                        except Exception as e:
-                            logger.error(f"Failed to load SentenceTransformer model: {e}")
+                    # Use global model registry for process-wide singleton
+                    try:
+                        from vulcan.models.model_registry import get_sentence_transformer
+                        cls._shared_embedding_model = get_sentence_transformer("all-MiniLM-L6-v2")
+                        if cls._shared_embedding_model is not None:
+                            logger.info("[TIMING] SentenceTransformer obtained from model registry (tool selector)")
+                    except ImportError:
+                        # Fallback to direct load if registry not available
+                        if TRANSFORMERS_AVAILABLE:
+                            try:
+                                logger.info("[TIMING] Loading SentenceTransformer for tool selector (fallback)...")
+                                import time
+                                start = time.perf_counter()
+                                cls._shared_embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+                                elapsed = time.perf_counter() - start
+                                logger.info(f"[TIMING] SentenceTransformer loaded in {elapsed:.2f}s (tool selector fallback)")
+                            except Exception as e:
+                                logger.error(f"Failed to load SentenceTransformer model: {e}")
         
         return cls._shared_embedding_model
     

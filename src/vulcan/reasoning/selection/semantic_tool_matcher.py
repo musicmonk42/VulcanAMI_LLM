@@ -286,16 +286,25 @@ class SemanticToolMatcher:
     def _get_shared_model(cls):
         """Get or create the shared embedding model (singleton pattern).
         
-        PERFORMANCE FIX: First try to use MultiTierFeatureExtractor's model
-        to avoid loading the same model twice (saves 3-5s and 500MB RAM).
+        PERFORMANCE FIX: Uses global model registry to ensure SentenceTransformer
+        is loaded exactly ONCE per process and shared across all components.
         """
         if cls._shared_model is None and not cls._model_load_attempted:
             with cls._shared_model_lock:
                 if cls._shared_model is None and not cls._model_load_attempted:
                     cls._model_load_attempted = True
                     
-                    # First, try to use MultiTierFeatureExtractor's model (same all-MiniLM-L6-v2)
-                    # Import outside try block to distinguish import errors from method call errors
+                    # First, try to use global model registry (process-wide singleton)
+                    try:
+                        from vulcan.models.model_registry import get_sentence_transformer
+                        cls._shared_model = get_sentence_transformer("all-MiniLM-L6-v2")
+                        if cls._shared_model is not None:
+                            logger.info("[SemanticToolMatcher] Using model from global registry")
+                            return cls._shared_model
+                    except ImportError:
+                        logger.debug("[SemanticToolMatcher] Model registry not available")
+                    
+                    # Fallback: Try MultiTierFeatureExtractor's model
                     MultiTierFeatureExtractor = None
                     try:
                         from .tool_selector import MultiTierFeatureExtractor as MTFE
@@ -315,12 +324,12 @@ class SemanticToolMatcher:
                         except Exception as e:
                             logger.debug(f"[SemanticToolMatcher] Error getting shared model: {e}")
                     
-                    # Fallback: load our own model
+                    # Last resort: load our own model directly
                     try:
                         from sentence_transformers import SentenceTransformer
-                        logger.info("[SemanticToolMatcher] Loading embedding model...")
+                        logger.info("[SemanticToolMatcher] Loading embedding model (fallback)...")
                         cls._shared_model = SentenceTransformer("all-MiniLM-L6-v2")
-                        logger.info("[SemanticToolMatcher] Embedding model loaded")
+                        logger.info("[SemanticToolMatcher] Embedding model loaded (fallback)")
                     except ImportError:
                         logger.warning("sentence-transformers not available for semantic matching")
                     except Exception as e:
