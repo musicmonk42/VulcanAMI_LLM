@@ -98,7 +98,11 @@ HIGH_COMPLEXITY_THRESHOLD = 0.7  # Above this, use ACCURATE mode
 # PERFORMANCE FIX: Raised from 0.40 to 0.70 to reduce unnecessary decomposition
 # Decomposition was causing cascade delays (48+ second query routing times)
 # Only truly complex queries should trigger hierarchical decomposition
-DECOMPOSITION_COMPLEXITY_THRESHOLD = 0.70  # At or above this, use decomposition
+#
+# CONFIGURABLE: Set VULCAN_DECOMPOSITION_THRESHOLD environment variable to override
+# Example: VULCAN_DECOMPOSITION_THRESHOLD=0.50 for more frequent decomposition
+import os as _os_env
+DECOMPOSITION_COMPLEXITY_THRESHOLD = float(_os_env.environ.get("VULCAN_DECOMPOSITION_THRESHOLD", "0.70"))
 
 # Strategy selection thresholds
 CAUSAL_REASONING_THRESHOLD = 0.6  # Complexity threshold for causal reasoning

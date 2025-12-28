@@ -71,6 +71,9 @@ def get_tool_selector():
     """
     Get or create the global ToolSelector instance.
     
+    BUG FIX: Tool Weight Memory Amnesia - Now loads persisted state at startup
+    so bandit weights survive restarts.
+    
     Returns:
         ToolSelector instance (singleton).
     """
@@ -88,6 +91,16 @@ def get_tool_selector():
         try:
             from vulcan.reasoning.selection.tool_selector import ToolSelector
             _tool_selector = ToolSelector()
+            
+            # BUG FIX: Tool Weight Memory Amnesia - Load persisted state
+            state_path = _get_tool_selector_state_path()
+            if state_path.exists():
+                try:
+                    _tool_selector.load_state(str(state_path))
+                    logger.info(f"[Singletons] ✓ ToolSelector state loaded from {state_path}")
+                except Exception as load_err:
+                    logger.warning(f"[Singletons] Could not load ToolSelector state: {load_err}")
+            
             logger.info("[Singletons] ✓ ToolSelector created and cached")
             return _tool_selector
         except ImportError as e:
@@ -96,6 +109,41 @@ def get_tool_selector():
         except Exception as e:
             logger.error(f"[Singletons] Failed to create ToolSelector: {e}")
             return None
+
+
+def _get_tool_selector_state_path():
+    """Get the path for tool selector state persistence."""
+    from pathlib import Path
+    import os
+    # Use environment variable or default to .vulcan_state directory
+    state_dir = os.environ.get("VULCAN_STATE_DIR", ".vulcan_state")
+    return Path(state_dir) / "tool_selector"
+
+
+def save_tool_selector_state():
+    """
+    BUG FIX: Tool Weight Memory Amnesia - Save ToolSelector state to disk.
+    
+    Call this periodically or on shutdown to persist bandit weights and other
+    learned state so it survives restarts.
+    
+    Returns:
+        bool: True if save succeeded, False otherwise.
+    """
+    global _tool_selector
+    
+    if _tool_selector is None:
+        logger.debug("[Singletons] No ToolSelector to save")
+        return False
+    
+    try:
+        state_path = _get_tool_selector_state_path()
+        _tool_selector.save_state(str(state_path))
+        logger.info(f"[Singletons] ✓ ToolSelector state saved to {state_path}")
+        return True
+    except Exception as e:
+        logger.error(f"[Singletons] Failed to save ToolSelector state: {e}")
+        return False
 
 
 def get_reasoning_integration():
@@ -564,8 +612,14 @@ def cleanup():
     """
     Release all singletons. Call on shutdown.
     
+    BUG FIX: Tool Weight Memory Amnesia - Now saves ToolSelector state before cleanup
+    so bandit weights persist across restarts.
+    
     This clears all cached singletons to free memory.
     """
+    # BUG FIX: Save tool selector state before cleanup
+    save_tool_selector_state()
+    
     reset_all()
     logger.info("[Singletons] All singletons cleaned up")
 

@@ -1294,6 +1294,8 @@ class CuriosityEngine:
         # FIX Issue #13: Threshold for detecting phantom resolutions
         self.PHANTOM_RESOLUTION_THRESHOLD = 3  # If resolved 3+ times in an hour, it's not really resolved
         self.PHANTOM_RESOLUTION_WINDOW = 3600  # 1 hour window for counting phantom resolutions
+        # FIX: Phantom Resolution Loop - extended cooldown for gaps that keep returning
+        self.PHANTOM_GAP_COOLDOWN_SECONDS = 3600  # 1 hour cooldown for phantom gaps
         
         # ISSUE #3 FIX: Bootstrap experiment constants
         self.BOOTSTRAP_EXPERIMENT_TIMEOUT_SECONDS = 30.0  # Short timeout for bootstrap experiments
@@ -1688,9 +1690,10 @@ class CuriosityEngine:
         BUG #14 FIX: Resolved gaps now have a TTL - they can be re-detected
         after GAP_RESOLUTION_TTL_SECONDS (30 min) if the underlying issue persists.
         
-        FIX Issue #13: Don't filter gaps that keep reappearing (phantom resolutions).
-        If a gap has been "resolved" 3+ times in the last hour, it's not really
-        resolved and should be kept for further investigation.
+        FIX: Phantom Resolution Loop - Gaps that have been "resolved" 3+ times in the
+        last hour get a much longer cooldown (1 hour) to prevent the 67x/hour loop.
+        Previously the code kept these gaps for "investigation" but that caused
+        them to be re-resolved repeatedly.
         
         Performance: Expired gap cleanup is rate-limited to every RESOLUTION_CLEANUP_INTERVAL
         seconds to avoid overhead on every call.
@@ -1722,20 +1725,25 @@ class CuriosityEngine:
             gap_type = getattr(gap, 'type', 'unknown')
             domain = getattr(gap, 'domain', 'general')
             
-            # FIX Issue #13: Check for phantom resolutions - if gap has been 
-            # "resolved" 3+ times in last hour, it's not really resolved
+            # FIX: Phantom Resolution Loop - check for gaps that keep getting "resolved"
+            # These gaps need a LONGER cooldown, not to be kept for more experiments
             recent_resolution_count = self._count_recent_resolutions(gap_type, domain, minutes=60)
             if recent_resolution_count >= self.PHANTOM_RESOLUTION_THRESHOLD:
-                # Don't filter this gap - it keeps returning, so the underlying issue isn't fixed
-                logger.warning(
-                    f"[CuriosityEngine] Gap {key} has {recent_resolution_count} phantom resolutions - NOT filtering"
+                # Apply extended cooldown for phantom resolutions
+                last_seen = self._gap_last_seen.get(key, 0)
+                if current_time - last_seen < self.PHANTOM_GAP_COOLDOWN_SECONDS:
+                    logger.debug(
+                        f"[CuriosityEngine] Gap {key} is a phantom resolution ({recent_resolution_count}x in 1h) - "
+                        f"applying extended {self.PHANTOM_GAP_COOLDOWN_SECONDS}s cooldown"
+                    )
+                    continue  # Skip this gap - it needs a longer break
+                # If the extended cooldown has passed, log but allow through
+                logger.info(
+                    f"[CuriosityEngine] Gap {key} phantom resolution cooldown expired, "
+                    f"allowing through after {recent_resolution_count}x resolutions"
                 )
-                filtered.append(gap)
-                type_counts[gap_type] += 1
-                self._gap_last_seen[key] = current_time
-                continue
             
-            # Skip if resolved (and not expired) - but only if not a phantom resolution
+            # Skip if resolved (and not expired)
             if key in self._resolved_gaps:
                 continue
             

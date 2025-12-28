@@ -173,7 +173,11 @@ MAX_SUCCESS_TIME_MS = 10000  # Maximum execution time (ms) for success
 # Issue: With decomposition path, each step calls tool selection which calls embeddings
 # Multiple 30s timeouts per query caused 48+ second delays (evidenced in logs)
 # 5 seconds is sufficient for cached embeddings; fallback to Tier 1 features otherwise
-EMBEDDING_TIMEOUT = 5.0  # Reduced from 30s to fix cascade delays
+#
+# CONFIGURABLE: Set VULCAN_EMBEDDING_TIMEOUT environment variable to override
+# Example: VULCAN_EMBEDDING_TIMEOUT=10.0 for slower environments
+import os as _os
+EMBEDDING_TIMEOUT = float(_os.environ.get("VULCAN_EMBEDDING_TIMEOUT", "5.0"))
 
 
 # ==============================================================================
