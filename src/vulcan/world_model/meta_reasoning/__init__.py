@@ -153,6 +153,25 @@ __author__ = "VULCAN-AMI Team"
 # Added import for InternalCritic and related items
 # Core components
 
+# Import safe_execution module with fallback
+try:
+    from .safe_execution import (
+        SafeExecutor,
+        ExecutionResult,
+        get_safe_executor,
+        reset_safe_executor,
+    )
+    _safe_execution_available = True
+except ImportError:
+    _safe_execution_available = False
+    SafeExecutor = None
+    ExecutionResult = None
+    get_safe_executor = None
+    reset_safe_executor = None
+    logger.warning(
+        "safe_execution module not found. Safe execution disabled."
+    )
+
 # Import auto_apply_policy with fallback
 try:
     from .auto_apply_policy import (
@@ -863,3 +882,87 @@ except NameError:
     GoalStatus = ObjectiveStatus  # alias for compatibility
 if "GoalStatus" not in __all__:
     __all__.append("GoalStatus")
+
+
+# ==========================================================================
+# PRIORITY 6: Safety Module Registration
+# ==========================================================================
+
+# Initialize safe executor on import (singleton)
+_safe_executor = None
+if _safe_execution_available and get_safe_executor is not None:
+    try:
+        _safe_executor = get_safe_executor()
+    except Exception as e:
+        logger.warning(f"Failed to initialize safe executor: {e}")
+
+
+def register_safety_modules():
+    """
+    Register safety modules with the main WorldModel system.
+    
+    Call this during system startup to ensure all safety components
+    are properly initialized and registered.
+    
+    This function:
+    1. Initializes the safe executor singleton
+    2. Creates an EthicalBoundaryMonitor instance
+    3. Registers both with the WorldModel
+    
+    Example:
+        from vulcan.world_model.meta_reasoning import register_safety_modules
+        register_safety_modules()
+    """
+    global _safe_executor
+    
+    try:
+        # Get or create safe executor
+        if _safe_execution_available and get_safe_executor is not None:
+            _safe_executor = get_safe_executor()
+        
+        # Try to register with WorldModel
+        try:
+            from ..world_model_core import WorldModel
+            world_model = WorldModel.get_instance()
+            
+            if _safe_executor is not None:
+                world_model.register_component('safe_executor', _safe_executor)
+                logger.info("✅ Safe executor registered with WorldModel")
+            
+            # Register ethical monitor
+            ethical_monitor = EthicalBoundaryMonitor()
+            world_model.register_component('ethical_monitor', ethical_monitor)
+            logger.info("✅ Ethical boundary monitor registered with WorldModel")
+            
+            logger.info("✅ Safety modules registered with WorldModel")
+            return True
+            
+        except ImportError:
+            logger.warning(
+                "WorldModel not available - safety modules initialized but not registered"
+            )
+            return False
+        except Exception as e:
+            logger.warning(f"Could not register with WorldModel: {e}")
+            return False
+            
+    except Exception as e:
+        logger.error(f"Failed to register safety modules: {e}")
+        return False
+
+
+# Add safe execution exports to __all__ if available
+if _safe_execution_available:
+    _safe_exec_exports = [
+        "SafeExecutor",
+        "ExecutionResult", 
+        "get_safe_executor",
+        "reset_safe_executor",
+    ]
+    for export in _safe_exec_exports:
+        if export not in __all__:
+            __all__.append(export)
+
+# Add register_safety_modules to exports
+if "register_safety_modules" not in __all__:
+    __all__.append("register_safety_modules")

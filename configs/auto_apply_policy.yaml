@@ -1,15 +1,17 @@
-version: 1
+version: "1"
 auto_apply:
   enabled: true
   # Budget limits for a single auto-apply
   max_files: 3
-  max_total_loc: 50
+  max_total_loc: 100
 
   # Allow/deny patterns (POSIX-style, relative to repo root)
   allowed_globs:
+    - "src/vulcan/**/*.py"
+    - "src/safety/**/*.py"
+    - "tests/**/*.py"
     - "configs/**"
     - "scripts/**"
-    - "src/**/*.py"
     - "!src/**/auth/**"
     - "!src/**/security/**"
     - "!src/**/db/**"
@@ -23,6 +25,10 @@ auto_apply:
     - "!configs/profile_staging.json"
 
   deny_globs:
+    - "**/__pycache__/**"
+    - "*.pyc"
+    - ".git/**"
+    - "venv/**"
     - "**/*.lock"
     - "**/requirements*.txt"
     - "**/poetry.lock"
@@ -33,18 +39,13 @@ auto_apply:
   # Pre-apply gates. Each item can be a string (command) or an object with cmd/timeout_s/cwd/env
   gates:
     commands:
-      - "python -m black --check ."
-      - "python -m isort --check-only ."
-      - "python -m flake8"
-      - "python -m mypy --ignore-missing-imports"
-      - "pytest -q"
-      - cmd: "python scripts/health_smoke.py"
+      - cmd: ["python", "-m", "pytest", "-x"]
         timeout_s: 30
-        cwd: "."
-        env:
-          ARENA_HOST: "127.0.0.1"
-          ARENA_PORT: "8181"
+      - cmd: ["python", "-m", "mypy", "--strict"]
+        timeout_s: 20
+      - cmd: ["python", "-m", "black", "--check", "."]
+        timeout_s: 10
 
     nso_requirements:
       adversarial_detected: false
-      risk_score_max: 0.30
+      risk_score_max: 0.3

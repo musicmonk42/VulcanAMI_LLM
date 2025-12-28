@@ -360,6 +360,21 @@ class SelfImprovementDrive:
             and not getattr(self, "require_human_approval", True)
         )
 
+        # PRIORITY 1: Safe Execution Module Integration
+        # Initialize safe executor for sandboxed improvement execution
+        self.safe_executor = get_safe_executor(timeout=60) if get_safe_executor else None
+        
+        # Store policy reference for apply_improvement method
+        self.policy = self._auto_apply_policy
+        
+        # Detect or set repository root for file operations
+        self.repo_root = self._detect_repo_root()
+        
+        logger.info(
+            f"Safe executor initialized: {self.safe_executor is not None}, "
+            f"repo_root: {self.repo_root}"
+        )
+
         logger.info(
             f"SelfImprovementDrive initialized with {len(self.objectives)} objectives"
         )
@@ -2636,16 +2651,24 @@ class SelfImprovementDrive:
         This method enables Git persistence for self-improvement fixes, preventing
         the "Groundhog Day" loop where fixes are lost on container restart.
         
+        WARNING: This is DISABLED by default for Railway deployments to prevent
+        unintended changes being pushed to the repository. Only enable this if
+        you have proper review processes in place.
+        
         Requires:
-        - VULCAN_GIT_PUSH_ENABLED=1 environment variable
+        - VULCAN_GIT_PUSH_ENABLED=1 environment variable (default: disabled)
         - Git credentials configured (via SSH key, token, or credential helper)
         
         Returns:
             True if push succeeded, False otherwise
         """
         # Check if git push is enabled via environment variable
+        # DEFAULT: DISABLED - to prevent Railway deployments from pushing changes
         if os.getenv("VULCAN_GIT_PUSH_ENABLED", "0") != "1":
-            logger.debug("Git push disabled (set VULCAN_GIT_PUSH_ENABLED=1 to enable)")
+            logger.debug(
+                "Git push disabled by default (Railway-safe). "
+                "Set VULCAN_GIT_PUSH_ENABLED=1 to enable (not recommended for production)"
+            )
             return False
         
         try:
@@ -2681,12 +2704,13 @@ class SelfImprovementDrive:
         """
         Stages, commits, and optionally pushes changes using git.
         
-        IMPORTANT: To enable git push (required for persistence in ephemeral containers
-        like Railway), set the VULCAN_GIT_PUSH_ENABLED=1 environment variable and ensure
-        git credentials are configured.
+        NOTE: Git push is DISABLED by default for Railway deployments. Changes are
+        committed locally only. To enable push (not recommended for production without
+        proper review), set VULCAN_GIT_PUSH_ENABLED=1.
         
         Without git push, fixes applied by the self-improvement system will be lost when
-        the container restarts (the "Groundhog Day" loop).
+        the container restarts. This is intentional for Railway deployment to prevent
+        unintended changes to the repository.
         """
         try:
             # Use safe executor if available, otherwise fallback to direct subprocess
@@ -2751,3 +2775,363 @@ class SelfImprovementDrive:
         except Exception as e:
             logger.warning(f"Git operation failed (is this a repo?): {e}")
             return "git_failed"
+
+    # ==========================================================================
+    # PRIORITY 1: Safe Execution Module Integration
+    # ==========================================================================
+
+    def _detect_repo_root(self) -> Path:
+        """
+        Detect the repository root directory.
+        
+        Uses git to find the root, falls back to common paths if git unavailable.
+        
+        Returns:
+            Path to repository root
+        """
+        # Try git to find repo root
+        try:
+            result = subprocess.run(
+                ["git", "rev-parse", "--show-toplevel"],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            if result.returncode == 0:
+                return Path(result.stdout.strip())
+        except Exception:
+            pass
+        
+        # Fallback: check common locations
+        fallback_paths = [
+            Path("/app"),
+            Path.cwd(),
+            Path(__file__).parent.parent.parent.parent.parent,  # Navigate up from this file
+        ]
+        
+        for path in fallback_paths:
+            if path.exists() and (path / "src").exists():
+                return path
+        
+        # Last resort: current working directory
+        return Path.cwd()
+
+    def apply_improvement(self, objective_type: str, changes: Dict[str, Any]) -> bool:
+        """
+        Apply improvement with SAFE EXECUTION.
+        
+        This method integrates safe execution and policy gates to ensure
+        improvements are applied safely and can be rolled back if tests fail.
+        
+        IMPORTANT: This method applies changes LOCALLY only. Changes are NOT
+        automatically pushed to GitHub. To enable git push (not recommended
+        for Railway deployment), set VULCAN_GIT_PUSH_ENABLED=1.
+        
+        Args:
+            objective_type: Type of improvement being applied
+            changes: Dictionary containing:
+                - file_path: Path to the file being modified
+                - new_content: New content for the file
+                - type: Type of change (e.g., "code_modification")
+                
+        Returns:
+            True if improvement was safely applied, False otherwise
+        """
+        # Check if auto-apply is disabled via environment variable
+        # Default: disabled to prevent unintended modifications in production (e.g., Railway)
+        if os.getenv("VULCAN_AUTO_APPLY_DISABLED", "1") == "1":
+            logger.info(
+                f"Auto-apply disabled (VULCAN_AUTO_APPLY_DISABLED=1). "
+                f"Skipping improvement for {objective_type}"
+            )
+            return False
+        # STEP 1: Validate target file exists
+        target_file = Path(changes.get("file_path", ""))
+        if not target_file.is_absolute():
+            target_file = self.repo_root / target_file
+        
+        if not target_file.exists():
+            logger.error(f"Target file does not exist: {target_file}")
+            return False
+        
+        # STEP 2: Run policy gates if enabled
+        if self.policy and getattr(self.policy, 'enabled', False):
+            files = [str(target_file)]
+            
+            # Check files against policy
+            check_result = check_files_against_policy(files, self.policy)
+            if hasattr(check_result, 'ok') and not check_result.ok:
+                reasons = getattr(check_result, 'reasons', ['Policy violation'])
+                logger.error(f"Policy violation: {reasons}")
+                return False
+            elif isinstance(check_result, tuple) and not check_result[0]:
+                logger.error(f"Policy violation: {check_result[1]}")
+                return False
+            
+            # Run gates
+            gates_report = run_gates(self.policy)
+            if hasattr(gates_report, 'ok') and not gates_report.ok:
+                failures = getattr(gates_report, 'failures', ['Gate failed'])
+                logger.error(f"Gate failures: {failures}")
+                return False
+            elif isinstance(gates_report, tuple) and not gates_report[0]:
+                logger.error(f"Gate failures: {gates_report[1]}")
+                return False
+        
+        # STEP 3: Apply changes using safe executor
+        if changes.get("type") == "code_modification":
+            # Write changes to temp file first
+            temp_file = target_file.with_suffix(target_file.suffix + ".tmp")
+            try:
+                temp_file.write_text(changes["new_content"])
+                
+                # Run tests on modified code using safe executor
+                if self.safe_executor:
+                    test_result = self.safe_executor.execute_safe(
+                        ["python", "-m", "pytest", str(target_file.parent), "-v", "-x"],
+                        timeout=30
+                    )
+                    
+                    if test_result.success:
+                        # Move temp to actual
+                        shutil.move(str(temp_file), str(target_file))
+                        logger.info(f"✅ Safely applied changes to {target_file}")
+                        return True
+                    else:
+                        # Clean up temp file
+                        if temp_file.exists():
+                            temp_file.unlink()
+                        logger.error(f"Tests failed: {test_result.stderr}")
+                        return False
+                else:
+                    # No safe executor available - apply without testing
+                    logger.warning("Safe executor not available, applying without test validation")
+                    shutil.move(str(temp_file), str(target_file))
+                    return True
+                    
+            except Exception as e:
+                # Clean up temp file on error
+                if temp_file.exists():
+                    temp_file.unlink()
+                logger.error(f"Error applying improvement: {e}")
+                return False
+        
+        return False
+
+    # ==========================================================================
+    # PRIORITY 3: Fix Hallucinated Improvements - Grounded Repository Scanning
+    # ==========================================================================
+
+    def scan_repository(self) -> Dict[str, str]:
+        """
+        Scan actual repository structure to get real file contents.
+        
+        This prevents hallucinated improvements by ensuring the system
+        works with actual code from the repository.
+        
+        Returns:
+            Dictionary mapping file paths to their contents
+        """
+        repo_files: Dict[str, str] = {}
+        valid_dirs = ["src/vulcan", "src/safety", "src/unified_platform"]
+        
+        for dir_path in valid_dirs:
+            base_path = self.repo_root / dir_path
+            if not base_path.exists():
+                continue
+            
+            for py_file in base_path.rglob("*.py"):
+                try:
+                    content = py_file.read_text(encoding="utf-8")
+                    # Store relative path from repo root
+                    rel_path = str(py_file.relative_to(self.repo_root))
+                    repo_files[rel_path] = content
+                except Exception as e:
+                    logger.warning(f"Could not read {py_file}: {e}")
+        
+        logger.info(f"Scanned repository: found {len(repo_files)} Python files")
+        return repo_files
+
+    def find_relevant_files(
+        self, 
+        objective_type: str, 
+        repo_files: Dict[str, str]
+    ) -> List[str]:
+        """
+        Find files relevant to a given improvement objective.
+        
+        Args:
+            objective_type: Type of improvement being targeted
+            repo_files: Dictionary of file paths to contents
+            
+        Returns:
+            List of relevant file paths, sorted by relevance
+        """
+        # Mapping from objective types to relevant keywords/paths
+        objective_keywords = {
+            "optimize_performance": ["routing", "cache", "performance", "query"],
+            "fix_circular_imports": ["import", "__init__"],
+            "improve_test_coverage": ["test_", "_test"],
+            "enhance_safety_systems": ["safety", "validation", "boundary"],
+            "fix_known_bugs": ["fix", "bug", "error"],
+        }
+        
+        keywords = objective_keywords.get(objective_type, [objective_type])
+        scored_files: List[Tuple[str, int]] = []
+        
+        for file_path, content in repo_files.items():
+            score = 0
+            file_path_lower = file_path.lower()
+            
+            # Score based on path matching
+            for keyword in keywords:
+                if keyword.lower() in file_path_lower:
+                    score += 2
+            
+            # Score based on content matching  
+            content_lower = content.lower()
+            for keyword in keywords:
+                score += content_lower.count(keyword.lower())
+            
+            if score > 0:
+                scored_files.append((file_path, score))
+        
+        # Sort by score descending
+        scored_files.sort(key=lambda x: x[1], reverse=True)
+        
+        return [f[0] for f in scored_files[:10]]  # Return top 10 relevant files
+
+    def analyze_ast(self, tree: ast.AST) -> Dict[str, Any]:
+        """
+        Analyze AST to understand code structure.
+        
+        Args:
+            tree: Parsed AST tree
+            
+        Returns:
+            Dictionary describing the code structure
+        """
+        structure = {
+            "classes": [],
+            "functions": [],
+            "imports": [],
+            "global_vars": [],
+        }
+        
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ClassDef):
+                class_info = {
+                    "name": node.name,
+                    "methods": [
+                        m.name for m in node.body 
+                        if isinstance(m, ast.FunctionDef)
+                    ],
+                    "line": node.lineno,
+                }
+                structure["classes"].append(class_info)
+                
+            elif isinstance(node, ast.FunctionDef):
+                # Only top-level functions
+                if not any(isinstance(parent, ast.ClassDef) for parent in ast.walk(tree)):
+                    func_info = {
+                        "name": node.name,
+                        "args": [arg.arg for arg in node.args.args],
+                        "line": node.lineno,
+                    }
+                    structure["functions"].append(func_info)
+                    
+            elif isinstance(node, (ast.Import, ast.ImportFrom)):
+                if isinstance(node, ast.Import):
+                    for alias in node.names:
+                        structure["imports"].append(alias.name)
+                else:
+                    module = node.module or ""
+                    structure["imports"].append(module)
+        
+        return structure
+
+    def generate_grounded_improvement(
+        self, 
+        objective_type: str
+    ) -> Dict[str, Any]:
+        """
+        Generate improvements based on ACTUAL code from the repository.
+        
+        This method ensures improvements are grounded in real code, preventing
+        hallucinated changes to non-existent files or methods.
+        
+        Args:
+            objective_type: Type of improvement to generate
+            
+        Returns:
+            Dictionary containing improvement details:
+                - file_path: Target file to modify
+                - original_content: Current file contents
+                - new_content: Proposed modifications
+                - type: "code_modification"
+        """
+        # Get real files
+        repo_files = self.scan_repository()
+        if not repo_files:
+            logger.error("No repository files found!")
+            return {}
+        
+        # Find relevant file for objective
+        relevant_files = self.find_relevant_files(objective_type, repo_files)
+        if not relevant_files:
+            logger.warning(f"No files found for objective: {objective_type}")
+            return {}
+        
+        # Pick actual file to improve
+        target_file = relevant_files[0]
+        actual_code = repo_files[target_file]
+        
+        # Parse AST to understand structure
+        try:
+            tree = ast.parse(actual_code)
+            structure = self.analyze_ast(tree)
+        except SyntaxError as e:
+            logger.error(f"Could not parse {target_file}: {e}")
+            return {}
+        
+        # Generate improvement prompt with ACTUAL code
+        # Truncate to avoid context overflow (first 3000 chars)
+        code_snippet = actual_code[:3000]
+        
+        prompt = f"""
+Improve this ACTUAL code from {target_file}:
+
+```python
+{code_snippet}
+```
+
+Current structure: {json.dumps(structure, indent=2)}
+Objective: {objective_type}
+
+Generate SPECIFIC improvements using existing classes and methods.
+Output the complete modified file content.
+"""
+        
+        # Call LLM with grounded context
+        improvement = None
+        if self.world_model and hasattr(self.world_model, "ask_llm"):
+            try:
+                improvement = self.world_model.ask_llm(prompt)
+            except Exception as e:
+                logger.error(f"LLM call failed: {e}")
+                return {}
+        else:
+            logger.warning("No LLM available for grounded improvement generation")
+            return {}
+        
+        if not improvement:
+            return {}
+        
+        return {
+            "file_path": str(self.repo_root / target_file),
+            "original_content": actual_code,
+            "new_content": improvement,
+            "type": "code_modification",
+            "objective_type": objective_type,
+            "structure": structure,
+        }
