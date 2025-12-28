@@ -2531,6 +2531,11 @@ class AgentPoolManager:
     def _handle_task_failure(self, agent_id: str, task_id: str, error: Exception):
         """
         Handle task failure
+        
+        FIX 3: Agent Job Tracking - This method now properly updates statistics
+        when a job fails. Previously, jobs that failed before reaching
+        _execute_agent_task (e.g., during setup) would not increment
+        total_jobs_failed, causing jobs to "disappear" in tracking.
 
         Args:
             agent_id: Agent identifier
@@ -2543,6 +2548,17 @@ class AgentPoolManager:
             if provenance:
                 if not provenance.is_complete():
                     provenance.complete("failed", error=str(error))
+                    # FIX 3: Only update stats if provenance wasn't already complete
+                    # (if complete, _execute_agent_task already updated stats)
+                    with self.stats_lock:
+                        self.stats["total_jobs_failed"] += 1
+                        current_stats = dict(self.stats)
+                    logger.warning(
+                        f"[AgentPool] Job failed (via _handle_task_failure): task={task_id}, "
+                        f"agent={agent_id}. Stats: submitted={current_stats['total_jobs_submitted']}, "
+                        f"completed={current_stats['total_jobs_completed']}, "
+                        f"failed={current_stats['total_jobs_failed']}"
+                    )
 
             # Remove from assignments
             if task_id in self.task_assignments:
