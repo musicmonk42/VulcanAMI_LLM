@@ -572,7 +572,7 @@ async def lifespan(app: FastAPI):
 
         deployment = initialize_component(
             "deployment",
-            lambda: ProductionDeployment(config, checkpoint_path=checkpoint_to_load),
+            lambda: ProductionDeployment(config, checkpoint_path=checkpoint_to_load, redis_client=redis_client),
         )
 
         # BUG FIX Issue #27: Use singleton UnifiedRuntime to prevent manifest reload per-query

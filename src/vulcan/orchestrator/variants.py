@@ -145,7 +145,7 @@ class ParallelOrchestrator(VULCANAGICollective):
     - Python 3.8+ compatible
     """
 
-    def __init__(self, config: Any, sys: Any, deps: EnhancedCollectiveDeps):
+    def __init__(self, config: Any, sys: Any, deps: EnhancedCollectiveDeps, redis_client: Any = None):
         """
         Initialize Parallel Orchestrator
 
@@ -153,8 +153,9 @@ class ParallelOrchestrator(VULCANAGICollective):
             config: Configuration object
             sys: System state object
             deps: Dependencies container
+            redis_client: Optional Redis client for state persistence across workers/restarts
         """
-        super().__init__(config, sys, deps)
+        super().__init__(config, sys, deps, redis_client=redis_client)
 
         # Initialize executors with reasonable limits
         max_workers_process = getattr(config, "max_parallel_processes", 4)
@@ -362,7 +363,7 @@ class FaultTolerantOrchestrator(VULCANAGICollective):
     - Graceful degradation
     """
 
-    def __init__(self, config: Any, sys: Any, deps: EnhancedCollectiveDeps):
+    def __init__(self, config: Any, sys: Any, deps: EnhancedCollectiveDeps, redis_client: Any = None):
         """
         Initialize Fault Tolerant Orchestrator
 
@@ -370,8 +371,9 @@ class FaultTolerantOrchestrator(VULCANAGICollective):
             config: Configuration object
             sys: System state object
             deps: Dependencies container
+            redis_client: Optional Redis client for state persistence across workers/restarts
         """
-        super().__init__(config, sys, deps)
+        super().__init__(config, sys, deps, redis_client=redis_client)
 
         # Fallback strategies for different error types
         self.fallback_strategies = {
@@ -712,7 +714,7 @@ class AdaptiveOrchestrator(VULCANAGICollective):
     - Multiple execution modes (fast, careful, exploratory, balanced)
     """
 
-    def __init__(self, config: Any, sys: Any, deps: EnhancedCollectiveDeps):
+    def __init__(self, config: Any, sys: Any, deps: EnhancedCollectiveDeps, redis_client: Any = None):
         """
         Initialize Adaptive Orchestrator
 
@@ -720,8 +722,9 @@ class AdaptiveOrchestrator(VULCANAGICollective):
             config: Configuration object
             sys: System state object
             deps: Dependencies container
+            redis_client: Optional Redis client for state persistence across workers/restarts
         """
-        super().__init__(config, sys, deps)
+        super().__init__(config, sys, deps, redis_client=redis_client)
 
         self.performance_monitor = PerformanceMonitor(
             window_size=getattr(config, "performance_window_size", 100)

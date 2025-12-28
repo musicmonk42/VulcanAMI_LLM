@@ -583,7 +583,7 @@ else:
 
 
 def create_production_deployment(
-    config, checkpoint_path=None, orchestrator_type="parallel"
+    config, checkpoint_path=None, orchestrator_type="parallel", redis_client=None
 ):
     """
     Convenience function to create a production deployment
@@ -592,14 +592,15 @@ def create_production_deployment(
         config: Configuration object
         checkpoint_path: Optional checkpoint path
         orchestrator_type: Type of orchestrator ('parallel', 'adaptive', 'fault_tolerant', 'basic')
+        redis_client: Optional Redis client for state persistence across workers/restarts
 
     Returns:
         ProductionDeployment instance
     """
-    return ProductionDeployment(config, checkpoint_path, orchestrator_type)
+    return ProductionDeployment(config, checkpoint_path, orchestrator_type, redis_client=redis_client)
 
 
-def create_orchestrator(config, sys, deps, variant="basic"):
+def create_orchestrator(config, sys, deps, variant="basic", redis_client=None):
     """
     Convenience function to create an orchestrator
 
@@ -608,21 +609,22 @@ def create_orchestrator(config, sys, deps, variant="basic"):
         sys: System state object
         deps: Dependencies container
         variant: Orchestrator variant ('basic', 'parallel', 'adaptive', 'fault_tolerant')
+        redis_client: Optional Redis client for state persistence across workers/restarts
 
     Returns:
         Orchestrator instance
     """
     if variant == "parallel":
-        return ParallelOrchestrator(config, sys, deps)
+        return ParallelOrchestrator(config, sys, deps, redis_client=redis_client)
     elif variant == "adaptive":
-        return AdaptiveOrchestrator(config, sys, deps)
+        return AdaptiveOrchestrator(config, sys, deps, redis_client=redis_client)
     elif variant == "fault_tolerant":
-        return FaultTolerantOrchestrator(config, sys, deps)
+        return FaultTolerantOrchestrator(config, sys, deps, redis_client=redis_client)
     else:
-        return VULCANAGICollective(config, sys, deps)
+        return VULCANAGICollective(config, sys, deps, redis_client=redis_client)
 
 
-def create_agent_pool(max_agents=10, min_agents=5, task_queue_type="custom"):
+def create_agent_pool(max_agents=10, min_agents=5, task_queue_type="custom", redis_client=None):
     """
     Convenience function to create an agent pool
 
@@ -630,11 +632,12 @@ def create_agent_pool(max_agents=10, min_agents=5, task_queue_type="custom"):
         max_agents: Maximum number of agents (default: 10, reduced from 100 for CPU optimization)
         min_agents: Minimum number of agents (default: 5, reduced from 10 for CPU optimization)
         task_queue_type: Type of task queue ('ray', 'celery', 'custom')
+        redis_client: Optional Redis client for state persistence across workers/restarts
 
     Returns:
         AgentPoolManager instance
     """
-    return AgentPoolManager(max_agents, min_agents, task_queue_type)
+    return AgentPoolManager(max_agents, min_agents, task_queue_type, redis_client=redis_client)
 
 
 def create_experiment_generator(config=None):
