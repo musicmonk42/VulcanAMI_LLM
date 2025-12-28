@@ -3740,6 +3740,11 @@ SLOW_REQUEST_THRESHOLD_MS = 5000  # Include timing breakdown for requests slower
 # BUG #35 FIX: Threshold for marking query outcomes as "slow" (matches COMPLEX_QUERY_TIME_THRESHOLD_MS)
 SLOW_QUERY_OUTCOME_THRESHOLD_MS = 30000  # 30 seconds - queries slower than this are marked as "slow"
 
+# ISSUE #35 FIX: Outcome status thresholds
+# Used to determine if a successful query should be marked as "slow" for learning
+SLOW_ROUTING_OUTCOME_THRESHOLD_MS = 10000  # 10 seconds - flag slow routing
+SLOW_TOTAL_OUTCOME_THRESHOLD_MS = 30000  # 30 seconds - flag slow total time
+
 # MEMORY MANAGEMENT: GC thresholds
 GC_SIGNIFICANT_CLEANUP_THRESHOLD = 100  # Log GC if collected more than this many objects
 GC_REQUEST_INTERVAL = 10  # Only trigger GC every N requests to reduce overhead
@@ -5323,6 +5328,16 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
                 selected_tools = ['general']
             
             # Record via OutcomeBridge for learning system integration
+            # ISSUE #35 FIX: Determine status based on execution time thresholds
+            # Queries that take >10s for routing OR >30s total should be marked "slow"
+            # not "success" to enable learning system to identify performance issues
+            if routing_time_ms > SLOW_ROUTING_OUTCOME_THRESHOLD_MS:
+                outcome_status = "slow"
+            elif latency_ms > SLOW_TOTAL_OUTCOME_THRESHOLD_MS:
+                outcome_status = "slow"
+            else:
+                outcome_status = "success"
+            
             bridge = get_outcome_bridge()
             
             # BUG FIX Issue #35: Determine status based on actual timing
@@ -5335,9 +5350,10 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
             
             bridge.record(
                 query_id=routing_stats.get("query_id", f"q_{int(time.time())}"),
+                status=outcome_status,
                 status=query_status,
                 routing_ms=routing_time_ms,
-                total_ms=float(latency_ms),
+                total_ms=latency_ms,
                 complexity=routing_stats.get("complexity_score", 0.0),
                 query_type=routing_stats.get("query_type", "general"),
                 tools=selected_tools,

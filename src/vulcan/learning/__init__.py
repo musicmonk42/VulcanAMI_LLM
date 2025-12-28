@@ -167,6 +167,9 @@ class UnifiedLearningSystem:
         # Set to 10s to flag truly abnormal routing while allowing normal operation
         self.slow_routing_threshold_ms = 10000
         self.tool_weight_adjustments: Dict[str, float] = {}
+        # ISSUE #15 FIX: Lock for thread-safe weight adjustments
+        # Prevents race conditions when async process_outcome calls update weights concurrently
+        self._weight_lock = threading.Lock()
         
         # MetaLearner reference (if available)
         self.meta_learner = None
@@ -249,13 +252,15 @@ class UnifiedLearningSystem:
                     logger.error(f"[Learning] MetaLearner slow routing error: {e}")
         
         # 3. Update tool weights based on success/failure
+        # ISSUE #15 FIX: Use lock to prevent race conditions in concurrent async calls
         if tools:  # Only if tools were recorded
             weight_delta = WEIGHT_ADJUSTMENT_SUCCESS if status == 'success' else WEIGHT_ADJUSTMENT_FAILURE
-            for tool in tools:
-                if tool not in self.tool_weight_adjustments:
-                    self.tool_weight_adjustments[tool] = 0.0
-                self.tool_weight_adjustments[tool] += weight_delta
-                logger.info(f"[Learning] Tool '{tool}' weight adjustment: {weight_delta:+.3f} (cumulative: {self.tool_weight_adjustments[tool]:+.3f})")
+            with self._weight_lock:
+                for tool in tools:
+                    if tool not in self.tool_weight_adjustments:
+                        self.tool_weight_adjustments[tool] = 0.0
+                    self.tool_weight_adjustments[tool] += weight_delta
+                    logger.info(f"[Learning] Tool '{tool}' weight adjustment: {weight_delta:+.3f} (cumulative: {self.tool_weight_adjustments[tool]:+.3f})")
         else:
             logger.warning(f"[Learning] No tools recorded for {query_id} - cannot learn from selection")
         
@@ -283,7 +288,9 @@ class UnifiedLearningSystem:
         Returns:
             Cumulative weight adjustment (positive = more successful, negative = less successful)
         """
-        return self.tool_weight_adjustments.get(tool, 0.0)
+        # ISSUE #15 FIX: Use lock for thread-safe read
+        with self._weight_lock:
+            return self.tool_weight_adjustments.get(tool, 0.0)
 
     def _create_integrated_difficulty_estimator(self):
         """Create difficulty estimator that uses continual learner's knowledge"""
