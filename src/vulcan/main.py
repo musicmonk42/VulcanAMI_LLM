@@ -5328,16 +5328,6 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
                 selected_tools = ['general']
             
             # Record via OutcomeBridge for learning system integration
-            # ISSUE #35 FIX: Determine status based on execution time thresholds
-            # Queries that take >10s for routing OR >30s total should be marked "slow"
-            # not "success" to enable learning system to identify performance issues
-            if routing_time_ms > SLOW_ROUTING_OUTCOME_THRESHOLD_MS:
-                outcome_status = "slow"
-            elif latency_ms > SLOW_TOTAL_OUTCOME_THRESHOLD_MS:
-                outcome_status = "slow"
-            else:
-                outcome_status = "success"
-            
             bridge = get_outcome_bridge()
             
             # BUG FIX Issue #35: Determine status based on actual timing
@@ -5350,7 +5340,6 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
             
             bridge.record(
                 query_id=routing_stats.get("query_id", f"q_{int(time.time())}"),
-                status=outcome_status,
                 status=query_status,
                 routing_ms=routing_time_ms,
                 total_ms=latency_ms,
