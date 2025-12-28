@@ -24,8 +24,10 @@ Author: Claude (diagnostic session)
 Date: 2024-12-26
 """
 
+import hashlib
 import logging
 import threading
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -253,6 +255,11 @@ class SemanticToolMatcher:
     
     This fixes the core issue where symbolic/analogical tools are never selected
     because there's no mechanism to understand what queries they're designed for.
+    
+    ISSUE #2 FIX: Added query embedding cache to prevent repeated computation
+    of embeddings for the same query. Previously, query embeddings were computed
+    inside the tool loop, causing N embedding computations per query (where N is
+    the number of tools). Now embeddings are cached and computed once per query.
     """
     
     # Class-level singleton for embedding model (same as MultiTierFeatureExtractor)
@@ -263,6 +270,14 @@ class SemanticToolMatcher:
     # Pre-computed tool embeddings
     _tool_embeddings: Dict[str, np.ndarray] = {}
     _embeddings_computed = False
+    
+    # ISSUE #2 FIX: Query embedding cache to prevent repeated computations
+    # Uses OrderedDict for proper LRU eviction - oldest accessed entries removed first
+    _query_embedding_cache: OrderedDict = OrderedDict()
+    _query_cache_lock = threading.Lock()
+    _query_cache_max_size = 1000
+    _query_cache_hits = 0
+    _query_cache_misses = 0
     
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         config = config or {}
@@ -361,6 +376,78 @@ class SemanticToolMatcher:
             except Exception as e:
                 logger.error(f"Failed to compute tool embeddings: {e}")
     
+    @classmethod
+    def _get_query_embedding_cached(cls, query: str, model) -> Optional[np.ndarray]:
+        """
+        Get query embedding from cache or compute and cache it.
+        
+        ISSUE #2 FIX: Caches query embeddings to prevent repeated computation.
+        This addresses the tool selection performance degradation where 
+        the same query was being embedded multiple times (once per tool).
+        
+        Args:
+            query: The query text to embed
+            model: The embedding model to use
+            
+        Returns:
+            Cached or newly computed embedding, or None on failure
+        """
+        # Create cache key from full query hash (SHA-256 provides good collision resistance)
+        cache_key = hashlib.sha256(query.encode(), usedforsecurity=False).hexdigest()
+        
+        with cls._query_cache_lock:
+            # Check cache first - move_to_end for LRU ordering
+            if cache_key in cls._query_embedding_cache:
+                cls._query_cache_hits += 1
+                # Move to end to mark as recently used (proper LRU behavior)
+                cls._query_embedding_cache.move_to_end(cache_key)
+                return cls._query_embedding_cache[cache_key]
+            
+            cls._query_cache_misses += 1
+        
+        # Compute embedding outside lock
+        try:
+            embedding = model.encode(
+                query,
+                show_progress_bar=False,
+                normalize_embeddings=True
+            )
+            
+            # Cache the result
+            with cls._query_cache_lock:
+                # LRU eviction: remove least recently used entry if at capacity
+                if len(cls._query_embedding_cache) >= cls._query_cache_max_size:
+                    # popitem(last=False) removes the oldest (first) entry for LRU
+                    cls._query_embedding_cache.popitem(last=False)
+                
+                cls._query_embedding_cache[cache_key] = embedding
+            
+            return embedding
+        except Exception as e:
+            logger.warning(f"[SemanticToolMatcher] Failed to compute query embedding: {e}")
+            return None
+    
+    @classmethod
+    def get_cache_stats(cls) -> Dict[str, Any]:
+        """Get query embedding cache statistics for monitoring."""
+        with cls._query_cache_lock:
+            total_requests = cls._query_cache_hits + cls._query_cache_misses
+            hit_rate = cls._query_cache_hits / total_requests if total_requests > 0 else 0.0
+            return {
+                "size": len(cls._query_embedding_cache),
+                "max_size": cls._query_cache_max_size,
+                "hits": cls._query_cache_hits,
+                "misses": cls._query_cache_misses,
+                "hit_rate": hit_rate,
+            }
+    
+    @classmethod
+    def clear_query_cache(cls) -> None:
+        """Clear the query embedding cache."""
+        with cls._query_cache_lock:
+            cls._query_embedding_cache.clear()
+            logger.info("[SemanticToolMatcher] Query embedding cache cleared")
+    
     def match_query(
         self,
         query: str,
@@ -368,6 +455,9 @@ class SemanticToolMatcher:
     ) -> Dict[str, SemanticMatch]:
         """
         Match query to tools using semantic similarity and keyword patterns.
+        
+        ISSUE #2 FIX: Query embedding is now computed ONCE using the cache,
+        instead of being recomputed for every tool in the loop.
         
         Args:
             query: The input query/problem text
@@ -381,6 +471,14 @@ class SemanticToolMatcher:
         
         results = {}
         query_lower = query.lower()
+        
+        # ISSUE #2 FIX: Pre-compute query embedding ONCE before the tool loop
+        # Previously this was done inside the loop, causing N embedding computations
+        query_embedding = None
+        if (self.embedding_model and SemanticToolMatcher._embeddings_computed):
+            query_embedding = SemanticToolMatcher._get_query_embedding_cached(
+                query, self.embedding_model
+            )
         
         for tool_name in available_tools:
             # 1. Keyword matching (fast, always available)
@@ -396,18 +494,12 @@ class SemanticToolMatcher:
                 # Cap keyword boost at 0.5
                 keyword_boost = min(0.5, keyword_boost)
             
-            # 2. Embedding similarity (slower, higher quality)
+            # 2. Embedding similarity (now uses pre-computed query embedding)
             similarity_score = 0.0
             
-            if (self.embedding_model and 
-                SemanticToolMatcher._embeddings_computed and
+            if (query_embedding is not None and 
                 tool_name in SemanticToolMatcher._tool_embeddings):
                 try:
-                    query_embedding = self.embedding_model.encode(
-                        query,
-                        show_progress_bar=False,
-                        normalize_embeddings=True
-                    )
                     tool_embedding = SemanticToolMatcher._tool_embeddings[tool_name]
                     
                     # Cosine similarity (embeddings are normalized)

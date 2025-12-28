@@ -375,11 +375,13 @@ def _run_cycle_wrapper(engine_state: Dict[str, Any]) -> Dict[str, Any]:
     """
     # Re-initialize logging in subprocess (loggers are not picklable)
     import logging
+    import sys
 
     subprocess_logger = logging.getLogger(__name__)
 
-    # Configure subprocess logging
-    handler = logging.StreamHandler()
+    # ISSUE #11 FIX: Configure subprocess logging to use stdout instead of stderr
+    # Previously using default StreamHandler (stderr) caused subprocess logs to appear as errors
+    handler = logging.StreamHandler(sys.stdout)  # Explicitly use stdout
     handler.setLevel(logging.INFO)
     formatter = logging.Formatter(
         "%(asctime)s - [SUBPROCESS] - %(name)s - %(levelname)s - %(message)s"

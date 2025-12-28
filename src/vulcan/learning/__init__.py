@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import gc
 import logging
 import threading
 import time
@@ -171,6 +172,15 @@ class UnifiedLearningSystem:
         # Prevents race conditions when async process_outcome calls update weights concurrently
         self._weight_lock = threading.Lock()
         
+        # ISSUE #10 FIX: Slow routing recovery mechanism
+        # Track consecutive slow routing events to trigger automatic recovery
+        self._slow_routing_count = 0
+        self._slow_routing_threshold_count = 3  # Trigger recovery after 3 consecutive slow events
+        self._total_recoveries_attempted = 0
+        self._total_recoveries_successful = 0
+        self._last_recovery_time = 0.0
+        self._recovery_cooldown_seconds = 60.0  # Don't attempt recovery more often than once per minute
+        
         # MetaLearner reference (if available)
         self.meta_learner = None
         if self.continual_learner and hasattr(self.continual_learner, 'meta_learner'):
@@ -238,10 +248,13 @@ class UnifiedLearningSystem:
             except Exception as e:
                 logger.error(f"[Learning] ContinualLearner error: {e}")
         
-        # 2. Detect and log slow routing
+        # 2. Detect and log slow routing with automatic recovery (ISSUE #10 FIX)
         if routing_ms > self.slow_routing_threshold_ms:
             logger.warning(f"[Learning] SLOW ROUTING DETECTED: {routing_ms}ms (threshold: {self.slow_routing_threshold_ms}ms)")
             logger.warning(f"[Learning] Slow query details: type={query_type}, tools={tools}")
+            
+            # Increment slow routing counter
+            self._slow_routing_count += 1
             
             # Feed to MetaLearner for strategy adjustment
             if self.meta_learner:
@@ -250,6 +263,32 @@ class UnifiedLearningSystem:
                         await self.meta_learner.record_slow_routing(query_type, tools, routing_ms)
                 except Exception as e:
                     logger.error(f"[Learning] MetaLearner slow routing error: {e}")
+            
+            # ISSUE #10 FIX: Trigger automatic recovery after consecutive slow routing events
+            if self._slow_routing_count >= self._slow_routing_threshold_count:
+                current_time = time.time()
+                if current_time - self._last_recovery_time >= self._recovery_cooldown_seconds:
+                    logger.warning(
+                        f"[Learning] Triggering slow routing RECOVERY: "
+                        f"{self._slow_routing_count} consecutive slow events detected"
+                    )
+                    recovery_success = await self._attempt_slow_routing_recovery()
+                    self._total_recoveries_attempted += 1
+                    if recovery_success:
+                        self._total_recoveries_successful += 1
+                        logger.info("[Learning] Slow routing recovery SUCCESSFUL")
+                    else:
+                        logger.warning("[Learning] Slow routing recovery FAILED")
+                    self._last_recovery_time = current_time
+                    self._slow_routing_count = 0  # Reset counter after recovery attempt
+                else:
+                    remaining_cooldown = self._recovery_cooldown_seconds - (current_time - self._last_recovery_time)
+                    logger.warning(
+                        f"[Learning] Recovery on cooldown, waiting {remaining_cooldown:.1f}s before next attempt"
+                    )
+        else:
+            # Reset slow routing counter on successful (fast) routing
+            self._slow_routing_count = 0
         
         # 3. Update tool weights based on success/failure
         # ISSUE #15 FIX: Use lock to prevent race conditions in concurrent async calls
@@ -291,6 +330,115 @@ class UnifiedLearningSystem:
         # ISSUE #15 FIX: Use lock for thread-safe read
         with self._weight_lock:
             return self.tool_weight_adjustments.get(tool, 0.0)
+
+    async def _attempt_slow_routing_recovery(self) -> bool:
+        """
+        Attempt to recover from slow routing performance degradation.
+        
+        ISSUE #10 FIX: This method implements automatic recovery when the system
+        detects persistent slow routing. Recovery actions include:
+        1. Clearing embedding caches to remove potentially stale data
+        2. Resetting circuit breakers that may be in degraded state
+        3. Triggering garbage collection to reclaim memory
+        
+        Returns:
+            True if recovery was successful, False otherwise
+        """
+        logger.info("[Learning] Starting slow routing recovery process...")
+        recovery_actions_taken = []
+        
+        try:
+            # 1. Clear embedding cache to reset any stale or accumulated entries
+            try:
+                from vulcan.routing.embedding_cache import clear_cache, get_cache_stats
+                stats_before = get_cache_stats()
+                clear_cache()
+                stats_after = get_cache_stats()
+                recovery_actions_taken.append(
+                    f"Embedding cache cleared: {stats_before.get('size', 0)} entries removed"
+                )
+                logger.info(
+                    f"[Learning] Recovery: Embedding cache cleared "
+                    f"(was {stats_before.get('size', 0)} entries)"
+                )
+            except ImportError:
+                logger.debug("[Learning] Recovery: Embedding cache module not available")
+            except Exception as e:
+                logger.warning(f"[Learning] Recovery: Failed to clear embedding cache: {e}")
+            
+            # 2. Reset embedding circuit breaker to allow fresh embedding attempts
+            try:
+                from vulcan.reasoning.selection.embedding_circuit_breaker import (
+                    reset_circuit_breaker,
+                    get_circuit_breaker_stats,
+                )
+                stats_before = get_circuit_breaker_stats()
+                reset_circuit_breaker()
+                recovery_actions_taken.append(
+                    f"Circuit breaker reset: was in {stats_before.get('state', 'unknown')} state"
+                )
+                logger.info(
+                    f"[Learning] Recovery: Circuit breaker reset "
+                    f"(was {stats_before.get('state', 'unknown')})"
+                )
+            except ImportError:
+                logger.debug("[Learning] Recovery: Circuit breaker module not available")
+            except Exception as e:
+                logger.warning(f"[Learning] Recovery: Failed to reset circuit breaker: {e}")
+            
+            # 3. ISSUE #2 FIX: Clear SemanticToolMatcher query embedding cache
+            try:
+                from vulcan.reasoning.selection.semantic_tool_matcher import SemanticToolMatcher
+                cache_stats = SemanticToolMatcher.get_cache_stats()
+                SemanticToolMatcher.clear_query_cache()
+                recovery_actions_taken.append(
+                    f"SemanticToolMatcher query cache cleared: {cache_stats.get('size', 0)} entries"
+                )
+                logger.info(
+                    f"[Learning] Recovery: SemanticToolMatcher query cache cleared "
+                    f"(was {cache_stats.get('size', 0)} entries, hit_rate={cache_stats.get('hit_rate', 0):.2%})"
+                )
+            except ImportError:
+                logger.debug("[Learning] Recovery: SemanticToolMatcher not available")
+            except Exception as e:
+                logger.warning(f"[Learning] Recovery: Failed to clear SemanticToolMatcher cache: {e}")
+            
+            # 4. Trigger garbage collection to reclaim memory
+            gc.collect()
+            recovery_actions_taken.append("Garbage collection triggered")
+            logger.info("[Learning] Recovery: Garbage collection complete")
+            
+            # Log recovery summary
+            logger.info(
+                f"[Learning] Slow routing recovery complete: {len(recovery_actions_taken)} actions taken"
+            )
+            for action in recovery_actions_taken:
+                logger.info(f"[Learning] Recovery action: {action}")
+            
+            return len(recovery_actions_taken) > 0
+            
+        except Exception as e:
+            logger.error(f"[Learning] Slow routing recovery failed with error: {e}")
+            return False
+
+    def get_recovery_stats(self) -> Dict[str, Any]:
+        """
+        Get statistics about slow routing recovery attempts.
+        
+        ISSUE #10 FIX: This method provides visibility into recovery attempts
+        to address the "recovery mechanisms not triggered" issue.
+        
+        Returns:
+            Dictionary with recovery statistics
+        """
+        return {
+            "slow_routing_count": self._slow_routing_count,
+            "slow_routing_threshold_count": self._slow_routing_threshold_count,
+            "total_recoveries_attempted": self._total_recoveries_attempted,
+            "total_recoveries_successful": self._total_recoveries_successful,
+            "last_recovery_time": self._last_recovery_time,
+            "recovery_cooldown_seconds": self._recovery_cooldown_seconds,
+        }
 
     def _create_integrated_difficulty_estimator(self):
         """Create difficulty estimator that uses continual learner's knowledge"""

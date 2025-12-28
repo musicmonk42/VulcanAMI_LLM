@@ -749,6 +749,11 @@ def get_unified_runtime(config: Optional[Any] = None) -> Optional[Any]:
     BUG FIX Issue #27: The UnifiedRuntime was loading manifest file on every query.
     This singleton ensures manifest is loaded once at startup.
     
+    ISSUE #5 FIX: Prevent repeated initialization/shutdown cycles by ensuring
+    only one UnifiedRuntime instance exists across the entire application.
+    Multiple fallback patterns in graphix_arena.py, main.py, and deployment.py
+    were creating separate instances when singleton returned None.
+    
     Args:
         config: Optional config for first-time initialization
         
@@ -776,6 +781,82 @@ def get_unified_runtime(config: Optional[Any] = None) -> Optional[Any]:
             return None
         except Exception as e:
             logger.error(f"[Singletons] Failed to create UnifiedRuntime: {e}")
+            return None
+
+
+def set_unified_runtime(runtime: Any) -> bool:
+    """
+    ISSUE #5 FIX: Register a UnifiedRuntime instance with the singleton registry.
+    
+    This allows callers to register a manually-created UnifiedRuntime instance
+    with the singleton registry, preventing duplicate instances when fallback
+    patterns create their own.
+    
+    Args:
+        runtime: The UnifiedRuntime instance to register as the singleton
+        
+    Returns:
+        True if registered successfully, False if singleton already exists
+    """
+    global _unified_runtime
+    
+    with _unified_runtime_lock:
+        if _unified_runtime is None:
+            _unified_runtime = runtime
+            logger.info("[Singletons] UnifiedRuntime registered from external source")
+            return True
+        elif _unified_runtime is not runtime:
+            logger.debug(
+                "[Singletons] UnifiedRuntime already exists - ignoring duplicate"
+            )
+            return False
+        return True  # Already registered (same instance)
+
+
+def get_or_create_unified_runtime(config: Optional[Any] = None) -> Optional[Any]:
+    """
+    ISSUE #5 FIX: Get or create UnifiedRuntime with automatic singleton registration.
+    
+    This is a convenience function that:
+    1. Tries to get the singleton UnifiedRuntime
+    2. If singleton returns None, creates a new instance directly
+    3. Registers the new instance with the singleton to prevent duplicates
+    
+    Use this instead of the fallback pattern:
+        runtime = get_unified_runtime()
+        if runtime is None:
+            runtime = UnifiedRuntime()
+            set_unified_runtime(runtime)
+    
+    Args:
+        config: Optional config for first-time initialization
+        
+    Returns:
+        UnifiedRuntime instance (singleton or newly created), or None if import fails
+    """
+    global _unified_runtime
+    
+    # First try the singleton
+    runtime = get_unified_runtime(config)
+    if runtime is not None:
+        return runtime
+    
+    # Singleton failed - try direct instantiation and register
+    with _unified_runtime_lock:
+        # Double-check in case another thread created it
+        if _unified_runtime is not None:
+            return _unified_runtime
+        
+        try:
+            from unified_runtime.unified_runtime_core import UnifiedRuntime
+            _unified_runtime = UnifiedRuntime(config=config)
+            logger.info("[Singletons] ✓ UnifiedRuntime created via fallback and cached")
+            return _unified_runtime
+        except ImportError as e:
+            logger.warning(f"[Singletons] UnifiedRuntime import failed in fallback: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"[Singletons] Failed to create UnifiedRuntime in fallback: {e}")
             return None
 
 

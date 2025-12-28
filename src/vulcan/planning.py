@@ -1934,12 +1934,10 @@ class EnhancedHierarchicalPlanner(HierarchicalGoalSystem):
             }
 
         try:
-            # Use singleton to prevent per-call reinitialization
+            # ISSUE #5 FIX: Use get_or_create_unified_runtime to prevent repeated init/shutdown
             try:
-                from vulcan.reasoning.singletons import get_unified_runtime
-                runtime = get_unified_runtime()
-                if runtime is None:
-                    runtime = UnifiedRuntime()
+                from vulcan.reasoning.singletons import get_or_create_unified_runtime
+                runtime = get_or_create_unified_runtime()
             except ImportError:
                 runtime = UnifiedRuntime()
             graph = {
