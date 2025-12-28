@@ -2907,16 +2907,32 @@ async def health_ready():
         503 Service Unavailable if not ready
     """
     try:
-        # Check if service manager is initialized and has services
+        # Check if service manager is initialized and has services mounted
         service_status = await service_manager.get_service_status()
-        has_services = len(service_status) > 0
         
-        if has_services:
-            return {"status": "ready", "timestamp": datetime.utcnow().isoformat()}
+        # Count how many services are mounted (indicates ready state)
+        mounted_services = sum(
+            1 for status in service_status.values() 
+            if status.get("mounted", False)
+        )
+        total_services = len(service_status)
+        
+        # Ready if we have at least one mounted service
+        if mounted_services > 0:
+            return {
+                "status": "ready", 
+                "timestamp": datetime.utcnow().isoformat(),
+                "mounted_services": mounted_services,
+                "total_services": total_services
+            }
         else:
             return JSONResponse(
                 status_code=503,
-                content={"status": "not_ready", "reason": "services_not_initialized"}
+                content={
+                    "status": "not_ready", 
+                    "reason": "no_services_mounted",
+                    "total_services": total_services
+                }
             )
     except Exception as e:
         return JSONResponse(
