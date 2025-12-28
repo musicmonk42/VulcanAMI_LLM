@@ -374,6 +374,12 @@ CACHE_STATS_LOG_INTERVAL: int = 10
 # This prevents 46-50+ second delays observed in production.
 QUERY_ROUTING_TIMEOUT_SECONDS: float = 5.0  # 5 seconds max (was 46-50s before fix)
 
+# FIX 2: Fallback plan constants (extracted from magic numbers per code review)
+FALLBACK_QUERY_ID_LENGTH: int = 12  # UUID truncation length for fallback query IDs
+FALLBACK_COMPLEXITY_SCORE: float = 0.3  # Default complexity for fallback routing
+FALLBACK_UNCERTAINTY_SCORE: float = 0.2  # Default uncertainty for fallback routing
+FALLBACK_TASK_TIMEOUT_SECONDS: float = 15.0  # Standard timeout for individual fallback tasks
+
 # ============================================================
 # CONSTANTS - Security Patterns
 # ============================================================
@@ -2239,7 +2245,7 @@ def _create_fallback_plan(
     Returns:
         ProcessingPlan with minimal/safe defaults
     """
-    query_id = f"q_fallback_{uuid.uuid4().hex[:12]}"
+    query_id = f"q_fallback_{uuid.uuid4().hex[:FALLBACK_QUERY_ID_LENGTH]}"
     
     # Determine learning mode based on source
     if source == "user":
@@ -2256,8 +2262,8 @@ def _create_fallback_plan(
         source=source,
         learning_mode=learning_mode,
         query_type=QueryType.GENERAL,  # Default to general for fallback
-        complexity_score=0.3,  # Assume moderate complexity
-        uncertainty_score=0.2,
+        complexity_score=FALLBACK_COMPLEXITY_SCORE,
+        uncertainty_score=FALLBACK_UNCERTAINTY_SCORE,
         collaboration_needed=False,
         arena_participation=False,
         requires_governance=False,
@@ -2283,7 +2289,7 @@ def _create_fallback_plan(
             capability="reasoning",
             prompt=query if query else "",
             priority=1,
-            timeout_seconds=15.0,  # Standard timeout for individual task
+            timeout_seconds=FALLBACK_TASK_TIMEOUT_SECONDS,
             parameters={
                 "query_type": "general",
                 "is_primary": True,
