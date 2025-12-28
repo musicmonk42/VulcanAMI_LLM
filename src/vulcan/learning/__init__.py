@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import gc
 import logging
 import threading
 import time
@@ -386,7 +387,6 @@ class UnifiedLearningSystem:
                 logger.warning(f"[Learning] Recovery: Failed to reset circuit breaker: {e}")
             
             # 3. Trigger garbage collection to reclaim memory
-            import gc
             gc.collect()
             recovery_actions_taken.append("Garbage collection triggered")
             logger.info("[Learning] Recovery: Garbage collection complete")
@@ -408,7 +408,7 @@ class UnifiedLearningSystem:
         """
         Get statistics about slow routing recovery attempts.
         
-        ISSUE #20 FIX: This method provides visibility into recovery attempts
+        ISSUE #10 FIX: This method provides visibility into recovery attempts
         to address the "recovery mechanisms not triggered" issue.
         
         Returns:
