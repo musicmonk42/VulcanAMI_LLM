@@ -1584,7 +1584,14 @@ class GraphixListener:
             # Initialize runtime - prefer full implementation if available
             if FULL_RUNTIME_AVAILABLE:
                 try:
-                    self.runtime = FullUnifiedRuntime()
+                    # Use singleton to prevent per-query reinitialization
+                    try:
+                        from vulcan.reasoning.singletons import get_unified_runtime
+                        self.runtime = get_unified_runtime()
+                        if self.runtime is None:
+                            self.runtime = FullUnifiedRuntime()
+                    except ImportError:
+                        self.runtime = FullUnifiedRuntime()
                     logger.info("Using full UnifiedRuntime from src.unified_runtime")
                 except Exception as e:
                     logger.warning(f"Failed to initialize full UnifiedRuntime: {e}")

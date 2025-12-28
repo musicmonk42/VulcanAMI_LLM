@@ -854,9 +854,15 @@ class GraphixArena:
         # Thread safety
         self.lock = threading.RLock()
 
-        # Initialize runtime with fallback
+        # Initialize runtime with fallback - use singleton to prevent duplicate initialization
         if UNIFIED_RUNTIME_AVAILABLE and UnifiedRuntime is not None:
-            self.runtime = UnifiedRuntime()
+            try:
+                from vulcan.reasoning.singletons import get_unified_runtime
+                self.runtime = get_unified_runtime()
+                if self.runtime is None:
+                    self.runtime = UnifiedRuntime()
+            except ImportError:
+                self.runtime = UnifiedRuntime()
         else:
             logger.warning("UnifiedRuntime not available, using mock runtime")
             self.runtime = self._create_mock_runtime()
