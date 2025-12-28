@@ -489,12 +489,31 @@ class ProductionDeployment:
                     "self_improvement_state": state_file,
                 }
 
-                components["world_model"] = CausalWorldModel(config=wm_config)
-                logger.info(
-                    "WorldModel (causal) initialized with meta-reasoning=%s, self-improvement=%s",
-                    True,
-                    enable_si,
-                )
+                # BUG FIX Issues #1-4: Use singleton WorldModel to prevent per-query reinitialization
+                try:
+                    from vulcan.reasoning.singletons import get_world_model
+                    components["world_model"] = get_world_model(config=wm_config)
+                    if components["world_model"]:
+                        logger.info(
+                            "WorldModel (causal) initialized via singleton with meta-reasoning=%s, self-improvement=%s",
+                            True,
+                            enable_si,
+                        )
+                    else:
+                        # Fallback to direct instantiation if singleton fails
+                        components["world_model"] = CausalWorldModel(config=wm_config)
+                        logger.info(
+                            "WorldModel (causal) initialized directly (singleton fallback) with meta-reasoning=%s, self-improvement=%s",
+                            True,
+                            enable_si,
+                        )
+                except ImportError:
+                    components["world_model"] = CausalWorldModel(config=wm_config)
+                    logger.info(
+                        "WorldModel (causal) initialized directly with meta-reasoning=%s, self-improvement=%s",
+                        True,
+                        enable_si,
+                    )
             elif CausalWorldModel and isinstance(CausalWorldModel, MagicMock):
                 logger.warning(
                     "CausalWorldModel is a MagicMock, skipping initialization."

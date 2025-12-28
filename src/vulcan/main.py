@@ -575,8 +575,20 @@ async def lifespan(app: FastAPI):
             lambda: ProductionDeployment(config, checkpoint_path=checkpoint_to_load),
         )
 
+        # BUG FIX Issue #27: Use singleton UnifiedRuntime to prevent manifest reload per-query
         if UNIFIED_RUNTIME_AVAILABLE:
-            deployment.unified_runtime = UnifiedRuntime()
+            try:
+                from vulcan.reasoning.singletons import get_unified_runtime
+                deployment.unified_runtime = get_unified_runtime()
+                if deployment.unified_runtime:
+                    logger.info("✓ UnifiedRuntime initialized via singleton")
+                else:
+                    # Fallback to direct instantiation if singleton fails
+                    deployment.unified_runtime = UnifiedRuntime()
+                    logger.info("✓ UnifiedRuntime initialized directly (singleton fallback)")
+            except ImportError:
+                deployment.unified_runtime = UnifiedRuntime()
+                logger.info("✓ UnifiedRuntime initialized directly")
 
         # Initialize LLM component
         llm_instance = initialize_component(
@@ -8418,8 +8430,16 @@ def main():
                 logger.warning(
                     f"Self-improvement config file not found at {self_improvement_config_path}, using default config settings."
                 )
-                # Initialize with default config dictionary if file not found
+                # BUG FIX Issue #5: Use singleton to prevent repeated state file loading
                 try:
+                    from vulcan.reasoning.singletons import get_self_improvement_drive
+                    self_improvement_drive = get_self_improvement_drive()
+                    if self_improvement_drive is None:
+                        # Fallback if singleton fails
+                        self_improvement_drive = SelfImprovementDrive(
+                            config={"enabled": True}
+                        )
+                except ImportError:
                     self_improvement_drive = SelfImprovementDrive(
                         config={"enabled": True}
                     )
@@ -8429,8 +8449,18 @@ def main():
                         f"Failed to initialize SelfImprovementDrive with default config, using MagicMock: {e}"
                     )
             else:
-                # Initialize the self-improvement drive from file path
+                # BUG FIX Issue #5: Use singleton to prevent repeated state file loading
                 try:
+                    from vulcan.reasoning.singletons import get_self_improvement_drive
+                    self_improvement_drive = get_self_improvement_drive(
+                        config_path=self_improvement_config_path
+                    )
+                    if self_improvement_drive is None:
+                        # Fallback if singleton fails
+                        self_improvement_drive = SelfImprovementDrive(
+                            config_path=self_improvement_config_path
+                        )
+                except ImportError:
                     self_improvement_drive = SelfImprovementDrive(
                         config_path=self_improvement_config_path
                     )

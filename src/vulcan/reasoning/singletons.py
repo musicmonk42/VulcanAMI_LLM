@@ -36,6 +36,9 @@ _cost_model: Optional[Any] = None
 _semantic_matcher: Optional[Any] = None
 _problem_decomposer: Optional[Any] = None
 _semantic_bridge: Optional[Any] = None
+_world_model: Optional[Any] = None
+_self_improvement_drive: Optional[Any] = None
+_unified_runtime: Optional[Any] = None
 _singleton_lock = threading.Lock()
 
 
@@ -190,6 +193,7 @@ def reset_all() -> None:
     global _problem_decomposer
     global _semantic_bridge
     global _curiosity_engine
+    global _world_model, _self_improvement_drive, _unified_runtime
     
     with _singleton_lock:
         _tool_selector = None
@@ -202,6 +206,9 @@ def reset_all() -> None:
         _problem_decomposer = None
         _semantic_bridge = None
         _curiosity_engine = None
+        _world_model = None
+        _self_improvement_drive = None
+        _unified_runtime = None
         _instances.clear()
         logger.info("[Singletons] All singletons reset")
 
@@ -420,8 +427,11 @@ def prewarm_all():
     Call from main.py or unified_platform.py during startup.
     
     This prevents the first query from triggering expensive model loading.
+    
+    BUG FIX Issues #1-5, #27: Now includes WorldModel, SelfImprovementDrive,
+    and UnifiedRuntime to prevent per-query reinitialization.
     """
-    logger.info("[Singletons] Pre-warming all reasoning singletons...")
+    logger.info("[Singletons] Pre-warming all singletons...")
     
     results = initialize_all()
     
@@ -446,6 +456,16 @@ def prewarm_all():
     
     ce = get_curiosity_engine()
     results['curiosity_engine'] = ce is not None
+    
+    # BUG FIX Issues #1-5, #27: Pre-warm critical per-query reinitialized components
+    wm = get_world_model()
+    results['world_model'] = wm is not None
+    
+    sid = get_self_improvement_drive()
+    results['self_improvement_drive'] = sid is not None
+    
+    ur = get_unified_runtime()
+    results['unified_runtime'] = ur is not None
     
     success_count = sum(1 for v in results.values() if v)
     logger.info(f"[Singletons] ✓ All singletons pre-warmed ({success_count}/{len(results)} initialized)")
@@ -532,4 +552,141 @@ def get_curiosity_engine() -> Optional[Any]:
             return None
         except Exception as e:
             logger.error(f"[Singletons] Failed to create CuriosityEngine: {e}")
+            return None
+
+
+# ============================================
+# WORLD MODEL SINGLETON (Issue #1-4)
+# ============================================
+
+_world_model_lock = threading.Lock()
+
+
+def get_world_model(config: Optional[dict] = None) -> Optional[Any]:
+    """
+    Get singleton WorldModel instance.
+    
+    BUG FIX Issue #1-4: The WorldModel was being reinitialized per-query,
+    causing ~10-15 seconds of initialization overhead. This singleton ensures
+    it's only initialized once at startup.
+    
+    Args:
+        config: Optional config dict for first-time initialization
+        
+    Returns:
+        WorldModel instance (singleton), or None if unavailable.
+    """
+    global _world_model
+    
+    if _world_model is not None:
+        logger.debug("[Singletons] Returning cached WorldModel")
+        return _world_model
+    
+    with _world_model_lock:
+        if _world_model is not None:
+            return _world_model
+        
+        logger.info("[Singletons] Creating global WorldModel (ONCE)")
+        try:
+            from vulcan.world_model.world_model_core import WorldModel
+            _world_model = WorldModel(config=config)
+            logger.info("[Singletons] ✓ WorldModel created and cached")
+            return _world_model
+        except ImportError as e:
+            logger.warning(f"[Singletons] WorldModel import failed: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"[Singletons] Failed to create WorldModel: {e}")
+            return None
+
+
+# ============================================
+# SELF-IMPROVEMENT DRIVE SINGLETON (Issue #5)
+# ============================================
+
+_self_improvement_lock = threading.Lock()
+
+
+def get_self_improvement_drive(config_path: Optional[str] = None, state_path: Optional[str] = None) -> Optional[Any]:
+    """
+    Get singleton SelfImprovementDrive instance.
+    
+    BUG FIX Issue #5: The SelfImprovementDrive was reloading state file repeatedly.
+    This singleton ensures state is loaded once and persisted in memory.
+    
+    Args:
+        config_path: Optional path to config file (first-time only)
+        state_path: Optional path to state file (first-time only)
+        
+    Returns:
+        SelfImprovementDrive instance (singleton), or None if unavailable.
+    """
+    global _self_improvement_drive
+    
+    if _self_improvement_drive is not None:
+        logger.debug("[Singletons] Returning cached SelfImprovementDrive")
+        return _self_improvement_drive
+    
+    with _self_improvement_lock:
+        if _self_improvement_drive is not None:
+            return _self_improvement_drive
+        
+        logger.info("[Singletons] Creating global SelfImprovementDrive (ONCE)")
+        try:
+            from vulcan.world_model.meta_reasoning.self_improvement_drive import SelfImprovementDrive
+            _self_improvement_drive = SelfImprovementDrive(
+                config_path=config_path,
+                state_path=state_path
+            )
+            logger.info("[Singletons] ✓ SelfImprovementDrive created and cached")
+            return _self_improvement_drive
+        except ImportError as e:
+            logger.warning(f"[Singletons] SelfImprovementDrive import failed: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"[Singletons] Failed to create SelfImprovementDrive: {e}")
+            return None
+
+
+# ============================================
+# UNIFIED RUNTIME SINGLETON (Issue #27)
+# ============================================
+
+_unified_runtime_lock = threading.Lock()
+
+
+def get_unified_runtime(config: Optional[Any] = None) -> Optional[Any]:
+    """
+    Get singleton UnifiedRuntime instance.
+    
+    BUG FIX Issue #27: The UnifiedRuntime was loading manifest file on every query.
+    This singleton ensures manifest is loaded once at startup.
+    
+    Args:
+        config: Optional config for first-time initialization
+        
+    Returns:
+        UnifiedRuntime instance (singleton), or None if unavailable.
+    """
+    global _unified_runtime
+    
+    if _unified_runtime is not None:
+        logger.debug("[Singletons] Returning cached UnifiedRuntime")
+        return _unified_runtime
+    
+    with _unified_runtime_lock:
+        if _unified_runtime is not None:
+            return _unified_runtime
+        
+        logger.info("[Singletons] Creating global UnifiedRuntime (ONCE)")
+        try:
+            from unified_runtime.unified_runtime_core import UnifiedRuntime
+            _unified_runtime = UnifiedRuntime(config=config)
+            logger.info("[Singletons] ✓ UnifiedRuntime created and cached")
+            return _unified_runtime
+        except ImportError as e:
+            logger.warning(f"[Singletons] UnifiedRuntime import failed: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"[Singletons] Failed to create UnifiedRuntime: {e}")
             return None
