@@ -572,9 +572,10 @@ class MultiTierFeatureExtractor:
             elapsed_ms = (time.perf_counter() - start_time) * 1000
             # FIX 4: Cache Configuration - Log cache stats with hits for monitoring
             stats = MultiTierFeatureExtractor.get_cache_stats()
+            hit_rate = stats.get('hit_rate', 0.0)
             logger.info(
                 f"Embedding cache: hit=True, key={cache_key[:16]}, time={elapsed_ms:.2f}ms, "
-                f"hit_rate={stats['hit_rate']:.1%}"
+                f"hit_rate={hit_rate:.1%}"
             )
             
             # Resize cached embedding if necessary
@@ -600,9 +601,12 @@ class MultiTierFeatureExtractor:
             # - Current cache size (should grow over time)
             # - Hit/miss counts (misses should not dominate after warmup)
             stats = MultiTierFeatureExtractor.get_cache_stats()
+            cache_size = stats.get('size', 0)
+            maxsize = stats.get('maxsize', 0)
+            hit_rate = stats.get('hit_rate', 0.0)
             logger.info(
                 f"Embedding cache: hit=False, key={cache_key[:16]}, time={elapsed_ms:.2f}ms, "
-                f"cache_size={stats['size']}/{stats['maxsize']}, hit_rate={stats['hit_rate']:.1%}"
+                f"cache_size={cache_size}/{maxsize}, hit_rate={hit_rate:.1%}"
             )
             
             # MEMORY FIX: Periodic cleanup to prevent progressive degradation
