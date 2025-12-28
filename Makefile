@@ -469,6 +469,27 @@ enable-reasoning-features: ## Enable all reasoning features (Problem Decomposer,
 	@echo "CROSS_DOMAIN_TRANSFER_ENABLED=true"
 	@echo "PATTERN_LEARNING_ENABLED=true"
 
+.PHONY: enable-performance-tuning
+enable-performance-tuning: ## Enable all performance tuning settings (PR Fixes)
+	@echo "$(GREEN)Enabling performance tuning settings...$(NC)"
+	@echo "Add these to your .env file:"
+	@echo ""
+	@echo "# Performance Tuning Configuration (PR Fixes)"
+	@echo "# Embedding timeout reduced from 30s to 5s to prevent cascade delays"
+	@echo "VULCAN_EMBEDDING_TIMEOUT=5.0"
+	@echo ""
+	@echo "# Decomposition threshold raised to reduce unnecessary decomposition"
+	@echo "VULCAN_DECOMPOSITION_THRESHOLD=0.70"
+	@echo ""
+	@echo "# Arena threshold lowered so more queries go through Arena"
+	@echo "ARENA_COMPLEXITY_THRESHOLD=0.1"
+	@echo ""
+	@echo "# Self-improvement auto-commit disabled by default"
+	@echo "VULCAN_SELF_IMPROVEMENT_AUTO_COMMIT=false"
+	@echo ""
+	@echo "# Gap give-up threshold increased from 3 to 10"
+	@echo "VULCAN_GAP_GIVEUP_THRESHOLD=10"
+
 ################################################################################
 # Utilities
 ################################################################################

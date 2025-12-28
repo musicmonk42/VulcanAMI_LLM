@@ -243,6 +243,19 @@ spec:
         {{- end }}
         {{- end }}
         {{- end }}
+        {{- /* Performance Tuning Configuration (PR Fixes) */}}
+        {{- if .Values.performanceTuning }}
+        - name: VULCAN_EMBEDDING_TIMEOUT
+          value: {{ .Values.performanceTuning.embeddingTimeout | quote }}
+        - name: VULCAN_DECOMPOSITION_THRESHOLD
+          value: {{ .Values.performanceTuning.decompositionThreshold | quote }}
+        - name: ARENA_COMPLEXITY_THRESHOLD
+          value: {{ .Values.performanceTuning.arenaComplexityThreshold | quote }}
+        - name: VULCAN_SELF_IMPROVEMENT_AUTO_COMMIT
+          value: {{ .Values.performanceTuning.selfImprovementAutoCommit | quote }}
+        - name: VULCAN_GAP_GIVEUP_THRESHOLD
+          value: {{ .Values.performanceTuning.gapGiveupThreshold | quote }}
+        {{- end }}
         {{- if .Values.memorySystem.enabled }}
         # Vulcan Memory System v46 AWS credentials
         {{- if .Values.secrets.awsAccessKeyId }}

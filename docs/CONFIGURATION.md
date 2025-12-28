@@ -55,6 +55,36 @@ query routing degradation (469ms → 152,048ms) by caching ML model instances.
 | CURIOSITY_LOW_BUDGET_SLEEP | No | Sleep when budget low (seconds) | "120.0" |
 | CURIOSITY_CYCLE_TIMEOUT | No | Timeout per cycle (seconds) | "300.0" |
 
+### 2.3 Performance Tuning Configuration (PR Fixes)
+
+These environment variables were added as part of critical performance fixes to address
+query routing delays, cascade timeouts, and learning system issues.
+
+| Var | Required | Purpose | Dev Default |
+|-----|----------|---------|-------------|
+| VULCAN_EMBEDDING_TIMEOUT | No | Embedding timeout for tool selector (seconds) | "5.0" |
+| VULCAN_DECOMPOSITION_THRESHOLD | No | Complexity threshold for decomposition | "0.70" |
+| ARENA_COMPLEXITY_THRESHOLD | No | Complexity threshold for Arena fast-path skip | "0.1" |
+| VULCAN_SELF_IMPROVEMENT_AUTO_COMMIT | No | Auto-commit self-improvements to Git | "false" |
+| VULCAN_GAP_GIVEUP_THRESHOLD | No | Attempts before marking gap as deferred | "10" |
+
+**Performance Tuning Notes:**
+
+- **VULCAN_EMBEDDING_TIMEOUT**: Reduced from 30s to 5s to prevent cascade delays when
+  decomposition calls multiple embeddings. Increase for slower CPU environments.
+
+- **VULCAN_DECOMPOSITION_THRESHOLD**: Raised from 0.40 to 0.70 so fewer queries trigger
+  the slow hierarchical decomposition path.
+
+- **ARENA_COMPLEXITY_THRESHOLD**: Lowered from 0.30 to 0.10 so more queries go through
+  Arena. Set to 0.0 to disable fast-path skip entirely.
+
+- **VULCAN_SELF_IMPROVEMENT_AUTO_COMMIT**: Disabled by default to prevent
+  "Cannot commit: /app is not a Git repository" errors in container environments.
+
+- **VULCAN_GAP_GIVEUP_THRESHOLD**: Increased from 3 to 10 to prevent premature give-up
+  on complex learning gaps.
+
 ## 3. Profiles
 development:
 - tracing: verbose
