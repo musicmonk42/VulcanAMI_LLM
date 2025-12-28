@@ -987,12 +987,12 @@ async def lifespan(app: FastAPI):
     # This ensures the model is loaded exactly ONCE per process and shared across all components
     # Must be done BEFORE ReasoningIntegration preload to avoid duplicate loads
     try:
-        from vulcan.models.model_registry import preload_all_models, get_cache_stats
-        preload_all_models()
-        stats = get_cache_stats()
+        from vulcan.models import model_registry
+        model_registry.preload_all_models()
+        stats = model_registry.get_cache_stats()
         logger.info(f"✓ Model Registry preloaded: {stats['models_cached']} models cached ({stats['model_keys']})")
     except ImportError as e:
-        logger.debug(f"Model registry not available for preload: {e}")
+        logger.debug(f"Model registry module not available for preload: {e}")
     except Exception as e:
         logger.warning(f"Model registry preload failed (models will load lazily): {e}")
 

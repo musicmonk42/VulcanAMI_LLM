@@ -370,7 +370,8 @@ class MultiTierFeatureExtractor:
                         cls._shared_embedding_model = get_sentence_transformer("all-MiniLM-L6-v2")
                         if cls._shared_embedding_model is not None:
                             logger.info("[TIMING] SentenceTransformer obtained from model registry (tool selector)")
-                    except ImportError:
+                    except ImportError as e:
+                        logger.debug(f"[TIMING] Model registry not available ({e}), using fallback")
                         # Fallback to direct load if registry not available
                         if TRANSFORMERS_AVAILABLE:
                             try:
