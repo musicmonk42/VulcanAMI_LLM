@@ -173,23 +173,20 @@ class Pattern:
             return 0.0
 
 
-_PRIORITY_NOT_SET = object()  # Sentinel value to detect if priority was explicitly set
-
-
 @dataclass
 class KnowledgeGap:
     """Single knowledge gap representation
     
     Note:
         The `severity` parameter is an alias for `priority` for backward compatibility.
-        If both are provided, `priority` takes precedence. If only `severity` is provided,
-        it will be used as the priority value.
+        If both are provided, `priority` takes precedence unless priority equals the
+        default value (0.5), in which case severity will be used.
     """
 
     type: str  # Gap type
     domain: str
     priority: float = 0.5  # Default priority value
-    estimated_cost: float = 0.0  # Made optional with default for severity alias support
+    estimated_cost: float = 0.0  # Default to 0.0 for backward compatibility
     missing_capability: Optional[str] = None
     gap_id: Optional[str] = None
     id: Optional[str] = None  # Alias for gap_id
@@ -206,15 +203,9 @@ class KnowledgeGap:
     def __post_init__(self):
         """Generate ID if not provided and handle severity alias"""
         # ISSUE FIX: Handle severity as an alias for priority
-        # If severity is provided and is not None, use it as priority
-        # The caller can override by explicitly providing priority
-        # Since dataclass doesn't provide a way to detect if a default was used,
-        # we use a simple rule: if severity is set but priority is at default (0.5),
-        # use severity. This matches the documented behavior.
+        # If severity is provided and priority is at default, use severity
         if self.severity is not None:
-            # Only use severity if it appears priority wasn't explicitly set to a different value
-            # We keep the current value of priority if it differs from default
-            if self.priority == 0.5:  # Default value
+            if self.priority == 0.5:  # Default value - use severity
                 self.priority = self.severity
             # Sync severity to match priority for consistency in serialization
             self.severity = self.priority
