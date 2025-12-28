@@ -570,8 +570,13 @@ class MultiTierFeatureExtractor:
         cached_embedding = MultiTierFeatureExtractor._get_cached_embedding(problem_str)
         if cached_embedding is not None:
             elapsed_ms = (time.perf_counter() - start_time) * 1000
-            # Priority 1 FIX: Add embedding cache logging
-            logger.info(f"Embedding cache: hit=True, key={cache_key[:16]}, time={elapsed_ms:.2f}ms")
+            # FIX 4: Cache Configuration - Log cache stats with hits for monitoring
+            stats = MultiTierFeatureExtractor.get_cache_stats()
+            hit_rate = stats.get('hit_rate', 0.0)
+            logger.info(
+                f"Embedding cache: hit=True, key={cache_key[:16]}, time={elapsed_ms:.2f}ms, "
+                f"hit_rate={hit_rate:.1%}"
+            )
             
             # Resize cached embedding if necessary
             if cached_embedding.shape[0] != self.dim:
@@ -591,8 +596,18 @@ class MultiTierFeatureExtractor:
             # Cache the raw embedding before resizing
             MultiTierFeatureExtractor._cache_embedding(problem_str, embedding)
             
-            # Priority 1 FIX: Add embedding cache logging for misses
-            logger.info(f"Embedding cache: hit=False, key={cache_key[:16]}, time={elapsed_ms:.2f}ms")
+            # FIX 4: Cache Configuration - Log cache stats with each miss for diagnosis
+            # This helps identify 0% hit rate issues by showing:
+            # - Current cache size (should grow over time)
+            # - Hit/miss counts (misses should not dominate after warmup)
+            stats = MultiTierFeatureExtractor.get_cache_stats()
+            cache_size = stats.get('size', 0)
+            maxsize = stats.get('maxsize', 0)
+            hit_rate = stats.get('hit_rate', 0.0)
+            logger.info(
+                f"Embedding cache: hit=False, key={cache_key[:16]}, time={elapsed_ms:.2f}ms, "
+                f"cache_size={cache_size}/{maxsize}, hit_rate={hit_rate:.1%}"
+            )
             
             # MEMORY FIX: Periodic cleanup to prevent progressive degradation
             # This addresses the issue where embedding batch times increased
