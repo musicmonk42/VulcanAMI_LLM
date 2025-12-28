@@ -169,10 +169,11 @@ MAX_SUCCESS_TIME_MS = 10000  # Maximum execution time (ms) for success
 # ==============================================================================
 # Embedding Timeout Configuration
 # ==============================================================================
-# Increased from 2.0s to handle CPU load on Railway and other cloud platforms
-# Production logs showed embedding times ranging from 10-15s under load
-# Setting to 30s to ensure semantic matching is not skipped due to timeout
-EMBEDDING_TIMEOUT = 30.0  # CPU embeddings take 10-15s under load
+# PERFORMANCE FIX: Reduced from 30s to 5s to prevent query routing cascade delays
+# Issue: With decomposition path, each step calls tool selection which calls embeddings
+# Multiple 30s timeouts per query caused 48+ second delays (evidenced in logs)
+# 5 seconds is sufficient for cached embeddings; fallback to Tier 1 features otherwise
+EMBEDDING_TIMEOUT = 5.0  # Reduced from 30s to fix cascade delays
 
 
 # ==============================================================================
