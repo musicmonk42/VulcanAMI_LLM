@@ -5310,9 +5310,19 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
             
             # Record via OutcomeBridge for learning system integration
             bridge = get_outcome_bridge()
+            
+            # BUG FIX Issue #35: Determine status based on actual timing
+            # Queries taking > 30s should be marked as "slow", not "success"
+            # This ensures gap detection properly identifies slow queries
+            SLOW_QUERY_THRESHOLD_MS = 30000  # 30 seconds (matches COMPLEX_QUERY_TIME_THRESHOLD_MS)
+            if float(latency_ms) > SLOW_QUERY_THRESHOLD_MS:
+                query_status = "slow"
+            else:
+                query_status = "success"
+            
             bridge.record(
                 query_id=routing_stats.get("query_id", f"q_{int(time.time())}"),
-                status="success",
+                status=query_status,
                 routing_ms=routing_time_ms,
                 total_ms=float(latency_ms),
                 complexity=routing_stats.get("complexity_score", 0.0),
