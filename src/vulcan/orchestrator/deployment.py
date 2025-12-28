@@ -1176,7 +1176,7 @@ class ProductionDeployment:
                 governed_actions = context
 
             # Execute with unified runtime or orchestrator - FIXED: Use governed_actions
-            if self.unified_runtime:
+            if self.unified_runtime is not None:
                 try:
                     result = asyncio.run(
                         self.unified_runtime.execute_graph(governed_actions)
