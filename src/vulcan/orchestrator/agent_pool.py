@@ -13,6 +13,7 @@
 # ============================================================
 
 import asyncio
+import gc
 import heapq
 import json
 import logging
@@ -1689,7 +1690,6 @@ class AgentPoolManager:
             # to clean up heavy objects that may have leaked (e.g., from reasoning
             # components like ToolSelector, SemanticToolMatcher)
             # This addresses the progressive query routing degradation issue
-            import gc
             gc.collect()
 
     def _assign_agent_with_timeout(
