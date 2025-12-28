@@ -39,6 +39,8 @@ _semantic_bridge: Optional[Any] = None
 _world_model: Optional[Any] = None
 _self_improvement_drive: Optional[Any] = None
 _unified_runtime: Optional[Any] = None
+_ai_runtime: Optional[Any] = None
+_multimodal_engine: Optional[Any] = None
 _singleton_lock = threading.Lock()
 
 
@@ -194,6 +196,7 @@ def reset_all() -> None:
     global _semantic_bridge
     global _curiosity_engine
     global _world_model, _self_improvement_drive, _unified_runtime
+    global _ai_runtime, _multimodal_engine
     
     with _singleton_lock:
         _tool_selector = None
@@ -209,6 +212,8 @@ def reset_all() -> None:
         _world_model = None
         _self_improvement_drive = None
         _unified_runtime = None
+        _ai_runtime = None
+        _multimodal_engine = None
         _instances.clear()
         logger.info("[Singletons] All singletons reset")
 
@@ -428,8 +433,9 @@ def prewarm_all():
     
     This prevents the first query from triggering expensive model loading.
     
-    BUG FIX Issues #1-5, #27: Now includes WorldModel, SelfImprovementDrive,
-    and UnifiedRuntime to prevent per-query reinitialization.
+    BUG FIX Issues #1-5, #27-28: Now includes WorldModel, SelfImprovementDrive,
+    UnifiedRuntime, AIRuntime, and MultiModalReasoningEngine to prevent 
+    per-query reinitialization.
     """
     logger.info("[Singletons] Pre-warming all singletons...")
     
@@ -466,6 +472,13 @@ def prewarm_all():
     
     ur = get_unified_runtime()
     results['unified_runtime'] = ur is not None
+    
+    # BUG FIX Issues #2-3, #28: Pre-warm AIRuntime and MultiModalReasoningEngine
+    ar = get_ai_runtime()
+    results['ai_runtime'] = ar is not None
+    
+    mme = get_multimodal_engine()
+    results['multimodal_engine'] = mme is not None
     
     success_count = sum(1 for v in results.values() if v)
     logger.info(f"[Singletons] ✓ All singletons pre-warmed ({success_count}/{len(results)} initialized)")
@@ -689,4 +702,99 @@ def get_unified_runtime(config: Optional[Any] = None) -> Optional[Any]:
             return None
         except Exception as e:
             logger.error(f"[Singletons] Failed to create UnifiedRuntime: {e}")
+            return None
+
+
+# ============================================
+# AI RUNTIME SINGLETON (Issue #28)
+# ============================================
+
+_ai_runtime_lock = threading.Lock()
+
+
+def get_ai_runtime(config: Optional[dict] = None) -> Optional[Any]:
+    """
+    Get singleton AIRuntime instance.
+    
+    BUG FIX Issue #28: The AIRuntime was registering OpenAI provider multiple times
+    because it was being re-instantiated per-query. This singleton ensures
+    providers are registered only once at startup.
+    
+    Args:
+        config: Optional config dict for first-time initialization
+        
+    Returns:
+        AIRuntime instance (singleton), or None if unavailable.
+    """
+    global _ai_runtime
+    
+    if _ai_runtime is not None:
+        logger.debug("[Singletons] Returning cached AIRuntime")
+        return _ai_runtime
+    
+    with _ai_runtime_lock:
+        if _ai_runtime is not None:
+            return _ai_runtime
+        
+        logger.info("[Singletons] Creating global AIRuntime (ONCE)")
+        try:
+            from unified_runtime.ai_runtime_integration import AIRuntime
+            _ai_runtime = AIRuntime(config=config)
+            logger.info("[Singletons] ✓ AIRuntime created and cached")
+            return _ai_runtime
+        except ImportError as e:
+            logger.warning(f"[Singletons] AIRuntime import failed: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"[Singletons] Failed to create AIRuntime: {e}")
+            return None
+
+
+# ============================================
+# MULTIMODAL REASONING ENGINE SINGLETON (Issue #2-3)
+# ============================================
+
+_multimodal_engine_lock = threading.Lock()
+
+
+def get_multimodal_engine(enable_learning: bool = True, device: str = "cpu") -> Optional[Any]:
+    """
+    Get singleton MultiModalReasoningEngine instance.
+    
+    BUG FIX Issues #2-3: The MultiModalReasoningEngine was logging
+    "Neural reasoning modules initialized successfully" multiple times
+    per query because it was being re-instantiated. This singleton ensures
+    neural modules are initialized only once at startup.
+    
+    Args:
+        enable_learning: Whether to enable learning mode (first-time only)
+        device: Device to use - "cpu" or "cuda" (first-time only)
+        
+    Returns:
+        MultiModalReasoningEngine instance (singleton), or None if unavailable.
+    """
+    global _multimodal_engine
+    
+    if _multimodal_engine is not None:
+        logger.debug("[Singletons] Returning cached MultiModalReasoningEngine")
+        return _multimodal_engine
+    
+    with _multimodal_engine_lock:
+        if _multimodal_engine is not None:
+            return _multimodal_engine
+        
+        logger.info("[Singletons] Creating global MultiModalReasoningEngine (ONCE)")
+        try:
+            from vulcan.reasoning.multimodal_reasoning import MultiModalReasoningEngine
+            _multimodal_engine = MultiModalReasoningEngine(
+                enable_learning=enable_learning,
+                device=device
+            )
+            logger.info("[Singletons] ✓ MultiModalReasoningEngine created and cached")
+            return _multimodal_engine
+        except ImportError as e:
+            logger.warning(f"[Singletons] MultiModalReasoningEngine import failed: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"[Singletons] Failed to create MultiModalReasoningEngine: {e}")
             return None

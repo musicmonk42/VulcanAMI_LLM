@@ -38,10 +38,12 @@ def _lazy_import_component(component_name):
     """Helper to lazy-load components, falling back to MagicMock on failure."""
     try:
         module = importlib.import_module(f".{component_name}", __package__)
-        logger.info(f"Lazy loaded {component_name}")
+        # BUG FIX Issue #29: Downgrade to DEBUG since these are loaded at startup
+        # not truly "lazy" (on-demand). The INFO log was misleading.
+        logger.debug(f"Loaded meta-reasoning component: {component_name}")
         return module
     except ImportError as e:
-        logger.error(f"Failed to lazy load {component_name}: {e}")
+        logger.error(f"Failed to load {component_name}: {e}")
         # Return a MagicMock object that can be called to produce another MagicMock
         # This allows ClassName() to work, returning a mock instance.
         return MagicMock()
