@@ -3725,6 +3725,8 @@ CHARS_PER_TOKEN_ESTIMATE = 3  # Conservative estimate for token calculation
 # JOB-TO-RESPONSE GAP FIX: Timing thresholds for debugging
 SLOW_PHASE_THRESHOLD_MS = 1000  # Log warning if phase takes longer than this
 SLOW_REQUEST_THRESHOLD_MS = 5000  # Include timing breakdown for requests slower than this
+# BUG #35 FIX: Threshold for marking query outcomes as "slow" (matches COMPLEX_QUERY_TIME_THRESHOLD_MS)
+SLOW_QUERY_OUTCOME_THRESHOLD_MS = 30000  # 30 seconds - queries slower than this are marked as "slow"
 
 # MEMORY MANAGEMENT: GC thresholds
 GC_SIGNIFICANT_CLEANUP_THRESHOLD = 100  # Log GC if collected more than this many objects
@@ -5314,8 +5316,7 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
             # BUG FIX Issue #35: Determine status based on actual timing
             # Queries taking > 30s should be marked as "slow", not "success"
             # This ensures gap detection properly identifies slow queries
-            SLOW_QUERY_THRESHOLD_MS = 30000  # 30 seconds (matches COMPLEX_QUERY_TIME_THRESHOLD_MS)
-            if float(latency_ms) > SLOW_QUERY_THRESHOLD_MS:
+            if float(latency_ms) > SLOW_QUERY_OUTCOME_THRESHOLD_MS:
                 query_status = "slow"
             else:
                 query_status = "success"

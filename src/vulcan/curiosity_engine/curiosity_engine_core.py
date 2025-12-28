@@ -1274,12 +1274,15 @@ class CuriosityEngine:
         # 1. False "errors" from bad consensus check added high_error_rate gaps
         # 2. Experiments ran but gaps were never marked resolved
         # 3. No deduplication - same gap type added repeatedly
-        self._resolved_gaps: Dict[str, float] = {}  # BUG #14 FIX: Track resolved gap keys with TTL (key -> timestamp)
+        # BUG #14 FIX: Track resolved gap keys with TTL (key -> resolution_timestamp)
+        self._resolved_gaps: Dict[str, float] = {}  
         self._gap_last_seen: Dict[str, float] = {}  # Track when gap was last added
         self._gap_attempts: Dict[str, int] = {}  # Track experiment attempts per gap
+        self._last_resolution_cleanup: float = 0.0  # Last time we cleaned up expired resolutions
         self.MAX_GAPS_PER_TYPE = 2  # Maximum gaps of same type
         self.GAP_COOLDOWN_SECONDS = 300  # Don't re-add same gap for 5 min
         self.GAP_RESOLUTION_TTL_SECONDS = 1800  # BUG #14 FIX: Allow re-detection after 30 min if issue persists
+        self.RESOLUTION_CLEANUP_INTERVAL = 300  # Only cleanup expired resolutions every 5 minutes
         
         # External gap injection (for OutcomeBridge connection)
         # This allows gaps detected by external systems (e.g., OutcomeBridge)
@@ -1579,6 +1582,9 @@ class CuriosityEngine:
         BUG #14 FIX: Resolved gaps now have a TTL - they can be re-detected
         after GAP_RESOLUTION_TTL_SECONDS (30 min) if the underlying issue persists.
         
+        Performance: Expired gap cleanup is rate-limited to every RESOLUTION_CLEANUP_INTERVAL
+        seconds to avoid overhead on every call.
+        
         Args:
             raw_gaps: List of raw gaps to filter
             
@@ -1590,13 +1596,16 @@ class CuriosityEngine:
         type_counts = defaultdict(int)
         
         # BUG #14 FIX: Clean up expired resolved gaps (TTL-based)
-        expired_keys = [
-            key for key, resolved_time in self._resolved_gaps.items()
-            if current_time - resolved_time > self.GAP_RESOLUTION_TTL_SECONDS
-        ]
-        for key in expired_keys:
-            del self._resolved_gaps[key]
-            logger.debug(f"[CuriosityEngine] Resolved gap {key} TTL expired, can be re-detected")
+        # Rate-limit cleanup to avoid overhead on every call
+        if current_time - self._last_resolution_cleanup > self.RESOLUTION_CLEANUP_INTERVAL:
+            self._last_resolution_cleanup = current_time
+            expired_keys = [
+                key for key, resolved_time in self._resolved_gaps.items()
+                if current_time - resolved_time > self.GAP_RESOLUTION_TTL_SECONDS
+            ]
+            for key in expired_keys:
+                del self._resolved_gaps[key]
+                logger.debug(f"[CuriosityEngine] Resolved gap {key} TTL expired, can be re-detected")
         
         for gap in raw_gaps:
             key = self._gap_key(gap)
