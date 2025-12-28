@@ -83,6 +83,8 @@ try:
         route_query_async,
         get_query_analyzer,
         shutdown_blocking_executor,
+        # FIX 2: Query Router Timeout constant
+        QUERY_ROUTING_TIMEOUT_SECONDS,
     )
 
     QUERY_ROUTER_AVAILABLE = True
@@ -102,6 +104,7 @@ except ImportError as e:
     route_query_async = None
     get_query_analyzer = None
     shutdown_blocking_executor = None
+    QUERY_ROUTING_TIMEOUT_SECONDS = 5.0  # Default fallback
 
 # Agent Collaboration
 try:
@@ -373,6 +376,7 @@ __all__ = [
     "route_query_async",
     "get_query_analyzer",
     "shutdown_blocking_executor",
+    "QUERY_ROUTING_TIMEOUT_SECONDS",  # FIX 2: Query Router Timeout constant
     # Agent Collaboration
     "AgentMessage",
     "AgentCollaborationManager",

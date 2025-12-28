@@ -367,6 +367,14 @@ ARENA_EXECUTION_COMPLEXITY_THRESHOLD: float = 0.45  # For complex execution task
 CACHE_STATS_LOG_INTERVAL: int = 10
 
 # ============================================================
+# CONSTANTS - Query Routing Timeout (FIX 2)
+# ============================================================
+# Maximum time allowed for query routing operations in seconds.
+# If routing takes longer than this, a fallback plan is returned.
+# This prevents 46-50+ second delays observed in production.
+QUERY_ROUTING_TIMEOUT_SECONDS: float = 5.0  # 5 seconds max (was 46-50s before fix)
+
+# ============================================================
 # CONSTANTS - Security Patterns
 # ============================================================
 
@@ -2141,7 +2149,8 @@ def route_query(
 async def route_query_async(
     query: str,
     source: Literal["user", "agent", "arena"] = "user",
-    session_id: Optional[str] = None
+    session_id: Optional[str] = None,
+    timeout: Optional[float] = None
 ) -> ProcessingPlan:
     """
     Async version of route_query that offloads blocking operations to a thread pool.
@@ -2150,10 +2159,15 @@ async def route_query_async(
     to prevent blocking the main event loop. The CPU-bound safety validation and
     adversarial check operations are executed in a thread pool executor.
     
+    FIX 2: Query Router Timeout - Now includes timeout protection to prevent
+    46-50+ second delays. If routing takes longer than QUERY_ROUTING_TIMEOUT_SECONDS
+    (default 5s), a fallback plan is returned immediately.
+    
     Args:
         query: The input query
         source: "user" | "agent" | "arena"
         session_id: Optional session identifier
+        timeout: Optional custom timeout in seconds (default: QUERY_ROUTING_TIMEOUT_SECONDS)
         
     Returns:
         ProcessingPlan with:
@@ -2175,15 +2189,120 @@ async def route_query_async(
     loop = asyncio.get_running_loop()
     executor = _get_blocking_executor()
     
-    # Offload the entire route_query call to a thread pool to avoid blocking
-    # the asyncio event loop with CPU-bound safety validation operations
-    plan = await loop.run_in_executor(
-        executor,
-        route_query,
-        query,
-        source,
-        session_id
+    # Use provided timeout or default
+    effective_timeout = timeout if timeout is not None else QUERY_ROUTING_TIMEOUT_SECONDS
+    
+    try:
+        # FIX 2: Wrap routing in timeout to prevent 46-50+ second delays
+        # Offload the entire route_query call to a thread pool to avoid blocking
+        # the asyncio event loop with CPU-bound safety validation operations
+        plan = await asyncio.wait_for(
+            loop.run_in_executor(
+                executor,
+                route_query,
+                query,
+                source,
+                session_id
+            ),
+            timeout=effective_timeout
+        )
+        return plan
+        
+    except asyncio.TimeoutError:
+        # FIX 2: Return fallback plan on timeout instead of blocking forever
+        logger.warning(
+            f"[QueryRouter] Query routing timed out after {effective_timeout}s. "
+            f"Returning fallback plan for source={source}"
+        )
+        return _create_fallback_plan(query, source, session_id, timeout_exceeded=True)
+
+
+def _create_fallback_plan(
+    query: str,
+    source: Literal["user", "agent", "arena"],
+    session_id: Optional[str] = None,
+    timeout_exceeded: bool = False
+) -> ProcessingPlan:
+    """
+    Create a minimal fallback processing plan when routing times out or fails.
+    
+    FIX 2: This function provides a safe fallback when query routing takes too long
+    (46-50+ seconds observed in production). Instead of blocking, we return a
+    minimal plan that routes directly to reasoning with reduced complexity.
+    
+    Args:
+        query: The original query text
+        source: Query source - "user", "agent", or "arena"
+        session_id: Optional session identifier
+        timeout_exceeded: Whether this fallback is due to timeout
+        
+    Returns:
+        ProcessingPlan with minimal/safe defaults
+    """
+    query_id = f"q_fallback_{uuid.uuid4().hex[:12]}"
+    
+    # Determine learning mode based on source
+    if source == "user":
+        learning_mode = LearningMode.USER_INTERACTION
+        telemetry_category = "user_query"
+    else:
+        learning_mode = LearningMode.AI_INTERACTION
+        telemetry_category = f"{source}_interaction"
+    
+    # Create minimal plan with safe defaults
+    plan = ProcessingPlan(
+        query_id=query_id,
+        original_query=query,
+        source=source,
+        learning_mode=learning_mode,
+        query_type=QueryType.GENERAL,  # Default to general for fallback
+        complexity_score=0.3,  # Assume moderate complexity
+        uncertainty_score=0.2,
+        collaboration_needed=False,
+        arena_participation=False,
+        requires_governance=False,
+        requires_audit=True,  # Always audit fallback routes
+        telemetry_category=telemetry_category,
+        telemetry_data={
+            "session_id": session_id,
+            "query_length": len(query) if query else 0,
+            "word_count": len(query.split()) if query else 0,
+            "source": source,
+            "learning_mode": learning_mode.value,
+            "fallback_routing": True,
+            "timeout_exceeded": timeout_exceeded,
+        }
     )
+    
+    # Create single reasoning task for fallback
+    base_task_id = uuid.uuid4().hex[:8]
+    plan.agent_tasks = [
+        AgentTask(
+            task_id=f"task_{base_task_id}_fallback",
+            task_type="general_task",
+            capability="reasoning",
+            prompt=query if query else "",
+            priority=1,
+            timeout_seconds=15.0,  # Standard timeout for individual task
+            parameters={
+                "query_type": "general",
+                "is_primary": True,
+                "source": source,
+                "fallback_routing": True,
+                "timeout_exceeded": timeout_exceeded,
+            }
+        )
+    ]
+    
+    plan.detected_patterns.append("fallback_routing")
+    if timeout_exceeded:
+        plan.detected_patterns.append("routing_timeout")
+    
+    logger.info(
+        f"[QueryRouter] Fallback plan created: {query_id}, source={source}, "
+        f"tasks=1, timeout_exceeded={timeout_exceeded}"
+    )
+    
     return plan
 
 
