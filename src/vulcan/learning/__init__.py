@@ -386,7 +386,24 @@ class UnifiedLearningSystem:
             except Exception as e:
                 logger.warning(f"[Learning] Recovery: Failed to reset circuit breaker: {e}")
             
-            # 3. Trigger garbage collection to reclaim memory
+            # 3. ISSUE #2 FIX: Clear SemanticToolMatcher query embedding cache
+            try:
+                from vulcan.reasoning.selection.semantic_tool_matcher import SemanticToolMatcher
+                cache_stats = SemanticToolMatcher.get_cache_stats()
+                SemanticToolMatcher.clear_query_cache()
+                recovery_actions_taken.append(
+                    f"SemanticToolMatcher query cache cleared: {cache_stats.get('size', 0)} entries"
+                )
+                logger.info(
+                    f"[Learning] Recovery: SemanticToolMatcher query cache cleared "
+                    f"(was {cache_stats.get('size', 0)} entries, hit_rate={cache_stats.get('hit_rate', 0):.2%})"
+                )
+            except ImportError:
+                logger.debug("[Learning] Recovery: SemanticToolMatcher not available")
+            except Exception as e:
+                logger.warning(f"[Learning] Recovery: Failed to clear SemanticToolMatcher cache: {e}")
+            
+            # 4. Trigger garbage collection to reclaim memory
             gc.collect()
             recovery_actions_taken.append("Garbage collection triggered")
             logger.info("[Learning] Recovery: Garbage collection complete")
