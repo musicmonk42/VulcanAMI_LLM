@@ -2845,6 +2845,7 @@ class SelfImprovementDrive:
                 f"Skipping improvement for {objective_type}"
             )
             return False
+
         # STEP 1: Validate target file exists
         target_file = Path(changes.get("file_path", ""))
         if not target_file.is_absolute():
@@ -2880,15 +2881,26 @@ class SelfImprovementDrive:
         
         # STEP 3: Apply changes using safe executor
         if changes.get("type") == "code_modification":
-            # Write changes to temp file first
-            temp_file = target_file.with_suffix(target_file.suffix + ".tmp")
+            # Create a robust temporary file path using tempfile
+            import tempfile
+            temp_dir = target_file.parent
+            temp_fd, temp_path = tempfile.mkstemp(
+                suffix=".tmp", 
+                prefix=f"{target_file.stem}_",
+                dir=temp_dir
+            )
+            temp_file = Path(temp_path)
+            
             try:
+                # Write content to temp file
+                os.close(temp_fd)  # Close the file descriptor from mkstemp
                 temp_file.write_text(changes["new_content"])
                 
                 # Run tests on modified code using safe executor
                 if self.safe_executor:
+                    # Run tests specific to the modified file if possible
                     test_result = self.safe_executor.execute_safe(
-                        ["python", "-m", "pytest", str(target_file.parent), "-v", "-x"],
+                        ["python", "-m", "pytest", str(target_file.parent), "-v", "-x", "--tb=short"],
                         timeout=30
                     )
                     
@@ -3018,8 +3030,11 @@ class SelfImprovementDrive:
             "global_vars": [],
         }
         
+        # First pass: collect classes and their methods
+        class_names = set()
         for node in ast.walk(tree):
             if isinstance(node, ast.ClassDef):
+                class_names.add(node.name)
                 class_info = {
                     "name": node.name,
                     "methods": [
@@ -3030,16 +3045,6 @@ class SelfImprovementDrive:
                 }
                 structure["classes"].append(class_info)
                 
-            elif isinstance(node, ast.FunctionDef):
-                # Only top-level functions
-                if not any(isinstance(parent, ast.ClassDef) for parent in ast.walk(tree)):
-                    func_info = {
-                        "name": node.name,
-                        "args": [arg.arg for arg in node.args.args],
-                        "line": node.lineno,
-                    }
-                    structure["functions"].append(func_info)
-                    
             elif isinstance(node, (ast.Import, ast.ImportFrom)):
                 if isinstance(node, ast.Import):
                     for alias in node.names:
@@ -3047,6 +3052,17 @@ class SelfImprovementDrive:
                 else:
                     module = node.module or ""
                     structure["imports"].append(module)
+        
+        # Second pass: find only top-level functions (direct children of Module)
+        if isinstance(tree, ast.Module):
+            for node in tree.body:
+                if isinstance(node, ast.FunctionDef):
+                    func_info = {
+                        "name": node.name,
+                        "args": [arg.arg for arg in node.args.args],
+                        "line": node.lineno,
+                    }
+                    structure["functions"].append(func_info)
         
         return structure
 

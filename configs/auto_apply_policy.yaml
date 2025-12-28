@@ -39,9 +39,9 @@ auto_apply:
   # Pre-apply gates. Each item can be a string (command) or an object with cmd/timeout_s/cwd/env
   gates:
     commands:
-      - cmd: ["python", "-m", "pytest", "-x"]
+      - cmd: ["python", "-m", "pytest", "-x", "."]
         timeout_s: 30
-      - cmd: ["python", "-m", "mypy", "--strict"]
+      - cmd: ["python", "-m", "mypy", "--strict", "."]
         timeout_s: 20
       - cmd: ["python", "-m", "black", "--check", "."]
         timeout_s: 10
