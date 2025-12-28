@@ -34,6 +34,7 @@ _bayesian_prior: Optional[Any] = None
 _warm_pool: Optional[Any] = None
 _cost_model: Optional[Any] = None
 _semantic_matcher: Optional[Any] = None
+_problem_decomposer: Optional[Any] = None
 _singleton_lock = threading.Lock()
 
 
@@ -181,6 +182,7 @@ def reset_all() -> None:
     """
     global _tool_selector, _reasoning_integration, _portfolio_executor
     global _bayesian_prior, _warm_pool, _cost_model, _semantic_matcher
+    global _problem_decomposer
     
     with _singleton_lock:
         _tool_selector = None
@@ -190,6 +192,7 @@ def reset_all() -> None:
         _warm_pool = None
         _cost_model = None
         _semantic_matcher = None
+        _problem_decomposer = None
         _instances.clear()
         logger.info("[Singletons] All singletons reset")
 
@@ -318,6 +321,46 @@ def get_semantic_matcher():
             return None
 
 
+def get_problem_decomposer():
+    """
+    Get singleton ProblemDecomposer instance.
+    
+    The ProblemDecomposer handles hierarchical problem breakdown for complex
+    queries (complexity >= 0.40). It uses multiple strategies:
+    - ExactDecomposition: Fast pattern matching
+    - SemanticDecomposition: Semantic-based decomposition
+    - StructuralDecomposition: Structural analysis
+    - AnalogicalDecomposition: Analogy-based
+    - SyntheticBridging: Synthetic bridging
+    - BruteForceSearch: Exhaustive search (last resort)
+    
+    Returns:
+        ProblemDecomposer instance (singleton).
+    """
+    global _problem_decomposer
+    
+    if _problem_decomposer is not None:
+        logger.debug("[Singletons] Returning cached ProblemDecomposer")
+        return _problem_decomposer
+    
+    with _singleton_lock:
+        if _problem_decomposer is not None:
+            return _problem_decomposer
+        
+        logger.info("[Singletons] Creating global ProblemDecomposer (ONCE)")
+        try:
+            from vulcan.problem_decomposer.decomposer_bootstrap import create_decomposer
+            _problem_decomposer = create_decomposer()
+            logger.info("[Singletons] ✓ ProblemDecomposer created and cached")
+            return _problem_decomposer
+        except ImportError as e:
+            logger.warning(f"[Singletons] ProblemDecomposer not available: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"[Singletons] Failed to create ProblemDecomposer: {e}")
+            return None
+
+
 def prewarm_all():
     """
     Pre-initialize all singletons at startup.
@@ -341,6 +384,9 @@ def prewarm_all():
     
     sm = get_semantic_matcher()
     results['semantic_matcher'] = sm is not None
+    
+    pd = get_problem_decomposer()
+    results['problem_decomposer'] = pd is not None
     
     success_count = sum(1 for v in results.values() if v)
     logger.info(f"[Singletons] ✓ All singletons pre-warmed ({success_count}/{len(results)} initialized)")

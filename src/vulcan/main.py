@@ -996,6 +996,42 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Model registry preload failed (models will load lazily): {e}")
 
+    # ================================================================
+    # PERFORMANCE FIX (Progressive Degradation): Pre-warm all reasoning singletons
+    # This prevents query routing from degrading 469ms → 152,048ms over time
+    # by ensuring all components (ToolSelector, BayesianMemoryPrior, WarmPool,
+    # StochasticCostModel, SemanticToolMatcher, ProblemDecomposer) are created
+    # exactly ONCE at startup.
+    # ================================================================
+    try:
+        from vulcan.reasoning.singletons import prewarm_all
+        prewarm_results = prewarm_all()
+        success_count = sum(1 for v in prewarm_results.values() if v)
+        logger.info(f"✓ Reasoning singletons pre-warmed: {success_count}/{len(prewarm_results)} components")
+        
+        # Validate ProblemDecomposer setup if available
+        if prewarm_results.get('problem_decomposer'):
+            try:
+                from vulcan.problem_decomposer.decomposer_bootstrap import validate_decomposer_setup
+                from vulcan.reasoning.singletons import get_problem_decomposer
+                decomposer = get_problem_decomposer()
+                if decomposer:
+                    validation = validate_decomposer_setup(decomposer)
+                    if validation['valid']:
+                        logger.info(
+                            f"  ✅ ProblemDecomposer validated: "
+                            f"strategies={validation['checks'].get('strategy_count', 0)}, "
+                            f"fallback_chain={validation['checks'].get('fallback_chain_count', 0)}"
+                        )
+                    else:
+                        logger.warning(f"  ⚠️ ProblemDecomposer validation warnings: {validation.get('errors', [])}")
+            except Exception as ve:
+                logger.debug(f"ProblemDecomposer validation skipped: {ve}")
+    except ImportError as e:
+        logger.debug(f"Reasoning singletons module not available for prewarm: {e}")
+    except Exception as e:
+        logger.warning(f"Reasoning singletons prewarm failed: {e}")
+
     # PERFORMANCE FIX (Issue #55/#56): Preload ReasoningIntegration and embedding models at startup
     # This prevents the first query from taking 60+ seconds to load all models
     try:
@@ -1018,6 +1054,24 @@ async def lifespan(app: FastAPI):
         logger.debug(f"ReasoningIntegration not available for preload: {e}")
     except Exception as e:
         logger.warning(f"ReasoningIntegration preload failed (will load on first request): {e}")
+
+    # ================================================================
+    # MEMORY MANAGEMENT: Start memory guard for automatic GC
+    # This monitors memory pressure and triggers garbage collection
+    # when usage exceeds threshold, preventing memory accumulation
+    # from repeated model loading.
+    # ================================================================
+    try:
+        from vulcan.monitoring.memory_guard import start_memory_guard
+        memory_guard = start_memory_guard(threshold_percent=85.0, check_interval=5.0)
+        if memory_guard:
+            logger.info("✓ MemoryGuard started (threshold=85%, interval=5s)")
+        else:
+            logger.debug("MemoryGuard not started (psutil may not be available)")
+    except ImportError as e:
+        logger.debug(f"MemoryGuard module not available: {e}")
+    except Exception as e:
+        logger.warning(f"MemoryGuard startup failed: {e}")
 
     # Initialize SelfOptimizer for autonomous performance tuning
     if SELF_OPTIMIZER_AVAILABLE:
@@ -5264,6 +5318,24 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
         except Exception as e:
             logger.debug(f"[VULCAN/v1/chat] Outcome recording setup failed: {e}")
 
+        # ================================================================
+        # MEMORY MANAGEMENT: Trigger garbage collection to prevent memory accumulation
+        # This prevents progressive query routing degradation (469ms → 152,048ms)
+        # caused by repeated SentenceTransformer model loading without cleanup.
+        # ================================================================
+        async def _post_request_gc():
+            """Background task to trigger garbage collection after request."""
+            try:
+                import gc
+                collected = gc.collect()
+                if collected > 100:  # Only log if significant cleanup occurred
+                    logger.debug(f"[VULCAN/v1/chat] Post-request GC collected {collected} objects")
+            except Exception:
+                pass  # Don't let GC errors affect the response
+        
+        # Schedule GC as a background task (non-blocking)
+        asyncio.create_task(_post_request_gc())
+
         return {
             "response": response_text,
             "metadata": metadata,
@@ -5315,6 +5387,13 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
             logger.debug(f"[VULCAN/v1/chat] Error outcome recorded to bridge with tools={selected_tools}")
         except Exception:
             pass  # Don't let outcome recording failure mask the original error
+        
+        # MEMORY MANAGEMENT: Trigger GC on error path too
+        try:
+            import gc
+            gc.collect()
+        except Exception:
+            pass
         
         raise HTTPException(status_code=500, detail=str(e))
 

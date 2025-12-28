@@ -95,6 +95,7 @@ DEFAULT_MIN_CONFIDENCE = 0.5  # Minimum confidence threshold for results
 FAST_PATH_COMPLEXITY_THRESHOLD = 0.3  # Below this, use fast path
 LOW_COMPLEXITY_THRESHOLD = 0.4  # Below this, use FAST mode
 HIGH_COMPLEXITY_THRESHOLD = 0.7  # Above this, use ACCURATE mode
+DECOMPOSITION_COMPLEXITY_THRESHOLD = 0.40  # At or above this, use decomposition
 
 # Strategy selection thresholds
 CAUSAL_REASONING_THRESHOLD = 0.6  # Complexity threshold for causal reasoning
@@ -274,12 +275,15 @@ class ReasoningIntegration:
                 - energy_budget_mj: Energy budget in mJ (default: 1000)
                 - min_confidence: Minimum confidence (default: 0.5)
                 - tool_selector_config: Config passed to ToolSelector
+                - enable_decomposition: Enable problem decomposition (default: True)
         """
         self._config = config or {}
 
         # Lazy-loaded components
         self._tool_selector: Optional[Any] = None
         self._portfolio_executor: Optional[Any] = None
+        self._problem_decomposer: Optional[Any] = None
+        self._query_bridge: Optional[Any] = None
 
         # Initialization state with thread safety
         self._initialized = False
@@ -295,8 +299,11 @@ class ReasoningIntegration:
         # Shutdown state
         self._shutdown = False
         self._shutdown_lock = threading.Lock()
+        
+        # Decomposition configuration
+        self._decomposition_enabled = self._config.get('enable_decomposition', True)
 
-        logger.info(f"{LOG_PREFIX} Initialized (lazy loading enabled)")
+        logger.info(f"{LOG_PREFIX} Initialized (lazy loading enabled, decomposition={self._decomposition_enabled})")
 
     def _init_components(self) -> None:
         """
@@ -324,6 +331,11 @@ class ReasoningIntegration:
 
             # Try to initialize PortfolioExecutor
             self._portfolio_executor = self._init_portfolio_executor()
+            
+            # Try to initialize ProblemDecomposer and QueryBridge (if decomposition enabled)
+            if self._decomposition_enabled:
+                self._problem_decomposer = self._init_problem_decomposer()
+                self._query_bridge = self._init_query_bridge()
 
             init_time = (time.perf_counter() - init_start) * 1000
 
@@ -332,7 +344,8 @@ class ReasoningIntegration:
             logger.info(
                 f"{LOG_PREFIX} Components initialized in {init_time:.1f}ms "
                 f"(ToolSelector: {self._tool_selector is not None}, "
-                f"PortfolioExecutor: {self._portfolio_executor is not None})"
+                f"PortfolioExecutor: {self._portfolio_executor is not None}, "
+                f"ProblemDecomposer: {self._problem_decomposer is not None})"
             )
 
     def _init_tool_selector(self) -> Optional[Any]:
@@ -401,6 +414,69 @@ class ReasoningIntegration:
         except Exception as e:
             logger.error(
                 f"{LOG_PREFIX} PortfolioExecutor initialization failed: {e}",
+                exc_info=True
+            )
+
+        return None
+
+    def _init_problem_decomposer(self) -> Optional[Any]:
+        """
+        Initialize ProblemDecomposer component with error handling.
+        
+        PERFORMANCE FIX: Uses singleton from singletons.py to ensure ProblemDecomposer
+        is created exactly ONCE per process.
+
+        Returns:
+            ProblemDecomposer instance if successful, None otherwise.
+        """
+        try:
+            from vulcan.reasoning.singletons import get_problem_decomposer
+
+            decomposer = get_problem_decomposer()
+            if decomposer is not None:
+                logger.info(f"{LOG_PREFIX} ProblemDecomposer obtained from singleton")
+                return decomposer
+
+            # Fallback: If singleton fails, try direct creation
+            logger.warning(f"{LOG_PREFIX} Singleton unavailable, creating ProblemDecomposer directly")
+            from vulcan.problem_decomposer.decomposer_bootstrap import create_decomposer
+            decomposer = create_decomposer()
+            logger.info(f"{LOG_PREFIX} ProblemDecomposer initialized successfully (fallback)")
+            return decomposer
+
+        except ImportError as e:
+            logger.warning(
+                f"{LOG_PREFIX} ProblemDecomposer not available (missing dependency): {e}"
+            )
+        except Exception as e:
+            logger.error(
+                f"{LOG_PREFIX} ProblemDecomposer initialization failed: {e}",
+                exc_info=True
+            )
+
+        return None
+
+    def _init_query_bridge(self) -> Optional[Any]:
+        """
+        Initialize QueryToProblemBridge component with error handling.
+
+        Returns:
+            QueryToProblemBridge instance if successful, None otherwise.
+        """
+        try:
+            from vulcan.reasoning.query_to_problem_bridge import get_query_to_problem_bridge
+
+            bridge = get_query_to_problem_bridge()
+            logger.info(f"{LOG_PREFIX} QueryToProblemBridge initialized successfully")
+            return bridge
+
+        except ImportError as e:
+            logger.warning(
+                f"{LOG_PREFIX} QueryToProblemBridge not available (missing dependency): {e}"
+            )
+        except Exception as e:
+            logger.error(
+                f"{LOG_PREFIX} QueryToProblemBridge initialization failed: {e}",
                 exc_info=True
             )
 
@@ -488,10 +564,28 @@ class ReasoningIntegration:
                     },
                 )
 
-            # Attempt tool selection if ToolSelector is available
-            result = self._select_with_tool_selector(
-                query, query_type, complexity, context
+            # Check if we should use decomposition for complex queries
+            use_decomposition = (
+                self._decomposition_enabled
+                and complexity >= DECOMPOSITION_COMPLEXITY_THRESHOLD
+                and self._problem_decomposer is not None
+                and self._query_bridge is not None
             )
+            
+            if use_decomposition:
+                # Use decomposition path for complex queries
+                logger.info(
+                    f"{LOG_PREFIX} Using decomposition path (complexity={complexity:.2f} >= "
+                    f"{DECOMPOSITION_COMPLEXITY_THRESHOLD})"
+                )
+                result = self._process_with_decomposition(
+                    query, query_type, complexity, context
+                )
+            else:
+                # Use direct tool selection for simpler queries
+                result = self._select_with_tool_selector(
+                    query, query_type, complexity, context
+                )
 
             # Record timing
             selection_time = (time.perf_counter() - selection_start) * 1000
@@ -631,6 +725,167 @@ class ReasoningIntegration:
                 "portfolio_executor_available": self._portfolio_executor is not None,
             },
         )
+
+    def _process_with_decomposition(
+        self,
+        query: str,
+        query_type: str,
+        complexity: float,
+        context: Optional[Dict[str, Any]],
+    ) -> ReasoningResult:
+        """
+        Process a complex query using hierarchical problem decomposition.
+
+        This method is called for queries with complexity >= DECOMPOSITION_COMPLEXITY_THRESHOLD.
+        It breaks down the query into subproblems, applies tool selection to each,
+        and aggregates the results.
+
+        Processing Flow:
+            1. Convert query to ProblemGraph via QueryToProblemBridge
+            2. Decompose using ProblemDecomposer (strategies: exact, semantic, structural, etc.)
+            3. For each subproblem step, apply ToolSelector
+            4. Aggregate results and determine overall strategy
+
+        Args:
+            query: The user query text to process
+            query_type: Type of query (reasoning, execution, etc.)
+            complexity: Query complexity score (0.4 to 1.0)
+            context: Optional context dictionary
+
+        Returns:
+            ReasoningResult with selected tools, strategy, and decomposition metadata
+
+        Note:
+            Falls back to direct tool selection if decomposition fails.
+        """
+        decomposition_start = time.perf_counter()
+
+        try:
+            # Step 1: Convert query to ProblemGraph
+            query_analysis = {
+                'type': query_type,
+                'complexity': complexity,
+                'uncertainty': context.get('uncertainty', 0.0) if context else 0.0,
+                'requires_reasoning': query_type in ('reasoning', 'causal', 'planning'),
+            }
+
+            problem_graph = self._query_bridge.convert_to_problem_graph(
+                query=query,
+                query_analysis=query_analysis,
+                tool_selection=None,  # Will be determined per subproblem
+            )
+
+            if problem_graph is None:
+                logger.warning(
+                    f"{LOG_PREFIX} Query bridge returned None, falling back to direct selection"
+                )
+                return self._select_with_tool_selector(query, query_type, complexity, context)
+
+            # Step 2: Decompose the problem
+            decomposition_plan = self._problem_decomposer.decompose_novel_problem(problem_graph)
+
+            if decomposition_plan is None or len(decomposition_plan.steps) == 0:
+                logger.warning(
+                    f"{LOG_PREFIX} Decomposition returned empty plan, falling back to direct selection"
+                )
+                return self._select_with_tool_selector(query, query_type, complexity, context)
+
+            logger.info(
+                f"{LOG_PREFIX} Decomposed into {len(decomposition_plan.steps)} steps, "
+                f"confidence={decomposition_plan.confidence:.2f}"
+            )
+
+            # Step 3: Apply tool selection to each subproblem step
+            all_tools: set = set()
+            step_results: List[Dict[str, Any]] = []
+            total_step_confidence = 0.0
+
+            for step in decomposition_plan.steps:
+                # Extract step description
+                if hasattr(step, 'description'):
+                    step_query = step.description
+                elif hasattr(step, 'to_dict'):
+                    step_dict = step.to_dict()
+                    step_query = step_dict.get('description', str(step))
+                else:
+                    step_query = str(step)
+
+                # Extract step complexity
+                if hasattr(step, 'estimated_complexity'):
+                    step_complexity = step.estimated_complexity
+                elif hasattr(step, 'complexity'):
+                    step_complexity = step.complexity
+                else:
+                    step_complexity = complexity * 0.5  # Default to half of parent
+
+                # Ensure step_complexity is within bounds
+                step_complexity = max(0.1, min(1.0, step_complexity))
+
+                # Apply tool selection to this step
+                step_result = self._select_with_tool_selector(
+                    query=step_query,
+                    query_type=query_type,
+                    complexity=step_complexity,
+                    context=context,
+                )
+
+                # Collect tools from this step
+                all_tools.update(step_result.selected_tools)
+                total_step_confidence += step_result.confidence
+
+                step_results.append({
+                    'step_id': getattr(step, 'step_id', f'step_{len(step_results)}'),
+                    'description': step_query[:100],  # Truncate for metadata
+                    'tools': step_result.selected_tools,
+                    'strategy': step_result.reasoning_strategy,
+                    'confidence': step_result.confidence,
+                })
+
+            # Step 4: Determine overall strategy based on decomposition
+            if decomposition_plan.strategy:
+                strategy_name = getattr(decomposition_plan.strategy, 'name', 'hierarchical')
+            else:
+                strategy_name = 'hierarchical_decomposition'
+
+            # Calculate overall confidence
+            num_steps = len(step_results)
+            avg_step_confidence = total_step_confidence / num_steps if num_steps > 0 else 0.5
+            overall_confidence = (decomposition_plan.confidence * 0.4) + (avg_step_confidence * 0.6)
+
+            decomposition_time_ms = (time.perf_counter() - decomposition_start) * 1000
+
+            logger.info(
+                f"{LOG_PREFIX} Decomposition complete: "
+                f"tools={list(all_tools)}, strategy={strategy_name}, "
+                f"confidence={overall_confidence:.2f}, time={decomposition_time_ms:.1f}ms"
+            )
+
+            return ReasoningResult(
+                selected_tools=list(all_tools) if all_tools else ["general"],
+                reasoning_strategy=strategy_name,
+                confidence=overall_confidence,
+                rationale=f"Hierarchical decomposition into {num_steps} subproblems",
+                metadata={
+                    "query_type": query_type,
+                    "complexity": complexity,
+                    "decomposition_path": True,
+                    "decomposition_steps": num_steps,
+                    "step_results": step_results,
+                    "decomposition_confidence": decomposition_plan.confidence,
+                    "decomposition_time_ms": decomposition_time_ms,
+                    "tool_selector_available": self._tool_selector is not None,
+                    "problem_decomposer_available": self._problem_decomposer is not None,
+                },
+            )
+
+        except Exception as e:
+            logger.error(
+                f"{LOG_PREFIX} Decomposition processing failed: {e}, "
+                f"falling back to direct selection",
+                exc_info=True
+            )
+            # Graceful degradation: fall back to direct tool selection
+            return self._select_with_tool_selector(query, query_type, complexity, context)
 
     def _extract_tools_from_result(self, result: Any) -> List[str]:
         """
