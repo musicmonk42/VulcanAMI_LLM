@@ -27,6 +27,34 @@ Security-critical ceilings not overridable (e.g., raising risk threshold beyond 
 | ENABLE_INTRINSIC_DRIVES | No | Self-improvement toggle | "false" |
 | OPENAI_API_KEY | Optional | AI provider | "" |
 
+### 2.1 Reasoning System Configuration (Singleton Pattern)
+
+These environment variables control the reasoning singleton system which prevents progressive
+query routing degradation (469ms → 152,048ms) by caching ML model instances.
+
+| Var | Required | Purpose | Dev Default |
+|-----|----------|---------|-------------|
+| REASONING_PREWARM_SINGLETONS | No | Prewarm all singletons at startup | "true" |
+| MEMORY_GUARD_ENABLED | No | Enable memory pressure monitoring | "true" |
+| MEMORY_GUARD_THRESHOLD_PERCENT | No | Memory % to trigger GC | "85.0" |
+| MEMORY_GUARD_CHECK_INTERVAL | No | Seconds between memory checks | "5.0" |
+| GC_REQUEST_INTERVAL | No | GC every N requests (rate limiting) | "10" |
+| PROBLEM_DECOMPOSER_ENABLED | No | Enable hierarchical problem decomposition | "true" |
+| DECOMPOSITION_COMPLEXITY_THRESHOLD | No | Complexity threshold for decomposition | "0.40" |
+| SEMANTIC_BRIDGE_ENABLED | No | Enable cross-domain knowledge transfer | "true" |
+| CROSS_DOMAIN_TRANSFER_ENABLED | No | Enable concept transfer between domains | "true" |
+| PATTERN_LEARNING_ENABLED | No | Learn patterns from successful outcomes | "true" |
+
+### 2.2 CuriosityDriver Configuration (Active Learning)
+
+| Var | Required | Purpose | Dev Default |
+|-----|----------|---------|-------------|
+| CURIOSITY_HEARTBEAT_INTERVAL | No | Seconds between heartbeat cycles | "60.0" |
+| CURIOSITY_MIN_BUDGET | No | Min budget to run learning cycle | "10.0" |
+| CURIOSITY_MAX_EXPERIMENTS | No | Max experiments per cycle | "5" |
+| CURIOSITY_LOW_BUDGET_SLEEP | No | Sleep when budget low (seconds) | "120.0" |
+| CURIOSITY_CYCLE_TIMEOUT | No | Timeout per cycle (seconds) | "300.0" |
+
 ## 3. Profiles
 development:
 - tracing: verbose
@@ -46,6 +74,10 @@ testing:
 | enable_explainability | Detailed execution explanations | Dev/Partial Prod |
 | enable_adversarial_testing | Inject synthetic risks | Dev only |
 | enforce_strict_provenance | Hard fail missing lineage | Production |
+| reasoning_prewarm_singletons | Prewarm ML models at startup | Production |
+| memory_guard_enabled | Auto GC on high memory | Production |
+| problem_decomposer_enabled | Hierarchical query decomposition | Production |
+| semantic_bridge_enabled | Cross-domain knowledge transfer | Production |
 
 ## 5. Intrinsic Drives Config Elements
 - triggers: startup, degradation, periodic, low_activity, error surge

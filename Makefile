@@ -431,6 +431,44 @@ enable-ray: ## Enable Ray workers for distributed execution (Fix #3)
 	@echo "RAY_ENABLED=true"
 	@echo "RAY_ADDRESS=auto"
 
+.PHONY: prewarm-singletons
+prewarm-singletons: ## Prewarm reasoning singletons (Progressive Degradation Fix)
+	@echo "$(GREEN)Prewarming reasoning singletons...$(NC)"
+	@echo "This initializes all ML models to prevent progressive query degradation."
+	PYTHONPATH=src python -c "from vulcan.reasoning.singletons import prewarm_all; results = prewarm_all(); print(f'Prewarming complete: {sum(1 for v in results.values() if v)}/{len(results)} components initialized')" || \
+		echo "$(YELLOW)Note: Run manually if dependencies not installed$(NC)"
+
+.PHONY: test-singletons
+test-singletons: ## Test reasoning singleton initialization
+	@echo "$(GREEN)Testing reasoning singletons...$(NC)"
+	PYTHONPATH=src pytest src/vulcan/tests/test_singletons.py -v || \
+		echo "$(YELLOW)Note: Install test dependencies first$(NC)"
+
+.PHONY: enable-reasoning-features
+enable-reasoning-features: ## Enable all reasoning features (Problem Decomposer, Semantic Bridge)
+	@echo "$(GREEN)Enabling reasoning features...$(NC)"
+	@echo "Add these to your .env file:"
+	@echo ""
+	@echo "# Reasoning System Configuration (Singleton Pattern)"
+	@echo "REASONING_PREWARM_SINGLETONS=true"
+	@echo ""
+	@echo "# Memory Guard (automatic GC on high memory)"
+	@echo "MEMORY_GUARD_ENABLED=true"
+	@echo "MEMORY_GUARD_THRESHOLD_PERCENT=85.0"
+	@echo "MEMORY_GUARD_CHECK_INTERVAL=5.0"
+	@echo ""
+	@echo "# GC Rate Limiting (every N requests)"
+	@echo "GC_REQUEST_INTERVAL=10"
+	@echo ""
+	@echo "# Problem Decomposer (hierarchical query decomposition)"
+	@echo "PROBLEM_DECOMPOSER_ENABLED=true"
+	@echo "DECOMPOSITION_COMPLEXITY_THRESHOLD=0.40"
+	@echo ""
+	@echo "# Semantic Bridge (cross-domain knowledge transfer)"
+	@echo "SEMANTIC_BRIDGE_ENABLED=true"
+	@echo "CROSS_DOMAIN_TRANSFER_ENABLED=true"
+	@echo "PATTERN_LEARNING_ENABLED=true"
+
 ################################################################################
 # Utilities
 ################################################################################

@@ -34,6 +34,26 @@ data:
   CURIOSITY_MAX_EXPERIMENTS: "5"
   CURIOSITY_LOW_BUDGET_SLEEP: "120.0"
   CURIOSITY_CYCLE_TIMEOUT: "300.0"
+  # Reasoning System Configuration (Singleton Pattern)
+  # Enables prewarming of all singletons at startup to prevent
+  # progressive query routing degradation (469ms → 152,048ms issue)
+  REASONING_PREWARM_SINGLETONS: "true"
+  # Memory Guard Configuration
+  # Background thread triggers GC when memory exceeds threshold
+  MEMORY_GUARD_ENABLED: "true"
+  MEMORY_GUARD_THRESHOLD_PERCENT: "85.0"
+  MEMORY_GUARD_CHECK_INTERVAL: "5.0"
+  # GC Rate Limiting (every N requests instead of every request)
+  GC_REQUEST_INTERVAL: "10"
+  # Problem Decomposer Configuration
+  # Complex queries (complexity >= threshold) use hierarchical decomposition
+  PROBLEM_DECOMPOSER_ENABLED: "true"
+  DECOMPOSITION_COMPLEXITY_THRESHOLD: "0.40"
+  # Semantic Bridge Configuration
+  # Enables cross-domain knowledge transfer for multi-tool queries
+  SEMANTIC_BRIDGE_ENABLED: "true"
+  CROSS_DOMAIN_TRANSFER_ENABLED: "true"
+  PATTERN_LEARNING_ENABLED: "true"
   # Vulcan Memory System v46 Configuration
   MILVUS_HOST: "milvus-service"
   MILVUS_PORT: "19530"

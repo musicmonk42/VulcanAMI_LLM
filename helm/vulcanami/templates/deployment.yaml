@@ -206,6 +206,43 @@ spec:
           value: {{ .Values.curiosityDriver.cycleTimeout | quote }}
         {{- end }}
         {{- end }}
+        {{- /* Reasoning System Configuration (Singleton Pattern) */}}
+        {{- if .Values.reasoning }}
+        - name: REASONING_PREWARM_SINGLETONS
+          value: {{ .Values.reasoning.prewarmSingletons | quote }}
+        {{- if .Values.reasoning.memoryGuard }}
+        {{- if .Values.reasoning.memoryGuard.enabled }}
+        - name: MEMORY_GUARD_ENABLED
+          value: "true"
+        - name: MEMORY_GUARD_THRESHOLD_PERCENT
+          value: {{ .Values.reasoning.memoryGuard.thresholdPercent | quote }}
+        - name: MEMORY_GUARD_CHECK_INTERVAL
+          value: {{ .Values.reasoning.memoryGuard.checkIntervalSeconds | quote }}
+        {{- end }}
+        {{- end }}
+        {{- if .Values.reasoning.gcRateLimiting }}
+        - name: GC_REQUEST_INTERVAL
+          value: {{ .Values.reasoning.gcRateLimiting.requestInterval | quote }}
+        {{- end }}
+        {{- if .Values.reasoning.problemDecomposer }}
+        {{- if .Values.reasoning.problemDecomposer.enabled }}
+        - name: PROBLEM_DECOMPOSER_ENABLED
+          value: "true"
+        - name: DECOMPOSITION_COMPLEXITY_THRESHOLD
+          value: {{ .Values.reasoning.problemDecomposer.complexityThreshold | quote }}
+        {{- end }}
+        {{- end }}
+        {{- if .Values.reasoning.semanticBridge }}
+        {{- if .Values.reasoning.semanticBridge.enabled }}
+        - name: SEMANTIC_BRIDGE_ENABLED
+          value: "true"
+        - name: CROSS_DOMAIN_TRANSFER_ENABLED
+          value: {{ .Values.reasoning.semanticBridge.crossDomainTransfer | quote }}
+        - name: PATTERN_LEARNING_ENABLED
+          value: {{ .Values.reasoning.semanticBridge.patternLearning | quote }}
+        {{- end }}
+        {{- end }}
+        {{- end }}
         {{- if .Values.memorySystem.enabled }}
         # Vulcan Memory System v46 AWS credentials
         {{- if .Values.secrets.awsAccessKeyId }}
