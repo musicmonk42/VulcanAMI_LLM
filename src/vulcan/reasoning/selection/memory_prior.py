@@ -295,12 +295,27 @@ class BayesianMemoryPrior:
         # CRITICAL FIX: Use RLock for better thread safety
         self.lock = threading.RLock()
 
-        # Initialize semantic tool matcher for query-based selection
+        # PERFORMANCE FIX: Use singleton semantic matcher to prevent
+        # repeated model loading that causes query routing degradation
+        # (469ms → 152,048ms over 15 queries)
         self.semantic_matcher = None
         if SEMANTIC_MATCHER_AVAILABLE:
             try:
-                self.semantic_matcher = SemanticToolMatcher()
-                logger.info("[BayesianMemoryPrior] Semantic tool matcher initialized")
+                from vulcan.reasoning.singletons import get_semantic_matcher
+                self.semantic_matcher = get_semantic_matcher()
+                if self.semantic_matcher is not None:
+                    logger.info("[BayesianMemoryPrior] Using cached semantic model from registry")
+                else:
+                    # Fallback to direct creation if singleton fails
+                    self.semantic_matcher = SemanticToolMatcher()
+                    logger.info("[BayesianMemoryPrior] Semantic tool matcher initialized (fallback)")
+            except ImportError:
+                # singletons module not available, fallback to direct creation
+                try:
+                    self.semantic_matcher = SemanticToolMatcher()
+                    logger.info("[BayesianMemoryPrior] Semantic tool matcher initialized (no singleton)")
+                except Exception as e:
+                    logger.warning(f"Failed to initialize semantic matcher: {e}")
             except Exception as e:
                 logger.warning(f"Failed to initialize semantic matcher: {e}")
 

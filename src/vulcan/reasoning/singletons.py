@@ -1,25 +1,64 @@
 """
-Global singletons for expensive components.
-Ensures components are created ONCE per process.
+Central singleton registry for reasoning components.
+All components that load ML models MUST use this registry.
 
 This module provides thread-safe singleton access to key reasoning components
 to prevent repeated initialization that causes:
 - "[ReasoningIntegration] Initialized" appearing multiple times
 - "Tool Selector initialized with 5 tools" appearing many times  
 - "Warm pool initialized with 5 tool pools" appearing repeatedly
+- "[BayesianMemoryPrior] Semantic tool matcher initialized" appearing repeatedly
+- "StochasticCostModel initialized" appearing repeatedly
+
+CRITICAL: Query routing degrades from 469ms to 152,048ms (324x slower) 
+because components are re-instantiated per-query instead of using singletons.
+Each instantiation loads ~300MB SentenceTransformer models that accumulate 
+without garbage collection.
 """
 
 import logging
 import threading
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 logger = logging.getLogger(__name__)
 
-# Module-level singletons
+# Global lock for singleton creation
+_lock = threading.Lock()
+_instances: dict = {}
+
+# Module-level singletons with individual locks for finer-grained concurrency
 _tool_selector: Optional[Any] = None
 _reasoning_integration: Optional[Any] = None
 _portfolio_executor: Optional[Any] = None
+_bayesian_prior: Optional[Any] = None
+_warm_pool: Optional[Any] = None
+_cost_model: Optional[Any] = None
+_semantic_matcher: Optional[Any] = None
+_problem_decomposer: Optional[Any] = None
+_semantic_bridge: Optional[Any] = None
 _singleton_lock = threading.Lock()
+
+
+def get_or_create(key: str, factory: Callable) -> Any:
+    """
+    Thread-safe singleton factory for arbitrary components.
+    
+    Args:
+        key: Unique key for the singleton
+        factory: Callable that creates the instance
+        
+    Returns:
+        The singleton instance, or None if factory fails
+    """
+    if key not in _instances:
+        with _lock:
+            if key not in _instances:
+                try:
+                    _instances[key] = factory()
+                except Exception as e:
+                    logger.error(f"[Singletons] Factory failed for '{key}': {e}")
+                    return None
+    return _instances.get(key)
 
 
 def get_tool_selector():
@@ -147,9 +186,350 @@ def reset_all() -> None:
     This will force components to be recreated on next access.
     """
     global _tool_selector, _reasoning_integration, _portfolio_executor
+    global _bayesian_prior, _warm_pool, _cost_model, _semantic_matcher
+    global _problem_decomposer
+    global _semantic_bridge
+    global _curiosity_engine
     
     with _singleton_lock:
         _tool_selector = None
         _reasoning_integration = None
         _portfolio_executor = None
+        _bayesian_prior = None
+        _warm_pool = None
+        _cost_model = None
+        _semantic_matcher = None
+        _problem_decomposer = None
+        _semantic_bridge = None
+        _curiosity_engine = None
+        _instances.clear()
         logger.info("[Singletons] All singletons reset")
+
+
+def get_bayesian_prior():
+    """
+    Get singleton BayesianMemoryPrior instance.
+    
+    Returns:
+        BayesianMemoryPrior instance (singleton).
+    """
+    global _bayesian_prior
+    
+    if _bayesian_prior is not None:
+        logger.debug("[Singletons] Returning cached BayesianMemoryPrior")
+        return _bayesian_prior
+    
+    with _singleton_lock:
+        if _bayesian_prior is not None:
+            return _bayesian_prior
+        
+        logger.info("[Singletons] Creating global BayesianMemoryPrior (ONCE)")
+        try:
+            from vulcan.reasoning.selection.memory_prior import BayesianMemoryPrior
+            _bayesian_prior = BayesianMemoryPrior()
+            logger.info("[Singletons] ✓ BayesianMemoryPrior created and cached")
+            return _bayesian_prior
+        except ImportError as e:
+            logger.warning(f"[Singletons] BayesianMemoryPrior not available: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"[Singletons] Failed to create BayesianMemoryPrior: {e}")
+            return None
+
+
+def get_warm_pool():
+    """
+    Get singleton WarmStartPool instance.
+    
+    Returns:
+        WarmStartPool instance (singleton).
+    """
+    global _warm_pool
+    
+    if _warm_pool is not None:
+        logger.debug("[Singletons] Returning cached WarmStartPool")
+        return _warm_pool
+    
+    with _singleton_lock:
+        if _warm_pool is not None:
+            return _warm_pool
+        
+        logger.info("[Singletons] Creating global WarmStartPool (ONCE)")
+        try:
+            from vulcan.reasoning.selection.warm_pool import WarmStartPool
+            _warm_pool = WarmStartPool()
+            logger.info("[Singletons] ✓ WarmStartPool created and cached")
+            return _warm_pool
+        except ImportError as e:
+            logger.warning(f"[Singletons] WarmStartPool not available: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"[Singletons] Failed to create WarmStartPool: {e}")
+            return None
+
+
+def get_cost_model():
+    """
+    Get singleton StochasticCostModel instance.
+    
+    Returns:
+        StochasticCostModel instance (singleton).
+    """
+    global _cost_model
+    
+    if _cost_model is not None:
+        logger.debug("[Singletons] Returning cached StochasticCostModel")
+        return _cost_model
+    
+    with _singleton_lock:
+        if _cost_model is not None:
+            return _cost_model
+        
+        logger.info("[Singletons] Creating global StochasticCostModel (ONCE)")
+        try:
+            from vulcan.reasoning.selection.tool_selector import StochasticCostModel
+            _cost_model = StochasticCostModel()
+            logger.info("[Singletons] ✓ StochasticCostModel created and cached")
+            return _cost_model
+        except ImportError as e:
+            logger.warning(f"[Singletons] StochasticCostModel not available: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"[Singletons] Failed to create StochasticCostModel: {e}")
+            return None
+
+
+def get_semantic_matcher():
+    """
+    Get singleton SemanticToolMatcher instance.
+    
+    Returns:
+        SemanticToolMatcher instance (singleton).
+    """
+    global _semantic_matcher
+    
+    if _semantic_matcher is not None:
+        logger.debug("[Singletons] Returning cached SemanticToolMatcher")
+        return _semantic_matcher
+    
+    with _singleton_lock:
+        if _semantic_matcher is not None:
+            return _semantic_matcher
+        
+        logger.info("[Singletons] Creating global SemanticToolMatcher (ONCE)")
+        try:
+            from vulcan.reasoning.selection.semantic_tool_matcher import SemanticToolMatcher
+            _semantic_matcher = SemanticToolMatcher()
+            logger.info("[Singletons] ✓ SemanticToolMatcher created and cached")
+            return _semantic_matcher
+        except ImportError as e:
+            logger.warning(f"[Singletons] SemanticToolMatcher not available: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"[Singletons] Failed to create SemanticToolMatcher: {e}")
+            return None
+
+
+def get_problem_decomposer():
+    """
+    Get singleton ProblemDecomposer instance.
+    
+    The ProblemDecomposer handles hierarchical problem breakdown for complex
+    queries (complexity >= 0.40). It uses multiple strategies:
+    - ExactDecomposition: Fast pattern matching
+    - SemanticDecomposition: Semantic-based decomposition
+    - StructuralDecomposition: Structural analysis
+    - AnalogicalDecomposition: Analogy-based
+    - SyntheticBridging: Synthetic bridging
+    - BruteForceSearch: Exhaustive search (last resort)
+    
+    Returns:
+        ProblemDecomposer instance (singleton).
+    """
+    global _problem_decomposer
+    
+    if _problem_decomposer is not None:
+        logger.debug("[Singletons] Returning cached ProblemDecomposer")
+        return _problem_decomposer
+    
+    with _singleton_lock:
+        if _problem_decomposer is not None:
+            return _problem_decomposer
+        
+        logger.info("[Singletons] Creating global ProblemDecomposer (ONCE)")
+        try:
+            from vulcan.problem_decomposer.decomposer_bootstrap import create_decomposer
+            _problem_decomposer = create_decomposer()
+            logger.info("[Singletons] ✓ ProblemDecomposer created and cached")
+            return _problem_decomposer
+        except ImportError as e:
+            logger.warning(f"[Singletons] ProblemDecomposer not available: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"[Singletons] Failed to create ProblemDecomposer: {e}")
+            return None
+
+
+def get_semantic_bridge():
+    """
+    Get singleton SemanticBridge instance.
+    
+    The SemanticBridge handles cross-domain knowledge transfer, enabling:
+    - Concept mapping across domains
+    - Transfer validation between domains
+    - Conflict resolution when domains disagree
+    - Learning from successful cross-domain transfers
+    
+    Returns:
+        SemanticBridge instance (singleton).
+    """
+    global _semantic_bridge
+    
+    if _semantic_bridge is not None:
+        logger.debug("[Singletons] Returning cached SemanticBridge")
+        return _semantic_bridge
+    
+    with _singleton_lock:
+        if _semantic_bridge is not None:
+            return _semantic_bridge
+        
+        logger.info("[Singletons] Creating global SemanticBridge (ONCE)")
+        try:
+            from vulcan.semantic_bridge import create_semantic_bridge
+            _semantic_bridge = create_semantic_bridge(
+                world_model=None,  # Will be injected if available
+                vulcan_memory=None,
+                config={
+                    'safety': {'max_risk_score': 0.8, 'require_validation': True},
+                    'transfer': {'full_transfer_threshold': 0.8, 'partial_transfer_threshold': 0.5},
+                }
+            )
+            logger.info("[Singletons] ✓ SemanticBridge created and cached")
+            return _semantic_bridge
+        except ImportError as e:
+            logger.warning(f"[Singletons] SemanticBridge not available: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"[Singletons] Failed to create SemanticBridge: {e}")
+            return None
+
+
+def prewarm_all():
+    """
+    Pre-initialize all singletons at startup.
+    Call from main.py or unified_platform.py during startup.
+    
+    This prevents the first query from triggering expensive model loading.
+    """
+    logger.info("[Singletons] Pre-warming all reasoning singletons...")
+    
+    results = initialize_all()
+    
+    # Also initialize the additional components
+    bp = get_bayesian_prior()
+    results['bayesian_prior'] = bp is not None
+    
+    wp = get_warm_pool()
+    results['warm_pool'] = wp is not None
+    
+    cm = get_cost_model()
+    results['cost_model'] = cm is not None
+    
+    sm = get_semantic_matcher()
+    results['semantic_matcher'] = sm is not None
+    
+    pd = get_problem_decomposer()
+    results['problem_decomposer'] = pd is not None
+    
+    sb = get_semantic_bridge()
+    results['semantic_bridge'] = sb is not None
+    
+    ce = get_curiosity_engine()
+    results['curiosity_engine'] = ce is not None
+    
+    success_count = sum(1 for v in results.values() if v)
+    logger.info(f"[Singletons] ✓ All singletons pre-warmed ({success_count}/{len(results)} initialized)")
+    
+    return results
+
+
+def cleanup():
+    """
+    Release all singletons. Call on shutdown.
+    
+    This clears all cached singletons to free memory.
+    """
+    reset_all()
+    logger.info("[Singletons] All singletons cleaned up")
+
+
+# ============================================
+# CURIOSITY ENGINE SINGLETON
+# ============================================
+
+_curiosity_engine: Optional[Any] = None
+_curiosity_engine_lock = threading.Lock()
+
+
+def get_curiosity_engine() -> Optional[Any]:
+    """
+    Get singleton CuriosityEngine instance.
+    
+    The CuriosityEngine is the main orchestrator for curiosity-driven learning,
+    including knowledge gap detection, experiment generation, and exploration
+    budget management.
+    
+    Returns:
+        CuriosityEngine instance (singleton), or None if unavailable.
+        
+    Note:
+        Returns None if CuriosityEngine is not available (e.g., missing numpy).
+        Always check the return value before using.
+    """
+    global _curiosity_engine
+    
+    # Check availability flag first
+    try:
+        from vulcan.curiosity_engine import CURIOSITY_ENGINE_AVAILABLE
+        if not CURIOSITY_ENGINE_AVAILABLE:
+            logger.debug("[Singletons] CuriosityEngine not available (dependencies missing)")
+            return None
+    except ImportError:
+        logger.debug("[Singletons] curiosity_engine module not importable")
+        return None
+    
+    if _curiosity_engine is not None:
+        logger.debug("[Singletons] Returning cached CuriosityEngine")
+        return _curiosity_engine
+    
+    with _curiosity_engine_lock:
+        if _curiosity_engine is not None:
+            return _curiosity_engine
+        
+        logger.info("[Singletons] Creating global CuriosityEngine (ONCE)")
+        try:
+            from vulcan.curiosity_engine import CuriosityEngine, get_curiosity_engine as ce_get
+            
+            # Try the factory function first (it may return a pre-existing instance)
+            if ce_get is not None:
+                engine = ce_get()
+                if engine is not None:
+                    _curiosity_engine = engine
+                    logger.info("[Singletons] ✓ CuriosityEngine obtained from factory")
+                    return _curiosity_engine
+            
+            # Otherwise create new instance
+            if CuriosityEngine is not None:
+                _curiosity_engine = CuriosityEngine()
+                logger.info("[Singletons] ✓ CuriosityEngine created and cached")
+                return _curiosity_engine
+            
+            logger.warning("[Singletons] CuriosityEngine class is None")
+            return None
+            
+        except ImportError as e:
+            logger.warning(f"[Singletons] CuriosityEngine import failed: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"[Singletons] Failed to create CuriosityEngine: {e}")
+            return None

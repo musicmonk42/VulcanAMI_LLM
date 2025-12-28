@@ -304,3 +304,32 @@ curiosityDriver:
   lowBudgetSleep: 120.0
   # Timeout for each learning cycle (seconds)
   cycleTimeout: 300.0
+
+# Reasoning System Configuration (Singleton Pattern)
+# Controls reasoning components initialization and behavior
+reasoning:
+  # Enable singleton prewarming at startup (recommended for production)
+  prewarmSingletons: true
+  # Enable memory guard for automatic GC when memory exceeds threshold
+  memoryGuard:
+    enabled: true
+    # Memory usage threshold (percent) to trigger GC
+    thresholdPercent: 85.0
+    # Check interval (seconds)
+    checkIntervalSeconds: 5.0
+  # GC rate limiting for chat endpoints
+  gcRateLimiting:
+    # Number of requests between GC triggers
+    requestInterval: 10
+  # Problem decomposition settings
+  problemDecomposer:
+    enabled: true
+    # Complexity threshold for using decomposition vs direct tool selection
+    complexityThreshold: 0.40
+  # Semantic bridge for cross-domain knowledge transfer
+  semanticBridge:
+    enabled: true
+    # Enable cross-domain transfer for multi-tool queries
+    crossDomainTransfer: true
+    # Enable pattern learning from successful outcomes
+    patternLearning: true
