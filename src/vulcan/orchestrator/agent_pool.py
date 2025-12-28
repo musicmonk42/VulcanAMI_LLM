@@ -1419,6 +1419,11 @@ class AgentPoolManager:
                 self._persist_state_to_redis()
 
                 logger.info(f"Agent {agent_id} terminated")
+        
+        # FIX: Agent Retirement Without Replacement
+        # Immediately ensure minimum agents after retirement to prevent pool shrinkage
+        # Previously cleanup only happened periodically, allowing pool to shrink
+        self._ensure_minimum_agents()
 
         return True
 

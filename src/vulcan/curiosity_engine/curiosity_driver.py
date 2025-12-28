@@ -378,6 +378,10 @@ def _run_cycle_wrapper(engine_state: Dict[str, Any]) -> Dict[str, Any]:
     import sys
 
     subprocess_logger = logging.getLogger(__name__)
+    
+    # FIX: Subprocess Logging Duplication - prevent propagation to parent loggers
+    # This prevents the same log from appearing twice (once from subprocess handler, once from root)
+    subprocess_logger.propagate = False
 
     # ISSUE #11 FIX: Configure subprocess logging to use stdout instead of stderr
     # Previously using default StreamHandler (stderr) caused subprocess logs to appear as errors
@@ -388,10 +392,10 @@ def _run_cycle_wrapper(engine_state: Dict[str, Any]) -> Dict[str, Any]:
     )
     handler.setFormatter(formatter)
 
-    # FIX: Avoid adding multiple handlers
-    if not subprocess_logger.handlers:
-        subprocess_logger.addHandler(handler)
-        subprocess_logger.setLevel(logging.INFO)
+    # FIX: Clear existing handlers and add fresh one to avoid duplication
+    subprocess_logger.handlers.clear()
+    subprocess_logger.addHandler(handler)
+    subprocess_logger.setLevel(logging.INFO)
 
     cycle_id = engine_state.get("cycle_id", 0)
     subprocess_logger.info(

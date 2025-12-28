@@ -1950,9 +1950,12 @@ class QueryAnalyzer:
         
         # Creative task support (Phase 2: Auto-inject introspection nodes)
         # FIX: Ensures introspection nodes are added to task graph for creative queries
+        # FIX: Raised complexity threshold from 0.3 to 0.5 to avoid over-complicating simple queries
         creative_count = sum(1 for ind in CREATIVE_INDICATORS if ind in query_lower)
         
-        if creative_count > 0 and plan and plan.complexity_score >= 0.3:
+        # FIX: Creative Task Over-Complexity - only inject introspection for truly complex creative tasks
+        # Require BOTH multiple creative indicators (>=2) AND higher complexity (>=0.5)
+        if creative_count >= 2 and plan and plan.complexity_score >= 0.5:
             logger.info(
                 f"[Creative Task] Detected {creative_count} creative indicators "
                 f"with complexity={plan.complexity_score:.2f}. Auto-injecting introspection nodes."

@@ -2063,9 +2063,17 @@ async def chat(request: ChatRequest):
                     query_id=routing_plan.query_id,
                 )
                 systems_used.append("governance_logger")
-                logger.info(
-                    f"[VULCAN] Governance logged for query {routing_plan.query_id}"
-                )
+                # FIX: Governance Logger Waste - reduce log noise for routine governance logging
+                # Only log at INFO level for high/critical sensitivity, DEBUG for routine
+                if routing_plan.governance_sensitivity.value in ("high", "critical"):
+                    logger.info(
+                        f"[VULCAN] Governance logged for query {routing_plan.query_id} "
+                        f"(sensitivity: {routing_plan.governance_sensitivity.value})"
+                    )
+                else:
+                    logger.debug(
+                        f"[VULCAN] Governance logged for query {routing_plan.query_id}"
+                    )
 
     except ImportError as e:
         logger.debug(f"[VULCAN] Routing layer not available: {e}")
@@ -4145,7 +4153,8 @@ async def unified_chat(request: UnifiedChatRequest):
                         query_id=routing_plan.query_id,
                     )
                     systems_used.append("governance_logger")
-                    logger.info(
+                    # FIX: Governance Logger Waste - reduce log noise for routine governance logging
+                    logger.debug(
                         f"[VULCAN/v1/chat] Governance logged for query {routing_plan.query_id}"
                     )
 
