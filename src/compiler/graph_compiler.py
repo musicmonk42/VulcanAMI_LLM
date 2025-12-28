@@ -1,5 +1,5 @@
 """
-Graph Compiler for Graphix IR
+Graph Compiler  Graphix IR
 Compiles JSON graph representations to optimized native machine code
 """
 
