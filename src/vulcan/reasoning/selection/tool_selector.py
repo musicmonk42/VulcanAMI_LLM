@@ -1217,8 +1217,13 @@ class ToolSelector:
                 config=config.get("warm_pool_config", {})
             )
             if self.warm_pool is None:
-                # Fallback: Create directly if singleton fails (should be rare)
-                logger.warning("WarmStartPool singleton unavailable, creating directly")
+                # Fallback: Create directly if singleton fails.
+                # Note: This may cause duplicate initialization if called multiple times,
+                # but is necessary for robustness when singletons module has issues.
+                logger.warning(
+                    "WarmStartPool singleton unavailable, creating instance directly. "
+                    "This may result in duplicate initialization if ToolSelector is created multiple times."
+                )
                 self.warm_pool = WarmStartPool(
                     tools=self.tools, config=config.get("warm_pool_config", {})
                 )

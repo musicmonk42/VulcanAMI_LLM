@@ -238,7 +238,12 @@ class VulcanGraphixBridge:
                 # instead of creating a new one to prevent multiple initialization.
                 # The WorldModel already creates MotivationalIntrospection during init.
                 if VULCAN_AVAILABLE:
-                    if hasattr(self.world_model, 'motivational_introspection') and self.world_model.motivational_introspection:
+                    # Check if WorldModel already has MotivationalIntrospection initialized
+                    wm_has_mi = (
+                        hasattr(self.world_model, 'motivational_introspection') 
+                        and self.world_model.motivational_introspection is not None
+                    )
+                    if wm_has_mi:
                         self.motivational_driver = self.world_model.motivational_introspection
                         logger.info(
                             "✓ VULCAN MotivationalIntrospection obtained from WorldModel (singleton)"

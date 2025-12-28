@@ -1514,6 +1514,11 @@ def create_runtime(**kwargs) -> AIRuntime:
     
     BUG FIX Issue #28: Use singleton to prevent duplicate OpenAI provider registration.
     The kwargs are only used on first creation.
+    
+    Note on resource management: The singleton runtime is designed to be long-lived
+    and should not be shutdown during normal operation. Resources are managed internally
+    by the AIRuntime class with connection pooling and automatic cleanup.
+    Call shutdown_runtime() only during application shutdown.
     """
     try:
         from vulcan.reasoning.singletons import get_ai_runtime
@@ -1529,9 +1534,11 @@ def create_runtime(**kwargs) -> AIRuntime:
 def quick_generate(
     prompt: str, model: str = "gpt-3.5-turbo", provider: str = "openai"
 ) -> str:
-    """Quick text generation helper using singleton runtime."""
+    """Quick text generation helper using singleton runtime.
+    
+    Note: Uses singleton runtime which should not be shutdown between calls.
+    """
     runtime = create_runtime()
-    # Don't shutdown singleton runtime
     task = AITask(
         operation=OperationType.GENERATE,
         provider=provider,
@@ -1550,9 +1557,11 @@ def quick_generate(
 def quick_embed(
     text: str, model: str = "text-embedding-ada-002", provider: str = "openai"
 ) -> List[float]:
-    """Quick embedding helper using singleton runtime."""
+    """Quick embedding helper using singleton runtime.
+    
+    Note: Uses singleton runtime which should not be shutdown between calls.
+    """
     runtime = create_runtime()
-    # Don't shutdown singleton runtime
     task = AITask(
         operation=OperationType.EMBED,
         provider=provider,
