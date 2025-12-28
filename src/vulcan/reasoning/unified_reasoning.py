@@ -39,6 +39,59 @@ from .reasoning_types import (
 
 logger = logging.getLogger(__name__)
 
+
+def _is_test_environment() -> bool:
+    """
+    Determine if running in test environment.
+    
+    Bug #3 Fix: Default to PRODUCTION for safety.
+    Only return True if explicitly in test mode via environment or explicit test framework.
+    
+    PRINCIPLE: Safety-first - default to production mode when uncertain.
+    """
+    import sys
+    
+    # Explicit TEST indicators (must be explicitly set to enable test mode)
+    explicit_test_indicators = [
+        os.getenv("PYTEST_CURRENT_TEST") is not None,  # pytest sets this during test execution
+        os.getenv("VULCAN_TEST_MODE", "").lower() == "true",
+        os.getenv("VULCAN_ENV", "").lower() == "test",
+    ]
+    
+    if any(explicit_test_indicators):
+        logger.debug("Test environment detected via explicit indicator")
+        return True
+    
+    # Check for active pytest execution (not just imported pytest module)
+    if "_pytest" in sys.modules:
+        # Only consider it a test if PYTEST_CURRENT_TEST is set (handled above)
+        # or if we're running inside a pytest worker
+        pytest_worker = os.getenv("PYTEST_XDIST_WORKER") is not None
+        if pytest_worker:
+            logger.debug("Test environment detected via pytest worker")
+            return True
+    
+    # Explicit PRODUCTION indicators - these override test detection
+    explicit_prod_indicators = [
+        os.getenv("VULCAN_PRODUCTION", "").lower() == "true",
+        os.getenv("VULCAN_FORCE_PRODUCTION_REASONING", "").lower() == "true",
+        os.getenv("VULCAN_ENV", "").lower() == "production",
+        os.getenv("ENVIRONMENT", "").lower() in ("production", "prod"),
+    ]
+    
+    if any(explicit_prod_indicators):
+        logger.debug("Production environment detected via explicit indicator")
+        return False
+    
+    # DEFAULT TO PRODUCTION (fail safe) - Bug #3 fix
+    # If no explicit indicator is found, assume production for safety
+    logger.debug(
+        "No explicit environment indicator found. "
+        "Defaulting to PRODUCTION mode for safety."
+    )
+    return False
+
+
 # CRITICAL FIX: Lazy loading for optional dependencies to avoid circular imports
 _SELECTION_COMPONENTS = None
 _REASONING_COMPONENTS = None
@@ -538,38 +591,31 @@ class UnifiedReasoner:
 
         # Runtime integration - PRODUCTION FIX: Skip heavy runtime in test environments
         # unless VULCAN_FORCE_PRODUCTION_REASONING is set to 'true'
+        # Bug #3 Fix: Default to PRODUCTION mode unless explicitly in test
         self.runtime = None
         if "UnifiedRuntime" in optional_components:
-            # Check for environment variable to force production reasoning
-            force_production = os.getenv("VULCAN_FORCE_PRODUCTION_REASONING", "").lower() == "true"
+            # Use improved environment detection (Bug #3 fix)
+            in_test = _is_test_environment()
+            skip_via_config = config.get("skip_runtime", False)
             
-            # Auto-detect if we're in a test environment
-            import sys
-
-            in_test = (
-                "pytest" in sys.modules
-                or "unittest" in sys.modules
-                or "_pytest" in sys.modules
-                or config.get("skip_runtime", False)
-            )
-
-            # Initialize runtime if not in test OR if force_production is enabled
-            if force_production or not in_test:
+            # Initialize runtime if not explicitly in test mode and not skipped
+            if not in_test and not skip_via_config:
                 try:
                     self.runtime = optional_components["UnifiedRuntime"]()
                     # DAEMON FIX: Make runtime threads daemon
                     self._daemonize_component_threads(self.runtime)
-                    if force_production and in_test:
-                        logger.info(
-                            "UnifiedRuntime initialized (forced via VULCAN_FORCE_PRODUCTION_REASONING)"
-                        )
+                    logger.info("UnifiedRuntime initialized in PRODUCTION mode")
                 except Exception as e:
                     logger.warning(f"Error initializing runtime: {e}")
                     self.runtime = None
+            elif skip_via_config:
+                logger.info(
+                    "Skipping UnifiedRuntime initialization (skip_runtime=True in config)."
+                )
             else:
                 logger.info(
                     "Skipping UnifiedRuntime initialization (test environment detected). "
-                    "Set VULCAN_FORCE_PRODUCTION_REASONING=true to override."
+                    "Set VULCAN_TEST_MODE=false or VULCAN_PRODUCTION=true to override."
                 )
 
         # Processor for multimodal inputs

@@ -564,8 +564,22 @@ class MultiModalReasoningEngine:
                         elapsed = time.perf_counter() - start
                         logger.error(f"Failed to load text model after {elapsed:.2f}s: {e}")
 
-    def register_modality_reasoner(self, modality: ModalityType, reasoner: Any):
-        """Register a reasoner for a specific modality"""
+    def register_modality_reasoner(self, modality: ModalityType, reasoner: Any) -> bool:
+        """Register a reasoner for a specific modality.
+        
+        Bug #5 Fix: Prevents duplicate registration of reasoners for the same modality.
+        
+        Returns:
+            True if registered, False if modality already has a reasoner (duplicate prevented)
+        """
+        # Bug #5 Fix: Check for existing registration to prevent memory leak
+        if modality in self.modality_reasoners:
+            logger.warning(
+                f"Reasoner for modality '{modality.value}' already registered - "
+                f"ignoring duplicate registration"
+            )
+            return False
+        
         self.modality_reasoners[modality] = reasoner
 
         # Initialize feature extractor if needed
@@ -573,6 +587,7 @@ class MultiModalReasoningEngine:
             self.feature_extractors[modality] = self._create_feature_extractor(modality)
 
         logger.info(f"Registered reasoner for modality {modality.value}")
+        return True
 
     # CRITICAL FIX: Add numpy-based attention fusion with numerical stability
     def attention_fusion_numpy(

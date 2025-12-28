@@ -323,11 +323,19 @@ class SafetyValidator:
 
 
 class ConsistencyChecker:
-    """Checks output consistency across tools"""
+    """Checks output consistency across tools with semantic comparison support.
+    
+    Bug #2 Fix: Instead of using exact equality comparison which fails on 
+    heterogeneous output types (dict vs list vs float), this checker now
+    normalizes outputs to text form and uses semantic/text-based comparison.
+    """
 
     def check_consistency(self, outputs: Dict[str, Any]) -> Tuple[bool, float, str]:
         """
-        Check if outputs from different tools are consistent
+        Check if outputs from different tools are consistent using semantic comparison.
+
+        Bug #2 Fix: Uses normalized text comparison for heterogeneous output types
+        instead of exact matching which always fails when tools return different types.
 
         Returns:
             (is_consistent, confidence, details)
@@ -355,10 +363,133 @@ class ConsistencyChecker:
             elif all(isinstance(v[1], str) for v in values):
                 return self._check_string_consistency(values)
             else:
-                return True, 0.3, "Mixed value types, cannot compare"
+                # Bug #2 Fix: Use semantic comparison for mixed types instead of failing
+                return self._check_semantic_consistency(values, outputs)
         except Exception as e:
             logger.error(f"Consistency check failed: {e}")
             return True, 0.5, f"Error: {str(e)}"
+
+    def _extract_answer_text(self, tool_name: str, output: Any) -> str:
+        """Extract the answer/conclusion as text from tool-specific output.
+        
+        Bug #2 Fix: Normalizes heterogeneous tool outputs to text form for comparison.
+        """
+        if output is None:
+            return ""
+        
+        # Handle string outputs directly
+        if isinstance(output, str):
+            return output
+        
+        # Handle dict outputs
+        if isinstance(output, dict):
+            # Try common keys for conclusions/answers
+            for key in ['answer', 'conclusion', 'result', 'output', 'response', 'text', 'value']:
+                if key in output:
+                    return str(output[key])
+            
+            # Tool-specific extraction
+            if tool_name == 'symbolic':
+                if 'proof' in output:
+                    return f"Valid: {output.get('valid', 'unknown')}, {output.get('conclusion', '')}"
+                return str(output.get('conclusion', output))
+            
+            elif tool_name == 'causal':
+                effects = output.get('effects', output.get('consequences', []))
+                if effects:
+                    return f"Effects: {', '.join(str(e) for e in effects[:5])}"
+                return str(output)
+            
+            elif tool_name == 'probabilistic':
+                if 'distribution' in output:
+                    return f"Most likely: {output.get('mode', output.get('mean', 'unknown'))}"
+                return str(output)
+            
+            elif tool_name == 'multimodal':
+                return str(output.get('fused_conclusion', output.get('result', output)))
+            
+            elif tool_name == 'analogical':
+                return str(output.get('mapped_conclusion', output.get('analogy', output)))
+            
+            # Fallback: convert dict to string
+            return str(output)
+        
+        # Handle list outputs
+        if isinstance(output, (list, tuple)):
+            if len(output) == 0:
+                return ""
+            # Take first element or join
+            if len(output) <= 3:
+                return "; ".join(str(x) for x in output)
+            return str(output[0])
+        
+        # Fallback
+        return str(output)
+
+    def _check_semantic_consistency(
+        self, values: List[Tuple[str, Any]], outputs: Dict[str, Any]
+    ) -> Tuple[bool, float, str]:
+        """Check consistency using semantic/text-based comparison for mixed types.
+        
+        Bug #2 Fix: Instead of failing on heterogeneous types, normalize all outputs
+        to text and compare using word overlap or simple heuristics.
+        """
+        try:
+            # Extract answer text from each tool
+            answers = {}
+            for tool_name, _ in values:
+                raw_output = outputs.get(tool_name)
+                answers[tool_name] = self._extract_answer_text(tool_name, raw_output)
+            
+            # Check if we have any answers to compare
+            if not answers or all(not a for a in answers.values()):
+                return True, 0.5, "No extractable answers for comparison"
+            
+            # Use text overlap for consistency check
+            all_words = []
+            tool_words = {}
+            
+            for tool, answer in answers.items():
+                # Tokenize: lowercase, split on whitespace and punctuation
+                words = set(answer.lower().split())
+                # Remove very short tokens
+                words = {w for w in words if len(w) > 2}
+                tool_words[tool] = words
+                all_words.extend(words)
+            
+            # Count word frequencies across all tools
+            from collections import Counter
+            word_counts = Counter(all_words)
+            
+            # Words appearing in at least half of the tools
+            num_tools = len(tool_words)
+            threshold = max(1, num_tools // 2)
+            common_words = {w for w, c in word_counts.items() if c >= threshold}
+            
+            # Calculate overlap score for each tool
+            overlaps = []
+            for tool, words in tool_words.items():
+                if words:
+                    overlap = len(words & common_words) / len(words)
+                    overlaps.append(overlap)
+                else:
+                    overlaps.append(0.0)
+            
+            avg_overlap = np.mean(overlaps) if overlaps else 0.0
+            
+            # Consistency threshold for text comparison (more lenient than exact match)
+            # Bug #2 Fix: 0.3 overlap is acceptable given tools produce different formats
+            has_consensus = avg_overlap >= 0.3
+            
+            if has_consensus:
+                return True, min(0.9, 0.5 + avg_overlap), f"Semantic consensus: {avg_overlap:.2f} word overlap"
+            else:
+                return False, avg_overlap, f"Low semantic consensus: {avg_overlap:.2f} overlap, {len(common_words)} common words"
+            
+        except Exception as e:
+            logger.warning(f"Semantic consistency check failed: {e}")
+            # Fail open for semantic check - mixed types shouldn't block execution
+            return True, 0.4, f"Semantic check error (allowing): {str(e)}"
 
     def _extract_comparable_value(self, output: Any) -> Any:
         """Extract comparable value from output"""
