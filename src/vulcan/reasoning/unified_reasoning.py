@@ -62,13 +62,13 @@ def _is_test_environment() -> bool:
         logger.debug("Test environment detected via explicit indicator")
         return True
     
-    # Check for active pytest execution (not just imported pytest module)
+    # Check for pytest-xdist parallel worker (separate from PYTEST_CURRENT_TEST check above)
+    # PYTEST_CURRENT_TEST is set during normal pytest runs, but pytest-xdist workers
+    # use a different environment variable
     if "_pytest" in sys.modules:
-        # Only consider it a test if PYTEST_CURRENT_TEST is set (handled above)
-        # or if we're running inside a pytest worker
         pytest_worker = os.getenv("PYTEST_XDIST_WORKER") is not None
         if pytest_worker:
-            logger.debug("Test environment detected via pytest worker")
+            logger.debug("Test environment detected via pytest-xdist worker")
             return True
     
     # Explicit PRODUCTION indicators - these override test detection

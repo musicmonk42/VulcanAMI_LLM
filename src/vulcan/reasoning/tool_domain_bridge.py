@@ -124,6 +124,29 @@ class ToolDomainBridge:
         self._domain_registry: Optional[Any] = None
         self._init_semantic_bridge()
     
+    @staticmethod
+    def _is_successful_transfer_result(result) -> bool:
+        """Check if a transfer result indicates success.
+        
+        Handles various result types from different transfer engine implementations.
+        
+        Args:
+            result: Transfer result object (TransferDecision, dict, or other)
+            
+        Returns:
+            True if the result indicates a successful transfer
+        """
+        if result is None:
+            return False
+        # Check for success attribute (TransferDecision objects)
+        if hasattr(result, 'success'):
+            return bool(result.success)
+        # Check for dict with success key
+        if isinstance(result, dict):
+            return result.get('success', False) or result.get('transferred', False)
+        # Non-None result without explicit failure assumed successful
+        return True
+    
     def _init_semantic_bridge(self):
         """Initialize SemanticBridge integration.
         
@@ -210,21 +233,8 @@ class ToolDomainBridge:
                         )
                         transfer_results.append(result)
                     
-                    # Robust success detection - handle various result types
-                    def is_successful_result(r) -> bool:
-                        """Check if a transfer result indicates success."""
-                        if r is None:
-                            return False
-                        # Check for success attribute (TransferDecision objects)
-                        if hasattr(r, 'success'):
-                            return bool(r.success)
-                        # Check for dict with success key
-                        if isinstance(r, dict):
-                            return r.get('success', False) or r.get('transferred', False)
-                        # Non-None result without explicit failure assumed successful
-                        return True
-                    
-                    successful = sum(1 for r in transfer_results if is_successful_result(r))
+                    # Use class method for robust success detection
+                    successful = sum(1 for r in transfer_results if self._is_successful_transfer_result(r))
                     
                     # Record the transfer
                     self.record_transfer(source_domain, target_domain, successful > 0, successful)
