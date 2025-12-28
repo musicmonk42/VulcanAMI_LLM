@@ -547,7 +547,7 @@ class DomainRegistry:
             if name in self.domains and not allow_update:
                 existing = self.domains[name]
                 # Check if this is a duplicate with different criticality
-                new_criticality = profile.criticality_score if profile else DomainCriticality.MEDIUM.value
+                new_criticality = profile.criticality_score if profile else None
                 if characteristics and "criticality" in characteristics:
                     criticality_map = {
                         "low": DomainCriticality.LOW.value,
@@ -560,7 +560,10 @@ class DomainRegistry:
                         DomainCriticality.MEDIUM.value,
                     )
                 
-                if abs(existing.criticality_score - new_criticality) > 0.01:
+                # BUG #8 FIX: Only warn if new_criticality is explicitly provided and differs
+                # If no criticality is specified (new_criticality is None), skip the warning
+                # This prevents noisy logs when semantic_bridge registers domains without criticality
+                if new_criticality is not None and abs(existing.criticality_score - new_criticality) > 0.01:
                     logger.warning(
                         "Domain '%s' already registered with criticality %.2f. "
                         "Rejecting duplicate with criticality %.2f. "
@@ -569,7 +572,7 @@ class DomainRegistry:
                     )
                 else:
                     logger.debug(
-                        "Domain '%s' already registered (same criticality) - skipping duplicate",
+                        "Domain '%s' already registered - skipping duplicate",
                         name
                     )
                 return False
