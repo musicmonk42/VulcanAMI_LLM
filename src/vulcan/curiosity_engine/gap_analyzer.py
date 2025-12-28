@@ -175,12 +175,18 @@ class Pattern:
 
 @dataclass
 class KnowledgeGap:
-    """Single knowledge gap representation"""
+    """Single knowledge gap representation
+    
+    Note:
+        The `severity` parameter is an alias for `priority` for backward compatibility.
+        If both are provided, `priority` takes precedence. If only `severity` is provided,
+        it will be used as the priority value.
+    """
 
     type: str  # Gap type
     domain: str
-    priority: float
-    estimated_cost: float
+    priority: float = 0.5  # Made optional with default for severity alias support
+    estimated_cost: float = 0.0  # Made optional with default for severity alias support
     missing_capability: Optional[str] = None
     gap_id: Optional[str] = None
     id: Optional[str] = None  # Alias for gap_id
@@ -190,9 +196,17 @@ class KnowledgeGap:
     complexity: float = 0.5
     dependencies: List[str] = field(default_factory=list)
     adjusted_roi: Optional[float] = None
+    # ISSUE FIX: Add severity as an alias for priority for backward compatibility
+    # This addresses the KnowledgeGap constructor bug where callers pass severity=
+    severity: Optional[float] = None  # Alias for priority
 
     def __post_init__(self):
-        """Generate ID if not provided"""
+        """Generate ID if not provided and handle severity alias"""
+        # ISSUE FIX: Handle severity as an alias for priority
+        # If severity is provided but priority is still at default, use severity as priority
+        if self.severity is not None and self.priority == 0.5:
+            self.priority = self.severity
+        
         if not self.gap_id and not self.id:
             # Generate unique ID
             content = f"{self.type}_{self.domain}_{self.timestamp}"
@@ -214,6 +228,7 @@ class KnowledgeGap:
             "type": self.type,
             "domain": self.domain,
             "priority": self.priority,
+            "severity": self.severity,  # Include severity alias in serialization
             "estimated_cost": self.estimated_cost,
             "missing_capability": self.missing_capability,
             "timestamp": self.timestamp,
