@@ -339,14 +339,32 @@ class ReasoningIntegration:
         """
         Initialize ToolSelector component with error handling.
 
+        PERFORMANCE FIX: Uses singleton from singletons.py to ensure ToolSelector
+        is created exactly ONCE per process. This prevents progressive query routing
+        degradation where each query creates new instances of:
+        - WarmStartPool ("Warm pool initialized with 5 tool pools")
+        - StochasticCostModel ("StochasticCostModel initialized")
+        - BayesianMemoryPrior with SemanticToolMatcher
+
         Returns:
             ToolSelector instance if successful, None otherwise.
         """
         try:
-            from vulcan.reasoning.selection.tool_selector import ToolSelector
+            # PERFORMANCE FIX: Use singleton instead of creating new instance
+            # This prevents "Tool Selector initialized with 5 tools" appearing
+            # multiple times and causing progressive routing time degradation
+            from vulcan.reasoning.singletons import get_tool_selector
 
+            selector = get_tool_selector()
+            if selector is not None:
+                logger.info(f"{LOG_PREFIX} ToolSelector obtained from singleton")
+                return selector
+
+            # Fallback: If singleton fails, try direct creation (should be rare)
+            logger.warning(f"{LOG_PREFIX} Singleton unavailable, creating ToolSelector directly")
+            from vulcan.reasoning.selection.tool_selector import ToolSelector
             selector = ToolSelector(self._config.get("tool_selector_config", {}))
-            logger.info(f"{LOG_PREFIX} ToolSelector initialized successfully")
+            logger.info(f"{LOG_PREFIX} ToolSelector initialized successfully (fallback)")
             return selector
 
         except ImportError as e:

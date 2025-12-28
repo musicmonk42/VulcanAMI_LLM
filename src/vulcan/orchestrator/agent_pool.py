@@ -13,6 +13,7 @@
 # ============================================================
 
 import asyncio
+import gc
 import heapq
 import json
 import logging
@@ -1684,6 +1685,12 @@ class AgentPoolManager:
         except Exception as e:
             logger.error(f"Agent {agent_id} job {job_id} FAILED: {e}")
             self._handle_task_failure(agent_id, job_id, e)
+        finally:
+            # PERFORMANCE FIX: Force garbage collection after job completion
+            # to clean up heavy objects that may have leaked (e.g., from reasoning
+            # components like ToolSelector, SemanticToolMatcher)
+            # This addresses the progressive query routing degradation issue
+            gc.collect()
 
     def _assign_agent_with_timeout(
         self, capability: AgentCapability, timeout_seconds: float
