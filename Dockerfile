@@ -87,7 +87,7 @@ RUN apt-get update && \
 
 # Upgrade pip and setuptools to latest versions
 # hadolint ignore=DL3013
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+RUN pip install --no-cache-dir --root-user-action=ignore --upgrade pip setuptools wheel
 
 # Copy requirement files
 # requirements.txt is the human-friendly file
@@ -111,17 +111,17 @@ COPY setup.py ./setup.py
 # Check if the file exists, is non-empty, and contains actual package entries (not just comments)
 RUN if [ -f requirements-hashed.txt ] && grep -qE '^[^#]' requirements-hashed.txt; then \
         echo "Using hashed dependency verification (requirements-hashed.txt)"; \
-        pip install --no-cache-dir --require-hashes -r requirements-hashed.txt; \
+        pip install --no-cache-dir --root-user-action=ignore --require-hashes -r requirements-hashed.txt; \
     else \
         echo "WARNING: requirements-hashed.txt not found or empty - using unhashed install (NOT RECOMMENDED FOR PRODUCTION)"; \
         echo "For production builds, generate requirements-hashed.txt with: pip-compile --generate-hashes requirements.txt"; \
-        pip install --no-cache-dir -r requirements.txt; \
+        pip install --no-cache-dir --root-user-action=ignore -r requirements.txt; \
     fi
 
 # Optional: Generate CycloneDX SBOM (can be skipped by removing lines)
 # This gives you an sbom.json artifact for compliance / scanning.
 # hadolint ignore=DL3013,SC2015
-RUN pip install --no-cache-dir cyclonedx-bom && \
+RUN pip install --no-cache-dir --root-user-action=ignore cyclonedx-bom && \
     cyclonedx-py requirements requirements.txt -o sbom.json || (echo "CycloneDX generation failed (continuing)"; touch sbom.json)
 
 # Copy application source (builder keeps full code to run compile step)
@@ -139,7 +139,7 @@ COPY demos/ ./demos/
 # Install local package (graphix) if setup.py exists
 RUN if [ -f setup.py ]; then \
         echo "Installing local package from setup.py"; \
-        pip install --no-cache-dir -e .; \
+        pip install --no-cache-dir --root-user-action=ignore -e .; \
     fi
 
 # Download spacy language model if spacy is installed
