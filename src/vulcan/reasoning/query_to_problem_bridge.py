@@ -236,11 +236,11 @@ class QueryToProblemBridge:
         """
         Generate a unique problem ID from the query.
         
-        Uses full MD5 hash for better collision resistance.
-        With full 32 hex chars, collision probability is negligible.
+        Uses SHA-256 hash for better collision resistance and security.
+        Full 64 hex chars ensures collision probability is negligible.
         """
-        # Use full MD5 hash for better collision resistance
-        hash_val = hashlib.md5(query.encode(), usedforsecurity=False).hexdigest()
+        # Use SHA-256 for better collision resistance
+        hash_val = hashlib.sha256(query.encode()).hexdigest()
         return f"query_{hash_val}"
     
     def _score_to_complexity_name(self, score: float) -> str:

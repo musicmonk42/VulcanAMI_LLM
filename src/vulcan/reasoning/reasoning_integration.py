@@ -1602,9 +1602,13 @@ class ReasoningIntegration:
             
             # Create pattern outcome for learning
             from vulcan.semantic_bridge import PatternOutcome
+            import hashlib
+            
+            # Use deterministic SHA-256 hash for pattern ID (hash() is not deterministic across runs)
+            pattern_hash = hashlib.sha256(query.encode()).hexdigest()[:8]
             
             outcome = PatternOutcome(
-                pattern_id=f"query_{hash(query) % 10000:04d}",
+                pattern_id=f"query_{pattern_hash}",
                 success=success,
                 domain=primary_domain,
                 execution_time=execution_time,

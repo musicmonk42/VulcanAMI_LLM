@@ -3728,6 +3728,10 @@ SLOW_REQUEST_THRESHOLD_MS = 5000  # Include timing breakdown for requests slower
 
 # MEMORY MANAGEMENT: GC thresholds
 GC_SIGNIFICANT_CLEANUP_THRESHOLD = 100  # Log GC if collected more than this many objects
+GC_REQUEST_INTERVAL = 10  # Only trigger GC every N requests to reduce overhead
+
+# Request counter for rate-limited GC (thread-safe via GIL for simple increment)
+_gc_request_counter = 0
 
 # REASONING OUTPUT FORMATTING: Limits for formatting reasoning results
 # These prevent context overflow while keeping meaningful output
@@ -5325,19 +5329,26 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
         # MEMORY MANAGEMENT: Trigger garbage collection to prevent memory accumulation
         # This prevents progressive query routing degradation (469ms → 152,048ms)
         # caused by repeated SentenceTransformer model loading without cleanup.
+        # Rate-limited to every GC_REQUEST_INTERVAL requests to reduce overhead.
         # ================================================================
-        async def _post_request_gc():
-            """Background task to trigger garbage collection after request."""
-            try:
-                import gc
-                collected = gc.collect()
-                if collected > GC_SIGNIFICANT_CLEANUP_THRESHOLD:
-                    logger.debug(f"[VULCAN/v1/chat] Post-request GC collected {collected} objects")
-            except Exception:
-                pass  # Don't let GC errors affect the response
+        global _gc_request_counter
+        _gc_request_counter += 1
         
-        # Schedule GC as a background task (non-blocking)
-        asyncio.create_task(_post_request_gc())
+        if _gc_request_counter >= GC_REQUEST_INTERVAL:
+            _gc_request_counter = 0  # Reset counter
+            
+            async def _post_request_gc():
+                """Background task to trigger garbage collection after request."""
+                try:
+                    import gc
+                    collected = gc.collect()
+                    if collected > GC_SIGNIFICANT_CLEANUP_THRESHOLD:
+                        logger.debug(f"[VULCAN/v1/chat] Post-request GC collected {collected} objects")
+                except Exception:
+                    pass  # Don't let GC errors affect the response
+            
+            # Schedule GC as a background task (non-blocking)
+            asyncio.create_task(_post_request_gc())
 
         return {
             "response": response_text,
