@@ -3726,6 +3726,11 @@ CHARS_PER_TOKEN_ESTIMATE = 3  # Conservative estimate for token calculation
 SLOW_PHASE_THRESHOLD_MS = 1000  # Log warning if phase takes longer than this
 SLOW_REQUEST_THRESHOLD_MS = 5000  # Include timing breakdown for requests slower than this
 
+# ISSUE #35 FIX: Outcome status thresholds
+# Used to determine if a successful query should be marked as "slow" for learning
+SLOW_ROUTING_OUTCOME_THRESHOLD_MS = 10000  # 10 seconds - flag slow routing
+SLOW_TOTAL_OUTCOME_THRESHOLD_MS = 30000  # 30 seconds - flag slow total time
+
 # MEMORY MANAGEMENT: GC thresholds
 GC_SIGNIFICANT_CLEANUP_THRESHOLD = 100  # Log GC if collected more than this many objects
 GC_REQUEST_INTERVAL = 10  # Only trigger GC every N requests to reduce overhead
@@ -5312,12 +5317,9 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
             # ISSUE #35 FIX: Determine status based on execution time thresholds
             # Queries that take >10s for routing OR >30s total should be marked "slow"
             # not "success" to enable learning system to identify performance issues
-            SLOW_ROUTING_THRESHOLD_MS = 10000  # 10 seconds
-            SLOW_TOTAL_THRESHOLD_MS = 30000  # 30 seconds
-            
-            if routing_time_ms > SLOW_ROUTING_THRESHOLD_MS:
+            if routing_time_ms > SLOW_ROUTING_OUTCOME_THRESHOLD_MS:
                 outcome_status = "slow"
-            elif float(latency_ms) > SLOW_TOTAL_THRESHOLD_MS:
+            elif latency_ms > SLOW_TOTAL_OUTCOME_THRESHOLD_MS:
                 outcome_status = "slow"
             else:
                 outcome_status = "success"
@@ -5327,7 +5329,7 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
                 query_id=routing_stats.get("query_id", f"q_{int(time.time())}"),
                 status=outcome_status,
                 routing_ms=routing_time_ms,
-                total_ms=float(latency_ms),
+                total_ms=latency_ms,
                 complexity=routing_stats.get("complexity_score", 0.0),
                 query_type=routing_stats.get("query_type", "general"),
                 tools=selected_tools,
