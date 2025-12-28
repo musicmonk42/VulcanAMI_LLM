@@ -173,19 +173,39 @@ class Pattern:
             return 0.0
 
 
+# Default priority value for KnowledgeGap - used in severity alias comparison
+_DEFAULT_PRIORITY = 0.5
+
+
 @dataclass
 class KnowledgeGap:
     """Single knowledge gap representation
     
-    Note:
-        The `severity` parameter is an alias for `priority` for backward compatibility.
-        If both are provided, `priority` takes precedence unless priority equals the
-        default value (0.5), in which case severity will be used.
+    Attributes:
+        type: The type of knowledge gap (e.g., "decomposition", "causal", "transfer")
+        domain: The domain area of the gap
+        priority: Priority level (0.0 to 1.0), defaults to 0.5
+        estimated_cost: Estimated cost to address the gap, defaults to 0.0
+        severity: Optional alias for priority. When provided:
+            - If priority is at its default (0.5), severity value is used as priority
+            - If priority was explicitly set to a non-default value, it takes precedence
+            - After __post_init__, severity is always synced to match the final priority value
+    
+    Example:
+        >>> # Using priority directly
+        >>> gap1 = KnowledgeGap(type="causal", domain="physics", priority=0.8, estimated_cost=10.0)
+        >>> gap1.priority  # 0.8
+        >>> gap1.severity  # None
+        >>> 
+        >>> # Using severity as alias
+        >>> gap2 = KnowledgeGap(type="causal", domain="physics", severity=0.7, estimated_cost=10.0)
+        >>> gap2.priority  # 0.7 (from severity)
+        >>> gap2.severity  # 0.7 (synced to priority)
     """
 
     type: str  # Gap type
     domain: str
-    priority: float = 0.5  # Default priority value
+    priority: float = _DEFAULT_PRIORITY
     estimated_cost: float = 0.0  # Default to 0.0 for backward compatibility
     missing_capability: Optional[str] = None
     gap_id: Optional[str] = None
@@ -205,7 +225,7 @@ class KnowledgeGap:
         # ISSUE FIX: Handle severity as an alias for priority
         # If severity is provided and priority is at default, use severity
         if self.severity is not None:
-            if self.priority == 0.5:  # Default value - use severity
+            if self.priority == _DEFAULT_PRIORITY:
                 self.priority = self.severity
             # Sync severity to match priority for consistency in serialization
             self.severity = self.priority
