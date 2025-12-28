@@ -246,6 +246,10 @@ class ProductionDeployment:
         try:
             # Import modules with error handling
             components = self._import_components()
+            
+            # Store components for external access (e.g., CuriosityEngine)
+            # This enables full_platform.py to access curiosity_engine directly
+            self._components = components
 
             # Create dependencies
             deps = self._create_dependencies(components)
@@ -276,6 +280,45 @@ class ProductionDeployment:
         except Exception as e:
             logger.error(f"Failed to initialize system: {e}", exc_info=True)
             raise
+    
+    @property
+    def curiosity_engine(self):
+        """
+        Get the CuriosityEngine instance.
+        
+        This property provides access to the CuriosityEngine for the 
+        CuriosityDriver initialization in full_platform.py.
+        
+        Returns:
+            CuriosityEngine instance or None if not available
+        """
+        if hasattr(self, '_components') and self._components:
+            return self._components.get("curiosity_engine")
+        return None
+    
+    @property
+    def problem_decomposer(self):
+        """
+        Get the ProblemDecomposer instance.
+        
+        Returns:
+            ProblemDecomposer instance or None if not available
+        """
+        if hasattr(self, '_components') and self._components:
+            return self._components.get("problem_decomposer")
+        return None
+    
+    @property
+    def semantic_bridge(self):
+        """
+        Get the SemanticBridge instance.
+        
+        Returns:
+            SemanticBridge instance or None if not available
+        """
+        if hasattr(self, '_components') and self._components:
+            return self._components.get("semantic_bridge")
+        return None
 
     def _load_reasoners(self, components: Dict[str, Any]):
         """Loads all available reasoning components with lazy imports and error handling."""

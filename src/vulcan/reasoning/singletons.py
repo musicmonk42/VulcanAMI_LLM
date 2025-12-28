@@ -189,6 +189,7 @@ def reset_all() -> None:
     global _bayesian_prior, _warm_pool, _cost_model, _semantic_matcher
     global _problem_decomposer
     global _semantic_bridge
+    global _curiosity_engine
     
     with _singleton_lock:
         _tool_selector = None
@@ -200,6 +201,7 @@ def reset_all() -> None:
         _semantic_matcher = None
         _problem_decomposer = None
         _semantic_bridge = None
+        _curiosity_engine = None
         _instances.clear()
         logger.info("[Singletons] All singletons reset")
 
@@ -442,6 +444,9 @@ def prewarm_all():
     sb = get_semantic_bridge()
     results['semantic_bridge'] = sb is not None
     
+    ce = get_curiosity_engine()
+    results['curiosity_engine'] = ce is not None
+    
     success_count = sum(1 for v in results.values() if v)
     logger.info(f"[Singletons] ✓ All singletons pre-warmed ({success_count}/{len(results)} initialized)")
     
@@ -456,3 +461,75 @@ def cleanup():
     """
     reset_all()
     logger.info("[Singletons] All singletons cleaned up")
+
+
+# ============================================
+# CURIOSITY ENGINE SINGLETON
+# ============================================
+
+_curiosity_engine: Optional[Any] = None
+_curiosity_engine_lock = threading.Lock()
+
+
+def get_curiosity_engine() -> Optional[Any]:
+    """
+    Get singleton CuriosityEngine instance.
+    
+    The CuriosityEngine is the main orchestrator for curiosity-driven learning,
+    including knowledge gap detection, experiment generation, and exploration
+    budget management.
+    
+    Returns:
+        CuriosityEngine instance (singleton), or None if unavailable.
+        
+    Note:
+        Returns None if CuriosityEngine is not available (e.g., missing numpy).
+        Always check the return value before using.
+    """
+    global _curiosity_engine
+    
+    # Check availability flag first
+    try:
+        from vulcan.curiosity_engine import CURIOSITY_ENGINE_AVAILABLE
+        if not CURIOSITY_ENGINE_AVAILABLE:
+            logger.debug("[Singletons] CuriosityEngine not available (dependencies missing)")
+            return None
+    except ImportError:
+        logger.debug("[Singletons] curiosity_engine module not importable")
+        return None
+    
+    if _curiosity_engine is not None:
+        logger.debug("[Singletons] Returning cached CuriosityEngine")
+        return _curiosity_engine
+    
+    with _curiosity_engine_lock:
+        if _curiosity_engine is not None:
+            return _curiosity_engine
+        
+        logger.info("[Singletons] Creating global CuriosityEngine (ONCE)")
+        try:
+            from vulcan.curiosity_engine import CuriosityEngine, get_curiosity_engine as ce_get
+            
+            # Try the factory function first (it may return a pre-existing instance)
+            if ce_get is not None:
+                engine = ce_get()
+                if engine is not None:
+                    _curiosity_engine = engine
+                    logger.info("[Singletons] ✓ CuriosityEngine obtained from factory")
+                    return _curiosity_engine
+            
+            # Otherwise create new instance
+            if CuriosityEngine is not None:
+                _curiosity_engine = CuriosityEngine()
+                logger.info("[Singletons] ✓ CuriosityEngine created and cached")
+                return _curiosity_engine
+            
+            logger.warning("[Singletons] CuriosityEngine class is None")
+            return None
+            
+        except ImportError as e:
+            logger.warning(f"[Singletons] CuriosityEngine import failed: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"[Singletons] Failed to create CuriosityEngine: {e}")
+            return None

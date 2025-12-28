@@ -16,6 +16,7 @@ Architecture:
 """
 
 import logging
+import threading
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 logger = logging.getLogger(__name__)
@@ -95,6 +96,7 @@ class ToolDomainBridge:
         self.logger = logging.getLogger(f"{__name__}.ToolDomainBridge")
         self._transfer_history: List[Dict[str, Any]] = []
         self._max_history = 100
+        self._history_lock = threading.Lock()  # Thread safety for transfer history
     
     def get_domains_for_tools(self, tools: List[str]) -> Set[str]:
         """
@@ -362,11 +364,12 @@ class ToolDomainBridge:
             'timestamp': time.time(),
         }
         
-        self._transfer_history.append(record)
-        
-        # Trim history if needed
-        if len(self._transfer_history) > self._max_history:
-            self._transfer_history = self._transfer_history[-self._max_history:]
+        with self._history_lock:
+            self._transfer_history.append(record)
+            
+            # Trim history if needed
+            if len(self._transfer_history) > self._max_history:
+                self._transfer_history = self._transfer_history[-self._max_history:]
     
     def get_transfer_statistics(self) -> Dict[str, Any]:
         """
@@ -375,17 +378,21 @@ class ToolDomainBridge:
         Returns:
             Dictionary with transfer statistics
         """
-        if not self._transfer_history:
-            return {
-                'total_transfers': 0,
-                'successful': 0,
-                'failed': 0,
-                'success_rate': 0.0,
-            }
+        with self._history_lock:
+            if not self._transfer_history:
+                return {
+                    'total_transfers': 0,
+                    'successful': 0,
+                    'failed': 0,
+                    'success_rate': 0.0,
+                }
+            
+            # Create a snapshot of history for thread-safe iteration
+            history_snapshot = list(self._transfer_history)
         
-        successful = sum(1 for t in self._transfer_history if t['success'])
-        total = len(self._transfer_history)
-        total_concepts = sum(t['concepts'] for t in self._transfer_history)
+        successful = sum(1 for t in history_snapshot if t['success'])
+        total = len(history_snapshot)
+        total_concepts = sum(t['concepts'] for t in history_snapshot)
         
         return {
             'total_transfers': total,

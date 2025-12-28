@@ -1484,6 +1484,13 @@ class ReasoningIntegration:
                         )
                         
                         if not compatibility.is_compatible():
+                            # Log why transfer was rejected for debugging
+                            concept_id = getattr(concept, 'concept_id', str(concept)[:20])
+                            logger.debug(
+                                f"{LOG_PREFIX} Transfer rejected for {concept_id}: "
+                                f"score={compatibility.compatibility_score:.2f}, "
+                                f"risks={compatibility.risks}"
+                            )
                             continue
                         
                         # Execute transfer
