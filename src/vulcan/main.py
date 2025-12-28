@@ -983,6 +983,19 @@ async def lifespan(app: FastAPI):
     else:
         logger.info("BERT model loading skipped (SKIP_BERT_EMBEDDINGS=true)")
 
+    # PERFORMANCE FIX (Phase 3): Preload SentenceTransformer via global model registry
+    # This ensures the model is loaded exactly ONCE per process and shared across all components
+    # Must be done BEFORE ReasoningIntegration preload to avoid duplicate loads
+    try:
+        from vulcan.models import model_registry
+        model_registry.preload_all_models()
+        stats = model_registry.get_cache_stats()
+        logger.info(f"✓ Model Registry preloaded: {stats['models_cached']} models cached ({stats['model_keys']})")
+    except ImportError as e:
+        logger.debug(f"Model registry module not available for preload: {e}")
+    except Exception as e:
+        logger.warning(f"Model registry preload failed (models will load lazily): {e}")
+
     # PERFORMANCE FIX (Issue #55/#56): Preload ReasoningIntegration and embedding models at startup
     # This prevents the first query from taking 60+ seconds to load all models
     try:

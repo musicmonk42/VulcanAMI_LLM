@@ -846,7 +846,22 @@ class HierarchicalMemory(BaseMemorySystem):
         }
 
     def _init_embedding_model(self, model_name: Optional[str] = None):
-        """Initialize the embedding model with fallback options."""
+        """Initialize the embedding model with fallback options.
+        
+        PERFORMANCE FIX: Uses global model registry to ensure SentenceTransformer
+        is loaded exactly ONCE per process and shared across all components.
+        """
+        # First, try to use global model registry (process-wide singleton)
+        try:
+            from vulcan.models.model_registry import get_sentence_transformer
+            model = get_sentence_transformer(model_name or "all-MiniLM-L6-v2")
+            if model is not None:
+                logger.info(f"[HierarchicalMemory] Using model from global registry")
+                return model
+        except ImportError:
+            logger.debug("[HierarchicalMemory] Model registry not available")
+        
+        # Fallback to direct loading
         if SENTENCE_TRANSFORMERS_AVAILABLE:
             if model_name is None:
                 # Use a lightweight but effective model by default
@@ -855,7 +870,7 @@ class HierarchicalMemory(BaseMemorySystem):
             try:
                 # Try to load the specified model
                 model = SentenceTransformer(model_name)
-                logger.info(f"Loaded embedding model: {model_name}")
+                logger.info(f"Loaded embedding model: {model_name} (fallback)")
                 return model
             except Exception as e:
                 logger.warning(f"Failed to load {model_name}: {e}")
