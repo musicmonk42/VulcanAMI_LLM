@@ -47,13 +47,29 @@ NON_CRITICAL_VIOLATION_TYPES = frozenset({
     'rate_limited',
 })
 
+# ==============================================================================
+# BUG #2 FIX: Complementary Reasoning Paradigms
+# ==============================================================================
+# Different reasoning paradigms (causal, symbolic, probabilistic, analogical, 
+# multimodal) are COMPLEMENTARY, not redundant. They produce different outputs
+# BY DESIGN - they're different approaches to solving problems.
+#
+# Checking "consensus" across these paradigms is WRONG - they SHOULD differ.
+# Only check consistency for same-type tools (e.g., two causal reasoners).
+COMPLEMENTARY_REASONING_TOOLS = frozenset({
+    'causal', 'symbolic', 'probabilistic', 'analogical', 'multimodal',
+    'neural', 'deductive', 'inductive', 'abductive'
+})
+
 # Tools that can legitimately produce inconsistent outputs due to their nature
-# Issue #54: Causal reasoning explores different causal paths which may produce different results
+# (This is now a subset - ALL complementary tools are expected to differ)
 TOOLS_WITH_EXPECTED_INCONSISTENCY = frozenset({
     'causal',
     'probabilistic',  # Probabilistic reasoning may have variance
     'analogical',     # Analogies may map differently
     'neural',         # Neural reasoning may have stochasticity
+    'symbolic',       # Different proof paths
+    'multimodal',     # Different modality combinations
 })
 
 # =============================================================================
@@ -1041,8 +1057,9 @@ class SafetyGovernor:
         Critical violations include security breaches, harmful content, and
         violations where the tool's contract requires CRITICAL safety level.
         
-        Issue #54: Tools that legitimately produce varying outputs (like causal reasoning
-        exploring different causal paths) should not be blocked for inconsistent_output.
+        BUG #2 FIX: Different reasoning paradigms (causal, symbolic, etc.) are
+        COMPLEMENTARY, not redundant. They SHOULD produce different outputs.
+        Inconsistent_output is NEVER critical when comparing different paradigms.
         
         Args:
             tool: The tool name being checked
@@ -1051,11 +1068,15 @@ class SafetyGovernor:
         Returns:
             True if the violation is critical, False otherwise
         """
-        # Issue #54: Don't treat inconsistent_output as critical for tools that 
-        # legitimately produce varying outputs (causal, probabilistic, etc.)
-        if 'inconsistent' in violation_type and tool in TOOLS_WITH_EXPECTED_INCONSISTENCY:
-            logger.info(f"[SafetyGovernor] Allowing inconsistent output for {tool} (expected for this tool type)")
-            return False
+        # BUG #2 FIX: Inconsistent output is NEVER critical for complementary reasoning tools
+        # Different paradigms SHOULD produce different outputs - that's by design
+        if 'inconsistent' in violation_type:
+            if tool in COMPLEMENTARY_REASONING_TOOLS:
+                logger.debug(f"[SafetyGovernor] Ignoring inconsistency for {tool} (complementary reasoning paradigm)")
+                return False
+            if tool in TOOLS_WITH_EXPECTED_INCONSISTENCY:
+                logger.debug(f"[SafetyGovernor] Allowing inconsistent output for {tool} (expected variance)")
+                return False
         
         # Check contract safety level
         if tool in self.contracts:
@@ -1112,20 +1133,54 @@ class SafetyGovernor:
             return False, f"Validation error: {str(e)}"
 
     def check_consensus(self, outputs: Dict[str, Any]) -> Tuple[bool, float, str]:
-        """Check consensus among multiple tool outputs"""
+        """Check consensus among multiple tool outputs.
+        
+        BUG #2 FIX: Different reasoning paradigms (causal, symbolic, probabilistic,
+        analogical, multimodal) are COMPLEMENTARY, not redundant. They SHOULD 
+        produce different outputs - that's by design. Only check consistency for
+        same-type tools (e.g., two causal reasoners).
+        """
 
         try:
+            tool_names = list(outputs.keys())
+            
+            # BUG #2 FIX: If all tools are different reasoning paradigms, skip consensus check
+            reasoning_tools = [t for t in tool_names if t in COMPLEMENTARY_REASONING_TOOLS]
+            
+            if len(reasoning_tools) == len(tool_names) and len(set(reasoning_tools)) == len(reasoning_tools):
+                # All tools are different reasoning types - no consistency expected
+                logger.debug(f"[Safety] Skipping consistency check: {tool_names} are complementary paradigms")
+                return True, 0.8, "complementary_paradigms"
+            
+            # Check if any tool is in the expected inconsistency set
+            if any(tool in TOOLS_WITH_EXPECTED_INCONSISTENCY for tool in tool_names):
+                # At least one tool may produce different results - be lenient
+                logger.debug(f"[Safety] Lenient consensus check: {tool_names} includes tools with expected variance")
+                return True, 0.7, "expected_variance"
+            
+            # Only check consistency if we have duplicate tool types
             is_consistent, confidence, details = (
                 self.consistency_checker.check_consistency(outputs)
             )
 
+            # Even if inconsistent, DON'T record as violation for complementary tools
             if not is_consistent and confidence < self.veto_threshold:
-                # Record inconsistency violation
-                with self.lock:
-                    for tool_name in outputs.keys():
-                        self._record_violation(
-                            tool_name, VetoReason.INCONSISTENT_OUTPUT, details
-                        )
+                # Only record violation for same-type tools
+                tool_types = set()
+                for tool_name in outputs.keys():
+                    base_type = tool_name.split('_')[0]
+                    tool_types.add(base_type)
+                
+                # If all different types, don't record violation
+                if len(tool_types) < len(outputs):
+                    # We have duplicate types - record violation
+                    with self.lock:
+                        for tool_name in outputs.keys():
+                            self._record_violation(
+                                tool_name, VetoReason.INCONSISTENT_OUTPUT, details
+                            )
+                else:
+                    logger.info(f"[Safety] Not recording inconsistency - different tool types: {tool_types}")
 
             return is_consistent, confidence, details
         except Exception as e:

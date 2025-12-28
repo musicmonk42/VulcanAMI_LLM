@@ -1267,6 +1267,19 @@ class CuriosityEngine:
         self._queries_ingested = 0
         self._failures_ingested = 0
         
+        # ==============================================================================
+        # BUG #4 FIX: Gap resolution tracking
+        # ==============================================================================
+        # Gaps were growing unbounded because:
+        # 1. False "errors" from bad consensus check added high_error_rate gaps
+        # 2. Experiments ran but gaps were never marked resolved
+        # 3. No deduplication - same gap type added repeatedly
+        self._resolved_gaps: Set[str] = set()  # Track resolved gap keys
+        self._gap_last_seen: Dict[str, float] = {}  # Track when gap was last added
+        self._gap_attempts: Dict[str, int] = {}  # Track experiment attempts per gap
+        self.MAX_GAPS_PER_TYPE = 2  # Maximum gaps of same type
+        self.GAP_COOLDOWN_SECONDS = 300  # Don't re-add same gap for 5 min
+        
         # External gap injection (for OutcomeBridge connection)
         # This allows gaps detected by external systems (e.g., OutcomeBridge)
         # to be included in the learning cycle
@@ -1502,6 +1515,87 @@ class CuriosityEngine:
                 )
             return gaps
 
+    # ==============================================================================
+    # BUG #4 FIX: Gap resolution tracking methods
+    # ==============================================================================
+    
+    def _gap_key(self, gap: Union[KnowledgeGap, Dict]) -> str:
+        """Generate unique key for gap deduplication.
+        
+        Args:
+            gap: KnowledgeGap object or dictionary with type/domain
+            
+        Returns:
+            Unique key string for the gap
+        """
+        if isinstance(gap, dict):
+            gap_type = gap.get('type', 'unknown')
+            domain = gap.get('domain', 'general')
+        else:
+            gap_type = getattr(gap, 'type', 'unknown')
+            domain = getattr(gap, 'domain', 'general')
+        return f"{gap_type}:{domain}"
+    
+    def mark_gap_resolved(self, gap: Union[KnowledgeGap, Dict], success: bool = True) -> None:
+        """Mark a gap as resolved after successful experiment.
+        
+        BUG #4 FIX: Ensures gaps don't accumulate forever by tracking
+        which gaps have been addressed.
+        
+        Args:
+            gap: The gap to mark as resolved
+            success: Whether resolution was successful (default True)
+        """
+        if success:
+            key = self._gap_key(gap)
+            self._resolved_gaps.add(key)
+            logger.info(f"[GapAnalyzer] Marked resolved: {key}")
+    
+    def _filter_gaps_with_resolution(self, raw_gaps: List[KnowledgeGap]) -> List[KnowledgeGap]:
+        """Filter gaps based on resolution status, cooldown, and type limits.
+        
+        BUG #4 FIX: Prevents gap accumulation by:
+        1. Removing already resolved gaps
+        2. Enforcing cooldown period per gap
+        3. Limiting gaps per type
+        
+        Args:
+            raw_gaps: List of raw gaps to filter
+            
+        Returns:
+            Filtered list of gaps
+        """
+        current_time = time.time()
+        filtered = []
+        type_counts = defaultdict(int)
+        
+        for gap in raw_gaps:
+            key = self._gap_key(gap)
+            
+            # Skip if resolved
+            if key in self._resolved_gaps:
+                continue
+            
+            # Skip if in cooldown
+            last_seen = self._gap_last_seen.get(key, 0)
+            if current_time - last_seen < self.GAP_COOLDOWN_SECONDS:
+                continue
+            
+            # Skip if too many of this type
+            gap_type = getattr(gap, 'type', 'unknown')
+            if type_counts[gap_type] >= self.MAX_GAPS_PER_TYPE:
+                continue
+            
+            filtered.append(gap)
+            type_counts[gap_type] += 1
+            self._gap_last_seen[key] = current_time
+        
+        logger.info(
+            f"[GapAnalyzer] {len(raw_gaps)} raw → {len(filtered)} after filtering "
+            f"(resolved={len(self._resolved_gaps)}, type_limits={dict(type_counts)})"
+        )
+        return filtered
+
     def select_exploration_strategy(
         self, context: Optional[Dict[str, Any]] = None
     ) -> str:
@@ -1527,19 +1621,25 @@ class CuriosityEngine:
     def identify_knowledge_gaps(
         self, strategy: Optional[str] = None
     ) -> List[KnowledgeGap]:
-        """Identify knowledge gaps using selected strategy - REFACTORED"""
+        """Identify knowledge gaps using selected strategy - REFACTORED
+        
+        BUG #4 FIX: Now filters gaps to prevent unbounded accumulation by:
+        1. Removing already resolved gaps
+        2. Enforcing cooldown period per gap type
+        3. Limiting gaps per type (MAX_GAPS_PER_TYPE)
+        """
 
         try:
             if strategy is None:
                 strategy = self.select_exploration_strategy()
 
-            gaps = []
+            raw_gaps = []
             
             # FIRST: Consume any external gaps (from OutcomeBridge, etc.)
             # This ensures gaps from external systems are always included
             external_gaps = self._consume_external_gaps()
             if external_gaps:
-                gaps.extend(external_gaps)
+                raw_gaps.extend(external_gaps)
                 logger.info(
                     f"[CuriosityEngine] Including {len(external_gaps)} external gaps"
                 )
@@ -1556,19 +1656,19 @@ class CuriosityEngine:
                     # FIX: Include outcome bridge gaps for cross-process data
                     outcome_gaps = self.gap_analyzer.analyze_from_outcome_bridge(minutes=60)
 
-                    gaps.extend(decomposition_gaps)
-                    gaps.extend(prediction_gaps)
-                    gaps.extend(transfer_gaps)
-                    gaps.extend(latent_gaps)
-                    gaps.extend(outcome_gaps)
+                    raw_gaps.extend(decomposition_gaps)
+                    raw_gaps.extend(prediction_gaps)
+                    raw_gaps.extend(transfer_gaps)
+                    raw_gaps.extend(latent_gaps)
+                    raw_gaps.extend(outcome_gaps)
                 elif strategy == "gap_driven":
                     decomposition_gaps = (
                         self.gap_analyzer.analyze_decomposition_failures()
                     )
                     # FIX: Include outcome bridge gaps for cross-process data
                     outcome_gaps = self.gap_analyzer.analyze_from_outcome_bridge(minutes=60)
-                    gaps.extend(decomposition_gaps[:5])
-                    gaps.extend(outcome_gaps[:3])
+                    raw_gaps.extend(decomposition_gaps[:5])
+                    raw_gaps.extend(outcome_gaps[:3])
                 else:  # balanced
                     decomposition_gaps = (
                         self.gap_analyzer.analyze_decomposition_failures()
@@ -1578,15 +1678,18 @@ class CuriosityEngine:
                     # This enables the subprocess to read query outcomes from the main process
                     outcome_gaps = self.gap_analyzer.analyze_from_outcome_bridge(minutes=60)
 
-                    gaps.extend(decomposition_gaps[:3])
-                    gaps.extend(prediction_gaps[:3])
-                    gaps.extend(outcome_gaps[:3])
+                    raw_gaps.extend(decomposition_gaps[:3])
+                    raw_gaps.extend(prediction_gaps[:3])
+                    raw_gaps.extend(outcome_gaps[:3])
             elif strategy == "minimal":
                 all_gaps = self.gap_analyzer.get_all_gaps()
-                gaps.extend(all_gaps[:3])
+                raw_gaps.extend(all_gaps[:3])
             elif strategy == "efficient":
                 all_gaps = self.gap_analyzer.get_all_gaps()
-                gaps.extend([g for g in all_gaps if g.estimated_cost < 20][:5])
+                raw_gaps.extend([g for g in all_gaps if g.estimated_cost < 20][:5])
+
+            # BUG #4 FIX: Filter gaps to prevent accumulation
+            gaps = self._filter_gaps_with_resolution(raw_gaps)
 
             # APPLY: Add to dependency graph
             for gap in gaps:
@@ -1761,7 +1864,11 @@ class CuriosityEngine:
             return []
 
     def run_experiment_sandboxed(self, experiment: Experiment) -> ExperimentResult:
-        """Run experiment in sandboxed environment - DELEGATED"""
+        """Run experiment in sandboxed environment - DELEGATED
+        
+        BUG #4 FIX: Now tracks experiment attempts per gap and marks gaps
+        as resolved when experiments succeed or after multiple attempts.
+        """
 
         try:
             # Run experiment through manager
@@ -1780,6 +1887,24 @@ class CuriosityEngine:
             # Adjust budget based on resource usage
             current_load = self.resource_monitor.get_current_load()
             self.exploration_budget.adjust_for_load(current_load)
+            
+            # BUG #4 FIX: Track experiment attempts and mark gaps resolved
+            if hasattr(experiment, 'gap') and experiment.gap:
+                gap = experiment.gap
+                gap_key = self._gap_key(gap)
+                
+                # Track attempts
+                self._gap_attempts[gap_key] = self._gap_attempts.get(gap_key, 0) + 1
+                
+                # Mark resolved if experiment succeeded with reasonable confidence
+                if result.success:
+                    self.mark_gap_resolved(gap, success=True)
+                    logger.info(f"[CuriosityEngine] Gap {gap_key} resolved by successful experiment")
+                
+                # Also resolve if we've tried this gap multiple times (give up after 3 attempts)
+                elif self._gap_attempts[gap_key] >= 3:
+                    logger.info(f"[CuriosityEngine] Resolving gap {gap_key} after {self._gap_attempts[gap_key]} attempts (giving up)")
+                    self.mark_gap_resolved(gap, success=False)
 
             return result
         except Exception as e:

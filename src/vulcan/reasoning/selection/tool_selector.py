@@ -321,6 +321,19 @@ CLEANUP_MISS_INTERVAL = 100  # Trigger cleanup every N cache misses
 # sufficient time headroom under CPU-only execution
 MULTIMODAL_TIME_BUDGET_MULTIPLIER = 3.0  # Allow multimodal more time headroom
 
+# ==============================================================================
+# BUG #1 FIX: Candidate filtering to prevent all-tools-selected bug
+# ==============================================================================
+# Different reasoning paradigms (causal, symbolic, probabilistic, analogical, 
+# multimodal) are COMPLEMENTARY, not redundant. They produce different outputs
+# BY DESIGN. The fix is to run only the best-matched tool(s), not all 5.
+#
+# When semantic matching returns {causal: 0.70, symbolic: 0.08, ...}, we should
+# only run the clearly winning tool, not all 5 tools.
+CANDIDATE_PRIOR_THRESHOLD = 0.15  # Minimum prior probability to be a candidate
+CANDIDATE_MAX_COUNT = 2  # Maximum number of candidates (1-2 tools, not 5)
+CANDIDATE_DOMINANCE_RATIO = 2.0  # If top tool has 2x the prior, use only that tool
+
 
 class MultiTierFeatureExtractor:
     """
@@ -1751,55 +1764,98 @@ class ToolSelector:
         safe_tools: List[str],
         prior_dist: Any,
     ) -> List[Dict[str, Any]]:
-        """Generate tool candidates with utility scores"""
-
+        """Generate tool candidates filtered by semantic matching prior.
+        
+        CRITICAL BUG #1 FIX: Different reasoning paradigms (causal, symbolic, 
+        probabilistic, analogical, multimodal) are COMPLEMENTARY, not redundant.
+        They produce different outputs BY DESIGN. We should run the best-matched 
+        tool(s), not all 5.
+        
+        When semantic matching returns {causal: 0.70, symbolic: 0.08, ...}, 
+        we only run the clearly winning tool, not all 5 tools.
+        """
         candidates = []
 
         try:
-            for tool_name in safe_tools:
-                # Predict costs
+            tool_priors = prior_dist.tool_probs if hasattr(prior_dist, 'tool_probs') and prior_dist.tool_probs else {}
+            
+            if not tool_priors:
+                # Fallback: if no priors, just use first safe tool
+                if safe_tools:
+                    cost_dist = self.cost_model.predict_cost(safe_tools[0], features)
+                    return [{"tool": safe_tools[0], "utility": 0.5, "quality": 0.5, 
+                             "cost": cost_dist, "prior": 0.2}]
+                return []
+            
+            # Sort tools by prior probability
+            sorted_tools = sorted(tool_priors.items(), key=lambda x: x[1], reverse=True)
+            
+            # CRITICAL: If one tool dominates (2x the next), just use that one
+            if len(sorted_tools) >= 2:
+                top_tool, top_prior = sorted_tools[0]
+                second_tool, second_prior = sorted_tools[1]
+                
+                if top_prior >= second_prior * CANDIDATE_DOMINANCE_RATIO:
+                    # Clear winner - only run this tool
+                    logger.info(f"[ToolSelector] Clear winner: {top_tool} ({top_prior:.3f}) >> {second_tool} ({second_prior:.3f})")
+                    
+                    if top_tool in safe_tools:
+                        cost_dist = self.cost_model.predict_cost(top_tool, features)
+                        return [{
+                            "tool": top_tool,
+                            "utility": 0.5 + top_prior,
+                            "quality": 0.5 + top_prior,
+                            "cost": cost_dist,
+                            "prior": top_prior,
+                        }]
+            
+            # No clear winner - take top N tools above threshold
+            viable_tools = [
+                (tool, prior) for tool, prior in sorted_tools
+                if tool in safe_tools and prior >= CANDIDATE_PRIOR_THRESHOLD
+            ][:CANDIDATE_MAX_COUNT]
+            
+            if not viable_tools:
+                # Fallback to top tool even if below threshold
+                for tool, prior in sorted_tools:
+                    if tool in safe_tools:
+                        viable_tools = [(tool, prior)]
+                        break
+            
+            logger.info(f"[ToolSelector] Selected {len(viable_tools)} from {len(safe_tools)}: {[t[0] for t in viable_tools]}")
+            
+            # Build candidate list with cost checking
+            for tool_name, prior in viable_tools:
                 cost_dist = self.cost_model.predict_cost(tool_name, features)
-
-                # Check hard constraints - be more lenient for multimodal
+                
                 time_budget = request.constraints.get("time_budget_ms", float("inf"))
-                predicted_time = cost_dist["time"]["mean"]
-                
-                # Allow multimodal more time headroom since it handles complex inputs
                 if tool_name == "multimodal":
-                    time_budget = time_budget * MULTIMODAL_TIME_BUDGET_MULTIPLIER
+                    time_budget *= MULTIMODAL_TIME_BUDGET_MULTIPLIER
                 
-                if predicted_time > time_budget:
-                    logger.debug(f"Tool {tool_name} filtered: predicted_time={predicted_time:.0f}ms > budget={time_budget:.0f}ms")
+                if cost_dist["time"]["mean"] > time_budget:
+                    logger.debug(f"Tool {tool_name} filtered: cost > budget")
                     continue
-                if cost_dist["energy"]["mean"] > request.constraints.get(
-                    "energy_budget_mj", float("inf")
-                ):
+                if cost_dist["energy"]["mean"] > request.constraints.get("energy_budget_mj", float("inf")):
                     continue
-
-                # Estimate quality (simplified - would use actual quality model)
-                quality_estimate = 0.5 + prior_dist.tool_probs.get(tool_name, 0.1)
-
-                # Compute utility
-                utility = self.utility_model.compute_utility(
-                    quality=quality_estimate,
-                    time=cost_dist["time"]["mean"],
-                    energy=cost_dist["energy"]["mean"],
-                    risk=1.0 - quality_estimate,
-                    context={"mode": request.mode.value},
-                )
-
-                candidates.append(
-                    {
-                        "tool": tool_name,
-                        "utility": utility,
-                        "quality": quality_estimate,
-                        "cost": cost_dist,
-                        "prior": prior_dist.tool_probs.get(tool_name, 0.1),
-                    }
-                )
-
-            # Sort by utility
+                
+                quality_estimate = 0.5 + prior
+                
+                candidates.append({
+                    "tool": tool_name,
+                    "utility": self.utility_model.compute_utility(
+                        quality=quality_estimate,
+                        time=cost_dist["time"]["mean"],
+                        energy=cost_dist["energy"]["mean"],
+                        risk=0.5 - prior,
+                        context={"mode": request.mode.value},
+                    ),
+                    "quality": quality_estimate,
+                    "cost": cost_dist,
+                    "prior": prior,
+                })
+            
             candidates.sort(key=lambda x: x["utility"], reverse=True)
+            
         except Exception as e:
             logger.error(f"Candidate generation failed: {e}")
 
@@ -1808,47 +1864,38 @@ class ToolSelector:
     def _select_strategy(
         self, request: SelectionRequest, candidates: List[Dict[str, Any]]
     ) -> ExecutionStrategy:
-        """Select portfolio execution strategy"""
-
-        try:
-            if not candidates:
-                return ExecutionStrategy.SINGLE
-
-            # Strategy selection based on mode and candidates
-            if request.mode == SelectionMode.FAST:
-                if len(candidates) >= 2:
-                    return ExecutionStrategy.SPECULATIVE_PARALLEL
-                else:
-                    return ExecutionStrategy.SINGLE
-
-            elif request.mode == SelectionMode.ACCURATE:
-                if len(candidates) >= 3:
-                    return ExecutionStrategy.COMMITTEE_CONSENSUS
-                elif len(candidates) >= 2:
-                    return ExecutionStrategy.SEQUENTIAL_REFINEMENT
-                else:
-                    return ExecutionStrategy.SINGLE
-
-            elif request.mode == SelectionMode.EFFICIENT:
-                return ExecutionStrategy.CASCADE
-
-            elif request.mode == SelectionMode.SAFE:
-                if len(candidates) >= 3:
-                    return ExecutionStrategy.COMMITTEE_CONSENSUS
-                else:
-                    return ExecutionStrategy.SINGLE
-
-            else:  # BALANCED
-                # Adaptive selection
-                if request.constraints.get("time_budget_ms", float("inf")) < 2000:
-                    return ExecutionStrategy.SPECULATIVE_PARALLEL
-                elif len(candidates) >= 3:
-                    return ExecutionStrategy.SEQUENTIAL_REFINEMENT
-                else:
-                    return ExecutionStrategy.SINGLE
-        except Exception as e:
-            logger.error(f"Strategy selection failed: {e}")
+        """Select execution strategy - prefer SINGLE tool for different reasoning paradigms.
+        
+        BUG #1 FIX: Different reasoning types (causal, symbolic, etc.) are 
+        complementary, not redundant. Running multiple and checking "consensus" 
+        is wrong - they SHOULD differ. Prefer SINGLE tool in most cases.
+        """
+        if not candidates:
             return ExecutionStrategy.SINGLE
+        
+        # With 1 candidate, always SINGLE
+        if len(candidates) == 1:
+            return ExecutionStrategy.SINGLE
+        
+        # With 2+ candidates, check if top one dominates
+        if len(candidates) >= 2:
+            top_prior = candidates[0].get("prior", 0)
+            second_prior = candidates[1].get("prior", 0)
+            
+            if top_prior > second_prior * 1.5:
+                logger.info(f"[ToolSelector] Using SINGLE: {candidates[0]['tool']} dominates")
+                return ExecutionStrategy.SINGLE
+        
+        # Only use multi-tool strategies in specific modes
+        if request.mode == SelectionMode.ACCURATE and len(candidates) >= 2:
+            # Run top 2 and pick best result (not consensus!)
+            return ExecutionStrategy.SPECULATIVE_PARALLEL
+        
+        if request.mode == SelectionMode.SAFE and len(candidates) >= 2:
+            return ExecutionStrategy.SEQUENTIAL_REFINEMENT
+        
+        # Default: just run the best tool
+        return ExecutionStrategy.SINGLE
 
     def _execute_portfolio(
         self,
@@ -1856,14 +1903,25 @@ class ToolSelector:
         candidates: List[Dict[str, Any]],
         strategy: ExecutionStrategy,
     ) -> Any:
-        """Execute tools using portfolio executor"""
+        """Execute tools using portfolio executor.
+        
+        BUG #6 FIX: Limit tools based on strategy to prevent excessive
+        multi-tool execution even when candidates are filtered.
+        """
 
         try:
             if not candidates:
                 return None
 
-            # Get tool names from candidates
-            tool_names = [c["tool"] for c in candidates[:5]]  # Max 5 tools
+            # CRITICAL FIX: Limit to appropriate number of tools based on strategy
+            if strategy == ExecutionStrategy.SINGLE:
+                tool_names = [candidates[0]["tool"]]
+            elif strategy == ExecutionStrategy.COMMITTEE_CONSENSUS:
+                tool_names = [c["tool"] for c in candidates[:3]]  # Max 3 for committee
+            else:
+                tool_names = [c["tool"] for c in candidates[:2]]  # Max 2 otherwise
+            
+            logger.info(f"[ToolSelector] Executing {len(tool_names)} tools with {strategy.value}")
 
             # Create monitor
             monitor = ExecutionMonitor(
@@ -2070,6 +2128,9 @@ class ToolSelector:
         1. Latency: < 5s = good, > 30s = needs improvement
         2. Confidence: > 0.7 = success, < 0.3 = failure
         3. Strategy: single tool = simple query, portfolio = complex query
+        
+        BUG #3 FIX: Status should reflect whether the tool EXECUTED successfully,
+        not whether different reasoning paradigms "agreed" (they SHOULD differ).
         """
         if not OUTCOME_BRIDGE_AVAILABLE or record_query_outcome is None:
             return
@@ -2078,23 +2139,43 @@ class ToolSelector:
             # Generate a unique query ID for this outcome
             query_id = f"tool_sel_{uuid.uuid4().hex[:12]}"
             
-            # Determine success status based on confidence and latency
-            # Success criteria:
-            # - High confidence (> SUCCESS_CONFIDENCE_THRESHOLD) indicates good tool selection
-            # - Reasonable latency (< MAX_SUCCESS_TIME_MS) indicates efficient execution
+            # BUG #3 FIX: Determine status based on execution success, not consensus
+            # A tool selection is successful if:
+            # 1. A tool was selected
+            # 2. The tool executed and produced a result
+            # 3. Confidence is above minimum threshold (not necessarily high)
+            
+            # Check if we have a valid result at all
+            has_result = result is not None and hasattr(result, 'selected_tool') and result.selected_tool
+            
+            # A minimum confidence is acceptable - different paradigms may have different scales
+            min_acceptable_confidence = 0.3  # Lowered from SUCCESS_CONFIDENCE_THRESHOLD
+            
             is_success = (
-                result.confidence > SUCCESS_CONFIDENCE_THRESHOLD 
+                has_result 
+                and result.confidence >= min_acceptable_confidence
                 and result.execution_time_ms < MAX_SUCCESS_TIME_MS
             )
-            status = "success" if is_success else "error"
             
-            # Determine error type if not successful
+            # Partial success: tool ran but took too long or had low confidence
+            if has_result and not is_success:
+                if result.execution_time_ms >= MAX_SUCCESS_TIME_MS:
+                    status = "slow"  # Not an error, just slow
+                elif result.confidence < min_acceptable_confidence:
+                    status = "low_confidence"  # Tool ran, just low certainty
+                else:
+                    status = "partial"
+            elif is_success:
+                status = "success"
+            else:
+                status = "no_result"
+            
+            # Determine error type only for actual failures
             error_type = None
-            if not is_success:
-                if result.confidence <= SUCCESS_CONFIDENCE_THRESHOLD:
-                    error_type = "low_confidence"
-                elif result.execution_time_ms >= MAX_SUCCESS_TIME_MS:
-                    error_type = "slow_execution"
+            if status in ("low_confidence", "slow"):
+                error_type = status  # Use status as error type for tracking
+            elif status == "no_result":
+                error_type = "execution_failed"
             
             # Estimate complexity from the strategy used
             # Single tool = simpler query, portfolio = complex query
