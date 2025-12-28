@@ -70,6 +70,7 @@ Error Handling:
 
 import atexit
 import logging
+import os
 import threading
 import time
 from dataclasses import dataclass, field
@@ -101,8 +102,11 @@ HIGH_COMPLEXITY_THRESHOLD = 0.7  # Above this, use ACCURATE mode
 #
 # CONFIGURABLE: Set VULCAN_DECOMPOSITION_THRESHOLD environment variable to override
 # Example: VULCAN_DECOMPOSITION_THRESHOLD=0.50 for more frequent decomposition
-import os as _os_env
-DECOMPOSITION_COMPLEXITY_THRESHOLD = float(_os_env.environ.get("VULCAN_DECOMPOSITION_THRESHOLD", "0.70"))
+try:
+    DECOMPOSITION_COMPLEXITY_THRESHOLD = float(os.environ.get("VULCAN_DECOMPOSITION_THRESHOLD", "0.70"))
+except (ValueError, TypeError):
+    logger.warning("Invalid VULCAN_DECOMPOSITION_THRESHOLD, using default 0.70")
+    DECOMPOSITION_COMPLEXITY_THRESHOLD = 0.70
 
 # Strategy selection thresholds
 CAUSAL_REASONING_THRESHOLD = 0.6  # Complexity threshold for causal reasoning

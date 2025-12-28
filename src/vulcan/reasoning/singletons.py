@@ -17,7 +17,9 @@ without garbage collection.
 """
 
 import logging
+import os
 import threading
+from pathlib import Path
 from typing import Any, Callable, Optional
 
 logger = logging.getLogger(__name__)
@@ -43,6 +45,13 @@ _ai_runtime: Optional[Any] = None
 _multimodal_engine: Optional[Any] = None
 _unified_reasoner: Optional[Any] = None  # BUG FIX: Add singleton for UnifiedReasoner
 _singleton_lock = threading.Lock()
+
+
+def _get_tool_selector_state_path() -> Path:
+    """Get the path for tool selector state persistence."""
+    # Use environment variable or default to .vulcan_state directory
+    state_dir = os.environ.get("VULCAN_STATE_DIR", ".vulcan_state")
+    return Path(state_dir) / "tool_selector"
 
 
 def get_or_create(key: str, factory: Callable) -> Any:
@@ -111,15 +120,6 @@ def get_tool_selector():
             return None
 
 
-def _get_tool_selector_state_path():
-    """Get the path for tool selector state persistence."""
-    from pathlib import Path
-    import os
-    # Use environment variable or default to .vulcan_state directory
-    state_dir = os.environ.get("VULCAN_STATE_DIR", ".vulcan_state")
-    return Path(state_dir) / "tool_selector"
-
-
 def save_tool_selector_state():
     """
     BUG FIX: Tool Weight Memory Amnesia - Save ToolSelector state to disk.
@@ -138,6 +138,8 @@ def save_tool_selector_state():
     
     try:
         state_path = _get_tool_selector_state_path()
+        # Ensure parent directory exists
+        state_path.parent.mkdir(parents=True, exist_ok=True)
         _tool_selector.save_state(str(state_path))
         logger.info(f"[Singletons] ✓ ToolSelector state saved to {state_path}")
         return True

@@ -176,8 +176,12 @@ MAX_SUCCESS_TIME_MS = 10000  # Maximum execution time (ms) for success
 #
 # CONFIGURABLE: Set VULCAN_EMBEDDING_TIMEOUT environment variable to override
 # Example: VULCAN_EMBEDDING_TIMEOUT=10.0 for slower environments
-import os as _os
-EMBEDDING_TIMEOUT = float(_os.environ.get("VULCAN_EMBEDDING_TIMEOUT", "5.0"))
+import os
+try:
+    EMBEDDING_TIMEOUT = float(os.environ.get("VULCAN_EMBEDDING_TIMEOUT", "5.0"))
+except (ValueError, TypeError):
+    logger.warning("Invalid VULCAN_EMBEDDING_TIMEOUT, using default 5.0")
+    EMBEDDING_TIMEOUT = 5.0
 
 
 # ==============================================================================
