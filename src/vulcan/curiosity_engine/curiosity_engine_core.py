@@ -1274,11 +1274,15 @@ class CuriosityEngine:
         # 1. False "errors" from bad consensus check added high_error_rate gaps
         # 2. Experiments ran but gaps were never marked resolved
         # 3. No deduplication - same gap type added repeatedly
-        self._resolved_gaps: Set[str] = set()  # Track resolved gap keys
+        # BUG #14 FIX: Track resolved gap keys with TTL (key -> resolution_timestamp)
+        self._resolved_gaps: Dict[str, float] = {}  
         self._gap_last_seen: Dict[str, float] = {}  # Track when gap was last added
         self._gap_attempts: Dict[str, int] = {}  # Track experiment attempts per gap
+        self._last_resolution_cleanup: float = 0.0  # Last time we cleaned up expired resolutions
         self.MAX_GAPS_PER_TYPE = 2  # Maximum gaps of same type
         self.GAP_COOLDOWN_SECONDS = 300  # Don't re-add same gap for 5 min
+        self.GAP_RESOLUTION_TTL_SECONDS = 1800  # BUG #14 FIX: Allow re-detection after 30 min if issue persists
+        self.RESOLUTION_CLEANUP_INTERVAL = 300  # Only cleanup expired resolutions every 5 minutes
         
         # External gap injection (for OutcomeBridge connection)
         # This allows gaps detected by external systems (e.g., OutcomeBridge)
@@ -1542,14 +1546,30 @@ class CuriosityEngine:
         BUG #4 FIX: Ensures gaps don't accumulate forever by tracking
         which gaps have been addressed.
         
+        BUG #14 FIX: Also marks gaps as resolved when giving up (success=False)
+        to prevent the attempt counter from growing indefinitely (3 → 9 → 11 → 13 → 19).
+        Gaps marked as resolved (regardless of success) will be filtered out
+        for the cooldown period, and attempts will be reset.
+        
         Args:
             gap: The gap to mark as resolved
             success: Whether resolution was successful (default True)
         """
+        key = self._gap_key(gap)
+        
+        # BUG #14 FIX: Always add to resolved set with timestamp (not just on success)
+        # This prevents the same gap from being re-added immediately
+        self._resolved_gaps[key] = time.time()
+        
+        # BUG #14 FIX: Reset attempts counter when gap is resolved (success or give-up)
+        # This prevents the log showing "after 19 attempts" when it should be "after 3 attempts"
+        if key in self._gap_attempts:
+            del self._gap_attempts[key]
+        
         if success:
-            key = self._gap_key(gap)
-            self._resolved_gaps.add(key)
-            logger.info(f"[GapAnalyzer] Marked resolved: {key}")
+            logger.info(f"[CuriosityEngine] Gap {key} resolved by successful experiment")
+        else:
+            logger.info(f"[CuriosityEngine] Gap {key} marked resolved after giving up")
     
     def _filter_gaps_with_resolution(self, raw_gaps: List[KnowledgeGap]) -> List[KnowledgeGap]:
         """Filter gaps based on resolution status, cooldown, and type limits.
@@ -1558,6 +1578,12 @@ class CuriosityEngine:
         1. Removing already resolved gaps
         2. Enforcing cooldown period per gap
         3. Limiting gaps per type
+        
+        BUG #14 FIX: Resolved gaps now have a TTL - they can be re-detected
+        after GAP_RESOLUTION_TTL_SECONDS (30 min) if the underlying issue persists.
+        
+        Performance: Expired gap cleanup is rate-limited to every RESOLUTION_CLEANUP_INTERVAL
+        seconds to avoid overhead on every call.
         
         Args:
             raw_gaps: List of raw gaps to filter
@@ -1569,10 +1595,22 @@ class CuriosityEngine:
         filtered = []
         type_counts = defaultdict(int)
         
+        # BUG #14 FIX: Clean up expired resolved gaps (TTL-based)
+        # Rate-limit cleanup to avoid overhead on every call
+        if current_time - self._last_resolution_cleanup > self.RESOLUTION_CLEANUP_INTERVAL:
+            self._last_resolution_cleanup = current_time
+            expired_keys = [
+                key for key, resolved_time in self._resolved_gaps.items()
+                if current_time - resolved_time > self.GAP_RESOLUTION_TTL_SECONDS
+            ]
+            for key in expired_keys:
+                del self._resolved_gaps[key]
+                logger.debug(f"[CuriosityEngine] Resolved gap {key} TTL expired, can be re-detected")
+        
         for gap in raw_gaps:
             key = self._gap_key(gap)
             
-            # Skip if resolved
+            # Skip if resolved (and not expired)
             if key in self._resolved_gaps:
                 continue
             
@@ -1899,11 +1937,9 @@ class CuriosityEngine:
                 # Mark resolved if experiment succeeded with reasonable confidence
                 if result.success:
                     self.mark_gap_resolved(gap, success=True)
-                    logger.info(f"[CuriosityEngine] Gap {gap_key} resolved by successful experiment")
                 
                 # Also resolve if we've tried this gap multiple times (give up after 3 attempts)
                 elif self._gap_attempts[gap_key] >= 3:
-                    logger.info(f"[CuriosityEngine] Resolving gap {gap_key} after {self._gap_attempts[gap_key]} attempts (giving up)")
                     self.mark_gap_resolved(gap, success=False)
 
             return result
@@ -1937,7 +1973,7 @@ class CuriosityEngine:
             )
 
             logger.info(
-                "Updated from %d experiment results (success rate: %.2f)",
+                "Updated from %d experiment results (learning rate: %.2f)",
                 len(results),
                 self.learning_rate,
             )

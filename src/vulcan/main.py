@@ -575,8 +575,20 @@ async def lifespan(app: FastAPI):
             lambda: ProductionDeployment(config, checkpoint_path=checkpoint_to_load),
         )
 
+        # BUG FIX Issue #27: Use singleton UnifiedRuntime to prevent manifest reload per-query
         if UNIFIED_RUNTIME_AVAILABLE:
-            deployment.unified_runtime = UnifiedRuntime()
+            try:
+                from vulcan.reasoning.singletons import get_unified_runtime
+                deployment.unified_runtime = get_unified_runtime()
+                if deployment.unified_runtime:
+                    logger.info("✓ UnifiedRuntime initialized via singleton")
+                else:
+                    # Fallback to direct instantiation if singleton fails
+                    deployment.unified_runtime = UnifiedRuntime()
+                    logger.info("✓ UnifiedRuntime initialized directly (singleton fallback)")
+            except ImportError:
+                deployment.unified_runtime = UnifiedRuntime()
+                logger.info("✓ UnifiedRuntime initialized directly")
 
         # Initialize LLM component
         llm_instance = initialize_component(
@@ -3725,6 +3737,8 @@ CHARS_PER_TOKEN_ESTIMATE = 3  # Conservative estimate for token calculation
 # JOB-TO-RESPONSE GAP FIX: Timing thresholds for debugging
 SLOW_PHASE_THRESHOLD_MS = 1000  # Log warning if phase takes longer than this
 SLOW_REQUEST_THRESHOLD_MS = 5000  # Include timing breakdown for requests slower than this
+# BUG #35 FIX: Threshold for marking query outcomes as "slow" (matches COMPLEX_QUERY_TIME_THRESHOLD_MS)
+SLOW_QUERY_OUTCOME_THRESHOLD_MS = 30000  # 30 seconds - queries slower than this are marked as "slow"
 
 # MEMORY MANAGEMENT: GC thresholds
 GC_SIGNIFICANT_CLEANUP_THRESHOLD = 100  # Log GC if collected more than this many objects
@@ -5310,9 +5324,18 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
             
             # Record via OutcomeBridge for learning system integration
             bridge = get_outcome_bridge()
+            
+            # BUG FIX Issue #35: Determine status based on actual timing
+            # Queries taking > 30s should be marked as "slow", not "success"
+            # This ensures gap detection properly identifies slow queries
+            if float(latency_ms) > SLOW_QUERY_OUTCOME_THRESHOLD_MS:
+                query_status = "slow"
+            else:
+                query_status = "success"
+            
             bridge.record(
                 query_id=routing_stats.get("query_id", f"q_{int(time.time())}"),
-                status="success",
+                status=query_status,
                 routing_ms=routing_time_ms,
                 total_ms=float(latency_ms),
                 complexity=routing_stats.get("complexity_score", 0.0),
@@ -8407,8 +8430,16 @@ def main():
                 logger.warning(
                     f"Self-improvement config file not found at {self_improvement_config_path}, using default config settings."
                 )
-                # Initialize with default config dictionary if file not found
+                # BUG FIX Issue #5: Use singleton to prevent repeated state file loading
                 try:
+                    from vulcan.reasoning.singletons import get_self_improvement_drive
+                    self_improvement_drive = get_self_improvement_drive()
+                    if self_improvement_drive is None:
+                        # Fallback if singleton fails
+                        self_improvement_drive = SelfImprovementDrive(
+                            config={"enabled": True}
+                        )
+                except ImportError:
                     self_improvement_drive = SelfImprovementDrive(
                         config={"enabled": True}
                     )
@@ -8418,8 +8449,18 @@ def main():
                         f"Failed to initialize SelfImprovementDrive with default config, using MagicMock: {e}"
                     )
             else:
-                # Initialize the self-improvement drive from file path
+                # BUG FIX Issue #5: Use singleton to prevent repeated state file loading
                 try:
+                    from vulcan.reasoning.singletons import get_self_improvement_drive
+                    self_improvement_drive = get_self_improvement_drive(
+                        config_path=self_improvement_config_path
+                    )
+                    if self_improvement_drive is None:
+                        # Fallback if singleton fails
+                        self_improvement_drive = SelfImprovementDrive(
+                            config_path=self_improvement_config_path
+                        )
+                except ImportError:
                     self_improvement_drive = SelfImprovementDrive(
                         config_path=self_improvement_config_path
                     )
