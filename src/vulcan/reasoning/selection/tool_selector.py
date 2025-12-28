@@ -1846,7 +1846,7 @@ class ToolSelector:
                         quality=quality_estimate,
                         time=cost_dist["time"]["mean"],
                         energy=cost_dist["energy"]["mean"],
-                        risk=0.5 - prior,
+                        risk=max(0.0, 0.5 - prior),  # Ensure non-negative risk
                         context={"mode": request.mode.value},
                     ),
                     "quality": quality_estimate,
