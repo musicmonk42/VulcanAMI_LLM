@@ -1296,6 +1296,11 @@ class CuriosityEngine:
         self.PHANTOM_RESOLUTION_WINDOW = 3600  # 1 hour window for counting phantom resolutions
         # FIX: Phantom Resolution Loop - extended cooldown for gaps that keep returning
         self.PHANTOM_GAP_COOLDOWN_SECONDS = 3600  # 1 hour cooldown for phantom gaps
+        # FIX: Learning System Give-Up Threshold
+        # Increased from 3 to 10 - don't mark gaps as "resolved" after only 3 failures
+        # Use environment variable to configure: VULCAN_GAP_GIVEUP_THRESHOLD
+        import os
+        self.GAP_GIVEUP_THRESHOLD = int(os.environ.get("VULCAN_GAP_GIVEUP_THRESHOLD", "10"))
         
         # ISSUE #3 FIX: Bootstrap experiment constants
         self.BOOTSTRAP_EXPERIMENT_TIMEOUT_SECONDS = 30.0  # Short timeout for bootstrap experiments
@@ -2070,8 +2075,14 @@ class CuriosityEngine:
                 if result.success:
                     self.mark_gap_resolved(gap, success=True)
                 
-                # Also resolve if we've tried this gap multiple times (give up after 3 attempts)
-                elif self._gap_attempts[gap_key] >= 3:
+                # FIX: Use configurable threshold - don't give up too quickly
+                # Default increased from 3 to 10 attempts before giving up
+                elif self._gap_attempts[gap_key] >= self.GAP_GIVEUP_THRESHOLD:
+                    logger.warning(
+                        f"[CuriosityEngine] Gap {gap_key} giving up after {self._gap_attempts[gap_key]} attempts - "
+                        f"marking as deferred, not resolved"
+                    )
+                    # Mark as "deferred" not "resolved" - it wasn't actually fixed
                     self.mark_gap_resolved(gap, success=False)
 
             return result
