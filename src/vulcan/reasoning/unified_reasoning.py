@@ -92,6 +92,100 @@ def _is_test_environment() -> bool:
     return False
 
 
+# ==============================================================================
+# BUG #5 FIX: Singleton Tool Weight Manager
+# ==============================================================================
+# Learning system and Ensemble had separate weight dictionaries, so learned
+# weights were never propagated. This singleton ensures all systems share the
+# same weight values.
+
+class ToolWeightManager:
+    """Singleton manager for tool weights shared between Learning and Ensemble.
+    
+    BUG #5 FIX: Learning system was updating tool weights in its own dictionary,
+    but Ensemble was reading from a separate dictionary. Weights never propagated.
+    This singleton ensures both systems use the same weight storage.
+    """
+    
+    _instance = None
+    _lock = threading.Lock()
+    
+    def __new__(cls):
+        if cls._instance is None:
+            with cls._lock:
+                # Double-check locking
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+                    cls._instance._weights: Dict[str, float] = {}
+                    cls._instance._update_lock = threading.RLock()
+        return cls._instance
+    
+    def get_weight(self, tool: str) -> float:
+        """Get weight for a single tool."""
+        with self._update_lock:
+            return self._weights.get(tool, 0.0)
+    
+    def set_weight(self, tool: str, value: float) -> None:
+        """Set absolute weight value for a tool."""
+        with self._update_lock:
+            self._weights[tool] = value
+            logger.debug(f"[WeightManager] {tool} = {value:.4f}")
+    
+    def adjust_weight(self, tool: str, delta: float) -> None:
+        """Adjust weight by delta (used by Learning system)."""
+        with self._update_lock:
+            current = self._weights.get(tool, 0.0)
+            self._weights[tool] = current + delta
+            logger.info(f"[WeightManager] {tool}: {current:.4f} → {self._weights[tool]:.4f}")
+    
+    def get_all_weights(self, tools: List[str]) -> Dict[str, float]:
+        """Get weights for multiple tools (used by Ensemble).
+        
+        Returns normalized weights with minimum value of 0.01 to ensure
+        all tools have some probability of being selected.
+        """
+        with self._update_lock:
+            weights = {t: max(self._weights.get(t, 0.0), 0.01) for t in tools}
+            
+            # Normalize if total > 0
+            total = sum(weights.values())
+            if total > 0:
+                weights = {k: v / total for k, v in weights.items()}
+            else:
+                # If all zero, use uniform weights
+                n = len(tools)
+                if n > 0:
+                    weights = {t: 1.0 / n for t in tools}
+            
+            return weights
+    
+    def get_raw_weights(self) -> Dict[str, float]:
+        """Get raw (non-normalized) weights for debugging."""
+        with self._update_lock:
+            return self._weights.copy()
+
+
+# Global instance accessor
+_weight_manager: Optional[ToolWeightManager] = None
+
+
+def get_weight_manager() -> ToolWeightManager:
+    """Get the singleton ToolWeightManager instance.
+    
+    Usage in Learning system:
+        from vulcan.reasoning.unified_reasoning import get_weight_manager
+        get_weight_manager().adjust_weight("causal", 0.01)
+        
+    Usage in Ensemble:
+        from vulcan.reasoning.unified_reasoning import get_weight_manager
+        weights = get_weight_manager().get_all_weights(["causal", "symbolic"])
+    """
+    global _weight_manager
+    if _weight_manager is None:
+        _weight_manager = ToolWeightManager()
+    return _weight_manager
+
+
 # CRITICAL FIX: Lazy loading for optional dependencies to avoid circular imports
 _SELECTION_COMPONENTS = None
 _REASONING_COMPONENTS = None
@@ -2694,11 +2788,33 @@ class UnifiedReasoner:
             return conclusions[0] if conclusions else None
 
     def _get_reasoning_type_weight(self, reasoning_type: ReasoningType) -> float:
-        """Get historical performance weight for reasoning type"""
+        """Get historical performance weight for reasoning type.
+        
+        BUG #5 FIX: Now also checks the shared ToolWeightManager for learned
+        weights from the Learning system.
+        """
 
         if not self.enable_learning:
             return 1.0
 
+        try:
+            # BUG #5 FIX: First check shared weight manager for learned weights
+            tool_name = reasoning_type.value if reasoning_type else "unknown"
+            shared_weight = get_weight_manager().get_weight(tool_name)
+            if shared_weight > 0:
+                logger.debug(f"[Ensemble] Using shared weight for {tool_name}: {shared_weight:.4f}")
+                # Combine with historical performance
+                historical_weight = self._get_historical_weight(reasoning_type)
+                return (shared_weight + historical_weight) / 2
+            
+            # Fall back to historical weight
+            return self._get_historical_weight(reasoning_type)
+        except Exception as e:
+            logger.warning(f"Weight calculation failed: {e}")
+            return 1.0
+    
+    def _get_historical_weight(self, reasoning_type: ReasoningType) -> float:
+        """Get historical performance weight based on reasoning history."""
         try:
             type_history = [
                 h
@@ -2716,7 +2832,7 @@ class UnifiedReasoner:
 
             return (success_rate + avg_confidence) / 2
         except Exception as e:
-            logger.warning(f"Weight calculation failed: {e}")
+            logger.warning(f"Historical weight calculation failed: {e}")
             return 1.0
 
     def _compute_cache_key(self, task: ReasoningTask) -> str:

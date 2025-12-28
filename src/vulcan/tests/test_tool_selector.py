@@ -24,6 +24,7 @@ from vulcan.reasoning.selection.safety_governor import SafetyLevel
 from vulcan.reasoning.selection.tool_selector import (
     CalibratedDecisionMaker,
     DistributionMonitor,
+    LGBM_AVAILABLE,
     MultiTierFeatureExtractor,
     SelectionMode,
     SelectionRequest,
@@ -69,8 +70,9 @@ class TestStochasticCostModel:
             assert cost["time"]["mean"] > 0
             assert cost["energy"]["mean"] > 0
 
+    @pytest.mark.skipif(not LGBM_AVAILABLE, reason="LightGBM not available")
     def test_update_cost_model(self):
-        """Test updating cost model - FIXED"""
+        """Test updating cost model - requires LightGBM"""
         model = StochasticCostModel()
         features = np.random.randn(128)
 
@@ -82,8 +84,9 @@ class TestStochasticCostModel:
         assert "symbolic" in model.models
         assert "time" in model.models["symbolic"]
 
+    @pytest.mark.skipif(not LGBM_AVAILABLE, reason="LightGBM not available")
     def test_save_and_load_model(self):
-        """Test saving and loading cost model - FIXED"""
+        """Test saving and loading cost model - requires LightGBM"""
         with tempfile.TemporaryDirectory() as tmpdir:
             model = StochasticCostModel()
 
