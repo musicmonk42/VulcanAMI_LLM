@@ -543,9 +543,20 @@ class UnifiedReasoner:
             if "CrossModalReasoner" in reasoning_components:
                 self.cross_modal = reasoning_components["CrossModalReasoner"]()
             if "MultiModalReasoningEngine" in reasoning_components:
-                self.multimodal = reasoning_components["MultiModalReasoningEngine"](
-                    enable_learning=enable_learning
-                )
+                # BUG FIX Issues #2-3: Use singleton MultiModalReasoningEngine
+                # to prevent "Neural reasoning modules initialized" appearing multiple times
+                try:
+                    from vulcan.reasoning.singletons import get_multimodal_engine
+                    self.multimodal = get_multimodal_engine(enable_learning=enable_learning)
+                    if self.multimodal is None:
+                        # Fallback to direct instantiation if singleton fails
+                        self.multimodal = reasoning_components["MultiModalReasoningEngine"](
+                            enable_learning=enable_learning
+                        )
+                except ImportError:
+                    self.multimodal = reasoning_components["MultiModalReasoningEngine"](
+                        enable_learning=enable_learning
+                    )
                 self.reasoners[ReasoningType.MULTIMODAL] = self.multimodal
                 self._register_modality_reasoners(
                     reasoning_components.get("ModalityType")

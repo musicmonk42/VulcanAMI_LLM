@@ -287,9 +287,16 @@ class UnifiedRuntime:
         else:
             self._metrics_aggregator = None
 
-        # AI Runtime
+        # AI Runtime - BUG FIX Issue #28: Use singleton to prevent duplicate provider registration
         if AIRuntime:
-            self.ai_runtime = AIRuntime()
+            try:
+                from vulcan.reasoning.singletons import get_ai_runtime
+                self.ai_runtime = get_ai_runtime()
+                if self.ai_runtime is None:
+                    # Fallback to direct instantiation if singleton fails
+                    self.ai_runtime = AIRuntime()
+            except ImportError:
+                self.ai_runtime = AIRuntime()
         else:
             self.ai_runtime = None
 

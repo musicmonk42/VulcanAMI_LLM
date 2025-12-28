@@ -568,13 +568,17 @@ class MultiModalReasoningEngine:
         """Register a reasoner for a specific modality.
         
         Bug #5 Fix: Prevents duplicate registration of reasoners for the same modality.
+        Bug #9 Fix: Downgraded duplicate warning to DEBUG to reduce log noise when
+        UnifiedReasoner is re-initialized multiple times.
         
         Returns:
             True if registered, False if modality already has a reasoner (duplicate prevented)
         """
         # Bug #5 Fix: Check for existing registration to prevent memory leak
         if modality in self.modality_reasoners:
-            logger.warning(
+            # Bug #9 Fix: Downgrade to DEBUG - duplicate registration is expected
+            # when UnifiedReasoner is re-instantiated (which happens per-query currently)
+            logger.debug(
                 f"Reasoner for modality '{modality.value}' already registered - "
                 f"ignoring duplicate registration"
             )
