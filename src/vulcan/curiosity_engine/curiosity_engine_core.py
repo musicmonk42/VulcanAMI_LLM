@@ -2272,7 +2272,7 @@ class CuriosityEngine:
             List of bootstrap Experiment objects
         """
         from .experiment_generator import Constraint, Experiment, ExperimentType
-        from .gap_analyzer import KnowledgeGap
+        # Note: KnowledgeGap is already imported at module level from .gap_analyzer
         
         experiments = []
         
