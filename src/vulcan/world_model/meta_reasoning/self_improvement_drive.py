@@ -45,6 +45,7 @@ import math
 import os
 import shutil
 import subprocess
+import tempfile
 import threading
 import time
 from dataclasses import dataclass, field
@@ -54,6 +55,13 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 # Initialize logger early - before it's used in import blocks
 logger = logging.getLogger(__name__)
+
+# ==========================================================================
+# CONSTANTS
+# ==========================================================================
+
+# Maximum characters to include in LLM prompts for code improvement
+MAX_CODE_SNIPPET_CHARS = 3000
 
 # NOTE: This patch assumes a class named SelfImprovementDrive exists.
 # Additions: policy loading, auto-apply gate, and robust get_status.
@@ -2882,7 +2890,6 @@ class SelfImprovementDrive:
         # STEP 3: Apply changes using safe executor
         if changes.get("type") == "code_modification":
             # Create a robust temporary file path using tempfile
-            import tempfile
             temp_dir = target_file.parent
             temp_fd, temp_path = tempfile.mkstemp(
                 suffix=".tmp", 
@@ -3111,8 +3118,8 @@ class SelfImprovementDrive:
             return {}
         
         # Generate improvement prompt with ACTUAL code
-        # Truncate to avoid context overflow (first 3000 chars)
-        code_snippet = actual_code[:3000]
+        # Truncate to avoid context overflow
+        code_snippet = actual_code[:MAX_CODE_SNIPPET_CHARS]
         
         prompt = f"""
 Improve this ACTUAL code from {target_file}:
