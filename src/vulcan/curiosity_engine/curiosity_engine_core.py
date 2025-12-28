@@ -2319,15 +2319,22 @@ class CuriosityEngine:
             
             for i, config in enumerate(bootstrap_gap_configs[:max_experiments]):
                 # Create synthetic gap
+                # FIX: Use correct KnowledgeGap parameters:
+                # - Use 'priority' instead of 'severity' (severity is not a valid parameter)
+                # - Store 'description' and 'related_patterns' in metadata (not top-level params)
                 gap = KnowledgeGap(
-                    id=f"bootstrap_{config['type']}_{i}",
                     type=config["type"],
                     domain=config["domain"],
-                    severity=0.3,  # Low severity for bootstrap
+                    priority=0.3,  # Low priority for bootstrap experiments
                     estimated_cost=config["complexity"] * 10,
-                    related_patterns=[],
-                    description=config["description"],
-                    metadata={"bootstrap": True, "auto_generated": True},
+                    gap_id=f"bootstrap_{config['type']}_{i}",
+                    complexity=config["complexity"],
+                    metadata={
+                        "bootstrap": True,
+                        "auto_generated": True,
+                        "description": config["description"],
+                        "related_patterns": [],
+                    },
                 )
                 
                 # Create experiment
