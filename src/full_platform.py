@@ -2879,6 +2879,52 @@ async def status_page(request: Request):
     return HTMLResponse(content=html_content)
 
 
+@app.get("/health/live")
+async def health_live():
+    """
+    Kubernetes/Docker liveness probe endpoint.
+    
+    This is a fast, lightweight endpoint that only checks if the process is alive.
+    It does NOT check service dependencies - use /health for comprehensive checks.
+    
+    Returns:
+        200 OK with {"status": "alive"} if the server is responding
+    """
+    return {"status": "alive", "timestamp": datetime.utcnow().isoformat()}
+
+
+@app.get("/health/ready")
+async def health_ready():
+    """
+    Kubernetes readiness probe endpoint.
+    
+    Checks if the application is ready to receive traffic. This performs a
+    lightweight check that critical services are available without doing
+    full health checks on all components.
+    
+    Returns:
+        200 OK with {"status": "ready"} if ready to serve requests
+        503 Service Unavailable if not ready
+    """
+    try:
+        # Check if service manager is initialized and has services
+        service_status = await service_manager.get_service_status()
+        has_services = len(service_status) > 0
+        
+        if has_services:
+            return {"status": "ready", "timestamp": datetime.utcnow().isoformat()}
+        else:
+            return JSONResponse(
+                status_code=503,
+                content={"status": "not_ready", "reason": "services_not_initialized"}
+            )
+    except Exception as e:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "not_ready", "reason": str(e)}
+        )
+
+
 @app.get("/health")
 async def health_check(request: Request):
     """Comprehensive health check for all services."""
