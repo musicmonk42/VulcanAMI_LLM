@@ -249,12 +249,22 @@ def get_bayesian_prior():
             return None
 
 
-def get_warm_pool():
+def get_warm_pool(tools: Optional[dict] = None, config: Optional[dict] = None):
     """
     Get singleton WarmStartPool instance.
     
+    BUG FIX Issues #3, #44: The WarmStartPool was being initialized multiple times
+    per query ("Warm pool initialized with 5 tool pools" appearing repeatedly).
+    This singleton ensures the pool is created once at startup.
+    
+    Args:
+        tools: Optional dictionary of tool_name -> tool_instance/factory.
+               Required on first call if pool needs initialization.
+               If None and pool doesn't exist, returns None (safe for early calls).
+        config: Optional configuration dictionary for WarmStartPool.
+        
     Returns:
-        WarmStartPool instance (singleton).
+        WarmStartPool instance (singleton), or None if tools not provided and pool doesn't exist.
     """
     global _warm_pool
     
@@ -266,10 +276,16 @@ def get_warm_pool():
         if _warm_pool is not None:
             return _warm_pool
         
+        # If no tools provided, cannot create WarmStartPool
+        # This is safe - callers that need tools will provide them
+        if tools is None:
+            logger.debug("[Singletons] WarmStartPool not yet initialized (no tools provided)")
+            return None
+        
         logger.info("[Singletons] Creating global WarmStartPool (ONCE)")
         try:
             from vulcan.reasoning.selection.warm_pool import WarmStartPool
-            _warm_pool = WarmStartPool()
+            _warm_pool = WarmStartPool(tools=tools, config=config or {})
             logger.info("[Singletons] ✓ WarmStartPool created and cached")
             return _warm_pool
         except ImportError as e:

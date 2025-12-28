@@ -764,15 +764,30 @@ class ProductionDeployment:
 
         # Semantic Bridge (Core) - Initialize before components that need it
         try:
-            from vulcan.semantic_bridge.semantic_bridge_core import SemanticBridge
-
-            # Pass world model, memory, and safety config
-            components["semantic_bridge"] = SemanticBridge(
-                world_model=components.get("world_model"),
-                vulcan_memory=components.get("am"),  # EpisodicMemory
-                safety_config=None,  # Will use singleton safety validator
-            )
-            logger.info("SemanticBridge initialized successfully")
+            # BUG FIX Issue #48: Use singleton SemanticBridge to prevent per-query reinitialization.
+            try:
+                from vulcan.reasoning.singletons import get_semantic_bridge
+                components["semantic_bridge"] = get_semantic_bridge()
+                if components["semantic_bridge"] is not None:
+                    logger.info("SemanticBridge obtained from singleton")
+                else:
+                    # Fallback to direct instantiation
+                    from vulcan.semantic_bridge.semantic_bridge_core import SemanticBridge
+                    components["semantic_bridge"] = SemanticBridge(
+                        world_model=components.get("world_model"),
+                        vulcan_memory=components.get("am"),
+                        safety_config=None,
+                    )
+                    logger.info("SemanticBridge initialized directly (singleton unavailable)")
+            except ImportError:
+                from vulcan.semantic_bridge.semantic_bridge_core import SemanticBridge
+                # Pass world model, memory, and safety config
+                components["semantic_bridge"] = SemanticBridge(
+                    world_model=components.get("world_model"),
+                    vulcan_memory=components.get("am"),  # EpisodicMemory
+                    safety_config=None,  # Will use singleton safety validator
+                )
+                logger.info("SemanticBridge initialized successfully")
         except ImportError as e:
             logger.error(f"Failed to import SemanticBridge: {e}")
             components["semantic_bridge"] = None
