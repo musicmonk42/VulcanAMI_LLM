@@ -1973,7 +1973,7 @@ class CuriosityEngine:
             )
 
             logger.info(
-                "Updated from %d experiment results (success rate: %.2f)",
+                "Updated from %d experiment results (learning rate: %.2f)",
                 len(results),
                 self.learning_rate,
             )
