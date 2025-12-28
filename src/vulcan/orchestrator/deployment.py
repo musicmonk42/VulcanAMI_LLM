@@ -182,7 +182,7 @@ class ProductionDeployment:
         config: Any,
         checkpoint_path: Optional[str] = None,
         orchestrator_type: str = "parallel",
-        redis_client: Any = None,
+        redis_client: Optional[Any] = None,
     ):
         """
         Initialize Production Deployment

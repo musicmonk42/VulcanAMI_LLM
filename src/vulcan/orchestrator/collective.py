@@ -79,7 +79,7 @@ class VULCANAGICollective:
     - Thread-safe operations
     """
 
-    def __init__(self, config: Any, sys: Any, deps: EnhancedCollectiveDeps, redis_client: Any = None):
+    def __init__(self, config: Any, sys: Any, deps: EnhancedCollectiveDeps, redis_client: Optional[Any] = None):
         """
         Initialize VULCAN AGI Collective
 

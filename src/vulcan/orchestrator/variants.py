@@ -145,7 +145,7 @@ class ParallelOrchestrator(VULCANAGICollective):
     - Python 3.8+ compatible
     """
 
-    def __init__(self, config: Any, sys: Any, deps: EnhancedCollectiveDeps, redis_client: Any = None):
+    def __init__(self, config: Any, sys: Any, deps: EnhancedCollectiveDeps, redis_client: Optional[Any] = None):
         """
         Initialize Parallel Orchestrator
 
@@ -363,7 +363,7 @@ class FaultTolerantOrchestrator(VULCANAGICollective):
     - Graceful degradation
     """
 
-    def __init__(self, config: Any, sys: Any, deps: EnhancedCollectiveDeps, redis_client: Any = None):
+    def __init__(self, config: Any, sys: Any, deps: EnhancedCollectiveDeps, redis_client: Optional[Any] = None):
         """
         Initialize Fault Tolerant Orchestrator
 
@@ -714,7 +714,7 @@ class AdaptiveOrchestrator(VULCANAGICollective):
     - Multiple execution modes (fast, careful, exploratory, balanced)
     """
 
-    def __init__(self, config: Any, sys: Any, deps: EnhancedCollectiveDeps, redis_client: Any = None):
+    def __init__(self, config: Any, sys: Any, deps: EnhancedCollectiveDeps, redis_client: Optional[Any] = None):
         """
         Initialize Adaptive Orchestrator
 
