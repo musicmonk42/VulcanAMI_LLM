@@ -120,10 +120,23 @@ class ToolWeightManager:
                     cls._instance._update_lock = threading.RLock()
         return cls._instance
     
-    def get_weight(self, tool: str) -> float:
-        """Get weight for a single tool."""
+    def get_weight(self, tool: str, default: float = 1.0) -> float:
+        """Get weight for a single tool.
+        
+        ISSUE #7 FIX: Return default weight (1.0) for tools that haven't been
+        seen before, rather than 0.0 which causes all weights to be zero.
+        This ensures ensemble weighting works correctly even before learning
+        has had time to adjust weights.
+        
+        Args:
+            tool: Tool name
+            default: Default weight for unseen tools (1.0 = neutral weight)
+            
+        Returns:
+            Weight value (default 1.0 if tool not in weights)
+        """
         with self._update_lock:
-            return self._weights.get(tool, 0.0)
+            return self._weights.get(tool, default)
     
     def set_weight(self, tool: str, value: float) -> None:
         """Set absolute weight value for a tool."""
@@ -132,27 +145,36 @@ class ToolWeightManager:
             logger.debug(f"[WeightManager] {tool} = {value:.4f}")
     
     def adjust_weight(self, tool: str, delta: float) -> None:
-        """Adjust weight by delta (used by Learning system)."""
+        """Adjust weight by delta (used by Learning system).
+        
+        ISSUE #7 FIX: Initialize from 1.0 (neutral weight) instead of 0.0
+        so that tools start with sensible weights before learning adjusts them.
+        """
         with self._update_lock:
-            current = self._weights.get(tool, 0.0)
+            # Start from 1.0 (neutral) instead of 0.0
+            current = self._weights.get(tool, 1.0)
             self._weights[tool] = current + delta
             logger.info(f"[WeightManager] {tool}: {current:.4f} → {self._weights[tool]:.4f}")
     
     def get_all_weights(self, tools: List[str]) -> Dict[str, float]:
         """Get weights for multiple tools (used by Ensemble).
         
-        Returns normalized weights with minimum value of 0.01 to ensure
-        all tools have some probability of being selected.
+        ISSUE #7 FIX: Returns normalized weights with default value of 1.0 for
+        unseen tools, rather than 0.01. This ensures ensemble weighting works
+        correctly even before learning has adjusted weights.
+        
+        Returns normalized weights.
         """
         with self._update_lock:
-            weights = {t: max(self._weights.get(t, 0.0), 0.01) for t in tools}
+            # Use 1.0 as default for unseen tools (neutral weight)
+            weights = {t: self._weights.get(t, 1.0) for t in tools}
             
             # Normalize if total > 0
             total = sum(weights.values())
             if total > 0:
                 weights = {k: v / total for k, v in weights.items()}
             else:
-                # If all zero, use uniform weights
+                # If all zero (shouldn't happen now with 1.0 default), use uniform weights
                 n = len(tools)
                 if n > 0:
                     weights = {t: 1.0 / n for t in tools}
