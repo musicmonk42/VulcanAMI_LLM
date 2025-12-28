@@ -62,6 +62,13 @@ class Settings(BaseSettings):
     improvement_check_interval_seconds: int = Field(
         default=120, env="IMPROVEMENT_CHECK_INTERVAL_SECONDS"
     )
+    
+    # FIX: Self-Improvement Git Commit Control
+    # Disable auto-commits to GitHub - prevents "Cannot commit: /app is not a Git repository" errors
+    # Default to False to prevent unintended commits in production environments
+    self_improvement_auto_commit: bool = Field(
+        default=False, env="VULCAN_SELF_IMPROVEMENT_AUTO_COMMIT"
+    )
 
     # --- Fields from old Settings class, preserved ---
     max_graph_size: int = 1000
@@ -177,8 +184,10 @@ class Settings(BaseSettings):
     arena_enabled: bool = Field(default=True, env="ARENA_ENABLED")
     # PERFORMANCE FIX: Complexity threshold for Arena fast-path skip
     # Queries with complexity < this value skip Arena entirely for faster response
-    # This prevents unnecessary Arena overhead for simple queries
-    arena_complexity_threshold: float = Field(default=0.3, env="ARENA_COMPLEXITY_THRESHOLD")
+    # This prevents unnecessary Arena overhead for very simple queries
+    # FIX: Lowered default from 0.3 to 0.1 - most queries should go through Arena
+    # Set ARENA_COMPLEXITY_THRESHOLD=0.0 to disable fast-path skip entirely
+    arena_complexity_threshold: float = Field(default=0.1, env="ARENA_COMPLEXITY_THRESHOLD")
 
     class Config:
         env_file = ".env"

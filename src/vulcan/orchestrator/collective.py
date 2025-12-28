@@ -11,7 +11,7 @@ import threading
 import time
 from collections import deque
 from enum import Enum
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 
@@ -79,7 +79,7 @@ class VULCANAGICollective:
     - Thread-safe operations
     """
 
-    def __init__(self, config: Any, sys: Any, deps: EnhancedCollectiveDeps):
+    def __init__(self, config: Any, sys: Any, deps: EnhancedCollectiveDeps, redis_client: Optional[Any] = None):
         """
         Initialize VULCAN AGI Collective
 
@@ -87,10 +87,12 @@ class VULCANAGICollective:
             config: Configuration object
             sys: System state object
             deps: Dependencies container
+            redis_client: Optional Redis client for state persistence across workers/restarts
         """
         self.config = config
         self.sys = sys
         self.deps = deps
+        self.redis_client = redis_client
 
         # FIXED: Bounded reasoning trace to prevent memory growth
         self.reasoning_trace = deque(maxlen=100)
@@ -113,10 +115,12 @@ class VULCANAGICollective:
 
         # Initialize agent pool
         # CPU OPTIMIZATION: Default reduced from min=10/max=100 to min=5/max=10
+        # BUG FIX: Pass redis_client for state persistence across workers/restarts
         self.agent_pool = AgentPoolManager(
             max_agents=getattr(config, "max_agents", 10),
             min_agents=getattr(config, "min_agents", 5),
             task_queue_type=getattr(config, "task_queue_type", "custom"),
+            redis_client=redis_client,
         )
 
         # Self-improvement tracking

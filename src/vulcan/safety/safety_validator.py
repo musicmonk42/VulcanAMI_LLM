@@ -1598,11 +1598,25 @@ class EnhancedSafetyValidator(SafetyValidator):
         # Use existing LLM validators for pre-check
         # FIX: Include source in context so validators can reduce false positives for internal calls
         context = {"query": query, "phase": "pre_check", "source": source}
+        
+        # FIX: Safety Validator False Positives - reduce sensitivity for internal/arena sources
+        # Internal sources (arena, agent, internal) should have higher tolerance
+        # as they're already validated or are intermediate processing steps
+        is_internal_source = source in ("arena", "agent", "internal", "system")
 
         for validator in self.llm_validators:
             try:
                 if not validator.check(query, context):
                     validator_name = validator.__class__.__name__
+                    
+                    # FIX: Skip ToxicityValidator false positives for internal sources
+                    # These are often legitimate system messages that trigger heuristics
+                    if is_internal_source and validator_name == "ToxicityValidator":
+                        logger.debug(
+                            f"[Safety] Skipping ToxicityValidator for internal source: {source}"
+                        )
+                        continue
+                    
                     if validator_name == "PromptInjectionValidator":
                         violations.append(SafetyViolationType.ADVERSARIAL)
                         reasons.append(

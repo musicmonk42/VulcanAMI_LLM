@@ -2489,6 +2489,18 @@ class WorldModel:
             f.write(updated_code)
 
         # 3. Git Commit (Simulated git_tools)
+        # FIX: Check if auto-commit is enabled via settings
+        # Default: DISABLED to prevent "Cannot commit: /app is not a Git repository" errors
+        try:
+            from vulcan.settings import settings
+            auto_commit_enabled = settings.self_improvement_auto_commit
+        except (ImportError, AttributeError):
+            auto_commit_enabled = False
+        
+        if not auto_commit_enabled:
+            logger.info("Self-improvement auto-commit disabled (set VULCAN_SELF_IMPROVEMENT_AUTO_COMMIT=true to enable)")
+            return diff_summary, False
+        
         # Check if the repo root is actually a Git repository
         if not (self.repo_root / ".git").exists():
             logger.warning(

@@ -37,7 +37,7 @@ _EMBEDDING_DIM = 256
 _MEMORY_CAPACITY = 100
 _KL_GUARD_THRESHOLD = 0.05
 _MAX_RETRIES = 3
-_FAST_OP_MAX_RETRIES = 1  # PERFORMANCE FIX: Fewer retries for fast operations
+_FAST_OP_MAX_RETRIES = 0  # FIX: Timeout Handler Issues - no retries for fast ops to prevent delays
 _VOCAB_SIZE = 5000
 _CACHE_TTL_SECONDS = 60.0
 _RESOURCE_CLEANUP_INTERVAL = 10  # PERFORMANCE FIX: Cleanup resources every N operations
@@ -618,11 +618,17 @@ class GraphixVulcanBridge:
                     )
                     return default
 
-                # ENHANCEMENT: Retry on timeout with exponential backoff
-                log.warning(
-                    f"Timeout on {fn.__name__ if hasattr(fn, '__name__') else 'unknown'}. Retrying in {0.05 * (2**attempt):.2f}s..."
-                )
-                await asyncio.sleep(0.05 * (2**attempt))
+                # FIX: Timeout Handler Issues - only retry if we have retries left
+                # Reduced logging level from WARNING to DEBUG to reduce noise
+                if max_retries > 0:
+                    log.debug(
+                        f"Timeout on {fn.__name__ if hasattr(fn, '__name__') else 'unknown'}. "
+                        f"Retrying in {0.05 * (2**attempt):.2f}s... (attempt {attempt + 1}/{max_retries + 1})"
+                    )
+                    await asyncio.sleep(0.05 * (2**attempt))
+                else:
+                    # No retries configured - return default immediately
+                    return default
 
             except Exception as e:
                 # FIX: Retry on all exceptions

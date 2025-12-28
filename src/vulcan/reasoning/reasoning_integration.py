@@ -70,6 +70,7 @@ Error Handling:
 
 import atexit
 import logging
+import os
 import threading
 import time
 from dataclasses import dataclass, field
@@ -95,7 +96,17 @@ DEFAULT_MIN_CONFIDENCE = 0.5  # Minimum confidence threshold for results
 FAST_PATH_COMPLEXITY_THRESHOLD = 0.3  # Below this, use fast path
 LOW_COMPLEXITY_THRESHOLD = 0.4  # Below this, use FAST mode
 HIGH_COMPLEXITY_THRESHOLD = 0.7  # Above this, use ACCURATE mode
-DECOMPOSITION_COMPLEXITY_THRESHOLD = 0.40  # At or above this, use decomposition
+# PERFORMANCE FIX: Raised from 0.40 to 0.70 to reduce unnecessary decomposition
+# Decomposition was causing cascade delays (48+ second query routing times)
+# Only truly complex queries should trigger hierarchical decomposition
+#
+# CONFIGURABLE: Set VULCAN_DECOMPOSITION_THRESHOLD environment variable to override
+# Example: VULCAN_DECOMPOSITION_THRESHOLD=0.50 for more frequent decomposition
+try:
+    DECOMPOSITION_COMPLEXITY_THRESHOLD = float(os.environ.get("VULCAN_DECOMPOSITION_THRESHOLD", "0.70"))
+except (ValueError, TypeError):
+    logger.warning("Invalid VULCAN_DECOMPOSITION_THRESHOLD, using default 0.70")
+    DECOMPOSITION_COMPLEXITY_THRESHOLD = 0.70
 
 # Strategy selection thresholds
 CAUSAL_REASONING_THRESHOLD = 0.6  # Complexity threshold for causal reasoning

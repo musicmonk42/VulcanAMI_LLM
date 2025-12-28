@@ -173,14 +173,40 @@ class Pattern:
             return 0.0
 
 
+# Default priority value for KnowledgeGap - used in severity alias comparison
+_DEFAULT_PRIORITY = 0.5
+
+
 @dataclass
 class KnowledgeGap:
-    """Single knowledge gap representation"""
+    """Single knowledge gap representation
+    
+    Attributes:
+        type: The type of knowledge gap (e.g., "decomposition", "causal", "transfer")
+        domain: The domain area of the gap
+        priority: Priority level (0.0 to 1.0), defaults to 0.5
+        estimated_cost: Estimated cost to address the gap, defaults to 0.0
+        severity: Optional alias for priority. When provided:
+            - If priority is at its default (0.5), severity value is used as priority
+            - If priority was explicitly set to a non-default value, it takes precedence
+            - After __post_init__, severity is always synced to match the final priority value
+    
+    Example:
+        >>> # Using priority directly
+        >>> gap1 = KnowledgeGap(type="causal", domain="physics", priority=0.8, estimated_cost=10.0)
+        >>> gap1.priority  # 0.8
+        >>> gap1.severity  # None
+        >>> 
+        >>> # Using severity as alias
+        >>> gap2 = KnowledgeGap(type="causal", domain="physics", severity=0.7, estimated_cost=10.0)
+        >>> gap2.priority  # 0.7 (from severity)
+        >>> gap2.severity  # 0.7 (synced to priority)
+    """
 
     type: str  # Gap type
     domain: str
-    priority: float
-    estimated_cost: float
+    priority: float = _DEFAULT_PRIORITY
+    estimated_cost: float = 0.0  # Default to 0.0 for backward compatibility
     missing_capability: Optional[str] = None
     gap_id: Optional[str] = None
     id: Optional[str] = None  # Alias for gap_id
@@ -190,9 +216,20 @@ class KnowledgeGap:
     complexity: float = 0.5
     dependencies: List[str] = field(default_factory=list)
     adjusted_roi: Optional[float] = None
+    # ISSUE FIX: Add severity as an alias for priority for backward compatibility
+    # This addresses the KnowledgeGap constructor bug where callers pass severity=
+    severity: Optional[float] = None  # Alias for priority
 
     def __post_init__(self):
-        """Generate ID if not provided"""
+        """Generate ID if not provided and handle severity alias"""
+        # ISSUE FIX: Handle severity as an alias for priority
+        # If severity is provided and priority is at default, use severity
+        if self.severity is not None:
+            if self.priority == _DEFAULT_PRIORITY:
+                self.priority = self.severity
+            # Sync severity to match priority for consistency in serialization
+            self.severity = self.priority
+        
         if not self.gap_id and not self.id:
             # Generate unique ID
             content = f"{self.type}_{self.domain}_{self.timestamp}"
@@ -208,7 +245,7 @@ class KnowledgeGap:
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization"""
-        return {
+        result = {
             "gap_id": self.gap_id,
             "id": self.id,
             "type": self.type,
@@ -223,6 +260,10 @@ class KnowledgeGap:
             "dependencies": self.dependencies,
             "adjusted_roi": self.adjusted_roi,
         }
+        # Only include severity if it was explicitly set
+        if self.severity is not None:
+            result["severity"] = self.severity
+        return result
 
     def mark_addressed(self):
         """Mark gap as addressed"""

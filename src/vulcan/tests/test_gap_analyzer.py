@@ -160,6 +160,8 @@ class TestKnowledgeGap:
         assert result["complexity"] == 0.8
         assert result["metadata"] == {"key": "value"}
         assert result["addressed"] is False
+        # severity should not be included when not explicitly set
+        assert "severity" not in result
 
     def test_gap_mark_addressed(self):
         """Test marking gap as addressed"""
@@ -220,6 +222,50 @@ class TestKnowledgeGap:
 
         assert gap1 == gap2
         assert gap1 != gap3
+
+    def test_gap_creation_with_severity_alias(self):
+        """Test gap creation using severity parameter as alias for priority"""
+        gap = KnowledgeGap(
+            type="performance",
+            domain="query_routing",
+            severity=0.75,  # Using severity as alias for priority
+            estimated_cost=15.0,
+        )
+
+        # Verify severity is correctly mapped to priority
+        assert gap.priority == 0.75
+        assert gap.severity == 0.75
+        assert gap.type == "performance"
+        assert gap.domain == "query_routing"
+
+    def test_gap_priority_takes_precedence_over_severity(self):
+        """Test that priority takes precedence when both are provided"""
+        gap = KnowledgeGap(
+            type="performance",
+            domain="query_routing",
+            priority=0.9,  # Explicit priority should take precedence
+            severity=0.3,  # Will be synced to priority value
+            estimated_cost=15.0,
+        )
+
+        assert gap.priority == 0.9
+        # severity is synced to priority when both are provided
+        assert gap.severity == 0.9
+
+    def test_gap_to_dict_includes_severity(self):
+        """Test that to_dict includes severity field"""
+        gap = KnowledgeGap(
+            type="performance",
+            domain="query_routing",
+            severity=0.6,
+            estimated_cost=10.0,
+        )
+
+        result = gap.to_dict()
+        
+        assert "severity" in result
+        assert result["severity"] == 0.6
+        assert result["priority"] == 0.6  # Should match since severity was used
 
 
 class TestLatentGap:

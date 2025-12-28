@@ -278,6 +278,17 @@ services:
       - SEMANTIC_BRIDGE_ENABLED=${SEMANTIC_BRIDGE_ENABLED:-true}
       - CROSS_DOMAIN_TRANSFER_ENABLED=${CROSS_DOMAIN_TRANSFER_ENABLED:-true}
       - PATTERN_LEARNING_ENABLED=${PATTERN_LEARNING_ENABLED:-true}
+      # Performance Tuning Configuration (PR Fixes)
+      # Embedding timeout reduced from 30s to 5s to prevent cascade delays
+      - VULCAN_EMBEDDING_TIMEOUT=${VULCAN_EMBEDDING_TIMEOUT:-5.0}
+      # Decomposition threshold raised to reduce unnecessary decomposition
+      - VULCAN_DECOMPOSITION_THRESHOLD=${VULCAN_DECOMPOSITION_THRESHOLD:-0.70}
+      # Arena threshold lowered so more queries go through Arena
+      - ARENA_COMPLEXITY_THRESHOLD=${ARENA_COMPLEXITY_THRESHOLD:-0.1}
+      # Self-improvement auto-commit disabled by default
+      - VULCAN_SELF_IMPROVEMENT_AUTO_COMMIT=${VULCAN_SELF_IMPROVEMENT_AUTO_COMMIT:-false}
+      # Gap give-up threshold increased from 3 to 10
+      - VULCAN_GAP_GIVEUP_THRESHOLD=${VULCAN_GAP_GIVEUP_THRESHOLD:-10}
       # Vulcan Memory System (v46) Configuration
       - MILVUS_HOST=milvus
       - MILVUS_PORT=19530

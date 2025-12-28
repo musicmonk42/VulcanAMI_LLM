@@ -182,6 +182,7 @@ class ProductionDeployment:
         config: Any,
         checkpoint_path: Optional[str] = None,
         orchestrator_type: str = "parallel",
+        redis_client: Optional[Any] = None,
     ):
         """
         Initialize Production Deployment
@@ -190,6 +191,7 @@ class ProductionDeployment:
             config: Configuration object
             checkpoint_path: Path to load checkpoint from
             orchestrator_type: Type of orchestrator ('parallel', 'adaptive', 'fault_tolerant', 'basic')
+            redis_client: Optional Redis client for state persistence across workers/restarts
         """
         self.config = config
         self.collective: Optional[VULCANAGICollective] = None
@@ -198,6 +200,7 @@ class ProductionDeployment:
         self.unified_runtime = None
         self.startup_time = time.time()
         self.orchestrator_type = orchestrator_type
+        self.redis_client = redis_client
         self._shutdown_requested = False
 
         # FIXED: Add checkpoint locking and step tracking to prevent race conditions
@@ -1104,18 +1107,19 @@ class ProductionDeployment:
             orchestrator_type = "basic"
 
         # Create appropriate orchestrator
+        # BUG FIX: Pass redis_client to all orchestrators for state persistence
         if orchestrator_type == "parallel":
             logger.info("Creating ParallelOrchestrator")
-            return ParallelOrchestrator(self.config, system_state, deps)
+            return ParallelOrchestrator(self.config, system_state, deps, redis_client=self.redis_client)
         elif orchestrator_type == "adaptive":
             logger.info("Creating AdaptiveOrchestrator")
-            return AdaptiveOrchestrator(self.config, system_state, deps)
+            return AdaptiveOrchestrator(self.config, system_state, deps, redis_client=self.redis_client)
         elif orchestrator_type == "fault_tolerant":
             logger.info("Creating FaultTolerantOrchestrator")
-            return FaultTolerantOrchestrator(self.config, system_state, deps)
+            return FaultTolerantOrchestrator(self.config, system_state, deps, redis_client=self.redis_client)
         else:
             logger.info("Creating basic VULCANAGICollective")
-            return VULCANAGICollective(self.config, system_state, deps)
+            return VULCANAGICollective(self.config, system_state, deps, redis_client=self.redis_client)
 
     def step_with_monitoring(
         self, history: List[Any], context: Dict[str, Any]
