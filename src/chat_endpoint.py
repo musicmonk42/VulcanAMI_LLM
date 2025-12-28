@@ -279,26 +279,56 @@ class VulcanChatEngine:
 
     @property
     def world_model(self):
-        """Lazy-load world model."""
+        """Lazy-load world model using singleton pattern.
+        
+        BUG FIX Issues #1-4, #45-46: Use singleton WorldModel to prevent per-query
+        reinitialization that causes 10-15 second overhead per query.
+        """
         if self._world_model is None:
+            # Try singleton first
+            try:
+                from vulcan.reasoning.singletons import get_world_model
+                self._world_model = get_world_model()
+                if self._world_model:
+                    logger.info("✓ World Model obtained from singleton")
+                    return self._world_model
+            except ImportError:
+                pass
+            
+            # Fallback to direct instantiation
             WMClass = _get_world_model()
             if WMClass:
                 try:
                     self._world_model = WMClass()
-                    logger.info("✓ World Model loaded")
+                    logger.info("✓ World Model loaded (fallback)")
                 except Exception as e:
                     logger.warning(f"Failed to initialize World Model: {e}")
         return self._world_model
 
     @property
     def reasoner(self):
-        """Lazy-load unified reasoner."""
+        """Lazy-load unified reasoner using singleton pattern.
+        
+        BUG FIX: Use singleton UnifiedReasoner to prevent per-query 
+        reinitialization of WarmStartPool, ToolSelector, and MultiModalReasoningEngine.
+        """
         if self._reasoner is None:
+            # Try singleton first
+            try:
+                from vulcan.reasoning.singletons import get_unified_reasoner
+                self._reasoner = get_unified_reasoner()
+                if self._reasoner:
+                    logger.info("✓ Unified Reasoner obtained from singleton")
+                    return self._reasoner
+            except ImportError:
+                pass
+            
+            # Fallback to direct instantiation
             URClass = _get_unified_reasoner()
             if URClass:
                 try:
                     self._reasoner = URClass()
-                    logger.info("✓ Unified Reasoner loaded")
+                    logger.info("✓ Unified Reasoner loaded (fallback)")
                 except Exception as e:
                     logger.warning(f"Failed to initialize Unified Reasoner: {e}")
         return self._reasoner
