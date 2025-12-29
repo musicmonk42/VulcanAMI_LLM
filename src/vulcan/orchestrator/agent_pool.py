@@ -476,6 +476,9 @@ class SystemMetrics:
     - Dead letter queue jobs
     """
     
+    # Alert threshold for job latency p99 in milliseconds (10 seconds)
+    ALERT_LATENCY_THRESHOLD_MS = 10000.0
+    
     def __init__(self, alert_threshold_dormancy: float = 0.95):
         """
         Initialize system metrics.
@@ -544,8 +547,16 @@ class SystemMetrics:
         sorted_latencies = sorted(latencies)
         n = len(sorted_latencies)
         
-        # Calculate p50 (median)
-        self.metrics["agent_job_latency_p50"] = sorted_latencies[n // 2]
+        # Calculate p50 (median) - proper handling for even-length arrays
+        if n % 2 == 0:
+            # For even-length arrays, median is average of two middle values
+            mid = n // 2
+            self.metrics["agent_job_latency_p50"] = (
+                sorted_latencies[mid - 1] + sorted_latencies[mid]
+            ) / 2.0
+        else:
+            # For odd-length arrays, median is the middle value
+            self.metrics["agent_job_latency_p50"] = sorted_latencies[n // 2]
         
         # Calculate p99
         p99_idx = min(int(n * 0.99), n - 1)
@@ -592,7 +603,7 @@ class SystemMetrics:
                 return f"Curiosity engine stuck in dormancy (ratio={dormancy:.2f})"
             
             # Alert if job latencies spike
-            if self.metrics["agent_job_latency_p99"] > 10000.0:  # 10 seconds
+            if self.metrics["agent_job_latency_p99"] > self.ALERT_LATENCY_THRESHOLD_MS:
                 self.metrics["consecutive_alerts"] += 1
                 return (
                     f"Job processing latency spike "
@@ -2048,10 +2059,10 @@ class AgentPoolManager:
         Calculate a composite score for agent selection based on multiple factors.
         
         RESOURCE-AWARE JOB DISTRIBUTION: This enables smarter job assignment
-        based on agent health scores (0.8-0.92 as seen in logs).
+        by considering agent health, load, and historical performance.
         
         Factors considered:
-        - Health score (40%): Agent's overall health
+        - Health score (40%): Agent's overall health (0.0-1.0)
         - Current load (30%): Inverse of current workload
         - Success rate (20%): Historical success rate
         - Capability match (10%): How well capability matches job
@@ -3122,8 +3133,8 @@ class AgentPoolManager:
         
         # Find a new agent (outside lock to avoid deadlock)
         try:
-            # Use wait_for_agent with a short timeout
-            new_agent_id = self.wait_for_agent(
+            # Use _assign_agent_with_timeout with a short timeout
+            new_agent_id = self._assign_agent_with_timeout(
                 capability=capability,
                 timeout_seconds=AGENT_SELECTION_TIMEOUT_SECONDS
             )

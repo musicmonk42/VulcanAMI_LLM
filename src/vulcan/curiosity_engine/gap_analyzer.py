@@ -1516,7 +1516,7 @@ class GapAnalyzer:
             # Consider it anomalous if there are slow routing events or low success rate
             if stats.slow_routing_count > 0:
                 return True
-            if stats.total_outcomes > 0 and stats.success_rate < 0.9:
+            if stats.total > 0 and stats.success_rate < 0.9:
                 return True
                 
             return False
