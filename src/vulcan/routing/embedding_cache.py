@@ -443,35 +443,24 @@ class EmbeddingCache:
         - Memory corruption
         - Application crashes during cache operations
         
-        Unlike clear(), this method:
-        1. Clears all cached entries
-        2. Resets all statistics
-        3. Rebuilds internal OrderedDict to ensure clean state
-        4. Logs the rebuild operation for audit purposes
+        Unlike clear(), this method logs the previous state before clearing
+        and emits a warning-level log message for audit purposes.
         
         Example:
             >>> cache.clear_and_rebuild()  # Cache may be corrupted
             >>> stats = cache.get_stats()
             >>> assert stats.size == 0
         """
+        # Capture state for logging before clearing
         with self._lock:
-            # Store old stats for logging
             old_size = len(self._cache)
             old_hits = self._hits
             old_misses = self._misses
-            
-            # Clear existing cache
-            self._cache.clear()
-            
-            # Rebuild internal OrderedDict to ensure clean state
-            self._cache = OrderedDict()
-            
-            # Reset all statistics
-            self._hits = 0
-            self._misses = 0
-            self._evictions = 0
-            self._compute_time_saved_ms = 0.0
         
+        # Use existing clear() method to avoid code duplication
+        self.clear()
+        
+        # Log with warning level for audit purposes (corruption recovery scenario)
         logger.warning(
             f"{LOG_PREFIX} Cache cleared and rebuilt (corruption recovery). "
             f"Previous state: size={old_size}, hits={old_hits}, misses={old_misses}"
