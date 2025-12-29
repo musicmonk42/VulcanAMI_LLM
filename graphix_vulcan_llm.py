@@ -570,7 +570,7 @@ def load_config(config_path: Optional[str]) -> Dict[str, Any]:
             dropout=0.1,
         ),
         "generation": {
-            "max_tokens": 64,  # Reduced from 128 for faster responses on CPU (~5s/token)
+            "max_tokens": 2000,  # Increased to 2000 for diagnostic purposes (was 64)
             "temperature": 0.7,
             "top_k": 50,
             "top_p": 0.9,

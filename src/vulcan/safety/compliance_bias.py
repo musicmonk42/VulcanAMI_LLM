@@ -2,23 +2,109 @@
 """
 Compliance checking and bias detection for VULCAN-AGI Safety Module.
 Implements regulatory compliance validation and multi-model bias detection.
+
+FIX: Mathematical Scenario Detection Integration
+- Added mathematical scenario detection to bypass HIPAA false positives
+- Mathematical problems with medical terminology (e.g., Bayesian probability
+  with disease testing) should not trigger HIPAA compliance checks
 """
 
 import hashlib
 import json
 import logging
+import re
 import threading
 import time
 from collections import defaultdict, deque
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
-import torch
-import torch.nn as nn
+
+# Optional torch import for bias detection neural models
+try:
+    import torch
+    import torch.nn as nn
+    TORCH_AVAILABLE = True
+except ImportError:
+    TORCH_AVAILABLE = False
+    torch = None
+    nn = None
 
 from .safety_types import ComplianceStandard
 
 logger = logging.getLogger(__name__)
+
+# ============================================================
+# MATHEMATICAL SCENARIO DETECTION CONSTANTS
+# ============================================================
+# FIX: Mathematical indicators for detecting Bayesian/probability problems
+# This prevents false positive HIPAA violations for math problems with medical terms
+
+MATHEMATICAL_INDICATORS = frozenset({
+    "probability", "bayesian", "bayes", "prior", "posterior",
+    "sensitivity", "specificity", "conditional probability", "likelihood",
+    "false positive", "false negative", "true positive", "true negative",
+    "statistical", "statistics", "formula", "equation",
+    "what is the probability", "what's the probability", "what are the odds",
+    "how likely", "base rate", "prevalence", "ppv", "npv",
+    "positive predictive value", "negative predictive value", "test accuracy",
+    "given that", "p(", "calculate", "compute",
+})
+
+# Mathematical notation regex patterns (pre-compiled for performance)
+MATH_NOTATION_PATTERNS = [
+    re.compile(r'\d+%'),           # Percentages
+    re.compile(r'\d+\.\d+'),       # Decimals
+    re.compile(r'\d+/\d+'),        # Fractions
+    re.compile(r'p\s*\('),         # Probability notation P(
+    re.compile(r'\d+\s*in\s*\d+'), # X in Y notation
+]
+
+# Hypothetical language indicators (signals math problem vs real medical data)
+HYPOTHETICAL_INDICATORS = frozenset({
+    "suppose", "assume", "imagine", "hypothetical", "example",
+    "probability problem", "statistics problem", "math problem",
+    "solve", "calculate", "compute",
+})
+
+
+def is_mathematical_scenario(query: str) -> bool:
+    """
+    Detect if query is a mathematical/statistical problem vs actual medical scenario.
+    
+    This prevents false positive HIPAA/medical safety violations for legitimate
+    mathematical problems that happen to use medical terminology (e.g., Bayesian
+    probability problems involving disease testing).
+    
+    FIX: GitHub Issue - Mathematical reasoning blocked by safety system false positives.
+    
+    Args:
+        query: The user query to analyze
+        
+    Returns:
+        True if query is a mathematical scenario that should bypass medical compliance checks
+    """
+    query_lower = query.lower()
+    
+    # Count mathematical indicators
+    math_score = sum(1 for indicator in MATHEMATICAL_INDICATORS if indicator in query_lower)
+    
+    # Check for mathematical notation patterns
+    has_math_notation = any(pattern.search(query_lower) for pattern in MATH_NOTATION_PATTERNS)
+    
+    # Check for hypothetical language
+    is_hypothetical = any(ind in query_lower for ind in HYPOTHETICAL_INDICATORS)
+    
+    # Return True if this looks like a math problem
+    # Either: 2+ math indicators, or 1 math indicator + notation, or hypothetical language
+    if math_score >= 2:
+        return True
+    if math_score >= 1 and has_math_notation:
+        return True
+    if is_hypothetical and math_score >= 1:
+        return True
+        
+    return False
 
 # ============================================================
 # COMPLIANCE MAPPER
@@ -288,6 +374,11 @@ class ComplianceMapper:
         """
         Check compliance with specified standards.
 
+        FIX: Mathematical Scenario Override
+        - Detects mathematical problems (e.g., Bayesian probability with medical terms)
+        - Bypasses HIPAA compliance checks for legitimate math scenarios
+        - This prevents false positives that block probabilistic reasoning tools
+
         Args:
             action: Action to validate for compliance
             context: Context containing compliance-relevant information
@@ -299,6 +390,21 @@ class ComplianceMapper:
         # Use all standards if none specified
         if standards is None:
             standards = list(self.standards.keys())
+
+        # FIX: Mathematical scenario override - extract query from action/context
+        # If this is a mathematical problem, skip medical/HIPAA compliance checks
+        query = action.get("query", "") or action.get("prompt", "") or context.get("query", "") or ""
+        is_math_scenario = is_mathematical_scenario(query) if query else False
+        
+        if is_math_scenario and ComplianceStandard.HIPAA in standards:
+            # Remove HIPAA from standards for mathematical scenarios
+            standards = [s for s in standards if s != ComplianceStandard.HIPAA]
+            logger.info(
+                "[ComplianceMapper] Mathematical scenario detected - "
+                "bypassing HIPAA compliance checks (not real PHI)"
+            )
+            # Mark context for downstream awareness
+            context["mathematical_scenario_override"] = True
 
         # Check cache (with lock)
         cache_key = self._generate_cache_key(action, context, standards)
@@ -1637,12 +1743,14 @@ class BiasDetector:
     """
     Multi-model bias detection system using neural networks.
     Detects demographic, representation, and fairness biases.
+    
+    Note: If PyTorch is not available, bias detection will use simplified
+    heuristic-based methods instead of neural models.
     """
 
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         """Initialize bias detector with models."""
         self.config = config or {}
-        self.bias_models = self._initialize_models()
         self.bias_history = deque(maxlen=1000)
         self.bias_thresholds = {
             "demographic": self.config.get("demographic_threshold", 0.15),
@@ -1677,19 +1785,32 @@ class BiasDetector:
         # Prediction cache
         self.prediction_cache = LRUCache(maxsize=500)
 
-        # Device management
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        # Only initialize torch models if available
+        self._torch_available = TORCH_AVAILABLE
+        if self._torch_available:
+            self.bias_models = self._initialize_models()
+            # Device management
+            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        # Move models to device
-        for model_name, model in self.bias_models.items():
-            self.bias_models[model_name] = model.to(self.device)
+            # Move models to device
+            for model_name, model in self.bias_models.items():
+                self.bias_models[model_name] = model.to(self.device)
 
-        logger.info(
-            f"BiasDetector initialized with multi-model ensemble on {self.device}"
-        )
+            logger.info(
+                f"BiasDetector initialized with multi-model ensemble on {self.device}"
+            )
+        else:
+            self.bias_models = {}
+            self.device = None
+            logger.warning(
+                "BiasDetector initialized without PyTorch - using heuristic bias detection"
+            )
 
-    def _initialize_models(self) -> Dict[str, nn.Module]:
+    def _initialize_models(self) -> Dict[str, "nn.Module"]:
         """Initialize bias detection models."""
+        if not self._torch_available:
+            return {}
+            
         models = {
             "demographic": self._build_demographic_bias_model(),
             "representation": self._build_representation_bias_model(),
@@ -1704,8 +1825,10 @@ class BiasDetector:
 
         return models
 
-    def _build_demographic_bias_model(self) -> nn.Module:
+    def _build_demographic_bias_model(self) -> "nn.Module":
         """Build model for demographic bias detection."""
+        if not self._torch_available:
+            return None
         return nn.Sequential(
             nn.Linear(128, 256),
             nn.ReLU(),
@@ -1719,8 +1842,10 @@ class BiasDetector:
             nn.Softmax(dim=-1),
         )
 
-    def _build_representation_bias_model(self) -> nn.Module:
+    def _build_representation_bias_model(self) -> "nn.Module":
         """Build model for representation bias detection."""
+        if not self._torch_available:
+            return None
         return nn.Sequential(
             nn.Linear(128, 64),
             nn.ReLU(),
@@ -1732,8 +1857,10 @@ class BiasDetector:
             nn.Sigmoid(),
         )
 
-    def _build_fairness_model(self) -> nn.Module:
+    def _build_fairness_model(self) -> "nn.Module":
         """Build model for fairness assessment."""
+        if not self._torch_available:
+            return None
         return nn.Sequential(
             nn.Linear(256, 512),
             nn.ReLU(),
@@ -1750,8 +1877,10 @@ class BiasDetector:
             nn.Sigmoid(),
         )
 
-    def _build_outcome_bias_model(self) -> nn.Module:
+    def _build_outcome_bias_model(self) -> "nn.Module":
         """Build model for outcome bias detection."""
+        if not self._torch_available:
+            return None
         return nn.Sequential(
             nn.Linear(128, 128),
             nn.ReLU(),
@@ -1764,8 +1893,10 @@ class BiasDetector:
             nn.Sigmoid(),
         )
 
-    def _build_allocation_bias_model(self) -> nn.Module:
+    def _build_allocation_bias_model(self) -> "nn.Module":
         """Build model for resource allocation bias detection."""
+        if not self._torch_available:
+            return None
         return nn.Sequential(
             nn.Linear(128, 96),
             nn.ReLU(),
@@ -1795,6 +1926,11 @@ class BiasDetector:
         Returns:
             Dictionary with bias detection results
         """
+        # FIX: Fallback when PyTorch is not available
+        if not self._torch_available:
+            # Return heuristic-based bias detection
+            return self._detect_bias_heuristic(action, context)
+        
         # Generate cache key
         cache_key = hashlib.md5(
             json.dumps(
@@ -1919,6 +2055,46 @@ class BiasDetector:
 
         return result
 
+    def _detect_bias_heuristic(
+        self, action: Dict[str, Any], context: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Fallback heuristic-based bias detection when PyTorch is unavailable.
+        
+        Uses simple keyword and pattern matching for basic bias detection.
+        """
+        bias_scores = {
+            "demographic": 0.0,
+            "representation": 0.0,
+            "outcome": 0.0,
+            "allocation": 0.0,
+            "fairness": 0.5,  # Neutral
+        }
+        
+        # Check for demographic bias indicators in action/context text
+        text_to_check = str(action) + str(context)
+        text_lower = text_to_check.lower()
+        
+        # Demographic keywords
+        demographic_keywords = ["gender", "race", "age", "ethnicity", "religion"]
+        demographic_score = sum(1 for kw in demographic_keywords if kw in text_lower) / len(demographic_keywords)
+        bias_scores["demographic"] = min(demographic_score, 0.5)
+        
+        # Check for any biases above threshold
+        bias_detected = any(
+            score >= self.bias_thresholds.get(bias_type, 0.15)
+            for bias_type, score in bias_scores.items()
+        )
+        
+        return {
+            "bias_detected": bias_detected,
+            "bias_scores": bias_scores,
+            "overall_bias_score": np.mean(list(bias_scores.values())),
+            "confidence": 0.5,  # Lower confidence for heuristic method
+            "recommendations": [] if not bias_detected else ["Review for potential bias"],
+            "method": "heuristic",
+        }
+
     def _extract_features(
         self, action: Dict[str, Any], context: Dict[str, Any]
     ) -> np.ndarray:
@@ -1999,7 +2175,7 @@ class BiasDetector:
 
         return extended
 
-    def _calculate_demographic_bias(self, output: torch.Tensor) -> float:
+    def _calculate_demographic_bias(self, output: "torch.Tensor") -> float:
         """Calculate demographic bias from model output."""
         probs = output.squeeze().numpy()
 
@@ -2014,7 +2190,7 @@ class BiasDetector:
 
         return float(normalized_bias)
 
-    def _analyze_demographic_bias(self, output: torch.Tensor) -> Dict[str, Any]:
+    def _analyze_demographic_bias(self, output: "torch.Tensor") -> Dict[str, Any]:
         """Detailed analysis of demographic bias."""
         probs = output.squeeze().numpy()
         categories = [

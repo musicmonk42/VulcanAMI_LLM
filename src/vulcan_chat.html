@@ -948,7 +948,7 @@
             
             <div class="setting-group">
                 <label for="maxTokens">Max Tokens</label>
-                <input type="number" id="maxTokens" value="500" min="100" max="4000">
+                <input type="number" id="maxTokens" value="2000" min="100" max="4000">
             </div>
             
             <div class="setting-group">
@@ -1071,7 +1071,7 @@
         // Global state
         let baseUrl = '';
         let apiKey = '';
-        let maxTokens = 500;
+        let maxTokens = 2000;  // Increased for diagnostic purposes (was 500)
         let tokenCost = 0.01;
         let conversations = [{ id: 0, name: 'Conversation 1', history: [] }];
         let currentTab = 0;
@@ -1132,7 +1132,7 @@
                 const s = JSON.parse(saved);
                 baseUrl = s.baseUrl || baseUrl;
                 apiKey = s.apiKey || '';
-                maxTokens = s.maxTokens || 500;
+                maxTokens = s.maxTokens || 2000;  // Updated default for diagnostics
                 tokenCost = s.tokenCost || 0.01;
                 systemToggles = s.systemToggles || systemToggles;
                 
@@ -1184,7 +1184,7 @@
         function saveAndClose() {
             baseUrl = document.getElementById('apiUrl').value.trim() || baseUrl;
             apiKey = document.getElementById('apiKey').value.trim();
-            maxTokens = parseInt(document.getElementById('maxTokens').value) || 500;
+            maxTokens = parseInt(document.getElementById('maxTokens').value) || 2000;  // Updated default
             tokenCost = parseFloat(document.getElementById('tokenCost').value) || 0.01;
             
             systemToggles.reasoning = document.getElementById('enableReasoning').checked;

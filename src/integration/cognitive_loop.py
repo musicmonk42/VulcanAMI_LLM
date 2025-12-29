@@ -49,7 +49,7 @@ class LoopSamplingConfig:
     temperature: float = 0.7
     top_k: int = 50
     top_p: float = 0.9
-    max_tokens: int = 128
+    max_tokens: int = 2000  # Increased for diagnostic purposes (was 128)
     min_tokens: int = 1
     stop_tokens: Tuple[Token, ...] = field(default_factory=lambda: ("</s>",))
     stop_strings: Tuple[str, ...] = field(default_factory=lambda: ("\n\n",))

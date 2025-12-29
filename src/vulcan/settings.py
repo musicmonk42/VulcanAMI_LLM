@@ -133,8 +133,8 @@ class Settings(BaseSettings):
     llm_ensemble_min_confidence: float = Field(
         default=0.7, env="LLM_ENSEMBLE_MIN_CONFIDENCE"
     )
-    # Maximum tokens for OpenAI API calls
-    llm_openai_max_tokens: int = Field(default=1000, env="LLM_OPENAI_MAX_TOKENS")
+    # Maximum tokens for OpenAI API calls (increased to 2000 for diagnostic purposes)
+    llm_openai_max_tokens: int = Field(default=2000, env="LLM_OPENAI_MAX_TOKENS")
 
     # Knowledge Distillation Configuration
     # When enabled, captures OpenAI responses and uses them to train Vulcan's local LLM

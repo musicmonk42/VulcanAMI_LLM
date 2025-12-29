@@ -79,7 +79,7 @@ class ApprovalRequest(BaseModel):
 class ChatRequest(BaseModel):
     """Request model for chat endpoint."""
     prompt: str
-    max_tokens: int = 512
+    max_tokens: int = 2000  # Increased for diagnostic purposes
 
 
 class ReasonRequest(BaseModel):
