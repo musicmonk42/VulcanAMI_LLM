@@ -81,6 +81,68 @@ class TestPhilosophicalQueryDetection:
             f"Philosophical query should have low complexity, got {plan.complexity_score}"
         )
 
+    def test_hedonism_ethical_dilemma_detected(self, query_analyzer):
+        """
+        ISSUE FIX TEST: Test hedonism/ethical dilemma queries are detected as philosophical.
+        
+        This test validates the fix for the issue where philosophical queries like
+        "ethical dilemma about hedonism and the experience machine" were incorrectly
+        routed to MATH-FAST-PATH with mathematical tools instead of PHILOSOPHICAL-FAST-PATH.
+        
+        Key observations from the bug:
+        - Query type: Philosophical/ethical dilemma
+        - Incorrect routing: MATH-FAST-PATH with complexity=0.30
+        - Wrong tools: probabilistic, symbolic, mathematical
+        - Correct routing: PHILOSOPHICAL-FAST-PATH with tools=['general']
+        """
+        # The exact type of query that was causing the bug
+        test_queries = [
+            "What is the ethical dilemma of hedonism and the experience machine?",
+            "Discuss the experience machine thought experiment",
+            "Is hedonism a valid ethical philosophy?",
+            "What are the utilitarian arguments for and against the experience machine?",
+            "Explain the moral implications of choosing pleasure over reality",
+        ]
+        
+        for query in test_queries:
+            is_philosophical = query_analyzer._is_philosophical_query(query)
+            assert is_philosophical, f"'{query}' should be detected as philosophical"
+            
+            # Verify routing uses philosophical fast-path (not math)
+            plan = query_analyzer.route_query(query, source="user")
+            
+            # Should use philosophical fast-path
+            assert plan.telemetry_data.get("philosophical_fast_path") == True, \
+                f"'{query}' should use philosophical_fast_path, got {plan.telemetry_data}"
+            
+            # Should NOT use math fast-path
+            assert plan.telemetry_data.get("math_fast_path") != True, \
+                f"'{query}' should NOT use math_fast_path"
+            
+            # Tools should be 'general', not mathematical
+            selected_tools = plan.telemetry_data.get("selected_tools", [])
+            assert "general" in selected_tools, \
+                f"'{query}' should use general tool, got {selected_tools}"
+            # Check all mathematical tools are excluded
+            math_tools = ["probabilistic", "symbolic", "mathematical"]
+            for math_tool in math_tools:
+                assert math_tool not in selected_tools, \
+                    f"'{query}' should NOT use math tool '{math_tool}', got {selected_tools}"
+
+    def test_ethical_dilemma_pattern_detected(self, query_analyzer):
+        """Test that 'ethical dilemma' pattern triggers philosophical detection."""
+        query = "This is an ethical dilemma I'm facing"
+        
+        is_philosophical = query_analyzer._is_philosophical_query(query)
+        assert is_philosophical, "Query with 'ethical dilemma' should be detected as philosophical"
+
+    def test_virtue_ethics_detected(self, query_analyzer):
+        """Test that virtue ethics discussions are detected as philosophical."""
+        query = "How would virtue ethics approach this situation?"
+        
+        is_philosophical = query_analyzer._is_philosophical_query(query)
+        assert is_philosophical, "Virtue ethics query should be detected as philosophical"
+
 
 class TestIdentityQueryDetection:
     """Tests for identity/attribution query detection."""
