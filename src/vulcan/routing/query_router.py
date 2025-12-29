@@ -913,6 +913,132 @@ MATH_MULTISTEP_PATTERNS: Tuple[re.Pattern, ...] = (
 )
 
 # ============================================================
+# CONSTANTS - Complex Physics Detection (ISSUE FIX)
+# ============================================================
+# FIX: Complex physics problems like triple-inverted pendulum Lagrangian mechanics
+# were being incorrectly routed to MATH-FAST-PATH with 5s timeout and 0.30 complexity.
+# These PhD-level problems require full mathematical reasoning, not fast-path shortcuts.
+#
+# Detection strategy:
+# 1. COMPLEX_PHYSICS_KEYWORDS: Terms indicating advanced physics/control theory
+# 2. FORCE_FULL_MATH_PATTERNS: Regex patterns for complex derivation requests
+# 3. When detected: Skip fast-path, set complexity >= 0.80, timeout >= 120s
+
+# Keywords indicating complex physics/control theory that need full reasoning
+# These problems require:
+# - Lagrangian L = T - V with coupled systems
+# - State-space matrices (8x8 minimum for triple pendulum)
+# - Controllability/observability matrix analysis
+# - Eigenvalue analysis for stability
+# - Nonlinear dynamics effects
+COMPLEX_PHYSICS_KEYWORDS: Tuple[str, ...] = (
+    # Control theory and dynamics
+    "controllability",
+    "observability",
+    "state matrix",
+    "state space",
+    "state-space",
+    "linearize",
+    "linearization",
+    "lyapunov",
+    "stability analysis",
+    "nonlinear dynamics",
+    "nonlinear system",
+    "chaos",
+    "chaotic",
+    "bifurcation",
+    "phase portrait",
+    "phase space",
+    # Pendulum systems (more specific than just "pendulum")
+    "inverted pendulum",
+    "double pendulum",
+    "triple pendulum",
+    "cart-pole",
+    "cart pole",
+    "swing-up",
+    "swing up",
+    "n-link pendulum",
+    "coupled pendulum",
+    "coupled oscillator",
+    # Advanced mechanics formulations
+    "equations of motion",  # Note: different from simple "equation"
+    "generalized coordinates",
+    "generalized momenta",
+    "canonical coordinates",
+    "canonical transformation",
+    "action principle",
+    "least action",
+    "variational principle",
+    "euler-lagrange",
+    "euler lagrange",
+    "hamilton's equations",
+    "hamiltonian mechanics",
+    "lagrangian mechanics",
+    "classical mechanics",
+    # Matrix/linear algebra in physics context
+    "mass matrix",
+    "stiffness matrix",
+    "damping matrix",
+    "coupling matrix",
+    "inertia matrix",
+    "jacobian matrix",
+    # Advanced mathematical physics
+    "perturbation theory",
+    "small oscillations",
+    "normal modes",
+    "mode shapes",
+    "natural frequency",
+    "natural frequencies",
+    "resonance",
+    "transfer function",
+    "bode plot",
+    "nyquist",
+    "root locus",
+    # Control design
+    "pole placement",
+    "lqr",
+    "lqg",
+    "kalman filter",
+    "state feedback",
+    "output feedback",
+    "observer design",
+    "full state feedback",
+)
+
+# Regex patterns that FORCE full mathematical reasoning (no fast-path)
+# These patterns indicate complex derivation or proof requests
+FORCE_FULL_MATH_PATTERNS: Tuple[re.Pattern, ...] = (
+    # Explicit derivation requests for equations of motion
+    re.compile(r"derive\s+(?:the\s+)?(?:equations?\s+of\s+motion|equation|dynamics)", re.IGNORECASE),
+    # Controllability/observability proofs
+    re.compile(r"(?:prove|show|demonstrate)\s+(?:the\s+)?controllability", re.IGNORECASE),
+    re.compile(r"(?:prove|show|demonstrate)\s+(?:the\s+)?observability", re.IGNORECASE),
+    # Linearization requests
+    re.compile(r"linearize\s+(?:the\s+)?(?:system|dynamics|equation)", re.IGNORECASE),
+    # State-space form requests
+    re.compile(r"state[\s\-]?space\s+(?:form|representation|model)", re.IGNORECASE),
+    # Eigenvalue/eigenvector analysis
+    re.compile(r"(?:find|compute|calculate|determine)\s+(?:the\s+)?eigen(?:value|vector)s?", re.IGNORECASE),
+    # Lagrangian formula pattern: L = T - V
+    re.compile(r"L\s*=\s*T\s*-\s*V", re.IGNORECASE),
+    # Hamiltonian pattern: H = T + V
+    re.compile(r"H\s*=\s*T\s*\+\s*V", re.IGNORECASE),
+    # Multi-body/coupled systems
+    re.compile(r"(?:double|triple|coupled|n-link)\s+(?:pendulum|oscillator)", re.IGNORECASE),
+    # Control theory requests
+    re.compile(r"(?:design|derive|compute)\s+(?:a\s+)?(?:controller|observer|kalman|lqr|lqg)", re.IGNORECASE),
+    # Stability analysis requests
+    re.compile(r"(?:analyze|determine|prove)\s+(?:the\s+)?stability", re.IGNORECASE),
+)
+
+# Extended timeout for complex physics problems (seconds)
+# Triple-inverted pendulum with full derivation can take 2+ minutes
+COMPLEX_PHYSICS_TIMEOUT_SECONDS: float = 120.0
+
+# Minimum complexity score for complex physics problems
+COMPLEX_PHYSICS_MIN_COMPLEXITY: float = 0.80
+
+# ============================================================
 # CONSTANTS - Security Patterns
 # ============================================================
 
@@ -1483,13 +1609,85 @@ class QueryAnalyzer:
             return self._strategy_orchestrator.get_health_status()
         return {"status": "tool_monitoring_not_available"}
 
+    def _is_complex_physics_query(self, query: str) -> bool:
+        """
+        Detect if query involves complex physics/control theory requiring full analysis.
+
+        CRITICAL FIX: Complex physics problems like triple-inverted pendulum Lagrangian
+        mechanics were being incorrectly routed to MATH-FAST-PATH with 5s timeout and
+        0.30 complexity. These PhD-level problems require:
+        - Full mathematical reasoning with all tools active
+        - Minimum complexity score of 0.80
+        - Extended timeout of 120s+
+        - Detailed derivation with all steps shown
+
+        Examples of queries that should match:
+        - "Derive the equations of motion for a triple inverted pendulum using Lagrangian"
+        - "Prove controllability of the linearized system"
+        - "Compute the eigenvalues of the state matrix"
+        - "Analyze the stability using Lyapunov methods"
+
+        Args:
+            query: The query string (not lowercased)
+
+        Returns:
+            True if query involves complex physics requiring full analysis
+        """
+        query_lower = query.lower()
+
+        # Check for FORCE_FULL_MATH_PATTERNS first (highest priority)
+        # These patterns explicitly indicate complex derivation requests
+        for pattern in FORCE_FULL_MATH_PATTERNS:
+            if pattern.search(query):
+                logger.info(
+                    "[QueryRouter] Complex physics detected: matches force-full-math pattern"
+                )
+                return True
+
+        # Count complex physics keyword matches
+        physics_keyword_count = sum(
+            1 for kw in COMPLEX_PHYSICS_KEYWORDS if kw in query_lower
+        )
+
+        # If ANY complex physics keyword is found, require full analysis
+        if physics_keyword_count >= 1:
+            logger.info(
+                f"[QueryRouter] Complex physics detected: {physics_keyword_count} "
+                f"keyword(s) found - bypassing fast-path"
+            )
+            return True
+
+        # Additional check: "pendulum" combined with derivation/analysis verbs
+        # Simple "pendulum" could be a basic mechanics problem, but combined with
+        # advanced verbs it indicates complex analysis
+        if "pendulum" in query_lower:
+            advanced_verbs = (
+                "derive", "linearize", "prove", "analyze", "stability",
+                "controllability", "eigenvalue", "state space", "state-space",
+                "equations of motion", "lagrangian", "hamiltonian"
+            )
+            if any(verb in query_lower for verb in advanced_verbs):
+                logger.info(
+                    "[QueryRouter] Complex physics detected: 'pendulum' with advanced analysis"
+                )
+                return True
+
+        return False
+
     def _is_mathematical_query(self, query: str) -> bool:
         """
-        Detect if query is a mathematical/statistical problem that should use fast path.
+        Detect if query is a SIMPLE mathematical/statistical problem for fast path.
 
         PERFORMANCE FIX: Mathematical queries like Bayesian probability problems should
         be routed directly to probabilistic/symbolic reasoning tools, bypassing heavy
         multi-agent orchestration that causes 60+ second delays.
+
+        CRITICAL FIX: This method now EXCLUDES complex physics queries that require
+        full analysis. Before returning True, it checks _is_complex_physics_query().
+        Complex physics (Lagrangian mechanics, control theory, etc.) needs:
+        - Full mathematical reasoning (not fast-path)
+        - Longer timeouts (120s+ instead of 5s)
+        - Higher complexity scores (0.80+ instead of 0.30)
 
         ENHANCED: Lowered threshold to activate math modules more aggressively.
         Now triggers on:
@@ -1510,8 +1708,16 @@ class QueryAnalyzer:
             query: The query string (not lowercased)
 
         Returns:
-            True if the query should use mathematical fast path
+            True if the query should use mathematical fast path (EXCLUDING complex physics)
         """
+        # CRITICAL FIX: Check for complex physics FIRST
+        # Complex physics queries should NOT use fast-path - they need full analysis
+        if self._is_complex_physics_query(query):
+            logger.info(
+                "[QueryRouter] Complex physics query - bypassing MATH-FAST-PATH"
+            )
+            return False
+
         query_lower = query.lower()
 
         # Count mathematical keyword matches
@@ -1711,6 +1917,105 @@ class QueryAnalyzer:
             logger.info(
                 f"[QueryRouter] {query_id}: FAST-PATH source={source}, "
                 f"tasks=1, complexity=0.00"
+            )
+            return plan
+
+        # CRITICAL FIX: Complex physics handling path
+        # Complex physics problems (Lagrangian mechanics, control theory, triple pendulum)
+        # require FULL mathematical reasoning with extended timeouts (120s+) and high
+        # complexity scores (0.80+). These should NOT use fast-path.
+        if query and self._is_complex_physics_query(query):
+            logger.info(
+                f"[QueryRouter] {query_id}: COMPLEX-PHYSICS-PATH detected - "
+                f"activating full mathematical reasoning"
+            )
+
+            # Determine learning mode
+            if source == "user":
+                learning_mode = LearningMode.USER_INTERACTION
+                with self._lock:
+                    self._user_interaction_count += 1
+                telemetry_category = "user_query"
+            else:
+                learning_mode = LearningMode.AI_INTERACTION
+                with self._lock:
+                    self._ai_interaction_count += 1
+                telemetry_category = f"{source}_interaction"
+
+            # Create plan for complex physics with FULL analysis
+            plan = ProcessingPlan(
+                query_id=query_id,
+                original_query=query,
+                source=source,
+                learning_mode=learning_mode,
+                query_type=QueryType.REASONING,  # Complex physics is reasoning
+                complexity_score=COMPLEX_PHYSICS_MIN_COMPLEXITY,  # High complexity (0.80+)
+                uncertainty_score=0.3,  # Moderate uncertainty for complex derivations
+                collaboration_needed=True,  # Enable multi-agent for complex analysis
+                collaboration_agents=["reasoning", "planning"],  # Multiple perspectives
+                arena_participation=False,  # Skip arena but use full tool selection
+                telemetry_category=telemetry_category,
+                telemetry_data={
+                    "session_id": session_id,
+                    "query_length": len(query),
+                    "word_count": len(query.split()),
+                    "query_number": query_number,
+                    "source": source,
+                    "learning_mode": learning_mode.value,
+                    "complex_physics_path": True,  # Mark as complex physics
+                    "extended_timeout": True,
+                },
+            )
+
+            # Mark as safe (bypass false positives)
+            plan.safety_passed = True
+            plan.detected_patterns.append("complex_physics_derivation")
+
+            # Create comprehensive task with ALL mathematical reasoning tools
+            # FIX: Activate symbolic, mathematical, probabilistic, causal, and analogical
+            plan.agent_tasks = [
+                AgentTask(
+                    task_id=f"task_{uuid.uuid4().hex[:8]}_physics",
+                    task_type="complex_physics_task",
+                    capability="reasoning",
+                    prompt=query,
+                    priority=3,  # High priority for complex physics
+                    timeout_seconds=COMPLEX_PHYSICS_TIMEOUT_SECONDS,  # 120s+ timeout
+                    parameters={
+                        "is_complex_physics": True,
+                        "require_detailed_derivation": True,
+                        "show_all_steps": True,
+                        # Activate ALL mathematical reasoning capabilities
+                        "tools": [
+                            "symbolic",       # For Lagrangian algebra
+                            "mathematical",   # For matrix operations
+                            "probabilistic",  # For stability analysis
+                            "causal",        # For system dynamics
+                            "analogical",    # For similar problems
+                        ],
+                        "config": {
+                            "max_tokens": 4000,      # Extended output for derivations
+                            "require_proofs": True,
+                            "show_all_steps": True,
+                            "latex_output": True,
+                            "numerical_precision": "high",
+                        },
+                        "skip_fast_path": True,  # Explicitly skip shortcuts
+                    },
+                )
+            ]
+
+            # Store full tool configuration in telemetry
+            plan.telemetry_data["selected_tools"] = [
+                "symbolic", "mathematical", "probabilistic", "causal", "analogical"
+            ]
+            plan.telemetry_data["reasoning_strategy"] = "complex_physics_full_derivation"
+            plan.telemetry_data["timeout_seconds"] = COMPLEX_PHYSICS_TIMEOUT_SECONDS
+
+            logger.info(
+                f"[QueryRouter] {query_id}: COMPLEX-PHYSICS-PATH source={source}, "
+                f"tasks=1, complexity={COMPLEX_PHYSICS_MIN_COMPLEXITY:.2f}, "
+                f"timeout={COMPLEX_PHYSICS_TIMEOUT_SECONDS}s, tools=ALL"
             )
             return plan
 
@@ -2379,6 +2684,26 @@ class QueryAnalyzer:
             logger.debug(
                 f"[High Complexity] Detected {high_complexity_count} high-complexity pattern, boost"
             )
+
+        # CRITICAL FIX: Complex physics keywords force high complexity
+        # PhD-level control theory/Lagrangian mechanics should NOT score 0.30
+        # These require minimum complexity of 0.80 for proper tool selection
+        physics_keyword_count = sum(
+            1 for kw in COMPLEX_PHYSICS_KEYWORDS if kw in query_lower
+        )
+        if physics_keyword_count >= 1:
+            # Force minimum complexity for complex physics
+            # Even 1 keyword indicates advanced physics requiring full analysis
+            physics_boost = max(
+                COMPLEX_PHYSICS_MIN_COMPLEXITY - score,  # Bring up to minimum
+                min(0.5, physics_keyword_count * 0.2)  # Or add substantial boost
+            )
+            if physics_boost > 0:
+                score += physics_boost
+                logger.info(
+                    f"[Complex Physics] Detected {physics_keyword_count} physics keyword(s), "
+                    f"complexity boosted by {physics_boost:.2f} to {score:.2f}"
+                )
 
         return min(1.0, score)
 

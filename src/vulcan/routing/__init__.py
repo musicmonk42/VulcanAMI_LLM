@@ -85,6 +85,11 @@ try:
         shutdown_blocking_executor,
         # FIX 2: Query Router Timeout constant
         QUERY_ROUTING_TIMEOUT_SECONDS,
+        # Complex Physics Detection constants (ISSUE FIX)
+        COMPLEX_PHYSICS_KEYWORDS,
+        FORCE_FULL_MATH_PATTERNS,
+        COMPLEX_PHYSICS_TIMEOUT_SECONDS,
+        COMPLEX_PHYSICS_MIN_COMPLEXITY,
     )
 
     QUERY_ROUTER_AVAILABLE = True
@@ -105,6 +110,11 @@ except ImportError as e:
     get_query_analyzer = None
     shutdown_blocking_executor = None
     QUERY_ROUTING_TIMEOUT_SECONDS = 5.0  # Default fallback
+    # Complex physics defaults
+    COMPLEX_PHYSICS_KEYWORDS = ()
+    FORCE_FULL_MATH_PATTERNS = ()
+    COMPLEX_PHYSICS_TIMEOUT_SECONDS = 120.0
+    COMPLEX_PHYSICS_MIN_COMPLEXITY = 0.80
 
 # Agent Collaboration
 try:
@@ -379,6 +389,11 @@ __all__ = [
     "get_query_analyzer",
     "shutdown_blocking_executor",
     "QUERY_ROUTING_TIMEOUT_SECONDS",  # FIX 2: Query Router Timeout constant
+    # Complex Physics Detection constants (ISSUE FIX)
+    "COMPLEX_PHYSICS_KEYWORDS",
+    "FORCE_FULL_MATH_PATTERNS",
+    "COMPLEX_PHYSICS_TIMEOUT_SECONDS",
+    "COMPLEX_PHYSICS_MIN_COMPLEXITY",
     # Agent Collaboration
     "AgentMessage",
     "AgentCollaborationManager",
