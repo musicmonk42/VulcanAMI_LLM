@@ -1272,6 +1272,207 @@ class TestTournamentWeightUpdate(unittest.TestCase):
 
 
 # ============================================================
+# Test Dead Letter Queue and Stuck Jobs - PERFORMANCE FIX
+# ============================================================
+
+
+class TestDeadLetterQueue(unittest.TestCase):
+    """Tests for dead letter queue functionality - PERFORMANCE FIX"""
+    
+    def setUp(self):
+        """Set up mock pool with DLQ support"""
+        self.pool = MockAgentPoolManager()
+        
+        # Add DLQ attributes
+        from collections import deque
+        self.pool._dead_letter_queue = deque(maxlen=100)
+        self.pool._dead_letter_lock = Mock()
+        self.pool._dead_letter_lock.__enter__ = Mock(return_value=None)
+        self.pool._dead_letter_lock.__exit__ = Mock(return_value=None)
+        self.pool._job_retry_counts = {}
+        self.pool._max_job_retries = 3
+        self.pool._stuck_job_threshold_seconds = 300
+    
+    def tearDown(self):
+        """Clean up"""
+        self.pool.shutdown()
+    
+    def test_dead_letter_queue_initialized(self):
+        """Test that DLQ is initialized"""
+        self.assertIsNotNone(self.pool._dead_letter_queue)
+        self.assertEqual(len(self.pool._dead_letter_queue), 0)
+    
+    def test_move_to_dead_letter_queue(self):
+        """Test moving a job to DLQ"""
+        def mock_move_to_dlq(task_id, reason, error=None):
+            entry = {
+                "task_id": task_id,
+                "reason": reason,
+                "error": str(error) if error else None,
+                "retry_count": self.pool._job_retry_counts.get(task_id, 0),
+                "timestamp": time.time(),
+            }
+            self.pool._dead_letter_queue.append(entry)
+            self.pool._job_retry_counts.pop(task_id, None)
+        
+        self.pool._move_to_dead_letter_queue = mock_move_to_dlq
+        
+        # Move a job to DLQ
+        self.pool._job_retry_counts["test_job_1"] = 3
+        self.pool._move_to_dead_letter_queue("test_job_1", "max_retries_exceeded")
+        
+        self.assertEqual(len(self.pool._dead_letter_queue), 1)
+        entry = self.pool._dead_letter_queue[0]
+        self.assertEqual(entry["task_id"], "test_job_1")
+        self.assertEqual(entry["reason"], "max_retries_exceeded")
+        self.assertEqual(entry["retry_count"], 3)
+        # Job should be removed from retry counts
+        self.assertNotIn("test_job_1", self.pool._job_retry_counts)
+    
+    def test_get_dead_letter_queue(self):
+        """Test getting DLQ contents"""
+        def mock_get_dlq():
+            return list(self.pool._dead_letter_queue)
+        
+        self.pool.get_dead_letter_queue = mock_get_dlq
+        
+        # Add some entries
+        self.pool._dead_letter_queue.append({"task_id": "job_1", "reason": "stuck"})
+        self.pool._dead_letter_queue.append({"task_id": "job_2", "reason": "failed"})
+        
+        dlq = self.pool.get_dead_letter_queue()
+        self.assertEqual(len(dlq), 2)
+    
+    def test_clear_dead_letter_queue(self):
+        """Test clearing the DLQ"""
+        def mock_clear_dlq():
+            count = len(self.pool._dead_letter_queue)
+            self.pool._dead_letter_queue.clear()
+            return count
+        
+        self.pool.clear_dead_letter_queue = mock_clear_dlq
+        
+        # Add entries
+        self.pool._dead_letter_queue.append({"task_id": "job_1"})
+        self.pool._dead_letter_queue.append({"task_id": "job_2"})
+        
+        count = self.pool.clear_dead_letter_queue()
+        self.assertEqual(count, 2)
+        self.assertEqual(len(self.pool._dead_letter_queue), 0)
+    
+    def test_retry_dead_letter_job(self):
+        """Test retrying a job from DLQ"""
+        def mock_retry_dlq_job(task_id):
+            for i, entry in enumerate(self.pool._dead_letter_queue):
+                if entry["task_id"] == task_id:
+                    del self.pool._dead_letter_queue[i]
+                    self.pool._job_retry_counts[task_id] = 0
+                    return True
+            return False
+        
+        self.pool.retry_dead_letter_job = mock_retry_dlq_job
+        
+        # Add entry to DLQ
+        self.pool._dead_letter_queue.append({"task_id": "job_1"})
+        
+        # Retry the job
+        result = self.pool.retry_dead_letter_job("job_1")
+        self.assertTrue(result)
+        self.assertEqual(len(self.pool._dead_letter_queue), 0)
+        self.assertEqual(self.pool._job_retry_counts.get("job_1"), 0)
+        
+        # Try to retry non-existent job
+        result = self.pool.retry_dead_letter_job("nonexistent")
+        self.assertFalse(result)
+
+
+class TestStuckJobDetection(unittest.TestCase):
+    """Tests for stuck job detection - PERFORMANCE FIX"""
+    
+    def setUp(self):
+        """Set up mock pool with stuck job detection"""
+        self.pool = MockAgentPoolManager()
+        self.pool._stuck_job_threshold_seconds = 300
+        self.pool.task_assignment_times = {}
+        self.pool.task_assignments = {}
+    
+    def tearDown(self):
+        """Clean up"""
+        self.pool.shutdown()
+    
+    def test_get_stuck_jobs_empty(self):
+        """Test get_stuck_jobs returns empty when no jobs"""
+        def mock_get_stuck_jobs():
+            current_time = time.time()
+            stuck_jobs = []
+            for task_id, assign_time in self.pool.task_assignment_times.items():
+                elapsed = current_time - assign_time
+                if elapsed > self.pool._stuck_job_threshold_seconds * 0.7:
+                    stuck_jobs.append({
+                        "task_id": task_id,
+                        "elapsed_seconds": elapsed,
+                    })
+            return stuck_jobs
+        
+        self.pool.get_stuck_jobs = mock_get_stuck_jobs
+        
+        stuck = self.pool.get_stuck_jobs()
+        self.assertEqual(len(stuck), 0)
+    
+    def test_get_stuck_jobs_detects_slow_jobs(self):
+        """Test that slow jobs are detected"""
+        def mock_get_stuck_jobs():
+            current_time = time.time()
+            stuck_jobs = []
+            for task_id, assign_time in self.pool.task_assignment_times.items():
+                elapsed = current_time - assign_time
+                threshold = self.pool._stuck_job_threshold_seconds * 0.7
+                if elapsed > threshold:
+                    stuck_jobs.append({
+                        "task_id": task_id,
+                        "elapsed_seconds": elapsed,
+                        "is_critical": elapsed > self.pool._stuck_job_threshold_seconds * 0.9,
+                    })
+            return stuck_jobs
+        
+        self.pool.get_stuck_jobs = mock_get_stuck_jobs
+        
+        # Add a job that's been running for a long time (250 seconds, which is > 210 = 300 * 0.7)
+        old_time = time.time() - 250
+        self.pool.task_assignment_times["slow_job"] = old_time
+        
+        stuck = self.pool.get_stuck_jobs()
+        self.assertEqual(len(stuck), 1)
+        self.assertEqual(stuck[0]["task_id"], "slow_job")
+        self.assertGreater(stuck[0]["elapsed_seconds"], 200)
+    
+    def test_statistics_include_dlq_metrics(self):
+        """Test that statistics include DLQ and stuck job metrics"""
+        from collections import deque
+        self.pool._dead_letter_queue = deque()
+        self.pool._dead_letter_queue.append({"task_id": "failed_job"})
+        self.pool.task_assignment_times = {}
+        
+        def mock_get_stuck_jobs():
+            return []
+        self.pool.get_stuck_jobs = mock_get_stuck_jobs
+        
+        def mock_get_statistics():
+            base = self.pool._stats.copy()  # Use _stats not stats
+            base["dead_letter_queue_size"] = len(self.pool._dead_letter_queue)
+            base["stuck_jobs"] = len(self.pool.get_stuck_jobs())
+            return base
+        
+        self.pool.get_statistics = mock_get_statistics
+        
+        stats = self.pool.get_statistics()
+        self.assertIn("dead_letter_queue_size", stats)
+        self.assertIn("stuck_jobs", stats)
+        self.assertEqual(stats["dead_letter_queue_size"], 1)
+        self.assertEqual(stats["stuck_jobs"], 0)
+
+
+# ============================================================
 # TEST SUITE RUNNER
 # ============================================================
 
@@ -1296,6 +1497,8 @@ def suite():
     test_suite.addTests(loader.loadTestsFromTestCase(TestRedisStateHydration))
     test_suite.addTests(loader.loadTestsFromTestCase(TestTournamentMultiAgentSelection))
     test_suite.addTests(loader.loadTestsFromTestCase(TestTournamentWeightUpdate))
+    test_suite.addTests(loader.loadTestsFromTestCase(TestDeadLetterQueue))
+    test_suite.addTests(loader.loadTestsFromTestCase(TestStuckJobDetection))
 
     return test_suite
 

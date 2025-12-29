@@ -90,6 +90,20 @@ class CuriosityDriverConfig:
     # Cache TTL for statistics (seconds)
     stats_cache_ttl: float = 5.0
 
+    # PERFORMANCE FIX: Idle detection and backoff settings
+    # Maximum consecutive empty cycles before entering dormant mode
+    max_empty_cycles: int = 3
+
+    # Progressive backoff intervals in seconds when no work is found
+    # Applied after consecutive empty cycles: 1st=5s, 2nd=15s, 3rd=60s, 4th+=300s
+    backoff_intervals: tuple = (5, 15, 60, 300)
+
+    # Dormant mode check interval (how often to check for new work when dormant)
+    dormant_check_interval: float = 300.0  # 5 minutes
+
+    # Minimum time between cycles to prevent CPU thrashing (seconds)
+    min_cycle_interval: float = 5.0
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization"""
         return {
@@ -101,6 +115,10 @@ class CuriosityDriverConfig:
             "max_workers": self.max_workers,
             "max_history": self.max_history,
             "stats_cache_ttl": self.stats_cache_ttl,
+            "max_empty_cycles": self.max_empty_cycles,
+            "backoff_intervals": list(self.backoff_intervals),
+            "dormant_check_interval": self.dormant_check_interval,
+            "min_cycle_interval": self.min_cycle_interval,
         }
 
 
@@ -517,6 +535,16 @@ class CuriosityDriver:
         self._last_cycle_result: Optional[CycleResult] = None
         self._consecutive_failures = 0
 
+        # PERFORMANCE FIX: Idle detection and backoff tracking
+        # Tracks consecutive cycles that found 0 knowledge gaps
+        self._consecutive_empty_cycles = 0
+        # Whether the driver is in dormant mode (no work found for extended period)
+        self._is_dormant = False
+        # Track last time we checked for work (for dormant mode)
+        self._last_work_check_time = 0.0
+        # Track when we last found actual work
+        self._last_work_found_time = 0.0
+
         # Caching for stats
         self._stats_cache: Optional[Dict[str, Any]] = None
         self._stats_cache_time = 0.0
@@ -526,10 +554,11 @@ class CuriosityDriver:
 
         logger.info(
             "CuriosityDriver initialized (heartbeat_interval=%.1fs, "
-            "min_budget=%.1f, max_workers=%d)",
+            "min_budget=%.1f, max_workers=%d, max_empty_cycles=%d)",
             self.config.heartbeat_interval,
             self.config.min_budget_threshold,
             self.config.max_workers,
+            self.config.max_empty_cycles,
         )
 
     # =========================================================================
@@ -675,20 +704,133 @@ class CuriosityDriver:
     # Heartbeat Loop
     # =========================================================================
 
+    def _should_run_cycle(self) -> tuple:
+        """
+        Determine if a learning cycle should run.
+        
+        PERFORMANCE FIX: Implements intelligent cycle management to prevent
+        running 320+ empty cycles that waste CPU. This method checks:
+        1. Whether we're in dormant mode (no work for extended period)
+        2. Progressive backoff based on consecutive empty cycles
+        3. Minimum time between cycles to prevent thrashing
+        
+        Returns:
+            Tuple of (should_run: bool, reason: str, sleep_time: float)
+            If should_run is False, sleep_time indicates how long to wait
+        """
+        current_time = time.time()
+        
+        # Check minimum cycle interval to prevent CPU thrashing
+        if self._last_cycle_time:
+            time_since_last = current_time - self._last_cycle_time
+            if time_since_last < self.config.min_cycle_interval:
+                wait_time = self.config.min_cycle_interval - time_since_last
+                return (False, "min_interval_not_reached", wait_time)
+        
+        # Check dormant mode
+        if self._is_dormant:
+            # In dormant mode, only check periodically for new work
+            time_since_check = current_time - self._last_work_check_time
+            if time_since_check < self.config.dormant_check_interval:
+                wait_time = self.config.dormant_check_interval - time_since_check
+                return (False, "dormant_mode", wait_time)
+            else:
+                # Time to check for new work - will exit dormant if work found
+                self._last_work_check_time = current_time
+                logger.debug(
+                    "Dormant mode: periodic check for new work "
+                    f"(empty_cycles={self._consecutive_empty_cycles})"
+                )
+        
+        # Apply progressive backoff based on consecutive empty cycles
+        if self._consecutive_empty_cycles > 0:
+            backoff_index = min(
+                self._consecutive_empty_cycles - 1,
+                len(self.config.backoff_intervals) - 1
+            )
+            backoff_time = self.config.backoff_intervals[backoff_index]
+            
+            time_since_last = current_time - (self._last_cycle_time or 0)
+            if time_since_last < backoff_time:
+                wait_time = backoff_time - time_since_last
+                return (False, "backoff", wait_time)
+        
+        return (True, "ok", 0.0)
+
+    def _update_empty_cycle_tracking(self, gaps_found: int, experiments_run: int) -> None:
+        """
+        Update tracking for empty cycles and manage dormant mode.
+        
+        PERFORMANCE FIX: Tracks consecutive empty cycles (0 gaps found) and
+        enters dormant mode after max_empty_cycles to prevent continuous
+        subprocess spawning when there's no work.
+        
+        Args:
+            gaps_found: Number of knowledge gaps identified
+            experiments_run: Number of experiments actually run
+        """
+        current_time = time.time()
+        
+        if gaps_found == 0 and experiments_run == 0:
+            # Empty cycle - increment counter
+            self._consecutive_empty_cycles += 1
+            
+            # Check if we should enter dormant mode
+            if self._consecutive_empty_cycles >= self.config.max_empty_cycles:
+                if not self._is_dormant:
+                    self._is_dormant = True
+                    self._last_work_check_time = current_time
+                    logger.info(
+                        f"Entering dormant mode after {self._consecutive_empty_cycles} "
+                        f"consecutive empty cycles (0 gaps found). "
+                        f"Will check for work every {self.config.dormant_check_interval}s"
+                    )
+        else:
+            # Found work - reset tracking and exit dormant mode
+            if self._is_dormant:
+                logger.info(
+                    f"Exiting dormant mode - found {gaps_found} gaps, "
+                    f"ran {experiments_run} experiments"
+                )
+            self._consecutive_empty_cycles = 0
+            self._is_dormant = False
+            self._last_work_found_time = current_time
+
     async def _heartbeat_loop(self) -> None:
         """
         Background heartbeat loop that periodically runs learning cycles.
 
+        PERFORMANCE FIX: Now implements intelligent cycle management:
+        1. Checks if cycle should run (prevents 320+ empty cycles)
+        2. Progressive backoff on consecutive empty cycles
+        3. Dormant mode when no work for extended period
+        4. Only spawns subprocess when actual work is available
+
         Follows EXAMINE → SELECT → APPLY → REMEMBER pattern:
-        1. EXAMINE: Check budget and state
-        2. SELECT: Decide whether to run cycle or sleep
-        3. APPLY: Execute learning cycle in subprocess
+        1. EXAMINE: Check budget, state, and work availability
+        2. SELECT: Decide whether to run cycle, sleep, or enter dormant
+        3. APPLY: Execute learning cycle in subprocess (only if work exists)
         4. REMEMBER: Record results and update statistics
         """
         logger.info("Heartbeat loop started")
 
         while self._running:
             try:
+                # EXAMINE: Check if we should run a cycle
+                should_run, reason, wait_time = self._should_run_cycle()
+                
+                if not should_run:
+                    if reason == "dormant_mode":
+                        # In dormant mode - long sleep, don't log every iteration
+                        pass
+                    elif reason == "backoff":
+                        logger.debug(
+                            f"Backoff active (empty_cycles={self._consecutive_empty_cycles}), "
+                            f"waiting {wait_time:.1f}s"
+                        )
+                    await asyncio.sleep(min(wait_time, self.config.heartbeat_interval))
+                    continue
+                
                 # EXAMINE: Check resource budget
                 available_budget = self.engine.exploration_budget.get_available()
 
@@ -709,18 +851,31 @@ class CuriosityDriver:
 
                 # APPLY: Run learning cycle
                 logger.debug(
-                    "Starting learning cycle (budget=%.2f, cycle=%d)",
+                    "Starting learning cycle (budget=%.2f, cycle=%d, "
+                    "empty_cycles=%d, dormant=%s)",
                     available_budget,
                     self._cycle_count + 1,
+                    self._consecutive_empty_cycles,
+                    self._is_dormant,
                 )
 
                 result = await self._run_cycle_async()
 
-                # REMEMBER: Update statistics
+                # REMEMBER: Update statistics and empty cycle tracking
                 self._process_cycle_result(result, available_budget)
+                
+                # PERFORMANCE FIX: Update empty cycle tracking
+                gaps_found = result.get("gaps_identified", 0)
+                experiments_run = result.get("experiments_run", 0)
+                self._update_empty_cycle_tracking(gaps_found, experiments_run)
 
-                # Sleep until next heartbeat
-                await asyncio.sleep(self.config.heartbeat_interval)
+                # Sleep until next heartbeat (modified by backoff if empty)
+                if self._consecutive_empty_cycles > 0:
+                    # Don't sleep full heartbeat interval if we're backing off
+                    # The backoff will be applied on next iteration
+                    await asyncio.sleep(self.config.min_cycle_interval)
+                else:
+                    await asyncio.sleep(self.config.heartbeat_interval)
 
             except asyncio.CancelledError:
                 logger.info("Heartbeat loop cancelled")
@@ -931,6 +1086,8 @@ class CuriosityDriver:
             - last_cycle_time: Timestamp of last cycle
             - last_cycle_result: Result of most recent cycle
             - consecutive_failures: Number of consecutive failed cycles
+            - consecutive_empty_cycles: Number of cycles with 0 gaps found
+            - is_dormant: Whether driver is in dormant mode
             - config: Driver configuration
             - statistics: Detailed statistics from tracker
         """
@@ -961,6 +1118,10 @@ class CuriosityDriver:
                     else None
                 ),
                 "consecutive_failures": self._consecutive_failures,
+                # PERFORMANCE FIX: Include idle detection metrics
+                "consecutive_empty_cycles": self._consecutive_empty_cycles,
+                "is_dormant": self._is_dormant,
+                "last_work_found_time": self._last_work_found_time,
                 "active_tasks": self._pool_manager.get_active_task_count(),
                 "config": self.config.to_dict(),
                 "statistics": detailed_stats,
@@ -993,9 +1154,38 @@ class CuriosityDriver:
             self._consecutive_failures = 0
             self._last_cycle_result = None
             self._stats_cache = None
-            logger.info("Statistics reset")
+            # PERFORMANCE FIX: Also reset idle detection tracking
+            self._consecutive_empty_cycles = 0
+            self._is_dormant = False
+            self._last_work_check_time = 0.0
+            self._last_work_found_time = 0.0
+            logger.info("Statistics reset (including idle detection state)")
         except Exception as e:
             logger.error("Error resetting statistics: %s", e)
+    
+    def wake_from_dormant(self) -> None:
+        """
+        Wake the driver from dormant mode.
+        
+        PERFORMANCE FIX: Allows external components to wake the driver
+        when new work is available, without waiting for the dormant check
+        interval. Call this when new queries/data arrive.
+        """
+        if self._is_dormant:
+            logger.info("Driver woken from dormant mode by external trigger")
+            self._is_dormant = False
+            self._consecutive_empty_cycles = 0
+            self._last_work_check_time = 0.0  # Allow immediate cycle
+    
+    @property
+    def is_dormant(self) -> bool:
+        """Check if driver is in dormant mode."""
+        return self._is_dormant
+    
+    @property
+    def consecutive_empty_cycles(self) -> int:
+        """Get number of consecutive empty cycles."""
+        return self._consecutive_empty_cycles
 
 
 # =============================================================================

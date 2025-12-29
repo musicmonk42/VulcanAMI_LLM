@@ -682,6 +682,155 @@ class TestCuriosityDriverExtendedStats:
 
 
 # =============================================================================
+# Test Idle Detection and Backoff - PERFORMANCE FIX
+# =============================================================================
+
+
+class TestCuriosityDriverIdleDetection:
+    """Tests for idle detection and backoff functionality - PERFORMANCE FIX"""
+
+    def test_should_run_cycle_initial(self, curiosity_engine, driver_config):
+        """Test should_run_cycle returns True initially"""
+        driver = CuriosityDriver(curiosity_engine, driver_config)
+        
+        should_run, reason, wait_time = driver._should_run_cycle()
+        
+        assert should_run is True
+        assert reason == "ok"
+        assert wait_time == 0.0
+
+    def test_should_run_cycle_respects_min_interval(self, curiosity_engine, driver_config):
+        """Test that minimum cycle interval is respected"""
+        driver = CuriosityDriver(curiosity_engine, driver_config)
+        
+        # Simulate that we just ran a cycle
+        driver._last_cycle_time = time.time()
+        
+        should_run, reason, wait_time = driver._should_run_cycle()
+        
+        # Should not run immediately after a cycle
+        assert should_run is False
+        assert reason == "min_interval_not_reached"
+        assert wait_time > 0
+
+    def test_dormant_mode_entry(self, curiosity_engine, driver_config):
+        """Test that driver enters dormant mode after max empty cycles"""
+        driver = CuriosityDriver(curiosity_engine, driver_config)
+        
+        # Simulate multiple empty cycles
+        for _ in range(driver.config.max_empty_cycles):
+            driver._update_empty_cycle_tracking(gaps_found=0, experiments_run=0)
+        
+        assert driver._is_dormant is True
+        assert driver._consecutive_empty_cycles == driver.config.max_empty_cycles
+
+    def test_dormant_mode_exit_on_work(self, curiosity_engine, driver_config):
+        """Test that driver exits dormant mode when work is found"""
+        driver = CuriosityDriver(curiosity_engine, driver_config)
+        
+        # Enter dormant mode
+        driver._is_dormant = True
+        driver._consecutive_empty_cycles = driver.config.max_empty_cycles
+        
+        # Find some work
+        driver._update_empty_cycle_tracking(gaps_found=1, experiments_run=1)
+        
+        assert driver._is_dormant is False
+        assert driver._consecutive_empty_cycles == 0
+
+    def test_wake_from_dormant(self, curiosity_engine, driver_config):
+        """Test wake_from_dormant method"""
+        driver = CuriosityDriver(curiosity_engine, driver_config)
+        
+        # Enter dormant mode
+        driver._is_dormant = True
+        driver._consecutive_empty_cycles = 5
+        driver._last_work_check_time = time.time()
+        
+        driver.wake_from_dormant()
+        
+        assert driver._is_dormant is False
+        assert driver._consecutive_empty_cycles == 0
+        assert driver._last_work_check_time == 0.0
+
+    def test_backoff_timing(self, curiosity_engine):
+        """Test progressive backoff timing"""
+        # Create config with shorter min_cycle_interval to test backoff separately
+        config = CuriosityDriverConfig(
+            heartbeat_interval=0.5,
+            min_budget_threshold=10.0,
+            max_experiments_per_cycle=2,
+            low_budget_sleep=0.2,
+            cycle_timeout=30.0,
+            max_workers=1,
+            min_cycle_interval=1.0,  # Short interval so we can test backoff
+        )
+        driver = CuriosityDriver(curiosity_engine, config)
+        
+        # After one empty cycle - set time far enough back to pass min_interval (1s)
+        # but not far enough to pass the backoff interval (5 seconds)
+        driver._consecutive_empty_cycles = 1
+        driver._last_cycle_time = time.time() - 2  # 2 seconds ago, past 1s min interval
+        
+        should_run, reason, wait_time = driver._should_run_cycle()
+        
+        # First backoff interval is 5 seconds, we're only 2 seconds past, so should wait
+        assert should_run is False
+        assert reason == "backoff"
+        assert wait_time > 0
+
+    def test_stats_include_idle_detection_metrics(self, curiosity_engine, driver_config):
+        """Test that stats include idle detection metrics"""
+        driver = CuriosityDriver(curiosity_engine, driver_config)
+        
+        # Set some idle detection state
+        driver._is_dormant = True
+        driver._consecutive_empty_cycles = 2
+        driver._last_work_found_time = time.time() - 100
+        
+        stats = driver.get_stats()
+        
+        assert "is_dormant" in stats
+        assert "consecutive_empty_cycles" in stats
+        assert "last_work_found_time" in stats
+        assert stats["is_dormant"] is True
+        assert stats["consecutive_empty_cycles"] == 2
+
+    def test_is_dormant_property(self, curiosity_engine, driver_config):
+        """Test is_dormant property"""
+        driver = CuriosityDriver(curiosity_engine, driver_config)
+        
+        assert driver.is_dormant is False
+        
+        driver._is_dormant = True
+        assert driver.is_dormant is True
+
+    def test_consecutive_empty_cycles_property(self, curiosity_engine, driver_config):
+        """Test consecutive_empty_cycles property"""
+        driver = CuriosityDriver(curiosity_engine, driver_config)
+        
+        assert driver.consecutive_empty_cycles == 0
+        
+        driver._consecutive_empty_cycles = 5
+        assert driver.consecutive_empty_cycles == 5
+
+    def test_config_includes_idle_detection_settings(self):
+        """Test that config includes idle detection settings"""
+        config = CuriosityDriverConfig()
+        
+        assert hasattr(config, "max_empty_cycles")
+        assert hasattr(config, "backoff_intervals")
+        assert hasattr(config, "dormant_check_interval")
+        assert hasattr(config, "min_cycle_interval")
+        
+        config_dict = config.to_dict()
+        assert "max_empty_cycles" in config_dict
+        assert "backoff_intervals" in config_dict
+        assert "dormant_check_interval" in config_dict
+        assert "min_cycle_interval" in config_dict
+
+
+# =============================================================================
 # Run Tests
 # =============================================================================
 

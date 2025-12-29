@@ -136,6 +136,13 @@ TOURNAMENT_WINNER_PERCENTAGE = 0.2
 # This constant controls how long to wait when selecting an agent for a task
 AGENT_SELECTION_TIMEOUT_SECONDS: float = 10.0  # 10 seconds max for agent selection
 
+# PERFORMANCE FIX: Dead letter queue and stuck job detection constants
+# DLQ stores jobs that fail repeatedly to prevent infinite retry loops
+DEFAULT_DLQ_SIZE = 100  # Maximum entries in dead letter queue
+# Jobs are considered "slow" at 70% of timeout, "critical" at 90%
+STUCK_JOB_WARNING_THRESHOLD = 0.7  # 70% of timeout
+STUCK_JOB_CRITICAL_THRESHOLD = 0.9  # 90% of timeout
+
 # FIXED: Add cachetools import for LRU cache with TTL
 try:
     from cachetools import TTLCache
@@ -733,6 +740,22 @@ class AgentPoolManager:
         # Dedicated executor thread for processing pending jobs
         self._executor_thread: Optional[threading.Thread] = None
         self._start_executor()
+        
+        # ========== PERFORMANCE FIX: Dead Letter Queue for Failed Jobs ==========
+        # Jobs that fail repeatedly are moved here instead of being retried infinitely
+        self._dead_letter_queue: deque = deque(
+            maxlen=self.config.get("dlq_size", DEFAULT_DLQ_SIZE)
+        )
+        self._dead_letter_lock = threading.Lock()
+        # Track retry counts per job
+        self._job_retry_counts: Dict[str, int] = {}
+        self._max_job_retries = self.config.get("max_job_retries", 3)
+        
+        # Track stuck jobs (jobs taking too long to complete)
+        self._stuck_job_threshold_seconds = self.config.get(
+            "stuck_job_threshold", 
+            task_timeout_seconds
+        )
 
         # Start monitoring
         self._start_monitor()
@@ -2621,6 +2644,191 @@ class AgentPoolManager:
                 self._pending_executions.pop(task_id, None)
 
     # ============================================================
+    # PERFORMANCE FIX: Stuck Job Detection and Dead Letter Queue
+    # ============================================================
+    
+    def _move_to_dead_letter_queue(
+        self, 
+        task_id: str, 
+        reason: str, 
+        error: Optional[Exception] = None
+    ) -> None:
+        """
+        Move a job to the dead letter queue after repeated failures.
+        
+        PERFORMANCE FIX: Jobs that fail repeatedly are moved here instead of 
+        being retried infinitely, preventing resource waste on jobs that 
+        will never succeed.
+        
+        Args:
+            task_id: Job identifier
+            reason: Reason for moving to DLQ (e.g., "max_retries_exceeded", "stuck")
+            error: Optional exception that caused the failure
+        """
+        with self._dead_letter_lock:
+            dlq_entry = {
+                "task_id": task_id,
+                "reason": reason,
+                "error": str(error) if error else None,
+                "retry_count": self._job_retry_counts.get(task_id, 0),
+                "timestamp": time.time(),
+                "provenance": None,
+            }
+            
+            # Try to get provenance info
+            try:
+                prov = self._get_provenance_by_job_id(task_id)
+                if prov:
+                    dlq_entry["provenance"] = prov.to_dict() if hasattr(prov, 'to_dict') else str(prov)
+            except Exception:
+                pass
+            
+            self._dead_letter_queue.append(dlq_entry)
+            
+            # Clean up retry counter
+            self._job_retry_counts.pop(task_id, None)
+            
+            logger.warning(
+                f"[DLQ] Job {task_id} moved to dead letter queue: {reason} "
+                f"(retries={dlq_entry['retry_count']})"
+            )
+
+    def get_dead_letter_queue(self) -> List[Dict[str, Any]]:
+        """
+        Get all jobs in the dead letter queue.
+        
+        Returns:
+            List of failed job records
+        """
+        with self._dead_letter_lock:
+            return list(self._dead_letter_queue)
+
+    def clear_dead_letter_queue(self) -> int:
+        """
+        Clear the dead letter queue.
+        
+        Returns:
+            Number of entries cleared
+        """
+        with self._dead_letter_lock:
+            count = len(self._dead_letter_queue)
+            self._dead_letter_queue.clear()
+            logger.info(f"[DLQ] Cleared {count} entries from dead letter queue")
+            return count
+
+    def retry_dead_letter_job(self, task_id: str) -> bool:
+        """
+        Retry a job from the dead letter queue.
+        
+        Args:
+            task_id: Job identifier to retry
+            
+        Returns:
+            True if job was found and requeued, False otherwise
+        """
+        with self._dead_letter_lock:
+            # Find job in DLQ
+            for i, entry in enumerate(self._dead_letter_queue):
+                if entry["task_id"] == task_id:
+                    # Remove from DLQ
+                    del self._dead_letter_queue[i]
+                    logger.info(f"[DLQ] Job {task_id} removed from DLQ for retry")
+                    # Reset retry count
+                    self._job_retry_counts[task_id] = 0
+                    return True
+        return False
+
+    def get_stuck_jobs(self) -> List[Dict[str, Any]]:
+        """
+        Get list of jobs that appear to be stuck.
+        
+        PERFORMANCE FIX: Identifies jobs that have been in processing state
+        longer than the configured threshold but haven't timed out yet.
+        
+        Returns:
+            List of stuck job information
+        """
+        current_time = time.time()
+        stuck_jobs = []
+        
+        with self.lock:
+            for task_id, assign_time in self.task_assignment_times.items():
+                elapsed = current_time - assign_time
+                warning_threshold = self._stuck_job_threshold_seconds * STUCK_JOB_WARNING_THRESHOLD
+                critical_threshold = self._stuck_job_threshold_seconds * STUCK_JOB_CRITICAL_THRESHOLD
+                if elapsed > warning_threshold:
+                    agent_id = self.task_assignments.get(task_id)
+                    stuck_jobs.append({
+                        "task_id": task_id,
+                        "agent_id": agent_id,
+                        "elapsed_seconds": elapsed,
+                        "timeout_seconds": self._stuck_job_threshold_seconds,
+                        "is_critical": elapsed > critical_threshold,
+                    })
+        
+        return stuck_jobs
+
+    def process_stuck_jobs(self) -> Dict[str, Any]:
+        """
+        Process jobs that are stuck in processing state.
+        
+        PERFORMANCE FIX: Identifies and recovers stuck jobs:
+        - Jobs at warning threshold (70% of timeout): Log warning
+        - Jobs at critical threshold (90%+ of timeout): Attempt recovery (restart or move to DLQ)
+        
+        Returns:
+            Summary of actions taken
+        """
+        stuck_jobs = self.get_stuck_jobs()
+        results = {
+            "total_stuck": len(stuck_jobs),
+            "warned": 0,
+            "recovered": 0,
+            "moved_to_dlq": 0,
+        }
+        
+        for job in stuck_jobs:
+            task_id = job["task_id"]
+            
+            if job["is_critical"]:
+                # Critical: try to recover
+                retry_count = self._job_retry_counts.get(task_id, 0)
+                
+                if retry_count >= self._max_job_retries:
+                    # Max retries exceeded - move to DLQ
+                    self._cancel_task(task_id)
+                    self._move_to_dead_letter_queue(task_id, "stuck_max_retries")
+                    results["moved_to_dlq"] += 1
+                else:
+                    # Try recovery
+                    self._job_retry_counts[task_id] = retry_count + 1
+                    logger.warning(
+                        f"[StuckJobs] Task {task_id} is stuck "
+                        f"(elapsed={job['elapsed_seconds']:.0f}s), "
+                        f"retry {retry_count + 1}/{self._max_job_retries}"
+                    )
+                    # Cancel and let it be resubmitted if still needed
+                    self._cancel_task(task_id)
+                    results["recovered"] += 1
+            else:
+                # Not yet critical, just log warning
+                logger.debug(
+                    f"[StuckJobs] Task {task_id} is slow "
+                    f"(elapsed={job['elapsed_seconds']:.0f}s, "
+                    f"threshold={job['timeout_seconds']:.0f}s)"
+                )
+                results["warned"] += 1
+        
+        if results["total_stuck"] > 0:
+            logger.info(
+                f"[StuckJobs] Processed {results['total_stuck']} stuck jobs: "
+                f"warned={results['warned']}, recovered={results['recovered']}, "
+                f"moved_to_dlq={results['moved_to_dlq']}"
+            )
+        
+        return results
+
+    # ============================================================
     # REASONING INTEGRATION HELPERS
     # ============================================================
     
@@ -2903,6 +3111,11 @@ class AgentPoolManager:
                     pending_count = len(self._pending_executions)
                 if pending_count > 0:
                     logger.debug(f"Pending executions queue size: {pending_count}")
+                
+                # PERFORMANCE FIX: Process stuck jobs every 6 iterations (~60 seconds)
+                # This catches jobs that are taking too long before they fully timeout
+                if monitor_iterations % 6 == 0:
+                    self.process_stuck_jobs()
 
             except Exception as e:
                 logger.error(f"Monitor error: {e}", exc_info=True)
@@ -3089,6 +3302,11 @@ class AgentPoolManager:
         # THREAD POOL FIX: Include pending executions count
         with self._pending_executions_lock:
             base_stats["pending_executions"] = len(self._pending_executions)
+        
+        # PERFORMANCE FIX: Include dead letter queue and stuck job stats
+        with self._dead_letter_lock:
+            base_stats["dead_letter_queue_size"] = len(self._dead_letter_queue)
+        base_stats["stuck_jobs"] = len(self.get_stuck_jobs())
         
         return base_stats
 
