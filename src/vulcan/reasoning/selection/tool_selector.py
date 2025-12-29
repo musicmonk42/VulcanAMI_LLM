@@ -409,13 +409,39 @@ class MultiTierFeatureExtractor:
         return cls._shared_embedding_model
     
     @classmethod
+    def _normalize_text(cls, text: str) -> str:
+        """Normalize text for consistent cache key generation.
+        
+        BUG #1 FIX: Ensures cache hits by normalizing query text consistently.
+        Without normalization, "hello world" and "Hello World " would generate
+        different cache keys despite being semantically identical queries.
+        
+        Normalization steps:
+        1. Strip leading/trailing whitespace
+        2. Collapse multiple whitespaces to single space
+        3. Convert to lowercase for case-insensitive matching
+        
+        Note: This is ONLY used for cache key generation. The original text
+        is still passed to the embedding model to preserve semantic nuances.
+        """
+        # Strip whitespace and convert to lowercase
+        normalized = text.strip().lower()
+        # Collapse multiple whitespaces to single space
+        normalized = ' '.join(normalized.split())
+        return normalized
+    
+    @classmethod
     def _compute_cache_key(cls, text: str) -> str:
         """Compute cache key for text using SHA-256 truncated to 32 chars.
         
         Uses SHA-256 with 32 chars (128-bit space) to reduce collision risk in high-throughput.
         This is a shared helper to ensure consistent key computation across cache operations.
+        
+        BUG #1 FIX: Now normalizes text before hashing to ensure consistent cache hits.
         """
-        return hashlib.sha256(text.encode(), usedforsecurity=False).hexdigest()[:32]
+        # Normalize text before computing hash to ensure consistent cache keys
+        normalized_text = cls._normalize_text(text)
+        return hashlib.sha256(normalized_text.encode(), usedforsecurity=False).hexdigest()[:32]
     
     @classmethod
     def _get_cached_embedding(cls, text: str) -> Optional[np.ndarray]:
@@ -1015,9 +1041,11 @@ class ToolSelectionBandit:
     def select_tool(self, features: np.ndarray, constraints: Dict[str, float]) -> str:
         """Select a tool using the adaptive bandit orchestrator."""
         if not self.is_enabled:
-            # Simple fallback: choose a tool randomly. A more sophisticated
-            # fallback could use a simple heuristic.
-            return np.random.choice(self.tool_names)
+            # CRITICAL BUG FIX: Use deterministic fallback instead of random selection.
+            # Random selection causes non-deterministic results and "Tool Selector at 40% health".
+            # Default to "probabilistic" as a reasonable general-purpose fallback.
+            logger.info("[ToolSelectionBandit] Using deterministic fallback: probabilistic")
+            return "probabilistic"
 
         context = BanditContext(
             features=features, problem_type="tool_selection", constraints=constraints
@@ -1727,7 +1755,9 @@ class ToolSelector:
             return features
         except Exception as e:
             logger.error(f"Feature extraction failed: {e}")
-            return np.random.randn(128)
+            # CRITICAL BUG FIX: Use deterministic zeros instead of random features.
+            # Random features cause non-deterministic tool selection.
+            return np.zeros(128)
 
     def _create_safety_context(self, request: SelectionRequest) -> SafetyContext:
         """Create safety context from request"""

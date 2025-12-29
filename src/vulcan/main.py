@@ -24,6 +24,14 @@ os.environ["NUMEXPR_NUM_THREADS"] = "4"
 os.environ["TOKENIZERS_PARALLELISM"] = "false"  # Prevent tokenizer deadlocks
 
 # ====================================================================
+# BUG #7 FIX: Disable TQDM progress bars that clutter logs
+# This environment variable disables all TQDM progress bars globally.
+# Progress bars like "Batches: 100%|██████████| 1/1 [00:19<00:00, 19.69s/it]"
+# are noisy in production logs and provide no value for batch embedding operations.
+# ====================================================================
+os.environ["TQDM_DISABLE"] = "1"
+
+# ====================================================================
 # PATH + SAFETY SETUP - MUST BE FIRST
 # ====================================================================
 from vulcan.orchestrator import ProductionDeployment
