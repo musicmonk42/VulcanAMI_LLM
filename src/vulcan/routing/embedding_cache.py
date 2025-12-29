@@ -343,6 +343,8 @@ class EmbeddingCache:
             >>> if embedding is not None:
             ...     print(f"Cache hit! Embedding dim: {len(embedding)}")
         """
+        # FIX #1: Comprehensive debug logging for cache operations
+        normalized = self._normalize_text(text)
         key = self._make_key(text)
         
         with self._lock:
@@ -354,9 +356,13 @@ class EmbeddingCache:
                 # Compute hit rate for logging
                 total = self._hits + self._misses
                 hit_rate = self._hits / total if total > 0 else 0.0
+                
+                # FIX #1: Enhanced debug logging with original and normalized text
                 logger.debug(
-                    f"{LOG_PREFIX} HIT: {key[:16]}... "
-                    f"(hits={self._hits}, misses={self._misses}, rate={hit_rate:.1%})"
+                    f"{LOG_PREFIX} HIT: key={key[:16]}... | "
+                    f"original='{text[:50]}{'...' if len(text) > 50 else ''}' | "
+                    f"normalized='{normalized[:50]}{'...' if len(normalized) > 50 else ''}' | "
+                    f"stats=(hits={self._hits}, misses={self._misses}, rate={hit_rate:.1%})"
                 )
                 
                 # Return copy to prevent external mutation
@@ -366,9 +372,13 @@ class EmbeddingCache:
             # Log cache miss with debug details
             total = self._hits + self._misses
             hit_rate = self._hits / total if total > 0 else 0.0
+            
+            # FIX #1: Enhanced debug logging for cache misses
             logger.debug(
-                f"{LOG_PREFIX} MISS: {key[:16]}... "
-                f"(hits={self._hits}, misses={self._misses}, rate={hit_rate:.1%}, "
+                f"{LOG_PREFIX} MISS: key={key[:16]}... | "
+                f"original='{text[:50]}{'...' if len(text) > 50 else ''}' | "
+                f"normalized='{normalized[:50]}{'...' if len(normalized) > 50 else ''}' | "
+                f"stats=(hits={self._hits}, misses={self._misses}, rate={hit_rate:.1%}, "
                 f"cache_size={len(self._cache)}/{self._max_size})"
             )
             return None
@@ -389,6 +399,8 @@ class EmbeddingCache:
             >>> embedding = model.encode("Hello world")
             >>> cache.put("Hello world", embedding)
         """
+        # FIX #1: Comprehensive debug logging for cache operations
+        normalized = self._normalize_text(text)
         key = self._make_key(text)
         
         with self._lock:
@@ -414,8 +426,11 @@ class EmbeddingCache:
             else:
                 self._cache[key] = list(embedding)
             
+            # FIX #1: Enhanced debug logging with original and normalized text
             logger.debug(
-                f"{LOG_PREFIX} STORED: {key[:16]}..., "
+                f"{LOG_PREFIX} STORED: key={key[:16]}... | "
+                f"original='{text[:50]}{'...' if len(text) > 50 else ''}' | "
+                f"normalized='{normalized[:50]}{'...' if len(normalized) > 50 else ''}' | "
                 f"cache_size={len(self._cache)}/{self._max_size}"
             )
     
@@ -587,6 +602,89 @@ class EmbeddingCache:
             lines.extend(key_sample)
             
             return "\n".join(lines)
+    
+    def debug_cache_state(self) -> Dict[str, Any]:
+        """
+        FIX #1: Get detailed debug information about cache state.
+        
+        This method provides comprehensive diagnostic data for debugging
+        cache hit rate issues. Returns all internal metrics and sample entries.
+        
+        Returns:
+            Dictionary with debug information including:
+            - size: Current cache size
+            - max_size: Maximum cache capacity
+            - hits: Total cache hits
+            - misses: Total cache misses
+            - hit_rate: Calculated hit rate
+            - evictions: Total eviction operations
+            - time_saved_ms: Estimated time saved by cache
+            - sample_keys: First 5 cache keys (truncated)
+            - fill_percentage: Cache fill percentage
+        
+        Example:
+            >>> debug_info = cache.debug_cache_state()
+            >>> if debug_info['hit_rate'] < 0.1:
+            ...     logger.warning("Low cache hit rate detected!")
+        """
+        with self._lock:
+            total = self._hits + self._misses
+            hit_rate = self._hits / total if total > 0 else 0.0
+            fill_pct = (len(self._cache) / self._max_size * 100) if self._max_size > 0 else 0.0
+            
+            # Get sample keys for debugging
+            sample_keys = [k[:32] + "..." for k in list(self._cache.keys())[:5]]
+            
+            return {
+                "size": len(self._cache),
+                "max_size": self._max_size,
+                "hits": self._hits,
+                "misses": self._misses,
+                "hit_rate": hit_rate,
+                "hit_rate_pct": f"{hit_rate:.1%}",
+                "evictions": self._evictions,
+                "time_saved_ms": self._compute_time_saved_ms,
+                "sample_keys": sample_keys,
+                "fill_percentage": f"{fill_pct:.1f}%",
+                "total_operations": total,
+            }
+    
+    def verify_key_generation(self, text: str) -> Dict[str, str]:
+        """
+        FIX #1: Verify cache key generation for debugging.
+        
+        This method shows exactly how a text string is normalized and hashed,
+        helping diagnose why cache hits might be failing.
+        
+        Args:
+            text: The text to analyze.
+        
+        Returns:
+            Dictionary with normalization steps:
+            - original: The original input text
+            - normalized: The normalized text
+            - key: The generated cache key
+            - is_cached: Whether this text is currently cached
+        
+        Example:
+            >>> result = cache.verify_key_generation("  Hello World  ")
+            >>> print(f"Key: {result['key']}, Cached: {result['is_cached']}")
+        """
+        normalized = self._normalize_text(text)
+        key = self._make_key(text)
+        
+        with self._lock:
+            is_cached = key in self._cache
+        
+        return {
+            "original": text,
+            "original_repr": repr(text),
+            "normalized": normalized,
+            "normalized_repr": repr(normalized),
+            "key": key,
+            "key_short": key[:16] + "...",
+            "is_cached": is_cached,
+        }
 
 
 # =============================================================================
@@ -1007,3 +1105,61 @@ def dump_cache_statistics() -> str:
         ...
     """
     return _get_cache().dump_statistics()
+
+
+def debug_cache_state() -> Dict[str, Any]:
+    """
+    FIX #1: Get detailed debug information about cache state.
+    
+    This function provides comprehensive diagnostic data for debugging
+    cache hit rate issues. Use this to diagnose 0% hit rate problems.
+    
+    Returns:
+        Dictionary with debug information including:
+        - size: Current cache size
+        - max_size: Maximum cache capacity  
+        - hits: Total cache hits
+        - misses: Total cache misses
+        - hit_rate: Calculated hit rate (0.0 to 1.0)
+        - hit_rate_pct: Hit rate as percentage string
+        - evictions: Total eviction operations
+        - time_saved_ms: Estimated time saved by cache
+        - sample_keys: First 5 cache keys (truncated)
+        - fill_percentage: Cache fill percentage
+        - total_operations: Total get operations
+    
+    Example:
+        >>> debug_info = debug_cache_state()
+        >>> print(f"Hit rate: {debug_info['hit_rate_pct']}")
+        >>> if debug_info['hit_rate'] < 0.1:
+        ...     print("WARNING: Low cache hit rate!")
+    """
+    return _get_cache().debug_cache_state()
+
+
+def verify_cache_key(text: str) -> Dict[str, str]:
+    """
+    FIX #1: Verify how a text string is normalized and hashed.
+    
+    This function shows exactly how cache keys are generated, helping
+    diagnose why cache hits might be failing (0% hit rate issue).
+    
+    Args:
+        text: The text to analyze.
+    
+    Returns:
+        Dictionary with normalization details:
+        - original: The original input text
+        - original_repr: repr() of original text (shows hidden chars)
+        - normalized: The normalized text
+        - normalized_repr: repr() of normalized text
+        - key: The full cache key (SHA-256 hash)
+        - key_short: Truncated cache key for display
+        - is_cached: Whether this text is currently cached
+    
+    Example:
+        >>> result = verify_cache_key("  Hello World  ")
+        >>> print(f"Normalized: {result['normalized']}")
+        >>> print(f"Is cached: {result['is_cached']}")
+    """
+    return _get_cache().verify_key_generation(text)

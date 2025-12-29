@@ -10,27 +10,164 @@
 #
 # VERSION HISTORY:
 #     1.0.0 - Extracted from main.py for modular architecture
+#     1.1.0 - FIX #2: Added circuit breaker, timeout handling, and progress monitoring
 # ============================================================
 
 import asyncio
 import json
 import logging
+import threading
 import time
-from typing import Any, Dict, Optional
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional
 
 # Module metadata
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 __author__ = "VULCAN-AGI Team"
 
 logger = logging.getLogger(__name__)
 
 # ============================================================
-# CONSTANTS
+# FIX #2: TIMEOUT AND CIRCUIT BREAKER CONSTANTS
 # ============================================================
+
+# Generator timeout - target completion time (30s instead of 120s)
+GENERATOR_TIMEOUT = 30.0
+
+# Progress monitoring - abort if no progress after this time
+PROGRESS_TIMEOUT_SECONDS = 15.0
+
+# Maximum concurrent Arena requests to prevent overload
+MAX_CONCURRENT_ARENA = 2
+
+# Circuit breaker settings
+CIRCUIT_BREAKER_THRESHOLD = 3  # Skip Arena after 3 consecutive timeouts
+CIRCUIT_BREAKER_RESET_TIME = 60.0  # Reset circuit after 60s of no failures
 
 # Issue #52: Hard timeout buffer for asyncio.wait_for wrapper
 # Adds small buffer beyond aiohttp timeout to catch edge cases
 TIMEOUT_BUFFER_SECONDS = 5.0
+
+
+# ============================================================
+# FIX #2: CIRCUIT BREAKER AND CONCURRENCY CONTROL
+# ============================================================
+
+@dataclass
+class ArenaCircuitBreaker:
+    """
+    FIX #2: Circuit breaker to skip Arena when experiencing consecutive timeouts.
+    
+    The circuit breaker prevents wasted time waiting for Arena when it's
+    experiencing issues. After CIRCUIT_BREAKER_THRESHOLD consecutive timeouts,
+    the circuit "opens" and Arena is bypassed until CIRCUIT_BREAKER_RESET_TIME
+    passes without any new failures.
+    
+    States:
+        CLOSED: Normal operation, Arena calls proceed
+        OPEN: Arena is bypassed, all calls return fallback immediately
+    """
+    consecutive_timeouts: int = 0
+    last_failure_time: float = 0.0
+    is_open: bool = False
+    total_timeouts: int = 0
+    total_successes: int = 0
+    _lock: threading.Lock = field(default_factory=threading.Lock)
+    
+    def record_timeout(self) -> None:
+        """Record a timeout and potentially open the circuit."""
+        with self._lock:
+            self.consecutive_timeouts += 1
+            self.total_timeouts += 1
+            self.last_failure_time = time.time()
+            
+            if self.consecutive_timeouts >= CIRCUIT_BREAKER_THRESHOLD:
+                if not self.is_open:
+                    logger.warning(
+                        f"[ARENA] Circuit breaker OPEN: {self.consecutive_timeouts} consecutive timeouts. "
+                        f"Arena bypassed for {CIRCUIT_BREAKER_RESET_TIME}s"
+                    )
+                self.is_open = True
+    
+    def record_success(self) -> None:
+        """Record a success and reset consecutive timeout counter."""
+        with self._lock:
+            self.consecutive_timeouts = 0
+            self.total_successes += 1
+            # Don't immediately close - let reset time handle it
+    
+    def should_bypass(self) -> bool:
+        """
+        Check if Arena should be bypassed.
+        
+        Returns:
+            True if circuit is open and should bypass Arena
+        """
+        with self._lock:
+            if not self.is_open:
+                return False
+            
+            # Check if enough time has passed to try again
+            elapsed = time.time() - self.last_failure_time
+            if elapsed >= CIRCUIT_BREAKER_RESET_TIME:
+                logger.info(
+                    f"[ARENA] Circuit breaker RESET: {elapsed:.1f}s since last failure. "
+                    f"Attempting Arena call."
+                )
+                self.is_open = False
+                self.consecutive_timeouts = 0
+                return False
+            
+            return True
+    
+    def get_stats(self) -> Dict[str, Any]:
+        """Get circuit breaker statistics."""
+        with self._lock:
+            return {
+                "is_open": self.is_open,
+                "consecutive_timeouts": self.consecutive_timeouts,
+                "total_timeouts": self.total_timeouts,
+                "total_successes": self.total_successes,
+                "last_failure_time": self.last_failure_time,
+                "time_since_failure": time.time() - self.last_failure_time if self.last_failure_time > 0 else None,
+            }
+
+
+# Global circuit breaker instance
+_circuit_breaker = ArenaCircuitBreaker()
+
+# Semaphore for limiting concurrent Arena requests
+_arena_semaphore: Optional[asyncio.Semaphore] = None
+
+
+def _get_arena_semaphore() -> asyncio.Semaphore:
+    """Get or create the Arena concurrency semaphore."""
+    global _arena_semaphore
+    if _arena_semaphore is None:
+        _arena_semaphore = asyncio.Semaphore(MAX_CONCURRENT_ARENA)
+    return _arena_semaphore
+
+
+def get_circuit_breaker_stats() -> Dict[str, Any]:
+    """
+    FIX #2: Get Arena circuit breaker statistics for monitoring.
+    
+    Returns:
+        Dictionary with circuit breaker state and metrics
+    """
+    return _circuit_breaker.get_stats()
+
+
+def reset_circuit_breaker() -> None:
+    """
+    FIX #2: Manually reset the circuit breaker.
+    
+    Use this to force Arena to be tried again after manual intervention.
+    """
+    global _circuit_breaker
+    _circuit_breaker = ArenaCircuitBreaker()
+    logger.info("[ARENA] Circuit breaker manually reset")
+
 
 # ============================================================
 # IMPORTS
@@ -207,6 +344,12 @@ async def execute_via_arena(query: str, routing_plan, arena_base_url: str = None
     """
     Execute query through Graphix Arena for training + graph execution.
     
+    FIX #2: Now includes:
+    - Circuit breaker to skip Arena after consecutive timeouts
+    - Concurrency limiting (MAX_CONCURRENT_ARENA simultaneous requests)
+    - Proper timeout (GENERATOR_TIMEOUT = 30s instead of 120s)
+    - Logging when Arena is bypassed due to performance issues
+    
     Arena handles:
     - Agent execution (generator/evolver/visualizer/etc)
     - Tournament selection among proposals
@@ -225,6 +368,22 @@ async def execute_via_arena(query: str, routing_plan, arena_base_url: str = None
         - execution_time: How long it took
         - metrics: Any performance metrics from Arena
     """
+    # FIX #2: Check circuit breaker first - skip Arena if experiencing issues
+    if _circuit_breaker.should_bypass():
+        cb_stats = _circuit_breaker.get_stats()
+        logger.warning(
+            f"[ARENA] Circuit breaker OPEN - bypassing Arena. "
+            f"Stats: {cb_stats['consecutive_timeouts']} consecutive timeouts, "
+            f"{cb_stats['time_since_failure']:.1f}s since last failure"
+        )
+        return {
+            "status": "circuit_breaker_open",
+            "reason": f"Arena bypassed due to {cb_stats['consecutive_timeouts']} consecutive timeouts",
+            "result": None,
+            "execution_time": 0,
+            "circuit_breaker_stats": cb_stats,
+        }
+    
     if not AIOHTTP_AVAILABLE:
         logger.warning("[ARENA] aiohttp not available, falling back to VULCAN-only processing")
         return {
@@ -244,13 +403,16 @@ async def execute_via_arena(query: str, routing_plan, arena_base_url: str = None
     # Get Arena configuration
     base_url = arena_base_url
     api_key = None
-    timeout = 120.0  # FIX #6: Increased from 90s to 120s to account for high CPU load
+    # FIX #2: Use GENERATOR_TIMEOUT (30s) instead of 120s
+    timeout = GENERATOR_TIMEOUT
     complexity_threshold = 0.3  # PERFORMANCE FIX: Default fast-path threshold
     
     if settings is not None:
         base_url = base_url or settings.arena_base_url
         api_key = settings.arena_api_key
-        timeout = settings.arena_timeout
+        # FIX #2: Cap timeout at GENERATOR_TIMEOUT even if settings has higher value
+        settings_timeout = settings.arena_timeout
+        timeout = min(settings_timeout, GENERATOR_TIMEOUT) if settings_timeout else GENERATOR_TIMEOUT
         complexity_threshold = getattr(settings, 'arena_complexity_threshold', 0.3)
     else:
         base_url = base_url or "http://localhost:8080/arena"
@@ -325,28 +487,31 @@ async def execute_via_arena(query: str, routing_plan, arena_base_url: str = None
     if api_key:
         headers["X-API-Key"] = api_key
     
-    logger.info(f"[ARENA] Executing via {agent_id}: {url}")
+    logger.info(f"[ARENA] Executing via {agent_id}: {url} (timeout={timeout}s)")
     t0 = time.perf_counter()
     
-    # Issue #52: Two-layer timeout strategy:
+    # FIX #2: Use semaphore to limit concurrent Arena requests
+    semaphore = _get_arena_semaphore()
+    
+    # Issue #52: Two-layer timeout strategy with FIX #2 improvements:
     # 1. Inner: aiohttp.ClientTimeout handles HTTP transport-level timeout
     # 2. Outer: asyncio.wait_for provides hard cutoff for entire async operation
     # The outer timeout is slightly longer to allow clean aiohttp timeout handling
-    # but ensures we never exceed the configured limit + buffer
     async def _execute_request():
-        session = await get_http_session()
-        async with session.post(
-            url,
-            data=payload_json,
-            headers=headers,
-            timeout=aiohttp.ClientTimeout(total=timeout)
-        ) as resp:
-            if resp.status == 200:
-                result = await resp.json()
-                return {"status": 200, "result": result}
-            else:
-                error_text = await resp.text()
-                return {"status": resp.status, "error": error_text}
+        async with semaphore:
+            session = await get_http_session()
+            async with session.post(
+                url,
+                data=payload_json,
+                headers=headers,
+                timeout=aiohttp.ClientTimeout(total=timeout)
+            ) as resp:
+                if resp.status == 200:
+                    result = await resp.json()
+                    return {"status": 200, "result": result}
+                else:
+                    error_text = await resp.text()
+                    return {"status": resp.status, "error": error_text}
     
     try:
         # Outer timeout: hard limit = configured timeout + buffer for clean handling
@@ -354,6 +519,8 @@ async def execute_via_arena(query: str, routing_plan, arena_base_url: str = None
         elapsed = time.perf_counter() - t0
         
         if response["status"] == 200:
+            # FIX #2: Record success for circuit breaker
+            _circuit_breaker.record_success()
             logger.info(f"[ARENA] {agent_id} completed in {elapsed:.2f}s")
             return {
                 "status": "success",
@@ -374,15 +541,24 @@ async def execute_via_arena(query: str, routing_plan, arena_base_url: str = None
                     
     except asyncio.TimeoutError:
         elapsed = time.perf_counter() - t0
-        logger.error(f"[ARENA] {agent_id} timeout after {elapsed:.2f}s")
+        # FIX #2: Record timeout for circuit breaker
+        _circuit_breaker.record_timeout()
+        cb_stats = _circuit_breaker.get_stats()
+        logger.error(
+            f"[ARENA] {agent_id} timeout after {elapsed:.2f}s. "
+            f"Circuit breaker: {cb_stats['consecutive_timeouts']}/{CIRCUIT_BREAKER_THRESHOLD} consecutive timeouts"
+        )
         return {
             "status": "timeout",
             "agent_id": agent_id,
             "execution_time": elapsed,
             "error": f"Arena request timed out after {timeout}s",
+            "circuit_breaker_stats": cb_stats,
         }
     except aiohttp.ClientError as e:
         elapsed = time.perf_counter() - t0
+        # FIX #2: Record as timeout for circuit breaker (connection issues count as failures)
+        _circuit_breaker.record_timeout()
         logger.error(f"[ARENA] {agent_id} connection error: {e}")
         return {
             "status": "connection_error",
@@ -502,6 +678,12 @@ __all__ = [
     "select_arena_agent",
     "build_arena_payload",
     "AIOHTTP_AVAILABLE",
+    # FIX #2: Circuit breaker and timeout constants
+    "GENERATOR_TIMEOUT",
+    "MAX_CONCURRENT_ARENA",
+    "CIRCUIT_BREAKER_THRESHOLD",
+    "get_circuit_breaker_stats",
+    "reset_circuit_breaker",
     # Backward compatibility
     "_select_arena_agent",
     "_build_arena_payload",

@@ -190,6 +190,7 @@ class SafetyViolation:
 
 
 @dataclass
+@dataclass
 class SafetyContext:
     """Context for safety evaluation"""
 
@@ -200,10 +201,24 @@ class SafetyContext:
     user_context: Dict[str, Any]
     safety_level: SafetyLevel
     metadata: Dict[str, Any] = field(default_factory=dict)
+    # FIX #3: Source parameter to distinguish user vs system operations
+    source: str = "user"
 
 
 class SafetyValidator:
     """Validates inputs and outputs for safety"""
+    
+    # FIX #3: Internal sources that should bypass sensitive data checks
+    # These are system operations that should not be blocked
+    INTERNAL_SOURCES = frozenset({
+        "system",
+        "arena_internal", 
+        "reasoning",
+        "tool_selection",
+        "embedding_cache",
+        "query_router",
+        "meta_reasoning",
+    })
 
     def __init__(self):
         # CRITICAL FIX: Pre-compile patterns to avoid ReDoS
@@ -216,13 +231,22 @@ class SafetyValidator:
             re.compile(r"(?i)\b(illegal|illicit|prohibited|banned)\b"),
         ]
 
-        # CRITICAL FIX: Pre-compile sensitive patterns with simple, safe regex
+        # FIX #3: Sensitive patterns - check for actual sensitive data
+        # Balanced to catch real secrets while reducing false positives on technical docs
         self.sensitive_patterns_compiled = [
-            re.compile(r"\b\d{3}-\d{2}-\d{4}\b"),  # SSN
-            re.compile(r"\b\d{16}\b"),  # Credit card
-            re.compile(r"(?i)\b(password|secret|token|api[_\s]?key)\b"),
-            re.compile(r"(?i)\b(private[_\s]?key|credential)\b"),
+            re.compile(r"\b\d{3}-\d{2}-\d{4}\b"),  # SSN format
+            re.compile(r"\b\d{16}\b"),  # Credit card (16 consecutive digits)
+            re.compile(r"(?i)\b(api[_\s]?key|secret[_\s]?key)\s*[:=]\s*['\"]?\w+"),  # API keys with values
+            re.compile(r"(?i)\bpassword\s*[:=]\s*['\"]?\S+"),  # Password with value
         ]
+        
+        # FIX #3: Patterns that look sensitive but are safe in technical contexts
+        self.technical_safe_patterns = frozenset({
+            "password field", "password validation", "password hash",
+            "api key rotation", "api key management", "secret management",
+            "token validation", "token refresh", "access token",
+            "credential storage", "credential rotation",
+        })
 
         # Safe content whitelist
         self.safe_keywords = {
@@ -312,10 +336,36 @@ class SafetyValidator:
         except Exception as e:
             logger.warning(f"Mathematical scenario detection failed: {e}")
             return False
+    
+    def _is_technical_safe_context(self, input_str: str) -> bool:
+        """
+        FIX #3: Check if input is in a technical/code context where
+        mentions of passwords, keys, etc. are safe.
+        
+        Args:
+            input_str: The input string to check
+            
+        Returns:
+            True if this is a safe technical context
+        """
+        input_lower = input_str.lower()
+        return any(pattern in input_lower for pattern in self.technical_safe_patterns)
 
-    def validate_input(self, input_data: Any) -> Tuple[bool, str]:
-        """Validate input for safety - CRITICAL: ReDoS protection"""
-
+    def validate_input(self, input_data: Any, source: str = "user") -> Tuple[bool, str]:
+        """
+        Validate input for safety - CRITICAL: ReDoS protection
+        
+        FIX #3: Added source parameter to distinguish user vs system operations.
+        Internal sources bypass sensitive data checks but NOT unsafe content checks.
+        
+        Args:
+            input_data: The input to validate
+            source: Source of the input. Internal sources like "system", "reasoning",
+                   "tool_selection" bypass sensitive data detection (not unsafe content)
+        
+        Returns:
+            Tuple of (is_safe, reason_message)
+        """
         try:
             input_str = str(input_data) if input_data else ""
 
@@ -326,23 +376,52 @@ class SafetyValidator:
             # CRITICAL FIX: Truncate for pattern matching to prevent ReDoS
             check_str = input_str[: self.max_pattern_check_size]
             check_str_lower = check_str.lower()
-
+            
+            # FIX #3: Check if this is an internal system operation
+            is_internal_source = source.lower() in self.INTERNAL_SOURCES
+            
             # Check for unsafe patterns with pre-compiled regex
+            # NOTE: Unsafe content checks are ALWAYS performed, even for internal sources
             for pattern in self.unsafe_patterns_compiled:
                 try:
                     match = pattern.search(check_str_lower)
                     if match:
-                        return False, f"Unsafe pattern detected: {match.group()}"
+                        matched_text = match.group()
+                        logger.warning(
+                            f"[SafetyValidator] Unsafe pattern blocked: '{matched_text}' "
+                            f"(source={source}, pattern={pattern.pattern})"
+                        )
+                        return False, f"Unsafe pattern detected: {matched_text}"
                 except Exception as e:
                     logger.warning(f"Pattern matching error: {e}")
                     continue
 
-            # Check for sensitive data
+            # FIX #3: Sensitive data checks are BYPASSED for internal sources
+            # This allows system operations to mention "password", "api_key" etc. in logs/code
+            if is_internal_source:
+                logger.debug(
+                    f"[SafetyValidator] Bypassing sensitive data check for internal source: {source}"
+                )
+                return True, f"Input validated (internal source: {source})"
+            
+            # FIX #3: Check for technical safe context before sensitive pattern check
+            if self._is_technical_safe_context(check_str):
+                logger.debug(
+                    f"[SafetyValidator] Technical context detected - allowing content"
+                )
+                return True, "Input validated (technical context)"
+
+            # Check for sensitive data (only for non-internal sources)
             for pattern in self.sensitive_patterns_compiled:
                 try:
                     match = pattern.search(check_str)
                     if match:
-                        return False, "Sensitive data detected"
+                        matched_text = match.group()[:30] + "..." if len(match.group()) > 30 else match.group()
+                        logger.warning(
+                            f"[SafetyValidator] Sensitive data blocked: pattern={pattern.pattern[:30]}... "
+                            f"(source={source})"
+                        )
+                        return False, f"Sensitive data detected: {pattern.pattern[:20]}..."
                 except Exception as e:
                     logger.warning(f"Sensitive pattern matching error: {e}")
                     continue
@@ -848,8 +927,9 @@ class SafetyGovernor:
         """
         try:
             with self.lock:
-                # Only check input safety for critical violations
-                is_safe, reason = self.validator.validate_input(context.problem)
+                # FIX #3: Pass source to validator for internal source handling
+                source = getattr(context, 'source', 'user')
+                is_safe, reason = self.validator.validate_input(context.problem, source=source)
                 if not is_safe:
                     self._record_violation(
                         context.tool_name, VetoReason.UNSAFE_INPUT, reason
@@ -890,6 +970,8 @@ class SafetyGovernor:
     ) -> Tuple[SafetyAction, Optional[str]]:
         """
         Main safety check for tool selection
+        
+        FIX #3: Now passes source parameter to validator for internal source bypass.
 
         Returns:
             (action, reason)
@@ -926,8 +1008,9 @@ class SafetyGovernor:
                         )
 
             with self.lock:
-                # Input validation
-                is_safe, reason = self.validator.validate_input(context.problem)
+                # FIX #3: Pass source to validator for internal source handling
+                source = getattr(context, 'source', 'user')
+                is_safe, reason = self.validator.validate_input(context.problem, source=source)
                 if not is_safe:
                     self._record_violation(
                         context.tool_name, VetoReason.UNSAFE_INPUT, reason
