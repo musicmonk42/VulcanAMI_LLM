@@ -19,8 +19,16 @@ from collections import defaultdict, deque
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
-import torch
-import torch.nn as nn
+
+# Optional torch import for bias detection neural models
+try:
+    import torch
+    import torch.nn as nn
+    TORCH_AVAILABLE = True
+except ImportError:
+    TORCH_AVAILABLE = False
+    torch = None
+    nn = None
 
 from .safety_types import ComplianceStandard
 
@@ -1735,12 +1743,14 @@ class BiasDetector:
     """
     Multi-model bias detection system using neural networks.
     Detects demographic, representation, and fairness biases.
+    
+    Note: If PyTorch is not available, bias detection will use simplified
+    heuristic-based methods instead of neural models.
     """
 
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         """Initialize bias detector with models."""
         self.config = config or {}
-        self.bias_models = self._initialize_models()
         self.bias_history = deque(maxlen=1000)
         self.bias_thresholds = {
             "demographic": self.config.get("demographic_threshold", 0.15),
@@ -1775,19 +1785,32 @@ class BiasDetector:
         # Prediction cache
         self.prediction_cache = LRUCache(maxsize=500)
 
-        # Device management
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        # Only initialize torch models if available
+        self._torch_available = TORCH_AVAILABLE
+        if self._torch_available:
+            self.bias_models = self._initialize_models()
+            # Device management
+            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        # Move models to device
-        for model_name, model in self.bias_models.items():
-            self.bias_models[model_name] = model.to(self.device)
+            # Move models to device
+            for model_name, model in self.bias_models.items():
+                self.bias_models[model_name] = model.to(self.device)
 
-        logger.info(
-            f"BiasDetector initialized with multi-model ensemble on {self.device}"
-        )
+            logger.info(
+                f"BiasDetector initialized with multi-model ensemble on {self.device}"
+            )
+        else:
+            self.bias_models = {}
+            self.device = None
+            logger.warning(
+                "BiasDetector initialized without PyTorch - using heuristic bias detection"
+            )
 
-    def _initialize_models(self) -> Dict[str, nn.Module]:
+    def _initialize_models(self) -> Dict[str, "nn.Module"]:
         """Initialize bias detection models."""
+        if not self._torch_available:
+            return {}
+            
         models = {
             "demographic": self._build_demographic_bias_model(),
             "representation": self._build_representation_bias_model(),
@@ -1802,8 +1825,10 @@ class BiasDetector:
 
         return models
 
-    def _build_demographic_bias_model(self) -> nn.Module:
+    def _build_demographic_bias_model(self) -> "nn.Module":
         """Build model for demographic bias detection."""
+        if not self._torch_available:
+            return None
         return nn.Sequential(
             nn.Linear(128, 256),
             nn.ReLU(),
@@ -1817,8 +1842,10 @@ class BiasDetector:
             nn.Softmax(dim=-1),
         )
 
-    def _build_representation_bias_model(self) -> nn.Module:
+    def _build_representation_bias_model(self) -> "nn.Module":
         """Build model for representation bias detection."""
+        if not self._torch_available:
+            return None
         return nn.Sequential(
             nn.Linear(128, 64),
             nn.ReLU(),
@@ -1830,8 +1857,10 @@ class BiasDetector:
             nn.Sigmoid(),
         )
 
-    def _build_fairness_model(self) -> nn.Module:
+    def _build_fairness_model(self) -> "nn.Module":
         """Build model for fairness assessment."""
+        if not self._torch_available:
+            return None
         return nn.Sequential(
             nn.Linear(256, 512),
             nn.ReLU(),
@@ -1848,8 +1877,10 @@ class BiasDetector:
             nn.Sigmoid(),
         )
 
-    def _build_outcome_bias_model(self) -> nn.Module:
+    def _build_outcome_bias_model(self) -> "nn.Module":
         """Build model for outcome bias detection."""
+        if not self._torch_available:
+            return None
         return nn.Sequential(
             nn.Linear(128, 128),
             nn.ReLU(),
@@ -1862,8 +1893,10 @@ class BiasDetector:
             nn.Sigmoid(),
         )
 
-    def _build_allocation_bias_model(self) -> nn.Module:
+    def _build_allocation_bias_model(self) -> "nn.Module":
         """Build model for resource allocation bias detection."""
+        if not self._torch_available:
+            return None
         return nn.Sequential(
             nn.Linear(128, 96),
             nn.ReLU(),
@@ -1893,6 +1926,11 @@ class BiasDetector:
         Returns:
             Dictionary with bias detection results
         """
+        # FIX: Fallback when PyTorch is not available
+        if not self._torch_available:
+            # Return heuristic-based bias detection
+            return self._detect_bias_heuristic(action, context)
+        
         # Generate cache key
         cache_key = hashlib.md5(
             json.dumps(
@@ -2017,6 +2055,46 @@ class BiasDetector:
 
         return result
 
+    def _detect_bias_heuristic(
+        self, action: Dict[str, Any], context: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Fallback heuristic-based bias detection when PyTorch is unavailable.
+        
+        Uses simple keyword and pattern matching for basic bias detection.
+        """
+        bias_scores = {
+            "demographic": 0.0,
+            "representation": 0.0,
+            "outcome": 0.0,
+            "allocation": 0.0,
+            "fairness": 0.5,  # Neutral
+        }
+        
+        # Check for demographic bias indicators in action/context text
+        text_to_check = str(action) + str(context)
+        text_lower = text_to_check.lower()
+        
+        # Demographic keywords
+        demographic_keywords = ["gender", "race", "age", "ethnicity", "religion"]
+        demographic_score = sum(1 for kw in demographic_keywords if kw in text_lower) / len(demographic_keywords)
+        bias_scores["demographic"] = min(demographic_score, 0.5)
+        
+        # Check for any biases above threshold
+        bias_detected = any(
+            score >= self.bias_thresholds.get(bias_type, 0.15)
+            for bias_type, score in bias_scores.items()
+        )
+        
+        return {
+            "bias_detected": bias_detected,
+            "bias_scores": bias_scores,
+            "overall_bias_score": np.mean(list(bias_scores.values())),
+            "confidence": 0.5,  # Lower confidence for heuristic method
+            "recommendations": [] if not bias_detected else ["Review for potential bias"],
+            "method": "heuristic",
+        }
+
     def _extract_features(
         self, action: Dict[str, Any], context: Dict[str, Any]
     ) -> np.ndarray:
@@ -2097,7 +2175,7 @@ class BiasDetector:
 
         return extended
 
-    def _calculate_demographic_bias(self, output: torch.Tensor) -> float:
+    def _calculate_demographic_bias(self, output: "torch.Tensor") -> float:
         """Calculate demographic bias from model output."""
         probs = output.squeeze().numpy()
 
@@ -2112,7 +2190,7 @@ class BiasDetector:
 
         return float(normalized_bias)
 
-    def _analyze_demographic_bias(self, output: torch.Tensor) -> Dict[str, Any]:
+    def _analyze_demographic_bias(self, output: "torch.Tensor") -> Dict[str, Any]:
         """Detailed analysis of demographic bias."""
         probs = output.squeeze().numpy()
         categories = [
