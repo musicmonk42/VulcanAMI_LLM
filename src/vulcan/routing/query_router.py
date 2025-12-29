@@ -1062,13 +1062,18 @@ PENDULUM_ADVANCED_VERBS: Tuple[str, ...] = (
 
 # Philosophical/paradox patterns - these should NOT trigger complex reasoning
 # Examples: "This sentence is false", "Experience machine", "Trolley problem"
+# ISSUE FIX: Added missing philosophical terms that were causing misrouting to MATH-FAST-PATH
+# Queries about hedonism, ethical dilemmas, etc. were getting routed to mathematical tools
 PHILOSOPHICAL_KEYWORDS: Tuple[str, ...] = (
     "paradox",
     "dilemma",
     "thought experiment",
     "philosophical",
+    "philosophy",  # Added: base form
     "ethics",
+    "ethical",  # Added: adjective form for "ethical dilemma"
     "moral",
+    "morality",  # Added: noun form
     "trolley problem",
     "experience machine",
     "free will",
@@ -1079,16 +1084,54 @@ PHILOSOPHICAL_KEYWORDS: Tuple[str, ...] = (
     "absurdism",
     "stoicism",
     "utilitarianism",
+    "utilitarian",  # Added: adjective form
     "deontological",
     "virtue ethics",
+    "virtue",  # Added: standalone "virtue" for virtue ethics discussions
     "metaphysics",
     "epistemology",
     "ontology",
     "determinism",
     "compatibilism",
+    # Added: Additional ethical/philosophical concepts
+    "hedonism",  # Was missing - caused routing to math tools
+    "hedonistic",
+    "consequentialism",
+    "consequentialist",
+    "kantian",
+    "categorical imperative",
+    "social contract",
+    "rawlsian",
+    "veil of ignorance",
+    "original position",
+    "greatest good",
+    "greatest happiness",
+    "pleasure machine",  # Alternative name for experience machine
+    "utility monster",
+    "repugnant conclusion",
+    "mere addition paradox",
+    "omelas",  # "The Ones Who Walk Away from Omelas"
+    "teleology",
+    "teleological",
+    "normative",
+    "metaethics",
+    "applied ethics",
+    "bioethics",
+    "sentience",
+    "qualia",
+    "hard problem",
+    "mind-body",
+    "dualism",
+    "materialism",
+    "physicalism",
+    "panpsychism",
+    "solipsism",
+    "phenomenology",
+    "existentialism",
 )
 
 # Compiled regex patterns for philosophical/paradox detection
+# ISSUE FIX: Added more patterns to catch philosophical queries that were being misrouted
 PHILOSOPHICAL_PATTERNS: Tuple[re.Pattern, ...] = (
     re.compile(r"this\s+(?:sentence|statement)\s+is\s+(?:false|true|a\s+lie)", re.IGNORECASE),
     re.compile(r"liar\s*(?:'s)?\s*paradox", re.IGNORECASE),
@@ -1101,6 +1144,21 @@ PHILOSOPHICAL_PATTERNS: Tuple[re.Pattern, ...] = (
     re.compile(r"(?:would|should)\s+you\s+(?:plug|connect)\s+(?:into|to)\s+(?:the\s+)?(?:experience|pleasure)\s+machine", re.IGNORECASE),
     re.compile(r"(?:if|what\s+if)\s+(?:you|we)\s+(?:were|are)\s+(?:living\s+)?in\s+a\s+simulation", re.IGNORECASE),
     re.compile(r"can\s+(?:an?\s+)?(?:ai|machine|computer)\s+(?:be|have|feel)\s+(?:conscious|sentient)", re.IGNORECASE),
+    # Added: More flexible patterns for experience machine
+    re.compile(r"(?:the\s+)?experience\s+machine", re.IGNORECASE),  # Any mention of "experience machine"
+    re.compile(r"(?:the\s+)?pleasure\s+machine", re.IGNORECASE),  # Alternative name
+    re.compile(r"nozick'?s?\s+(?:experience|thought)\s+experiment", re.IGNORECASE),
+    # Added: Ethical dilemma patterns
+    re.compile(r"(?:ethical|moral)\s+(?:dilemma|problem|question|issue)", re.IGNORECASE),
+    re.compile(r"(?:is\s+it|would\s+it\s+be)\s+(?:ethical|moral|right|wrong)\s+to", re.IGNORECASE),
+    re.compile(r"(?:what|how)\s+(?:should|would)\s+(?:a\s+)?(?:utilitarian|kantian|virtue\s+ethicist)", re.IGNORECASE),
+    # Added: Thought experiment patterns
+    re.compile(r"(?:imagine|suppose|consider)\s+(?:a\s+)?(?:scenario|situation|case)\s+where", re.IGNORECASE),
+    re.compile(r"(?:in\s+)?(?:a\s+)?hypothetical\s+(?:scenario|situation|world)", re.IGNORECASE),
+    # Added: Philosophy of mind patterns
+    re.compile(r"hard\s+problem\s+of\s+consciousness", re.IGNORECASE),
+    re.compile(r"mind-?body\s+(?:problem|dualism)", re.IGNORECASE),
+    re.compile(r"what\s+(?:is|are)\s+qualia", re.IGNORECASE),
 )
 
 # Identity/attribution patterns - direct factual responses needed
@@ -1907,6 +1965,17 @@ class QueryAnalyzer:
         if self._is_complex_physics_query(query):
             logger.info(
                 "[QueryRouter] Complex physics query - bypassing MATH-FAST-PATH"
+            )
+            return False
+
+        # ISSUE FIX: Check for philosophical queries BEFORE math detection
+        # Philosophical queries containing words like "dilemma", "ethics", "hedonism"
+        # were incorrectly triggering math fast-path because some philosophy words
+        # overlap with math terms (e.g., "what is the X" pattern).
+        # Philosophical queries should use general handler, not mathematical tools.
+        if self._is_philosophical_query(query):
+            logger.info(
+                "[QueryRouter] Philosophical query - bypassing MATH-FAST-PATH"
             )
             return False
 

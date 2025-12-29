@@ -151,20 +151,26 @@ TOOL_DESCRIPTIONS = {
         USE THIS TOOL FOR:
         - Simple greetings and conversational exchanges
         - Identity/attribution queries (who created this, what are you)
-        - Philosophical paradoxes and thought experiments (no deep analysis needed)
+        - Philosophical paradoxes and thought experiments (no deep mathematical analysis needed)
+        - Ethical dilemmas and moral philosophy questions (discussion, not calculation)
         - Simple factual lookups that don't require reasoning
         - Acknowledging user input (thanks, okay, goodbye)
         - Meta-questions about the system itself
         
         BYPASS COMPLEX REASONING FOR:
         - Paradoxes like "This sentence is false" (direct response, no logic solving)
+        - Philosophical thought experiments like "The Experience Machine", "Trolley Problem"
+        - Ethical dilemmas involving hedonism, utilitarianism, virtue ethics
+        - Questions about consciousness, free will, meaning of life
         - Greetings like "Hello", "How are you?"
         - Identity queries like "Who made you?", "Who created you?"
         - Simple facts like "What is the capital of France?"
         
         TRIGGER KEYWORDS: hello, hi, hey, thanks, goodbye, who created, who made,
         what are you, paradox, this sentence is false, greeting, conversation,
-        simple, basic, general, help
+        simple, basic, general, help, philosophical, ethical, moral, dilemma,
+        hedonism, utilitarianism, virtue, consciousness, free will, experience machine,
+        thought experiment, existential, meaning of life
     """,
 }
 
@@ -457,6 +463,8 @@ TOOL_KEYWORDS = {
     ],
     # PERFORMANCE FIX: General/lightweight tool for simple queries
     # These queries should bypass complex reasoning entirely
+    # ISSUE FIX: Added comprehensive philosophical/ethical keywords that were causing
+    # queries to be misrouted to mathematical tools instead of general handler
     "general": [
         # Greetings and conversational
         "hello",
@@ -512,6 +520,63 @@ TOOL_KEYWORDS = {
         "nice",
         "great",
         "awesome",
+        # ISSUE FIX: Comprehensive philosophical/ethical terms
+        # These were causing queries to route to math tools
+        "ethical",
+        "ethics",
+        "moral",
+        "morality",
+        "philosophy",
+        "hedonism",
+        "hedonistic",
+        "utilitarianism",
+        "utilitarian",
+        "consequentialism",
+        "consequentialist",
+        "deontological",
+        "kantian",
+        "virtue ethics",
+        "virtue",
+        "categorical imperative",
+        "free will",
+        "determinism",
+        "compatibilism",
+        "consciousness",
+        "sentience",
+        "qualia",
+        "existential",
+        "existentialism",
+        "nihilism",
+        "absurdism",
+        "stoicism",
+        "meaning of life",
+        "trolley problem",
+        "pleasure machine",
+        "nozick",
+        "rawlsian",
+        "social contract",
+        "veil of ignorance",
+        "greatest good",
+        "greatest happiness",
+        "metaphysics",
+        "epistemology",
+        "ontology",
+        "phenomenology",
+        "dualism",
+        "materialism",
+        "physicalism",
+        "panpsychism",
+        "solipsism",
+        "mind-body problem",
+        "hard problem of consciousness",
+        "philosophical zombie",
+        "chinese room",
+        "mary's room",
+        "twin earth",
+        "simulation",
+        "omelas",
+        "utility monster",
+        "repugnant conclusion",
     ],
 }
 
