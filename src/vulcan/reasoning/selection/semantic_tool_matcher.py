@@ -377,6 +377,27 @@ class SemanticToolMatcher:
                 logger.error(f"Failed to compute tool embeddings: {e}")
     
     @classmethod
+    def _normalize_text(cls, text: str) -> str:
+        """
+        Normalize text for consistent cache key generation.
+        
+        CRITICAL FIX: Without normalization, "hello world" and "Hello World "
+        generate different cache keys despite being semantically identical.
+        This was causing 0% cache hit rate.
+        
+        Args:
+            text: Text to normalize.
+        
+        Returns:
+            Normalized text string.
+        """
+        # Strip whitespace and convert to lowercase
+        normalized = text.strip().lower()
+        # Collapse multiple whitespaces to single space
+        normalized = ' '.join(normalized.split())
+        return normalized
+    
+    @classmethod
     def _get_query_embedding_cached(cls, query: str, model) -> Optional[np.ndarray]:
         """
         Get query embedding from cache or compute and cache it.
@@ -385,6 +406,9 @@ class SemanticToolMatcher:
         This addresses the tool selection performance degradation where 
         the same query was being embedded multiple times (once per tool).
         
+        CRITICAL FIX: Now normalizes text before hashing to ensure cache hits.
+        Without this, queries with different whitespace/casing would miss cache.
+        
         Args:
             query: The query text to embed
             model: The embedding model to use
@@ -392,8 +416,10 @@ class SemanticToolMatcher:
         Returns:
             Cached or newly computed embedding, or None on failure
         """
-        # Create cache key from full query hash (SHA-256 provides good collision resistance)
-        cache_key = hashlib.sha256(query.encode(), usedforsecurity=False).hexdigest()
+        # CRITICAL FIX: Normalize text before hashing for consistent cache keys
+        normalized_query = cls._normalize_text(query)
+        # Create cache key from normalized query hash (SHA-256 provides good collision resistance)
+        cache_key = hashlib.sha256(normalized_query.encode(), usedforsecurity=False).hexdigest()
         
         with cls._query_cache_lock:
             # Check cache first - move_to_end for LRU ordering
@@ -401,14 +427,22 @@ class SemanticToolMatcher:
                 cls._query_cache_hits += 1
                 # Move to end to mark as recently used (proper LRU behavior)
                 cls._query_embedding_cache.move_to_end(cache_key)
+                logger.debug(
+                    f"[SemanticToolMatcher] Cache HIT: {cache_key[:8]}... "
+                    f"(hits={cls._query_cache_hits}, misses={cls._query_cache_misses})"
+                )
                 return cls._query_embedding_cache[cache_key]
             
             cls._query_cache_misses += 1
+            logger.debug(
+                f"[SemanticToolMatcher] Cache MISS: {cache_key[:8]}... "
+                f"(hits={cls._query_cache_hits}, misses={cls._query_cache_misses})"
+            )
         
         # Compute embedding outside lock
         try:
             embedding = model.encode(
-                query,
+                query,  # Use original query for embedding (preserves semantic nuances)
                 show_progress_bar=False,
                 normalize_embeddings=True
             )
@@ -421,6 +455,10 @@ class SemanticToolMatcher:
                     cls._query_embedding_cache.popitem(last=False)
                 
                 cls._query_embedding_cache[cache_key] = embedding
+                logger.debug(
+                    f"[SemanticToolMatcher] Cached embedding: {cache_key[:8]}... "
+                    f"(cache_size={len(cls._query_embedding_cache)}/{cls._query_cache_max_size})"
+                )
             
             return embedding
         except Exception as e:

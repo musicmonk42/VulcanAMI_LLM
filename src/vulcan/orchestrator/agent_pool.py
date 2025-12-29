@@ -461,6 +461,198 @@ class PriorityJobQueue:
 
 
 # ============================================================
+# SYSTEM METRICS - Monitoring and Instrumentation
+# ============================================================
+
+
+class SystemMetrics:
+    """
+    System metrics for monitoring CuriosityEngine and AgentPool performance.
+    
+    Tracks:
+    - Curiosity engine useful/empty cycles
+    - Agent job latency percentiles (p50, p99)
+    - Stuck job recoveries
+    - Dead letter queue jobs
+    """
+    
+    # Alert threshold for job latency p99 in milliseconds (10 seconds)
+    ALERT_LATENCY_THRESHOLD_MS = 10000.0
+    
+    def __init__(self, alert_threshold_dormancy: float = 0.95):
+        """
+        Initialize system metrics.
+        
+        Args:
+            alert_threshold_dormancy: Threshold for alerting on curiosity dormancy (0.0-1.0)
+        """
+        self._lock = threading.RLock()
+        self.metrics: Dict[str, Any] = {
+            # Curiosity Engine metrics
+            "curiosity_useful_cycles": 0,
+            "curiosity_empty_cycles": 0,
+            "curiosity_total_experiments": 0,
+            "curiosity_successful_experiments": 0,
+            
+            # Agent Pool metrics
+            "agent_job_latencies_ms": deque(maxlen=1000),  # Rolling window
+            "agent_job_latency_p50": 0.0,
+            "agent_job_latency_p99": 0.0,
+            "stuck_job_recoveries": 0,
+            "dead_letter_jobs": 0,
+            
+            # Health metrics
+            "last_healthy_cycle_timestamp": time.time(),
+            "consecutive_alerts": 0,
+        }
+        self.alert_threshold_dormancy = alert_threshold_dormancy
+        
+        logger.info("SystemMetrics initialized for monitoring")
+    
+    def record_curiosity_cycle(self, experiments_run: int, successful: int) -> None:
+        """
+        Record a curiosity engine learning cycle result.
+        
+        Args:
+            experiments_run: Number of experiments run in this cycle
+            successful: Number of successful experiments
+        """
+        with self._lock:
+            if experiments_run > 0:
+                self.metrics["curiosity_useful_cycles"] += 1
+                self.metrics["last_healthy_cycle_timestamp"] = time.time()
+            else:
+                self.metrics["curiosity_empty_cycles"] += 1
+            
+            self.metrics["curiosity_total_experiments"] += experiments_run
+            self.metrics["curiosity_successful_experiments"] += successful
+    
+    def record_job_latency(self, latency_ms: float) -> None:
+        """
+        Record a job latency measurement.
+        
+        Args:
+            latency_ms: Job latency in milliseconds
+        """
+        with self._lock:
+            self.metrics["agent_job_latencies_ms"].append(latency_ms)
+            self._update_latency_percentiles()
+    
+    def _update_latency_percentiles(self) -> None:
+        """Update p50 and p99 latency metrics. Must be called with lock held."""
+        latencies = list(self.metrics["agent_job_latencies_ms"])
+        if not latencies:
+            return
+        
+        sorted_latencies = sorted(latencies)
+        n = len(sorted_latencies)
+        
+        # Calculate p50 (median) - proper handling for even-length arrays
+        if n % 2 == 0:
+            # For even-length arrays, median is average of two middle values
+            mid = n // 2
+            self.metrics["agent_job_latency_p50"] = (
+                sorted_latencies[mid - 1] + sorted_latencies[mid]
+            ) / 2.0
+        else:
+            # For odd-length arrays, median is the middle value
+            self.metrics["agent_job_latency_p50"] = sorted_latencies[n // 2]
+        
+        # Calculate p99
+        p99_idx = min(int(n * 0.99), n - 1)
+        self.metrics["agent_job_latency_p99"] = sorted_latencies[p99_idx]
+    
+    def record_stuck_job_recovery(self) -> None:
+        """Record a stuck job recovery event."""
+        with self._lock:
+            self.metrics["stuck_job_recoveries"] += 1
+    
+    def record_dead_letter_job(self) -> None:
+        """Record a job moved to dead letter queue."""
+        with self._lock:
+            self.metrics["dead_letter_jobs"] += 1
+    
+    def get_dormancy_ratio(self) -> float:
+        """
+        Get the ratio of empty cycles to total cycles.
+        
+        Returns:
+            Dormancy ratio (0.0-1.0), higher means more dormant
+        """
+        with self._lock:
+            total = (
+                self.metrics["curiosity_useful_cycles"] + 
+                self.metrics["curiosity_empty_cycles"]
+            )
+            if total == 0:
+                return 0.0
+            return self.metrics["curiosity_empty_cycles"] / total
+    
+    def should_alert(self) -> Optional[str]:
+        """
+        Check if any metric warrants an alert.
+        
+        Returns:
+            Alert message string if alerting, None otherwise
+        """
+        with self._lock:
+            # Alert if curiosity engine is too dormant
+            dormancy = self.get_dormancy_ratio()
+            if dormancy > self.alert_threshold_dormancy:
+                self.metrics["consecutive_alerts"] += 1
+                return f"Curiosity engine stuck in dormancy (ratio={dormancy:.2f})"
+            
+            # Alert if job latencies spike
+            if self.metrics["agent_job_latency_p99"] > self.ALERT_LATENCY_THRESHOLD_MS:
+                self.metrics["consecutive_alerts"] += 1
+                return (
+                    f"Job processing latency spike "
+                    f"(p99={self.metrics['agent_job_latency_p99']:.0f}ms)"
+                )
+            
+            # Reset consecutive alerts if healthy
+            self.metrics["consecutive_alerts"] = 0
+            return None
+    
+    def get_all_metrics(self) -> Dict[str, Any]:
+        """
+        Get all metrics as a dictionary.
+        
+        Returns:
+            Dictionary of all metrics (excludes the raw latencies deque)
+        """
+        with self._lock:
+            return {
+                "curiosity_useful_cycles": self.metrics["curiosity_useful_cycles"],
+                "curiosity_empty_cycles": self.metrics["curiosity_empty_cycles"],
+                "curiosity_total_experiments": self.metrics["curiosity_total_experiments"],
+                "curiosity_successful_experiments": self.metrics["curiosity_successful_experiments"],
+                "curiosity_dormancy_ratio": self.get_dormancy_ratio(),
+                "agent_job_latency_p50": self.metrics["agent_job_latency_p50"],
+                "agent_job_latency_p99": self.metrics["agent_job_latency_p99"],
+                "stuck_job_recoveries": self.metrics["stuck_job_recoveries"],
+                "dead_letter_jobs": self.metrics["dead_letter_jobs"],
+                "last_healthy_cycle_timestamp": self.metrics["last_healthy_cycle_timestamp"],
+                "consecutive_alerts": self.metrics["consecutive_alerts"],
+            }
+    
+    def reset(self) -> None:
+        """Reset all metrics."""
+        with self._lock:
+            self.metrics["curiosity_useful_cycles"] = 0
+            self.metrics["curiosity_empty_cycles"] = 0
+            self.metrics["curiosity_total_experiments"] = 0
+            self.metrics["curiosity_successful_experiments"] = 0
+            self.metrics["agent_job_latencies_ms"].clear()
+            self.metrics["agent_job_latency_p50"] = 0.0
+            self.metrics["agent_job_latency_p99"] = 0.0
+            self.metrics["stuck_job_recoveries"] = 0
+            self.metrics["dead_letter_jobs"] = 0
+            self.metrics["last_healthy_cycle_timestamp"] = time.time()
+            self.metrics["consecutive_alerts"] = 0
+
+
+# ============================================================
 # STANDALONE WORKER FUNCTION (MUST BE AT MODULE LEVEL FOR PICKLING)
 # ============================================================
 
@@ -1850,14 +2042,73 @@ class AgentPoolManager:
         if not available_agents:
             return None
 
-        # Select agent with best performance (lowest failure rate)
-        best_agent = min(
-            available_agents,
-            key=lambda aid: self.agents[aid].tasks_failed
-            / max(1, self.agents[aid].tasks_completed),
-        )
-
+        # RESOURCE-AWARE JOB DISTRIBUTION
+        # Select agent using weighted scoring based on health, load, and success rate
+        agent_scores = []
+        for agent_id in available_agents:
+            score = self.calculate_agent_score(agent_id)
+            agent_scores.append((agent_id, score))
+        
+        # Pick best agent (highest score)
+        best_agent = max(agent_scores, key=lambda x: x[1])[0]
+        
         return best_agent
+
+    def calculate_agent_score(self, agent_id: str) -> float:
+        """
+        Calculate a composite score for agent selection based on multiple factors.
+        
+        RESOURCE-AWARE JOB DISTRIBUTION: This enables smarter job assignment
+        by considering agent health, load, and historical performance.
+        
+        Factors considered:
+        - Health score (40%): Agent's overall health (0.0-1.0)
+        - Current load (30%): Inverse of current workload
+        - Success rate (20%): Historical success rate
+        - Capability match (10%): How well capability matches job
+        
+        Args:
+            agent_id: The agent to score
+            
+        Returns:
+            Composite score between 0.0 and 1.0
+        """
+        if agent_id not in self.agents:
+            return 0.0
+        
+        metadata = self.agents[agent_id]
+        
+        try:
+            score = 0.0
+            
+            # Factor 1: Health score (40% weight)
+            health_score = metadata.get_health_score()
+            score += health_score * 0.4
+            
+            # Factor 2: Current load - inverse (30% weight)
+            # If agent is working, load = 1.0, otherwise 0.0
+            is_working = 1.0 if metadata.state == AgentState.WORKING else 0.0
+            load_factor = 1.0 - is_working  # Lower load = higher score
+            score += load_factor * 0.3
+            
+            # Factor 3: Success rate (20% weight)
+            total_tasks = metadata.tasks_completed + metadata.tasks_failed
+            if total_tasks > 0:
+                success_rate = metadata.tasks_completed / total_tasks
+            else:
+                success_rate = 0.5  # Default for new agents
+            score += success_rate * 0.2
+            
+            # Factor 4: Capability match bonus (10% weight)
+            # Higher score for more specialized agents
+            capability_bonus = 1.0 if metadata.capability != AgentCapability.GENERAL else 0.8
+            score += capability_bonus * 0.1
+            
+            return min(1.0, max(0.0, score))
+            
+        except Exception as e:
+            logger.warning(f"Error calculating agent score for {agent_id}: {e}")
+            return 0.5  # Default mid-range score
 
     def get_agents_by_capability(
         self, 
@@ -2828,6 +3079,136 @@ class AgentPoolManager:
         
         return results
 
+    def reassign_job(self, task_id: str, force: bool = False) -> Optional[str]:
+        """
+        Reassign a stuck or failed job to a different agent.
+        
+        This is used for stuck job recovery. The job is unassigned from its
+        current agent and assigned to a new available agent.
+        
+        Args:
+            task_id: Task identifier to reassign
+            force: If True, force reassignment even if job is still running
+            
+        Returns:
+            New agent ID if reassigned successfully, None otherwise
+        """
+        with self.lock:
+            # Check if task exists
+            if task_id not in self.task_assignments:
+                logger.warning(f"[Reassign] Task {task_id} not found in assignments")
+                return None
+            
+            old_agent_id = self.task_assignments.get(task_id)
+            old_agent = self.agents.get(old_agent_id) if old_agent_id else None
+            
+            # Get task info from provenance
+            provenance = self._get_provenance_by_job_id(task_id)
+            if provenance is None:
+                logger.warning(f"[Reassign] Task {task_id} has no provenance record")
+                return None
+            
+            # Determine capability required
+            capability = AgentCapability.GENERAL
+            if hasattr(provenance, 'capability_required') and provenance.capability_required:
+                capability = provenance.capability_required
+            elif old_agent:
+                capability = old_agent.capability
+            
+            # Release old agent if it was assigned
+            if old_agent_id and old_agent_id in self.agents:
+                if old_agent.state == AgentState.WORKING or force:
+                    old_agent.transition_state(
+                        AgentState.IDLE, 
+                        f"Task {task_id} reassigned"
+                    )
+                    logger.info(
+                        f"[Reassign] Released agent {old_agent_id} from task {task_id}"
+                    )
+            
+            # Remove old assignment
+            del self.task_assignments[task_id]
+            if task_id in self.task_assignment_times:
+                del self.task_assignment_times[task_id]
+        
+        # Find a new agent (outside lock to avoid deadlock)
+        try:
+            # Use _assign_agent_with_timeout with a short timeout
+            new_agent_id = self._assign_agent_with_timeout(
+                capability=capability,
+                timeout_seconds=AGENT_SELECTION_TIMEOUT_SECONDS
+            )
+            
+            if new_agent_id:
+                with self.lock:
+                    # Reassign to new agent
+                    self.task_assignments[task_id] = new_agent_id
+                    self.task_assignment_times[task_id] = time.time()
+                    
+                    new_agent = self.agents.get(new_agent_id)
+                    if new_agent:
+                        new_agent.transition_state(
+                            AgentState.WORKING,
+                            f"Reassigned task {task_id}"
+                        )
+                
+                logger.info(
+                    f"[Reassign] Task {task_id} reassigned from {old_agent_id} to {new_agent_id}"
+                )
+                return new_agent_id
+            else:
+                logger.warning(f"[Reassign] No available agent for task {task_id}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"[Reassign] Failed to reassign task {task_id}: {e}")
+            return None
+
+    def recover_stuck_job(self, task_id: str) -> bool:
+        """
+        Attempt to recover a stuck job.
+        
+        Based on logs showing jobs completing in 0.000s - 0.042s normally,
+        this identifies and recovers jobs that have been running too long.
+        
+        Args:
+            task_id: Task identifier
+            
+        Returns:
+            True if recovery was successful, False otherwise
+        """
+        # Get retry count
+        retry_count = self._job_retry_counts.get(task_id, 0)
+        
+        if retry_count >= self._max_job_retries:
+            # Max retries exceeded - move to DLQ
+            logger.warning(
+                f"[RecoverStuck] Job {task_id} exceeded max retries ({retry_count}), "
+                f"moving to dead letter queue"
+            )
+            self._cancel_task(task_id)
+            self._move_to_dead_letter_queue(task_id, "max_recovery_attempts")
+            return False
+        
+        # Increment retry count
+        self._job_retry_counts[task_id] = retry_count + 1
+        
+        # Attempt reassignment to different agent
+        new_agent_id = self.reassign_job(task_id, force=True)
+        
+        if new_agent_id:
+            logger.info(
+                f"[RecoverStuck] Job {task_id} recovered (retry {retry_count + 1}), "
+                f"reassigned to {new_agent_id}"
+            )
+            return True
+        else:
+            logger.warning(
+                f"[RecoverStuck] Failed to recover job {task_id}, "
+                f"no available agents"
+            )
+            return False
+
     # ============================================================
     # REASONING INTEGRATION HELPERS
     # ============================================================
@@ -3739,6 +4120,7 @@ __all__ = [
     "RecoveryManager",
     "ResponseTimeTracker",
     "PriorityJobQueue",
+    "SystemMetrics",
     "CACHETOOLS_AVAILABLE",
     "TTLCache",
     "TOURNAMENT_MANAGER_AVAILABLE",

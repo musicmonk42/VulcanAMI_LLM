@@ -1333,6 +1333,25 @@ class CuriosityEngine:
         # boost relevant improvement objectives (e.g., slow_routing -> optimize_performance)
         self._on_gaps_detected_callback: Optional[Callable[[List[Dict[str, Any]]], Any]] = None
 
+        # ==============================================================================
+        # INTELLIGENT CYCLE MANAGEMENT (Issue: Learning cycle 340-365: 0 experiments)
+        # ==============================================================================
+        # The engine was blindly running every cycle regardless of work availability.
+        # These attributes enable should_run_cycle() to implement progressive backoff.
+        self._empty_cycles = 0  # Count of consecutive cycles with 0 experiments
+        self._last_successful_cycle = time.time()  # Timestamp of last cycle with experiments
+        self._last_cycle_time = time.time()  # Timestamp of last cycle attempt
+        self._backoff_multiplier = 1  # Current backoff multiplier
+        self._base_cycle_interval = 10  # Base interval between cycles in seconds
+        self._max_backoff_exponent = 5  # Max backoff: 2^5 * base = 320 seconds
+        self._last_outcome_count = 0  # Track outcome count for wake triggers
+        self._cycles_without_experiments = 0  # For exploration forcing
+        self._exploration_temperature = 1.0  # Multiplier for exploration when stagnant
+        
+        # Thresholds for intelligent cycle management
+        self.EMPTY_CYCLE_SKIP_THRESHOLD = 3  # Start backoff after this many empty cycles
+        self.EXPLORATION_FORCE_THRESHOLD = 20  # Force exploration after this many cycles without experiments
+
         # Thread safety
         self.lock = threading.RLock()
 
@@ -1818,6 +1837,190 @@ class CuriosityEngine:
             f"(resolved={len(self._resolved_gaps)}, type_limits={dict(type_counts)})"
         )
         return filtered
+
+    # ==============================================================================
+    # INTELLIGENT CYCLE MANAGEMENT
+    # ==============================================================================
+    # Issue: Learning cycle 340-365: 0 experiments, 0.00 success rate
+    # The engine was blindly running every cycle regardless of work availability.
+    # These methods implement progressive backoff and wake triggers.
+    
+    def should_run_cycle(self) -> bool:
+        """
+        Determine if a learning cycle should run based on available work and backoff.
+        
+        This prevents the engine from blindly running every cycle when there's no
+        work available, reducing resource waste.
+        
+        Returns:
+            True if cycle should run, False if should skip
+        """
+        with self.lock:
+            current_time = time.time()
+            
+            # Check for explicit wake triggers
+            if self.has_wake_triggers():
+                self.reset_backoff()
+                logger.debug("[CuriosityEngine] Wake trigger detected, running cycle")
+                return True
+            
+            # Progressive backoff after empty cycles
+            if self._empty_cycles > 0:
+                backoff_time = self._base_cycle_interval * (
+                    2 ** min(self._empty_cycles, self._max_backoff_exponent)
+                )
+                time_since_last = current_time - self._last_cycle_time
+                
+                if time_since_last < backoff_time:
+                    logger.debug(
+                        f"[CuriosityEngine] Backoff active: {time_since_last:.1f}s < "
+                        f"{backoff_time:.1f}s (empty_cycles={self._empty_cycles})"
+                    )
+                    return False
+            
+            # Check for potential gaps before running
+            if not self.gap_analyzer.has_potential_gaps():
+                self._empty_cycles += 1
+                logger.debug(
+                    f"[CuriosityEngine] No potential gaps, incrementing empty_cycles to "
+                    f"{self._empty_cycles}"
+                )
+                return False
+            
+            return True
+    
+    def has_wake_triggers(self) -> bool:
+        """
+        Check if there are triggers that should wake the engine from backoff.
+        
+        Wake triggers include:
+        - New outcome data from the outcome bridge
+        - Error rate spikes
+        - Tool weight drift
+        - External gaps injected
+        
+        Returns:
+            True if there's a reason to wake up and run a cycle
+        """
+        try:
+            # Wake on external gaps injected
+            with self._external_gaps_lock:
+                if len(self._external_gaps) > 0:
+                    logger.debug(
+                        f"[CuriosityEngine] Wake trigger: {len(self._external_gaps)} external gaps"
+                    )
+                    return True
+            
+            # Wake on new outcome data
+            try:
+                from .outcome_bridge import get_recent_count
+                recent_outcomes = get_recent_count(minutes=5)
+                if recent_outcomes > self._last_outcome_count:
+                    logger.debug(
+                        f"[CuriosityEngine] Wake trigger: new outcomes "
+                        f"({recent_outcomes} > {self._last_outcome_count})"
+                    )
+                    self._last_outcome_count = recent_outcomes
+                    return True
+            except ImportError:
+                pass  # outcome_bridge not available
+            except Exception as e:
+                logger.debug(f"[CuriosityEngine] Could not check outcome bridge: {e}")
+            
+            # Wake on error rate spike
+            if self._detect_error_spike():
+                logger.debug("[CuriosityEngine] Wake trigger: error spike detected")
+                return True
+            
+            # Wake on stagnation (force exploration)
+            if self._cycles_without_experiments >= self.EXPLORATION_FORCE_THRESHOLD:
+                logger.debug(
+                    f"[CuriosityEngine] Wake trigger: stagnation "
+                    f"({self._cycles_without_experiments} cycles without experiments)"
+                )
+                return True
+            
+            return False
+            
+        except Exception as e:
+            logger.warning(f"[CuriosityEngine] Error checking wake triggers: {e}")
+            return True  # Default to running if we can't check
+    
+    def _detect_error_spike(self) -> bool:
+        """
+        Detect if there's been a spike in error rates that warrants investigation.
+        
+        Returns:
+            True if error rate has spiked significantly
+        """
+        try:
+            stats = self.gap_analyzer.get_statistics()
+            
+            # Check if we have enough data
+            total_failures = (
+                stats.get("decomposition_failures", 0) +
+                stats.get("prediction_errors", 0) +
+                stats.get("transfer_failures", 0)
+            )
+            
+            # Consider it a spike if we have 10+ recent failures
+            if total_failures >= 10:
+                return True
+            
+            return False
+        except Exception as e:
+            logger.debug(f"[CuriosityEngine] Error detecting error spike: {e}")
+            return False
+    
+    def reset_backoff(self) -> None:
+        """
+        Reset the backoff state after a successful wake trigger or cycle.
+        """
+        with self.lock:
+            self._empty_cycles = 0
+            self._backoff_multiplier = 1
+            self._exploration_temperature = 1.0
+            logger.debug("[CuriosityEngine] Backoff reset")
+    
+    def record_cycle_result(self, experiments_run: int, success_count: int) -> None:
+        """
+        Record the result of a learning cycle for backoff management.
+        
+        Args:
+            experiments_run: Number of experiments that were run
+            success_count: Number of successful experiments
+        """
+        with self.lock:
+            current_time = time.time()
+            self._last_cycle_time = current_time
+            
+            if experiments_run > 0:
+                # Successful cycle with experiments
+                self._last_successful_cycle = current_time
+                self._empty_cycles = 0
+                self._cycles_without_experiments = 0
+                self._exploration_temperature = 1.0
+                logger.debug(
+                    f"[CuriosityEngine] Cycle complete: {experiments_run} experiments, "
+                    f"{success_count} successes - backoff reset"
+                )
+            else:
+                # Empty cycle - increment counters
+                self._empty_cycles += 1
+                self._cycles_without_experiments += 1
+                
+                # Increase exploration temperature for stagnation
+                if self._cycles_without_experiments > 10:
+                    self._exploration_temperature = min(
+                        2.0, 
+                        self._exploration_temperature * 1.1
+                    )
+                
+                logger.info(
+                    f"[CuriosityEngine] Empty cycle - empty_cycles={self._empty_cycles}, "
+                    f"total_without_experiments={self._cycles_without_experiments}, "
+                    f"exploration_temp={self._exploration_temperature:.2f}"
+                )
 
     def select_exploration_strategy(
         self, context: Optional[Dict[str, Any]] = None

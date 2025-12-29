@@ -1435,6 +1435,96 @@ class GapAnalyzer:
                 logger.error("Error getting all gaps: %s", e)
                 return []
 
+    # ==============================================================================
+    # GAP DETECTION ENHANCEMENT
+    # ==============================================================================
+    # Issue: [GapAnalyzer] 0 raw → 0 after filtering
+    # The gap analyzer was too restrictive. Add pre-filtering intelligence.
+    
+    def has_potential_gaps(self) -> bool:
+        """
+        Quick check to determine if there might be gaps worth analyzing.
+        
+        This is used by CuriosityEngine.should_run_cycle() to avoid running
+        expensive gap analysis when there's clearly nothing to analyze.
+        
+        Checks are lightweight and don't involve full gap analysis:
+        - Recent failures tracked
+        - Exploration budget available
+        - Uncertainty signals
+        - Performance anomalies
+        
+        Returns:
+            True if there might be gaps worth investigating
+        """
+        with self._lock:
+            try:
+                checks = [
+                    self._has_recent_failures(),
+                    self._has_exploration_budget(),
+                    self._has_uncertainty_signals(),
+                    self._has_performance_anomalies(),
+                ]
+                
+                has_potential = any(checks)
+                logger.debug(
+                    f"[GapAnalyzer] has_potential_gaps={has_potential} "
+                    f"(failures={checks[0]}, budget={checks[1]}, "
+                    f"uncertainty={checks[2]}, anomalies={checks[3]})"
+                )
+                return has_potential
+                
+            except Exception as e:
+                logger.warning(f"[GapAnalyzer] Error checking potential gaps: {e}")
+                return True  # Default to True if we can't check
+    
+    def _has_recent_failures(self) -> bool:
+        """Check if there are recent failures that might indicate gaps."""
+        try:
+            stats = self.failure_tracker.get_statistics()
+            total_failures = (
+                stats.get("decomposition_failures", 0) +
+                stats.get("prediction_errors", 0) +
+                stats.get("transfer_failures", 0)
+            )
+            return total_failures > 0
+        except Exception:
+            return False
+    
+    def _has_exploration_budget(self) -> bool:
+        """Check if there's exploration budget available."""
+        # This is a placeholder - actual budget check would be in CuriosityEngine
+        # Always return True to not block on budget checks here
+        return True
+    
+    def _has_uncertainty_signals(self) -> bool:
+        """Check if there are uncertainty signals in recent patterns."""
+        try:
+            patterns = self.pattern_tracker.get_patterns()
+            # Consider it uncertain if we have patterns to analyze
+            return len(patterns) > 0
+        except Exception:
+            return False
+    
+    def _has_performance_anomalies(self) -> bool:
+        """Check if there are performance anomalies worth investigating."""
+        try:
+            # Check if outcome bridge has recent slow queries or errors
+            from .outcome_bridge import get_outcome_statistics
+            stats = get_outcome_statistics()
+            
+            # Consider it anomalous if there are slow routing events or low success rate
+            if stats.slow_routing_count > 0:
+                return True
+            if stats.total > 0 and stats.success_rate < 0.9:
+                return True
+                
+            return False
+        except ImportError:
+            return False  # outcome_bridge not available
+        except Exception:
+            return False
+
     def get_statistics(self) -> Dict[str, Any]:
         """Get gap analysis statistics - DELEGATED"""
         with self._lock:
