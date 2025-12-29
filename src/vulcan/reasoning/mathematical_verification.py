@@ -117,6 +117,10 @@ class SafeMathEvaluator:
     }
     
     # Allowed mathematical functions
+    # SECURITY: This whitelist is the critical security control for SafeMathEvaluator.
+    # Only functions explicitly listed here can be called from evaluated expressions.
+    # Any modifications to this list should be reviewed for security implications.
+    # Do NOT add functions that could access the filesystem, network, or execute code.
     MATH_FUNCTIONS: Dict[str, Callable[..., float]] = {
         "abs": abs,
         "sqrt": math.sqrt,
@@ -177,9 +181,10 @@ class SafeMathEvaluator:
             Evaluated result as float
             
         Raises:
-            ValueError: If expression contains invalid operations
+            ValueError: If expression contains invalid operations or syntax
             ZeroDivisionError: If division by zero occurs
-            OverflowError: If result overflows
+            OverflowError: If result overflows numerical limits
+            FloatingPointError: If floating point operation fails (e.g., inf * 0)
         """
         if not expression or not expression.strip():
             raise ValueError("Empty expression")
