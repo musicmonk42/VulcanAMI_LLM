@@ -136,6 +136,13 @@ TOURNAMENT_WINNER_PERCENTAGE = 0.2
 # This constant controls how long to wait when selecting an agent for a task
 AGENT_SELECTION_TIMEOUT_SECONDS: float = 10.0  # 10 seconds max for agent selection
 
+# PERFORMANCE FIX: Dead letter queue and stuck job detection constants
+# DLQ stores jobs that fail repeatedly to prevent infinite retry loops
+DEFAULT_DLQ_SIZE = 100  # Maximum entries in dead letter queue
+# Jobs are considered "slow" at 70% of timeout, "critical" at 90%
+STUCK_JOB_WARNING_THRESHOLD = 0.7  # 70% of timeout
+STUCK_JOB_CRITICAL_THRESHOLD = 0.9  # 90% of timeout
+
 # FIXED: Add cachetools import for LRU cache with TTL
 try:
     from cachetools import TTLCache
@@ -736,7 +743,9 @@ class AgentPoolManager:
         
         # ========== PERFORMANCE FIX: Dead Letter Queue for Failed Jobs ==========
         # Jobs that fail repeatedly are moved here instead of being retried infinitely
-        self._dead_letter_queue: deque = deque(maxlen=100)  # Keep last 100 failed jobs
+        self._dead_letter_queue: deque = deque(
+            maxlen=self.config.get("dlq_size", DEFAULT_DLQ_SIZE)
+        )
         self._dead_letter_lock = threading.Lock()
         # Track retry counts per job
         self._job_retry_counts: Dict[str, int] = {}
@@ -2745,14 +2754,16 @@ class AgentPoolManager:
         with self.lock:
             for task_id, assign_time in self.task_assignment_times.items():
                 elapsed = current_time - assign_time
-                if elapsed > self._stuck_job_threshold_seconds * 0.7:  # 70% of timeout
+                warning_threshold = self._stuck_job_threshold_seconds * STUCK_JOB_WARNING_THRESHOLD
+                critical_threshold = self._stuck_job_threshold_seconds * STUCK_JOB_CRITICAL_THRESHOLD
+                if elapsed > warning_threshold:
                     agent_id = self.task_assignments.get(task_id)
                     stuck_jobs.append({
                         "task_id": task_id,
                         "agent_id": agent_id,
                         "elapsed_seconds": elapsed,
                         "timeout_seconds": self._stuck_job_threshold_seconds,
-                        "is_critical": elapsed > self._stuck_job_threshold_seconds * 0.9,
+                        "is_critical": elapsed > critical_threshold,
                     })
         
         return stuck_jobs
@@ -2762,8 +2773,8 @@ class AgentPoolManager:
         Process jobs that are stuck in processing state.
         
         PERFORMANCE FIX: Identifies and recovers stuck jobs:
-        - Jobs at 70-90% of timeout: Log warning
-        - Jobs at 90%+ of timeout: Attempt recovery (restart or move to DLQ)
+        - Jobs at warning threshold (70% of timeout): Log warning
+        - Jobs at critical threshold (90%+ of timeout): Attempt recovery (restart or move to DLQ)
         
         Returns:
             Summary of actions taken
