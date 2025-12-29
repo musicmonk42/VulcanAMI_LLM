@@ -484,6 +484,7 @@ def mark_gap_resolved(
     gap_key: str,
     success: bool = True,
     db_path: Optional[Path] = None,
+    skip_phantom_check: bool = False,
 ) -> bool:
     """
     Mark a gap as resolved in persistent storage.
@@ -492,14 +493,21 @@ def mark_gap_resolved(
     giving up after too many attempts. The resolution persists across
     subprocess restarts.
     
+    ISSUE #2 FIX: Added phantom resolution detection and cooldown period.
+    Before this fix, gaps were being "resolved" 49x in one hour without
+    actual verification, causing the phantom resolution death spiral.
+    
     Args:
         gap_key: Unique gap identifier (e.g., "high_error_rate:query_processing").
         success: True if resolved successfully by experiment, False if giving up.
             Both cases prevent immediate re-detection for the TTL period.
         db_path: Optional path to database file.
+        skip_phantom_check: If True, skip the phantom resolution check.
+            Use sparingly - only when you're certain the resolution is genuine.
     
     Returns:
         True if marking succeeded, False otherwise.
+        Returns False if the gap is a phantom resolution (resolved too many times).
     
     Example:
         >>> # After successful experiment
@@ -510,6 +518,40 @@ def mark_gap_resolved(
     """
     if not _init_db(db_path):
         return False
+    
+    # ISSUE #2 FIX: Check for phantom resolution before marking
+    # This prevents the death spiral where gaps are "resolved" 49x/hour
+    if not skip_phantom_check:
+        if is_phantom_resolution(gap_key, db_path=db_path):
+            logger.warning(
+                f"{LOG_PREFIX} Refusing to mark phantom resolution: {gap_key}. "
+                f"Gap has been resolved too many times recently without actual fix."
+            )
+            return False
+        
+        # ISSUE #2 FIX: Add cooldown check - don't resolve same gap within 1 hour
+        # This prevents rapid re-resolution that indicates the underlying issue isn't fixed
+        try:
+            with _get_db(db_path) as conn:
+                cursor = conn.execute(
+                    """
+                    SELECT resolved_at FROM gap_resolutions
+                    WHERE gap_key = ? AND resolved_at > ?
+                    """,
+                    (gap_key, time.time() - PHANTOM_COOLDOWN_SECONDS),
+                )
+                recent_resolution = cursor.fetchone()
+                if recent_resolution:
+                    time_since = time.time() - recent_resolution["resolved_at"]
+                    remaining = PHANTOM_COOLDOWN_SECONDS - time_since
+                    logger.info(
+                        f"{LOG_PREFIX} Gap {gap_key} was resolved {time_since:.0f}s ago. "
+                        f"Cooldown remaining: {remaining:.0f}s. Skipping re-resolution."
+                    )
+                    return False
+        except sqlite3.Error as e:
+            logger.warning(f"{LOG_PREFIX} Error checking cooldown: {e}")
+            # Continue with resolution if cooldown check fails
     
     try:
         with _get_db(db_path) as conn:

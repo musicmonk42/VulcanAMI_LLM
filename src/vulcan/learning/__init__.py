@@ -27,6 +27,16 @@ logger = logging.getLogger(__name__)
 WEIGHT_ADJUSTMENT_SUCCESS = 0.01
 WEIGHT_ADJUSTMENT_FAILURE = -0.005
 
+# ISSUE #5 FIX: Tool Weight Death Spiral Prevention
+# These constants prevent tools from accumulating unbounded negative weights.
+# Without bounds, tools can become unusable due to accumulated failures.
+MIN_TOOL_WEIGHT = -0.1  # Minimum weight bound (prevents tools becoming unusable)
+MAX_TOOL_WEIGHT = 0.2   # Maximum weight bound (prevents runaway positive weights)
+WEIGHT_DECAY_FACTOR = 0.95  # Decay factor applied to weights periodically (moves towards 0)
+WEIGHT_DECAY_INTERVAL_SECONDS = 3600  # Apply decay every hour
+WEIGHT_DECAY_EPSILON = 0.001  # Weights below this threshold are considered zero
+MAX_DECAY_INTERVALS = 168  # Cap decay at 1 week (168 hours) to prevent precision issues
+
 # Make torch import conditional to allow module import even without torch
 try:
     import torch
@@ -172,6 +182,9 @@ class UnifiedLearningSystem:
         # Prevents race conditions when async process_outcome calls update weights concurrently
         self._weight_lock = threading.Lock()
         
+        # ISSUE #5 FIX: Track last decay time for periodic weight decay
+        self._last_weight_decay_time = time.time()
+        
         # ISSUE #10 FIX: Slow routing recovery mechanism
         # Track consecutive slow routing events to trigger automatic recovery
         self._slow_routing_count = 0
@@ -292,14 +305,31 @@ class UnifiedLearningSystem:
         
         # 3. Update tool weights based on success/failure
         # ISSUE #15 FIX: Use lock to prevent race conditions in concurrent async calls
+        # ISSUE #5 FIX: Apply weight bounds to prevent death spiral
         if tools:  # Only if tools were recorded
             weight_delta = WEIGHT_ADJUSTMENT_SUCCESS if status == 'success' else WEIGHT_ADJUSTMENT_FAILURE
             with self._weight_lock:
+                # Apply periodic weight decay first (moves weights towards 0)
+                self._apply_weight_decay_if_needed()
+                
                 for tool in tools:
                     if tool not in self.tool_weight_adjustments:
                         self.tool_weight_adjustments[tool] = 0.0
-                    self.tool_weight_adjustments[tool] += weight_delta
-                    logger.info(f"[Learning] Tool '{tool}' weight adjustment: {weight_delta:+.3f} (cumulative: {self.tool_weight_adjustments[tool]:+.3f})")
+                    
+                    new_weight = self.tool_weight_adjustments[tool] + weight_delta
+                    
+                    # ISSUE #5 FIX: Clamp weight to bounds to prevent death spiral
+                    old_weight = self.tool_weight_adjustments[tool]
+                    self.tool_weight_adjustments[tool] = max(MIN_TOOL_WEIGHT, min(MAX_TOOL_WEIGHT, new_weight))
+                    
+                    # Log if weight was clamped
+                    if self.tool_weight_adjustments[tool] != new_weight:
+                        logger.info(
+                            f"[Learning] Tool '{tool}' weight CLAMPED: {old_weight:+.3f} + {weight_delta:+.3f} = "
+                            f"{new_weight:+.3f} -> {self.tool_weight_adjustments[tool]:+.3f} (bounds: [{MIN_TOOL_WEIGHT}, {MAX_TOOL_WEIGHT}])"
+                        )
+                    else:
+                        logger.info(f"[Learning] Tool '{tool}' weight adjustment: {weight_delta:+.3f} (cumulative: {self.tool_weight_adjustments[tool]:+.3f})")
         else:
             logger.warning(f"[Learning] No tools recorded for {query_id} - cannot learn from selection")
         
@@ -314,6 +344,42 @@ class UnifiedLearningSystem:
         
         logger.info(f"[Learning] Outcome processing complete for {query_id}")
 
+    def _apply_weight_decay_if_needed(self) -> None:
+        """
+        Apply periodic weight decay to all tool weights.
+        
+        ISSUE #5 FIX: This method prevents the tool weight death spiral by
+        periodically decaying weights towards zero. Without decay, weights
+        can accumulate indefinitely in either direction.
+        
+        This should be called while holding self._weight_lock.
+        """
+        current_time = time.time()
+        time_since_decay = current_time - self._last_weight_decay_time
+        
+        if time_since_decay >= WEIGHT_DECAY_INTERVAL_SECONDS:
+            # Calculate how many decay intervals have passed, capped to prevent precision issues
+            intervals = min(
+                int(time_since_decay / WEIGHT_DECAY_INTERVAL_SECONDS),
+                MAX_DECAY_INTERVALS
+            )
+            decay_multiplier = WEIGHT_DECAY_FACTOR ** intervals
+            
+            decayed_count = 0
+            for tool in self.tool_weight_adjustments:
+                old_weight = self.tool_weight_adjustments[tool]
+                if abs(old_weight) > WEIGHT_DECAY_EPSILON:  # Only decay non-zero weights
+                    self.tool_weight_adjustments[tool] = old_weight * decay_multiplier
+                    decayed_count += 1
+            
+            if decayed_count > 0:
+                logger.info(
+                    f"[Learning] Applied weight decay (factor={decay_multiplier:.3f}) "
+                    f"to {decayed_count} tool weights after {time_since_decay:.0f}s"
+                )
+            
+            self._last_weight_decay_time = current_time
+
     def get_tool_weight_adjustment(self, tool: str) -> float:
         """
         Get cumulative weight adjustment for a tool.
@@ -326,10 +392,25 @@ class UnifiedLearningSystem:
             
         Returns:
             Cumulative weight adjustment (positive = more successful, negative = less successful)
+            Value is bounded by [MIN_TOOL_WEIGHT, MAX_TOOL_WEIGHT]
         """
         # ISSUE #15 FIX: Use lock for thread-safe read
         with self._weight_lock:
             return self.tool_weight_adjustments.get(tool, 0.0)
+
+    def reset_tool_weights(self) -> None:
+        """
+        Reset all tool weights to zero.
+        
+        ISSUE #5 FIX: This method allows manual reset of accumulated weights
+        if the system gets into a bad state. Should be called during system
+        recovery or after major configuration changes.
+        """
+        with self._weight_lock:
+            old_weights = dict(self.tool_weight_adjustments)
+            self.tool_weight_adjustments.clear()
+            self._last_weight_decay_time = time.time()
+            logger.info(f"[Learning] Reset tool weights: {old_weights} -> cleared")
 
     async def _attempt_slow_routing_recovery(self) -> bool:
         """
