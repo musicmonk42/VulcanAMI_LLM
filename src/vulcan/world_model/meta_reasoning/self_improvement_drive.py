@@ -3667,7 +3667,8 @@ FILE: <path/to/file.py>
             return False, f"Rejected: too few implementation lines ({len(lines)} < 5)"
         
         # Check for only 'pass' statements in functions/classes
-        pass_only_pattern = re.compile(r'(def|class)\s+\w+.*:\s*\n\s*pass\s*$', re.MULTILINE)
+        # Use lookahead to properly match pass-only definitions within larger content
+        pass_only_pattern = re.compile(r'(def|class)\s+\w+.*:\s*\n\s*pass\s*(?=\n|$)', re.MULTILINE)
         matches = pass_only_pattern.findall(content)
         total_defs = content.count('def ') + content.count('class ')
         if total_defs > 0 and len(matches) == total_defs:
@@ -3827,7 +3828,14 @@ FILE: <path/to/file.py>
                 class_match = re.search(r'(class QueryAnalyzer.*?:)', content)
                 if class_match:
                     # Find a good insertion point (after __init__ or first method)
-                    init_end = content.find('def ', content.find('def __init__') + 1)
+                    init_pos = content.find('def __init__')
+                    if init_pos == -1:
+                        # No __init__, find first method in class
+                        first_def_pos = content.find('def ', class_match.end())
+                        init_end = first_def_pos if first_def_pos > 0 else -1
+                    else:
+                        init_end = content.find('def ', init_pos + 1)
+                    
                     if init_end > 0:
                         # Insert classify_query method
                         classify_method = '''
@@ -3888,21 +3896,24 @@ except ImportError:
     
 '''
                 # Insert at top of file after existing imports
-                last_import = max(content.rfind('import '), content.rfind('from '))
-                if last_import > 0:
+                last_import_pos = content.rfind('import ')
+                last_from_pos = content.rfind('from ')
+                # Only proceed if at least one import exists
+                if last_import_pos > 0 or last_from_pos > 0:
+                    last_import = max(last_import_pos, last_from_pos)
                     end_of_import_line = content.find('\n', last_import) + 1
                     return content[:end_of_import_line] + import_fix + content[end_of_import_line:]
         
-        # Pattern 3: Add logging for timeout issues
+        # Pattern 3: Performance issues - only add import time if needed
+        # Note: Actual timing instrumentation requires more context and is not applied automatically
         if 'timeout' in description.lower() and 'performance' in issue_type.lower():
-            # Add timing instrumentation
+            # Add timing import if not present (minimal safe change)
             if 'import time' not in content:
-                content = 'import time\n' + content
-            # Look for methods that might be slow
-            method_match = re.search(r'(def \w+\([^)]*\):)\s*\n(\s+)("""[^"]*""")?', content)
-            if method_match:
-                # We found a method, but don't modify without more context
-                pass
+                # Insert at the top after initial imports
+                first_import = content.find('import ')
+                if first_import >= 0:
+                    end_of_first_import = content.find('\n', first_import) + 1
+                    return content[:end_of_first_import] + 'import time  # Added for performance monitoring\n' + content[end_of_first_import:]
         
         # No applicable pattern found
         return None
