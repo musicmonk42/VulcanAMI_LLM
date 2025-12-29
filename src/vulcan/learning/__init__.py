@@ -34,6 +34,8 @@ MIN_TOOL_WEIGHT = -0.1  # Minimum weight bound (prevents tools becoming unusable
 MAX_TOOL_WEIGHT = 0.2   # Maximum weight bound (prevents runaway positive weights)
 WEIGHT_DECAY_FACTOR = 0.95  # Decay factor applied to weights periodically (moves towards 0)
 WEIGHT_DECAY_INTERVAL_SECONDS = 3600  # Apply decay every hour
+WEIGHT_DECAY_EPSILON = 0.001  # Weights below this threshold are considered zero
+MAX_DECAY_INTERVALS = 168  # Cap decay at 1 week (168 hours) to prevent precision issues
 
 # Make torch import conditional to allow module import even without torch
 try:
@@ -356,14 +358,17 @@ class UnifiedLearningSystem:
         time_since_decay = current_time - self._last_weight_decay_time
         
         if time_since_decay >= WEIGHT_DECAY_INTERVAL_SECONDS:
-            # Calculate how many decay intervals have passed
-            intervals = int(time_since_decay / WEIGHT_DECAY_INTERVAL_SECONDS)
+            # Calculate how many decay intervals have passed, capped to prevent precision issues
+            intervals = min(
+                int(time_since_decay / WEIGHT_DECAY_INTERVAL_SECONDS),
+                MAX_DECAY_INTERVALS
+            )
             decay_multiplier = WEIGHT_DECAY_FACTOR ** intervals
             
             decayed_count = 0
             for tool in self.tool_weight_adjustments:
                 old_weight = self.tool_weight_adjustments[tool]
-                if abs(old_weight) > 0.001:  # Only decay non-zero weights
+                if abs(old_weight) > WEIGHT_DECAY_EPSILON:  # Only decay non-zero weights
                     self.tool_weight_adjustments[tool] = old_weight * decay_multiplier
                     decayed_count += 1
             
