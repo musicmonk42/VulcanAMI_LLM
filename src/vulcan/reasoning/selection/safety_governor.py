@@ -190,7 +190,6 @@ class SafetyViolation:
 
 
 @dataclass
-@dataclass
 class SafetyContext:
     """Context for safety evaluation"""
 

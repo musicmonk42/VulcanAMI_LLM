@@ -327,13 +327,13 @@ class SystemHealthMonitor:
         if new_level != old_level:
             if new_level.value > old_level.value:
                 logger.warning(
-                    f"[HealthMonitor] Degradation detected: {old_level.value} -> {new_level.value}. "
+                    f"[HealthMonitor] Degradation detected: {old_level.name} -> {new_level.name}. "
                     f"Issues: {', '.join(issues)}"
                 )
                 self._notify_degradation(new_level, issues)
             else:
                 logger.info(
-                    f"[HealthMonitor] Partial recovery: {old_level.value} -> {new_level.value}"
+                    f"[HealthMonitor] Partial recovery: {old_level.name} -> {new_level.name}"
                 )
         
         self._degradation_level = new_level
