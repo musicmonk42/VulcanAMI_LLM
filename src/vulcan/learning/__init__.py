@@ -1153,4 +1153,37 @@ __all__ = [
     "PlanningAlgorithm",
     "MetaLearningAlgorithm",
     "PacingStrategy",
+    # Weight adjustment constants
+    "WEIGHT_ADJUSTMENT_SUCCESS",
+    "WEIGHT_ADJUSTMENT_FAILURE",
+    "MIN_TOOL_WEIGHT",
+    "MAX_TOOL_WEIGHT",
 ]
+
+# Mathematical Accuracy Integration
+try:
+    from .mathematical_accuracy_integration import (
+        MathematicalAccuracyIntegration,
+        MathematicalFeedback,
+        create_math_learning_integration,
+        MATH_ERROR_PENALTIES,
+        MATH_VERIFICATION_REWARD,
+    )
+    
+    MATH_LEARNING_AVAILABLE = True
+    __all__.extend([
+        "MathematicalAccuracyIntegration",
+        "MathematicalFeedback",
+        "create_math_learning_integration",
+        "MATH_ERROR_PENALTIES",
+        "MATH_VERIFICATION_REWARD",
+        "MATH_LEARNING_AVAILABLE",
+    ])
+except ImportError as e:
+    logger.warning(f"Mathematical accuracy integration not available: {e}")
+    MATH_LEARNING_AVAILABLE = False
+    MathematicalAccuracyIntegration = None
+    MathematicalFeedback = None
+    create_math_learning_integration = None
+    MATH_ERROR_PENALTIES = {}
+    MATH_VERIFICATION_REWARD = 0.015

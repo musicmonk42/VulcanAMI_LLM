@@ -143,6 +143,36 @@ except ImportError:
         logger.debug("Outcome bridge not available - implicit feedback disabled")
 
 
+# Import mathematical verification for accuracy feedback
+# This enables learning from mathematical reasoning accuracy
+try:
+    from ..mathematical_verification import (
+        MathematicalVerificationEngine,
+        MathErrorType,
+        MathVerificationStatus,
+        BayesianProblem,
+    )
+    MATH_VERIFICATION_AVAILABLE = True
+    logger.info("Mathematical verification imported for accuracy feedback")
+except ImportError:
+    try:
+        from vulcan.reasoning.mathematical_verification import (
+            MathematicalVerificationEngine,
+            MathErrorType,
+            MathVerificationStatus,
+            BayesianProblem,
+        )
+        MATH_VERIFICATION_AVAILABLE = True
+        logger.info("Mathematical verification imported for accuracy feedback")
+    except ImportError:
+        MathematicalVerificationEngine = None
+        MathErrorType = None
+        MathVerificationStatus = None
+        BayesianProblem = None
+        MATH_VERIFICATION_AVAILABLE = False
+        logger.debug("Mathematical verification not available")
+
+
 # Import embedding circuit breaker for latency protection
 try:
     from .embedding_circuit_breaker import (
@@ -1302,6 +1332,17 @@ class ToolSelector:
         
         # Learning system integration (set externally)
         self.learning_system: Optional[Any] = None
+        
+        # Mathematical verification engine for accuracy feedback
+        # This enables learning from mathematical reasoning accuracy
+        self.math_verifier: Optional["MathematicalVerificationEngine"] = None
+        if MATH_VERIFICATION_AVAILABLE and config.get("enable_math_verification", True):
+            try:
+                self.math_verifier = MathematicalVerificationEngine()
+                logger.info("Mathematical verification engine initialized for selection feedback")
+            except Exception as e:
+                logger.warning(f"Failed to initialize math verifier: {e}")
+                self.math_verifier = None
 
         # Execution statistics
         self.execution_history = deque(maxlen=1000)
@@ -1312,6 +1353,16 @@ class ToolSelector:
                 "avg_time": 0.0,
                 "avg_energy": 0.0,
                 "avg_confidence": 0.0,
+            }
+        )
+        
+        # Mathematical accuracy statistics
+        self.math_accuracy_metrics = defaultdict(
+            lambda: {
+                "verifications": 0,
+                "verified_correct": 0,
+                "errors_detected": 0,
+                "error_types": defaultdict(int),
             }
         )
 
@@ -2086,7 +2137,7 @@ class ToolSelector:
             return self._create_failure_result()
 
     def _update_learning(self, request: SelectionRequest, result: SelectionResult):
-        """Update learning components"""
+        """Update learning components including mathematical accuracy feedback."""
 
         try:
             # Update bandit
@@ -2118,12 +2169,177 @@ class ToolSelector:
                     result.confidence > 0.5,  # Simplified success metric
                 )
 
+            # Mathematical verification for probabilistic/Bayesian results
+            # This provides accuracy feedback to the learning system
+            if self.config.get("enable_math_verification", True):
+                self._verify_mathematical_result(request, result)
+
             # Check for distribution shift
             if self.config.get("enable_distribution_monitoring"):
                 if self.distribution_monitor.detect_shift(request.features, result):
                     self._handle_distribution_shift()
         except Exception as e:
             logger.error(f"Learning update failed: {e}")
+
+    def _verify_mathematical_result(
+        self, request: SelectionRequest, result: SelectionResult
+    ):
+        """
+        Verify mathematical accuracy of results and provide feedback to learning system.
+        
+        This method checks if the result contains mathematical/probabilistic content
+        and verifies it using the MathematicalVerificationEngine. Errors are reported
+        to the learning system to penalize tools that produce mathematical errors.
+        
+        Critical focus: Detecting specificity/sensitivity confusion in Bayesian reasoning.
+        """
+        if not self.math_verifier or not MATH_VERIFICATION_AVAILABLE:
+            return
+        
+        tool_name = result.selected_tool
+        exec_result = result.execution_result
+        
+        # Only verify probabilistic/Bayesian results
+        if tool_name not in ("probabilistic", "symbolic", "causal"):
+            return
+        
+        try:
+            # Check if result contains Bayesian/probability content
+            if not isinstance(exec_result, dict):
+                return
+            
+            # Look for Bayesian problem indicators
+            has_posterior = "posterior" in exec_result or "probability" in exec_result
+            has_prior = "prior" in exec_result
+            has_test_metrics = any(
+                k in exec_result for k in ["sensitivity", "specificity", "likelihood"]
+            )
+            
+            if not (has_posterior and (has_prior or has_test_metrics)):
+                return
+            
+            # Extract Bayesian problem parameters
+            posterior = exec_result.get("posterior") or exec_result.get("probability")
+            if posterior is None:
+                return
+            
+            prior = exec_result.get("prior", 0.5)
+            sensitivity = exec_result.get("sensitivity")
+            specificity = exec_result.get("specificity")
+            likelihood = exec_result.get("likelihood")
+            
+            # Create Bayesian problem for verification
+            problem = BayesianProblem(
+                prior=float(prior),
+                likelihood=float(likelihood) if likelihood else None,
+                sensitivity=float(sensitivity) if sensitivity else None,
+                specificity=float(specificity) if specificity else None,
+            )
+            
+            # Verify the calculation
+            verification_result = self.math_verifier.verify_bayesian_calculation(
+                problem, float(posterior)
+            )
+            
+            # Update metrics
+            with self.stats_lock:
+                metrics = self.math_accuracy_metrics[tool_name]
+                metrics["verifications"] += 1
+                
+                if verification_result.status == MathVerificationStatus.VERIFIED:
+                    metrics["verified_correct"] += 1
+                    # Reward tool for correct mathematical result
+                    if self.learning_system:
+                        self._apply_math_reward(tool_name)
+                    logger.info(
+                        f"[MathVerify] Tool '{tool_name}' VERIFIED correct Bayesian result"
+                    )
+                elif verification_result.status == MathVerificationStatus.ERROR_DETECTED:
+                    metrics["errors_detected"] += 1
+                    for error in verification_result.errors:
+                        metrics["error_types"][error.value] += 1
+                    
+                    # Penalize tool for mathematical error
+                    if self.learning_system:
+                        self._apply_math_penalty(
+                            tool_name, 
+                            verification_result.errors[0] if verification_result.errors else None
+                        )
+                    
+                    logger.warning(
+                        f"[MathVerify] Tool '{tool_name}' ERROR: {verification_result.explanation}"
+                    )
+                    
+                    # Add correction info to result metadata
+                    if hasattr(result, 'metadata') and result.metadata is not None:
+                        result.metadata["math_verification"] = {
+                            "status": "error_detected",
+                            "errors": [e.value for e in verification_result.errors],
+                            "corrections": verification_result.corrections,
+                            "explanation": verification_result.explanation,
+                        }
+                        
+        except Exception as e:
+            logger.debug(f"Mathematical verification skipped: {e}")
+
+    def _apply_math_reward(self, tool_name: str):
+        """Apply reward to tool for correct mathematical result."""
+        if not self.learning_system:
+            return
+        
+        try:
+            if hasattr(self.learning_system, '_weight_lock'):
+                with self.learning_system._weight_lock:
+                    if tool_name not in self.learning_system.tool_weight_adjustments:
+                        self.learning_system.tool_weight_adjustments[tool_name] = 0.0
+                    
+                    # Reward for mathematical correctness (0.015)
+                    reward = 0.015
+                    old_weight = self.learning_system.tool_weight_adjustments[tool_name]
+                    self.learning_system.tool_weight_adjustments[tool_name] = min(
+                        0.2,  # MAX_TOOL_WEIGHT
+                        old_weight + reward
+                    )
+                    logger.info(
+                        f"[MathVerify] Rewarded '{tool_name}': {old_weight:.4f} -> "
+                        f"{self.learning_system.tool_weight_adjustments[tool_name]:.4f}"
+                    )
+        except Exception as e:
+            logger.warning(f"Failed to apply math reward: {e}")
+
+    def _apply_math_penalty(self, tool_name: str, error_type: Optional["MathErrorType"]):
+        """Apply penalty to tool for mathematical error."""
+        if not self.learning_system:
+            return
+        
+        try:
+            # Penalty varies by error severity
+            penalty_map = {
+                "specificity_confusion": -0.02,
+                "base_rate_neglect": -0.015,
+                "complement_error": -0.01,
+                "arithmetic_error": -0.008,
+            }
+            
+            error_name = error_type.value if error_type else "unknown"
+            penalty = penalty_map.get(error_name, -0.01)
+            
+            if hasattr(self.learning_system, '_weight_lock'):
+                with self.learning_system._weight_lock:
+                    if tool_name not in self.learning_system.tool_weight_adjustments:
+                        self.learning_system.tool_weight_adjustments[tool_name] = 0.0
+                    
+                    old_weight = self.learning_system.tool_weight_adjustments[tool_name]
+                    self.learning_system.tool_weight_adjustments[tool_name] = max(
+                        -0.1,  # MIN_TOOL_WEIGHT
+                        old_weight + penalty
+                    )
+                    logger.warning(
+                        f"[MathVerify] Penalized '{tool_name}' for {error_name}: "
+                        f"{old_weight:.4f} -> {self.learning_system.tool_weight_adjustments[tool_name]:.4f}"
+                    )
+        except Exception as e:
+            logger.warning(f"Failed to apply math penalty: {e}")
 
     def _cache_result(self, request: SelectionRequest, result: SelectionResult):
         """Cache selection and result"""

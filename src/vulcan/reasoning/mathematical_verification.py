@@ -14,14 +14,23 @@ This module detects and corrects common mathematical errors including:
 - Probability axiom violations
 - Bayesian inference errors
 - Complement confusion in probability calculations
+
+Security Note:
+- Uses AST-based safe expression evaluation instead of eval()
+- All mathematical operations are validated before execution
+- No arbitrary code execution is possible
 """
 
+from __future__ import annotations
+
+import ast
 import logging
 import math
+import operator
 import re
 import threading
 import time
-from collections import defaultdict, deque
+from collections import Counter, defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
@@ -61,6 +70,240 @@ class MathVerificationStatus(Enum):
     UNCERTAIN = "uncertain"
     TIMEOUT = "timeout"
     FAILED = "failed"
+
+
+# ============================================================================
+# SAFE EXPRESSION EVALUATOR
+# ============================================================================
+
+
+class SafeMathEvaluator:
+    """
+    Secure mathematical expression evaluator using AST parsing.
+    
+    This class provides safe evaluation of mathematical expressions without
+    using eval() or exec(). It parses expressions into an AST and evaluates
+    only allowed mathematical operations.
+    
+    Security features:
+    - No arbitrary code execution
+    - Whitelist-based operation validation
+    - Bounded recursion depth
+    - No access to Python builtins
+    
+    Example:
+        >>> evaluator = SafeMathEvaluator()
+        >>> evaluator.evaluate("2 + 3 * 4")
+        14
+        >>> evaluator.evaluate("sqrt(16) + sin(pi/2)", {"x": 5})
+        5.0
+    """
+    
+    # Allowed binary operators
+    BINARY_OPS: Dict[type, Callable[[Any, Any], Any]] = {
+        ast.Add: operator.add,
+        ast.Sub: operator.sub,
+        ast.Mult: operator.mul,
+        ast.Div: operator.truediv,
+        ast.FloorDiv: operator.floordiv,
+        ast.Mod: operator.mod,
+        ast.Pow: operator.pow,
+    }
+    
+    # Allowed unary operators
+    UNARY_OPS: Dict[type, Callable[[Any], Any]] = {
+        ast.UAdd: operator.pos,
+        ast.USub: operator.neg,
+    }
+    
+    # Allowed mathematical functions
+    MATH_FUNCTIONS: Dict[str, Callable[..., float]] = {
+        "abs": abs,
+        "sqrt": math.sqrt,
+        "exp": math.exp,
+        "log": math.log,
+        "log10": math.log10,
+        "log2": math.log2,
+        "sin": math.sin,
+        "cos": math.cos,
+        "tan": math.tan,
+        "asin": math.asin,
+        "acos": math.acos,
+        "atan": math.atan,
+        "sinh": math.sinh,
+        "cosh": math.cosh,
+        "tanh": math.tanh,
+        "ceil": math.ceil,
+        "floor": math.floor,
+        "round": round,
+        "min": min,
+        "max": max,
+        "pow": pow,
+    }
+    
+    # Allowed mathematical constants
+    MATH_CONSTANTS: Dict[str, float] = {
+        "pi": math.pi,
+        "e": math.e,
+        "tau": math.tau,
+        "inf": math.inf,
+    }
+    
+    # Maximum recursion depth for nested expressions
+    MAX_DEPTH = 50
+    
+    def __init__(self, max_depth: int = MAX_DEPTH):
+        """
+        Initialize the safe evaluator.
+        
+        Args:
+            max_depth: Maximum recursion depth for nested expressions
+        """
+        self.max_depth = max_depth
+    
+    def evaluate(
+        self,
+        expression: str,
+        variables: Optional[Dict[str, float]] = None,
+    ) -> float:
+        """
+        Safely evaluate a mathematical expression.
+        
+        Args:
+            expression: Mathematical expression string
+            variables: Optional dictionary of variable bindings
+            
+        Returns:
+            Evaluated result as float
+            
+        Raises:
+            ValueError: If expression contains invalid operations
+            ZeroDivisionError: If division by zero occurs
+            OverflowError: If result overflows
+        """
+        if not expression or not expression.strip():
+            raise ValueError("Empty expression")
+        
+        variables = variables or {}
+        
+        try:
+            tree = ast.parse(expression, mode='eval')
+        except SyntaxError as e:
+            raise ValueError(f"Invalid expression syntax: {e}") from e
+        
+        return self._evaluate_node(tree.body, variables, depth=0)
+    
+    def _evaluate_node(
+        self,
+        node: ast.AST,
+        variables: Dict[str, float],
+        depth: int,
+    ) -> float:
+        """
+        Recursively evaluate an AST node.
+        
+        Args:
+            node: AST node to evaluate
+            variables: Variable bindings
+            depth: Current recursion depth
+            
+        Returns:
+            Evaluated result
+        """
+        if depth > self.max_depth:
+            raise ValueError(f"Expression too deeply nested (max {self.max_depth})")
+        
+        # Handle numeric literals
+        if isinstance(node, ast.Constant):
+            if isinstance(node.value, (int, float)):
+                return float(node.value)
+            raise ValueError(f"Unsupported constant type: {type(node.value)}")
+        
+        # Handle legacy Num nodes (Python < 3.8 compatibility)
+        if isinstance(node, ast.Num):
+            return float(node.n)
+        
+        # Handle variable names and constants
+        if isinstance(node, ast.Name):
+            name = node.id
+            if name in variables:
+                return float(variables[name])
+            if name in self.MATH_CONSTANTS:
+                return self.MATH_CONSTANTS[name]
+            raise ValueError(f"Unknown variable or constant: {name}")
+        
+        # Handle binary operations
+        if isinstance(node, ast.BinOp):
+            op_type = type(node.op)
+            if op_type not in self.BINARY_OPS:
+                raise ValueError(f"Unsupported binary operator: {op_type.__name__}")
+            
+            left = self._evaluate_node(node.left, variables, depth + 1)
+            right = self._evaluate_node(node.right, variables, depth + 1)
+            
+            # Check for division by zero
+            if op_type in (ast.Div, ast.FloorDiv, ast.Mod) and right == 0:
+                raise ZeroDivisionError("Division by zero")
+            
+            return self.BINARY_OPS[op_type](left, right)
+        
+        # Handle unary operations
+        if isinstance(node, ast.UnaryOp):
+            op_type = type(node.op)
+            if op_type not in self.UNARY_OPS:
+                raise ValueError(f"Unsupported unary operator: {op_type.__name__}")
+            
+            operand = self._evaluate_node(node.operand, variables, depth + 1)
+            return self.UNARY_OPS[op_type](operand)
+        
+        # Handle function calls
+        if isinstance(node, ast.Call):
+            if not isinstance(node.func, ast.Name):
+                raise ValueError("Only simple function calls are supported")
+            
+            func_name = node.func.id
+            if func_name not in self.MATH_FUNCTIONS:
+                raise ValueError(f"Unknown function: {func_name}")
+            
+            args = [
+                self._evaluate_node(arg, variables, depth + 1)
+                for arg in node.args
+            ]
+            
+            if node.keywords:
+                raise ValueError("Keyword arguments not supported")
+            
+            try:
+                return self.MATH_FUNCTIONS[func_name](*args)
+            except (ValueError, TypeError) as e:
+                raise ValueError(f"Error in function {func_name}: {e}") from e
+        
+        # Handle comparison operations (for completeness)
+        if isinstance(node, ast.Compare):
+            raise ValueError("Comparison operations not supported in arithmetic")
+        
+        raise ValueError(f"Unsupported expression type: {type(node).__name__}")
+
+
+# Global safe evaluator instance
+_safe_evaluator = SafeMathEvaluator()
+
+
+def safe_math_eval(
+    expression: str,
+    variables: Optional[Dict[str, float]] = None,
+) -> float:
+    """
+    Convenience function for safe mathematical expression evaluation.
+    
+    Args:
+        expression: Mathematical expression string
+        variables: Optional variable bindings
+        
+    Returns:
+        Evaluated result
+    """
+    return _safe_evaluator.evaluate(expression, variables)
 
 
 # ============================================================================
@@ -674,36 +917,36 @@ class MathematicalVerificationEngine:
         variables: Optional[Dict[str, float]] = None,
     ) -> VerificationResult:
         """
-        Verify an arithmetic calculation.
+        Verify an arithmetic calculation using secure AST-based evaluation.
+        
+        This method uses SafeMathEvaluator to securely parse and evaluate
+        mathematical expressions without using eval() or exec().
         
         Args:
-            expression: Mathematical expression as string
-            claimed_result: The claimed result
-            variables: Optional variable bindings
+            expression: Mathematical expression as string (e.g., "2 + 3 * 4")
+            claimed_result: The claimed result to verify
+            variables: Optional variable bindings (e.g., {"x": 5, "y": 10})
             
         Returns:
-            VerificationResult
+            VerificationResult with verification status and any errors
+            
+        Example:
+            >>> engine = MathematicalVerificationEngine()
+            >>> result = engine.verify_arithmetic("sqrt(16) + 2", 6.0)
+            >>> result.status == MathVerificationStatus.VERIFIED
+            True
         """
         try:
-            # Build safe evaluation environment
-            safe_dict = {
-                "abs": abs, "sqrt": math.sqrt, "exp": math.exp,
-                "log": math.log, "sin": math.sin, "cos": math.cos,
-                "tan": math.tan, "pi": math.pi, "e": math.e,
-            }
+            # Use secure AST-based evaluator instead of eval()
+            correct_result = safe_math_eval(expression, variables)
             
-            if variables:
-                safe_dict.update(variables)
-            
-            # Evaluate expression
-            correct_result = eval(expression, {"__builtins__": {}}, safe_dict)
-            
-            # Check result
+            # Check result with tolerance for floating point comparison
             if abs(correct_result - claimed_result) < self.tolerance:
                 return VerificationResult(
                     status=MathVerificationStatus.VERIFIED,
                     confidence=0.99,
                     explanation=f"Arithmetic verified: {expression} = {correct_result}",
+                    metadata={"computed_value": correct_result},
                 )
             else:
                 return VerificationResult(
@@ -713,6 +956,11 @@ class MathematicalVerificationEngine:
                     corrections={"correct_result": correct_result},
                     explanation=f"Arithmetic error: {expression} = {correct_result}, "
                                f"not {claimed_result}",
+                    metadata={
+                        "computed_value": correct_result,
+                        "claimed_value": claimed_result,
+                        "difference": abs(correct_result - claimed_result),
+                    },
                 )
                 
         except ZeroDivisionError:
@@ -729,7 +977,14 @@ class MathematicalVerificationEngine:
                 errors=[MathErrorType.NUMERICAL_OVERFLOW],
                 explanation="Numerical overflow in calculation",
             )
+        except ValueError as e:
+            return VerificationResult(
+                status=MathVerificationStatus.FAILED,
+                confidence=0.0,
+                explanation=f"Expression parsing failed: {str(e)}",
+            )
         except Exception as e:
+            logger.warning(f"Unexpected error in verify_arithmetic: {e}")
             return VerificationResult(
                 status=MathVerificationStatus.FAILED,
                 confidence=0.0,
@@ -901,7 +1156,7 @@ class MathematicalVerificationEngine:
         if signature in self.learned_error_patterns:
             # Return most common errors for this problem type
             errors = self.learned_error_patterns[signature]
-            from collections import Counter
+            # Counter is imported at module level
             error_counts = Counter(errors)
             return [error for error, _ in error_counts.most_common(3)]
         
@@ -1009,20 +1264,17 @@ class MathematicalToolOrchestrator:
         claimed_result: float,
         variables: Optional[Dict[str, float]],
     ) -> Optional[VerificationResult]:
-        """Verify using NumPy."""
+        """
+        Verify using secure AST-based evaluation with NumPy precision.
+        
+        Uses the SafeMathEvaluator for secure expression parsing
+        and NumPy's isclose for floating point comparison.
+        """
         try:
             import numpy as np
             
-            safe_dict = {
-                "abs": np.abs, "sqrt": np.sqrt, "exp": np.exp,
-                "log": np.log, "sin": np.sin, "cos": np.cos,
-                "pi": np.pi, "e": np.e,
-            }
-            
-            if variables:
-                safe_dict.update(variables)
-            
-            result = eval(expression, {"__builtins__": {}}, safe_dict)
+            # Use secure AST-based evaluator instead of eval()
+            result = safe_math_eval(expression, variables)
             
             if np.isclose(result, claimed_result):
                 return VerificationResult(
@@ -1156,6 +1408,9 @@ __all__ = [
     "MathSolution",
     "VerificationResult",
     "BayesianProblem",
+    # Safe evaluation
+    "SafeMathEvaluator",
+    "safe_math_eval",
     # Main classes
     "MathematicalVerificationEngine",
     "MathematicalToolOrchestrator",
