@@ -39,6 +39,27 @@ from .reasoning_types import (
 
 logger = logging.getLogger(__name__)
 
+# ==============================================================================
+# MATHEMATICAL VERIFICATION CONSTANTS
+# ==============================================================================
+# These constants control the mathematical verification and learning integration.
+# They are extracted as named constants per code review feedback.
+
+# Confidence adjustment factors
+MATH_VERIFICATION_CONFIDENCE_BOOST = 1.1  # Boost confidence when verified correct
+MATH_ERROR_CONFIDENCE_PENALTY = 0.5  # Reduce confidence when error detected
+
+# Learning reward/penalty values
+MATH_ACCURACY_REWARD = 0.015  # Bonus for mathematically correct results
+MATH_ACCURACY_PENALTY = -0.01  # Penalty for mathematical errors
+MATH_WEIGHT_ADJUSTMENT_PENALTY = -0.01  # Adjustment to tool weights on error
+
+# Keys to search for numerical results in conclusions
+NUMERICAL_RESULT_KEYS = ('probability', 'result', 'value', 'posterior', 'answer')
+
+# Problem type identifiers
+PROBLEM_TYPE_BAYESIAN = 'bayesian'
+
 
 def _is_test_environment() -> bool:
     """
@@ -2988,7 +3009,7 @@ class UnifiedReasoner:
             if isinstance(conclusion, dict):
                 # Look for probability/calculation results in the conclusion
                 numerical_value = None
-                for key in ['probability', 'result', 'value', 'posterior', 'answer']:
+                for key in NUMERICAL_RESULT_KEYS:
                     if key in conclusion and isinstance(conclusion[key], (int, float)):
                         numerical_value = conclusion[key]
                         break
@@ -2997,7 +3018,7 @@ class UnifiedReasoner:
                     return None
                     
                 # Check for Bayesian calculation context
-                if 'prior' in conclusion or task.query.get('problem_type') == 'bayesian':
+                if 'prior' in conclusion or task.query.get('problem_type') == PROBLEM_TYPE_BAYESIAN:
                     # Construct BayesianProblem from context
                     BayesianProblem = self._optional_components.get("BayesianProblem")
                     if BayesianProblem:
@@ -3078,7 +3099,7 @@ class UnifiedReasoner:
             
             if verification.status == MathVerificationStatus.VERIFIED:
                 # Correct result - boost confidence and trigger reward
-                result.confidence = min(1.0, result.confidence * 1.1)  # Small confidence boost
+                result.confidence = min(1.0, result.confidence * MATH_VERIFICATION_CONFIDENCE_BOOST)
                 logger.info("[MathVerification] Calculation verified as correct")
                 
                 # PRIORITY 3 FIX: Reward tool through learning integration
@@ -3092,9 +3113,12 @@ class UnifiedReasoner:
                     f"[MathVerification] Mathematical error detected: {verification.errors}"
                 )
                 
-                # Apply corrections to result
+                # Apply corrections to result (handle non-dict conclusions safely)
                 if verification.corrections:
-                    corrected_conclusion = result.conclusion.copy() if isinstance(result.conclusion, dict) else {}
+                    if isinstance(result.conclusion, dict):
+                        corrected_conclusion = result.conclusion.copy()
+                    else:
+                        corrected_conclusion = {'original_value': result.conclusion}
                     corrected_conclusion['math_correction'] = {
                         'original': result.conclusion,
                         'corrected': verification.corrections.get('correct_posterior') or verification.corrections.get('correct_result'),
@@ -3104,7 +3128,7 @@ class UnifiedReasoner:
                     result.conclusion = corrected_conclusion
                     
                 # Reduce confidence due to detected error
-                result.confidence = max(0.0, result.confidence * 0.5)
+                result.confidence = max(0.0, result.confidence * MATH_ERROR_CONFIDENCE_PENALTY)
                 result.explanation = (result.explanation or "") + f"\n[Math Error: {verification.explanation}]"
                 
                 # PRIORITY 3 FIX: Penalize tool through learning integration
@@ -3145,7 +3169,7 @@ class UnifiedReasoner:
                     verification_status = math_verification.get('status', 'unknown')
                     if verification_status == 'verified':
                         # Boost learning signal for mathematically correct results
-                        learning_data['math_accuracy_bonus'] = 0.015
+                        learning_data['math_accuracy_bonus'] = MATH_ACCURACY_REWARD
                         learning_data['learning_signal'] = 'positive'
                         logger.info(
                             f"[Learning] Mathematical accuracy reward applied for "
@@ -3153,7 +3177,7 @@ class UnifiedReasoner:
                         )
                     elif verification_status == 'error_detected':
                         # Penalty for mathematically incorrect results
-                        learning_data['math_accuracy_penalty'] = -0.01
+                        learning_data['math_accuracy_penalty'] = MATH_ACCURACY_PENALTY
                         learning_data['learning_signal'] = 'negative'
                         learning_data['errors'] = math_verification.get('errors', [])
                         logger.info(
@@ -3165,7 +3189,7 @@ class UnifiedReasoner:
                         # Also update the shared weight manager for this tool
                         tool_name = task.task_type.value if task.task_type else "unknown"
                         weight_manager = get_weight_manager()
-                        weight_manager.adjust_weight(tool_name, -0.01)
+                        weight_manager.adjust_weight(tool_name, MATH_WEIGHT_ADJUSTMENT_PENALTY)
 
             self.learner.update(learning_data)
         except Exception as e:
