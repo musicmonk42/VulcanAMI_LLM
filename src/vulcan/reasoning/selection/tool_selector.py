@@ -2278,6 +2278,30 @@ class ToolSelector:
                             "corrections": verification_result.corrections,
                             "explanation": verification_result.explanation,
                         }
+                    
+                    # FIX: Apply correction to execution result
+                    # If verification detected an error and we have a correct value,
+                    # update the result to use the corrected value instead of the wrong one.
+                    # This ensures downstream consumers get the mathematically correct answer.
+                    if verification_result.corrections and "correct_posterior" in verification_result.corrections:
+                        correct_value = verification_result.corrections["correct_posterior"]
+                        
+                        # Update the execution result with corrected value
+                        if isinstance(exec_result, dict):
+                            # Preserve original for audit, add correction
+                            exec_result["original_posterior"] = posterior
+                            exec_result["corrected_posterior"] = correct_value
+                            exec_result["math_corrected"] = True
+                            
+                            # Replace the primary value with the corrected one
+                            if "posterior" in exec_result:
+                                exec_result["posterior"] = correct_value
+                            elif "probability" in exec_result:
+                                exec_result["probability"] = correct_value
+                            
+                            logger.info(
+                                f"[MathVerify] CORRECTED result: {posterior:.6f} -> {correct_value:.6f}"
+                            )
                         
         except Exception as e:
             logger.debug(f"Mathematical verification skipped: {e}")

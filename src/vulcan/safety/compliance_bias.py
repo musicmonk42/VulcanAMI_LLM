@@ -2,11 +2,17 @@
 """
 Compliance checking and bias detection for VULCAN-AGI Safety Module.
 Implements regulatory compliance validation and multi-model bias detection.
+
+FIX: Mathematical Scenario Detection Integration
+- Added mathematical scenario detection to bypass HIPAA false positives
+- Mathematical problems with medical terminology (e.g., Bayesian probability
+  with disease testing) should not trigger HIPAA compliance checks
 """
 
 import hashlib
 import json
 import logging
+import re
 import threading
 import time
 from collections import defaultdict, deque
@@ -19,6 +25,78 @@ import torch.nn as nn
 from .safety_types import ComplianceStandard
 
 logger = logging.getLogger(__name__)
+
+# ============================================================
+# MATHEMATICAL SCENARIO DETECTION CONSTANTS
+# ============================================================
+# FIX: Mathematical indicators for detecting Bayesian/probability problems
+# This prevents false positive HIPAA violations for math problems with medical terms
+
+MATHEMATICAL_INDICATORS = frozenset({
+    "probability", "bayesian", "bayes", "prior", "posterior",
+    "sensitivity", "specificity", "conditional probability", "likelihood",
+    "false positive", "false negative", "true positive", "true negative",
+    "statistical", "statistics", "formula", "equation",
+    "what is the probability", "what's the probability", "what are the odds",
+    "how likely", "base rate", "prevalence", "ppv", "npv",
+    "positive predictive value", "negative predictive value", "test accuracy",
+    "given that", "p(", "calculate", "compute",
+})
+
+# Mathematical notation regex patterns (pre-compiled for performance)
+MATH_NOTATION_PATTERNS = [
+    re.compile(r'\d+%'),           # Percentages
+    re.compile(r'\d+\.\d+'),       # Decimals
+    re.compile(r'\d+/\d+'),        # Fractions
+    re.compile(r'p\s*\('),         # Probability notation P(
+    re.compile(r'\d+\s*in\s*\d+'), # X in Y notation
+]
+
+# Hypothetical language indicators (signals math problem vs real medical data)
+HYPOTHETICAL_INDICATORS = frozenset({
+    "suppose", "assume", "imagine", "hypothetical", "example",
+    "probability problem", "statistics problem", "math problem",
+    "solve", "calculate", "compute",
+})
+
+
+def is_mathematical_scenario(query: str) -> bool:
+    """
+    Detect if query is a mathematical/statistical problem vs actual medical scenario.
+    
+    This prevents false positive HIPAA/medical safety violations for legitimate
+    mathematical problems that happen to use medical terminology (e.g., Bayesian
+    probability problems involving disease testing).
+    
+    FIX: GitHub Issue - Mathematical reasoning blocked by safety system false positives.
+    
+    Args:
+        query: The user query to analyze
+        
+    Returns:
+        True if query is a mathematical scenario that should bypass medical compliance checks
+    """
+    query_lower = query.lower()
+    
+    # Count mathematical indicators
+    math_score = sum(1 for indicator in MATHEMATICAL_INDICATORS if indicator in query_lower)
+    
+    # Check for mathematical notation patterns
+    has_math_notation = any(pattern.search(query_lower) for pattern in MATH_NOTATION_PATTERNS)
+    
+    # Check for hypothetical language
+    is_hypothetical = any(ind in query_lower for ind in HYPOTHETICAL_INDICATORS)
+    
+    # Return True if this looks like a math problem
+    # Either: 2+ math indicators, or 1 math indicator + notation, or hypothetical language
+    if math_score >= 2:
+        return True
+    if math_score >= 1 and has_math_notation:
+        return True
+    if is_hypothetical and math_score >= 1:
+        return True
+        
+    return False
 
 # ============================================================
 # COMPLIANCE MAPPER
@@ -288,6 +366,11 @@ class ComplianceMapper:
         """
         Check compliance with specified standards.
 
+        FIX: Mathematical Scenario Override
+        - Detects mathematical problems (e.g., Bayesian probability with medical terms)
+        - Bypasses HIPAA compliance checks for legitimate math scenarios
+        - This prevents false positives that block probabilistic reasoning tools
+
         Args:
             action: Action to validate for compliance
             context: Context containing compliance-relevant information
@@ -299,6 +382,21 @@ class ComplianceMapper:
         # Use all standards if none specified
         if standards is None:
             standards = list(self.standards.keys())
+
+        # FIX: Mathematical scenario override - extract query from action/context
+        # If this is a mathematical problem, skip medical/HIPAA compliance checks
+        query = action.get("query", "") or action.get("prompt", "") or context.get("query", "") or ""
+        is_math_scenario = is_mathematical_scenario(query) if query else False
+        
+        if is_math_scenario and ComplianceStandard.HIPAA in standards:
+            # Remove HIPAA from standards for mathematical scenarios
+            standards = [s for s in standards if s != ComplianceStandard.HIPAA]
+            logger.info(
+                "[ComplianceMapper] Mathematical scenario detected - "
+                "bypassing HIPAA compliance checks (not real PHI)"
+            )
+            # Mark context for downstream awareness
+            context["mathematical_scenario_override"] = True
 
         # Check cache (with lock)
         cache_key = self._generate_cache_key(action, context, standards)
