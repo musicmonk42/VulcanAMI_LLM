@@ -224,6 +224,24 @@ except ImportError as e:
     BOOTSTRAP_AVAILABLE = False
     DecomposerBootstrap = None
 
+# Mathematical Decomposer - SOTA mathematical verification integration
+try:
+    from .mathematical_decomposer import (
+        EnhancedMathematicalDecomposer,
+        MathematicalProblemContext,
+        detect_mathematical_problem,
+        MATH_VERIFICATION_AVAILABLE,
+    )
+
+    MATHEMATICAL_DECOMPOSER_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"Mathematical decomposer not available: {e}")
+    MATHEMATICAL_DECOMPOSER_AVAILABLE = False
+    EnhancedMathematicalDecomposer = None
+    MathematicalProblemContext = None
+    detect_mathematical_problem = None
+    MATH_VERIFICATION_AVAILABLE = False
+
 __all__ = [
     # Core Problem Decomposer
     "ProblemDecomposer",
@@ -292,6 +310,10 @@ __all__ = [
     "ProblemToExperienceConverter",
     # Bootstrap
     "DecomposerBootstrap",
+    # Mathematical Decomposer
+    "EnhancedMathematicalDecomposer",
+    "MathematicalProblemContext",
+    "detect_mathematical_problem",
     # Availability Flags
     "PROBLEM_DECOMPOSER_AVAILABLE",
     "STRATEGIES_AVAILABLE",
@@ -302,6 +324,8 @@ __all__ = [
     "ADAPTIVE_THRESHOLDS_AVAILABLE",
     "LEARNING_INTEGRATION_AVAILABLE",
     "BOOTSTRAP_AVAILABLE",
+    "MATHEMATICAL_DECOMPOSER_AVAILABLE",
+    "MATH_VERIFICATION_AVAILABLE",
 ]
 
 # Version info
