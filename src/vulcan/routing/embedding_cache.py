@@ -435,7 +435,7 @@ class EmbeddingCache:
     
     def clear_and_rebuild(self) -> None:
         """
-        Clear the cache and rebuild internal state for corruption recovery.
+        Clear the cache and reset all internal state for corruption recovery.
         
         This method is useful when the cache may be corrupted due to:
         - Serialization/deserialization issues
@@ -443,22 +443,31 @@ class EmbeddingCache:
         - Memory corruption
         - Application crashes during cache operations
         
-        Unlike clear(), this method logs the previous state before clearing
-        and emits a warning-level log message for audit purposes.
+        Unlike clear(), this method:
+        - Logs the previous state before clearing for audit purposes
+        - Emits a warning-level log message to indicate corruption recovery
+        - Performs all operations under a single lock to prevent race conditions
+        
+        Note: This clears the cache entirely. Actual cache entries are rebuilt
+        lazily through normal cache operations (get/put) after calling this method.
         
         Example:
             >>> cache.clear_and_rebuild()  # Cache may be corrupted
             >>> stats = cache.get_stats()
             >>> assert stats.size == 0
         """
-        # Capture state for logging before clearing
         with self._lock:
+            # Capture state for logging before clearing
             old_size = len(self._cache)
             old_hits = self._hits
             old_misses = self._misses
-        
-        # Use existing clear() method to avoid code duplication
-        self.clear()
+            
+            # Clear cache and reset statistics (same as clear() but under single lock)
+            self._cache.clear()
+            self._hits = 0
+            self._misses = 0
+            self._evictions = 0
+            self._compute_time_saved_ms = 0.0
         
         # Log with warning level for audit purposes (corruption recovery scenario)
         logger.warning(
@@ -849,10 +858,11 @@ def clear_cache() -> None:
 
 def clear_and_rebuild_cache() -> None:
     """
-    Clear and rebuild the embedding cache for corruption recovery.
+    Clear the embedding cache and reset internal state for corruption recovery.
     
     This function should be called when the cache may be corrupted.
-    It performs a complete cache rebuild to ensure clean internal state.
+    It clears all cached entries and resets statistics to ensure clean state.
+    Cache entries are rebuilt lazily through normal operations after calling this.
     
     Use cases:
         - Cache corruption suspected (inconsistent results)
