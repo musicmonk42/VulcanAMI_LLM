@@ -3566,9 +3566,16 @@ FILE: <path/to/file.py>
             elif hasattr(self, "_mock_llm_response"):
                 response_text = self._mock_llm_response(prompt)
             else:
-                # Fallback stub for standalone runs without full environment
-                logger.warning("No LLM provider found, using stub response.")
-                response_text = "FILE: src/vulcan/temp_fix.py\n```python\n# Auto-generated fix\ndef fix(): pass\n```"
+                # No LLM available - use targeted fix generation based on code analysis
+                # This prevents boilerplate generation by examining actual code
+                logger.info("No LLM provider found, using code-analysis-based fix generation.")
+                fix_content, fix_path = self._generate_targeted_fix(observation)
+                if fix_content and fix_path:
+                    logger.info(f"Generated targeted fix for {fix_path}")
+                    return fix_content, fix_path
+                else:
+                    logger.warning("Could not generate targeted fix - no applicable pattern found")
+                    return None, None
 
             # Parse Response
             lines = response_text.strip().split("\n")
@@ -3586,7 +3593,21 @@ FILE: <path/to/file.py>
                 elif in_code_block:
                     code_lines.append(line)
 
-            return "\n".join(code_lines), file_path
+            content = "\n".join(code_lines)
+            
+            # Validate the LLM-generated improvement to reject boilerplate
+            objective_type = action.get("_drive_metadata", {}).get("objective_type", "")
+            if content and file_path:
+                is_valid, reason = self._validate_improvement(content, file_path, objective_type)
+                if not is_valid:
+                    logger.warning(f"LLM generated invalid improvement: {reason}")
+                    # Fall back to targeted fix
+                    fix_content, fix_path = self._generate_targeted_fix(observation)
+                    if fix_content and fix_path:
+                        return fix_content, fix_path
+                    return None, None
+            
+            return content, file_path
 
         except Exception as e:
             logger.error(f"LLM generation failed: {e}")
@@ -3601,6 +3622,290 @@ FILE: <path/to/file.py>
             return False, str(e)
         except Exception as e:
             return False, str(e)
+
+    def _validate_improvement(self, content: str, file_path: str, objective_type: str) -> Tuple[bool, str]:
+        """
+        Validate that a generated improvement is REAL, not boilerplate.
+        
+        This prevents the self-improvement system from creating useless placeholder
+        files like "enhance_safety.py" with empty implementations.
+        
+        Validation criteria:
+        1. Must not contain common boilerplate indicators
+        2. Must have substantial implementation (not just pass/...)
+        3. Must be relevant to the objective type
+        4. Must target an existing file OR have clear justification for new file
+        
+        Args:
+            content: The generated code content
+            file_path: Target file path
+            objective_type: The improvement objective being addressed
+            
+        Returns:
+            Tuple of (is_valid, rejection_reason)
+        """
+        # Boilerplate indicators that suggest generated code is not real
+        boilerplate_indicators = [
+            '# Auto-generated fix',
+            '# Placeholder',
+            '# TODO: Implement',
+            '# TODO',
+            'def fix(): pass',
+            'class SafetySystem:\n    pass',
+            'raise NotImplementedError',
+            '...',
+        ]
+        
+        # Check for boilerplate patterns
+        for indicator in boilerplate_indicators:
+            if indicator in content:
+                return False, f"Rejected: contains boilerplate pattern '{indicator[:30]}...'"
+        
+        # Check content has substantial implementation
+        lines = [l for l in content.split('\n') if l.strip() and not l.strip().startswith('#')]
+        if len(lines) < 5:
+            return False, f"Rejected: too few implementation lines ({len(lines)} < 5)"
+        
+        # Check for only 'pass' statements in functions/classes
+        pass_only_pattern = re.compile(r'(def|class)\s+\w+.*:\s*\n\s*pass\s*$', re.MULTILINE)
+        matches = pass_only_pattern.findall(content)
+        total_defs = content.count('def ') + content.count('class ')
+        if total_defs > 0 and len(matches) == total_defs:
+            return False, "Rejected: all functions/classes are empty (pass only)"
+        
+        # Check file path is sensible
+        suspicious_paths = ['temp_fix.py', 'auto_fix.py', 'generated_fix.py', 'enhance_safety.py']
+        for suspicious in suspicious_paths:
+            if suspicious in file_path:
+                return False, f"Rejected: suspicious generated file path '{file_path}'"
+        
+        # For fix objectives, verify targeting existing file
+        if objective_type in ('fix_known_bugs', 'fix_circular_imports'):
+            target_path = self.repo_root / file_path if not Path(file_path).is_absolute() else Path(file_path)
+            if not target_path.exists():
+                # New files for fix objectives are suspicious
+                return False, f"Rejected: fix objective targeting non-existent file '{file_path}'"
+        
+        # Verify the content actually addresses the objective (soft check)
+        # This is informational - we don't reject solely on keyword mismatch
+        # since a fix might add new methods that don't mention "bug" explicitly
+        objective_keywords = {
+            'fix_known_bugs': ['fix', 'bug', 'error', 'issue', 'patch', 'classify', 'route', 'handle'],
+            'optimize_performance': ['optimize', 'cache', 'performance', 'speed', 'fast', 'lazy', 'batch'],
+            'improve_test_coverage': ['test', 'assert', 'mock', 'fixture', 'pytest', 'expect'],
+            'enhance_safety_systems': ['safety', 'validate', 'check', 'boundary', 'verify', 'constraint'],
+            'fix_circular_imports': ['import', 'from', 'module', 'lazy'],
+        }
+        
+        keywords = objective_keywords.get(objective_type, [])
+        content_lower = content.lower()
+        keyword_matches = sum(1 for kw in keywords if kw in content_lower)
+        
+        # Log low keyword match but don't reject - the fix might still be valid
+        if keywords and keyword_matches == 0:
+            logger.debug(f"Note: content has no objective keywords for '{objective_type}', may need review")
+        
+        logger.info(f"Improvement validated: {file_path} for {objective_type}")
+        return True, "Valid improvement"
+
+    def _generate_targeted_fix(self, observation: Dict[str, Any]) -> Tuple[Optional[str], Optional[str]]:
+        """
+        Generate a targeted fix based on actual code analysis when LLM is unavailable.
+        
+        Instead of producing boilerplate, this method:
+        1. Examines diagnosed issues from code introspection
+        2. Reads the actual source file with the problem
+        3. Generates a specific, minimal fix for the identified issue
+        
+        This is the KEY method that prevents "theatrical" self-improvement.
+        
+        Args:
+            observation: Dictionary containing diagnosed issues and code context
+            
+        Returns:
+            Tuple of (fix_content, file_path) or (None, None) if no fix possible
+        """
+        # Get the target issue
+        target_issue = observation.get('target_issue')
+        if not target_issue:
+            # Try to find a high-priority issue from diagnosed issues
+            current_issues = observation.get('current_issues', [])
+            critical_issues = [i for i in current_issues if i.get('severity') == 'critical']
+            high_issues = [i for i in current_issues if i.get('severity') == 'high']
+            target_issue = (critical_issues or high_issues or current_issues or [None])[0]
+        
+        if not target_issue:
+            logger.warning("No target issue found for targeted fix generation")
+            return None, None
+        
+        component = target_issue.get('component', '')
+        affected_files = target_issue.get('affected_files', [])
+        
+        # Get the actual file to fix
+        if not affected_files and self.code_introspector:
+            # Try to find the file from component name
+            for filepath in self.code_introspector.source_files:
+                if component.lower() in filepath.lower():
+                    affected_files = [filepath]
+                    break
+        
+        if not affected_files:
+            logger.warning(f"No files identified for component {component}")
+            return None, None
+        
+        target_file = affected_files[0]
+        
+        # Get the actual content of the file
+        file_content = None
+        if self.code_introspector and target_file in self.code_introspector.source_files:
+            file_content = self.code_introspector.source_files[target_file].get('content')
+        else:
+            # Try reading directly
+            try:
+                target_path = Path(target_file)
+                if not target_path.is_absolute():
+                    target_path = self.repo_root / target_file
+                if target_path.exists():
+                    file_content = target_path.read_text(encoding='utf-8')
+            except Exception as e:
+                logger.debug(f"Could not read {target_file}: {e}")
+        
+        if not file_content:
+            logger.warning(f"Could not read content of {target_file}")
+            return None, None
+        
+        # Generate the fix based on issue type
+        issue_type = target_issue.get('type', '')
+        description = target_issue.get('description', '')
+        suggested_fix = target_issue.get('suggested_fix', '')
+        
+        # Apply known fix patterns based on issue analysis
+        fixed_content = self._apply_known_fix_pattern(
+            file_content, 
+            issue_type, 
+            description,
+            suggested_fix,
+            component
+        )
+        
+        if fixed_content and fixed_content != file_content:
+            logger.info(f"Generated targeted fix for {target_file}")
+            return fixed_content, str(target_file)
+        
+        logger.info(f"No applicable fix pattern for issue in {target_file}")
+        return None, None
+
+    def _apply_known_fix_pattern(
+        self, 
+        content: str, 
+        issue_type: str, 
+        description: str,
+        suggested_fix: str,
+        component: str
+    ) -> Optional[str]:
+        """
+        Apply known fix patterns to source code.
+        
+        This method contains templates for common fixes that can be applied
+        without LLM assistance, based on code introspection findings.
+        
+        Args:
+            content: Original file content
+            issue_type: Type of issue (missing_implementation, performance, etc.)
+            description: Issue description
+            suggested_fix: Suggested fix from diagnosis
+            component: Affected component name
+            
+        Returns:
+            Fixed content or None if no pattern applies
+        """
+        # Pattern 1: Missing classify_query method in QueryRouter
+        if component == 'QueryRouter' and 'classify' in description.lower():
+            # Check if classify_query is missing
+            if 'def classify_query' not in content and 'class QueryAnalyzer' in content:
+                # Find the class definition to insert the method
+                class_match = re.search(r'(class QueryAnalyzer.*?:)', content)
+                if class_match:
+                    # Find a good insertion point (after __init__ or first method)
+                    init_end = content.find('def ', content.find('def __init__') + 1)
+                    if init_end > 0:
+                        # Insert classify_query method
+                        classify_method = '''
+    def classify_query(self, query: str) -> str:
+        """
+        Classify query type based on content patterns.
+        
+        Added by self-improvement system to fix missing classification.
+        
+        Args:
+            query: The query string to classify
+            
+        Returns:
+            Query type string: 'IDENTITY', 'PHILOSOPHICAL', 'CONVERSATIONAL', 
+            'MATHEMATICAL', or 'GENERAL'
+        """
+        query_lower = query.lower()
+        
+        # Identity queries - about the system's creator/origin
+        identity_phrases = ['who created', 'who made', 'who built', 'your creator', 'made by']
+        if any(phrase in query_lower for phrase in identity_phrases):
+            return 'IDENTITY'
+        
+        # Philosophical queries - paradoxes, thought experiments
+        philosophical_phrases = ['meaning of', 'this sentence is false', 'experience machine', 
+                                'trolley problem', 'free will', 'consciousness']
+        if any(phrase in query_lower for phrase in philosophical_phrases):
+            return 'PHILOSOPHICAL'
+        
+        # Conversational queries - greetings, small talk
+        conversational_phrases = ['hello', 'how are you', 'what would', 'nice to meet']
+        if any(phrase in query_lower for phrase in conversational_phrases):
+            return 'CONVERSATIONAL'
+        
+        # Mathematical queries - calculations, probabilities
+        mathematical_phrases = ['calculate', 'probability', 'integral', 'derivative', 'solve']
+        if any(phrase in query_lower for phrase in mathematical_phrases):
+            return 'MATHEMATICAL'
+        
+        return 'GENERAL'
+
+'''
+                        # Insert after class definition
+                        return content[:init_end] + classify_method + content[init_end:]
+        
+        # Pattern 2: Add missing import
+        if 'import' in issue_type.lower() and 'ImportError' in description:
+            # Extract module name from error
+            import_match = re.search(r"No module named '(\w+)'", description)
+            if import_match:
+                module_name = import_match.group(1)
+                # Add optional import with fallback
+                import_fix = f'''
+try:
+    import {module_name}
+except ImportError:
+    {module_name} = None  # Graceful fallback
+    
+'''
+                # Insert at top of file after existing imports
+                last_import = max(content.rfind('import '), content.rfind('from '))
+                if last_import > 0:
+                    end_of_import_line = content.find('\n', last_import) + 1
+                    return content[:end_of_import_line] + import_fix + content[end_of_import_line:]
+        
+        # Pattern 3: Add logging for timeout issues
+        if 'timeout' in description.lower() and 'performance' in issue_type.lower():
+            # Add timing instrumentation
+            if 'import time' not in content:
+                content = 'import time\n' + content
+            # Look for methods that might be slow
+            method_match = re.search(r'(def \w+\([^)]*\):)\s*\n(\s+)("""[^"]*""")?', content)
+            if method_match:
+                # We found a method, but don't modify without more context
+                pass
+        
+        # No applicable pattern found
+        return None
 
     def _apply_file_modification(
         self, file_path: str, new_content: str

@@ -1612,5 +1612,125 @@ class TestIntegration:
         assert drive._csiu_w != initial_weights
 
 
+class TestImprovementValidation:
+    """Test improvement validation and targeted fix generation"""
+
+    def test_validate_improvement_rejects_boilerplate(self, drive):
+        """Test that boilerplate code is rejected"""
+        boilerplate_content = """# Auto-generated fix
+def fix(): pass
+"""
+        is_valid, reason = drive._validate_improvement(
+            boilerplate_content, "src/vulcan/temp_fix.py", "fix_known_bugs"
+        )
+        assert is_valid is False
+        assert "boilerplate" in reason.lower() or "rejected" in reason.lower()
+
+    def test_validate_improvement_rejects_pass_only(self, drive):
+        """Test that pass-only implementations are rejected"""
+        pass_only_content = """class SafetySystem:
+    pass
+"""
+        is_valid, reason = drive._validate_improvement(
+            pass_only_content, "src/vulcan/safety.py", "enhance_safety_systems"
+        )
+        assert is_valid is False
+        assert "rejected" in reason.lower()
+
+    def test_validate_improvement_rejects_suspicious_paths(self, drive):
+        """Test that suspicious file paths are rejected"""
+        valid_content = """
+def real_implementation():
+    '''A real function'''
+    value = compute_something()
+    result = process_value(value)
+    return result
+"""
+        is_valid, reason = drive._validate_improvement(
+            valid_content, "temp_fix.py", "fix_known_bugs"
+        )
+        assert is_valid is False
+        assert "suspicious" in reason.lower() or "rejected" in reason.lower()
+
+    def test_validate_improvement_rejects_too_short(self, drive):
+        """Test that very short implementations are rejected"""
+        short_content = "# Just a comment"
+        is_valid, reason = drive._validate_improvement(
+            short_content, "src/vulcan/module.py", "fix_known_bugs"
+        )
+        assert is_valid is False
+        assert "few" in reason.lower() or "rejected" in reason.lower()
+
+    def test_validate_improvement_accepts_real_code(self, drive):
+        """Test that substantial real code is accepted"""
+        real_code = """
+def classify_query(query: str) -> str:
+    '''Classify query by type.'''
+    query_lower = query.lower()
+    
+    # Identity queries
+    if 'who created' in query_lower or 'who made' in query_lower:
+        return 'IDENTITY'
+    
+    # Philosophical queries
+    if 'meaning of' in query_lower or 'paradox' in query_lower:
+        return 'PHILOSOPHICAL'
+    
+    # Mathematical queries
+    if 'calculate' in query_lower or 'probability' in query_lower:
+        return 'MATHEMATICAL'
+    
+    return 'GENERAL'
+"""
+        # For this test, we need an existing file - use the module itself
+        is_valid, reason = drive._validate_improvement(
+            real_code, 
+            "src/vulcan/world_model/meta_reasoning/self_improvement_drive.py", 
+            "fix_known_bugs"
+        )
+        assert is_valid is True
+        assert "valid" in reason.lower()
+
+    def test_generate_targeted_fix_returns_none_without_issues(self, drive):
+        """Test that targeted fix returns None when no issues found"""
+        observation = {
+            'current_issues': [],
+            'target_issue': None,
+        }
+        content, path = drive._generate_targeted_fix(observation)
+        assert content is None
+        assert path is None
+
+    def test_diagnose_system_issues_returns_list(self, drive):
+        """Test that diagnose_system_issues returns a list"""
+        issues = drive.diagnose_system_issues()
+        assert isinstance(issues, list)
+        # Issues may be empty or have entries depending on codebase state
+        
+    def test_generate_improvement_observation_includes_issues(self, drive):
+        """Test that observation includes diagnosed issues"""
+        obj = drive.objectives[0]
+        observation = drive.generate_improvement_observation(obj)
+        
+        assert 'objective_type' in observation
+        assert 'current_issues' in observation
+        assert 'timestamp' in observation
+        assert observation['objective_type'] == obj.type
+
+    def test_code_introspector_initialized(self, drive):
+        """Test that code introspector is initialized"""
+        assert drive.code_introspector is not None or drive.repo_root is not None
+
+    def test_log_analyzer_initialized(self, drive):
+        """Test that log analyzer is initialized"""
+        # Log analyzer may be None if log dir doesn't exist
+        # But it should be attempted
+        assert hasattr(drive, 'log_analyzer')
+
+    def test_code_knowledge_store_initialized(self, drive):
+        """Test that code knowledge store is initialized"""
+        assert hasattr(drive, 'code_knowledge_store')
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
