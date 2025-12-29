@@ -1243,12 +1243,133 @@ class ObjectiveNegotiator:
     def _negotiate_via_nash_bargaining(
         self, proposals: List[AgentProposal], analysis: Dict[str, Any]
     ) -> NegotiationResult:
-        """Negotiate using Nash bargaining solution (Placeholder)"""
-        logger.warning(
-            "Nash bargaining strategy is not fully implemented - using fallback."
+        """
+        Negotiate using Nash bargaining solution.
+        
+        Nash bargaining maximizes the product of utility gains from a disagreement point:
+            max ∏(u_i - d_i)
+        where:
+            u_i = utility for agent i under the solution
+            d_i = disagreement point (fallback utility) for agent i
+        
+        Args:
+            proposals: List of agent proposals
+            analysis: Analysis of the proposal space
+            
+        Returns:
+            NegotiationResult with Nash bargaining solution
+        """
+        logger.debug("Negotiating via Nash Bargaining strategy...")
+        _np = self._np
+        
+        objectives = analysis["objectives"]
+        if not objectives:
+            return self._create_deadlock_result(proposals, "No objectives for Nash bargaining")
+        
+        # Step 1: Define disagreement points for each agent
+        # Disagreement point = minimum acceptable utility (0 if no other option)
+        disagreement_points = {}
+        for proposal in proposals:
+            agent_id = proposal.agent_id
+            # Disagreement point based on flexibility: high flexibility means willing to accept less
+            # d_i = 0 for fully flexible, higher for less flexible agents
+            disagreement_points[agent_id] = (1.0 - proposal.flexibility) * 0.3
+        
+        # Step 2: Generate candidate solutions (feasible region)
+        candidates = self._generate_candidate_solutions(objectives)
+        
+        if not candidates:
+            logger.warning("No candidate solutions generated for Nash bargaining")
+            return self._create_deadlock_result(proposals, "No feasible solutions found")
+        
+        # Step 3: Find solution that maximizes Nash product
+        best_candidate = None
+        best_nash_product = -float('inf')
+        iterations = 0
+        
+        for candidate in candidates:
+            iterations += 1
+            candidate_outcomes = candidate.get("objectives", {})
+            
+            # Calculate utility for each agent
+            nash_product = 1.0
+            feasible = True
+            
+            for proposal in proposals:
+                agent_id = proposal.agent_id
+                d_i = disagreement_points[agent_id]
+                
+                # Utility = how well the candidate meets this agent's target
+                achieved = candidate_outcomes.get(proposal.objective, 0.0)
+                target = proposal.target_value if proposal.target_value > 0 else 1.0
+                
+                # Normalize utility to [0, 1] range
+                u_i = max(0.0, min(1.0, achieved / target))
+                
+                # Check feasibility: utility must exceed disagreement point
+                if u_i < d_i:
+                    feasible = False
+                    break
+                
+                # Nash product: multiply utility gains from disagreement point
+                # Add small epsilon for numerical stability
+                utility_gain = max(1e-9, u_i - d_i)
+                nash_product *= utility_gain
+            
+            if feasible and nash_product > best_nash_product:
+                best_nash_product = nash_product
+                best_candidate = candidate
+        
+        if best_candidate is None:
+            logger.warning("No feasible Nash bargaining solution found")
+            # Fallback: find candidate with highest Nash product even if below disagreement
+            best_candidate = max(
+                candidates,
+                key=lambda c: self._calculate_nash_product(c, proposals)
+            )
+            outcome = NegotiationOutcome.COMPROMISE
+            confidence = 0.5
+            reasoning_suffix = "Fallback used - some agents may be below their disagreement points."
+        else:
+            outcome = NegotiationOutcome.CONSENSUS
+            confidence = 0.85
+            reasoning_suffix = f"All {len(proposals)} agents achieved utility above their disagreement points."
+        
+        # Step 4: Extract solution
+        agreed_objectives = best_candidate.get("objectives", {})
+        agreed_weights = best_candidate.get("weights", {})
+        
+        # Track compromises made
+        compromises = []
+        for proposal in proposals:
+            achieved = agreed_objectives.get(proposal.objective, 0.0)
+            target = proposal.target_value
+            if target > 0 and achieved < target * 0.95:  # Less than 95% of target
+                compromises.append({
+                    "agent": proposal.agent_id,
+                    "objective": proposal.objective,
+                    "target": target,
+                    "achieved": achieved,
+                    "ratio": achieved / target if target > 0 else 0.0
+                })
+        
+        # Check if solution is Pareto optimal
+        is_pareto = self._is_pareto_optimal(best_candidate, candidates, objectives)
+        
+        return NegotiationResult(
+            outcome=outcome,
+            agreed_objectives=agreed_objectives,
+            objective_weights=agreed_weights,
+            participating_agents=[p.agent_id for p in proposals],
+            strategy_used=NegotiationStrategy.NASH_BARGAINING,
+            iterations=iterations,
+            convergence_time_ms=0,  # Set by caller
+            compromises_made=compromises,
+            pareto_optimal=is_pareto,
+            confidence=confidence,
+            reasoning=f"Nash bargaining solution found with product {best_nash_product:.6f}. {reasoning_suffix}",
+            metadata={"nash_product": best_nash_product, "disagreement_points": disagreement_points}
         )
-        # Fallback to weighted average for now
-        return self._negotiate_via_weighted_average(proposals, analysis)
 
     def _negotiate_via_lexicographic(
         self, proposals: List[AgentProposal], analysis: Dict[str, Any]
@@ -1316,12 +1437,190 @@ class ObjectiveNegotiator:
     def _negotiate_via_minimax(
         self, proposals: List[AgentProposal], analysis: Dict[str, Any]
     ) -> NegotiationResult:
-        """Negotiate using minimax (minimize maximum regret) (Placeholder)"""
-        logger.warning("Minimax strategy is not fully implemented - using fallback.")
-        # Fallback to weighted average for now
-        return self._negotiate_via_weighted_average(proposals, analysis)
+        """
+        Negotiate using minimax strategy (minimize maximum regret).
+        
+        Minimax finds the solution that minimizes the worst-case regret across all agents:
+            min_x max_i regret_i(x)
+        where:
+            regret_i(x) = ideal_i - achieved_i(x) for maximization objectives
+            
+        This ensures no single agent is severely disadvantaged.
+        
+        Args:
+            proposals: List of agent proposals
+            analysis: Analysis of the proposal space
+            
+        Returns:
+            NegotiationResult with minimax solution
+        """
+        logger.debug("Negotiating via Minimax strategy...")
+        _np = self._np
+        
+        objectives = analysis["objectives"]
+        if not objectives:
+            return self._create_deadlock_result(proposals, "No objectives for Minimax")
+        
+        # Step 1: Generate candidate solutions
+        candidates = self._generate_candidate_solutions(objectives)
+        
+        if not candidates:
+            logger.warning("No candidate solutions generated for Minimax")
+            return self._create_deadlock_result(proposals, "No feasible solutions found")
+        
+        # Step 2: Find solution that minimizes maximum regret
+        best_candidate = None
+        min_max_regret = float('inf')
+        iterations = 0
+        regret_details = {}
+        
+        for candidate in candidates:
+            iterations += 1
+            candidate_outcomes = candidate.get("objectives", {})
+            
+            # Calculate regret for each agent
+            max_regret_for_candidate = 0.0
+            agent_regrets = {}
+            
+            for proposal in proposals:
+                agent_id = proposal.agent_id
+                objective = proposal.objective
+                
+                # Agent's ideal outcome (their target value)
+                ideal = proposal.target_value
+                
+                # Actual outcome achieved in this candidate
+                actual = candidate_outcomes.get(objective, 0.0)
+                
+                # Get objective direction from hierarchy (maximize by default)
+                maximize = self._get_objective_direction(objective)
+                
+                # Calculate regret (weighted by agent importance)
+                if maximize:
+                    # For maximization: regret = how much short of ideal
+                    regret_amount = max(0.0, ideal - actual)
+                else:
+                    # For minimization: regret = how much over ideal
+                    regret_amount = max(0.0, actual - ideal)
+                
+                # Weight regret by proposal weight (agent importance)
+                weighted_regret = regret_amount * proposal.weight
+                agent_regrets[agent_id] = weighted_regret
+                
+                max_regret_for_candidate = max(max_regret_for_candidate, weighted_regret)
+            
+            # Check if this candidate has lower maximum regret
+            if max_regret_for_candidate < min_max_regret:
+                min_max_regret = max_regret_for_candidate
+                best_candidate = candidate
+                regret_details = agent_regrets.copy()
+        
+        if best_candidate is None:
+            # Should not happen if candidates exist, but handle gracefully
+            best_candidate = candidates[0]
+            min_max_regret = self._calculate_max_regret(best_candidate, proposals)
+        
+        # Step 3: Extract solution
+        agreed_objectives = best_candidate.get("objectives", {})
+        agreed_weights = best_candidate.get("weights", {})
+        
+        # Step 4: Determine outcome based on regret level
+        # If max regret is very low, we have consensus; otherwise compromise
+        if min_max_regret < 0.1:
+            outcome = NegotiationOutcome.CONSENSUS
+            confidence = 0.9
+        elif min_max_regret < 0.3:
+            outcome = NegotiationOutcome.COMPROMISE
+            confidence = 0.75
+        else:
+            outcome = NegotiationOutcome.COMPROMISE
+            confidence = 0.6
+        
+        # Track compromises (agents with non-zero regret)
+        compromises = []
+        for proposal in proposals:
+            achieved = agreed_objectives.get(proposal.objective, 0.0)
+            target = proposal.target_value
+            if target > 0 and achieved < target * 0.95:
+                compromises.append({
+                    "agent": proposal.agent_id,
+                    "objective": proposal.objective,
+                    "target": target,
+                    "achieved": achieved,
+                    "regret": regret_details.get(proposal.agent_id, 0.0)
+                })
+        
+        # Check Pareto optimality
+        is_pareto = self._is_pareto_optimal(best_candidate, candidates, objectives)
+        
+        # Find agent with maximum regret for reasoning
+        if regret_details:
+            max_regret_agent = max(regret_details.items(), key=lambda x: x[1])[0]
+        else:
+            max_regret_agent = "unknown"
+        
+        return NegotiationResult(
+            outcome=outcome,
+            agreed_objectives=agreed_objectives,
+            objective_weights=agreed_weights,
+            participating_agents=[p.agent_id for p in proposals],
+            strategy_used=NegotiationStrategy.MINIMAX,
+            iterations=iterations,
+            convergence_time_ms=0,  # Set by caller
+            compromises_made=compromises,
+            pareto_optimal=is_pareto,
+            confidence=confidence,
+            reasoning=f"Minimax solution minimizes maximum regret to {min_max_regret:.4f}. "
+                     f"Agent '{max_regret_agent}' has the highest regret in this solution.",
+            metadata={"max_regret": min_max_regret, "agent_regrets": regret_details}
+        )
 
-    # --- End Placeholder Implementations ---
+    def _is_pareto_optimal(
+        self, candidate: Dict[str, Any], all_candidates: List[Dict[str, Any]], objectives: List[str]
+    ) -> bool:
+        """Check if a candidate solution is Pareto optimal among all candidates."""
+        candidate_outcomes = candidate.get("objectives", {})
+        
+        for other in all_candidates:
+            if other is candidate:
+                continue
+            other_outcomes = other.get("objectives", {})
+            
+            # Check if other dominates candidate
+            if self._dominates(other_outcomes, candidate_outcomes, objectives):
+                return False
+        
+        return True
+
+    def _get_objective_direction(self, objective: str) -> bool:
+        """
+        Get the optimization direction for an objective.
+        
+        Args:
+            objective: Name of the objective
+            
+        Returns:
+            True if objective should be maximized, False if minimized
+        """
+        # Default to maximize
+        if not hasattr(self.objective_hierarchy, "objectives"):
+            return True
+        
+        obj_data = self.objective_hierarchy.objectives.get(objective)
+        if obj_data is None:
+            return True
+        
+        # Check for attribute-style access (dataclass/object)
+        if hasattr(obj_data, "maximize"):
+            return getattr(obj_data, "maximize", True)
+        
+        # Check for dict-style access
+        if isinstance(obj_data, dict):
+            return obj_data.get("maximize", True)
+        
+        return True
+
+    # --- End Negotiation Strategy Implementations ---
 
     def _generate_candidate_solutions(
         self, objectives: List[str]
