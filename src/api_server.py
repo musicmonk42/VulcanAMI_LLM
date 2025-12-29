@@ -1292,7 +1292,7 @@ class APIRequestHandler(BaseHTTPRequestHandler):
         Expected request format:
         {
             "message": "user message",
-            "max_tokens": 1024,
+            "max_tokens": 2000,
             "enable_reasoning": true,
             "enable_memory": true,
             "enable_safety": true,
@@ -1320,7 +1320,7 @@ class APIRequestHandler(BaseHTTPRequestHandler):
         client_ip = self.client_address[0] if self.client_address else "unknown"
         logger.info(f"Chat request from {client_ip}: {message[:QUERY_PREVIEW_LOG_LENGTH]}...")
         
-        max_tokens = data.get("max_tokens", 1024)
+        max_tokens = data.get("max_tokens", 2000)  # Increased default for diagnostics
         enable_reasoning = data.get("enable_reasoning", True)
         enable_memory = data.get("enable_memory", True)
         enable_safety = data.get("enable_safety", True)

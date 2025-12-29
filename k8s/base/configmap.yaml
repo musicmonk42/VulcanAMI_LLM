@@ -21,6 +21,7 @@ data:
   # LLM Configuration
   # Note: API keys should be set via Secrets, not ConfigMap
   # The OPENAI_API_KEY should be mounted from vulcanami-secrets
+  LLM_OPENAI_MAX_TOKENS: "2000"  # Increased for diagnostic purposes (was 1000)
   # Self-improvement settings (non-sensitive)
   ENABLE_SELF_IMPROVEMENT: "0"  # Set to "1" to enable
   INTRINSIC_DRIVES_ENABLED: "False"

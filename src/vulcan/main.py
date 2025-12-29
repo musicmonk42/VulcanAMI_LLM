@@ -313,8 +313,8 @@ class Settings(BaseSettings):
     llm_ensemble_min_confidence: float = Field(
         default=0.7, env="LLM_ENSEMBLE_MIN_CONFIDENCE"
     )
-    # Maximum tokens for OpenAI API calls
-    llm_openai_max_tokens: int = Field(default=1000, env="LLM_OPENAI_MAX_TOKENS")
+    # Maximum tokens for OpenAI API calls (increased to 2000 for diagnostic purposes)
+    llm_openai_max_tokens: int = Field(default=2000, env="LLM_OPENAI_MAX_TOKENS")
 
     # Knowledge Distillation Configuration
     # When enabled, captures OpenAI responses and uses them to train Vulcan's local LLM
@@ -3729,7 +3729,7 @@ class UnifiedChatRequest(BaseModel):
     """Request model for unified chat that leverages entire platform."""
 
     message: str
-    max_tokens: int = 1024
+    max_tokens: int = 2000  # Increased for diagnostic purposes (was 1024)
     history: List[Dict[str, str]] = []
     # These are handled automatically but can be overridden
     enable_reasoning: bool = True

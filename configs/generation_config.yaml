@@ -13,7 +13,7 @@ generation:
   allow_repetition: false   # Whether to allow repeated tokens
   
   # Generation limits
-  max_tokens: 512           # Maximum tokens to generate
+  max_tokens: 2000          # Maximum tokens to generate (increased for diagnostic purposes)
   min_tokens: 1             # Minimum tokens to generate
   
   # Stopping conditions

@@ -118,7 +118,7 @@ class HybridLLMExecutor:
         mode: str = "parallel",
         timeout: float = 30.0,
         ensemble_min_confidence: float = 0.7,
-        openai_max_tokens: int = 1000,
+        openai_max_tokens: int = 2000,  # Increased for diagnostic purposes
     ):
         """
         Initialize the hybrid executor.

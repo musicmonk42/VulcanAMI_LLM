@@ -209,7 +209,7 @@ class ChatRequest(BaseModel):
     """Chat request model matching vulcan_chat.html frontend expectations."""
 
     message: str = Field(..., description="User's message/question")
-    max_tokens: int = Field(default=1024, description="Maximum tokens in response")
+    max_tokens: int = Field(default=2000, description="Maximum tokens in response (increased for diagnostics)")
     enable_reasoning: bool = Field(default=True, description="Enable unified reasoning")
     enable_memory: bool = Field(default=True, description="Enable memory retrieval")
     enable_safety: bool = Field(default=True, description="Enable safety validation")
