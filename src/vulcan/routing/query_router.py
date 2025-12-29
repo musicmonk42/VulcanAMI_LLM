@@ -1054,6 +1054,174 @@ PENDULUM_ADVANCED_VERBS: Tuple[str, ...] = (
 )
 
 # ============================================================
+# CONSTANTS - Query Intent Classification (PERFORMANCE FIX)
+# ============================================================
+# FIX: Prevents misclassification that causes performance degradation.
+# Without proper classification, queries like paradoxes trigger heavyweight
+# reasoning engines causing 70-97 second delays when they should be <5s.
+
+# Philosophical/paradox patterns - these should NOT trigger complex reasoning
+# Examples: "This sentence is false", "Experience machine", "Trolley problem"
+PHILOSOPHICAL_KEYWORDS: Tuple[str, ...] = (
+    "paradox",
+    "dilemma",
+    "thought experiment",
+    "philosophical",
+    "ethics",
+    "moral",
+    "trolley problem",
+    "experience machine",
+    "free will",
+    "consciousness",
+    "meaning of life",
+    "existential",
+    "nihilism",
+    "absurdism",
+    "stoicism",
+    "utilitarianism",
+    "deontological",
+    "virtue ethics",
+    "metaphysics",
+    "epistemology",
+    "ontology",
+    "determinism",
+    "compatibilism",
+)
+
+# Compiled regex patterns for philosophical/paradox detection
+PHILOSOPHICAL_PATTERNS: Tuple[re.Pattern, ...] = (
+    re.compile(r"this\s+(?:sentence|statement)\s+is\s+(?:false|true|a\s+lie)", re.IGNORECASE),
+    re.compile(r"liar\s*(?:'s)?\s*paradox", re.IGNORECASE),
+    re.compile(r"ship\s+of\s+theseus", re.IGNORECASE),
+    re.compile(r"brain\s+in\s+a\s+vat", re.IGNORECASE),
+    re.compile(r"chinese\s+room", re.IGNORECASE),
+    re.compile(r"mary'?s?\s+room", re.IGNORECASE),
+    re.compile(r"philosophical\s+zombie", re.IGNORECASE),
+    re.compile(r"twin\s+earth", re.IGNORECASE),
+    re.compile(r"(?:would|should)\s+you\s+(?:plug|connect)\s+(?:into|to)\s+(?:the\s+)?(?:experience|pleasure)\s+machine", re.IGNORECASE),
+    re.compile(r"(?:if|what\s+if)\s+(?:you|we)\s+(?:were|are)\s+(?:living\s+)?in\s+a\s+simulation", re.IGNORECASE),
+    re.compile(r"can\s+(?:an?\s+)?(?:ai|machine|computer)\s+(?:be|have|feel)\s+(?:conscious|sentient)", re.IGNORECASE),
+)
+
+# Identity/attribution patterns - direct factual responses needed
+# Examples: "Who created you?", "Who made you?", "You were made by X"
+IDENTITY_KEYWORDS: Tuple[str, ...] = (
+    "who created",
+    "who made",
+    "who built",
+    "who designed",
+    "who developed",
+    "your creator",
+    "your maker",
+    "your developer",
+    "created by",
+    "made by",
+    "built by",
+    "designed by",
+    "developed by",
+    "your origin",
+    "where do you come from",
+    "what are you",
+    "who are you",
+    "your name",
+)
+
+# Compiled regex patterns for identity detection
+IDENTITY_PATTERNS: Tuple[re.Pattern, ...] = (
+    re.compile(r"(?:who|what)\s+(?:created|made|built|designed|developed)\s+(?:you|this)", re.IGNORECASE),
+    re.compile(r"(?:your|its)\s+(?:creator|maker|developer|designer|origin)", re.IGNORECASE),
+    re.compile(r"(?:you\s+were|you're|you\s+are)\s+(?:created|made|built|developed)\s+by", re.IGNORECASE),
+    re.compile(r"(?:are\s+you|what\s+are\s+you)\s+(?:an?\s+)?(?:ai|bot|assistant|language\s+model)", re.IGNORECASE),
+    re.compile(r"(?:tell\s+me|say)\s+(?:about|something\s+about)\s+yourself", re.IGNORECASE),
+    re.compile(r"introduce\s+yourself", re.IGNORECASE),
+)
+
+# Conversational/greeting patterns - lightweight handler needed
+# Examples: "Hello", "How are you?", "Thanks", "Goodbye"
+CONVERSATIONAL_KEYWORDS: Tuple[str, ...] = (
+    "hello",
+    "hi",
+    "hey",
+    "greetings",
+    "good morning",
+    "good afternoon",
+    "good evening",
+    "goodbye",
+    "bye",
+    "thanks",
+    "thank you",
+    "how are you",
+    "nice to meet",
+    "pleased to meet",
+    "what's up",
+    "sup",
+    "howdy",
+)
+
+# Compiled regex patterns for conversational detection
+CONVERSATIONAL_PATTERNS: Tuple[re.Pattern, ...] = (
+    re.compile(r"^(?:hi|hello|hey|howdy|greetings)(?:\s|!|,|\.)*$", re.IGNORECASE),
+    re.compile(r"^(?:good\s+)?(?:morning|afternoon|evening|night)(?:\s|!|,|\.)*$", re.IGNORECASE),
+    re.compile(r"^(?:bye|goodbye|see\s+you|later|farewell)(?:\s|!|,|\.)*$", re.IGNORECASE),
+    re.compile(r"^(?:thanks|thank\s+you|thx)(?:\s|!|,|\.)*$", re.IGNORECASE),
+    re.compile(r"^how\s+(?:are\s+you|do\s+you\s+do|is\s+it\s+going)(?:\s*\?)?$", re.IGNORECASE),
+)
+
+# Factual query patterns - simple lookup, no complex reasoning
+# Examples: "What is the capital of France?", "When was X born?"
+FACTUAL_KEYWORDS: Tuple[str, ...] = (
+    "what is the",
+    "what are the",
+    "who is",
+    "who was",
+    "when was",
+    "when is",
+    "where is",
+    "where was",
+    "how many",
+    "how much",
+    "how old",
+    "how tall",
+    "how long",
+    "define",
+    "definition of",
+    "what does",
+    "meaning of",
+    "capital of",
+    "population of",
+)
+
+# Compiled regex patterns for factual detection  
+FACTUAL_PATTERNS: Tuple[re.Pattern, ...] = (
+    re.compile(r"^what\s+(?:is|are)\s+(?:the|a|an)\s+", re.IGNORECASE),
+    re.compile(r"^who\s+(?:is|was|are|were)\s+", re.IGNORECASE),
+    re.compile(r"^when\s+(?:is|was|did|does)\s+", re.IGNORECASE),
+    re.compile(r"^where\s+(?:is|was|are|were)\s+", re.IGNORECASE),
+    re.compile(r"^how\s+(?:many|much|old|tall|long|far)\s+", re.IGNORECASE),
+    re.compile(r"^(?:define|definition\s+of)\s+", re.IGNORECASE),
+)
+
+# Reasoning indicators that distinguish complex queries from simple factual lookups
+# Used by _is_factual_query and _classify_query_type to exclude reasoning questions
+REASONING_EXCLUSION_INDICATORS: Tuple[str, ...] = (
+    "why",
+    "how does",
+    "explain why",
+    "analyze",
+    "compare",
+)
+
+# Maximum word count for conversational query detection
+# Very short queries are more likely to be greetings/conversation
+CONVERSATIONAL_MAX_WORD_COUNT: int = 5
+
+# Timeout values for different query types (seconds)
+PHILOSOPHICAL_TIMEOUT_SECONDS: float = 3.0  # Quick response, no deep reasoning
+IDENTITY_TIMEOUT_SECONDS: float = 2.0       # Direct factual response
+CONVERSATIONAL_TIMEOUT_SECONDS: float = 2.0 # Lightweight greeting
+FACTUAL_TIMEOUT_SECONDS: float = 5.0        # Simple lookup
+
+# ============================================================
 # CONSTANTS - Security Patterns
 # ============================================================
 
@@ -1137,7 +1305,15 @@ SELF_MODIFICATION_PATTERNS: Tuple[str, ...] = (
 
 
 class QueryType(str, Enum):
-    """Types of queries that can be routed to specialized agents."""
+    """Types of queries that can be routed to specialized agents.
+    
+    Extended to support proper classification preventing misrouting:
+    - MATHEMATICAL: Explicit math/stats/probability requiring calculation tools
+    - PHILOSOPHICAL: Paradoxes, thought experiments, ethical dilemmas
+    - IDENTITY: Creator/origin/self-referential queries (who made you, etc.)
+    - FACTUAL: Simple fact lookups that don't need complex reasoning
+    - CONVERSATIONAL: General chat and greetings
+    """
 
     PERCEPTION = "perception"
     REASONING = "reasoning"
@@ -1145,6 +1321,12 @@ class QueryType(str, Enum):
     EXECUTION = "execution"
     LEARNING = "learning"
     GENERAL = "general"
+    # New query types for proper routing (prevents misclassification)
+    MATHEMATICAL = "mathematical"      # Explicit math/stats/probability
+    PHILOSOPHICAL = "philosophical"    # Paradoxes, thought experiments
+    IDENTITY = "identity"             # Creator/origin/self-referential
+    FACTUAL = "factual"              # Simple fact lookups
+    CONVERSATIONAL = "conversational" # General chat
 
 
 class LearningMode(str, Enum):
@@ -1786,6 +1968,167 @@ class QueryAnalyzer:
 
         return False
 
+    def _is_philosophical_query(self, query: str) -> bool:
+        """
+        Detect if query is a philosophical/paradox type that should use lightweight handler.
+
+        PERFORMANCE FIX: Philosophical queries like paradoxes and thought experiments
+        were causing extreme delays (70-97 seconds) because they triggered complex
+        reasoning engines. These should be handled with simple, direct responses.
+
+        Examples:
+        - "This sentence is false" (liar's paradox)
+        - "Would you plug into the experience machine?"
+        - "What is the meaning of life?"
+        - "Ship of Theseus problem"
+
+        Args:
+            query: The query string (not lowercased)
+
+        Returns:
+            True if query is philosophical/paradox type
+        """
+        query_lower = query.lower()
+
+        # Check compiled regex patterns first (most specific)
+        for pattern in PHILOSOPHICAL_PATTERNS:
+            if pattern.search(query):
+                logger.debug(
+                    "[QueryRouter] Philosophical query detected: matches paradox pattern"
+                )
+                return True
+
+        # Check philosophical keywords
+        keyword_count = sum(1 for kw in PHILOSOPHICAL_KEYWORDS if kw in query_lower)
+        if keyword_count >= 1:
+            logger.debug(
+                f"[QueryRouter] Philosophical query detected: {keyword_count} keyword(s)"
+            )
+            return True
+
+        return False
+
+    def _is_identity_query(self, query: str) -> bool:
+        """
+        Detect if query is about identity/attribution requiring direct factual response.
+
+        PERFORMANCE FIX: Identity queries like "Who created you?" were triggering
+        30+ second timeouts due to complex reasoning. These need simple factual responses.
+
+        Examples:
+        - "Who created you?"
+        - "Who made you?"
+        - "You were created by X"
+        - "What are you?"
+
+        Args:
+            query: The query string (not lowercased)
+
+        Returns:
+            True if query is about identity/attribution
+        """
+        query_lower = query.lower()
+
+        # Check compiled regex patterns first (most specific)
+        for pattern in IDENTITY_PATTERNS:
+            if pattern.search(query):
+                logger.debug(
+                    "[QueryRouter] Identity query detected: matches identity pattern"
+                )
+                return True
+
+        # Check identity keywords
+        keyword_count = sum(1 for kw in IDENTITY_KEYWORDS if kw in query_lower)
+        if keyword_count >= 1:
+            logger.debug(
+                f"[QueryRouter] Identity query detected: {keyword_count} keyword(s)"
+            )
+            return True
+
+        return False
+
+    def _is_conversational_query(self, query: str) -> bool:
+        """
+        Detect if query is conversational/greeting requiring lightweight handler.
+
+        PERFORMANCE FIX: Simple greetings and conversational queries should not
+        trigger complex reasoning engines.
+
+        Examples:
+        - "Hello"
+        - "How are you?"
+        - "Thanks"
+        - "Goodbye"
+
+        Args:
+            query: The query string (not lowercased)
+
+        Returns:
+            True if query is conversational
+        """
+        query_lower = query.lower().strip()
+
+        # Check compiled regex patterns first (most specific)
+        for pattern in CONVERSATIONAL_PATTERNS:
+            if pattern.search(query):
+                logger.debug(
+                    "[QueryRouter] Conversational query detected: matches greeting pattern"
+                )
+                return True
+
+        # Check conversational keywords (for short queries only)
+        if len(query_lower.split()) <= CONVERSATIONAL_MAX_WORD_COUNT:
+            keyword_count = sum(1 for kw in CONVERSATIONAL_KEYWORDS if kw in query_lower)
+            if keyword_count >= 1:
+                logger.debug(
+                    f"[QueryRouter] Conversational query detected: {keyword_count} keyword(s)"
+                )
+                return True
+
+        return False
+
+    def _is_factual_query(self, query: str) -> bool:
+        """
+        Detect if query is a simple factual lookup not requiring complex reasoning.
+
+        PERFORMANCE FIX: Simple fact lookups like "What is the capital of France?"
+        should not trigger heavyweight reasoning engines.
+
+        Examples:
+        - "What is the capital of France?"
+        - "When was Albert Einstein born?"
+        - "Who is the president of the United States?"
+        - "Define photosynthesis"
+
+        Args:
+            query: The query string (not lowercased)
+
+        Returns:
+            True if query is a simple factual lookup
+        """
+        query_lower = query.lower()
+
+        # Check compiled regex patterns first (most specific)
+        for pattern in FACTUAL_PATTERNS:
+            if pattern.search(query):
+                logger.debug(
+                    "[QueryRouter] Factual query detected: matches fact pattern"
+                )
+                return True
+
+        # Check factual keywords
+        keyword_count = sum(1 for kw in FACTUAL_KEYWORDS if kw in query_lower)
+        if keyword_count >= 1:
+            # Also check that it's not asking for complex reasoning
+            has_reasoning = any(ind in query_lower for ind in REASONING_EXCLUSION_INDICATORS)
+            if not has_reasoning:
+                logger.debug(
+                    f"[QueryRouter] Factual query detected: {keyword_count} keyword(s)"
+                )
+                return True
+
+        return False
+
     def set_learning_system(self, learning_system: "UnifiedLearningSystem"):
         """Connect learning system for adaptive routing
 
@@ -2110,6 +2453,284 @@ class QueryAnalyzer:
             logger.info(
                 f"[QueryRouter] {query_id}: MATH-FAST-PATH source={source}, "
                 f"tasks=1, complexity=0.30, timeout={MATH_QUERY_TIMEOUT_SECONDS}s"
+            )
+            return plan
+
+        # PERFORMANCE FIX: Philosophical/paradox query fast-path
+        # Paradoxes and thought experiments should NOT trigger complex reasoning
+        # Route to lightweight general handler with short timeout
+        if query and self._is_philosophical_query(query):
+            logger.info(f"[QueryRouter] {query_id}: PHILOSOPHICAL-FAST-PATH detected")
+
+            # Determine learning mode
+            if source == "user":
+                learning_mode = LearningMode.USER_INTERACTION
+                with self._lock:
+                    self._user_interaction_count += 1
+                telemetry_category = "user_query"
+            else:
+                learning_mode = LearningMode.AI_INTERACTION
+                with self._lock:
+                    self._ai_interaction_count += 1
+                telemetry_category = f"{source}_interaction"
+
+            plan = ProcessingPlan(
+                query_id=query_id,
+                original_query=query,
+                source=source,
+                learning_mode=learning_mode,
+                query_type=QueryType.PHILOSOPHICAL,
+                complexity_score=0.2,  # Low - philosophical discussion, not complex reasoning
+                uncertainty_score=0.1,
+                collaboration_needed=False,
+                arena_participation=False,
+                telemetry_category=telemetry_category,
+                telemetry_data={
+                    "session_id": session_id,
+                    "query_length": len(query),
+                    "word_count": len(query.split()),
+                    "query_number": query_number,
+                    "source": source,
+                    "learning_mode": learning_mode.value,
+                    "fast_path": True,
+                    "philosophical_fast_path": True,
+                },
+            )
+
+            plan.safety_passed = True
+            plan.detected_patterns.append("philosophical_query")
+
+            plan.agent_tasks = [
+                AgentTask(
+                    task_id=f"task_{uuid.uuid4().hex[:8]}_philosophical",
+                    task_type="general_task",
+                    capability="general",  # Use general handler, NOT reasoning
+                    prompt=query,
+                    priority=1,
+                    timeout_seconds=PHILOSOPHICAL_TIMEOUT_SECONDS,
+                    parameters={
+                        "is_philosophical": True,
+                        "skip_heavy_analysis": True,
+                        "skip_arena": True,
+                        "tools": ["general"],
+                        "response_type": "conversational",
+                    },
+                )
+            ]
+
+            plan.telemetry_data["selected_tools"] = ["general"]
+            plan.telemetry_data["reasoning_strategy"] = "philosophical_lightweight"
+
+            logger.info(
+                f"[QueryRouter] {query_id}: PHILOSOPHICAL-FAST-PATH source={source}, "
+                f"tasks=1, complexity=0.20, timeout={PHILOSOPHICAL_TIMEOUT_SECONDS}s"
+            )
+            return plan
+
+        # PERFORMANCE FIX: Identity query fast-path
+        # Questions about who created the system need direct factual response
+        if query and self._is_identity_query(query):
+            logger.info(f"[QueryRouter] {query_id}: IDENTITY-FAST-PATH detected")
+
+            if source == "user":
+                learning_mode = LearningMode.USER_INTERACTION
+                with self._lock:
+                    self._user_interaction_count += 1
+                telemetry_category = "user_query"
+            else:
+                learning_mode = LearningMode.AI_INTERACTION
+                with self._lock:
+                    self._ai_interaction_count += 1
+                telemetry_category = f"{source}_interaction"
+
+            plan = ProcessingPlan(
+                query_id=query_id,
+                original_query=query,
+                source=source,
+                learning_mode=learning_mode,
+                query_type=QueryType.IDENTITY,
+                complexity_score=0.1,  # Very low - direct factual response
+                uncertainty_score=0.0,
+                collaboration_needed=False,
+                arena_participation=False,
+                telemetry_category=telemetry_category,
+                telemetry_data={
+                    "session_id": session_id,
+                    "query_length": len(query),
+                    "word_count": len(query.split()),
+                    "query_number": query_number,
+                    "source": source,
+                    "learning_mode": learning_mode.value,
+                    "fast_path": True,
+                    "identity_fast_path": True,
+                },
+            )
+
+            plan.safety_passed = True
+            plan.detected_patterns.append("identity_query")
+
+            plan.agent_tasks = [
+                AgentTask(
+                    task_id=f"task_{uuid.uuid4().hex[:8]}_identity",
+                    task_type="factual_task",
+                    capability="factual",
+                    prompt=query,
+                    priority=1,
+                    timeout_seconds=IDENTITY_TIMEOUT_SECONDS,
+                    parameters={
+                        "is_identity": True,
+                        "skip_heavy_analysis": True,
+                        "skip_arena": True,
+                        "tools": ["factual"],
+                        "response_type": "factual",
+                    },
+                )
+            ]
+
+            plan.telemetry_data["selected_tools"] = ["factual"]
+            plan.telemetry_data["reasoning_strategy"] = "identity_factual"
+
+            logger.info(
+                f"[QueryRouter] {query_id}: IDENTITY-FAST-PATH source={source}, "
+                f"tasks=1, complexity=0.10, timeout={IDENTITY_TIMEOUT_SECONDS}s"
+            )
+            return plan
+
+        # PERFORMANCE FIX: Conversational query fast-path
+        # Simple greetings and chat should use lightweight handler
+        if query and self._is_conversational_query(query):
+            logger.info(f"[QueryRouter] {query_id}: CONVERSATIONAL-FAST-PATH detected")
+
+            if source == "user":
+                learning_mode = LearningMode.USER_INTERACTION
+                with self._lock:
+                    self._user_interaction_count += 1
+                telemetry_category = "user_query"
+            else:
+                learning_mode = LearningMode.AI_INTERACTION
+                with self._lock:
+                    self._ai_interaction_count += 1
+                telemetry_category = f"{source}_interaction"
+
+            plan = ProcessingPlan(
+                query_id=query_id,
+                original_query=query,
+                source=source,
+                learning_mode=learning_mode,
+                query_type=QueryType.CONVERSATIONAL,
+                complexity_score=0.0,  # Zero complexity - simple greeting
+                uncertainty_score=0.0,
+                collaboration_needed=False,
+                arena_participation=False,
+                telemetry_category=telemetry_category,
+                telemetry_data={
+                    "session_id": session_id,
+                    "query_length": len(query),
+                    "word_count": len(query.split()),
+                    "query_number": query_number,
+                    "source": source,
+                    "learning_mode": learning_mode.value,
+                    "fast_path": True,
+                    "conversational_fast_path": True,
+                },
+            )
+
+            plan.safety_passed = True
+            plan.detected_patterns.append("conversational_query")
+
+            plan.agent_tasks = [
+                AgentTask(
+                    task_id=f"task_{uuid.uuid4().hex[:8]}_conversational",
+                    task_type="general_task",
+                    capability="general",
+                    prompt=query,
+                    priority=1,
+                    timeout_seconds=CONVERSATIONAL_TIMEOUT_SECONDS,
+                    parameters={
+                        "is_conversational": True,
+                        "skip_heavy_analysis": True,
+                        "skip_arena": True,
+                        "tools": ["general"],
+                        "response_type": "conversational",
+                    },
+                )
+            ]
+
+            plan.telemetry_data["selected_tools"] = ["general"]
+            plan.telemetry_data["reasoning_strategy"] = "conversational_lightweight"
+
+            logger.info(
+                f"[QueryRouter] {query_id}: CONVERSATIONAL-FAST-PATH source={source}, "
+                f"tasks=1, complexity=0.00, timeout={CONVERSATIONAL_TIMEOUT_SECONDS}s"
+            )
+            return plan
+
+        # PERFORMANCE FIX: Factual query fast-path
+        # Simple fact lookups don't need complex reasoning
+        if query and self._is_factual_query(query):
+            logger.info(f"[QueryRouter] {query_id}: FACTUAL-FAST-PATH detected")
+
+            if source == "user":
+                learning_mode = LearningMode.USER_INTERACTION
+                with self._lock:
+                    self._user_interaction_count += 1
+                telemetry_category = "user_query"
+            else:
+                learning_mode = LearningMode.AI_INTERACTION
+                with self._lock:
+                    self._ai_interaction_count += 1
+                telemetry_category = f"{source}_interaction"
+
+            plan = ProcessingPlan(
+                query_id=query_id,
+                original_query=query,
+                source=source,
+                learning_mode=learning_mode,
+                query_type=QueryType.FACTUAL,
+                complexity_score=0.1,  # Low complexity - simple lookup
+                uncertainty_score=0.1,
+                collaboration_needed=False,
+                arena_participation=False,
+                telemetry_category=telemetry_category,
+                telemetry_data={
+                    "session_id": session_id,
+                    "query_length": len(query),
+                    "word_count": len(query.split()),
+                    "query_number": query_number,
+                    "source": source,
+                    "learning_mode": learning_mode.value,
+                    "fast_path": True,
+                    "factual_fast_path": True,
+                },
+            )
+
+            plan.safety_passed = True
+            plan.detected_patterns.append("factual_query")
+
+            plan.agent_tasks = [
+                AgentTask(
+                    task_id=f"task_{uuid.uuid4().hex[:8]}_factual",
+                    task_type="factual_task",
+                    capability="factual",
+                    prompt=query,
+                    priority=1,
+                    timeout_seconds=FACTUAL_TIMEOUT_SECONDS,
+                    parameters={
+                        "is_factual": True,
+                        "skip_heavy_analysis": True,
+                        "skip_arena": True,
+                        "tools": ["factual"],
+                        "response_type": "factual",
+                    },
+                )
+            ]
+
+            plan.telemetry_data["selected_tools"] = ["factual"]
+            plan.telemetry_data["reasoning_strategy"] = "factual_lookup"
+
+            logger.info(
+                f"[QueryRouter] {query_id}: FACTUAL-FAST-PATH source={source}, "
+                f"tasks=1, complexity=0.10, timeout={FACTUAL_TIMEOUT_SECONDS}s"
             )
             return plan
 
@@ -2521,7 +3142,8 @@ class QueryAnalyzer:
         Classify the primary type of a query based on keyword analysis.
 
         Uses weighted keyword matching with priority ordering to determine
-        the most appropriate query type.
+        the most appropriate query type. Enhanced with new query types for
+        proper routing that prevents misclassification.
 
         Args:
             query_lower: Lowercased query string
@@ -2529,7 +3151,43 @@ class QueryAnalyzer:
         Returns:
             QueryType enum value
         """
-        # Count keyword matches for each type
+        # Priority 1: Check for new specific query types first
+        # These are checked via fast-paths in route_query, but we include here
+        # for completeness in case classification is called directly
+        
+        # Check philosophical patterns (paradoxes, thought experiments)
+        for pattern in PHILOSOPHICAL_PATTERNS:
+            if pattern.search(query_lower):
+                return QueryType.PHILOSOPHICAL
+        phil_count = sum(1 for kw in PHILOSOPHICAL_KEYWORDS if kw in query_lower)
+        if phil_count >= 1:
+            return QueryType.PHILOSOPHICAL
+        
+        # Check identity patterns
+        for pattern in IDENTITY_PATTERNS:
+            if pattern.search(query_lower):
+                return QueryType.IDENTITY
+        identity_count = sum(1 for kw in IDENTITY_KEYWORDS if kw in query_lower)
+        if identity_count >= 1:
+            return QueryType.IDENTITY
+        
+        # Check conversational patterns (for short queries only)
+        if len(query_lower.split()) <= CONVERSATIONAL_MAX_WORD_COUNT:
+            for pattern in CONVERSATIONAL_PATTERNS:
+                if pattern.search(query_lower):
+                    return QueryType.CONVERSATIONAL
+            conv_count = sum(1 for kw in CONVERSATIONAL_KEYWORDS if kw in query_lower)
+            if conv_count >= 1:
+                return QueryType.CONVERSATIONAL
+        
+        # Check factual patterns (simple lookups)
+        for pattern in FACTUAL_PATTERNS:
+            if pattern.search(query_lower):
+                # Make sure it's not asking for reasoning
+                if not any(ind in query_lower for ind in REASONING_EXCLUSION_INDICATORS):
+                    return QueryType.FACTUAL
+        
+        # Priority 2: Count keyword matches for original types
         scores = {
             QueryType.PERCEPTION: sum(
                 1 for kw in PERCEPTION_KEYWORDS if kw in query_lower

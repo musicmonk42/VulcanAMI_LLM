@@ -145,6 +145,27 @@ TOOL_DESCRIPTIONS = {
         chart, graph, table, figure, document, PDF, screenshot, see, look,
         describe, analyze, what is this, uploaded, attached, file, scan, read
     """,
+    "general": """
+        General-purpose handler for lightweight queries that don't need complex reasoning.
+        
+        USE THIS TOOL FOR:
+        - Simple greetings and conversational exchanges
+        - Identity/attribution queries (who created this, what are you)
+        - Philosophical paradoxes and thought experiments (no deep analysis needed)
+        - Simple factual lookups that don't require reasoning
+        - Acknowledging user input (thanks, okay, goodbye)
+        - Meta-questions about the system itself
+        
+        BYPASS COMPLEX REASONING FOR:
+        - Paradoxes like "This sentence is false" (direct response, no logic solving)
+        - Greetings like "Hello", "How are you?"
+        - Identity queries like "Who made you?", "Who created you?"
+        - Simple facts like "What is the capital of France?"
+        
+        TRIGGER KEYWORDS: hello, hi, hey, thanks, goodbye, who created, who made,
+        what are you, paradox, this sentence is false, greeting, conversation,
+        simple, basic, general, help
+    """,
 }
 
 
@@ -433,6 +454,64 @@ TOOL_KEYWORDS = {
         "this file",
         "the file",
         "this document",
+    ],
+    # PERFORMANCE FIX: General/lightweight tool for simple queries
+    # These queries should bypass complex reasoning entirely
+    "general": [
+        # Greetings and conversational
+        "hello",
+        "hi",
+        "hey",
+        "howdy",
+        "greetings",
+        "good morning",
+        "good afternoon",
+        "good evening",
+        "thanks",
+        "thank you",
+        "goodbye",
+        "bye",
+        "okay",
+        "ok",
+        "sure",
+        "yes",
+        "no",
+        "please",
+        "sorry",
+        # Identity/attribution patterns
+        "who created",
+        "who made",
+        "who built",
+        "who designed",
+        "who developed",
+        "your creator",
+        "your maker",
+        "created by",
+        "made by",
+        "what are you",
+        "who are you",
+        "introduce yourself",
+        "tell me about yourself",
+        # Philosophical paradoxes (should NOT use complex reasoning)
+        "paradox",
+        "this sentence is false",
+        "liar paradox",
+        "ship of theseus",
+        "brain in a vat",
+        "experience machine",
+        "thought experiment",
+        "philosophical",
+        "dilemma",
+        # Simple acknowledgments
+        "i see",
+        "got it",
+        "understood",
+        "makes sense",
+        "interesting",
+        "cool",
+        "nice",
+        "great",
+        "awesome",
     ],
 }
 
