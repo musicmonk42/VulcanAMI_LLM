@@ -462,7 +462,7 @@ class EmbeddingCache:
             old_hits = self._hits
             old_misses = self._misses
             
-            # Clear cache and reset statistics (same as clear() but under single lock)
+            # Clear cache and reset statistics (inline to ensure single lock scope)
             self._cache.clear()
             self._hits = 0
             self._misses = 0
