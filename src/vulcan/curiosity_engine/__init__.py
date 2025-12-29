@@ -281,6 +281,53 @@ except ImportError as e:
     cleanup_old_outcomes = None
     OutcomeStatistics = None
 
+# SQLite resolution bridge for cross-process gap resolution state (Bug #1 & #2 Fix)
+try:
+    from .resolution_bridge import (
+        is_gap_resolved,
+        mark_gap_resolved as persistent_mark_gap_resolved,
+        clear_gap_resolution,
+        get_gap_attempts,
+        increment_gap_attempts,
+        reset_gap_attempts,
+        record_resolution_history,
+        get_recent_resolutions_count,
+        is_phantom_resolution,
+        get_experiment_count,
+        increment_experiment_count,
+        get_all_counters,
+        get_all_resolved_gaps,
+        get_resolution_statistics,
+        cleanup_old_data as cleanup_old_resolutions,
+        reset_database as reset_resolution_database,
+        ResolutionRecord,
+        ResolutionStatistics,
+        ResolutionStatus,
+    )
+    RESOLUTION_BRIDGE_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"Resolution bridge not available: {e}")
+    RESOLUTION_BRIDGE_AVAILABLE = False
+    is_gap_resolved = None
+    persistent_mark_gap_resolved = None
+    clear_gap_resolution = None
+    get_gap_attempts = None
+    increment_gap_attempts = None
+    reset_gap_attempts = None
+    record_resolution_history = None
+    get_recent_resolutions_count = None
+    is_phantom_resolution = None
+    get_experiment_count = None
+    increment_experiment_count = None
+    get_all_counters = None
+    get_all_resolved_gaps = None
+    get_resolution_statistics = None
+    cleanup_old_resolutions = None
+    reset_resolution_database = None
+    ResolutionRecord = None
+    ResolutionStatistics = None
+    ResolutionStatus = None
+
 __all__ = [
     # Core Engine
     "CuriosityEngine",
@@ -383,6 +430,27 @@ __all__ = [
     "cleanup_old_outcomes",
     "OutcomeStatistics",
     "OUTCOME_BRIDGE_AVAILABLE",
+    # Resolution Bridge (Bug #1 & #2 Fix: Phantom Resolution Loop, Cold Start)
+    "is_gap_resolved",
+    "persistent_mark_gap_resolved",
+    "clear_gap_resolution",
+    "get_gap_attempts",
+    "increment_gap_attempts",
+    "reset_gap_attempts",
+    "record_resolution_history",
+    "get_recent_resolutions_count",
+    "is_phantom_resolution",
+    "get_experiment_count",
+    "increment_experiment_count",
+    "get_all_counters",
+    "get_all_resolved_gaps",
+    "get_resolution_statistics",
+    "cleanup_old_resolutions",
+    "reset_resolution_database",
+    "ResolutionRecord",
+    "ResolutionStatistics",
+    "ResolutionStatus",
+    "RESOLUTION_BRIDGE_AVAILABLE",
     # Availability Flags
     "CURIOSITY_ENGINE_AVAILABLE",
     "GAP_ANALYZER_AVAILABLE",

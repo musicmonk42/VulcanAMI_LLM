@@ -27,6 +27,21 @@ from .exploration_budget import DynamicBudget, ResourceMonitor
 # Import other curiosity_engine components
 from .gap_analyzer import GapAnalyzer, KnowledgeGap
 
+# FIX: Import resolution_bridge for cross-process state persistence
+# This fixes Bug #1 (Phantom Resolution Loop) and Bug #2 (Cold Start Always Triggered)
+from .resolution_bridge import (
+    is_gap_resolved as _persistent_is_gap_resolved,
+    mark_gap_resolved as _persistent_mark_gap_resolved,
+    get_gap_attempts as _persistent_get_gap_attempts,
+    increment_gap_attempts as _persistent_increment_gap_attempts,
+    reset_gap_attempts as _persistent_reset_gap_attempts,
+    record_resolution_history as _persistent_record_resolution_history,
+    get_recent_resolutions_count as _persistent_get_recent_resolutions_count,
+    is_phantom_resolution as _persistent_is_phantom_resolution,
+    get_experiment_count as _persistent_get_experiment_count,
+    increment_experiment_count as _persistent_increment_experiment_count,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -1562,7 +1577,7 @@ class CuriosityEngine:
             domain = getattr(gap, 'domain', 'general')
         return f"{gap_type}:{domain}"
     
-    def mark_gap_resolved(self, gap: Union[KnowledgeGap, Dict], success: bool = True) -> None:
+    def mark_gap_resolved(self, gap: Union[KnowledgeGap, Dict], success: bool = True, cycle_id: Optional[int] = None) -> None:
         """Mark a gap as resolved after successful experiment.
         
         BUG #4 FIX: Ensures gaps don't accumulate forever by tracking
@@ -1573,14 +1588,28 @@ class CuriosityEngine:
         Gaps marked as resolved (regardless of success) will be filtered out
         for the cooldown period, and attempts will be reset.
         
+        BUG #1 FIX (Phantom Resolution Loop): Now persists resolution state to SQLite
+        via resolution_bridge, so resolutions survive subprocess restarts.
+        
         Args:
             gap: The gap to mark as resolved
             success: Whether resolution was successful (default True)
+            cycle_id: Optional learning cycle ID for tracking (default None)
         """
         key = self._gap_key(gap)
         current_time = time.time()
         
-        # FIX Issue #13: Track resolution history for phantom detection
+        # FIX Bug #1: Persist to SQLite for cross-process visibility
+        # This ensures subprocesses know about resolutions from previous cycles
+        try:
+            _persistent_mark_gap_resolved(key, success=success)
+            _persistent_record_resolution_history(key, success=success, cycle_id=cycle_id)
+            if not success:
+                _persistent_reset_gap_attempts(key)
+        except Exception as e:
+            logger.debug(f"[CuriosityEngine] Could not persist resolution to SQLite: {e}")
+        
+        # FIX Issue #13: Track resolution history for phantom detection (in-memory cache)
         if key not in self._gap_resolution_history:
             self._gap_resolution_history[key] = []
         self._gap_resolution_history[key].append((current_time, success))
@@ -1600,8 +1629,12 @@ class CuriosityEngine:
         if key in self._gap_attempts:
             del self._gap_attempts[key]
         
-        # FIX Issue #13: Log warning if this gap keeps getting "resolved"
-        recent_resolutions = len(self._gap_resolution_history[key])
+        # FIX Issue #13: Check for phantom resolution pattern (from persistent storage)
+        try:
+            recent_resolutions = _persistent_get_recent_resolutions_count(key)
+        except Exception:
+            recent_resolutions = len(self._gap_resolution_history[key])
+        
         if recent_resolutions >= self.PHANTOM_RESOLUTION_THRESHOLD:
             logger.warning(
                 f"[CuriosityEngine] PHANTOM RESOLUTION: Gap {key} 'resolved' {recent_resolutions}x "
@@ -1695,10 +1728,9 @@ class CuriosityEngine:
         BUG #14 FIX: Resolved gaps now have a TTL - they can be re-detected
         after GAP_RESOLUTION_TTL_SECONDS (30 min) if the underlying issue persists.
         
-        FIX: Phantom Resolution Loop - Gaps that have been "resolved" 3+ times in the
-        last hour get a much longer cooldown (1 hour) to prevent the 67x/hour loop.
-        Previously the code kept these gaps for "investigation" but that caused
-        them to be re-resolved repeatedly.
+        FIX Bug #1 (Phantom Resolution Loop): Now checks SQLite for resolved gaps
+        via resolution_bridge, so subprocess instances know about resolutions from
+        previous cycles. This prevents gaps being "resolved" 40-90 times per hour.
         
         Performance: Expired gap cleanup is rate-limited to every RESOLUTION_CLEANUP_INTERVAL
         seconds to avoid overhead on every call.
@@ -1730,9 +1762,21 @@ class CuriosityEngine:
             gap_type = getattr(gap, 'type', 'unknown')
             domain = getattr(gap, 'domain', 'general')
             
-            # FIX: Phantom Resolution Loop - check for gaps that keep getting "resolved"
-            # These gaps need a LONGER cooldown, not to be kept for more experiments
-            recent_resolution_count = self._count_recent_resolutions(gap_type, domain, minutes=60)
+            # FIX Bug #1: Check persistent storage FIRST for cross-process resolution state
+            # This ensures subprocesses know about resolutions from previous cycles
+            try:
+                if _persistent_is_gap_resolved(key, ttl_seconds=self.GAP_RESOLUTION_TTL_SECONDS):
+                    logger.debug(f"[CuriosityEngine] Gap {key} is resolved in persistent storage, skipping")
+                    continue
+            except Exception:
+                pass  # Fall through to in-memory check
+            
+            # FIX Bug #1: Check for phantom resolution pattern from persistent storage
+            try:
+                recent_resolution_count = _persistent_get_recent_resolutions_count(key)
+            except Exception:
+                recent_resolution_count = self._count_recent_resolutions(gap_type, domain, minutes=60)
+            
             if recent_resolution_count >= self.PHANTOM_RESOLUTION_THRESHOLD:
                 # Apply extended cooldown for phantom resolutions
                 last_seen = self._gap_last_seen.get(key, 0)
@@ -1748,7 +1792,7 @@ class CuriosityEngine:
                     f"allowing through after {recent_resolution_count}x resolutions"
                 )
             
-            # Skip if resolved (and not expired)
+            # Skip if resolved in in-memory cache (and not expired)
             if key in self._resolved_gaps:
                 continue
             
@@ -2203,27 +2247,50 @@ class CuriosityEngine:
                         result = self.run_experiment_sandboxed(exp)
                         results.append(result)
                         experiments_run += 1
+                        
+                        # FIX Bug #2: Persist experiment count to SQLite
+                        # This prevents false cold-start detection in subprocesses
+                        try:
+                            _persistent_increment_experiment_count("total_experiments", 1)
+                        except Exception:
+                            pass
+                
+                # FIX Bug #2: Check persistent experiment count for cold start detection
+                # Subprocesses should check SQLite to see if any experiments were ever run
+                try:
+                    persistent_experiment_count = _persistent_get_experiment_count("total_experiments")
+                except Exception:
+                    persistent_experiment_count = 0
                 
                 # ISSUE #3 FIX: Generate bootstrap experiments when:
-                # 1. No experiments ran at all (true cold start), OR
+                # 1. No experiments ran at all in THIS cycle AND no persistent history, OR
                 # 2. Very few experiments ran and we had no initial priorities
-                # This ensures the learning system makes progress even without ingested data
+                # FIX Bug #2: Also consider persistent experiment count to avoid false cold start
+                is_true_cold_start = (
+                    experiments_run == 0 and 
+                    persistent_experiment_count == 0
+                )
                 needs_bootstrap = (
-                    experiments_run == 0 or 
-                    (experiments_run < 2 and not had_initial_priorities)
+                    is_true_cold_start or 
+                    (experiments_run < 2 and not had_initial_priorities and persistent_experiment_count < 5)
                 )
                 if needs_bootstrap:
                     remaining_slots = max_experiments - experiments_run
                     if remaining_slots > 0:
                         logger.info(
-                            f"[CuriosityEngine] Cold start detected (ran {experiments_run}/{max_experiments}) "
-                            f"- generating {remaining_slots} bootstrap experiments"
+                            f"[CuriosityEngine] Cold start detected (ran {experiments_run}/{max_experiments}, "
+                            f"persistent={persistent_experiment_count}) - generating {remaining_slots} bootstrap experiments"
                         )
                         bootstrap_experiments = self._generate_bootstrap_experiments(remaining_slots)
                         for exp in bootstrap_experiments[:remaining_slots]:
                             result = self.run_experiment_sandboxed(exp)
                             results.append(result)
                             experiments_run += 1
+                            # Persist bootstrap experiments too
+                            try:
+                                _persistent_increment_experiment_count("total_experiments", 1)
+                            except Exception:
+                                pass
 
                 # BUG FIX: Log summary of gaps that generated no experiments
                 if gaps_with_no_experiments > 0:
