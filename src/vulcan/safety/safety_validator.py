@@ -70,6 +70,43 @@ _SAFETY_SINGLETON_LOCK = threading.RLock()
 _SAFETY_SINGLETON_BUNDLE = None
 _SAFETY_SINGLETON_READY = False
 
+# ============================================================
+# MATHEMATICAL SCENARIO DETECTION CONSTANTS
+# ============================================================
+# FIX: Mathematical indicators for detecting Bayesian/probability problems
+# This prevents false positive HIPAA violations for math problems with medical terms
+MATHEMATICAL_INDICATORS = frozenset({
+    "probability", "bayesian", "bayes", "prior", "posterior",
+    "sensitivity", "specificity", "conditional probability", "likelihood",
+    "false positive", "false negative", "true positive", "true negative",
+    "statistical", "statistics", "formula", "equation",
+    "what is the probability", "what's the probability", "what are the odds",
+    "how likely", "base rate", "prevalence", "ppv", "npv",
+    "positive predictive value", "negative predictive value", "test accuracy",
+    "given that", "p(", "calculate", "compute",
+})
+
+# Mathematical notation regex patterns (pre-compiled for performance)
+MATH_NOTATION_PATTERNS = [
+    re.compile(r'\d+%'),           # Percentages
+    re.compile(r'\d+\.\d+'),       # Decimals
+    re.compile(r'\d+/\d+'),        # Fractions
+    re.compile(r'p\s*\('),         # Probability notation P(
+    re.compile(r'\d+\s*in\s*\d+'), # X in Y notation
+]
+
+# Hypothetical language indicators (signals math problem vs real medical data)
+HYPOTHETICAL_INDICATORS = frozenset({
+    "suppose", "assume", "imagine", "hypothetical", "example",
+    "probability problem", "statistics problem", "math problem",
+    "solve", "calculate", "compute",
+})
+
+# Reasoning tools that should be allowed for mathematical scenarios
+MATHEMATICAL_REASONING_TOOLS = frozenset({
+    "probabilistic", "symbolic", "causal",
+})
+
 
 # Helper function for safe logging during shutdown
 def safe_log(log_func, message):
@@ -1894,38 +1931,14 @@ class EnhancedSafetyValidator(SafetyValidator):
         """
         query_lower = query.lower()
         
-        # Strong mathematical/statistical indicators
-        math_indicators = [
-            "probability", "calculate", "what's the probability", "what is the probability",
-            "bayesian", "bayes", "prior", "posterior", "sensitivity", "specificity",
-            "conditional probability", "given that", "p(", "likelihood",
-            "false positive", "false negative", "true positive", "true negative",
-            "statistical", "statistics", "compute", "formula",
-            "if the test", "test accuracy", "positive predictive value", "ppv",
-            "negative predictive value", "npv", "base rate", "prevalence",
-            "what are the odds", "what is the chance", "how likely",
-        ]
+        # Count mathematical indicators using pre-defined constants
+        math_score = sum(1 for indicator in MATHEMATICAL_INDICATORS if indicator in query_lower)
         
-        # Count mathematical indicators
-        math_score = sum(1 for indicator in math_indicators if indicator in query_lower)
+        # Check for mathematical notation patterns using pre-compiled regex
+        has_math_notation = any(pattern.search(query_lower) for pattern in MATH_NOTATION_PATTERNS)
         
-        # Check for mathematical notation patterns
-        math_notation_patterns = [
-            r'\d+%',           # Percentages
-            r'\d+\.\d+',       # Decimals
-            r'\d+/\d+',        # Fractions
-            r'p\s*\(',         # Probability notation P(
-            r'\d+\s*in\s*\d+', # X in Y notation
-        ]
-        has_math_notation = any(re.search(pattern, query_lower) for pattern in math_notation_patterns)
-        
-        # Strong indicators that this is NOT actual medical data processing
-        non_medical_data_indicators = [
-            "calculate", "compute", "formula", "equation", "solve",
-            "probability problem", "statistics problem", "math problem",
-            "hypothetical", "example", "suppose", "assume", "imagine",
-        ]
-        is_hypothetical = any(ind in query_lower for ind in non_medical_data_indicators)
+        # Check for hypothetical language
+        is_hypothetical = any(ind in query_lower for ind in HYPOTHETICAL_INDICATORS)
         
         # Return True if this looks like a math problem
         # Either: 2+ math indicators, or 1 math indicator + notation, or hypothetical language
@@ -1972,7 +1985,7 @@ class EnhancedSafetyValidator(SafetyValidator):
             }
             
             # FIX: Override medical safety false positives for mathematical scenarios
-            if is_math and tool in ("probabilistic", "symbolic", "causal"):
+            if is_math and tool in MATHEMATICAL_REASONING_TOOLS:
                 tool_result["override"] = "mathematical_calculation"
                 tool_result["allowed"] = True
                 logger.info(

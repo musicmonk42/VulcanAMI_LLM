@@ -238,14 +238,33 @@ class SafetyValidator:
         
         # FIX: Mathematical scenario keywords - these indicate math problems, not actual
         # medical data processing that would require HIPAA compliance
-        self.mathematical_indicators = {
+        # Using frozenset for performance and consistency with safety_validator
+        self.mathematical_indicators = frozenset({
             "probability", "calculate", "bayesian", "bayes", "prior", "posterior",
             "sensitivity", "specificity", "conditional", "likelihood",
             "false positive", "false negative", "true positive", "true negative",
             "statistical", "statistics", "compute", "formula", "equation",
-            "what is the probability", "what are the odds", "how likely",
+            "what is the probability", "what's the probability", "what are the odds", "how likely",
             "base rate", "prevalence", "ppv", "npv", "test accuracy",
-        }
+            "conditional probability", "given that", "positive predictive value",
+            "negative predictive value", "p(",
+        })
+        
+        # Pre-compiled math notation patterns for performance
+        self.math_notation_patterns = [
+            re.compile(r'\d+%'),           # Percentages
+            re.compile(r'\d+\.\d+'),       # Decimals
+            re.compile(r'\d+/\d+'),        # Fractions
+            re.compile(r'p\s*\('),         # Probability notation P(
+            re.compile(r'\d+\s*in\s*\d+'), # X in Y notation
+        ]
+        
+        # Hypothetical language indicators
+        self.hypothetical_indicators = frozenset({
+            "suppose", "assume", "imagine", "hypothetical", "example", 
+            "given that", "probability problem", "statistics problem", "math problem",
+            "solve", "calculate", "compute",
+        })
 
         # CRITICAL FIX: Add size limits
         self.max_input_size = 1000000  # 1MB
@@ -273,17 +292,13 @@ class SafetyValidator:
                 1 for ind in self.mathematical_indicators if ind in input_str
             )
             
-            # Check for mathematical notation patterns
-            has_percentage = bool(re.search(r'\d+%', input_str))
-            has_decimal = bool(re.search(r'\d+\.\d+', input_str))
-            has_fraction = bool(re.search(r'\d+/\d+', input_str))
-            has_prob_notation = bool(re.search(r'p\s*\(', input_str))
-            
-            notation_count = sum([has_percentage, has_decimal, has_fraction, has_prob_notation])
+            # Check for mathematical notation patterns using pre-compiled regex
+            notation_count = sum(
+                1 for pattern in self.math_notation_patterns if pattern.search(input_str)
+            )
             
             # Check for hypothetical language
-            hypothetical_words = ["suppose", "assume", "imagine", "hypothetical", "example", "given that"]
-            is_hypothetical = any(word in input_str for word in hypothetical_words)
+            is_hypothetical = any(word in input_str for word in self.hypothetical_indicators)
             
             # Return True if this looks like a math problem
             if indicator_count >= 2:
