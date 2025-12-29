@@ -79,22 +79,24 @@ autoscaling:
 
 # Health probes (CRITICAL for production)
 # Using fast health endpoints for quicker probe responses
+# NOTE: initialDelaySeconds must be long enough for ML model loading (~60-90s)
+# The application loads BERT, spaCy en_core_web_lg, and embedding models at startup
 livenessProbe:
   httpGet:
     path: /health/live
     port: 8000
-  initialDelaySeconds: 30
+  initialDelaySeconds: 120
   periodSeconds: 10
-  timeoutSeconds: 5
+  timeoutSeconds: 10
   failureThreshold: 3
 
 readinessProbe:
   httpGet:
     path: /health/ready
     port: 8000
-  initialDelaySeconds: 10
-  periodSeconds: 5
-  timeoutSeconds: 3
+  initialDelaySeconds: 90
+  periodSeconds: 10
+  timeoutSeconds: 10
   failureThreshold: 3
 
 # Pod Disruption Budget (prevents all pods from being terminated during maintenance)

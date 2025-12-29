@@ -227,7 +227,9 @@ USER graphix
 
 # Healthcheck using curl (uses fast /health/live endpoint)
 # Uses PORT env var with default of 8000 if not set
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+# CRITICAL: start-period must be long enough for ML model loading (~60-90s)
+# The application loads BERT, spaCy, and other models during startup
+HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
     CMD curl -fsS http://localhost:${PORT:-8000}/health/live || exit 1
 
 # Entrypoint ensures runtime secrets are provided securely
