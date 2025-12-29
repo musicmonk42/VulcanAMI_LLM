@@ -992,6 +992,59 @@ def get_outcome_statistics(
         return default_stats
 
 
+def _deduplicate_outcomes(
+    outcomes: List[Dict[str, Any]],
+    log_level: str = "info"
+) -> List[Dict[str, Any]]:
+    """
+    Deduplicate outcomes by query_id.
+    
+    AUDIT FIX: Shared helper function to ensure consistent deduplication
+    behavior across all gap detection functions. This prevents the same
+    query from being counted multiple times.
+    
+    Behavior:
+    - Outcomes with unique query_id are kept (first occurrence wins)
+    - Outcomes with duplicate query_id are filtered out
+    - Outcomes with no query_id are included (legacy data compatibility)
+    
+    Args:
+        outcomes: List of outcome dictionaries to deduplicate
+        log_level: Logging level for deduplication messages ("info" or "debug")
+    
+    Returns:
+        List of unique outcomes (deduplicated by query_id)
+    """
+    seen_query_ids: set = set()
+    unique_outcomes: List[Dict[str, Any]] = []
+    duplicate_count = 0
+    
+    for o in outcomes:
+        query_id = o.get("query_id")
+        if query_id and query_id not in seen_query_ids:
+            seen_query_ids.add(query_id)
+            unique_outcomes.append(o)
+        elif query_id:
+            duplicate_count += 1
+        else:
+            # If no query_id, include it (legacy data compatibility)
+            # This allows backwards compatibility with old data that may
+            # not have query_ids while still deduplicating new data
+            unique_outcomes.append(o)
+    
+    if duplicate_count > 0:
+        message = (
+            f"{LOG_PREFIX} Deduplicated {duplicate_count} duplicate outcomes "
+            f"({len(unique_outcomes)} unique from {len(outcomes)} total)"
+        )
+        if log_level == "debug":
+            logger.debug(message)
+        else:
+            logger.info(message)
+    
+    return unique_outcomes
+
+
 def analyze_outcomes_for_gaps(
     outcomes: List[Dict[str, Any]]
 ) -> List[Dict[str, Any]]:
@@ -1041,30 +1094,9 @@ def analyze_outcomes_for_gaps(
     if not outcomes:
         return []
     
-    # AUDIT FIX: Deduplicate outcomes by query_id at the top level
-    # This prevents the same query from being counted multiple times across
-    # all gap detection functions. The deduplication is also done in
-    # _detect_error_rate_gaps for defense-in-depth.
-    seen_query_ids: set = set()
-    unique_outcomes: List[Dict[str, Any]] = []
-    duplicate_count = 0
-    
-    for o in outcomes:
-        query_id = o.get("query_id")
-        if query_id and query_id not in seen_query_ids:
-            seen_query_ids.add(query_id)
-            unique_outcomes.append(o)
-        elif query_id:
-            duplicate_count += 1
-        else:
-            # If no query_id, include it (legacy data)
-            unique_outcomes.append(o)
-    
-    if duplicate_count > 0:
-        logger.info(
-            f"{LOG_PREFIX} Deduplicated {duplicate_count} duplicate outcomes "
-            f"({len(unique_outcomes)} unique from {len(outcomes)} total)"
-        )
+    # AUDIT FIX: Deduplicate outcomes at the top level using shared helper
+    # All downstream functions receive already-deduplicated data
+    unique_outcomes = _deduplicate_outcomes(outcomes, log_level="info")
     
     gaps: List[Dict[str, Any]] = []
     
@@ -1175,8 +1207,11 @@ def _detect_error_rate_gaps(
     analogical, multimodal) are COMPLEMENTARY and produce different outputs BY DESIGN.
     Low consensus between paradigms is NOT an error.
     
+    Note: Deduplication is handled by the caller (analyze_outcomes_for_gaps),
+    so this function assumes outcomes are already deduplicated.
+    
     Args:
-        outcomes: List of outcome dictionaries
+        outcomes: List of outcome dictionaries (assumed to be pre-deduplicated)
     
     Returns:
         List of detected error rate gaps
@@ -1184,42 +1219,24 @@ def _detect_error_rate_gaps(
     if not outcomes:
         return []
     
-    # AUDIT FIX: Deduplicate outcomes by query_id to prevent counting same query multiple times
-    # This fixes the issue where the same failure is counted multiple times
-    seen_query_ids: set = set()
-    unique_outcomes: List[Dict[str, Any]] = []
-    for o in outcomes:
-        query_id = o.get("query_id")
-        if query_id and query_id not in seen_query_ids:
-            seen_query_ids.add(query_id)
-            unique_outcomes.append(o)
-        elif not query_id:
-            # If no query_id, include it but log a warning
-            unique_outcomes.append(o)
-    
-    if len(unique_outcomes) < len(outcomes):
-        logger.debug(
-            f"{LOG_PREFIX} Deduplicated {len(outcomes)} outcomes to {len(unique_outcomes)} unique"
-        )
-    
     # AUDIT FIX: Only count TRUE errors, not slow/low_confidence outcomes
     # "slow" and "low_confidence" are legitimate outcomes, not errors
+    # Note: Deduplication is handled by the caller (analyze_outcomes_for_gaps)
     true_errors = [
-        o for o in unique_outcomes 
+        o for o in outcomes 
         if o.get("status") in TRUE_ERROR_STATUSES
     ]
     
-    # AUDIT FIX: Use unique_outcomes for denominator to get accurate rate
-    error_rate = len(true_errors) / len(unique_outcomes) if unique_outcomes else 0.0
+    error_rate = len(true_errors) / len(outcomes) if outcomes else 0.0
     
     # Log classification breakdown for debugging
     status_counts: Dict[str, int] = {}
-    for o in unique_outcomes:
+    for o in outcomes:
         status = o.get("status", "unknown")
         status_counts[status] = status_counts.get(status, 0) + 1
     
     logger.debug(
-        f"{LOG_PREFIX} Outcome classification: total={len(unique_outcomes)}, "
+        f"{LOG_PREFIX} Outcome classification: total={len(outcomes)}, "
         f"true_errors={len(true_errors)}, error_rate={error_rate:.1%}, "
         f"breakdown={status_counts}"
     )
@@ -1236,7 +1253,7 @@ def _detect_error_rate_gaps(
     return [
         DetectedGap(
             gap_type=GapType.HIGH_ERROR_RATE.value,
-            description=f"{error_rate * 100:.1f}% true error rate ({len(true_errors)}/{len(unique_outcomes)} queries)",
+            description=f"{error_rate * 100:.1f}% true error rate ({len(true_errors)}/{len(outcomes)} queries)",
             severity=min(1.0, error_rate * 5),
             evidence=list(error_types.keys())[:5],
             suggested_action="Investigate error patterns (excludes slow/low_confidence outcomes)",
