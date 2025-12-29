@@ -45,6 +45,9 @@ from .self_improvement_drive import (
     FailureType,
     ImprovementObjective,
     SelfImprovementState,
+    CodeIntrospector,
+    LogAnalyzer,
+    CodeKnowledgeStore,
 )
 from .objective_hierarchy import (
     Objective,
@@ -370,6 +373,10 @@ __all__ = [
     "FailureType",
     "ImprovementObjective",
     "SelfImprovementState",
+    # Code introspection classes
+    "CodeIntrospector",
+    "LogAnalyzer",
+    "CodeKnowledgeStore",
     # Data structures - InternalCritic (Added)
     "Critique",
     "Evaluation",
