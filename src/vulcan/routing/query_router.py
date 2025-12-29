@@ -434,6 +434,24 @@ MATHEMATICAL_KEYWORDS: Tuple[str, ...] = (
 # Fast path timeout for mathematical queries (much shorter than general timeout)
 MATH_QUERY_TIMEOUT_SECONDS: float = 5.0  # 5 seconds target for math queries
 
+# Pre-compiled patterns for mathematical query detection (PERFORMANCE FIX)
+# Compiling these at module level avoids repeated compilation on each method call
+MATH_PROBABILITY_NOTATION_PATTERNS: Tuple[re.Pattern, ...] = (
+    re.compile(r'p\s*\('),           # P(
+    re.compile(r'\d+%'),             # percentages
+    re.compile(r'0\.\d+'),           # decimals like 0.95
+    re.compile(r'\d+/\d+'),          # fractions like 1/10
+    re.compile(r'\d+\s*in\s*\d+'),   # X in Y notation
+)
+
+MATH_CALCULATION_PATTERNS: Tuple[re.Pattern, ...] = (
+    re.compile(r'calculate\s+(?:the\s+)?(?:probability|percentage|mean|median|std)', re.IGNORECASE),
+    re.compile(r'what\s+is\s+(?:the\s+)?probability', re.IGNORECASE),
+    re.compile(r'what\s+are\s+the\s+odds', re.IGNORECASE),
+    re.compile(r'compute\s+(?:the\s+)?', re.IGNORECASE),
+    re.compile(r'solve\s+(?:the\s+)?(?:equation|formula)', re.IGNORECASE),
+)
+
 # ============================================================
 # CONSTANTS - Security Patterns
 # ============================================================
@@ -967,17 +985,10 @@ class QueryAnalyzer:
             )
             return True
         
-        # Check for probability notation patterns (e.g., P(A|B), 95%, 0.04)
-        probability_patterns = [
-            r'p\s*\(',           # P(
-            r'\d+%',             # percentages
-            r'0\.\d+',           # decimals like 0.95
-            r'\d+/\d+',          # fractions like 1/10
-            r'\d+\s*in\s*\d+',   # X in Y notation
-        ]
-        
+        # Check for probability notation patterns using pre-compiled regex
+        # (PERFORMANCE FIX: use module-level compiled patterns instead of re-compiling)
         has_prob_notation = any(
-            re.search(pattern, query_lower) for pattern in probability_patterns
+            pattern.search(query_lower) for pattern in MATH_PROBABILITY_NOTATION_PATTERNS
         )
         
         # Mathematical query if: 1 keyword + probability notation
@@ -985,17 +996,9 @@ class QueryAnalyzer:
             logger.debug("[QueryRouter] Mathematical query detected: keyword + notation")
             return True
         
-        # Check for explicit calculation requests
-        explicit_calc_patterns = [
-            r'calculate\s+(?:the\s+)?(?:probability|percentage|mean|median|std)',
-            r'what\s+is\s+(?:the\s+)?probability',
-            r'what\s+are\s+the\s+odds',
-            r'compute\s+(?:the\s+)?',
-            r'solve\s+(?:the\s+)?(?:equation|formula)',
-        ]
-        
-        for pattern in explicit_calc_patterns:
-            if re.search(pattern, query_lower):
+        # Check for explicit calculation requests using pre-compiled patterns
+        for pattern in MATH_CALCULATION_PATTERNS:
+            if pattern.search(query_lower):
                 logger.debug(f"[QueryRouter] Mathematical query detected: explicit calc pattern")
                 return True
         

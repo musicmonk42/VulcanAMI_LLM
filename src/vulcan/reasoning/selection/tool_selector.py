@@ -2283,21 +2283,30 @@ class ToolSelector:
                     # If verification detected an error and we have a correct value,
                     # update the result to use the corrected value instead of the wrong one.
                     # This ensures downstream consumers get the mathematically correct answer.
+                    #
+                    # THREAD-SAFETY FIX: Create a copy of the dictionary to avoid concurrent
+                    # modification issues. The correction is stored in metadata as well.
                     if verification_result.corrections and "correct_posterior" in verification_result.corrections:
                         correct_value = verification_result.corrections["correct_posterior"]
                         
                         # Update the execution result with corrected value
                         if isinstance(exec_result, dict):
+                            # Create a copy for thread-safe modification
+                            corrected_result = dict(exec_result)
+                            
                             # Preserve original for audit, add correction
-                            exec_result["original_posterior"] = posterior
-                            exec_result["corrected_posterior"] = correct_value
-                            exec_result["math_corrected"] = True
+                            corrected_result["original_posterior"] = posterior
+                            corrected_result["corrected_posterior"] = correct_value
+                            corrected_result["math_corrected"] = True
                             
                             # Replace the primary value with the corrected one
-                            if "posterior" in exec_result:
-                                exec_result["posterior"] = correct_value
-                            elif "probability" in exec_result:
-                                exec_result["probability"] = correct_value
+                            if "posterior" in corrected_result:
+                                corrected_result["posterior"] = correct_value
+                            elif "probability" in corrected_result:
+                                corrected_result["probability"] = correct_value
+                            
+                            # Update the result object with the corrected data
+                            result.execution_result = corrected_result
                             
                             logger.info(
                                 f"[MathVerify] CORRECTED result: {posterior:.6f} -> {correct_value:.6f}"
