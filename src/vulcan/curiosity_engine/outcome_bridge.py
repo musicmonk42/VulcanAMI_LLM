@@ -121,6 +121,42 @@ HIGH_VARIANCE_CV_THRESHOLD = 1.0  # Coefficient of variation
 MIN_SAMPLES_FOR_VARIANCE = 10  # Minimum samples for variance analysis
 MIN_SLOW_QUERIES_FOR_GAP = 3  # Minimum slow queries to report gap
 
+# =============================================================================
+# AUDIT FIX: Outcome Classification Constants
+# =============================================================================
+# These statuses represent legitimate outcomes that should NOT be counted as errors:
+# - "success": Query completed successfully
+# - "slow": Query completed but took longer than expected (still successful)
+# - "low_confidence": Query completed but reasoning paradigm had low certainty (still successful)
+# - "partial": Query partially completed (may be successful for complex queries)
+#
+# Only these statuses should be counted as TRUE errors:
+# - "error": Actual error during processing
+# - "timeout": Query exceeded time limit (hard failure)
+# - "cancelled": Query was cancelled externally
+# - "no_result": No result was produced (hard failure)
+#
+# CRITICAL: Different reasoning paradigms (causal, symbolic, probabilistic, analogical, 
+# multimodal) are COMPLEMENTARY, not redundant. They SHOULD produce different outputs.
+# A low consensus between paradigms is NOT an error - it's expected behavior.
+
+# Statuses that are NOT errors (query completed in some form)
+NON_ERROR_STATUSES = frozenset({
+    "success",
+    "slow",           # Completed but slow - not an error
+    "low_confidence", # Completed with low confidence - not an error  
+    "partial",        # Partially completed - may be acceptable for complex queries
+})
+
+# Statuses that ARE true errors (query failed to complete)
+TRUE_ERROR_STATUSES = frozenset({
+    "error",
+    "timeout",
+    "cancelled",
+    "no_result",
+    "execution_failed",
+})
+
 # Cleanup defaults
 DEFAULT_RETENTION_DAYS = 7
 DEFAULT_QUERY_LIMIT = 500
@@ -859,6 +895,12 @@ def get_outcome_statistics(
     success rates, average routing times, and error counts. Statistics
     are computed from the last hour of data for relevance.
     
+    AUDIT FIX: The success_rate now correctly distinguishes between:
+    - TRUE errors: "error", "timeout", "cancelled", "no_result"
+    - NON-errors: "success", "slow", "low_confidence", "partial"
+    
+    The error_count only includes TRUE errors, not slow/low_confidence outcomes.
+    
     Args:
         db_path: Optional path to database file.
     
@@ -904,22 +946,35 @@ def get_outcome_statistics(
             # Compute statistics from last hour
             hour_ago = (datetime.utcnow() - timedelta(hours=1)).isoformat()
             
+            # AUDIT FIX: Count TRUE errors only, not slow/low_confidence
+            # Build a SQL IN clause for true error statuses
+            true_error_list = list(TRUE_ERROR_STATUSES)
+            true_error_placeholders = ",".join("?" for _ in true_error_list)
+            
+            # AUDIT FIX: Count non-error statuses (success + slow + low_confidence + partial)
+            non_error_list = list(NON_ERROR_STATUSES)
+            non_error_placeholders = ",".join("?" for _ in non_error_list)
+            
             stats_row = conn.execute(
-                """
+                f"""
                 SELECT 
                     AVG(routing_time_ms),
                     MAX(routing_time_ms),
                     COUNT(CASE WHEN routing_time_ms > ? THEN 1 END),
-                    COUNT(CASE WHEN status != 'success' THEN 1 END),
-                    COUNT(CASE WHEN status = 'success' THEN 1 END)
+                    COUNT(CASE WHEN status IN ({true_error_placeholders}) THEN 1 END),
+                    COUNT(CASE WHEN status IN ({non_error_placeholders}) THEN 1 END),
+                    COUNT(*)
                 FROM query_outcomes WHERE timestamp > ?
                 """,
-                (SLOW_ROUTING_THRESHOLD_MS, hour_ago),
+                (SLOW_ROUTING_THRESHOLD_MS, *true_error_list, *non_error_list, hour_ago),
             ).fetchone()
             
+            # AUDIT FIX: success_count now includes all non-error statuses
             success_count = stats_row[4] or 0
             error_count = stats_row[3] or 0
-            total_recent = success_count + error_count
+            total_recent = stats_row[5] or 0
+            
+            # Success rate = non-errors / total (more accurate than old method)
             success_rate = success_count / total_recent if total_recent > 0 else 0.0
         
         return OutcomeStatistics(
@@ -947,13 +1002,19 @@ def analyze_outcomes_for_gaps(
     that should be addressed by the learning system. Uses configurable
     thresholds for gap detection.
     
+    AUDIT FIX: Added deduplication by query_id to prevent counting the same
+    failure multiple times. This fixes the issue where phantom resolutions
+    were occurring because the same query outcome was being processed
+    multiple times through different code paths.
+    
     Gap Types Detected:
         - slow_routing: Multiple queries taking >10s to route.
             Suggests embedding cache issues or model loading problems.
         - complex_query_handling: High complexity queries averaging >30s.
             Suggests reasoning pipeline optimization needed.
-        - high_error_rate: Error rate exceeding 10%.
-            Suggests systematic failures requiring investigation.
+        - high_error_rate: TRUE error rate exceeding 10%.
+            Only counts actual errors (timeout, error, cancelled, no_result).
+            Does NOT count slow/low_confidence as errors (these are legitimate).
         - routing_variance: High variance in routing times (CV > 1.0).
             Suggests inconsistent cache behavior.
     
@@ -980,19 +1041,44 @@ def analyze_outcomes_for_gaps(
     if not outcomes:
         return []
     
+    # AUDIT FIX: Deduplicate outcomes by query_id at the top level
+    # This prevents the same query from being counted multiple times across
+    # all gap detection functions. The deduplication is also done in
+    # _detect_error_rate_gaps for defense-in-depth.
+    seen_query_ids: set = set()
+    unique_outcomes: List[Dict[str, Any]] = []
+    duplicate_count = 0
+    
+    for o in outcomes:
+        query_id = o.get("query_id")
+        if query_id and query_id not in seen_query_ids:
+            seen_query_ids.add(query_id)
+            unique_outcomes.append(o)
+        elif query_id:
+            duplicate_count += 1
+        else:
+            # If no query_id, include it (legacy data)
+            unique_outcomes.append(o)
+    
+    if duplicate_count > 0:
+        logger.info(
+            f"{LOG_PREFIX} Deduplicated {duplicate_count} duplicate outcomes "
+            f"({len(unique_outcomes)} unique from {len(outcomes)} total)"
+        )
+    
     gaps: List[Dict[str, Any]] = []
     
     # Gap: Slow routing (>10s)
-    gaps.extend(_detect_slow_routing_gaps(outcomes))
+    gaps.extend(_detect_slow_routing_gaps(unique_outcomes))
     
     # Gap: Complex query handling issues
-    gaps.extend(_detect_complex_query_gaps(outcomes))
+    gaps.extend(_detect_complex_query_gaps(unique_outcomes))
     
-    # Gap: High error rate
-    gaps.extend(_detect_error_rate_gaps(outcomes))
+    # Gap: High error rate (TRUE errors only, excludes slow/low_confidence)
+    gaps.extend(_detect_error_rate_gaps(unique_outcomes))
     
     # Gap: High routing time variance
-    gaps.extend(_detect_variance_gaps(outcomes))
+    gaps.extend(_detect_variance_gaps(unique_outcomes))
     
     return gaps
 
@@ -1076,6 +1162,19 @@ def _detect_error_rate_gaps(
     """
     Detect high error rate gaps from outcomes.
     
+    AUDIT FIX: This function was counting ALL non-success outcomes as errors,
+    including legitimate statuses like "slow" and "low_confidence". This caused
+    successful complex reasoning (which may be slow or have lower confidence)
+    to be misclassified as failures.
+    
+    The fix distinguishes between:
+    - TRUE errors: "error", "timeout", "cancelled", "no_result", "execution_failed"
+    - NON-errors: "success", "slow", "low_confidence", "partial"
+    
+    CRITICAL: Different reasoning paradigms (causal, symbolic, probabilistic, 
+    analogical, multimodal) are COMPLEMENTARY and produce different outputs BY DESIGN.
+    Low consensus between paradigms is NOT an error.
+    
     Args:
         outcomes: List of outcome dictionaries
     
@@ -1085,25 +1184,62 @@ def _detect_error_rate_gaps(
     if not outcomes:
         return []
     
-    errors = [o for o in outcomes if o.get("status") != "success"]
-    error_rate = len(errors) / len(outcomes)
+    # AUDIT FIX: Deduplicate outcomes by query_id to prevent counting same query multiple times
+    # This fixes the issue where the same failure is counted multiple times
+    seen_query_ids: set = set()
+    unique_outcomes: List[Dict[str, Any]] = []
+    for o in outcomes:
+        query_id = o.get("query_id")
+        if query_id and query_id not in seen_query_ids:
+            seen_query_ids.add(query_id)
+            unique_outcomes.append(o)
+        elif not query_id:
+            # If no query_id, include it but log a warning
+            unique_outcomes.append(o)
+    
+    if len(unique_outcomes) < len(outcomes):
+        logger.debug(
+            f"{LOG_PREFIX} Deduplicated {len(outcomes)} outcomes to {len(unique_outcomes)} unique"
+        )
+    
+    # AUDIT FIX: Only count TRUE errors, not slow/low_confidence outcomes
+    # "slow" and "low_confidence" are legitimate outcomes, not errors
+    true_errors = [
+        o for o in unique_outcomes 
+        if o.get("status") in TRUE_ERROR_STATUSES
+    ]
+    
+    # AUDIT FIX: Use unique_outcomes for denominator to get accurate rate
+    error_rate = len(true_errors) / len(unique_outcomes) if unique_outcomes else 0.0
+    
+    # Log classification breakdown for debugging
+    status_counts: Dict[str, int] = {}
+    for o in unique_outcomes:
+        status = o.get("status", "unknown")
+        status_counts[status] = status_counts.get(status, 0) + 1
+    
+    logger.debug(
+        f"{LOG_PREFIX} Outcome classification: total={len(unique_outcomes)}, "
+        f"true_errors={len(true_errors)}, error_rate={error_rate:.1%}, "
+        f"breakdown={status_counts}"
+    )
     
     if error_rate <= HIGH_ERROR_RATE_THRESHOLD:
         return []
     
     # Group by error type for evidence
     error_types: Dict[str, int] = {}
-    for e in errors:
+    for e in true_errors:
         error_type = e.get("error_type", "unknown")
         error_types[error_type] = error_types.get(error_type, 0) + 1
     
     return [
         DetectedGap(
             gap_type=GapType.HIGH_ERROR_RATE.value,
-            description=f"{error_rate * 100:.1f}% error rate",
+            description=f"{error_rate * 100:.1f}% true error rate ({len(true_errors)}/{len(unique_outcomes)} queries)",
             severity=min(1.0, error_rate * 5),
             evidence=list(error_types.keys())[:5],
-            suggested_action="Investigate error patterns",
+            suggested_action="Investigate error patterns (excludes slow/low_confidence outcomes)",
         ).to_dict()
     ]
 
