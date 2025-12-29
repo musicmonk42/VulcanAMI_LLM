@@ -435,6 +435,21 @@ def _load_optional_components():
     except ImportError:
         logger.debug("SafetyValidator not available")
 
+    # PRIORITY 2 FIX: Load Mathematical Verification Engine
+    try:
+        from vulcan.reasoning.mathematical_verification import (
+            MathematicalVerificationEngine,
+            MathVerificationStatus,
+            BayesianProblem,
+        )
+
+        components["MathematicalVerificationEngine"] = MathematicalVerificationEngine
+        components["MathVerificationStatus"] = MathVerificationStatus
+        components["BayesianProblem"] = BayesianProblem
+        logger.info("MathematicalVerificationEngine loaded for calculation validation")
+    except ImportError as e:
+        logger.debug(f"MathematicalVerificationEngine not available: {e}")
+
     _OPTIONAL_COMPONENTS = components
     return components
 
@@ -753,8 +768,34 @@ class UnifiedReasoner:
             except Exception as e:
                 logger.warning(f"Error initializing processor: {e}")
 
+        # PRIORITY 2 FIX: Initialize Mathematical Verification Engine
+        # Connect verification to calculation pipeline for mathematical accuracy
+        self.math_verification_engine = None
+        self._math_accuracy_integration = None
+        if "MathematicalVerificationEngine" in optional_components:
+            try:
+                self.math_verification_engine = optional_components["MathematicalVerificationEngine"]()
+                logger.info("MathematicalVerificationEngine initialized for calculation validation")
+                
+                # Try to initialize the learning integration as well
+                try:
+                    from vulcan.learning.mathematical_accuracy_integration import (
+                        MathematicalAccuracyIntegration,
+                    )
+                    self._math_accuracy_integration = MathematicalAccuracyIntegration(
+                        math_engine=self.math_verification_engine
+                    )
+                    logger.info("MathematicalAccuracyIntegration connected for learning feedback")
+                except ImportError as ie:
+                    logger.debug(f"Mathematical accuracy integration not available: {ie}")
+            except Exception as e:
+                logger.warning(f"Error initializing mathematical verification engine: {e}")
+
         # Store selection components for later use
         self._selection_components = selection_components
+        
+        # Store optional components for mathematical verification access
+        self._optional_components = optional_components
 
         # Reasoning orchestration strategies
         self.reasoning_strategies = {
@@ -2886,7 +2927,7 @@ class UnifiedReasoner:
     def _postprocess_result(
         self, result: ReasoningResult, task: ReasoningTask
     ) -> ReasoningResult:
-        """Post-process reasoning result"""
+        """Post-process reasoning result with mathematical verification"""
 
         try:
             if not result.explanation and result.reasoning_chain:
@@ -2903,19 +2944,228 @@ class UnifiedReasoner:
                     "filtered": True,
                     "reason": f"Confidence {result.confidence:.2f} below threshold {threshold}",
                 }
+            
+            # PRIORITY 2 FIX: Apply mathematical verification to calculation results
+            # Check if this is a mathematical task that needs verification
+            is_mathematical = task.query.get("is_mathematical", False) if task.query else False
+            require_verification = task.constraints.get("require_verification", False) if task.constraints else False
+            
+            if (is_mathematical or require_verification) and self.math_verification_engine:
+                verification_result = self._verify_mathematical_result(result, task)
+                if verification_result:
+                    result = self._apply_verification_to_result(result, verification_result, task)
+                    
         except Exception as e:
             logger.warning(f"Post-processing failed: {e}")
 
         return result
+    
+    def _verify_mathematical_result(
+        self, result: ReasoningResult, task: ReasoningTask
+    ) -> Optional[Any]:
+        """
+        PRIORITY 2 FIX: Verify mathematical calculation results.
+        
+        Integrates the MathematicalVerificationEngine into the calculation
+        validation workflow to detect and correct mathematical errors.
+        
+        Args:
+            result: The reasoning result to verify
+            task: The original task with context
+            
+        Returns:
+            VerificationResult if verification was performed, None otherwise
+        """
+        if not self.math_verification_engine:
+            return None
+        
+        try:
+            conclusion = result.conclusion
+            if conclusion is None:
+                return None
+            
+            # Extract numerical result if present
+            if isinstance(conclusion, dict):
+                # Look for probability/calculation results in the conclusion
+                numerical_value = None
+                for key in ['probability', 'result', 'value', 'posterior', 'answer']:
+                    if key in conclusion and isinstance(conclusion[key], (int, float)):
+                        numerical_value = conclusion[key]
+                        break
+                
+                if numerical_value is None:
+                    return None
+                    
+                # Check for Bayesian calculation context
+                if 'prior' in conclusion or task.query.get('problem_type') == 'bayesian':
+                    # Construct BayesianProblem from context
+                    BayesianProblem = self._optional_components.get("BayesianProblem")
+                    if BayesianProblem:
+                        problem = BayesianProblem(
+                            prior=conclusion.get('prior', task.query.get('prior', 0.01)),
+                            sensitivity=conclusion.get('sensitivity', task.query.get('sensitivity')),
+                            specificity=conclusion.get('specificity', task.query.get('specificity')),
+                        )
+                        
+                        # Verify the calculation
+                        verification = self.math_verification_engine.verify_bayesian_calculation(
+                            problem, numerical_value
+                        )
+                        logger.info(
+                            f"[MathVerification] Bayesian verification: status={verification.status.value}, "
+                            f"confidence={verification.confidence:.2f}"
+                        )
+                        return verification
+                
+                # For general arithmetic, verify the expression if available
+                expression = conclusion.get('expression', task.query.get('expression'))
+                if expression and isinstance(expression, str):
+                    variables = conclusion.get('variables', task.query.get('variables', {}))
+                    verification = self.math_verification_engine.verify_arithmetic(
+                        expression, numerical_value, variables
+                    )
+                    logger.info(
+                        f"[MathVerification] Arithmetic verification: status={verification.status.value}, "
+                        f"confidence={verification.confidence:.2f}"
+                    )
+                    return verification
+                    
+            elif isinstance(conclusion, (int, float)):
+                # Direct numerical result - check for expression in query
+                expression = task.query.get('expression') if task.query else None
+                if expression:
+                    variables = task.query.get('variables', {})
+                    verification = self.math_verification_engine.verify_arithmetic(
+                        expression, conclusion, variables
+                    )
+                    return verification
+                    
+        except Exception as e:
+            logger.warning(f"Mathematical verification failed: {e}")
+            
+        return None
+    
+    def _apply_verification_to_result(
+        self, result: ReasoningResult, verification: Any, task: ReasoningTask
+    ) -> ReasoningResult:
+        """
+        PRIORITY 2 & 3 FIX: Apply verification results and update learning system.
+        
+        If verification detects errors, applies corrections and triggers
+        learning system penalties/rewards based on mathematical accuracy.
+        
+        Args:
+            result: Original reasoning result
+            verification: VerificationResult from math engine
+            task: Original task for context
+            
+        Returns:
+            Updated ReasoningResult with verification applied
+        """
+        MathVerificationStatus = self._optional_components.get("MathVerificationStatus")
+        if not MathVerificationStatus:
+            return result
+        
+        try:
+            # Add verification metadata to result
+            if not hasattr(result, 'metadata') or result.metadata is None:
+                result.metadata = {}
+            result.metadata['math_verification'] = {
+                'status': verification.status.value,
+                'confidence': verification.confidence,
+                'errors': [e.value for e in verification.errors] if verification.errors else [],
+            }
+            
+            if verification.status == MathVerificationStatus.VERIFIED:
+                # Correct result - boost confidence and trigger reward
+                result.confidence = min(1.0, result.confidence * 1.1)  # Small confidence boost
+                logger.info("[MathVerification] Calculation verified as correct")
+                
+                # PRIORITY 3 FIX: Reward tool through learning integration
+                if self._math_accuracy_integration and self.learner:
+                    tool_name = task.task_type.value if task.task_type else "unknown"
+                    self._math_accuracy_integration.reward_tool(tool_name, self.learner)
+                    
+            elif verification.status == MathVerificationStatus.ERROR_DETECTED:
+                # Error detected - apply corrections and trigger penalty
+                logger.warning(
+                    f"[MathVerification] Mathematical error detected: {verification.errors}"
+                )
+                
+                # Apply corrections to result
+                if verification.corrections:
+                    corrected_conclusion = result.conclusion.copy() if isinstance(result.conclusion, dict) else {}
+                    corrected_conclusion['math_correction'] = {
+                        'original': result.conclusion,
+                        'corrected': verification.corrections.get('correct_posterior') or verification.corrections.get('correct_result'),
+                        'errors': [e.value for e in verification.errors],
+                        'explanation': verification.explanation,
+                    }
+                    result.conclusion = corrected_conclusion
+                    
+                # Reduce confidence due to detected error
+                result.confidence = max(0.0, result.confidence * 0.5)
+                result.explanation = (result.explanation or "") + f"\n[Math Error: {verification.explanation}]"
+                
+                # PRIORITY 3 FIX: Penalize tool through learning integration
+                if self._math_accuracy_integration and self.learner and verification.errors:
+                    tool_name = task.task_type.value if task.task_type else "unknown"
+                    for error in verification.errors:
+                        self._math_accuracy_integration.penalize_tool(
+                            tool_name, error, self.learner
+                        )
+                        
+        except Exception as e:
+            logger.warning(f"Failed to apply verification to result: {e}")
+            
+        return result
 
     def _learn_from_reasoning(self, task: ReasoningTask, result: ReasoningResult):
-        """Learn from reasoning result"""
+        """
+        Learn from reasoning result with mathematical accuracy integration.
+        
+        PRIORITY 3 FIX: Connect learning system to mathematical verification results
+        to reward mathematical accuracy, not just execution success.
+        """
 
         if not self.learner:
             return
 
         try:
             learning_data = {"task": task, "result": result, "timestamp": time.time()}
+
+            # PRIORITY 3 FIX: Include mathematical verification results in learning
+            # This ensures the learning system rewards mathematical correctness
+            if hasattr(result, 'metadata') and result.metadata:
+                math_verification = result.metadata.get('math_verification')
+                if math_verification:
+                    learning_data['math_verification'] = math_verification
+                    
+                    # Adjust learning based on mathematical accuracy
+                    verification_status = math_verification.get('status', 'unknown')
+                    if verification_status == 'verified':
+                        # Boost learning signal for mathematically correct results
+                        learning_data['math_accuracy_bonus'] = 0.015
+                        learning_data['learning_signal'] = 'positive'
+                        logger.info(
+                            f"[Learning] Mathematical accuracy reward applied for "
+                            f"tool {task.task_type.value if task.task_type else 'unknown'}"
+                        )
+                    elif verification_status == 'error_detected':
+                        # Penalty for mathematically incorrect results
+                        learning_data['math_accuracy_penalty'] = -0.01
+                        learning_data['learning_signal'] = 'negative'
+                        learning_data['errors'] = math_verification.get('errors', [])
+                        logger.info(
+                            f"[Learning] Mathematical accuracy penalty applied for "
+                            f"tool {task.task_type.value if task.task_type else 'unknown'}, "
+                            f"errors: {math_verification.get('errors', [])}"
+                        )
+                        
+                        # Also update the shared weight manager for this tool
+                        tool_name = task.task_type.value if task.task_type else "unknown"
+                        weight_manager = get_weight_manager()
+                        weight_manager.adjust_weight(tool_name, -0.01)
 
             self.learner.update(learning_data)
         except Exception as e:
