@@ -433,6 +433,50 @@ class EmbeddingCache:
         
         logger.info(f"{LOG_PREFIX} Cache cleared")
     
+    def clear_and_rebuild(self) -> None:
+        """
+        Clear the cache and rebuild internal state for corruption recovery.
+        
+        This method is useful when the cache may be corrupted due to:
+        - Serialization/deserialization issues
+        - Concurrent access race conditions
+        - Memory corruption
+        - Application crashes during cache operations
+        
+        Unlike clear(), this method:
+        1. Clears all cached entries
+        2. Resets all statistics
+        3. Rebuilds internal OrderedDict to ensure clean state
+        4. Logs the rebuild operation for audit purposes
+        
+        Example:
+            >>> cache.clear_and_rebuild()  # Cache may be corrupted
+            >>> stats = cache.get_stats()
+            >>> assert stats.size == 0
+        """
+        with self._lock:
+            # Store old stats for logging
+            old_size = len(self._cache)
+            old_hits = self._hits
+            old_misses = self._misses
+            
+            # Clear existing cache
+            self._cache.clear()
+            
+            # Rebuild internal OrderedDict to ensure clean state
+            self._cache = OrderedDict()
+            
+            # Reset all statistics
+            self._hits = 0
+            self._misses = 0
+            self._evictions = 0
+            self._compute_time_saved_ms = 0.0
+        
+        logger.warning(
+            f"{LOG_PREFIX} Cache cleared and rebuilt (corruption recovery). "
+            f"Previous state: size={old_size}, hits={old_hits}, misses={old_misses}"
+        )
+    
     def __len__(self) -> int:
         """
         Get current cache size.
@@ -812,6 +856,27 @@ def clear_cache() -> None:
         >>> assert stats['size'] == 0
     """
     _get_cache().clear()
+
+
+def clear_and_rebuild_cache() -> None:
+    """
+    Clear and rebuild the embedding cache for corruption recovery.
+    
+    This function should be called when the cache may be corrupted.
+    It performs a complete cache rebuild to ensure clean internal state.
+    
+    Use cases:
+        - Cache corruption suspected (inconsistent results)
+        - After application crashes
+        - When cache behavior is erratic
+        - Memory corruption recovery
+    
+    Example:
+        >>> clear_and_rebuild_cache()  # Cache may be corrupted
+        >>> stats = get_cache_stats()
+        >>> assert stats['size'] == 0
+    """
+    _get_cache().clear_and_rebuild()
 
 
 def configure_cache(max_size: int = DEFAULT_MAX_CACHE_SIZE) -> None:

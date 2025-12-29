@@ -818,6 +818,16 @@ class SafetyConfig:
         }
     )
 
+    # FIX: Safety bypass categories for mathematical problems
+    # These query categories skip certain safety validation steps that would
+    # incorrectly flag legitimate mathematical/statistical operations
+    safety_bypass_categories: List[str] = field(
+        default_factory=lambda: [
+            "mathematical_computation",
+            "statistical_analysis",
+        ]
+    )
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert configuration to dictionary."""
         return asdict(self)

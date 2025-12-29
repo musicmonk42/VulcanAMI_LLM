@@ -219,6 +219,7 @@ try:
         is_simple_query,
         get_cache_stats as get_embedding_cache_stats,
         clear_cache as clear_embedding_cache,
+        clear_and_rebuild_cache as clear_and_rebuild_embedding_cache,
     )
 
     EMBEDDING_CACHE_AVAILABLE = True
@@ -230,6 +231,7 @@ except ImportError as e:
     is_simple_query = None
     get_embedding_cache_stats = None
     clear_embedding_cache = None
+    clear_and_rebuild_embedding_cache = None
 
 
 # ============================================================
@@ -420,6 +422,7 @@ __all__ = [
     "is_simple_query",
     "get_embedding_cache_stats",
     "clear_embedding_cache",
+    "clear_and_rebuild_embedding_cache",  # FIX: Cache corruption recovery
     "EMBEDDING_CACHE_AVAILABLE",
     # Module functions
     "initialize_routing_components",

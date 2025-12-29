@@ -131,6 +131,11 @@ TOURNAMENT_MAX_CANDIDATES = 3  # Maximum agents to run in parallel for tournamen
 TOURNAMENT_DIVERSITY_PENALTY = 0.3
 TOURNAMENT_WINNER_PERCENTAGE = 0.2
 
+# Agent selection timeout configuration
+# FIX: Optimize agent selection timeout to prevent 50s delays
+# This constant controls how long to wait when selecting an agent for a task
+AGENT_SELECTION_TIMEOUT_SECONDS: float = 10.0  # 10 seconds max for agent selection
+
 # FIXED: Add cachetools import for LRU cache with TTL
 try:
     from cachetools import TTLCache
@@ -1545,8 +1550,9 @@ class AgentPoolManager:
             RuntimeError: If job queue is full or pool is shutting down
         """
         job_id = f"job_{uuid.uuid4().hex[:8]}"
-        # FIXED: Use shorter default timeout (5 seconds instead of 300)
-        timeout_seconds = timeout_seconds if timeout_seconds is not None else 5.0
+        # FIX: Use AGENT_SELECTION_TIMEOUT_SECONDS constant instead of hardcoded value
+        # Previously hardcoded to 5.0, now configurable via constant (default 10s)
+        timeout_seconds = timeout_seconds if timeout_seconds is not None else AGENT_SELECTION_TIMEOUT_SECONDS
 
         with self.lock:
             # FIXED: Check shutdown first

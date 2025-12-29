@@ -178,7 +178,12 @@ try:
     )
 
     # Agent pool management
-    from .agent_pool import AgentPoolManager, AutoScaler, RecoveryManager
+    from .agent_pool import (
+        AgentPoolManager,
+        AutoScaler,
+        RecoveryManager,
+        AGENT_SELECTION_TIMEOUT_SECONDS,
+    )
 
     # Main orchestrator
     from .collective import ActionType, ModalityType, VULCANAGICollective
@@ -334,6 +339,7 @@ __all__ = [
     "AgentPoolManager",
     "AutoScaler",
     "RecoveryManager",
+    "AGENT_SELECTION_TIMEOUT_SECONDS",  # FIX: Agent selection timeout constant
     # Metrics
     "EnhancedMetricsCollector",
     "MetricType",
