@@ -1329,9 +1329,11 @@ class ObjectiveNegotiator:
             )
             outcome = NegotiationOutcome.COMPROMISE
             confidence = 0.5
+            reasoning_suffix = "Fallback used - some agents may be below their disagreement points."
         else:
             outcome = NegotiationOutcome.CONSENSUS
             confidence = 0.85
+            reasoning_suffix = f"All {len(proposals)} agents achieved utility above their disagreement points."
         
         # Step 4: Extract solution
         agreed_objectives = best_candidate.get("objectives", {})
@@ -1365,8 +1367,7 @@ class ObjectiveNegotiator:
             compromises_made=compromises,
             pareto_optimal=is_pareto,
             confidence=confidence,
-            reasoning=f"Nash bargaining solution found with product {best_nash_product:.6f}. "
-                     f"All {len(proposals)} agents achieved utility above their disagreement points.",
+            reasoning=f"Nash bargaining solution found with product {best_nash_product:.6f}. {reasoning_suffix}",
             metadata={"nash_product": best_nash_product, "disagreement_points": disagreement_points}
         )
 
@@ -1491,12 +1492,8 @@ class ObjectiveNegotiator:
                 # Actual outcome achieved in this candidate
                 actual = candidate_outcomes.get(objective, 0.0)
                 
-                # Get objective direction from hierarchy
-                maximize = True
-                if hasattr(self.objective_hierarchy, "objectives"):
-                    obj_data = self.objective_hierarchy.objectives.get(objective)
-                    if obj_data:
-                        maximize = getattr(obj_data, "maximize", True) if hasattr(obj_data, "maximize") else obj_data.get("maximize", True) if isinstance(obj_data, dict) else True
+                # Get objective direction from hierarchy (maximize by default)
+                maximize = self._get_objective_direction(objective)
                 
                 # Calculate regret (weighted by agent importance)
                 if maximize:
@@ -1557,7 +1554,10 @@ class ObjectiveNegotiator:
         is_pareto = self._is_pareto_optimal(best_candidate, candidates, objectives)
         
         # Find agent with maximum regret for reasoning
-        max_regret_agent = max(regret_details.items(), key=lambda x: x[1])[0] if regret_details else "unknown"
+        if regret_details:
+            max_regret_agent = max(regret_details.items(), key=lambda x: x[1])[0]
+        else:
+            max_regret_agent = "unknown"
         
         return NegotiationResult(
             outcome=outcome,
@@ -1589,6 +1589,34 @@ class ObjectiveNegotiator:
             # Check if other dominates candidate
             if self._dominates(other_outcomes, candidate_outcomes, objectives):
                 return False
+        
+        return True
+
+    def _get_objective_direction(self, objective: str) -> bool:
+        """
+        Get the optimization direction for an objective.
+        
+        Args:
+            objective: Name of the objective
+            
+        Returns:
+            True if objective should be maximized, False if minimized
+        """
+        # Default to maximize
+        if not hasattr(self.objective_hierarchy, "objectives"):
+            return True
+        
+        obj_data = self.objective_hierarchy.objectives.get(objective)
+        if obj_data is None:
+            return True
+        
+        # Check for attribute-style access (dataclass/object)
+        if hasattr(obj_data, "maximize"):
+            return getattr(obj_data, "maximize", True)
+        
+        # Check for dict-style access
+        if isinstance(obj_data, dict):
+            return obj_data.get("maximize", True)
         
         return True
 
