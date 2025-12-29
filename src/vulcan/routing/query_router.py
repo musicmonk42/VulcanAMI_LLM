@@ -401,7 +401,8 @@ CACHE_STATS_LOG_INTERVAL: int = 10
 # - Safety validation: 1-2s
 # - Complexity scoring: <1s
 # - Buffer for system load: 2-3s
-QUERY_ROUTING_TIMEOUT_SECONDS: float = 20.0  # 20 seconds max (was 5s, too short for embeddings)
+# - Optimized complexity analysis buffer: 5-10s
+QUERY_ROUTING_TIMEOUT_SECONDS: float = 30.0  # 30 seconds max (increased from 20s to optimize complexity analysis)
 
 # FIX 2: Fallback plan constants (extracted from magic numbers per code review)
 FALLBACK_QUERY_ID_LENGTH: int = 12  # UUID truncation length for fallback query IDs

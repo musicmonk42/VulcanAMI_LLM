@@ -235,11 +235,83 @@ class SafetyValidator:
             "summarize",
             "explain",
         }
+        
+        # FIX: Mathematical scenario keywords - these indicate math problems, not actual
+        # medical data processing that would require HIPAA compliance
+        # Using frozenset for performance and consistency with safety_validator
+        self.mathematical_indicators = frozenset({
+            "probability", "calculate", "bayesian", "bayes", "prior", "posterior",
+            "sensitivity", "specificity", "conditional", "likelihood",
+            "false positive", "false negative", "true positive", "true negative",
+            "statistical", "statistics", "compute", "formula", "equation",
+            "what is the probability", "what's the probability", "what are the odds", "how likely",
+            "base rate", "prevalence", "ppv", "npv", "test accuracy",
+            "conditional probability", "given that", "positive predictive value",
+            "negative predictive value", "p(",
+        })
+        
+        # Pre-compiled math notation patterns for performance
+        self.math_notation_patterns = [
+            re.compile(r'\d+%'),           # Percentages
+            re.compile(r'\d+\.\d+'),       # Decimals
+            re.compile(r'\d+/\d+'),        # Fractions
+            re.compile(r'p\s*\('),         # Probability notation P(
+            re.compile(r'\d+\s*in\s*\d+'), # X in Y notation
+        ]
+        
+        # Hypothetical language indicators
+        self.hypothetical_indicators = frozenset({
+            "suppose", "assume", "imagine", "hypothetical", "example", 
+            "given that", "probability problem", "statistics problem", "math problem",
+            "solve", "calculate", "compute",
+        })
 
         # CRITICAL FIX: Add size limits
         self.max_input_size = 1000000  # 1MB
         self.max_output_size = 5000000  # 5MB
         self.max_pattern_check_size = 10000  # Only check first 10KB for patterns
+
+    def is_mathematical_scenario(self, input_data: Any) -> bool:
+        """
+        Detect if input is a mathematical/statistical problem.
+        
+        FIX: This prevents false positive safety violations for mathematical problems
+        that mention medical terms (e.g., Bayesian probability with disease testing).
+        
+        Args:
+            input_data: The query or problem to check
+            
+        Returns:
+            True if this is a mathematical scenario
+        """
+        try:
+            input_str = str(input_data).lower() if input_data else ""
+            
+            # Count mathematical indicators
+            indicator_count = sum(
+                1 for ind in self.mathematical_indicators if ind in input_str
+            )
+            
+            # Check for mathematical notation patterns using pre-compiled regex
+            notation_count = sum(
+                1 for pattern in self.math_notation_patterns if pattern.search(input_str)
+            )
+            
+            # Check for hypothetical language
+            is_hypothetical = any(word in input_str for word in self.hypothetical_indicators)
+            
+            # Return True if this looks like a math problem
+            if indicator_count >= 2:
+                return True
+            if indicator_count >= 1 and notation_count >= 1:
+                return True
+            if is_hypothetical and indicator_count >= 1:
+                return True
+            
+            return False
+        except Exception as e:
+            logger.warning(f"Mathematical scenario detection failed: {e}")
+            return False
 
     def validate_input(self, input_data: Any) -> Tuple[bool, str]:
         """Validate input for safety - CRITICAL: ReDoS protection"""
