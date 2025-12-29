@@ -785,11 +785,37 @@ class SelectionCache:
         except Exception as e:
             logger.error(f"Cache warming failed: {e}")
 
+    @staticmethod
+    def _normalize_text(text: str) -> str:
+        """
+        Normalize text for consistent cache key generation.
+        
+        CRITICAL FIX: Without normalization, "hello world" and "Hello World "
+        generate different cache keys despite being semantically identical.
+        This was causing 0% cache hit rate.
+        
+        Args:
+            text: Text to normalize.
+        
+        Returns:
+            Normalized text string.
+        """
+        # Strip whitespace and convert to lowercase
+        normalized = text.strip().lower()
+        # Collapse multiple whitespaces to single space
+        normalized = ' '.join(normalized.split())
+        return normalized
+    
     def _compute_feature_key(self, problem: Any) -> str:
-        """Compute cache key for features"""
+        """Compute cache key for features
+        
+        CRITICAL FIX: Now normalizes problem text before hashing.
+        """
         try:
             problem_str = str(problem)[:1000]  # Limit size
-            hash_val = hashlib.sha256(problem_str.encode()).hexdigest()[:16]
+            # CRITICAL FIX: Normalize text before hashing for consistent cache keys
+            normalized = self._normalize_text(problem_str)
+            hash_val = hashlib.sha256(normalized.encode()).hexdigest()[:16]
             return f"features_{hash_val}"
         except Exception as e:
             logger.error(f"Feature key computation failed: {e}")
@@ -813,10 +839,15 @@ class SelectionCache:
             return f"selection_{time.time()}"
 
     def _compute_result_key(self, tool: str, problem: Any) -> str:
-        """Compute cache key for result"""
+        """Compute cache key for result
+        
+        CRITICAL FIX: Now normalizes problem text before hashing.
+        """
         try:
             problem_str = str(problem)[:1000]
-            problem_hash = hashlib.sha256(problem_str.encode()).hexdigest()[:16]
+            # CRITICAL FIX: Normalize text before hashing for consistent cache keys
+            normalized = self._normalize_text(problem_str)
+            problem_hash = hashlib.sha256(normalized.encode()).hexdigest()[:16]
             return f"result_{tool}_{problem_hash}"
         except Exception as e:
             logger.error(f"Result key computation failed: {e}")

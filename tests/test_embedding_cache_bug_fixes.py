@@ -380,5 +380,163 @@ class TestToolSelectionDeterminism:
             f"Disabled bandit should return 'probabilistic', got: {results[0]}"
 
 
+class TestEmbeddingCacheKeyNormalization:
+    """Tests for EmbeddingCache key normalization fix (0% hit rate issue)."""
+    
+    def test_embedding_cache_normalize_text(self):
+        """Test that _normalize_text properly normalizes text."""
+        from vulcan.routing.embedding_cache import EmbeddingCache
+        
+        test_cases = [
+            ("  hello world  ", "hello world"),
+            ("HELLO WORLD", "hello world"),
+            ("hello   world", "hello world"),
+            ("\n\nhello\t\tworld\n\n", "hello world"),
+            ("MixedCase TEXT", "mixedcase text"),
+        ]
+        
+        for input_text, expected in test_cases:
+            normalized = EmbeddingCache._normalize_text(input_text)
+            assert normalized == expected, \
+                f"Expected '{expected}' but got '{normalized}' for input '{repr(input_text)}'"
+    
+    def test_embedding_cache_key_consistency(self):
+        """Test that EmbeddingCache generates same key for equivalent queries."""
+        from vulcan.routing.embedding_cache import EmbeddingCache
+        
+        # These should all produce the same cache key after normalization
+        equivalent_queries = [
+            "Hello World",
+            "hello world",
+            "  hello world  ",
+            "HELLO WORLD",
+            "hello   world",
+            "\nhello world\n",
+        ]
+        
+        cache_keys = [EmbeddingCache._make_key(q) for q in equivalent_queries]
+        
+        # All keys should be identical
+        first_key = cache_keys[0]
+        for i, key in enumerate(cache_keys):
+            assert key == first_key, \
+                f"Query '{equivalent_queries[i]}' produced different cache key: {key} vs {first_key}"
+    
+    def test_embedding_cache_different_keys_for_different_content(self):
+        """Test that different queries produce different cache keys."""
+        from vulcan.routing.embedding_cache import EmbeddingCache
+        
+        different_queries = [
+            "hello world",
+            "goodbye world",
+            "hello there",
+            "world hello",
+        ]
+        
+        cache_keys = [EmbeddingCache._make_key(q) for q in different_queries]
+        unique_keys = set(cache_keys)
+        
+        assert len(unique_keys) == len(different_queries), \
+            "Different queries should produce different cache keys"
+
+
+class TestQueryRouterCacheKeyNormalization:
+    """Tests for QueryRouter cache key normalization fix."""
+    
+    def test_query_router_normalize_text(self):
+        """Test that _normalize_text in query_router properly normalizes text."""
+        from vulcan.routing.query_router import _normalize_text
+        
+        test_cases = [
+            ("  hello world  ", "hello world"),
+            ("HELLO WORLD", "hello world"),
+            ("hello   world", "hello world"),
+            ("\n\nhello\t\tworld\n\n", "hello world"),
+        ]
+        
+        for input_text, expected in test_cases:
+            normalized = _normalize_text(input_text)
+            assert normalized == expected, \
+                f"Expected '{expected}' but got '{normalized}' for input '{repr(input_text)}'"
+    
+    def test_query_router_hash_consistency(self):
+        """Test that _compute_query_hash generates same hash for equivalent queries."""
+        from vulcan.routing.query_router import _compute_query_hash
+        
+        equivalent_queries = [
+            "Hello World",
+            "hello world",
+            "  hello world  ",
+            "HELLO WORLD",
+        ]
+        
+        hashes = [_compute_query_hash(q) for q in equivalent_queries]
+        
+        # All hashes should be identical
+        first_hash = hashes[0]
+        for i, h in enumerate(hashes):
+            assert h == first_hash, \
+                f"Query '{equivalent_queries[i]}' produced different hash: {h} vs {first_hash}"
+
+
+class TestSemanticToolMatcherCacheKeyNormalization:
+    """Tests for SemanticToolMatcher cache key normalization fix."""
+    
+    def test_semantic_matcher_normalize_text(self):
+        """Test that _normalize_text in SemanticToolMatcher properly normalizes text."""
+        from vulcan.reasoning.selection.semantic_tool_matcher import SemanticToolMatcher
+        
+        test_cases = [
+            ("  hello world  ", "hello world"),
+            ("HELLO WORLD", "hello world"),
+            ("hello   world", "hello world"),
+        ]
+        
+        for input_text, expected in test_cases:
+            normalized = SemanticToolMatcher._normalize_text(input_text)
+            assert normalized == expected, \
+                f"Expected '{expected}' but got '{normalized}' for input '{repr(input_text)}'"
+
+
+class TestSelectionCacheKeyNormalization:
+    """Tests for SelectionCache cache key normalization fix."""
+    
+    def test_selection_cache_normalize_text(self):
+        """Test that _normalize_text in SelectionCache properly normalizes text."""
+        from vulcan.reasoning.selection.selection_cache import SelectionCache
+        
+        test_cases = [
+            ("  hello world  ", "hello world"),
+            ("HELLO WORLD", "hello world"),
+            ("hello   world", "hello world"),
+        ]
+        
+        for input_text, expected in test_cases:
+            normalized = SelectionCache._normalize_text(input_text)
+            assert normalized == expected, \
+                f"Expected '{expected}' but got '{normalized}' for input '{repr(input_text)}'"
+    
+    def test_selection_cache_feature_key_consistency(self):
+        """Test that SelectionCache generates same feature key for equivalent problems."""
+        from vulcan.reasoning.selection.selection_cache import SelectionCache
+        
+        cache = SelectionCache({})
+        
+        equivalent_problems = [
+            "Hello World",
+            "hello world",
+            "  hello world  ",
+            "HELLO WORLD",
+        ]
+        
+        keys = [cache._compute_feature_key(p) for p in equivalent_problems]
+        
+        # All keys should be identical
+        first_key = keys[0]
+        for i, key in enumerate(keys):
+            assert key == first_key, \
+                f"Problem '{equivalent_problems[i]}' produced different key: {key} vs {first_key}"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

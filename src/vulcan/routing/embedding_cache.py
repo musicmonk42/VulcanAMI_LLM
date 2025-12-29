@@ -268,6 +268,35 @@ class EmbeddingCache:
         logger.info(f"{LOG_PREFIX} Initialized with max_size={max_size}")
     
     @staticmethod
+    def _normalize_text(text: str) -> str:
+        """
+        Normalize text for consistent cache key generation.
+        
+        CRITICAL FIX: This was the root cause of 0% cache hit rate.
+        Without normalization, "hello world" and "Hello World " would generate
+        different cache keys despite being semantically identical queries.
+        
+        Normalization steps:
+        1. Strip leading/trailing whitespace
+        2. Convert to lowercase for case-insensitive matching
+        3. Collapse multiple whitespaces to single space
+        
+        Note: This is ONLY used for cache key generation. The original text
+        is still passed to the embedding model to preserve semantic nuances.
+        
+        Args:
+            text: Text to normalize.
+        
+        Returns:
+            Normalized text string.
+        """
+        # Strip whitespace and convert to lowercase
+        normalized = text.strip().lower()
+        # Collapse multiple whitespaces to single space
+        normalized = ' '.join(normalized.split())
+        return normalized
+    
+    @staticmethod
     def _make_key(text: str) -> str:
         """
         Create cache key from text using SHA-256.
@@ -275,6 +304,10 @@ class EmbeddingCache:
         Uses full SHA-256 hash (64 hex characters) for collision resistance.
         SHA-256 provides ~128 bits of collision resistance, making
         collisions astronomically unlikely for any practical use case.
+        
+        CRITICAL FIX: Now normalizes text before hashing to ensure cache hits.
+        This fixes the 0% hit rate issue where equivalent queries like
+        "Hello World" and "hello world" generated different keys.
         
         Args:
             text: Text to hash.
@@ -287,7 +320,9 @@ class EmbeddingCache:
             used for security purposes (just cache keying), which allows
             the hash to work in FIPS-restricted environments.
         """
-        return hashlib.sha256(text.encode("utf-8"), usedforsecurity=False).hexdigest()
+        # Normalize text before hashing to ensure consistent cache keys
+        normalized = EmbeddingCache._normalize_text(text)
+        return hashlib.sha256(normalized.encode("utf-8"), usedforsecurity=False).hexdigest()
     
     def get(self, text: str) -> Optional[List[float]]:
         """
@@ -316,12 +351,26 @@ class EmbeddingCache:
                 # Move to end (most recently used)
                 self._cache.move_to_end(key)
                 
-                logger.debug(f"{LOG_PREFIX} HIT: {key[:16]}...")
+                # Compute hit rate for logging
+                total = self._hits + self._misses
+                hit_rate = self._hits / total if total > 0 else 0.0
+                logger.debug(
+                    f"{LOG_PREFIX} HIT: {key[:16]}... "
+                    f"(hits={self._hits}, misses={self._misses}, rate={hit_rate:.1%})"
+                )
                 
                 # Return copy to prevent external mutation
                 return self._cache[key].copy()
             
             self._misses += 1
+            # Log cache miss with debug details
+            total = self._hits + self._misses
+            hit_rate = self._hits / total if total > 0 else 0.0
+            logger.debug(
+                f"{LOG_PREFIX} MISS: {key[:16]}... "
+                f"(hits={self._hits}, misses={self._misses}, rate={hit_rate:.1%}, "
+                f"cache_size={len(self._cache)}/{self._max_size})"
+            )
             return None
     
     def put(self, text: str, embedding: List[float]) -> None:
@@ -498,6 +547,46 @@ class EmbeddingCache:
         key = self._make_key(text)
         with self._lock:
             return key in self._cache
+    
+    def dump_statistics(self) -> str:
+        """
+        Dump comprehensive cache statistics for debugging.
+        
+        Returns a formatted string with:
+        - Cache size and capacity
+        - Hit rate and performance metrics
+        - Sample of cached keys (first 10)
+        - Eviction and time saved information
+        
+        Returns:
+            Formatted statistics string for logging/debugging.
+        
+        Example:
+            >>> print(cache.dump_statistics())
+            === EmbeddingCache Statistics ===
+            Size: 50/10000
+            Hit rate: 75.0% (150 hits, 50 misses)
+            ...
+        """
+        with self._lock:
+            total = self._hits + self._misses
+            hit_rate = self._hits / total if total > 0 else 0.0
+            
+            # Get first 10 keys for sample
+            keys = list(self._cache.keys())[:10]
+            key_sample = [f"  {k[:32]}..." for k in keys]
+            
+            lines = [
+                f"=== {LOG_PREFIX} Statistics ===",
+                f"Size: {len(self._cache)}/{self._max_size}",
+                f"Hit rate: {hit_rate:.1%} ({self._hits} hits, {self._misses} misses)",
+                f"Evictions: {self._evictions}",
+                f"Time saved: {self._compute_time_saved_ms:.0f}ms",
+                f"Sample keys ({min(10, len(keys))} of {len(keys)}):",
+            ]
+            lines.extend(key_sample)
+            
+            return "\n".join(lines)
 
 
 # =============================================================================
@@ -901,3 +990,20 @@ def configure_cache(max_size: int = DEFAULT_MAX_CACHE_SIZE) -> None:
         _embedding_cache = EmbeddingCache(max_size=max_size)
     
     logger.info(f"{LOG_PREFIX} Cache configured with max_size={max_size}")
+
+
+def dump_cache_statistics() -> str:
+    """
+    Dump comprehensive cache statistics for debugging.
+    
+    Returns a formatted string with cache size, hit rate, sample keys,
+    and other diagnostic information.
+    
+    Example:
+        >>> print(dump_cache_statistics())
+        === [EmbeddingCache] Statistics ===
+        Size: 50/10000
+        Hit rate: 75.0% (150 hits, 50 misses)
+        ...
+    """
+    return _get_cache().dump_statistics()
