@@ -13,6 +13,19 @@ Run with:
 import pytest
 
 
+def matches_any_pattern(query: str, patterns) -> bool:
+    """Helper function to check if query matches any pattern in the tuple.
+    
+    Args:
+        query: The query string to test
+        patterns: Tuple of compiled regex patterns
+        
+    Returns:
+        True if any pattern matches the query
+    """
+    return any(pattern.search(query) for pattern in patterns)
+
+
 class TestComplexPhysicsKeywords:
     """Tests for COMPLEX_PHYSICS_KEYWORDS constant."""
 
@@ -99,8 +112,9 @@ class TestForceFullMathPatterns:
         ]
         
         for query in test_queries:
-            matched = any(pattern.search(query) for pattern in FORCE_FULL_MATH_PATTERNS)
-            assert matched, f"Pattern should match: '{query}'"
+            assert matches_any_pattern(query, FORCE_FULL_MATH_PATTERNS), (
+                f"Pattern should match: '{query}'"
+            )
 
     def test_controllability_proof_pattern(self):
         """Test pattern for controllability proofs."""
@@ -113,8 +127,9 @@ class TestForceFullMathPatterns:
         ]
         
         for query in test_queries:
-            matched = any(pattern.search(query) for pattern in FORCE_FULL_MATH_PATTERNS)
-            assert matched, f"Pattern should match: '{query}'"
+            assert matches_any_pattern(query, FORCE_FULL_MATH_PATTERNS), (
+                f"Pattern should match: '{query}'"
+            )
 
     def test_lagrangian_formula_pattern(self):
         """Test pattern for L = T - V formula."""
@@ -127,8 +142,9 @@ class TestForceFullMathPatterns:
         ]
         
         for query in test_queries:
-            matched = any(pattern.search(query) for pattern in FORCE_FULL_MATH_PATTERNS)
-            assert matched, f"Pattern should match: '{query}'"
+            assert matches_any_pattern(query, FORCE_FULL_MATH_PATTERNS), (
+                f"Pattern should match: '{query}'"
+            )
 
     def test_eigenvalue_analysis_pattern(self):
         """Test pattern for eigenvalue analysis."""
@@ -141,8 +157,9 @@ class TestForceFullMathPatterns:
         ]
         
         for query in test_queries:
-            matched = any(pattern.search(query) for pattern in FORCE_FULL_MATH_PATTERNS)
-            assert matched, f"Pattern should match: '{query}'"
+            assert matches_any_pattern(query, FORCE_FULL_MATH_PATTERNS), (
+                f"Pattern should match: '{query}'"
+            )
 
 
 class TestComplexPhysicsDetection:

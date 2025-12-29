@@ -1036,7 +1036,22 @@ FORCE_FULL_MATH_PATTERNS: Tuple[re.Pattern, ...] = (
 COMPLEX_PHYSICS_TIMEOUT_SECONDS: float = 120.0
 
 # Minimum complexity score for complex physics problems
+# This ensures complex physics queries get proper tool selection and resources
 COMPLEX_PHYSICS_MIN_COMPLEXITY: float = 0.80
+
+# Complexity boost factors for physics keywords in _calculate_complexity()
+# PHYSICS_COMPLEXITY_BOOST_MIN: Minimum boost to bring score up to threshold
+# PHYSICS_COMPLEXITY_BOOST_PER_KEYWORD: Additional boost per physics keyword
+PHYSICS_COMPLEXITY_BOOST_PER_KEYWORD: float = 0.20
+PHYSICS_COMPLEXITY_BOOST_CAP: float = 0.50  # Maximum cumulative boost
+
+# Advanced verbs that indicate complex analysis when combined with "pendulum"
+# Simple "pendulum" might be basic mechanics, but with these verbs it's advanced
+PENDULUM_ADVANCED_VERBS: Tuple[str, ...] = (
+    "derive", "linearize", "prove", "analyze", "stability",
+    "controllability", "eigenvalue", "state space", "state-space",
+    "equations of motion", "lagrangian", "hamiltonian"
+)
 
 # ============================================================
 # CONSTANTS - Security Patterns
@@ -1661,12 +1676,7 @@ class QueryAnalyzer:
         # Simple "pendulum" could be a basic mechanics problem, but combined with
         # advanced verbs it indicates complex analysis
         if "pendulum" in query_lower:
-            advanced_verbs = (
-                "derive", "linearize", "prove", "analyze", "stability",
-                "controllability", "eigenvalue", "state space", "state-space",
-                "equations of motion", "lagrangian", "hamiltonian"
-            )
-            if any(verb in query_lower for verb in advanced_verbs):
+            if any(verb in query_lower for verb in PENDULUM_ADVANCED_VERBS):
                 logger.info(
                     "[QueryRouter] Complex physics detected: 'pendulum' with advanced analysis"
                 )
@@ -2696,7 +2706,7 @@ class QueryAnalyzer:
             # Even 1 keyword indicates advanced physics requiring full analysis
             physics_boost = max(
                 COMPLEX_PHYSICS_MIN_COMPLEXITY - score,  # Bring up to minimum
-                min(0.5, physics_keyword_count * 0.2)  # Or add substantial boost
+                min(PHYSICS_COMPLEXITY_BOOST_CAP, physics_keyword_count * PHYSICS_COMPLEXITY_BOOST_PER_KEYWORD)
             )
             if physics_boost > 0:
                 score += physics_boost
