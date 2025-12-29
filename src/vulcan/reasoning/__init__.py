@@ -342,6 +342,16 @@ __all__ = [
     "EXPLAINER_AVAILABLE",
     "SELECTION_AVAILABLE",
     "BANDIT_AVAILABLE",
+    # ===== Mathematical Verification =====
+    "MathematicalVerificationEngine",
+    "MathematicalToolOrchestrator",
+    "MathErrorType",
+    "MathVerificationStatus",
+    "MathProblem",
+    "MathSolution",
+    "VerificationResult",
+    "BayesianProblem",
+    "MATHEMATICAL_VERIFICATION_AVAILABLE",
 ]
 
 
@@ -360,6 +370,7 @@ def get_module_status() -> dict:
         "explainer": EXPLAINER_AVAILABLE,
         "selection": SELECTION_AVAILABLE,
         "bandit": BANDIT_AVAILABLE,
+        "mathematical_verification": MATHEMATICAL_VERIFICATION_AVAILABLE,
     }
 
 
@@ -464,6 +475,35 @@ except ImportError as e:
     get_reasoning_statistics = None
     shutdown_reasoning = None
     INTEGRATION_AVAILABLE = False
+
+# ============================================================================
+# Mathematical Verification - SOTA Mathematical Reasoning
+# ============================================================================
+try:
+    from .mathematical_verification import (
+        MathematicalVerificationEngine,
+        MathematicalToolOrchestrator,
+        MathErrorType,
+        MathVerificationStatus,
+        MathProblem,
+        MathSolution,
+        VerificationResult,
+        BayesianProblem,
+    )
+
+    MATHEMATICAL_VERIFICATION_AVAILABLE = True
+    logger.info("Mathematical verification engine loaded successfully")
+except ImportError as e:
+    logger.warning(f"Mathematical verification import failed: {e}")
+    MathematicalVerificationEngine = None
+    MathematicalToolOrchestrator = None
+    MathErrorType = None
+    MathVerificationStatus = None
+    MathProblem = None
+    MathSolution = None
+    VerificationResult = None
+    BayesianProblem = None
+    MATHEMATICAL_VERIFICATION_AVAILABLE = False
 
 
 # ============================================================================

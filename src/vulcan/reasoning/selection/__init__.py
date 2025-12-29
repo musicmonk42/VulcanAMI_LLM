@@ -64,6 +64,12 @@ try:
 except ImportError:
     CIRCUIT_BREAKER_AVAILABLE = False
 
+# Mathematical verification availability (from tool_selector)
+try:
+    from .tool_selector import MATH_VERIFICATION_AVAILABLE
+except ImportError:
+    MATH_VERIFICATION_AVAILABLE = False
+
 
 __all__ = [
     # Main Orchestrator
@@ -97,6 +103,7 @@ __all__ = [
     "BANDIT_AVAILABLE",
     "SEMANTIC_MATCHER_AVAILABLE",
     "CIRCUIT_BREAKER_AVAILABLE",
+    "MATH_VERIFICATION_AVAILABLE",
 ]
 
 # Add optional components to __all__ if they were imported successfully
