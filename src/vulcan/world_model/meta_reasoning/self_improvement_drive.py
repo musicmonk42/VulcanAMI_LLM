@@ -38,11 +38,14 @@ ENCODING FIX (2025-10-19):
 
 from typing import Any, Dict, List, Tuple
 import ast
+from collections import defaultdict
+from datetime import datetime, timedelta
 import difflib
 import json
 import logging
 import math
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -110,6 +113,684 @@ try:
 except ImportError:
     # Fallback if safe execution module not available
     get_safe_executor = None
+
+
+# ==========================================================================
+# CODE INTROSPECTION - Enables Vulcan to examine its own source code
+# ==========================================================================
+
+
+class CodeIntrospector:
+    """
+    Enables Vulcan to examine its own source code.
+    
+    This class provides the ability to:
+    - Scan and parse all Python files in the project
+    - Find specific class methods by name
+    - Trace function calls from entry points
+    - Find missing implementations
+    - Analyze specific components like QueryRouter
+    """
+    
+    def __init__(self, project_root: Path):
+        """
+        Initialize the code introspector.
+        
+        Args:
+            project_root: Path to the project root directory
+        """
+        self.project_root = Path(project_root) if not isinstance(project_root, Path) else project_root
+        self.source_files: Dict[str, Dict[str, Any]] = {}
+        self.import_graph: Dict[str, List[str]] = {}
+        self.function_signatures: Dict[str, Dict[str, Any]] = {}
+        self.class_hierarchy: Dict[str, List[str]] = {}
+        self._scan_codebase()
+    
+    def _scan_codebase(self) -> None:
+        """Scan all Python files in the project."""
+        if not self.project_root.exists():
+            logger.warning(f"Project root does not exist: {self.project_root}")
+            return
+        
+        for py_file in self.project_root.rglob("*.py"):
+            # Skip virtual environments and cache directories
+            path_str = str(py_file)
+            if "venv" in path_str or "__pycache__" in path_str or ".git" in path_str:
+                continue
+            
+            try:
+                with open(py_file, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                
+                # Parse the AST
+                try:
+                    tree = ast.parse(content)
+                except SyntaxError as e:
+                    logger.debug(f"Syntax error parsing {py_file}: {e}")
+                    tree = None
+                
+                self.source_files[str(py_file)] = {
+                    'content': content,
+                    'ast': tree,
+                    'lines': content.splitlines()
+                }
+                
+                # Extract import graph
+                if tree:
+                    imports = []
+                    for node in ast.walk(tree):
+                        if isinstance(node, ast.Import):
+                            for alias in node.names:
+                                imports.append(alias.name)
+                        elif isinstance(node, ast.ImportFrom):
+                            if node.module:
+                                imports.append(node.module)
+                    self.import_graph[str(py_file)] = imports
+                    
+            except Exception as e:
+                logger.debug(f"Failed to parse {py_file}: {e}")
+        
+        logger.info(f"CodeIntrospector: Scanned {len(self.source_files)} Python files")
+    
+    def find_class_method(self, class_name: str, method_name: str) -> Optional[str]:
+        """
+        Find implementation of a specific method in a class.
+        
+        Args:
+            class_name: Name of the class to search for
+            method_name: Name of the method within the class
+            
+        Returns:
+            String representation of the method if found, None otherwise
+        """
+        for filepath, data in self.source_files.items():
+            tree = data.get('ast')
+            if tree is None:
+                continue
+            
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ClassDef) and node.name == class_name:
+                    for item in node.body:
+                        if isinstance(item, ast.FunctionDef) and item.name == method_name:
+                            try:
+                                return ast.unparse(item)
+                            except Exception:
+                                # Fallback for older Python versions
+                                start_line = item.lineno - 1
+                                end_line = item.end_lineno if hasattr(item, 'end_lineno') else start_line + 20
+                                return '\n'.join(data['lines'][start_line:end_line])
+        return None
+    
+    def trace_function_calls(self, entry_point: str) -> List[str]:
+        """
+        Trace all function calls from an entry point.
+        
+        Args:
+            entry_point: Name of the function or method to trace from
+            
+        Returns:
+            List of function/method names that are called
+        """
+        calls: List[str] = []
+        for filepath, data in self.source_files.items():
+            if entry_point not in data['content']:
+                continue
+            
+            tree = data.get('ast')
+            if tree is None:
+                continue
+            
+            # Extract function calls using AST
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Call):
+                    if isinstance(node.func, ast.Name):
+                        calls.append(node.func.id)
+                    elif isinstance(node.func, ast.Attribute):
+                        try:
+                            calls.append(f"{ast.unparse(node.func.value)}.{node.func.attr}")
+                        except Exception:
+                            calls.append(node.func.attr)
+        
+        return list(set(calls))  # Remove duplicates
+    
+    def find_missing_implementations(self) -> List[Dict[str, Any]]:
+        """
+        Find methods that are called but not implemented.
+        
+        Returns:
+            List of dictionaries describing potentially missing implementations
+        """
+        missing: List[Dict[str, Any]] = []
+        all_calls: set = set()
+        all_definitions: set = set()
+        
+        for filepath, data in self.source_files.items():
+            tree = data.get('ast')
+            if tree is None:
+                continue
+            
+            # Collect all function/method calls
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Call):
+                    if isinstance(node.func, ast.Attribute):
+                        all_calls.add(node.func.attr)
+            
+            # Collect all function/method definitions
+            for node in ast.walk(tree):
+                if isinstance(node, ast.FunctionDef):
+                    all_definitions.add(node.name)
+        
+        # Find calls without definitions (excluding builtins and common methods)
+        common_methods = {
+            'get', 'set', 'add', 'remove', 'append', 'extend', 'pop', 'update',
+            'keys', 'values', 'items', 'copy', 'clear', 'format', 'join', 'split',
+            'strip', 'replace', 'lower', 'upper', 'startswith', 'endswith',
+            'encode', 'decode', 'read', 'write', 'close', 'open', 'exists',
+            'mkdir', 'info', 'debug', 'warning', 'error', 'critical',
+        }
+        
+        for call in all_calls:
+            if call not in all_definitions and call not in common_methods:
+                missing.append({
+                    'function': call,
+                    'type': 'missing_implementation'
+                })
+        
+        return missing
+    
+    def analyze_query_routing(self) -> Dict[str, Any]:
+        """
+        Specifically analyze the QueryRouter implementation.
+        
+        Returns:
+            Dictionary containing analysis results for query routing
+        """
+        analysis: Dict[str, Any] = {
+            'has_query_router': False,
+            'routing_logic_found': False,
+            'route_methods': [],
+            'missing_routes': [],
+            'issues': [],
+            'file_path': None
+        }
+        
+        # Find QueryRouter class
+        for filepath, data in self.source_files.items():
+            if 'QueryRouter' not in data['content'] and 'QueryAnalyzer' not in data['content']:
+                continue
+            
+            analysis['has_query_router'] = True
+            analysis['file_path'] = filepath
+            
+            tree = data.get('ast')
+            if tree is None:
+                continue
+            
+            # Look for route/classify methods
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ClassDef) and ('Router' in node.name or 'Analyzer' in node.name):
+                    for method in node.body:
+                        if isinstance(method, ast.FunctionDef):
+                            if 'route' in method.name.lower() or 'classify' in method.name.lower():
+                                analysis['route_methods'].append(method.name)
+                                
+                                # Check for actual routing logic
+                                try:
+                                    method_body = ast.unparse(method)
+                                except Exception:
+                                    method_body = data['content'][method.lineno:method.end_lineno if hasattr(method, 'end_lineno') else method.lineno + 50]
+                                
+                                if any(kw in method_body.lower() for kw in [
+                                    'philosophical', 'mathematical', 'identity',
+                                    'querytype', 'query_type', 'routing'
+                                ]):
+                                    analysis['routing_logic_found'] = True
+        
+        # Identify issues
+        if not analysis['routing_logic_found'] and analysis['has_query_router']:
+            analysis['issues'].append("Query routing exists but classification logic may be incomplete")
+        
+        if not analysis['route_methods'] and analysis['has_query_router']:
+            analysis['issues'].append("No route/classify methods found in router class")
+            analysis['missing_routes'] = [
+                'philosophical_route',
+                'identity_route', 
+                'conversational_route'
+            ]
+        
+        return analysis
+    
+    def get_file_structure(self, directory: Optional[str] = None) -> Dict[str, List[str]]:
+        """
+        Get the file structure of the project.
+        
+        Args:
+            directory: Optional subdirectory to focus on
+            
+        Returns:
+            Dictionary mapping directories to their Python files
+        """
+        structure: Dict[str, List[str]] = defaultdict(list)
+        base = self.project_root / directory if directory else self.project_root
+        
+        for filepath in self.source_files.keys():
+            try:
+                rel_path = Path(filepath).relative_to(base)
+                parent = str(rel_path.parent)
+                structure[parent].append(rel_path.name)
+            except ValueError:
+                continue
+        
+        return dict(structure)
+
+
+class LogAnalyzer:
+    """
+    Analyze Vulcan's own logs for patterns and issues.
+    
+    This class provides the ability to:
+    - Parse and analyze log files
+    - Detect patterns like timeouts, routing failures, errors
+    - Extract recent failures for diagnostic purposes
+    """
+    
+    def __init__(self, log_dir: Path):
+        """
+        Initialize the log analyzer.
+        
+        Args:
+            log_dir: Path to the logs directory
+        """
+        self.log_dir = Path(log_dir) if not isinstance(log_dir, Path) else log_dir
+        self.patterns = {
+            'timeouts': re.compile(r'timeout|timed out', re.IGNORECASE),
+            'routing_failures': re.compile(r'route|routing|classify', re.IGNORECASE),
+            'slow_queries': re.compile(r'took (\d+\.?\d*)s'),
+            'errors': re.compile(r'ERROR|CRITICAL|FAILED', re.IGNORECASE),
+            'exceptions': re.compile(r'Exception|Error:|Traceback', re.IGNORECASE),
+            'memory_issues': re.compile(r'memory|MemoryError|OOM', re.IGNORECASE),
+            'import_errors': re.compile(r'ImportError|ModuleNotFoundError', re.IGNORECASE),
+        }
+    
+    def analyze_recent_failures(self, hours: int = 1) -> Dict[str, List[Dict[str, Any]]]:
+        """
+        Analyze recent log entries for failures.
+        
+        Args:
+            hours: Number of hours to look back (default: 1)
+            
+        Returns:
+            Dictionary mapping pattern types to lists of matched log entries
+        """
+        cutoff_time = datetime.now() - timedelta(hours=hours)
+        failures: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+        
+        if not self.log_dir.exists():
+            logger.debug(f"Log directory does not exist: {self.log_dir}")
+            return dict(failures)
+        
+        for log_file in self.log_dir.glob("*.log"):
+            try:
+                # Skip old log files based on modification time
+                file_mtime = datetime.fromtimestamp(log_file.stat().st_mtime)
+                if file_mtime < cutoff_time:
+                    continue
+                
+                with open(log_file, 'r', encoding='utf-8', errors='replace') as f:
+                    for line in f:
+                        # Try to extract timestamp and check recency
+                        try:
+                            match = re.search(r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})', line)
+                            if match:
+                                log_time = datetime.strptime(match.group(1), '%Y-%m-%d %H:%M:%S')
+                                if log_time < cutoff_time:
+                                    continue
+                        except (ValueError, AttributeError):
+                            pass  # If we can't parse timestamp, include line anyway
+                        
+                        # Check patterns
+                        for pattern_name, pattern in self.patterns.items():
+                            if pattern.search(line):
+                                failures[pattern_name].append({
+                                    'line': line.strip()[:200],  # Truncate long lines
+                                    'file': log_file.name,
+                                    'pattern': pattern_name
+                                })
+                                
+            except Exception as e:
+                logger.debug(f"Error reading log file {log_file}: {e}")
+        
+        return dict(failures)
+    
+    def get_error_summary(self, hours: int = 24) -> Dict[str, Any]:
+        """
+        Get a summary of errors from recent logs.
+        
+        Args:
+            hours: Number of hours to look back
+            
+        Returns:
+            Summary dictionary with error counts and examples
+        """
+        failures = self.analyze_recent_failures(hours)
+        
+        summary = {
+            'total_errors': sum(len(v) for v in failures.values()),
+            'error_types': {k: len(v) for k, v in failures.items()},
+            'examples': {k: v[:3] for k, v in failures.items()},  # First 3 examples each
+            'hours_analyzed': hours,
+            'has_critical_issues': False
+        }
+        
+        # Flag critical issues
+        if failures.get('errors', []) or failures.get('exceptions', []):
+            summary['has_critical_issues'] = True
+        
+        return summary
+
+
+class CodeKnowledgeStore:
+    """
+    Stores and retrieves code knowledge using the memory system.
+    
+    This class integrates with HierarchicalMemory and GraphRAG to:
+    - Store code patterns, issues, and insights as memories
+    - Retrieve relevant code knowledge when making improvements
+    - Learn from past code changes and their outcomes
+    - Build a knowledge graph of code relationships
+    """
+    
+    def __init__(self, memory_system=None):
+        """
+        Initialize the code knowledge store.
+        
+        Args:
+            memory_system: Optional HierarchicalMemory or GraphRAG instance
+        """
+        self._memory = memory_system
+        self._local_cache: Dict[str, Dict[str, Any]] = {}
+        self._pattern_index: Dict[str, List[str]] = defaultdict(list)
+        self._issue_history: List[Dict[str, Any]] = []
+        self._learning_outcomes: List[Dict[str, Any]] = []
+        
+        # Try to initialize memory system if not provided
+        if self._memory is None:
+            self._memory = self._initialize_memory()
+    
+    def _initialize_memory(self):
+        """Try to initialize connection to memory system."""
+        try:
+            from vulcan.memory.hierarchical import HierarchicalMemory
+            from vulcan.memory.base import MemoryConfig
+            # Create a minimal config for code knowledge
+            config = MemoryConfig(
+                max_memories=10000,
+                default_importance=0.5,
+                decay_rate=0.001
+            )
+            return HierarchicalMemory(config)
+        except ImportError:
+            logger.debug("HierarchicalMemory not available, using local cache only")
+        except Exception as e:
+            logger.debug(f"Failed to initialize HierarchicalMemory: {e}")
+        
+        try:
+            from persistant_memory_v46 import GraphRAG
+            return GraphRAG(embedding_model="llm_embeddings")
+        except ImportError:
+            logger.debug("GraphRAG not available, using local cache only")
+        except Exception as e:
+            logger.debug(f"Failed to initialize GraphRAG: {e}")
+        
+        return None
+    
+    def store_code_pattern(
+        self,
+        pattern_type: str,
+        pattern_data: Dict[str, Any],
+        source_file: str,
+        confidence: float = 0.8
+    ) -> str:
+        """
+        Store a learned code pattern in memory.
+        
+        Args:
+            pattern_type: Type of pattern (e.g., 'bug_pattern', 'optimization', 'antipattern')
+            pattern_data: Dictionary containing pattern details
+            source_file: Source file where pattern was found
+            confidence: Confidence score for this pattern
+            
+        Returns:
+            Pattern ID for later retrieval
+        """
+        pattern_id = f"pattern_{pattern_type}_{hash(str(pattern_data)) % 10000}"
+        
+        memory_entry = {
+            'id': pattern_id,
+            'type': pattern_type,
+            'data': pattern_data,
+            'source_file': source_file,
+            'confidence': confidence,
+            'timestamp': time.time(),
+            'access_count': 0
+        }
+        
+        # Store in local cache
+        self._local_cache[pattern_id] = memory_entry
+        self._pattern_index[pattern_type].append(pattern_id)
+        
+        # Store in memory system if available
+        if self._memory is not None:
+            try:
+                if hasattr(self._memory, 'add_node'):
+                    # GraphRAG style
+                    self._memory.add_node(
+                        node_id=pattern_id,
+                        content=json.dumps(pattern_data),
+                        metadata={
+                            'type': 'code_pattern',
+                            'pattern_type': pattern_type,
+                            'source_file': source_file,
+                            'confidence': confidence
+                        }
+                    )
+                elif hasattr(self._memory, 'store'):
+                    # HierarchicalMemory style
+                    from vulcan.memory.base import Memory, MemoryType
+                    mem = Memory(
+                        content=pattern_data,
+                        memory_type=MemoryType.SEMANTIC,
+                        metadata={
+                            'pattern_id': pattern_id,
+                            'pattern_type': pattern_type,
+                            'source_file': source_file
+                        },
+                        importance=confidence
+                    )
+                    self._memory.store(mem)
+            except Exception as e:
+                logger.debug(f"Failed to store pattern in memory system: {e}")
+        
+        return pattern_id
+    
+    def store_issue(
+        self,
+        issue: Dict[str, Any],
+        resolved: bool = False,
+        resolution: Optional[str] = None
+    ) -> str:
+        """
+        Store a diagnosed issue for learning.
+        
+        Args:
+            issue: Issue dictionary from diagnose_system_issues
+            resolved: Whether the issue has been resolved
+            resolution: Description of how it was resolved
+            
+        Returns:
+            Issue ID
+        """
+        issue_id = f"issue_{issue.get('component', 'unknown')}_{int(time.time())}"
+        
+        issue_entry = {
+            'id': issue_id,
+            'issue': issue,
+            'resolved': resolved,
+            'resolution': resolution,
+            'timestamp': time.time()
+        }
+        
+        self._issue_history.append(issue_entry)
+        
+        # Limit history size
+        if len(self._issue_history) > 1000:
+            self._issue_history = self._issue_history[-500:]
+        
+        return issue_id
+    
+    def record_learning_outcome(
+        self,
+        objective_type: str,
+        success: bool,
+        code_changes: Dict[str, Any],
+        metrics_before: Optional[Dict[str, float]] = None,
+        metrics_after: Optional[Dict[str, float]] = None
+    ):
+        """
+        Record the outcome of a code improvement for learning.
+        
+        Args:
+            objective_type: Type of improvement attempted
+            success: Whether the improvement was successful
+            code_changes: Dictionary describing what was changed
+            metrics_before: Performance metrics before change
+            metrics_after: Performance metrics after change
+        """
+        outcome = {
+            'objective_type': objective_type,
+            'success': success,
+            'code_changes': code_changes,
+            'metrics_before': metrics_before or {},
+            'metrics_after': metrics_after or {},
+            'timestamp': time.time()
+        }
+        
+        self._learning_outcomes.append(outcome)
+        
+        # Learn from outcome
+        if success:
+            # Store successful pattern
+            self.store_code_pattern(
+                pattern_type='successful_fix',
+                pattern_data={
+                    'objective_type': objective_type,
+                    'changes': code_changes,
+                    'improvement': self._calculate_improvement(metrics_before, metrics_after)
+                },
+                source_file=code_changes.get('file_modified', 'unknown'),
+                confidence=0.9
+            )
+        else:
+            # Store failed attempt to avoid repeating
+            self.store_code_pattern(
+                pattern_type='failed_attempt',
+                pattern_data={
+                    'objective_type': objective_type,
+                    'changes': code_changes,
+                    'reason': code_changes.get('error', 'unknown')
+                },
+                source_file=code_changes.get('file_modified', 'unknown'),
+                confidence=0.7
+            )
+        
+        # Limit history
+        if len(self._learning_outcomes) > 500:
+            self._learning_outcomes = self._learning_outcomes[-250:]
+    
+    def _calculate_improvement(
+        self,
+        before: Optional[Dict[str, float]],
+        after: Optional[Dict[str, float]]
+    ) -> float:
+        """Calculate improvement score from metrics."""
+        if not before or not after:
+            return 0.0
+        
+        improvements = []
+        for key in before:
+            if key in after:
+                # Assume lower is better for loss/error metrics
+                if 'loss' in key.lower() or 'error' in key.lower():
+                    improvement = (before[key] - after[key]) / (before[key] + 1e-10)
+                else:
+                    improvement = (after[key] - before[key]) / (before[key] + 1e-10)
+                improvements.append(improvement)
+        
+        return sum(improvements) / len(improvements) if improvements else 0.0
+    
+    def get_similar_issues(self, issue: Dict[str, Any], limit: int = 5) -> List[Dict[str, Any]]:
+        """
+        Find similar past issues for learning from previous resolutions.
+        
+        Args:
+            issue: Current issue to find similar ones for
+            limit: Maximum number of similar issues to return
+            
+        Returns:
+            List of similar past issues with their resolutions
+        """
+        component = issue.get('component', '')
+        issue_type = issue.get('type', '')
+        
+        similar = []
+        for past_issue in reversed(self._issue_history):
+            past = past_issue.get('issue', {})
+            if (past.get('component') == component or past.get('type') == issue_type):
+                if past_issue.get('resolved'):
+                    similar.append(past_issue)
+                    if len(similar) >= limit:
+                        break
+        
+        return similar
+    
+    def get_successful_patterns_for_objective(
+        self,
+        objective_type: str,
+        limit: int = 10
+    ) -> List[Dict[str, Any]]:
+        """
+        Get successful fix patterns for a given objective type.
+        
+        Args:
+            objective_type: Type of objective to find patterns for
+            limit: Maximum patterns to return
+            
+        Returns:
+            List of successful pattern data
+        """
+        patterns = []
+        for pattern_id in self._pattern_index.get('successful_fix', []):
+            pattern = self._local_cache.get(pattern_id)
+            if pattern:
+                data = pattern.get('data', {})
+                if data.get('objective_type') == objective_type:
+                    pattern['access_count'] = pattern.get('access_count', 0) + 1
+                    patterns.append(pattern)
+                    if len(patterns) >= limit:
+                        break
+        
+        return patterns
+    
+    def get_statistics(self) -> Dict[str, Any]:
+        """Get statistics about stored code knowledge."""
+        return {
+            'total_patterns': len(self._local_cache),
+            'pattern_types': {k: len(v) for k, v in self._pattern_index.items()},
+            'issues_tracked': len(self._issue_history),
+            'learning_outcomes': len(self._learning_outcomes),
+            'successful_fixes': sum(1 for o in self._learning_outcomes if o.get('success')),
+            'memory_system_connected': self._memory is not None
+        }
 
 
 class TriggerType(Enum):
@@ -377,6 +1058,32 @@ class SelfImprovementDrive:
         
         # Detect or set repository root for file operations
         self.repo_root = self._detect_repo_root()
+        
+        # Initialize code introspection capabilities
+        # This enables Vulcan to examine its own source code and logs
+        try:
+            self.code_introspector = CodeIntrospector(self.repo_root)
+            logger.info(f"CodeIntrospector initialized: {len(self.code_introspector.source_files)} files scanned")
+        except Exception as e:
+            logger.warning(f"Failed to initialize CodeIntrospector: {e}")
+            self.code_introspector = None
+        
+        # Initialize log analyzer for self-diagnosis
+        log_dir = self.repo_root / 'logs'
+        try:
+            self.log_analyzer = LogAnalyzer(log_dir)
+            logger.info(f"LogAnalyzer initialized: monitoring {log_dir}")
+        except Exception as e:
+            logger.warning(f"Failed to initialize LogAnalyzer: {e}")
+            self.log_analyzer = None
+        
+        # Initialize code knowledge store for learning from code patterns
+        try:
+            self.code_knowledge_store = CodeKnowledgeStore()
+            logger.info(f"CodeKnowledgeStore initialized: {self.code_knowledge_store.get_statistics()}")
+        except Exception as e:
+            logger.warning(f"Failed to initialize CodeKnowledgeStore: {e}")
+            self.code_knowledge_store = None
         
         logger.info(
             f"Safe executor initialized: {self.safe_executor is not None}, "
@@ -1770,6 +2477,195 @@ class SelfImprovementDrive:
         
         return boost_counts
 
+    # ---------- Code Introspection Methods ----------
+
+    def diagnose_system_issues(self) -> List[Dict[str, Any]]:
+        """
+        Use introspection to diagnose system issues.
+        
+        This method examines Vulcan's own code and logs to identify problems
+        that the self-improvement system should address.
+        
+        Returns:
+            List of diagnosed issues, each with type, component, severity, and description
+        """
+        issues: List[Dict[str, Any]] = []
+        
+        # 1. Analyze query routing implementation
+        if self.code_introspector:
+            try:
+                routing_analysis = self.code_introspector.analyze_query_routing()
+                if routing_analysis.get('has_query_router') and not routing_analysis.get('routing_logic_found'):
+                    issues.append({
+                        'type': 'missing_implementation',
+                        'component': 'QueryRouter',
+                        'severity': 'critical',
+                        'description': 'QueryRouter may have incomplete classification logic',
+                        'suggested_fix': 'Review classify_query method for pattern matching',
+                        'affected_files': [routing_analysis.get('file_path', 'query_router.py')],
+                        'details': routing_analysis.get('issues', [])
+                    })
+                
+                # Check for issues in routing analysis
+                for issue in routing_analysis.get('issues', []):
+                    issues.append({
+                        'type': 'potential_issue',
+                        'component': 'QueryRouter',
+                        'severity': 'medium',
+                        'description': issue,
+                        'affected_files': [routing_analysis.get('file_path', 'query_router.py')]
+                    })
+                
+            except Exception as e:
+                logger.debug(f"Query routing analysis failed: {e}")
+        
+        # 2. Check recent logs for patterns
+        if self.log_analyzer:
+            try:
+                log_failures = self.log_analyzer.analyze_recent_failures(hours=1)
+                
+                # Check for timeout patterns
+                if log_failures.get('timeouts') and len(log_failures['timeouts']) > 10:
+                    issues.append({
+                        'type': 'performance',
+                        'component': 'QueryHandler',
+                        'severity': 'high',
+                        'description': f"Found {len(log_failures['timeouts'])} timeout errors in recent logs",
+                        'evidence': log_failures['timeouts'][:3]  # First 3 examples
+                    })
+                
+                # Check for error patterns
+                if log_failures.get('errors') and len(log_failures['errors']) > 5:
+                    issues.append({
+                        'type': 'errors',
+                        'component': 'System',
+                        'severity': 'high',
+                        'description': f"Found {len(log_failures['errors'])} error entries in recent logs",
+                        'evidence': log_failures['errors'][:3]
+                    })
+                
+                # Check for import errors
+                if log_failures.get('import_errors'):
+                    issues.append({
+                        'type': 'dependency',
+                        'component': 'Imports',
+                        'severity': 'medium',
+                        'description': f"Found {len(log_failures['import_errors'])} import errors",
+                        'evidence': log_failures['import_errors'][:3]
+                    })
+                    
+            except Exception as e:
+                logger.debug(f"Log analysis failed: {e}")
+        
+        # 3. Find missing implementations
+        if self.code_introspector:
+            try:
+                missing = self.code_introspector.find_missing_implementations()
+                # Only report if there are many missing implementations (likely real issues)
+                significant_missing = [m for m in missing if not m['function'].startswith('_')]
+                if len(significant_missing) > 10:
+                    issues.append({
+                        'type': 'missing_implementation',
+                        'component': 'Unknown',
+                        'severity': 'low',
+                        'description': f"Found {len(significant_missing)} potentially missing function implementations",
+                        'evidence': significant_missing[:5]  # First 5 examples
+                    })
+            except Exception as e:
+                logger.debug(f"Missing implementation analysis failed: {e}")
+        
+        # Store issues in knowledge store and enhance with past similar issues
+        if self.code_knowledge_store and issues:
+            for issue in issues:
+                # Store the issue
+                self.code_knowledge_store.store_issue(issue, resolved=False)
+                
+                # Find similar past issues with resolutions
+                similar = self.code_knowledge_store.get_similar_issues(issue, limit=3)
+                if similar:
+                    issue['similar_past_issues'] = similar
+                    # Extract successful resolutions as hints
+                    resolutions = [s.get('resolution') for s in similar if s.get('resolution')]
+                    if resolutions:
+                        issue['suggested_resolutions'] = resolutions
+        
+        logger.info(f"Diagnosed {len(issues)} system issues")
+        return issues
+
+    def generate_improvement_observation(self, objective: ImprovementObjective) -> Dict[str, Any]:
+        """
+        Generate observation that includes code introspection results.
+        
+        This provides context for LLM-based improvement generation by including
+        diagnosed issues and relevant code context.
+        
+        Args:
+            objective: The improvement objective to generate observation for
+            
+        Returns:
+            Dictionary containing observation data including diagnosed issues
+        """
+        # First, diagnose current issues
+        current_issues = self.diagnose_system_issues()
+        
+        # Base observation
+        observation: Dict[str, Any] = {
+            'objective_type': objective.type,
+            'current_issues': current_issues,
+            'timestamp': time.time(),
+            'objective_weight': objective.weight,
+            'objective_attempts': objective.attempts,
+        }
+        
+        # If fixing bugs, include specific code context
+        if objective.type == 'fix_known_bugs' and current_issues:
+            # Pick highest severity issue
+            critical_issues = [i for i in current_issues if i.get('severity') == 'critical']
+            high_issues = [i for i in current_issues if i.get('severity') == 'high']
+            
+            target_issues = critical_issues or high_issues
+            if target_issues:
+                issue = target_issues[0]
+                observation['target_issue'] = issue
+                
+                # Include actual code context
+                if issue.get('component') and self.code_introspector:
+                    component = issue['component']
+                    # Try to find relevant code
+                    if component == 'QueryRouter':
+                        current_impl = self.code_introspector.find_class_method('QueryAnalyzer', 'route_query')
+                        if not current_impl:
+                            current_impl = self.code_introspector.find_class_method('QueryRouter', 'route')
+                        if current_impl:
+                            # Truncate to avoid prompt overflow
+                            observation['current_code'] = current_impl[:MAX_CODE_SNIPPET_CHARS]
+        
+        # For optimization objectives, include performance-related issues
+        if objective.type == 'optimize_performance':
+            perf_issues = [i for i in current_issues if i.get('type') == 'performance']
+            observation['performance_issues'] = perf_issues
+        
+        # Include successful patterns from code knowledge store for learning
+        if self.code_knowledge_store:
+            try:
+                successful_patterns = self.code_knowledge_store.get_successful_patterns_for_objective(
+                    objective.type, limit=5
+                )
+                if successful_patterns:
+                    observation['successful_patterns'] = [
+                        {
+                            'changes': p.get('data', {}).get('changes', {}),
+                            'improvement': p.get('data', {}).get('improvement', 0),
+                            'confidence': p.get('confidence', 0)
+                        }
+                        for p in successful_patterns
+                    ]
+                    logger.info(f"Found {len(successful_patterns)} successful patterns for {objective.type}")
+            except Exception as e:
+                logger.debug(f"Failed to retrieve successful patterns: {e}")
+        
+        return observation
+
     # ---------- Action Planning ----------
 
     def generate_improvement_action(
@@ -2376,6 +3272,26 @@ class SelfImprovementDrive:
             self.state.current_objective = None
             self.state.active = False
             self._save_state()
+            
+            # Record learning outcome in code knowledge store
+            if self.code_knowledge_store:
+                try:
+                    self.code_knowledge_store.record_learning_outcome(
+                        objective_type=objective_type,
+                        success=success,
+                        code_changes={
+                            'file_modified': details.get('file_modified', 'unknown'),
+                            'changes_applied': details.get('changes_applied', ''),
+                            'error': details.get('error', '') if not success else None,
+                            'tokens_used': details.get('tokens_used', 0),
+                            'cost_usd': details.get('cost_usd', 0.0)
+                        },
+                        metrics_before=details.get('metrics_before'),
+                        metrics_after=details.get('metrics_after')
+                    )
+                    logger.info(f"Learning outcome recorded for {objective_type}")
+                except Exception as e:
+                    logger.debug(f"Failed to record learning outcome: {e}")
 
     # ---------- Status ----------
 
@@ -2553,27 +3469,94 @@ class SelfImprovementDrive:
     ) -> Tuple[Optional[str], Optional[str]]:
         """
         Uses the WorldModel's LLM interface (or fallback) to generate the code improvement.
+        
+        Enhanced with code introspection to provide actual code context to the LLM,
+        enabling more accurate and targeted fixes.
+        
         Returns (content, file_path).
         """
         # Extract details from action plan
         goal = action.get("high_level_goal")
         observation = action.get("raw_observation", {})
+        
+        # Generate improvement observation with code introspection
+        objective_type = action.get("_drive_metadata", {}).get("objective_type")
+        if objective_type:
+            # Find the matching objective
+            matching_obj = next(
+                (obj for obj in self.objectives if obj.type == objective_type), 
+                None
+            )
+            if matching_obj:
+                # Get enhanced observation with diagnosed issues
+                enhanced_obs = self.generate_improvement_observation(matching_obj)
+                observation.update(enhanced_obs)
+        
+        # Build context sections for the prompt
+        issues_context = ""
+        if observation.get('current_issues'):
+            issues_context = "\n\nDiagnosed Issues:\n"
+            for issue in observation['current_issues']:
+                severity = issue.get('severity', 'unknown').upper()
+                desc = issue.get('description', 'No description')
+                issues_context += f"- {severity}: {desc}\n"
+                if issue.get('evidence'):
+                    issues_context += f"  Evidence: {str(issue['evidence'])[:200]}\n"
+        
+        # Include current code if available
+        code_context = ""
+        if observation.get('current_code'):
+            code_context = f"\n\nCurrent Implementation:\n```python\n{observation['current_code']}\n```"
+        
+        # Include target issue details
+        target_issue_context = ""
+        if observation.get('target_issue'):
+            issue = observation['target_issue']
+            target_issue_context = f"""
+\n\nTarget Issue to Fix:
+- Component: {issue.get('component', 'Unknown')}
+- Severity: {issue.get('severity', 'Unknown')}
+- Description: {issue.get('description', 'No description')}
+- Suggested Fix: {issue.get('suggested_fix', 'Review implementation')}
+"""
+            # Include suggested resolutions from past similar issues
+            if issue.get('suggested_resolutions'):
+                target_issue_context += "\n\nPast Successful Resolutions for Similar Issues:\n"
+                for i, resolution in enumerate(issue['suggested_resolutions'][:3], 1):
+                    target_issue_context += f"  {i}. {resolution}\n"
+        
+        # Include learned patterns from code knowledge store
+        patterns_context = ""
+        if observation.get('successful_patterns'):
+            patterns_context = "\n\nLearned Successful Patterns for This Objective:\n"
+            for i, pattern in enumerate(observation['successful_patterns'][:3], 1):
+                changes = pattern.get('changes', {})
+                improvement = pattern.get('improvement', 0)
+                patterns_context += f"  {i}. File: {changes.get('file_modified', 'unknown')}, Improvement: {improvement:.1%}\n"
 
-        # Construct Prompt
+        # Construct enhanced prompt with code introspection context
         prompt = f"""
-        You are an expert software engineer improving the Vulcan system.
-        Objective: {goal}
-        Task Details: {json.dumps(observation)}
+You are an expert software engineer improving the Vulcan system.
+Objective: {goal}
+{issues_context}
+{code_context}
+{target_issue_context}
+{patterns_context}
+Task Details: {json.dumps({k: v for k, v in observation.items() if k not in ['current_issues', 'current_code', 'target_issue', 'successful_patterns']}, indent=2)}
 
-        Please provide the FULL content of the Python file that needs to be created or modified to solve this.
-        If modifying, provide the complete updated file.
+Based on the diagnosed issues and current code, provide the FULL corrected implementation.
+Focus on fixing the identified issues, especially any CRITICAL severity problems.
+Consider the learned successful patterns when making improvements.
 
-        Format your response exactly as follows:
-        FILE: <path/to/file.py>
-        ```python
-        <code content here>
-        ```
-        """
+Please provide the FULL content of the Python file that needs to be created or modified to solve this.
+If modifying, provide the complete updated file.
+
+Format your response exactly as follows:
+FILE: <path/to/file.py>
+```python
+<code content here>
+```
+"""
 
         # Call LLM (Mock integration if WorldModel not fully wired, otherwise use it)
         try:
