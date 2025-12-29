@@ -305,5 +305,73 @@ class TestCacheKeyDeterminism:
         assert all(c in '0123456789abcdef' for c in key), "Cache key should be hexadecimal"
 
 
+class TestToolSelectionDeterminism:
+    """Tests for tool selection determinism fixes."""
+    
+    def test_bandit_fallback_is_deterministic(self):
+        """Test that ToolSelectionBandit fallback doesn't use random selection."""
+        # Check that the code doesn't use np.random.choice in fallback
+        import inspect
+        from vulcan.reasoning.selection.tool_selector import ToolSelectionBandit
+        
+        source = inspect.getsource(ToolSelectionBandit.select_tool)
+        
+        # Should NOT contain random.choice
+        assert "np.random.choice" not in source, \
+            "ToolSelectionBandit.select_tool should not use random selection in fallback"
+        
+        # Should contain deterministic fallback
+        assert "probabilistic" in source, \
+            "ToolSelectionBandit.select_tool should have deterministic 'probabilistic' fallback"
+    
+    def test_feature_extraction_fallback_is_deterministic(self):
+        """Test that feature extraction fallback uses zeros instead of random."""
+        # Check that the code uses np.zeros instead of np.random.randn
+        import inspect
+        from vulcan.reasoning.selection.tool_selector import ToolSelector
+        
+        source = inspect.getsource(ToolSelector._extract_features)
+        
+        # Should NOT contain random.randn
+        assert "np.random.randn" not in source, \
+            "ToolSelector._extract_features should not use random features in fallback"
+        
+        # Should contain zeros fallback
+        assert "np.zeros" in source, \
+            "ToolSelector._extract_features should use deterministic np.zeros fallback"
+    
+    def test_selection_cache_features_are_deterministic(self):
+        """Test that selection cache feature extraction uses zeros."""
+        # Check that the code uses np.zeros instead of np.random.randn
+        import inspect
+        from vulcan.reasoning.selection.selection_cache import SelectionCache
+        
+        source = inspect.getsource(SelectionCache._extract_features_for_pattern)
+        
+        # Should NOT contain random.randn
+        assert "np.random.randn" not in source, \
+            "SelectionCache._extract_features_for_pattern should not use random features"
+        
+        # Should contain zeros fallback
+        assert "np.zeros" in source, \
+            "SelectionCache._extract_features_for_pattern should use deterministic np.zeros"
+    
+    def test_disabled_bandit_returns_consistent_tool(self):
+        """Test that disabled bandit returns same tool every time."""
+        from vulcan.reasoning.selection.tool_selector import ToolSelectionBandit
+        import numpy as np
+        
+        bandit = ToolSelectionBandit({'feature_dim': 128})
+        bandit.is_enabled = False  # Force disabled
+        
+        # Run 10 times - should always return same tool
+        results = [bandit.select_tool(np.zeros(128), {}) for _ in range(10)]
+        
+        assert len(set(results)) == 1, \
+            f"Disabled bandit should return consistent tool, got: {results}"
+        assert results[0] == "probabilistic", \
+            f"Disabled bandit should return 'probabilistic', got: {results[0]}"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

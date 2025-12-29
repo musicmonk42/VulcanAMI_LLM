@@ -1041,9 +1041,11 @@ class ToolSelectionBandit:
     def select_tool(self, features: np.ndarray, constraints: Dict[str, float]) -> str:
         """Select a tool using the adaptive bandit orchestrator."""
         if not self.is_enabled:
-            # Simple fallback: choose a tool randomly. A more sophisticated
-            # fallback could use a simple heuristic.
-            return np.random.choice(self.tool_names)
+            # CRITICAL BUG FIX: Use deterministic fallback instead of random selection.
+            # Random selection causes non-deterministic results and "Tool Selector at 40% health".
+            # Default to "probabilistic" as a reasonable general-purpose fallback.
+            logger.info("[ToolSelectionBandit] Using deterministic fallback: probabilistic")
+            return "probabilistic"
 
         context = BanditContext(
             features=features, problem_type="tool_selection", constraints=constraints
@@ -1753,7 +1755,9 @@ class ToolSelector:
             return features
         except Exception as e:
             logger.error(f"Feature extraction failed: {e}")
-            return np.random.randn(128)
+            # CRITICAL BUG FIX: Use deterministic zeros instead of random features.
+            # Random features cause non-deterministic tool selection.
+            return np.zeros(128)
 
     def _create_safety_context(self, request: SelectionRequest) -> SafetyContext:
         """Create safety context from request"""
