@@ -25,52 +25,67 @@ logger = logging.getLogger(__name__)
 
 # Critical violation types that MUST override semantic selections
 # These represent serious safety concerns that cannot be ignored
-CRITICAL_VIOLATION_TYPES = frozenset({
-    'harmful_content',
-    'security_breach',
-    'pii_exposure',
-    'illegal_activity',
-    'dangerous_instruction',
-    'unsafe_input',
-    'unsafe_output',
-    'forbidden_operation',
-})
+CRITICAL_VIOLATION_TYPES = frozenset(
+    {
+        "harmful_content",
+        "security_breach",
+        "pii_exposure",
+        "illegal_activity",
+        "dangerous_instruction",
+        "unsafe_input",
+        "unsafe_output",
+        "forbidden_operation",
+    }
+)
 
 # Non-critical violation types that can be ignored when semantic boost is applied
 # These are warnings that don't pose immediate safety risks
 # Issue #54: inconsistent_output is expected for causal reasoning (different causal paths)
-NON_CRITICAL_VIOLATION_TYPES = frozenset({
-    'inconsistent_output',
-    'contract_violation',
-    'confidence_too_low',
-    'resource_exceeded',
-    'rate_limited',
-})
+NON_CRITICAL_VIOLATION_TYPES = frozenset(
+    {
+        "inconsistent_output",
+        "contract_violation",
+        "confidence_too_low",
+        "resource_exceeded",
+        "rate_limited",
+    }
+)
 
 # ==============================================================================
 # BUG #2 FIX: Complementary Reasoning Paradigms
 # ==============================================================================
-# Different reasoning paradigms (causal, symbolic, probabilistic, analogical, 
+# Different reasoning paradigms (causal, symbolic, probabilistic, analogical,
 # multimodal) are COMPLEMENTARY, not redundant. They produce different outputs
 # BY DESIGN - they're different approaches to solving problems.
 #
 # Checking "consensus" across these paradigms is WRONG - they SHOULD differ.
 # Only check consistency for same-type tools (e.g., two causal reasoners).
-COMPLEMENTARY_REASONING_TOOLS = frozenset({
-    'causal', 'symbolic', 'probabilistic', 'analogical', 'multimodal',
-    'neural', 'deductive', 'inductive', 'abductive'
-})
+COMPLEMENTARY_REASONING_TOOLS = frozenset(
+    {
+        "causal",
+        "symbolic",
+        "probabilistic",
+        "analogical",
+        "multimodal",
+        "neural",
+        "deductive",
+        "inductive",
+        "abductive",
+    }
+)
 
 # Tools that can legitimately produce inconsistent outputs due to their nature
 # (This is now a subset - ALL complementary tools are expected to differ)
-TOOLS_WITH_EXPECTED_INCONSISTENCY = frozenset({
-    'causal',
-    'probabilistic',  # Probabilistic reasoning may have variance
-    'analogical',     # Analogies may map differently
-    'neural',         # Neural reasoning may have stochasticity
-    'symbolic',       # Different proof paths
-    'multimodal',     # Different modality combinations
-})
+TOOLS_WITH_EXPECTED_INCONSISTENCY = frozenset(
+    {
+        "causal",
+        "probabilistic",  # Probabilistic reasoning may have variance
+        "analogical",  # Analogies may map differently
+        "neural",  # Neural reasoning may have stochasticity
+        "symbolic",  # Different proof paths
+        "multimodal",  # Different modality combinations
+    }
+)
 
 # =============================================================================
 # SEMANTIC KEYWORD SYNONYMS
@@ -85,42 +100,161 @@ TOOLS_WITH_EXPECTED_INCONSISTENCY = frozenset({
 
 SEMANTIC_KEYWORD_SYNONYMS: Dict[str, Dict[str, List[str]]] = {
     "symbolic": {
-        "logic": ["logical", "reasoning", "deduce", "deduction", "inference", 
-                  "prove", "proof", "theorem", "axiom", "premise", "conclusion",
-                  "syllogism", "valid", "invalid", "entail", "imply", "implies",
-                  "therefore", "hence", "thus", "if-then", "modus"],
-        "rules": ["rule", "constraint", "condition", "requirement", "principle",
-                  "law", "formula", "equation", "statement", "proposition",
-                  "hypothesis", "assumption", "given", "premises"],
+        "logic": [
+            "logical",
+            "reasoning",
+            "deduce",
+            "deduction",
+            "inference",
+            "prove",
+            "proof",
+            "theorem",
+            "axiom",
+            "premise",
+            "conclusion",
+            "syllogism",
+            "valid",
+            "invalid",
+            "entail",
+            "imply",
+            "implies",
+            "therefore",
+            "hence",
+            "thus",
+            "if-then",
+            "modus",
+        ],
+        "rules": [
+            "rule",
+            "constraint",
+            "condition",
+            "requirement",
+            "principle",
+            "law",
+            "formula",
+            "equation",
+            "statement",
+            "proposition",
+            "hypothesis",
+            "assumption",
+            "given",
+            "premises",
+        ],
     },
     "causal": {
-        "graph": ["model", "diagram", "structure", "relationship", "chain", 
-                  "link", "network", "path", "mechanism", "connection",
-                  "causation", "causal", "cause", "effect", "influence"],
-        "data": ["information", "evidence", "observation", "scenario", "case",
-                 "example", "situation", "event", "outcome", "result",
-                 "fact", "variable", "factor", "condition"],
+        "graph": [
+            "model",
+            "diagram",
+            "structure",
+            "relationship",
+            "chain",
+            "link",
+            "network",
+            "path",
+            "mechanism",
+            "connection",
+            "causation",
+            "causal",
+            "cause",
+            "effect",
+            "influence",
+        ],
+        "data": [
+            "information",
+            "evidence",
+            "observation",
+            "scenario",
+            "case",
+            "example",
+            "situation",
+            "event",
+            "outcome",
+            "result",
+            "fact",
+            "variable",
+            "factor",
+            "condition",
+        ],
     },
     "analogical": {
-        "source": ["first", "like", "similar", "compare", "domain", "original",
-                   "base", "reference", "known", "familiar", "existing",
-                   "is to", "as", "same as", "equivalent"],
-        "target": ["second", "to", "other", "between", "mapping", "new",
-                   "unknown", "different", "destination", "application",
-                   "transfer", "apply", "extend"],
+        "source": [
+            "first",
+            "like",
+            "similar",
+            "compare",
+            "domain",
+            "original",
+            "base",
+            "reference",
+            "known",
+            "familiar",
+            "existing",
+            "is to",
+            "as",
+            "same as",
+            "equivalent",
+        ],
+        "target": [
+            "second",
+            "to",
+            "other",
+            "between",
+            "mapping",
+            "new",
+            "unknown",
+            "different",
+            "destination",
+            "application",
+            "transfer",
+            "apply",
+            "extend",
+        ],
     },
     "probabilistic": {
         # Probabilistic has no required_inputs in its contract, but we define
         # synonyms here for reference and potential future use with optional validation
-        "probability": ["likely", "likelihood", "chance", "odds", "risk",
-                        "uncertain", "confidence", "bayesian", "bayes",
-                        "estimate", "predict", "expect", "distribution"],
+        "probability": [
+            "likely",
+            "likelihood",
+            "chance",
+            "odds",
+            "risk",
+            "uncertain",
+            "confidence",
+            "bayesian",
+            "bayes",
+            "estimate",
+            "predict",
+            "expect",
+            "distribution",
+        ],
     },
     "multimodal": {
-        "modalities": ["image", "picture", "photo", "video", "audio", "visual",
-                       "text", "diagram", "chart", "graph", "figure", "table",
-                       "document", "file", "attachment", "screenshot", "scan",
-                       "see", "look", "view", "show", "display", "describe"],
+        "modalities": [
+            "image",
+            "picture",
+            "photo",
+            "video",
+            "audio",
+            "visual",
+            "text",
+            "diagram",
+            "chart",
+            "graph",
+            "figure",
+            "table",
+            "document",
+            "file",
+            "attachment",
+            "screenshot",
+            "scan",
+            "see",
+            "look",
+            "view",
+            "show",
+            "display",
+            "describe",
+        ],
     },
 }
 
@@ -206,18 +340,20 @@ class SafetyContext:
 
 class SafetyValidator:
     """Validates inputs and outputs for safety"""
-    
+
     # FIX #3: Internal sources that should bypass sensitive data checks
     # These are system operations that should not be blocked
-    INTERNAL_SOURCES = frozenset({
-        "system",
-        "arena_internal", 
-        "reasoning",
-        "tool_selection",
-        "embedding_cache",
-        "query_router",
-        "meta_reasoning",
-    })
+    INTERNAL_SOURCES = frozenset(
+        {
+            "system",
+            "arena_internal",
+            "reasoning",
+            "tool_selection",
+            "embedding_cache",
+            "query_router",
+            "meta_reasoning",
+        }
+    )
 
     def __init__(self):
         # CRITICAL FIX: Pre-compile patterns to avoid ReDoS
@@ -235,17 +371,28 @@ class SafetyValidator:
         self.sensitive_patterns_compiled = [
             re.compile(r"\b\d{3}-\d{2}-\d{4}\b"),  # SSN format
             re.compile(r"\b\d{16}\b"),  # Credit card (16 consecutive digits)
-            re.compile(r"(?i)\b(api[_\s]?key|secret[_\s]?key)\s*[:=]\s*['\"]?\w+"),  # API keys with values
+            re.compile(
+                r"(?i)\b(api[_\s]?key|secret[_\s]?key)\s*[:=]\s*['\"]?\w+"
+            ),  # API keys with values
             re.compile(r"(?i)\bpassword\s*[:=]\s*['\"]?\S+"),  # Password with value
         ]
-        
+
         # FIX #3: Patterns that look sensitive but are safe in technical contexts
-        self.technical_safe_patterns = frozenset({
-            "password field", "password validation", "password hash",
-            "api key rotation", "api key management", "secret management",
-            "token validation", "token refresh", "access token",
-            "credential storage", "credential rotation",
-        })
+        self.technical_safe_patterns = frozenset(
+            {
+                "password field",
+                "password validation",
+                "password hash",
+                "api key rotation",
+                "api key management",
+                "secret management",
+                "token validation",
+                "token refresh",
+                "access token",
+                "credential storage",
+                "credential rotation",
+            }
+        )
 
         # Safe content whitelist
         self.safe_keywords = {
@@ -258,36 +405,74 @@ class SafetyValidator:
             "summarize",
             "explain",
         }
-        
+
         # FIX: Mathematical scenario keywords - these indicate math problems, not actual
         # medical data processing that would require HIPAA compliance
         # Using frozenset for performance and consistency with safety_validator
-        self.mathematical_indicators = frozenset({
-            "probability", "calculate", "bayesian", "bayes", "prior", "posterior",
-            "sensitivity", "specificity", "conditional", "likelihood",
-            "false positive", "false negative", "true positive", "true negative",
-            "statistical", "statistics", "compute", "formula", "equation",
-            "what is the probability", "what's the probability", "what are the odds", "how likely",
-            "base rate", "prevalence", "ppv", "npv", "test accuracy",
-            "conditional probability", "given that", "positive predictive value",
-            "negative predictive value", "p(",
-        })
-        
+        self.mathematical_indicators = frozenset(
+            {
+                "probability",
+                "calculate",
+                "bayesian",
+                "bayes",
+                "prior",
+                "posterior",
+                "sensitivity",
+                "specificity",
+                "conditional",
+                "likelihood",
+                "false positive",
+                "false negative",
+                "true positive",
+                "true negative",
+                "statistical",
+                "statistics",
+                "compute",
+                "formula",
+                "equation",
+                "what is the probability",
+                "what's the probability",
+                "what are the odds",
+                "how likely",
+                "base rate",
+                "prevalence",
+                "ppv",
+                "npv",
+                "test accuracy",
+                "conditional probability",
+                "given that",
+                "positive predictive value",
+                "negative predictive value",
+                "p(",
+            }
+        )
+
         # Pre-compiled math notation patterns for performance
         self.math_notation_patterns = [
-            re.compile(r'\d+%'),           # Percentages
-            re.compile(r'\d+\.\d+'),       # Decimals
-            re.compile(r'\d+/\d+'),        # Fractions
-            re.compile(r'p\s*\('),         # Probability notation P(
-            re.compile(r'\d+\s*in\s*\d+'), # X in Y notation
+            re.compile(r"\d+%"),  # Percentages
+            re.compile(r"\d+\.\d+"),  # Decimals
+            re.compile(r"\d+/\d+"),  # Fractions
+            re.compile(r"p\s*\("),  # Probability notation P(
+            re.compile(r"\d+\s*in\s*\d+"),  # X in Y notation
         ]
-        
+
         # Hypothetical language indicators
-        self.hypothetical_indicators = frozenset({
-            "suppose", "assume", "imagine", "hypothetical", "example", 
-            "given that", "probability problem", "statistics problem", "math problem",
-            "solve", "calculate", "compute",
-        })
+        self.hypothetical_indicators = frozenset(
+            {
+                "suppose",
+                "assume",
+                "imagine",
+                "hypothetical",
+                "example",
+                "given that",
+                "probability problem",
+                "statistics problem",
+                "math problem",
+                "solve",
+                "calculate",
+                "compute",
+            }
+        )
 
         # CRITICAL FIX: Add size limits
         self.max_input_size = 1000000  # 1MB
@@ -297,32 +482,36 @@ class SafetyValidator:
     def is_mathematical_scenario(self, input_data: Any) -> bool:
         """
         Detect if input is a mathematical/statistical problem.
-        
+
         FIX: This prevents false positive safety violations for mathematical problems
         that mention medical terms (e.g., Bayesian probability with disease testing).
-        
+
         Args:
             input_data: The query or problem to check
-            
+
         Returns:
             True if this is a mathematical scenario
         """
         try:
             input_str = str(input_data).lower() if input_data else ""
-            
+
             # Count mathematical indicators
             indicator_count = sum(
                 1 for ind in self.mathematical_indicators if ind in input_str
             )
-            
+
             # Check for mathematical notation patterns using pre-compiled regex
             notation_count = sum(
-                1 for pattern in self.math_notation_patterns if pattern.search(input_str)
+                1
+                for pattern in self.math_notation_patterns
+                if pattern.search(input_str)
             )
-            
+
             # Check for hypothetical language
-            is_hypothetical = any(word in input_str for word in self.hypothetical_indicators)
-            
+            is_hypothetical = any(
+                word in input_str for word in self.hypothetical_indicators
+            )
+
             # Return True if this looks like a math problem
             if indicator_count >= 2:
                 return True
@@ -330,20 +519,20 @@ class SafetyValidator:
                 return True
             if is_hypothetical and indicator_count >= 1:
                 return True
-            
+
             return False
         except Exception as e:
             logger.warning(f"Mathematical scenario detection failed: {e}")
             return False
-    
+
     def _is_technical_safe_context(self, input_str: str) -> bool:
         """
         FIX #3: Check if input is in a technical/code context where
         mentions of passwords, keys, etc. are safe.
-        
+
         Args:
             input_str: The input string to check
-            
+
         Returns:
             True if this is a safe technical context
         """
@@ -353,15 +542,15 @@ class SafetyValidator:
     def validate_input(self, input_data: Any, source: str = "user") -> Tuple[bool, str]:
         """
         Validate input for safety - CRITICAL: ReDoS protection
-        
+
         FIX #3: Added source parameter to distinguish user vs system operations.
         Internal sources bypass sensitive data checks but NOT unsafe content checks.
-        
+
         Args:
             input_data: The input to validate
             source: Source of the input. Internal sources like "system", "reasoning",
                    "tool_selection" bypass sensitive data detection (not unsafe content)
-        
+
         Returns:
             Tuple of (is_safe, reason_message)
         """
@@ -375,10 +564,10 @@ class SafetyValidator:
             # CRITICAL FIX: Truncate for pattern matching to prevent ReDoS
             check_str = input_str[: self.max_pattern_check_size]
             check_str_lower = check_str.lower()
-            
+
             # FIX #3: Check if this is an internal system operation
             is_internal_source = source.lower() in self.INTERNAL_SOURCES
-            
+
             # Check for unsafe patterns with pre-compiled regex
             # NOTE: Unsafe content checks are ALWAYS performed, even for internal sources
             for pattern in self.unsafe_patterns_compiled:
@@ -402,7 +591,7 @@ class SafetyValidator:
                     f"[SafetyValidator] Bypassing sensitive data check for internal source: {source}"
                 )
                 return True, f"Input validated (internal source: {source})"
-            
+
             # FIX #3: Check for technical safe context before sensitive pattern check
             if self._is_technical_safe_context(check_str):
                 logger.debug(
@@ -415,12 +604,19 @@ class SafetyValidator:
                 try:
                     match = pattern.search(check_str)
                     if match:
-                        matched_text = match.group()[:30] + "..." if len(match.group()) > 30 else match.group()
+                        matched_text = (
+                            match.group()[:30] + "..."
+                            if len(match.group()) > 30
+                            else match.group()
+                        )
                         logger.warning(
                             f"[SafetyValidator] Sensitive data blocked: pattern={pattern.pattern[:30]}... "
                             f"(source={source})"
                         )
-                        return False, f"Sensitive data detected: {pattern.pattern[:20]}..."
+                        return (
+                            False,
+                            f"Sensitive data detected: {pattern.pattern[:20]}...",
+                        )
                 except Exception as e:
                     logger.warning(f"Sensitive pattern matching error: {e}")
                     continue
@@ -490,8 +686,8 @@ class SafetyValidator:
 
 class ConsistencyChecker:
     """Checks output consistency across tools with semantic comparison support.
-    
-    Bug #2 Fix: Instead of using exact equality comparison which fails on 
+
+    Bug #2 Fix: Instead of using exact equality comparison which fails on
     heterogeneous output types (dict vs list vs float), this checker now
     normalizes outputs to text form and uses semantic/text-based comparison.
     """
@@ -537,49 +733,59 @@ class ConsistencyChecker:
 
     def _extract_answer_text(self, tool_name: str, output: Any) -> str:
         """Extract the answer/conclusion as text from tool-specific output.
-        
+
         Bug #2 Fix: Normalizes heterogeneous tool outputs to text form for comparison.
         """
         if output is None:
             return ""
-        
+
         # Handle string outputs directly
         if isinstance(output, str):
             return output
-        
+
         # Handle dict outputs
         if isinstance(output, dict):
             # Try common keys for conclusions/answers
-            for key in ['answer', 'conclusion', 'result', 'output', 'response', 'text', 'value']:
+            for key in [
+                "answer",
+                "conclusion",
+                "result",
+                "output",
+                "response",
+                "text",
+                "value",
+            ]:
                 if key in output:
                     return str(output[key])
-            
+
             # Tool-specific extraction
-            if tool_name == 'symbolic':
-                if 'proof' in output:
+            if tool_name == "symbolic":
+                if "proof" in output:
                     return f"Valid: {output.get('valid', 'unknown')}, {output.get('conclusion', '')}"
-                return str(output.get('conclusion', output))
-            
-            elif tool_name == 'causal':
-                effects = output.get('effects', output.get('consequences', []))
+                return str(output.get("conclusion", output))
+
+            elif tool_name == "causal":
+                effects = output.get("effects", output.get("consequences", []))
                 if effects:
                     return f"Effects: {', '.join(str(e) for e in effects[:5])}"
                 return str(output)
-            
-            elif tool_name == 'probabilistic':
-                if 'distribution' in output:
+
+            elif tool_name == "probabilistic":
+                if "distribution" in output:
                     return f"Most likely: {output.get('mode', output.get('mean', 'unknown'))}"
                 return str(output)
-            
-            elif tool_name == 'multimodal':
-                return str(output.get('fused_conclusion', output.get('result', output)))
-            
-            elif tool_name == 'analogical':
-                return str(output.get('mapped_conclusion', output.get('analogy', output)))
-            
+
+            elif tool_name == "multimodal":
+                return str(output.get("fused_conclusion", output.get("result", output)))
+
+            elif tool_name == "analogical":
+                return str(
+                    output.get("mapped_conclusion", output.get("analogy", output))
+                )
+
             # Fallback: convert dict to string
             return str(output)
-        
+
         # Handle list outputs
         if isinstance(output, (list, tuple)):
             if len(output) == 0:
@@ -588,7 +794,7 @@ class ConsistencyChecker:
             if len(output) <= 3:
                 return "; ".join(str(x) for x in output)
             return str(output[0])
-        
+
         # Fallback
         return str(output)
 
@@ -596,7 +802,7 @@ class ConsistencyChecker:
         self, values: List[Tuple[str, Any]], outputs: Dict[str, Any]
     ) -> Tuple[bool, float, str]:
         """Check consistency using semantic/text-based comparison for mixed types.
-        
+
         Bug #2 Fix: Instead of failing on heterogeneous types, normalize all outputs
         to text and compare using word overlap or simple heuristics.
         """
@@ -606,15 +812,15 @@ class ConsistencyChecker:
             for tool_name, _ in values:
                 raw_output = outputs.get(tool_name)
                 answers[tool_name] = self._extract_answer_text(tool_name, raw_output)
-            
+
             # Check if we have any answers to compare
             if not answers or all(not a for a in answers.values()):
                 return True, 0.5, "No extractable answers for comparison"
-            
+
             # Use text overlap for consistency check
             all_words = []
             tool_words = {}
-            
+
             for tool, answer in answers.items():
                 # Tokenize: lowercase, split on whitespace and punctuation
                 words = set(answer.lower().split())
@@ -622,15 +828,15 @@ class ConsistencyChecker:
                 words = {w for w in words if len(w) > 2}
                 tool_words[tool] = words
                 all_words.extend(words)
-            
+
             # Count word frequencies across all tools
             word_counts = Counter(all_words)
-            
+
             # Words appearing in at least half of the tools
             num_tools = len(tool_words)
             threshold = max(1, num_tools // 2)
             common_words = {w for w, c in word_counts.items() if c >= threshold}
-            
+
             # Calculate overlap score for each tool
             overlaps = []
             for tool, words in tool_words.items():
@@ -639,22 +845,30 @@ class ConsistencyChecker:
                     overlaps.append(float(overlap))  # Ensure float type
                 else:
                     overlaps.append(0.0)
-            
+
             # Use nanmean to handle edge cases safely
             avg_overlap = float(np.nanmean(overlaps)) if overlaps else 0.0
             # Handle potential NaN from empty or all-NaN overlaps
             if np.isnan(avg_overlap):
                 avg_overlap = 0.0
-            
+
             # Consistency threshold for text comparison (more lenient than exact match)
             # Bug #2 Fix: 0.3 overlap is acceptable given tools produce different formats
             has_consensus = avg_overlap >= 0.3
-            
+
             if has_consensus:
-                return True, min(0.9, 0.5 + avg_overlap), f"Semantic consensus: {avg_overlap:.2f} word overlap"
+                return (
+                    True,
+                    min(0.9, 0.5 + avg_overlap),
+                    f"Semantic consensus: {avg_overlap:.2f} word overlap",
+                )
             else:
-                return False, avg_overlap, f"Low semantic consensus: {avg_overlap:.2f} overlap, {len(common_words)} common words"
-            
+                return (
+                    False,
+                    avg_overlap,
+                    f"Low semantic consensus: {avg_overlap:.2f} overlap, {len(common_words)} common words",
+                )
+
         except Exception as e:
             logger.warning(f"Semantic consistency check failed: {e}")
             # Fail open for semantic check - mixed types shouldn't block execution
@@ -816,18 +1030,18 @@ class SafetyGovernor:
 
     def _initialize_default_contracts(self):
         """Initialize default tool contracts.
-        
+
         Tool contracts define resource limits, confidence requirements, and safety
         levels for each reasoning tool.
-        
+
         IMPORTANT: `required_inputs` are NOW validated using SEMANTIC SYNONYM EXPANSION
         (see SEMANTIC_KEYWORD_SYNONYMS at the top of this file). This means:
         - A query doesn't need to contain literal "graph" for causal tool
         - It can contain synonyms like "model", "relationship", "cause", "effect"
         - The semantic matcher will accept any synonym match
-        
+
         This enables tool-appropriate validation without rejecting natural language queries.
-        
+
         `forbidden_inputs` are retained as hard safety measures against problematic content.
         """
         self.contracts["symbolic"] = ToolContract(
@@ -906,20 +1120,20 @@ class SafetyGovernor:
     ) -> Tuple[SafetyAction, Optional[str]]:
         """
         Check only for critical safety violations.
-        
+
         This is used for initial tool filtering before semantic matching.
         It checks for truly dangerous inputs (harmful content, PII, etc.)
         but does NOT check resource constraints or contract violations.
-        
+
         This allows semantic matching to consider all tools, with resource
         constraint violations being handled after semantic selection.
-        
+
         Args:
             context: Safety context for evaluation
-            
+
         Returns:
             (action, reason) - VETO only for critical issues
-            
+
         Note:
             Exceptions fail CLOSED (VETO) to ensure safety is maintained
             even when unexpected errors occur.
@@ -927,41 +1141,51 @@ class SafetyGovernor:
         try:
             with self.lock:
                 # FIX #3: Pass source to validator for internal source handling
-                source = getattr(context, 'source', 'user')
-                is_safe, reason = self.validator.validate_input(context.problem, source=source)
+                source = getattr(context, "source", "user")
+                is_safe, reason = self.validator.validate_input(
+                    context.problem, source=source
+                )
                 if not is_safe:
                     self._record_violation(
                         context.tool_name, VetoReason.UNSAFE_INPUT, reason
                     )
-                    
+
                     # For critical safety level, always veto
                     if context.safety_level == SafetyLevel.CRITICAL:
                         return (SafetyAction.VETO, reason)
-                    
+
                     # For other levels, sanitize is acceptable
                     return (SafetyAction.SANITIZE, reason)
-                
+
                 # Check forbidden inputs only (not resource constraints)
                 if context.tool_name in self.contracts:
                     contract = self.contracts[context.tool_name]
-                    
+
                     # Only check forbidden inputs, not time/energy budgets
                     if contract.forbidden_inputs:
                         problem_str = str(context.problem).lower()
                         found = [
-                            forb for forb in contract.forbidden_inputs if forb in problem_str
+                            forb
+                            for forb in contract.forbidden_inputs
+                            if forb in problem_str
                         ]
                         if found:
                             self._record_violation(
-                                context.tool_name, VetoReason.CONTRACT_VIOLATION,
-                                f"Forbidden inputs found: {found}"
+                                context.tool_name,
+                                VetoReason.CONTRACT_VIOLATION,
+                                f"Forbidden inputs found: {found}",
                             )
-                            return (SafetyAction.VETO, f"Forbidden inputs found: {found}")
-                
+                            return (
+                                SafetyAction.VETO,
+                                f"Forbidden inputs found: {found}",
+                            )
+
                 return (SafetyAction.ALLOW, None)
         except Exception as e:
             # Fail CLOSED on exceptions - safety first
-            logger.error(f"Critical safety check failed with exception: {e}. Failing closed (VETO).")
+            logger.error(
+                f"Critical safety check failed with exception: {e}. Failing closed (VETO)."
+            )
             return (SafetyAction.VETO, f"Safety check error: {str(e)}")
 
     def check_safety(
@@ -969,7 +1193,7 @@ class SafetyGovernor:
     ) -> Tuple[SafetyAction, Optional[str]]:
         """
         Main safety check for tool selection
-        
+
         FIX #3: Now passes source parameter to validator for internal source bypass.
 
         Returns:
@@ -1008,8 +1232,10 @@ class SafetyGovernor:
 
             with self.lock:
                 # FIX #3: Pass source to validator for internal source handling
-                source = getattr(context, 'source', 'user')
-                is_safe, reason = self.validator.validate_input(context.problem, source=source)
+                source = getattr(context, "source", "user")
+                is_safe, reason = self.validator.validate_input(
+                    context.problem, source=source
+                )
                 if not is_safe:
                     self._record_violation(
                         context.tool_name, VetoReason.UNSAFE_INPUT, reason
@@ -1108,136 +1334,152 @@ class SafetyGovernor:
     ) -> List[str]:
         """
         Apply safety checks to selected tools, preserving semantic selections for non-critical violations.
-        
+
         This method is designed to integrate with semantic tool matching, where semantic
         boost has already identified the most appropriate tools. Non-critical safety
         violations should not override these selections.
-        
+
         Args:
             selected_tools: List of selected tool names
             context: Selection context including 'semantic_boost_applied' flag
-            
+
         Returns:
             Potentially modified list of tools (unchanged for non-critical violations
             when semantic boost was applied)
         """
         if context is None:
             context = {}
-            
+
         if not selected_tools:
             return selected_tools
-        
-        semantic_boost_applied = context.get('semantic_boost_applied', False)
+
+        semantic_boost_applied = context.get("semantic_boost_applied", False)
         original_selection = list(selected_tools)
-        
+
         # Check each selected tool for violations
         adjusted_tools = list(selected_tools)
         has_critical_violation = False
-        
+
         for tool in selected_tools:
             # Build safety context for tool check
-            problem = context.get('problem', context.get('query', ''))
+            problem = context.get("problem", context.get("query", ""))
             safety_context = SafetyContext(
                 problem=problem,
                 tool_name=tool,
-                features=context.get('features'),
-                constraints=context.get('constraints', {}),
+                features=context.get("features"),
+                constraints=context.get("constraints", {}),
                 user_context=context,
                 safety_level=SafetyLevel.MEDIUM,
             )
-            
+
             action, reason = self.check_safety(safety_context)
-            
+
             if action == SafetyAction.VETO:
                 # Normalize violation type for comparison
                 violation_type = self._normalize_violation_type(reason)
-                
+
                 # Check if this is a critical violation based on:
                 # 1. Contract safety level requirement
                 # 2. Violation type matching CRITICAL_VIOLATION_TYPES
                 is_critical = self._is_critical_violation(tool, violation_type)
-                
+
                 if is_critical:
                     has_critical_violation = True
-                    logger.error(f"[SafetyGovernor] CRITICAL: {violation_type} for '{tool}' - overriding selection")
+                    logger.error(
+                        f"[SafetyGovernor] CRITICAL: {violation_type} for '{tool}' - overriding selection"
+                    )
                     if tool in adjusted_tools:
                         adjusted_tools.remove(tool)
                 elif semantic_boost_applied:
                     # Non-critical + semantic boost = just warn, don't override
-                    logger.info(f"[SafetyGovernor] Non-critical ({violation_type}) - preserving semantic selection: {original_selection}")
+                    logger.info(
+                        f"[SafetyGovernor] Non-critical ({violation_type}) - preserving semantic selection: {original_selection}"
+                    )
                 else:
                     # Non-critical + no semantic boost = normal adjustment
-                    logger.warning(f"[SafetyGovernor] WARNING: {violation_type} for '{tool}' - adjusting selection")
+                    logger.warning(
+                        f"[SafetyGovernor] WARNING: {violation_type} for '{tool}' - adjusting selection"
+                    )
                     if tool in adjusted_tools:
                         adjusted_tools.remove(tool)
-        
+
         # Only override for critical violations
         if has_critical_violation:
             if not adjusted_tools:
-                logger.warning("[SafetyGovernor] All tools removed by critical safety checks - using 'general' fallback")
-                return ['general']
+                logger.warning(
+                    "[SafetyGovernor] All tools removed by critical safety checks - using 'general' fallback"
+                )
+                return ["general"]
             return adjusted_tools
-        
+
         # Preserve semantic selection if it was applied and no critical violations
         if semantic_boost_applied:
-            logger.info(f"[SafetyGovernor] Semantic selection preserved: {original_selection}")
+            logger.info(
+                f"[SafetyGovernor] Semantic selection preserved: {original_selection}"
+            )
             return original_selection
-        
+
         # If all tools were removed without semantic boost, return a safe fallback
         if not adjusted_tools and selected_tools:
-            logger.warning("[SafetyGovernor] All tools removed by safety checks - using 'general' fallback")
-            return ['general']
-        
+            logger.warning(
+                "[SafetyGovernor] All tools removed by safety checks - using 'general' fallback"
+            )
+            return ["general"]
+
         return adjusted_tools
 
     def _normalize_violation_type(self, reason: Optional[str]) -> str:
         """
         Normalize a violation reason to a consistent format for comparison.
-        
+
         Args:
             reason: The raw violation reason string
-            
+
         Returns:
             Normalized violation type string (lowercase, underscores instead of spaces)
         """
         if not reason:
-            return 'unknown'
-        return reason.lower().replace(' ', '_')
+            return "unknown"
+        return reason.lower().replace(" ", "_")
 
     def _is_critical_violation(self, tool: str, violation_type: str) -> bool:
         """
         Determine if a violation is critical and must override tool selection.
-        
+
         Critical violations include security breaches, harmful content, and
         violations where the tool's contract requires CRITICAL safety level.
-        
+
         BUG #2 FIX: Different reasoning paradigms (causal, symbolic, etc.) are
         COMPLEMENTARY, not redundant. They SHOULD produce different outputs.
         Inconsistent_output is NEVER critical when comparing different paradigms.
-        
+
         Args:
             tool: The tool name being checked
             violation_type: Normalized violation type string
-            
+
         Returns:
             True if the violation is critical, False otherwise
         """
         # BUG #2 FIX: Inconsistent output is NEVER critical for complementary reasoning tools
         # Different paradigms SHOULD produce different outputs - that's by design
-        if 'inconsistent' in violation_type:
+        if "inconsistent" in violation_type:
             if tool in COMPLEMENTARY_REASONING_TOOLS:
-                logger.debug(f"[SafetyGovernor] Ignoring inconsistency for {tool} (complementary reasoning paradigm)")
+                logger.debug(
+                    f"[SafetyGovernor] Ignoring inconsistency for {tool} (complementary reasoning paradigm)"
+                )
                 return False
             if tool in TOOLS_WITH_EXPECTED_INCONSISTENCY:
-                logger.debug(f"[SafetyGovernor] Allowing inconsistent output for {tool} (expected variance)")
+                logger.debug(
+                    f"[SafetyGovernor] Allowing inconsistent output for {tool} (expected variance)"
+                )
                 return False
-        
+
         # Check contract safety level
         if tool in self.contracts:
             contract = self.contracts[tool]
-            if getattr(contract, 'required_safety_level', None) == SafetyLevel.CRITICAL:
+            if getattr(contract, "required_safety_level", None) == SafetyLevel.CRITICAL:
                 return True
-        
+
         # Check if violation type matches any critical violation pattern
         return any(crit in violation_type for crit in CRITICAL_VIOLATION_TYPES)
 
@@ -1288,30 +1530,38 @@ class SafetyGovernor:
 
     def check_consensus(self, outputs: Dict[str, Any]) -> Tuple[bool, float, str]:
         """Check consensus among multiple tool outputs.
-        
+
         BUG #2 FIX: Different reasoning paradigms (causal, symbolic, probabilistic,
-        analogical, multimodal) are COMPLEMENTARY, not redundant. They SHOULD 
+        analogical, multimodal) are COMPLEMENTARY, not redundant. They SHOULD
         produce different outputs - that's by design. Only check consistency for
         same-type tools (e.g., two causal reasoners).
         """
 
         try:
             tool_names = list(outputs.keys())
-            
+
             # BUG #2 FIX: If all tools are different reasoning paradigms, skip consensus check
-            reasoning_tools = [t for t in tool_names if t in COMPLEMENTARY_REASONING_TOOLS]
-            
-            if len(reasoning_tools) == len(tool_names) and len(set(reasoning_tools)) == len(reasoning_tools):
+            reasoning_tools = [
+                t for t in tool_names if t in COMPLEMENTARY_REASONING_TOOLS
+            ]
+
+            if len(reasoning_tools) == len(tool_names) and len(
+                set(reasoning_tools)
+            ) == len(reasoning_tools):
                 # All tools are different reasoning types - no consistency expected
-                logger.debug(f"[Safety] Skipping consistency check: {tool_names} are complementary paradigms")
+                logger.debug(
+                    f"[Safety] Skipping consistency check: {tool_names} are complementary paradigms"
+                )
                 return True, 0.8, "complementary_paradigms"
-            
+
             # Check if any tool is in the expected inconsistency set
             if any(tool in TOOLS_WITH_EXPECTED_INCONSISTENCY for tool in tool_names):
                 # At least one tool may produce different results - be lenient
-                logger.debug(f"[Safety] Lenient consensus check: {tool_names} includes tools with expected variance")
+                logger.debug(
+                    f"[Safety] Lenient consensus check: {tool_names} includes tools with expected variance"
+                )
                 return True, 0.7, "expected_variance"
-            
+
             # Only check consistency if we have duplicate tool types
             is_consistent, confidence, details = (
                 self.consistency_checker.check_consistency(outputs)
@@ -1322,9 +1572,9 @@ class SafetyGovernor:
                 # Only record violation for same-type tools
                 tool_types = set()
                 for tool_name in outputs.keys():
-                    base_type = tool_name.split('_')[0]
+                    base_type = tool_name.split("_")[0]
                     tool_types.add(base_type)
-                
+
                 # If all different types, don't record violation
                 if len(tool_types) < len(outputs):
                     # We have duplicate types - record violation
@@ -1334,7 +1584,9 @@ class SafetyGovernor:
                                 tool_name, VetoReason.INCONSISTENT_OUTPUT, details
                             )
                 else:
-                    logger.info(f"[Safety] Not recording inconsistency - different tool types: {tool_types}")
+                    logger.info(
+                        f"[Safety] Not recording inconsistency - different tool types: {tool_types}"
+                    )
 
             return is_consistent, confidence, details
         except Exception as e:
@@ -1345,11 +1597,11 @@ class SafetyGovernor:
         self, context: SafetyContext, contract: ToolContract
     ) -> Optional[str]:
         """Check if context violates contract.
-        
+
         Uses semantic keyword matching to understand query intent rather than
         requiring literal keywords. For example, a causal query about "cause and
         effect relationships" will match the semantic synonyms for "graph" and "data".
-        
+
         NOTE: Resource constraint checks (time/energy budget) are intentionally
         lenient. The semantic matcher has determined tool appropriateness based
         on query content, so we only enforce hard safety limits.
@@ -1362,19 +1614,19 @@ class SafetyGovernor:
             if contract.required_inputs:
                 problem_str = str(context.problem).lower()
                 tool_synonyms = SEMANTIC_KEYWORD_SYNONYMS.get(contract.tool_name, {})
-                
+
                 missing_semantic = []
                 for req in contract.required_inputs:
                     # Get synonyms for this required keyword
                     synonyms = tool_synonyms.get(req, [])
                     all_matches = [req] + synonyms  # Include literal + synonyms
-                    
+
                     # Check if ANY match is found in the query
                     found_match = any(match in problem_str for match in all_matches)
-                    
+
                     if not found_match:
                         missing_semantic.append(req)
-                
+
                 if missing_semantic:
                     # Log as advisory - semantic matcher already determined appropriateness
                     # This only fires if NONE of the synonyms matched
