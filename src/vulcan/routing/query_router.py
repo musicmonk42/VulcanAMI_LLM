@@ -371,8 +371,17 @@ CACHE_STATS_LOG_INTERVAL: int = 10
 # ============================================================
 # Maximum time allowed for query routing operations in seconds.
 # If routing takes longer than this, a fallback plan is returned.
-# This prevents 46-50+ second delays observed in production.
-QUERY_ROUTING_TIMEOUT_SECONDS: float = 5.0  # 5 seconds max (was 46-50s before fix)
+# This prevents indefinite delays observed in production.
+#
+# BUG #2 FIX: Increased from 5.0s to 20.0s to accommodate embedding computation.
+# The embedding model can take 10-15 seconds on first invocation (cache miss).
+# With embedding cache enabled (Bug #1 fix), subsequent requests should be much faster.
+# The timeout is now set to allow for:
+# - Initial embedding computation: 10-15s
+# - Safety validation: 1-2s
+# - Complexity scoring: <1s
+# - Buffer for system load: 2-3s
+QUERY_ROUTING_TIMEOUT_SECONDS: float = 20.0  # 20 seconds max (was 5s, too short for embeddings)
 
 # FIX 2: Fallback plan constants (extracted from magic numbers per code review)
 FALLBACK_QUERY_ID_LENGTH: int = 12  # UUID truncation length for fallback query IDs
