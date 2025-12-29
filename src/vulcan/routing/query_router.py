@@ -429,6 +429,21 @@ MATHEMATICAL_KEYWORDS: Tuple[str, ...] = (
     # Statistics
     "mean", "median", "standard deviation", "variance", "correlation",
     "regression", "hypothesis test", "confidence interval", "p-value",
+    # PRIORITY 1 FIX: Advanced Mathematical Concepts
+    # Lagrangian mechanics and physics + mathematics combinations
+    "lagrangian", "hamiltonian", "equation of motion", "equations of motion",
+    "euler-lagrange", "euler lagrange", "action principle", "variational",
+    # Multi-step mathematical derivations
+    "derive", "derivation", "proof", "theorem", "lemma", "corollary",
+    "integration", "differentiate", "differentiation", "partial derivative",
+    "gradient", "divergence", "curl", "laplacian",
+    # Advanced calculus and physics
+    "differential equation", "ordinary differential", "partial differential",
+    "boundary condition", "initial condition", "fourier", "laplace transform",
+    "taylor series", "series expansion", "limit", "convergence",
+    # Linear algebra and optimization
+    "determinant", "inverse matrix", "transpose", "orthogonal",
+    "optimization", "minimize", "maximize", "constraint", "lagrange multiplier",
 )
 
 # Fast path timeout for mathematical queries (much shorter than general timeout)
@@ -1193,10 +1208,11 @@ class QueryAnalyzer:
             plan.safety_passed = True
             plan.detected_patterns.append("mathematical_calculation")
             
-            # Create single task for mathematical execution
+            # PRIORITY 4 FIX: Create mathematical execution tasks with specialized tools
+            # Route to probabilistic/symbolic/mathematical tools instead of general
             plan.agent_tasks = [AgentTask(
                 task_id=f"task_{uuid.uuid4().hex[:8]}_math",
-                task_type="execution_task",
+                task_type="mathematical_task",
                 capability="reasoning",  # Use probabilistic reasoning
                 prompt=query,
                 priority=2,  # Higher priority for math
@@ -1205,10 +1221,17 @@ class QueryAnalyzer:
                     "is_mathematical": True,
                     "skip_heavy_analysis": True,
                     "skip_arena": True,
+                    # PRIORITY 4 FIX: Route to specialized mathematical tools
+                    "tools": ["probabilistic", "symbolic", "mathematical"],
                     "preferred_tool": "probabilistic",  # Hint to use probabilistic tool
                     "mathematical_scenario_override": True,  # Safety override
+                    "require_verification": True,  # Trigger mathematical verification
                 }
             )]
+            
+            # PRIORITY 4 FIX: Store selected tools in telemetry for downstream use
+            plan.telemetry_data["selected_tools"] = ["probabilistic", "symbolic", "mathematical"]
+            plan.telemetry_data["reasoning_strategy"] = "mathematical_execution"
             
             logger.info(
                 f"[QueryRouter] {query_id}: MATH-FAST-PATH source={source}, "
