@@ -41,6 +41,7 @@ from vulcan.curiosity_engine.resolution_bridge import (
     is_gap_resolved,
     is_phantom_resolution,
     mark_gap_resolved,
+    mark_gap_resolved_batch,
     record_resolution_history,
     reset_database,
     reset_gap_attempts,
@@ -125,6 +126,45 @@ class TestGapResolutionBasics:
         
         # With long TTL, resolution should still be valid
         assert is_gap_resolved(gap_key, ttl_seconds=3600)
+
+    def test_batch_resolution(self, clean_database):
+        """Test batch resolution operation."""
+        gap_key = "test:batch1"
+        
+        result = mark_gap_resolved_batch(
+            gap_key,
+            success=True,
+            cycle_id=123,
+            reset_attempts=False,
+        )
+        
+        assert result is True
+        assert is_gap_resolved(gap_key)
+        # History should be recorded
+        count = get_recent_resolutions_count(gap_key)
+        assert count == 1
+
+    def test_batch_resolution_with_reset(self, clean_database):
+        """Test batch resolution with attempt reset."""
+        gap_key = "test:batch2"
+        
+        # First, create some attempts
+        increment_gap_attempts(gap_key)
+        increment_gap_attempts(gap_key)
+        assert get_gap_attempts(gap_key) == 2
+        
+        # Now resolve with reset
+        result = mark_gap_resolved_batch(
+            gap_key,
+            success=False,  # Giving up
+            cycle_id=456,
+            reset_attempts=True,
+        )
+        
+        assert result is True
+        assert is_gap_resolved(gap_key)
+        # Attempts should be reset
+        assert get_gap_attempts(gap_key) == 0
 
 
 # =============================================================================
