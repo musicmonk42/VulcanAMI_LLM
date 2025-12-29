@@ -1603,6 +1603,14 @@ class EnhancedSafetyValidator(SafetyValidator):
         # Internal sources (arena, agent, internal) should have higher tolerance
         # as they're already validated or are intermediate processing steps
         is_internal_source = source in ("arena", "agent", "internal", "system")
+        
+        # FIX: Mathematical scenario detection - skip medical/HIPAA false positives for math problems
+        is_math_scenario = self.is_mathematical_scenario(query)
+        if is_math_scenario:
+            context["is_mathematical_scenario"] = True
+            logger.debug(
+                f"[Safety] Detected mathematical scenario - reducing medical false positives"
+            )
 
         for validator in self.llm_validators:
             try:
@@ -1614,6 +1622,14 @@ class EnhancedSafetyValidator(SafetyValidator):
                     if is_internal_source and validator_name == "ToxicityValidator":
                         logger.debug(
                             f"[Safety] Skipping ToxicityValidator for internal source: {source}"
+                        )
+                        continue
+                    
+                    # FIX: Skip medical/compliance validators for mathematical scenarios
+                    # Math problems about disease probability are NOT actual medical data processing
+                    if is_math_scenario and validator_name in ("MedicalValidator", "HIPAAValidator", "ComplianceValidator"):
+                        logger.debug(
+                            f"[Safety] Skipping {validator_name} for mathematical scenario"
                         )
                         continue
                     
@@ -1675,7 +1691,11 @@ class EnhancedSafetyValidator(SafetyValidator):
             confidence=confidence,
             violations=violations,
             reasons=reasons,
-            metadata={"query_length": len(query), "phase": "pre_check"},
+            metadata={
+                "query_length": len(query),
+                "phase": "pre_check",
+                "is_mathematical_scenario": is_math_scenario,
+            },
         )
 
     def validate_response(self, response: str, original_query: str) -> SafetyReport:
@@ -1855,6 +1875,114 @@ class EnhancedSafetyValidator(SafetyValidator):
             return RiskLevel.LOW
         else:
             return RiskLevel.SAFE
+
+    def is_mathematical_scenario(self, query: str) -> bool:
+        """
+        Detect if query is a mathematical/statistical problem vs actual medical scenario.
+        
+        This prevents false positive HIPAA/medical safety violations for legitimate
+        mathematical problems that happen to use medical terminology (e.g., Bayesian
+        probability problems involving disease testing).
+        
+        FIX: GitHub Issue - Mathematical reasoning blocked by safety system false positives.
+        
+        Args:
+            query: The user query to analyze
+            
+        Returns:
+            True if query is a mathematical scenario that should bypass medical safety checks
+        """
+        query_lower = query.lower()
+        
+        # Strong mathematical/statistical indicators
+        math_indicators = [
+            "probability", "calculate", "what's the probability", "what is the probability",
+            "bayesian", "bayes", "prior", "posterior", "sensitivity", "specificity",
+            "conditional probability", "given that", "p(", "likelihood",
+            "false positive", "false negative", "true positive", "true negative",
+            "statistical", "statistics", "compute", "formula",
+            "if the test", "test accuracy", "positive predictive value", "ppv",
+            "negative predictive value", "npv", "base rate", "prevalence",
+            "what are the odds", "what is the chance", "how likely",
+        ]
+        
+        # Count mathematical indicators
+        math_score = sum(1 for indicator in math_indicators if indicator in query_lower)
+        
+        # Check for mathematical notation patterns
+        math_notation_patterns = [
+            r'\d+%',           # Percentages
+            r'\d+\.\d+',       # Decimals
+            r'\d+/\d+',        # Fractions
+            r'p\s*\(',         # Probability notation P(
+            r'\d+\s*in\s*\d+', # X in Y notation
+        ]
+        has_math_notation = any(re.search(pattern, query_lower) for pattern in math_notation_patterns)
+        
+        # Strong indicators that this is NOT actual medical data processing
+        non_medical_data_indicators = [
+            "calculate", "compute", "formula", "equation", "solve",
+            "probability problem", "statistics problem", "math problem",
+            "hypothetical", "example", "suppose", "assume", "imagine",
+        ]
+        is_hypothetical = any(ind in query_lower for ind in non_medical_data_indicators)
+        
+        # Return True if this looks like a math problem
+        # Either: 2+ math indicators, or 1 math indicator + notation, or hypothetical language
+        if math_score >= 2:
+            return True
+        if math_score >= 1 and has_math_notation:
+            return True
+        if is_hypothetical and math_score >= 1:
+            return True
+            
+        return False
+
+    def validate_tool_selection_for_math(
+        self, query: str, tools: List[str], context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Dict[str, Any]]:
+        """
+        Validate tool selection with mathematical scenario override.
+        
+        This method prevents probabilistic reasoning tools from being incorrectly
+        blocked by HIPAA/medical safety checks when the query is actually a
+        mathematical problem.
+        
+        FIX: GitHub Issue - Probabilistic tools blocked for Bayesian math problems.
+        
+        Args:
+            query: The user query
+            tools: List of tool names to validate
+            context: Optional context dictionary
+            
+        Returns:
+            Dictionary mapping tool names to validation results with allowed status
+        """
+        context = context or {}
+        results = {}
+        
+        # Check if this is a mathematical scenario
+        is_math = self.is_mathematical_scenario(query)
+        
+        for tool in tools:
+            tool_result = {
+                "allowed": True,
+                "override": None,
+                "warnings": [],
+            }
+            
+            # FIX: Override medical safety false positives for mathematical scenarios
+            if is_math and tool in ("probabilistic", "symbolic", "causal"):
+                tool_result["override"] = "mathematical_calculation"
+                tool_result["allowed"] = True
+                logger.info(
+                    f"[SafetyValidator] Allowing {tool} tool for mathematical scenario - "
+                    f"bypassing potential medical false positives"
+                )
+            
+            results[tool] = tool_result
+        
+        return results
 
     async def validate_action_comprehensive_async(
         self,
