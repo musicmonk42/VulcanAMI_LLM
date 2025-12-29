@@ -775,6 +775,54 @@ def get_recent_outcomes(
         return []
 
 
+def get_recent_count(
+    minutes: int = 5,
+    db_path: Optional[Path] = None,
+) -> int:
+    """
+    Get count of recent outcomes for wake trigger detection.
+    
+    This is a lightweight function used by CuriosityEngine to detect
+    if new query outcomes have arrived since the last check, which
+    serves as a wake trigger to exit backoff mode.
+    
+    Args:
+        minutes: Look back window in minutes (default: 5).
+        db_path: Optional path to database file.
+    
+    Returns:
+        Count of outcomes in the specified time window.
+    
+    Example:
+        >>> count = get_recent_count(minutes=5)
+        >>> if count > last_count:
+        ...     print("New outcomes detected!")
+    """
+    path = db_path or DEFAULT_DB_PATH
+    
+    # Check if database exists
+    if not path.exists():
+        return 0
+    
+    cutoff = (datetime.utcnow() - timedelta(minutes=minutes)).isoformat()
+    
+    try:
+        with _get_db(db_path) as conn:
+            cursor = conn.execute(
+                """
+                SELECT COUNT(*) FROM query_outcomes 
+                WHERE timestamp > ?
+                """,
+                (cutoff,),
+            )
+            row = cursor.fetchone()
+            return row[0] if row else 0
+        
+    except sqlite3.Error as e:
+        logger.debug(f"{LOG_PREFIX} Failed to count recent outcomes: {e}")
+        return 0
+
+
 def get_unprocessed_outcomes(
     limit: int = 100,
     db_path: Optional[Path] = None,
