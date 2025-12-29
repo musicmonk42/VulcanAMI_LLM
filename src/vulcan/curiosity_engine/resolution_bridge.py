@@ -114,13 +114,24 @@ logger = logging.getLogger(__name__)
 # Logging prefix for consistent output
 LOG_PREFIX = "[ResolutionBridge]"
 
-# Default database path - uses tempdir for cross-platform compatibility
+# Default database path - uses user-specific data directory for security
 # Can be overridden via VULCAN_RESOLUTION_DB_PATH environment variable
+# Falls back to temp directory if user data directory is not available
+_default_db_dir = os.environ.get("XDG_DATA_HOME") or os.path.join(
+    os.path.expanduser("~"), ".local", "share"
+)
+_default_db_path = os.path.join(_default_db_dir, "vulcan", "gap_resolutions.db")
+
+# Ensure the directory exists with secure permissions (0o700 = rwx------)
+try:
+    db_dir = os.path.dirname(_default_db_path)
+    os.makedirs(db_dir, mode=0o700, exist_ok=True)
+except OSError:
+    # Fall back to temp directory if we can't create the data directory
+    _default_db_path = os.path.join(tempfile.gettempdir(), "vulcan_gap_resolutions.db")
+
 DEFAULT_DB_PATH = Path(
-    os.environ.get(
-        "VULCAN_RESOLUTION_DB_PATH",
-        os.path.join(tempfile.gettempdir(), "vulcan_gap_resolutions.db")
-    )
+    os.environ.get("VULCAN_RESOLUTION_DB_PATH", _default_db_path)
 )
 
 # Database connection timeout in seconds
@@ -348,6 +359,8 @@ def _init_db(db_path: Optional[Path] = None) -> bool:
         try:
             with _get_db(db_path) as conn:
                 # Gap resolutions table - tracks current resolution status
+                # Note: DEFAULT (strftime('%s', 'now')) evaluates at insertion time in SQLite
+                # because the expression is wrapped in parentheses
                 conn.execute("""
                     CREATE TABLE IF NOT EXISTS gap_resolutions (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -355,7 +368,7 @@ def _init_db(db_path: Optional[Path] = None) -> bool:
                         resolved_at REAL NOT NULL,
                         success INTEGER NOT NULL DEFAULT 1,
                         attempts INTEGER NOT NULL DEFAULT 1,
-                        created_at REAL DEFAULT (strftime('%s', 'now'))
+                        created_at REAL
                     )
                 """)
                 
@@ -367,7 +380,7 @@ def _init_db(db_path: Optional[Path] = None) -> bool:
                         timestamp REAL NOT NULL,
                         success INTEGER NOT NULL DEFAULT 1,
                         cycle_id INTEGER,
-                        created_at REAL DEFAULT (strftime('%s', 'now'))
+                        created_at REAL
                     )
                 """)
                 
@@ -377,7 +390,7 @@ def _init_db(db_path: Optional[Path] = None) -> bool:
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         counter_name TEXT UNIQUE NOT NULL,
                         value INTEGER NOT NULL DEFAULT 0,
-                        updated_at REAL DEFAULT (strftime('%s', 'now'))
+                        updated_at REAL
                     )
                 """)
                 
@@ -664,6 +677,90 @@ def reset_gap_attempts(
         return True
     except sqlite3.Error as e:
         logger.warning(f"{LOG_PREFIX} Error resetting gap attempts: {e}")
+        return False
+
+
+def mark_gap_resolved_batch(
+    gap_key: str,
+    success: bool = True,
+    cycle_id: Optional[int] = None,
+    reset_attempts: bool = False,
+    db_path: Optional[Path] = None,
+) -> bool:
+    """
+    Mark a gap as resolved with all related operations in a single transaction.
+    
+    This function combines mark_gap_resolved, record_resolution_history, and
+    optionally reset_gap_attempts into a single atomic database transaction
+    for better performance and consistency.
+    
+    Args:
+        gap_key: Unique gap identifier.
+        success: True if resolved successfully, False if giving up.
+        cycle_id: Optional learning cycle ID for tracking.
+        reset_attempts: If True, also reset the attempts counter.
+        db_path: Optional path to database file.
+    
+    Returns:
+        True if all operations succeeded, False otherwise.
+    
+    Example:
+        >>> # Mark gap resolved with all tracking in one transaction
+        >>> mark_gap_resolved_batch(
+        ...     "high_error_rate:query_processing",
+        ...     success=True,
+        ...     cycle_id=123,
+        ...     reset_attempts=True
+        ... )
+    """
+    if not _init_db(db_path):
+        return False
+    
+    current_time = time.time()
+    
+    try:
+        with _get_db(db_path) as conn:
+            # Start transaction (implicit in SQLite)
+            
+            # 1. Mark gap as resolved (UPSERT)
+            conn.execute(
+                """
+                INSERT INTO gap_resolutions (gap_key, resolved_at, success, attempts)
+                VALUES (?, ?, ?, COALESCE(
+                    (SELECT attempts FROM gap_resolutions WHERE gap_key = ?), 0
+                ) + 1)
+                ON CONFLICT(gap_key) DO UPDATE SET
+                    resolved_at = excluded.resolved_at,
+                    success = excluded.success,
+                    attempts = gap_resolutions.attempts + 1
+                """,
+                (gap_key, current_time, 1 if success else 0, gap_key),
+            )
+            
+            # 2. Record in history
+            conn.execute(
+                """
+                INSERT INTO resolution_history (gap_key, timestamp, success, cycle_id, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (gap_key, current_time, 1 if success else 0, cycle_id, current_time),
+            )
+            
+            # 3. Optionally reset attempts
+            if reset_attempts:
+                conn.execute(
+                    "UPDATE gap_resolutions SET attempts = 0 WHERE gap_key = ?",
+                    (gap_key,),
+                )
+            
+            conn.commit()
+        
+        status = "resolved" if success else "deferred"
+        logger.info(f"{LOG_PREFIX} Gap {gap_key} marked as {status} (batch)")
+        return True
+        
+    except sqlite3.Error as e:
+        logger.warning(f"{LOG_PREFIX} Error in batch resolution: {e}")
         return False
 
 

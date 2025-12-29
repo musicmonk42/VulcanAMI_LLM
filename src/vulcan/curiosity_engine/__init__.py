@@ -286,6 +286,7 @@ try:
     from .resolution_bridge import (
         is_gap_resolved,
         mark_gap_resolved as persistent_mark_gap_resolved,
+        mark_gap_resolved_batch as persistent_mark_gap_resolved_batch,
         clear_gap_resolution,
         get_gap_attempts,
         increment_gap_attempts,
@@ -310,6 +311,7 @@ except ImportError as e:
     RESOLUTION_BRIDGE_AVAILABLE = False
     is_gap_resolved = None
     persistent_mark_gap_resolved = None
+    persistent_mark_gap_resolved_batch = None
     clear_gap_resolution = None
     get_gap_attempts = None
     increment_gap_attempts = None
@@ -433,6 +435,7 @@ __all__ = [
     # Resolution Bridge (Bug #1 & #2 Fix: Phantom Resolution Loop, Cold Start)
     "is_gap_resolved",
     "persistent_mark_gap_resolved",
+    "persistent_mark_gap_resolved_batch",
     "clear_gap_resolution",
     "get_gap_attempts",
     "increment_gap_attempts",

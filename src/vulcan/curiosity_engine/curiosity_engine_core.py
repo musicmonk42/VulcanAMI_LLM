@@ -32,6 +32,7 @@ from .gap_analyzer import GapAnalyzer, KnowledgeGap
 from .resolution_bridge import (
     is_gap_resolved as _persistent_is_gap_resolved,
     mark_gap_resolved as _persistent_mark_gap_resolved,
+    mark_gap_resolved_batch as _persistent_mark_gap_resolved_batch,
     get_gap_attempts as _persistent_get_gap_attempts,
     increment_gap_attempts as _persistent_increment_gap_attempts,
     reset_gap_attempts as _persistent_reset_gap_attempts,
@@ -1599,13 +1600,16 @@ class CuriosityEngine:
         key = self._gap_key(gap)
         current_time = time.time()
         
-        # FIX Bug #1: Persist to SQLite for cross-process visibility
+        # FIX Bug #1: Persist to SQLite for cross-process visibility using batch operation
         # This ensures subprocesses know about resolutions from previous cycles
+        # Using batch operation for atomicity and performance
         try:
-            _persistent_mark_gap_resolved(key, success=success)
-            _persistent_record_resolution_history(key, success=success, cycle_id=cycle_id)
-            if not success:
-                _persistent_reset_gap_attempts(key)
+            _persistent_mark_gap_resolved_batch(
+                key,
+                success=success,
+                cycle_id=cycle_id,
+                reset_attempts=not success,  # Reset attempts when giving up
+            )
         except Exception as e:
             logger.debug(f"[CuriosityEngine] Could not persist resolution to SQLite: {e}")
         
