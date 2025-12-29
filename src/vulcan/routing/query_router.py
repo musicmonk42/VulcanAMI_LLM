@@ -1151,7 +1151,7 @@ PHILOSOPHICAL_PATTERNS: Tuple[re.Pattern, ...] = (
     # Added: Ethical dilemma patterns
     re.compile(r"(?:ethical|moral)\s+(?:dilemma|problem|question|issue)", re.IGNORECASE),
     re.compile(r"(?:is\s+it|would\s+it\s+be)\s+(?:ethical|moral|right|wrong)\s+to", re.IGNORECASE),
-    re.compile(r"(?:what|how)\s+(?:should|would)\s+(?:a\s+)?(?:utilitarian|kantian|virtue\s+ethicist)", re.IGNORECASE),
+    re.compile(r"(?:what|how)\s+(?:should|would)\s+(?:a\s+)?(?:utilitarian|kantian|virtue\s+ethicist)(?:\s+(?:do|think|say|approach))?", re.IGNORECASE),
     # Added: Thought experiment patterns
     re.compile(r"(?:imagine|suppose|consider)\s+(?:a\s+)?(?:scenario|situation|case)\s+where", re.IGNORECASE),
     re.compile(r"(?:in\s+)?(?:a\s+)?hypothetical\s+(?:scenario|situation|world)", re.IGNORECASE),

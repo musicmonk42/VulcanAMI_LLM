@@ -123,8 +123,11 @@ class TestPhilosophicalQueryDetection:
             selected_tools = plan.telemetry_data.get("selected_tools", [])
             assert "general" in selected_tools, \
                 f"'{query}' should use general tool, got {selected_tools}"
-            assert "probabilistic" not in selected_tools and "symbolic" not in selected_tools, \
-                f"'{query}' should NOT use math tools, got {selected_tools}"
+            # Check all mathematical tools are excluded
+            math_tools = ["probabilistic", "symbolic", "mathematical"]
+            for math_tool in math_tools:
+                assert math_tool not in selected_tools, \
+                    f"'{query}' should NOT use math tool '{math_tool}', got {selected_tools}"
 
     def test_ethical_dilemma_pattern_detected(self, query_analyzer):
         """Test that 'ethical dilemma' pattern triggers philosophical detection."""
