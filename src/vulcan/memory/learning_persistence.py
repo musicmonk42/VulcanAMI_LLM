@@ -127,14 +127,29 @@ class StateMetadata(TypedDict, total=False):
 
 
 class InteractionRecord(TypedDict, total=False):
-    """Type definition for a query/answer interaction record."""
+    """
+    Type definition for a query/answer interaction record.
     
+    Required fields (should always be present):
+        query_id: Unique identifier for the interaction
+        query: The user's query text
+        answer: The system's response text
+        timestamp: Unix timestamp of the interaction
+    
+    Optional fields:
+        tools_used: List of tools used (defaults to empty list)
+        success: Whether interaction was successful (defaults to True)
+        latency_ms: Response latency in milliseconds (defaults to 0.0)
+        metadata: Additional metadata (defaults to empty dict)
+    """
+    # Core fields (always present in practice)
     query_id: str
     query: str
     answer: str
+    timestamp: float
+    # Optional fields with defaults
     tools_used: List[str]
     success: bool
-    timestamp: float
     latency_ms: float
     metadata: Dict[str, Any]
 

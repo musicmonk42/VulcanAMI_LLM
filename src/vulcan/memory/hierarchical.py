@@ -1622,7 +1622,11 @@ class PersistentHierarchicalMemory:
     - GraphRAG for semantic retrieval
     - UnlearningEngine for controlled forgetting
     - ZKProver for cryptographic proofs
+    - LearningStatePersistence for learning state recovery
     """
+
+    # Class-level singleton for learning persistence (shared across instances)
+    _learning_persistence_instance: Optional["LearningStatePersistence"] = None
 
     def __init__(self, config: PersistentMemoryConfig):
         self.episodic = EpisodicMemory()
@@ -1645,6 +1649,27 @@ class PersistentHierarchicalMemory:
 
         # Zero-knowledge proofs for verification
         self.zk_prover = ZKProver()
+        
+        # Initialize learning persistence singleton
+        self._init_learning_persistence()
+
+    @classmethod
+    def _init_learning_persistence(cls) -> None:
+        """Initialize the learning persistence singleton if not already done."""
+        if cls._learning_persistence_instance is None:
+            try:
+                from .learning_persistence import LearningStatePersistence
+                cls._learning_persistence_instance = LearningStatePersistence()
+                logger.info("LearningStatePersistence initialized for PersistentHierarchicalMemory")
+            except Exception as e:
+                logger.warning(f"Failed to initialize LearningStatePersistence: {e}")
+
+    @classmethod
+    def get_learning_persistence(cls) -> Optional["LearningStatePersistence"]:
+        """Get the learning persistence singleton instance."""
+        if cls._learning_persistence_instance is None:
+            cls._init_learning_persistence()
+        return cls._learning_persistence_instance
 
     def _is_recent(self, item) -> bool:
         """Check if item is recent enough for episodic memory."""
@@ -1828,19 +1853,19 @@ class PersistentHierarchicalMemory:
         except Exception as e:
             logger.debug(f"Failed to store interaction in episodic memory: {e}")
         
-        # Store in learning persistence for recovery
+        # Store in learning persistence for recovery (using singleton)
         try:
-            from .learning_persistence import LearningStatePersistence
-            persistence = LearningStatePersistence()
-            persistence.add_interaction(
-                query_id=query_id,
-                query=query,
-                answer=answer,
-                tools_used=tools_used,
-                success=success,
-                latency_ms=latency_ms,
-                metadata=metadata,
-            )
+            persistence = self.get_learning_persistence()
+            if persistence:
+                persistence.add_interaction(
+                    query_id=query_id,
+                    query=query,
+                    answer=answer,
+                    tools_used=tools_used,
+                    success=success,
+                    latency_ms=latency_ms,
+                    metadata=metadata,
+                )
         except Exception as e:
             logger.debug(f"Failed to store interaction in learning persistence: {e}")
 
@@ -1859,12 +1884,18 @@ class PersistentHierarchicalMemory:
             success_only: If True, only return successful interactions.
         
         Returns:
-            List of matching interaction records.
+            List of matching interaction records with keys:
+            - query_id: Unique identifier of the interaction
+            - content: The query/answer text content
+            - score: Semantic similarity score
+            - tools_used: List of tools used
+            - success: Whether the interaction was successful
         """
-        results = []
+        results: List[Dict[str, Any]] = []
         
         try:
             # Search GraphRAG for semantic matches
+            # RetrievalResult has: node_id, content, score, metadata, source, hop
             rag_results = self.graph_rag.retrieve(
                 query=query,
                 k=k,
@@ -1872,16 +1903,17 @@ class PersistentHierarchicalMemory:
             )
             
             for result in rag_results:
-                metadata = getattr(result, 'metadata', {})
-                if metadata.get('type') == 'interaction':
-                    if success_only and not metadata.get('success', True):
+                # RetrievalResult is a dataclass with metadata dict
+                result_metadata = result.metadata if hasattr(result, 'metadata') else {}
+                if result_metadata.get('type') == 'interaction':
+                    if success_only and not result_metadata.get('success', True):
                         continue
                     results.append({
-                        'query_id': metadata.get('query_id'),
-                        'content': getattr(result, 'content', ''),
-                        'score': getattr(result, 'score', 0.0),
-                        'tools_used': metadata.get('tools_used', []),
-                        'success': metadata.get('success', True),
+                        'query_id': result_metadata.get('query_id'),
+                        'content': result.content if hasattr(result, 'content') else '',
+                        'score': result.score if hasattr(result, 'score') else 0.0,
+                        'tools_used': result_metadata.get('tools_used', []),
+                        'success': result_metadata.get('success', True),
                     })
         except Exception as e:
             logger.warning(f"Failed to search interactions in GraphRAG: {e}")

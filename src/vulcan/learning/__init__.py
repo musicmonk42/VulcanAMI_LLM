@@ -374,21 +374,23 @@ class UnifiedLearningSystem:
         if self._learning_persistence:
             try:
                 # Extract query and answer from outcome if available
-                query_text = outcome.get('query', outcome.get('prompt', ''))
-                answer_text = outcome.get('answer', outcome.get('response', ''))
+                # Outcome may contain: 'query'/'prompt' for input, 'answer'/'response' for output
+                # This supports multiple outcome formats from different callers
+                query_text = outcome.get('query') or outcome.get('prompt', '')
+                answer_text = outcome.get('answer') or outcome.get('response', '')
                 
                 if query_text or answer_text:
                     self._learning_persistence.add_interaction(
                         query_id=query_id,
-                        query=query_text,
-                        answer=answer_text,
+                        query=str(query_text),
+                        answer=str(answer_text),
                         tools_used=tools,
                         success=(status == 'success'),
-                        latency_ms=outcome.get('total_ms', routing_ms),
+                        latency_ms=float(outcome.get('total_ms') or routing_ms or 0),
                         metadata={
                             'query_type': query_type,
-                            'complexity': outcome.get('complexity', 0.0),
-                            'routing_ms': routing_ms,
+                            'complexity': float(outcome.get('complexity') or 0.0),
+                            'routing_ms': float(routing_ms or 0),
                         }
                     )
             except Exception as e:
