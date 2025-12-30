@@ -5446,6 +5446,34 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
         except Exception as e:
             logger.debug(f"[VULCAN/v1/chat] Live feedback processing skipped: {e}")
 
+        # ================================================================
+        # STEP 12: Crystallize knowledge from execution (Knowledge Crystallizer)
+        # ================================================================
+        try:
+            learning_system = None
+            if hasattr(deployment, "collective") and hasattr(deployment.collective.deps, "learning"):
+                learning_system = deployment.collective.deps.learning
+            
+            if learning_system and hasattr(learning_system, "continual_learner") and learning_system.continual_learner:
+                learner = learning_system.continual_learner
+                
+                # Crystallize knowledge from this execution (non-blocking)
+                if hasattr(learner, "crystallize_from_execution"):
+                    learner.crystallize_from_execution(
+                        query=user_message,
+                        response=response_text,
+                        success=metadata.get("safety_status") == "safe",
+                        tools_used=systems_used,
+                        strategy=metadata.get("reasoning_type"),
+                        metadata={
+                            "query_id": query_id,
+                            "response_id": response_id,
+                            "latency_ms": latency_ms,
+                        },
+                    )
+        except Exception as e:
+            logger.debug(f"[VULCAN/v1/chat] Knowledge crystallization skipped: {e}")
+
         return {
             "response": response_text,
             "metadata": metadata,
