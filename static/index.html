@@ -1140,6 +1140,14 @@
             }
         };
         
+        // Custom error class for timeout detection
+        class TimeoutError extends Error {
+            constructor(message) {
+                super(message);
+                this.name = 'TimeoutError';
+            }
+        }
+        
         // Global state
         let baseUrl = '';
         let apiKey = '';
@@ -1756,10 +1764,15 @@
                 }
             };
             
+            // If an AbortController signal is provided, clear timeout on abort
+            if (options && options.signal) {
+                options.signal.addEventListener('abort', cleanup, { once: true });
+            }
+            
             const timeoutPromise = new Promise((_, reject) => {
                 timeoutId = setTimeout(() => {
                     timeoutId = null;  // Mark as fired
-                    reject(new Error(`Request timeout after ${timeout/1000}s - backend may be overloaded`));
+                    reject(new TimeoutError(`Request timeout after ${timeout/1000}s - backend may be overloaded`));
                 }, timeout);
             });
             
@@ -1770,6 +1783,11 @@
                 ),
                 timeoutPromise
             ]);
+        }
+
+        // Helper to check if an error is a timeout error
+        function isTimeoutError(error) {
+            return error instanceof TimeoutError || error.name === 'TimeoutError';
         }
 
         // Message Sending
@@ -1939,7 +1957,7 @@
                         throw e;
                     }
                     // If timeout or network error, try alternative endpoint
-                    if (e.message && e.message.includes('timeout')) {
+                    if (isTimeoutError(e)) {
                         console.log('Request timeout on primary endpoint, trying alternative...');
                     } else {
                         console.log('Trying alternative endpoint...');
@@ -2010,7 +2028,7 @@
                 
                 // Provide better error messages for timeout scenarios
                 let errorMessage = e.message;
-                if (e.message && e.message.includes('timeout')) {
+                if (isTimeoutError(e)) {
                     errorMessage = 'Request timed out - the server may be under heavy load. Please try again.';
                     console.warn('Request timeout:', e);
                 } else {
