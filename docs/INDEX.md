@@ -1,7 +1,7 @@
 # VulcanAMI Documentation Index
 
-**Version:** 2.2.0  
-**Last Updated:** December 23, 2024
+**Version:** 2.3.0  
+**Last Updated:** December 30, 2024
 
 Welcome to the VulcanAMI/GraphixVulcan documentation. This index organizes all documentation for easy navigation.
 
@@ -38,11 +38,12 @@ Welcome to the VulcanAMI/GraphixVulcan documentation. This index organizes all d
 | [QUICK_START_WINDOWS.md](QUICK_START_WINDOWS.md) | Windows-specific setup |
 | [UNIFIED_STARTUP_GUIDE.md](UNIFIED_STARTUP_GUIDE.md) | All-in-one startup |
 
-### Architecture & Design (8 docs)
+### Architecture & Design (9 docs)
 
 | Document | Description |
 |----------|-------------|
 | [ARCHITECTURE_OVERVIEW.md](ARCHITECTURE_OVERVIEW.md) ⭐ | Platform architecture deep dive |
+| [VULCAN_INTERNAL_LLM_DEEP_DIVE.md](VULCAN_INTERNAL_LLM_DEEP_DIVE.md) ⭐ | Ultra deep dive into internal LLM |
 | [COMPREHENSIVE_REPO_OVERVIEW.md](COMPREHENSIVE_REPO_OVERVIEW.md) | Repository structure |
 | [ONTOLOGY.md](ONTOLOGY.md) | Node type definitions |
 | [EXECUTION_ENGINE.md](EXECUTION_ENGINE.md) | Graph execution details |
@@ -140,10 +141,11 @@ Welcome to the VulcanAMI/GraphixVulcan documentation. This index organizes all d
 5. [COMPLETE_SERVICE_CATALOG.md](COMPLETE_SERVICE_CATALOG.md)
 
 ### Data Scientists / ML Engineers
-1. [AI_TRAINING_GUIDE.md](AI_TRAINING_GUIDE.md)
-2. [AUTONOMOUS_LEARNING_ANALYSIS.md](AUTONOMOUS_LEARNING_ANALYSIS.md)
-3. [INTRINSIC_DRIVES.md](INTRINSIC_DRIVES.md)
-4. [VULCAN_PERFORMANCE_AUDIT_REPORT.md](VULCAN_PERFORMANCE_AUDIT_REPORT.md)
+1. [VULCAN_INTERNAL_LLM_DEEP_DIVE.md](VULCAN_INTERNAL_LLM_DEEP_DIVE.md) ⭐
+2. [AI_TRAINING_GUIDE.md](AI_TRAINING_GUIDE.md)
+3. [AUTONOMOUS_LEARNING_ANALYSIS.md](AUTONOMOUS_LEARNING_ANALYSIS.md)
+4. [INTRINSIC_DRIVES.md](INTRINSIC_DRIVES.md)
+5. [VULCAN_PERFORMANCE_AUDIT_REPORT.md](VULCAN_PERFORMANCE_AUDIT_REPORT.md)
 
 ### Security Engineers
 1. [SECURITY.md](SECURITY.md) ⭐
@@ -180,11 +182,11 @@ The following documents were consolidated on December 23, 2024:
 
 ## 📋 Documentation Standards
 
-- All documents use version 2.2.0
-- Last updated: December 23, 2024
+- All documents use version 2.3.0
+- Last updated: December 30, 2024
 - ⭐ = Essential reading
 
 ---
 
-**Document Version:** 2.2.0  
-**Last Updated:** December 23, 2024
+**Document Version:** 2.3.0  
+**Last Updated:** December 30, 2024
