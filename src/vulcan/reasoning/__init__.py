@@ -352,6 +352,17 @@ __all__ = [
     "VerificationResult",
     "BayesianProblem",
     "MATHEMATICAL_VERIFICATION_AVAILABLE",
+    # ===== Mathematical Computation =====
+    "MathematicalComputationTool",
+    "ProblemType",
+    "SolutionStrategy",
+    "ComputationResult",
+    "ProblemClassification",
+    "ProblemClassifier",
+    "CodeTemplates",
+    "create_mathematical_computation_tool",
+    "MATHEMATICAL_COMPUTATION_AVAILABLE",
+    "MATH_EXECUTION_AVAILABLE",
 ]
 
 
@@ -371,6 +382,7 @@ def get_module_status() -> dict:
         "selection": SELECTION_AVAILABLE,
         "bandit": BANDIT_AVAILABLE,
         "mathematical_verification": MATHEMATICAL_VERIFICATION_AVAILABLE,
+        "mathematical_computation": MATHEMATICAL_COMPUTATION_AVAILABLE,
     }
 
 
@@ -504,6 +516,37 @@ except ImportError as e:
     VerificationResult = None
     BayesianProblem = None
     MATHEMATICAL_VERIFICATION_AVAILABLE = False
+
+# ============================================================================
+# Mathematical Computation Tool - SOTA Symbolic Computation
+# ============================================================================
+try:
+    from .mathematical_computation import (
+        MathematicalComputationTool,
+        ProblemType,
+        SolutionStrategy,
+        ComputationResult,
+        ProblemClassification,
+        ProblemClassifier,
+        CodeTemplates,
+        create_mathematical_computation_tool,
+        SAFE_EXECUTION_AVAILABLE as MATH_EXECUTION_AVAILABLE,
+    )
+
+    MATHEMATICAL_COMPUTATION_AVAILABLE = True
+    logger.info("Mathematical computation tool loaded successfully")
+except ImportError as e:
+    logger.warning(f"Mathematical computation import failed: {e}")
+    MathematicalComputationTool = None
+    ProblemType = None
+    SolutionStrategy = None
+    ComputationResult = None
+    ProblemClassification = None
+    ProblemClassifier = None
+    CodeTemplates = None
+    create_mathematical_computation_tool = None
+    MATH_EXECUTION_AVAILABLE = False
+    MATHEMATICAL_COMPUTATION_AVAILABLE = False
 
 
 # ============================================================================

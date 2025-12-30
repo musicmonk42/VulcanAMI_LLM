@@ -2,7 +2,7 @@ VULCAN-AGI Reasoning Module
 
 Overview
 
-The Reasoning Module in the VULCAN-AGI system provides a robust, production-grade framework for intelligent reasoning across multiple paradigms, including probabilistic, causal, analogical, multimodal, and symbolic reasoning. It orchestrates these paradigms through a central UnifiedReasoner, which leverages advanced tool selection, safety governance, and portfolio execution strategies to deliver optimal, safe, and efficient reasoning outcomes. The module is designed for scalability, thread safety, bounded memory usage, and comprehensive error handling, with fallbacks for optional dependencies to ensure functionality in diverse environments.
+The Reasoning Module in the VULCAN-AGI system provides a robust, production-grade framework for intelligent reasoning across multiple paradigms, including probabilistic, causal, analogical, multimodal, symbolic reasoning, and **mathematical computation**. It orchestrates these paradigms through a central UnifiedReasoner, which leverages advanced tool selection, safety governance, and portfolio execution strategies to deliver optimal, safe, and efficient reasoning outcomes. The module is designed for scalability, thread safety, bounded memory usage, and comprehensive error handling, with fallbacks for optional dependencies to ensure functionality in diverse environments.
 
 The module is organized into a core reasoning system and two submodules:
 
@@ -32,6 +32,8 @@ Multimodal Reasoning: Fusion strategies (early/late/hybrid), cross-modal transfe
 
 Symbolic Reasoning: FOL theorem proving (tableau, resolution, natural deduction), constraint satisfaction (CSP), Bayesian networks, fuzzy logic, and temporal reasoning (Allen's interval algebra).
 
+**Mathematical Computation**: Safe code execution using RestrictedPython sandbox for SymPy/NumPy computations. Supports symbolic integration, differentiation, equation solving, limits, series expansions, matrix operations, and more. Generates executable code + computed results instead of text descriptions.
+
 Tool Selection: ToolSelector uses Bayesian priors, utility models, cost estimation, safety governance, and caching for optimal tool choices.
 
 Safety \& Explainability: Safety checks via SafetyGovernor, step-by-step explanations with ReasoningExplainer, and audit trails.
@@ -59,6 +61,8 @@ causal\_reasoning.py: Implements CausalReasoner for DAG-based causal discovery, 
 analogical\_reasoning.py: Offers AnalogicalReasoner with semantic enrichment (spaCy, Sentence Transformers), entity recognition, and graph-based analogy mapping.
 
 multimodal\_reasoning.py: Implements MultimodalReasoner with fusion networks (PyTorch), modality-specific extractors (timm for vision, librosa for audio), and cross-modal alignment.
+
+mathematical\_verification.py: Implements MathematicalVerificationEngine for formal mathematical verification, Bayesian calculation validation, and MathematicalComputationTool for safe SymPy/NumPy code execution in a RestrictedPython sandbox. Supports symbolic integration, differentiation, equation solving, limits, series, and matrix operations.
 
 contextual\_bandit.py: Provides ContextualBanditLearner for tool selection using exploration strategies (epsilon-greedy, Thompson sampling, UCB) and ML reward models (Random Forest, Neural Networks).
 
@@ -126,13 +130,13 @@ Clone the repository (or integrate into your project).
 
 Install required dependencies:
 
-textpip install numpy torch scikit-learn networkx spacy sentence-transformers timm librosa transformers scipy statsmodels causal-learn lingam dowhy lightgbm faiss-cpu psutil cachetools
+textpip install numpy torch scikit-learn networkx spacy sentence-transformers timm librosa transformers scipy statsmodels causal-learn lingam dowhy lightgbm faiss-cpu psutil cachetools sympy RestrictedPython asteval
 
 
 
 Core: numpy, logging, typing, collections, dataclasses, time, pathlib, pickle, json, enum, concurrent.futures, threading, uuid, os, datetime, hashlib, re, sys, zlib, queue, asyncio, math, random, heapq, copy.
 
-Optional: torch (neural/fusion), sklearn (models/clustering), networkx (graphs), spacy (NLP), sentence\_transformers (embeddings), timm/PIL/torchvision (vision), librosa/transformers (audio), scipy/statsmodels (stats), causallearn/lingam/dowhy (causal), lightgbm (cost modeling), faiss (vector search), psutil (resource monitoring), cachetools (caching).
+Optional: torch (neural/fusion), sklearn (models/clustering), networkx (graphs), spacy (NLP), sentence\_transformers (embeddings), timm/PIL/torchvision (vision), librosa/transformers (audio), scipy/statsmodels (stats), causallearn/lingam/dowhy (causal), lightgbm (cost modeling), faiss (vector search), psutil (resource monitoring), cachetools (caching), sympy/RestrictedPython/asteval (mathematical computation with safe execution).
 
 Fallbacks: Mock implementations (e.g., NumPy for FAISS, TF-IDF for embeddings, simple graphs for NetworkX).
 

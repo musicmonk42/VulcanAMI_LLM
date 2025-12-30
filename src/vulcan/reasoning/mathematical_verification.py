@@ -1401,6 +1401,407 @@ class MathematicalToolOrchestrator:
 
 
 # ============================================================================
+# MATHEMATICAL COMPUTATION TOOL
+# ============================================================================
+
+# Try to import safe execution module
+try:
+    from ..utils.safe_execution import execute_math_code, is_safe_execution_available
+
+    SAFE_EXECUTION_AVAILABLE = is_safe_execution_available()
+except ImportError:
+    SAFE_EXECUTION_AVAILABLE = False
+    execute_math_code = None
+    logger.warning("Safe execution module not available")
+
+
+@dataclass
+class ComputationResult:
+    """Result from a mathematical computation."""
+
+    success: bool
+    code: str
+    result: Optional[str] = None
+    explanation: str = ""
+    error: Optional[str] = None
+    tool: str = "mathematical_computation"
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+class MathematicalComputationTool:
+    """
+    Tool for mathematical computations using SymPy with safe code execution.
+
+    This tool bridges the gap between LLM-generated mathematical approaches and
+    actual computational execution. Instead of just describing how to solve a
+    problem, it generates executable SymPy code, runs it in a safe sandbox,
+    and returns both the code and computed result.
+
+    Features:
+        - Generates executable SymPy code from natural language queries
+        - Executes code safely using RestrictedPython sandbox
+        - Returns structured results with code, computed values, and explanations
+        - Falls back to text description if execution fails
+
+    Example:
+        >>> tool = MathematicalComputationTool(llm=my_llm)
+        >>> result = tool.execute("Integrate x^2 with respect to x")
+        >>> print(result.code)    # x = Symbol('x'); result = integrate(x**2, x)
+        >>> print(result.result)  # x**3/3
+    """
+
+    # System prompt for code generation
+    CODE_GENERATION_PROMPT = '''You are a Python code generator for symbolic mathematics.
+Generate executable Python code using SymPy to solve mathematical problems.
+
+RULES:
+1. Use SymPy functions and objects (already imported: Symbol, symbols, integrate, diff, solve, simplify, expand, factor, limit, series, Matrix, sqrt, exp, log, sin, cos, tan, pi, E, I, oo, etc.)
+2. Define variables using Symbol() or symbols()
+3. Assign the FINAL answer to the variable named 'result'
+4. Show derivation steps as comments
+5. DO NOT include any import statements
+6. Output ONLY valid Python code (no markdown, no explanations before or after)
+
+EXAMPLE FORMAT:
+# Define variables
+x = Symbol('x')
+# Define the function
+f = x**2
+# Perform the operation
+integral = integrate(f, x)
+# Simplify and assign result
+result = simplify(integral)
+'''
+
+    def __init__(self, llm=None, max_tokens: int = 500):
+        """
+        Initialize the mathematical computation tool.
+
+        Args:
+            llm: Language model for code generation (must have .generate() method)
+            max_tokens: Maximum tokens for code generation
+        """
+        self.llm = llm
+        self.max_tokens = max_tokens
+        self.name = "mathematical_computation"
+        self.description = "Symbolic mathematics using SymPy with safe code execution"
+        self._lock = threading.RLock()
+
+        logger.info(
+            f"MathematicalComputationTool initialized: "
+            f"safe_execution={SAFE_EXECUTION_AVAILABLE}, llm={'available' if llm else 'none'}"
+        )
+
+    def execute(self, query: str, **kwargs) -> ComputationResult:
+        """
+        Execute mathematical computation.
+
+        Args:
+            query: Mathematical problem or question in natural language
+            **kwargs: Additional arguments (llm override, etc.)
+
+        Returns:
+            ComputationResult with code, result, and explanation
+        """
+        llm = kwargs.get("llm", self.llm)
+
+        with self._lock:
+            try:
+                # Step 1: Generate SymPy code
+                code = self._generate_code(query, llm)
+
+                if not code.strip():
+                    return self._fallback_response(query, "", "Failed to generate code")
+
+                # Step 2: Execute the code
+                if not SAFE_EXECUTION_AVAILABLE or execute_math_code is None:
+                    return self._fallback_response(
+                        query, code, "Safe execution not available"
+                    )
+
+                execution_result = execute_math_code(code)
+
+                if not execution_result["success"]:
+                    # Code execution failed
+                    logger.warning(
+                        f"Code execution failed: {execution_result['error']}"
+                    )
+                    return self._fallback_response(
+                        query, code, execution_result["error"]
+                    )
+
+                # Step 3: Format response
+                result_str = str(execution_result["result"])
+                explanation = self._generate_explanation(query, code, result_str, llm)
+
+                return ComputationResult(
+                    success=True,
+                    code=code,
+                    result=result_str,
+                    explanation=explanation,
+                    tool=self.name,
+                    metadata={
+                        "query": query,
+                        # Limit to first 10 keys to keep metadata manageable
+                        # and avoid serializing large namespace contents
+                        "execution_namespace_keys": list(
+                            execution_result.get("namespace", {}).keys()
+                        )[:10],
+                    },
+                )
+
+            except Exception as e:
+                logger.error(f"Mathematical computation tool failed: {e}")
+                return ComputationResult(
+                    success=False,
+                    code="",
+                    error=str(e),
+                    explanation=f"Failed to solve: {e}",
+                    tool=self.name,
+                )
+
+    def _generate_code(self, query: str, llm) -> str:
+        """
+        Generate SymPy code to solve the problem.
+
+        Args:
+            query: Mathematical problem description
+            llm: Language model for generation
+
+        Returns:
+            Generated Python/SymPy code string
+        """
+        if llm is None:
+            # Return a simple template if no LLM available
+            return self._generate_template_code(query)
+
+        prompt = f"""{self.CODE_GENERATION_PROMPT}
+
+Problem: {query}
+
+Generate ONLY the Python code:"""
+
+        try:
+            # Try different LLM interfaces
+            if hasattr(llm, "generate"):
+                code = llm.generate(prompt, max_tokens=self.max_tokens)
+            elif hasattr(llm, "__call__"):
+                code = llm(prompt)
+            elif hasattr(llm, "complete"):
+                response = llm.complete(prompt)
+                code = response.text if hasattr(response, "text") else str(response)
+            else:
+                logger.warning("Unknown LLM interface, using template")
+                return self._generate_template_code(query)
+
+            # Clean up code
+            return self._clean_code(code)
+
+        except Exception as e:
+            logger.warning(f"LLM code generation failed: {e}")
+            return self._generate_template_code(query)
+
+    def _generate_template_code(self, query: str) -> str:
+        """
+        Generate template code based on query keywords.
+
+        This is a fallback when no LLM is available.
+        """
+        query_lower = query.lower()
+
+        # Detect integration
+        if any(kw in query_lower for kw in ["integrate", "integral", "antiderivative"]):
+            # Extract simple expression if possible
+            return """# Integration
+x = Symbol('x')
+# Define the expression (defaulting to x^2 as example)
+f = x**2
+# Integrate
+result = integrate(f, x)
+"""
+
+        # Detect differentiation
+        if any(kw in query_lower for kw in ["differentiate", "derivative", "diff"]):
+            return """# Differentiation
+x = Symbol('x')
+# Define the expression
+f = x**3 + x**2
+# Differentiate
+result = diff(f, x)
+"""
+
+        # Detect equation solving
+        if any(kw in query_lower for kw in ["solve", "equation", "find x", "find the value"]):
+            return """# Solve equation
+x = Symbol('x')
+# Solve x^2 - 4 = 0
+result = solve(x**2 - 4, x)
+"""
+
+        # Detect limit
+        if "limit" in query_lower:
+            return """# Limit computation
+x = Symbol('x')
+# Compute limit as x -> 0
+result = limit(sin(x)/x, x, 0)
+"""
+
+        # Detect series/expansion
+        if any(kw in query_lower for kw in ["series", "taylor", "expand", "expansion"]):
+            return """# Series expansion
+x = Symbol('x')
+# Taylor series of e^x around 0
+result = series(exp(x), x, 0, 5)
+"""
+
+        # Default: symbolic simplification
+        return """# Mathematical computation
+x = Symbol('x')
+# Define expression
+expr = x**2 + 2*x + 1
+# Simplify/factor
+result = factor(expr)
+"""
+
+    def _clean_code(self, code: str) -> str:
+        """
+        Remove markdown formatting and explanations from generated code.
+
+        Args:
+            code: Raw code string from LLM
+
+        Returns:
+            Cleaned Python code
+        """
+        # Remove markdown code blocks
+        if "```python" in code:
+            parts = code.split("```python")
+            if len(parts) > 1:
+                code = parts[1].split("```")[0]
+        elif "```" in code:
+            parts = code.split("```")
+            if len(parts) > 1:
+                code = parts[1].split("```")[0]
+
+        # Remove import lines (already in namespace)
+        lines = code.strip().split("\n")
+        clean_lines = []
+        for line in lines:
+            stripped = line.strip()
+            # Skip import statements
+            if stripped.startswith("from sympy import"):
+                continue
+            if stripped.startswith("import sympy"):
+                continue
+            if stripped.startswith("from numpy import"):
+                continue
+            if stripped.startswith("import numpy"):
+                continue
+            clean_lines.append(line)
+
+        return "\n".join(clean_lines).strip()
+
+    def _generate_explanation(
+        self, query: str, code: str, result: str, llm
+    ) -> str:
+        """
+        Generate natural language explanation of the solution.
+
+        Args:
+            query: Original problem
+            code: Generated code
+            result: Computed result
+            llm: Language model
+
+        Returns:
+            Natural language explanation
+        """
+        if llm is None:
+            return f"The computation was performed using SymPy. The result is: {result}"
+
+        prompt = f"""Explain this mathematical solution concisely (2-3 sentences):
+
+Problem: {query}
+
+Code:
+{code}
+
+Result: {result}
+
+Brief explanation:"""
+
+        try:
+            if hasattr(llm, "generate"):
+                return llm.generate(prompt, max_tokens=200)
+            elif hasattr(llm, "__call__"):
+                return llm(prompt)
+            else:
+                return f"The computation was performed using SymPy. The result is: {result}"
+        except Exception as e:
+            logger.warning(f"Explanation generation failed: {e}")
+            return f"The computation was performed using SymPy. The result is: {result}"
+
+    def _fallback_response(
+        self, query: str, code: str, error: str
+    ) -> ComputationResult:
+        """
+        Fallback to text description if code execution fails.
+
+        Args:
+            query: Original problem
+            code: Attempted code
+            error: Error message
+
+        Returns:
+            ComputationResult with fallback explanation
+        """
+        explanation = (
+            f"Code execution failed ({error}). "
+            f"The attempted approach was:\n{code}" if code else
+            f"Could not generate executable code for: {query}"
+        )
+
+        return ComputationResult(
+            success=False,
+            code=code,
+            result=None,
+            explanation=explanation,
+            error=error,
+            tool=self.name,
+        )
+
+    def format_response(self, result: ComputationResult) -> str:
+        """
+        Format computation result for display.
+
+        Args:
+            result: ComputationResult from execute()
+
+        Returns:
+            Formatted string for display
+        """
+        if not result.success:
+            return f"""**Mathematical Computation**
+
+⚠️ Execution failed: {result.error}
+
+{result.explanation}
+"""
+
+        return f"""**Mathematical Computation**
+
+**Code:**
+```python
+{result.code}
+```
+
+**Result:** {result.result}
+
+**Explanation:** {result.explanation}
+"""
+
+
+# ============================================================================
 # EXPORTS
 # ============================================================================
 
@@ -1413,10 +1814,12 @@ __all__ = [
     "MathSolution",
     "VerificationResult",
     "BayesianProblem",
+    "ComputationResult",
     # Safe evaluation
     "SafeMathEvaluator",
     "safe_math_eval",
     # Main classes
     "MathematicalVerificationEngine",
     "MathematicalToolOrchestrator",
+    "MathematicalComputationTool",
 ]

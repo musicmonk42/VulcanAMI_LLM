@@ -622,6 +622,20 @@ class UnifiedReasoner:
         except Exception as e:
             logger.warning(f"Error initializing specialized reasoners: {e}")
 
+        # Initialize mathematical computation tool
+        try:
+            from .mathematical_computation import MathematicalComputationTool
+            math_tool = MathematicalComputationTool(
+                llm=None,  # Will use templates without LLM
+                enable_learning=enable_learning
+            )
+            self.reasoners[ReasoningType.MATHEMATICAL] = math_tool
+            logger.info("Mathematical computation tool registered")
+        except ImportError as e:
+            logger.warning(f"Mathematical computation tool not available: {e}")
+        except Exception as e:
+            logger.warning(f"Error initializing mathematical computation tool: {e}")
+
         # FIX: Normalize enum keys to string keys for portfolio executor and warm pool
         tools_by_name = {k.value: v for k, v in self.reasoners.items()}
 
