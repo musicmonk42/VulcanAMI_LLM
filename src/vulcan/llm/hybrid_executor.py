@@ -159,12 +159,21 @@ class HybridLLMExecutor:
     # MAIN EXECUTION METHOD
     # ============================================================
 
+    # Default system prompt that explicitly allows conversation memory
+    # MEMORY FIX: The default prompt now tells the model to remember information from conversation
+    DEFAULT_SYSTEM_PROMPT = (
+        "You are VULCAN, an advanced AI assistant. "
+        "You SHOULD remember and reference information shared earlier in this conversation. "
+        "When a user shares their name, location, preferences, or any personal details during this session, "
+        "you may recall and use that information naturally in your responses."
+    )
+
     async def execute(
         self,
         prompt: str,
         max_tokens: int = 1000,
         temperature: float = 0.7,
-        system_prompt: str = "You are VULCAN, an advanced AI assistant.",
+        system_prompt: str = None,
         enable_distillation: bool = True,
         conversation_history: Optional[List[Dict[str, str]]] = None,
     ) -> Dict[str, Any]:
@@ -175,7 +184,7 @@ class HybridLLMExecutor:
             prompt: The input prompt
             max_tokens: Maximum tokens for response
             temperature: Sampling temperature
-            system_prompt: System prompt for OpenAI
+            system_prompt: System prompt for OpenAI (defaults to DEFAULT_SYSTEM_PROMPT if None)
             enable_distillation: Whether to capture responses for knowledge distillation
             conversation_history: Optional list of previous messages in the conversation.
                                  Each message should be a dict with 'role' and 'content' keys.
@@ -186,27 +195,31 @@ class HybridLLMExecutor:
         """
         self._execution_count += 1
         loop = asyncio.get_running_loop()
+        
+        # Use default system prompt if none provided
+        # MEMORY FIX: Default prompt now allows conversation memory
+        effective_system_prompt = system_prompt if system_prompt is not None else self.DEFAULT_SYSTEM_PROMPT
 
         if self.mode == "local_first":
             result = await self._execute_local_first(
-                loop, prompt, max_tokens, temperature, system_prompt, conversation_history
+                loop, prompt, max_tokens, temperature, effective_system_prompt, conversation_history
             )
         elif self.mode == "openai_first":
             result = await self._execute_openai_first(
-                loop, prompt, max_tokens, temperature, system_prompt, conversation_history
+                loop, prompt, max_tokens, temperature, effective_system_prompt, conversation_history
             )
         elif self.mode == "parallel":
             result = await self._execute_parallel(
-                loop, prompt, max_tokens, temperature, system_prompt, conversation_history
+                loop, prompt, max_tokens, temperature, effective_system_prompt, conversation_history
             )
         elif self.mode == "ensemble":
             result = await self._execute_ensemble(
-                loop, prompt, max_tokens, temperature, system_prompt, conversation_history
+                loop, prompt, max_tokens, temperature, effective_system_prompt, conversation_history
             )
         else:
             self.logger.warning(f"Unknown mode '{self.mode}', defaulting to parallel")
             result = await self._execute_parallel(
-                loop, prompt, max_tokens, temperature, system_prompt, conversation_history
+                loop, prompt, max_tokens, temperature, effective_system_prompt, conversation_history
             )
 
         # Update statistics
