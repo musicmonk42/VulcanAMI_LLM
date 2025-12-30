@@ -658,6 +658,11 @@ QUERY_ROUTING_TIMEOUT_SECONDS: float = (
     5.0  # 5 seconds max - aggressive timeout to prevent cascade delays
 )
 
+# PERFORMANCE FIX Issue #2: Reduced timeout for simple queries
+# Simple greetings and short queries should route in <2 seconds
+# This prevents cascade delays when the semantic matcher is slow
+SIMPLE_QUERY_ROUTING_TIMEOUT_SECONDS: float = 2.0
+
 # FIX 2: Fallback plan constants (extracted from magic numbers per code review)
 FALLBACK_QUERY_ID_LENGTH: int = 12  # UUID truncation length for fallback query IDs
 FALLBACK_COMPLEXITY_SCORE: float = 0.3  # Default complexity for fallback routing
@@ -4288,10 +4293,24 @@ async def route_query_async(
     loop = asyncio.get_running_loop()
     executor = _get_blocking_executor()
 
-    # Use provided timeout or default
-    effective_timeout = (
-        timeout if timeout is not None else QUERY_ROUTING_TIMEOUT_SECONDS
-    )
+    # PERFORMANCE FIX Issue #2: Use shorter timeout for simple queries
+    # Simple queries don't need semantic matching so can route much faster
+    is_simple = False
+    if EMBEDDING_CACHE_AVAILABLE and embedding_cache_is_simple_query is not None:
+        try:
+            is_simple = embedding_cache_is_simple_query(query)
+        except (TypeError, ValueError, AttributeError):
+            # These are the expected errors from embedding cache functions
+            # Fall back to default timeout on any expected error
+            pass
+    
+    # Use provided timeout, or SIMPLE timeout for simple queries, or default
+    if timeout is not None:
+        effective_timeout = timeout
+    elif is_simple:
+        effective_timeout = SIMPLE_QUERY_ROUTING_TIMEOUT_SECONDS
+    else:
+        effective_timeout = QUERY_ROUTING_TIMEOUT_SECONDS
 
     try:
         # FIX 2: Wrap routing in timeout to prevent 46-50+ second delays

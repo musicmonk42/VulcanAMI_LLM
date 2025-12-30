@@ -194,6 +194,10 @@ class RuntimeConfig:
 class UnifiedRuntime:
     """Main orchestrator integrating all runtime components"""
 
+    # BUG FIX Issue #1: Track singleton instance to prevent __del__ cleanup
+    # when multiple instances are created. Only the singleton should cleanup.
+    _singleton_instance: Optional["UnifiedRuntime"] = None
+
     def __init__(self, config: Optional[RuntimeConfig] = None):
         self.config = config or RuntimeConfig()
         self.node_handlers = get_node_handlers()
@@ -209,6 +213,8 @@ class UnifiedRuntime:
         self.io_count = 0
         self._execution_lock = threading.Lock()
         self._cleanup_in_progress = False
+        # BUG FIX Issue #1: Track if this instance is the singleton
+        self._is_singleton = False
 
         # Determine paths relative to this file's location if possible
         base_path = Path(__file__).resolve().parent.parent.parent
@@ -1174,9 +1180,24 @@ class UnifiedRuntime:
 
     def __del__(self):
         """
-        Destructor to ensure cleanup
+        Destructor to ensure cleanup.
+        
+        BUG FIX Issue #1: Only cleanup if this is the singleton instance.
+        Non-singleton instances created as fallbacks should NOT trigger
+        cleanup, as that destroys shared state and caches for all queries.
+        This was causing the "UnifiedRuntime shutdown complete" log after
+        every query followed by full reinitialization on the next query.
         """
         try:
+            # BUG FIX Issue #1: Skip cleanup for non-singleton instances
+            # This prevents the per-query reinitialization problem
+            if not getattr(self, '_is_singleton', False):
+                if logger:
+                    logger.debug(
+                        "Skipping cleanup for non-singleton UnifiedRuntime instance"
+                    )
+                return
+            
             if not self._cleanup_in_progress:
                 self.cleanup()
         except Exception as e:
@@ -1193,10 +1214,17 @@ _global_runtime: Optional[UnifiedRuntime] = None
 
 
 def get_runtime(config: Optional[RuntimeConfig] = None) -> UnifiedRuntime:
-    """Get or create global runtime instance"""
+    """Get or create global runtime instance.
+    
+    BUG FIX Issue #1: Marks the instance as singleton so __del__ knows
+    to perform cleanup only for this instance, not transient fallback instances.
+    """
     global _global_runtime
     if _global_runtime is None:
         _global_runtime = UnifiedRuntime(config)
+        # BUG FIX Issue #1: Mark as singleton for __del__ check
+        _global_runtime._is_singleton = True
+        UnifiedRuntime._singleton_instance = _global_runtime
     # If a config is passed later, should we update the global one?
     # For now, only initialize if None. Re-initializing might have side effects.
     # elif config is not None and _global_runtime.config != config:
