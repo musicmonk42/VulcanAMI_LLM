@@ -136,6 +136,9 @@ COPY configs/ ./configs/
 # Copy demo files (including vulcan_chat.html)
 COPY demos/ ./demos/
 
+# Copy static files (chat interface HTML/CSS/JS)
+COPY static/ ./static/
+
 # Install local package (graphix) if setup.py exists
 RUN if [ -f setup.py ]; then \
         echo "Installing local package from setup.py"; \
@@ -193,6 +196,8 @@ COPY --from=builder /app/graphix_vulcan_llm.py ./graphix_vulcan_llm.py
 COPY --from=builder /app/configs ./configs
 # Copy demo files (including vulcan_chat.html)
 COPY --from=builder /app/demos ./demos
+# Copy static files (chat interface HTML/CSS/JS)
+COPY --from=builder /app/static ./static
 # Copy generated SBOM (optional)
 COPY --from=builder /app/sbom.json ./sbom.json
 
