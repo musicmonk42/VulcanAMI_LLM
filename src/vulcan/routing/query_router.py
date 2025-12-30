@@ -646,17 +646,16 @@ CACHE_STATS_LOG_INTERVAL: int = 10
 # If routing takes longer than this, a fallback plan is returned.
 # This prevents indefinite delays observed in production.
 #
-# BUG #2 FIX: Increased from 5.0s to 20.0s to accommodate embedding computation.
-# The embedding model can take 10-15 seconds on first invocation (cache miss).
-# With embedding cache enabled (Bug #1 fix), subsequent requests should be much faster.
-# The timeout is now set to allow for:
-# - Initial embedding computation: 10-15s
-# - Safety validation: 1-2s
-# - Complexity scoring: <1s
-# - Buffer for system load: 2-3s
-# - Optimized complexity analysis buffer: 5-10s
+# EMERGENCY FIX: Reduced from 30s to 5s to kill embedding bottleneck.
+# Evidence from logs:
+# - Batches: 100%|██████████| 1/1 [00:20<00:00, 20.23s/it] (20 seconds!)
+# - [QueryRouter] Query routing timed out after 30.0s
+# - SLOW ROUTING DETECTED: 30225ms (threshold: 10000ms)
+#
+# With circuit breaker at 1s threshold and aggressive caching, 5s should be enough.
+# If embedding takes longer, circuit breaker will trip and use keyword fallback.
 QUERY_ROUTING_TIMEOUT_SECONDS: float = (
-    30.0  # 30 seconds max (increased from 20s to optimize complexity analysis)
+    5.0  # 5 seconds max - aggressive timeout to prevent cascade delays
 )
 
 # FIX 2: Fallback plan constants (extracted from magic numbers per code review)
