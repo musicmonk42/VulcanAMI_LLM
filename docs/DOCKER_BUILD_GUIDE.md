@@ -98,7 +98,7 @@ docker compose -f docker-compose.prod.yml up -d
 ### Main Application (`Dockerfile`)
 - **Base**: python:3.10.11-slim
 - **User**: graphix (UID 1001)
-- **Ports**: 5000
+- **Ports**: 8000
 - **Features**:
   - Multi-stage build (builder + runtime)
   - Hash-verified dependencies

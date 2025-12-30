@@ -142,8 +142,6 @@ The orchestrator includes:
 - Deterministic behavior via `DEMO_SEED` environment variable
 - Metrics summarization showing before/after comparison
 
-See `docs/DEMO_GUIDE.md` for detailed usage and configuration.
-
 ---
 
 ## 6. 📡 Monitoring with SSE Mind Stream

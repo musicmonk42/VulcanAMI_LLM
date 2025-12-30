@@ -20,13 +20,18 @@ patches:
     target:
       kind: Deployment
       name: vulcanami-api
-
-configMapGenerator:
-  - name: vulcanami-config
-    behavior: merge
-    literals:
-      - ENVIRONMENT=development
-      - LOG_LEVEL=DEBUG
+  # Patch ConfigMap for development environment
+  - patch: |-
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: vulcanami-config
+      data:
+        ENVIRONMENT: "development"
+        LOG_LEVEL: "DEBUG"
+    target:
+      kind: ConfigMap
+      name: vulcanami-config
 
 images:
   - name: ghcr.io/musicmonk42/vulcanami_llm-api

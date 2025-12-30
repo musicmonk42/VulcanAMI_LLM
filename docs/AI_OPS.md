@@ -175,7 +175,6 @@ Recovery: restore DB snapshot → re-verify audit hashes → replay last applied
 | Training | `docs/AI_TRAINING_GUIDE.md` |
 | Transparency | `docs/transparency_report.md` |
 | Visualization | `docs/visualization_guide.md` |
-| Demo | `docs/DEMO_GUIDE.md`, `docs/EASY_DEMO_GUIDE.md` |
 
 ---
 

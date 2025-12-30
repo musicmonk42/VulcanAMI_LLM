@@ -28,7 +28,7 @@ Welcome to the VulcanAMI/GraphixVulcan documentation. This index organizes all d
 
 ## 📚 Complete Documentation
 
-### Getting Started (7 docs)
+### Getting Started (5 docs)
 
 | Document | Description |
 |----------|-------------|
@@ -36,8 +36,6 @@ Welcome to the VulcanAMI/GraphixVulcan documentation. This index organizes all d
 | [NEW_ENGINEER_SETUP.md](NEW_ENGINEER_SETUP.md) ⭐ | Step-by-step onboarding |
 | [QUICK_REFERENCE.md](QUICK_REFERENCE.md) | Common commands cheat sheet |
 | [QUICK_START_WINDOWS.md](QUICK_START_WINDOWS.md) | Windows-specific setup |
-| [EASY_DEMO_GUIDE.md](EASY_DEMO_GUIDE.md) | Simple demo walkthrough |
-| [DEMO_GUIDE.md](DEMO_GUIDE.md) | Full demo instructions |
 | [UNIFIED_STARTUP_GUIDE.md](UNIFIED_STARTUP_GUIDE.md) | All-in-one startup |
 
 ### Architecture & Design (8 docs)
@@ -53,14 +51,13 @@ Welcome to the VulcanAMI/GraphixVulcan documentation. This index organizes all d
 | [philosophy.md](philosophy.md) | Design philosophy |
 | [patent_doc.md](patent_doc.md) | Patent documentation |
 
-### Platform Components (5 docs)
+### Platform Components (4 docs)
 
 | Document | Description |
 |----------|-------------|
 | [COMPLETE_SERVICE_CATALOG.md](COMPLETE_SERVICE_CATALOG.md) ⭐ | All services and functions |
 | [ARENA_FOR+GRAPHIX.md](ARENA_FOR+GRAPHIX.md) | Arena service details |
 | [README_CHAT.md](README_CHAT.md) | Chat interface guide |
-| [DEMO_ADAPTER.md](DEMO_ADAPTER.md) | Demo adapter setup |
 | [SAFETY_VALIDATOR_SINGLETON_GUIDE.md](SAFETY_VALIDATOR_SINGLETON_GUIDE.md) | Safety validation |
 
 ### Deployment (9 docs)
