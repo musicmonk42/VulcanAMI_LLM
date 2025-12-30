@@ -179,13 +179,18 @@ class ValidationTestSuite:
             # Initialize components
             self.nso = NSOAligner() if NSOAligner else None
             self.obs = ObservabilityManager() if ObservabilityManager else None
-            # Use singleton for UnifiedRuntime to prevent per-test reinitialization
+            # BUG FIX Issue #1: Use get_or_create_unified_runtime to prevent per-test reinitialization
             if UnifiedRuntime:
                 try:
-                    from vulcan.reasoning.singletons import get_unified_runtime
-                    self.runtime = get_unified_runtime()
+                    from vulcan.reasoning.singletons import get_or_create_unified_runtime, set_unified_runtime
+                    self.runtime = get_or_create_unified_runtime()
                     if self.runtime is None:
                         self.runtime = UnifiedRuntime()
+                        # Register fallback instance with singleton
+                        try:
+                            set_unified_runtime(self.runtime)
+                        except Exception:
+                            pass
                 except ImportError:
                     self.runtime = UnifiedRuntime()
             else:

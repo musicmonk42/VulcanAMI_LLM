@@ -588,7 +588,7 @@ async def lifespan(app: FastAPI):
         if UNIFIED_RUNTIME_AVAILABLE:
             # ISSUE #5 FIX: Use get_or_create_unified_runtime to prevent repeated init/shutdown
             try:
-                from vulcan.reasoning.singletons import get_or_create_unified_runtime
+                from vulcan.reasoning.singletons import get_or_create_unified_runtime, set_unified_runtime
                 deployment.unified_runtime = get_or_create_unified_runtime()
                 if deployment.unified_runtime:
                     logger.info("✓ UnifiedRuntime initialized via singleton")
@@ -596,7 +596,13 @@ async def lifespan(app: FastAPI):
                     logger.warning("UnifiedRuntime not available")
             except ImportError:
                 deployment.unified_runtime = UnifiedRuntime()
-                logger.info("✓ UnifiedRuntime initialized directly")
+                # BUG FIX Issue #1: Register fallback instance with singleton
+                try:
+                    from vulcan.reasoning.singletons import set_unified_runtime
+                    set_unified_runtime(deployment.unified_runtime)
+                except ImportError:
+                    pass
+                logger.info("✓ UnifiedRuntime initialized directly (registered with singleton)")
 
         # Initialize LLM component
         llm_instance = initialize_component(

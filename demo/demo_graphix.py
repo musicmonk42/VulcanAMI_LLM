@@ -331,7 +331,18 @@ class EnhancedGraphixDemo:
             self.tournament = None
 
         try:
-            self.runtime = UnifiedRuntime() if UnifiedRuntime else None
+            # BUG FIX Issue #1: Use singleton to prevent per-demo reinitialization
+            if UnifiedRuntime:
+                try:
+                    from vulcan.reasoning.singletons import get_or_create_unified_runtime, set_unified_runtime
+                    self.runtime = get_or_create_unified_runtime()
+                    if self.runtime is None:
+                        self.runtime = UnifiedRuntime()
+                        set_unified_runtime(self.runtime)
+                except ImportError:
+                    self.runtime = UnifiedRuntime()
+            else:
+                self.runtime = None
         except Exception as e:
             self.logger.error(f"Failed to initialize UnifiedRuntime: {e}")
             self.runtime = None
