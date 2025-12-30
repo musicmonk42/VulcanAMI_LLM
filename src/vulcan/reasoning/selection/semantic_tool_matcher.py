@@ -27,6 +27,7 @@ Date: 2024-12-26
 import hashlib
 import logging
 import threading
+import time
 from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
@@ -34,6 +35,17 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 
 logger = logging.getLogger(__name__)
+
+# Import circuit breaker for embedding performance protection
+try:
+    from .embedding_circuit_breaker import (
+        get_embedding_circuit_breaker,
+    )
+    CIRCUIT_BREAKER_AVAILABLE = True
+except ImportError:
+    CIRCUIT_BREAKER_AVAILABLE = False
+    get_embedding_circuit_breaker = None
+    logger.debug("[SemanticToolMatcher] Circuit breaker not available")
 
 
 # =============================================================================
@@ -780,14 +792,30 @@ class SemanticToolMatcher:
 
         CRITICAL FIX: Now normalizes text before hashing to ensure cache hits.
         Without this, queries with different whitespace/casing would miss cache.
+        
+        PERFORMANCE FIX: Integrates circuit breaker to skip embeddings when
+        performance degrades, preventing 30-second delays.
 
         Args:
             query: The query text to embed
             model: The embedding model to use
 
         Returns:
-            Cached or newly computed embedding, or None on failure
+            Cached or newly computed embedding, or None on failure/circuit open
         """
+        # Get circuit breaker once for reuse throughout method
+        circuit_breaker = None
+        if CIRCUIT_BREAKER_AVAILABLE:
+            circuit_breaker = get_embedding_circuit_breaker()
+        
+        # PERFORMANCE FIX: Check circuit breaker first - skip embedding if circuit is open
+        if circuit_breaker is not None and circuit_breaker.should_skip_embedding():
+            logger.warning(
+                "[SemanticToolMatcher] Circuit breaker OPEN - skipping embedding, "
+                "using keyword-only matching"
+            )
+            return None
+        
         # CRITICAL FIX: Normalize text before hashing for consistent cache keys
         normalized_query = cls._normalize_text(query)
         # Create cache key from normalized query hash (SHA-256 provides good collision resistance)
@@ -813,13 +841,19 @@ class SemanticToolMatcher:
                 f"(hits={cls._query_cache_hits}, misses={cls._query_cache_misses})"
             )
 
-        # Compute embedding outside lock
+        # Compute embedding outside lock - track time for circuit breaker
+        start_time = time.perf_counter()
         try:
             embedding = model.encode(
                 query,  # Use original query for embedding (preserves semantic nuances)
                 show_progress_bar=False,
                 normalize_embeddings=True,
             )
+            
+            # Record successful latency to circuit breaker
+            elapsed_ms = (time.perf_counter() - start_time) * 1000
+            if circuit_breaker is not None:
+                circuit_breaker.record_latency(elapsed_ms)
 
             # Cache the result
             with cls._query_cache_lock:
@@ -831,13 +865,19 @@ class SemanticToolMatcher:
                 cls._query_embedding_cache[cache_key] = embedding
                 logger.debug(
                     f"[SemanticToolMatcher] Cached embedding: {cache_key[:8]}... "
-                    f"(cache_size={len(cls._query_embedding_cache)}/{cls._query_cache_max_size})"
+                    f"(cache_size={len(cls._query_embedding_cache)}/{cls._query_cache_max_size}, "
+                    f"time={elapsed_ms:.0f}ms)"
                 )
 
             return embedding
         except Exception as e:
+            # Record failure to circuit breaker
+            elapsed_ms = (time.perf_counter() - start_time) * 1000
+            if circuit_breaker is not None:
+                circuit_breaker.record_failure()
+            
             logger.warning(
-                f"[SemanticToolMatcher] Failed to compute query embedding: {e}"
+                f"[SemanticToolMatcher] Failed to compute query embedding after {elapsed_ms:.0f}ms: {e}"
             )
             return None
 
