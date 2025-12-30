@@ -237,6 +237,12 @@ memorySystem:
     memoryStore: /app/memory_store
     cacheRoot: /tmp/vulcan_cache
     configPath: /app/configs
+  # Learning State Persistence Configuration
+  # Persists tool weights, concepts, and contraindications across queries and restarts
+  learningPersistence:
+    enabled: true
+    # File: learning_state.json (stored in memoryStore path)
+    filename: learning_state.json
 
 # Persistent Volume Claims for memory system
 persistence:

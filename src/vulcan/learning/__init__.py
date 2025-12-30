@@ -69,6 +69,15 @@ from .curriculum_learning import (
 from .learning_types import FeedbackData, LearningConfig, LearningMode, TaskInfo
 from .parameter_history import ParameterHistoryManager
 
+# Import learning state persistence
+try:
+    from ..memory.learning_persistence import LearningStatePersistence
+    LEARNING_PERSISTENCE_AVAILABLE = True
+except ImportError:
+    LEARNING_PERSISTENCE_AVAILABLE = False
+    LearningStatePersistence = None
+    logger.warning("LearningStatePersistence not available - learning state will not persist")
+
 # Import torch-dependent components conditionally
 if TORCH_AVAILABLE:
     try:
@@ -181,6 +190,25 @@ class UnifiedLearningSystem:
         # ISSUE #15 FIX: Lock for thread-safe weight adjustments
         # Prevents race conditions when async process_outcome calls update weights concurrently
         self._weight_lock = threading.Lock()
+        
+        # PERSISTENCE FIX: Initialize persistence layer and load previous state
+        # This ensures learning state persists across queries and server restarts
+        self._learning_persistence = None
+        if LEARNING_PERSISTENCE_AVAILABLE:
+            try:
+                self._learning_persistence = LearningStatePersistence()
+                # Load previous tool weights from disk
+                persisted_state = self._learning_persistence.load_state()
+                persisted_weights = persisted_state.get("tool_weights", {})
+                if persisted_weights:
+                    self.tool_weight_adjustments = persisted_weights.copy()
+                    logger.info(
+                        f"[Learning] Loaded {len(persisted_weights)} tool weights from disk: "
+                        f"{persisted_weights}"
+                    )
+            except Exception as e:
+                logger.warning(f"[Learning] Failed to initialize persistence: {e}")
+                self._learning_persistence = None
         
         # ISSUE #5 FIX: Track last decay time for periodic weight decay
         self._last_weight_decay_time = time.time()
@@ -330,10 +358,45 @@ class UnifiedLearningSystem:
                         )
                     else:
                         logger.info(f"[Learning] Tool '{tool}' weight adjustment: {weight_delta:+.3f} (cumulative: {self.tool_weight_adjustments[tool]:+.3f})")
+                
+                # PERSISTENCE FIX: Save tool weights to disk after every update
+                # This ensures learning state persists across queries and server restarts
+                if self._learning_persistence:
+                    try:
+                        self._learning_persistence.update_tool_weights(self.tool_weight_adjustments)
+                    except Exception as e:
+                        logger.warning(f"[Learning] Failed to persist tool weights: {e}")
         else:
             logger.warning(f"[Learning] No tools recorded for {query_id} - cannot learn from selection")
         
-        # 4. Feed to MetaLearner for pattern detection
+        # 4. Store interaction in learning persistence for query/answer history
+        # This enables learning from past interactions and semantic search
+        if self._learning_persistence:
+            try:
+                # Extract query and answer from outcome if available
+                # Outcome may contain: 'query'/'prompt' for input, 'answer'/'response' for output
+                # This supports multiple outcome formats from different callers
+                query_text = outcome.get('query') or outcome.get('prompt', '')
+                answer_text = outcome.get('answer') or outcome.get('response', '')
+                
+                if query_text or answer_text:
+                    self._learning_persistence.add_interaction(
+                        query_id=query_id,
+                        query=str(query_text),
+                        answer=str(answer_text),
+                        tools_used=tools,
+                        success=(status == 'success'),
+                        latency_ms=float(outcome.get('total_ms') or routing_ms or 0),
+                        metadata={
+                            'query_type': query_type,
+                            'complexity': float(outcome.get('complexity') or 0.0),
+                            'routing_ms': float(routing_ms or 0),
+                        }
+                    )
+            except Exception as e:
+                logger.debug(f"[Learning] Failed to store interaction: {e}")
+        
+        # 5. Feed to MetaLearner for pattern detection
         if self.meta_learner:
             try:
                 if hasattr(self.meta_learner, 'update_from_outcome'):
@@ -411,6 +474,14 @@ class UnifiedLearningSystem:
             self.tool_weight_adjustments.clear()
             self._last_weight_decay_time = time.time()
             logger.info(f"[Learning] Reset tool weights: {old_weights} -> cleared")
+            
+            # PERSISTENCE FIX: Clear persisted state when weights are reset
+            if self._learning_persistence:
+                try:
+                    self._learning_persistence.clear_state()
+                    logger.info("[Learning] Cleared persisted learning state")
+                except Exception as e:
+                    logger.warning(f"[Learning] Failed to clear persisted state: {e}")
 
     async def _attempt_slow_routing_recovery(self) -> bool:
         """
@@ -519,6 +590,22 @@ class UnifiedLearningSystem:
             "total_recoveries_successful": self._total_recoveries_successful,
             "last_recovery_time": self._last_recovery_time,
             "recovery_cooldown_seconds": self._recovery_cooldown_seconds,
+        }
+
+    def get_persistence_stats(self) -> Dict[str, Any]:
+        """
+        Get statistics about learning state persistence.
+        
+        PERSISTENCE FIX: Provides visibility into the persistence layer state.
+        
+        Returns:
+            Dictionary with persistence statistics
+        """
+        if self._learning_persistence:
+            return self._learning_persistence.get_stats()
+        return {
+            "persistence_available": False,
+            "reason": "LearningStatePersistence not initialized"
         }
 
     def _create_integrated_difficulty_estimator(self):

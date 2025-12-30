@@ -80,3 +80,7 @@ data:
   MEMORY_STORE_PATH: "/app/memory_store"
   CACHE_ROOT: "/tmp/vulcan_cache"
   CONFIG_PATH: "/app/configs"
+  # Learning State Persistence Configuration
+  # Path for persisting learning state (tool weights, concepts, contraindications)
+  # This ensures learning persists across queries and server restarts
+  VULCAN_STORAGE_PATH: "/app/memory_store"

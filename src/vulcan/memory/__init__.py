@@ -19,6 +19,7 @@ from .distributed import (
     MemoryNode,
 )
 from .hierarchical import HierarchicalMemory, MemoryLevel
+from .learning_persistence import LearningStatePersistence
 from .persistence import CompressionType, MemoryPersistence, MemoryVersionControl
 from .retrieval import AttentionMechanism, MemoryIndex, MemorySearch, RetrievalResult
 from .specialized import (
@@ -55,6 +56,7 @@ __all__ = [
     "MemoryPersistence",
     "MemoryVersionControl",
     "CompressionType",
+    "LearningStatePersistence",
     # Retrieval
     "MemoryIndex",
     "MemorySearch",
