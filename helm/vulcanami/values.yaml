@@ -356,10 +356,10 @@ performanceTuning:
   selfImprovementAutoCommit: false
   # Gap give-up threshold increased from 3 to 10
   gapGiveupThreshold: 10
-  # Semantic matching configuration (EMERGENCY FIX for Embedding Bottleneck)
-  # Disable slow semantic matching (default: true = disabled for fast routing)
-  # Set to false to re-enable embedding-based tool selection (may cause slow queries)
-  disableSemanticMatching: true
+  # Semantic matching configuration (Performance Optimized)
+  # Now safe to enable (default: false = enabled) due to Issue #2 and #3 caching fixes
+  # Set to true to disable for keyword-only routing (faster but less accurate)
+  disableSemanticMatching: false
 
 # OpenAI Response Caching Configuration
 # Enables LRU+TTL caching for OpenAI API responses to reduce costs and latency

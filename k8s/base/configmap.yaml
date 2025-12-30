@@ -66,10 +66,10 @@ data:
   VULCAN_SELF_IMPROVEMENT_AUTO_COMMIT: "false"
   # Gap give-up threshold increased from 3 to 10
   VULCAN_GAP_GIVEUP_THRESHOLD: "10"
-  # Semantic Matching Configuration (EMERGENCY FIX for Embedding Bottleneck)
-  # Disable slow semantic matching (default: 1 = disabled for fast routing)
-  # Set to 0 to re-enable embedding-based tool selection (may cause slow queries)
-  VULCAN_DISABLE_SEMANTIC_MATCHING: "1"
+  # Semantic Matching Configuration (Performance Optimized)
+  # Now safe to enable (default: 0 = enabled) due to Issue #2 and #3 caching fixes
+  # Set to 1 to disable for keyword-only routing (faster but less accurate)
+  VULCAN_DISABLE_SEMANTIC_MATCHING: "0"
   # OpenAI Response Caching Configuration (Performance Optimization)
   # Enables LRU+TTL caching for OpenAI API responses to reduce costs and latency
   OPENAI_CACHE_ENABLED: "true"

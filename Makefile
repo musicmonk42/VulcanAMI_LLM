@@ -532,6 +532,32 @@ enable-performance-tuning: ## Enable all performance tuning settings (PR Fixes)
 	@echo ""
 	@echo "# Gap give-up threshold increased from 3 to 10"
 	@echo "VULCAN_GAP_GIVEUP_THRESHOLD=10"
+	@echo ""
+	@echo "# Semantic matching enabled by default (safe after Issue #2 and #3 caching fixes)"
+	@echo "# Set to 1 to disable for keyword-only routing (faster but less accurate)"
+	@echo "VULCAN_DISABLE_SEMANTIC_MATCHING=0"
+
+.PHONY: enable-semantic-matching
+enable-semantic-matching: ## Enable semantic matching for accurate tool selection (Issue #4 Fix)
+	@echo "$(GREEN)Enabling semantic matching...$(NC)"
+	@echo "Now safe to enable due to Issue #2 and #3 caching fixes."
+	@echo ""
+	@echo "Add to your .env file:"
+	@echo "VULCAN_DISABLE_SEMANTIC_MATCHING=0"
+	@echo ""
+	@echo "Note: Semantic matching provides more accurate tool selection using embeddings."
+	@echo "Previously caused 6-30s delays, but now safe due to:"
+	@echo "  - Issue #2: HierarchicalMemory singleton (models load once)"
+	@echo "  - Issue #3: show_progress_bar=False (no batch progress overhead)"
+
+.PHONY: disable-semantic-matching
+disable-semantic-matching: ## Disable semantic matching for faster routing
+	@echo "$(YELLOW)Disabling semantic matching...$(NC)"
+	@echo ""
+	@echo "Add to your .env file:"
+	@echo "VULCAN_DISABLE_SEMANTIC_MATCHING=1"
+	@echo ""
+	@echo "Note: This uses keyword-only tool selection (faster but less accurate)."
 
 ################################################################################
 # Utilities
