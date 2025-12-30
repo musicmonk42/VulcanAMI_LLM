@@ -46,6 +46,7 @@ _multimodal_engine: Optional[Any] = None
 _unified_reasoner: Optional[Any] = None  # BUG FIX: Add singleton for UnifiedReasoner
 _math_verification_engine: Optional[Any] = None  # CACHING FIX: Singleton for MathematicalVerificationEngine
 _hierarchical_memory: Optional[Any] = None  # PERF FIX Issue #2: Singleton for HierarchicalMemory
+_unified_learning_system: Optional[Any] = None  # PERF FIX Issue #5: Singleton for UnifiedLearningSystem
 _singleton_lock = threading.Lock()
 
 
@@ -307,6 +308,7 @@ def reset_all() -> None:
     global _world_model, _self_improvement_drive, _unified_runtime
     global _ai_runtime, _multimodal_engine, _unified_reasoner
     global _math_verification_engine, _hierarchical_memory
+    global _unified_learning_system
     
     with _singleton_lock:
         _tool_selector = None
@@ -327,6 +329,7 @@ def reset_all() -> None:
         _unified_reasoner = None
         _math_verification_engine = None
         _hierarchical_memory = None
+        _unified_learning_system = None
         _instances.clear()
         logger.info("[Singletons] All singletons reset")
 
@@ -615,6 +618,10 @@ def prewarm_all():
     # CACHING FIX: Pre-warm MathematicalVerificationEngine
     mve = get_math_verification_engine()
     results['math_verification_engine'] = mve is not None
+    
+    # PERF FIX Issue #5: Pre-warm UnifiedLearningSystem to persist ensemble weights
+    uls = get_unified_learning_system()
+    results['unified_learning_system'] = uls is not None
     
     success_count = sum(1 for v in results.values() if v)
     logger.info(f"[Singletons] ✓ All singletons pre-warmed ({success_count}/{len(results)} initialized)")
@@ -1129,4 +1136,57 @@ def get_hierarchical_memory(config: Optional[Any] = None) -> Optional[Any]:
             return None
         except Exception as e:
             logger.error(f"[Singletons] Failed to create HierarchicalMemory: {e}")
+            return None
+
+
+# ============================================
+# UNIFIED LEARNING SYSTEM SINGLETON (Issue #5)
+# ============================================
+
+_unified_learning_system_lock = threading.Lock()
+
+
+def get_unified_learning_system() -> Optional[Any]:
+    """
+    Get singleton UnifiedLearningSystem instance.
+    
+    PERF FIX Issue #5: The UnifiedLearningSystem was being re-instantiated
+    per request, causing:
+    - "[Ensemble] All weights are zero - using uniform weights" every request
+    - Tool weight adjustments being lost between requests
+    - Learning state not persisting across queries
+    - LearningStatePersistence re-loading from disk repeatedly
+    
+    With the singleton pattern, the learning system:
+    - Initializes once at startup with LearningStatePersistence
+    - Maintains tool weight adjustments across all requests
+    - Ensemble weights persist and accumulate properly
+    - Learning feedback actually improves routing over time
+    
+    Returns:
+        UnifiedLearningSystem instance (singleton), or None if unavailable.
+    """
+    global _unified_learning_system
+    
+    if _unified_learning_system is not None:
+        logger.debug("[Singletons] Returning cached UnifiedLearningSystem")
+        return _unified_learning_system
+    
+    with _unified_learning_system_lock:
+        if _unified_learning_system is not None:
+            return _unified_learning_system
+        
+        logger.info("[Singletons] Creating global UnifiedLearningSystem (ONCE)")
+        try:
+            from vulcan.learning import UnifiedLearningSystem
+            
+            _unified_learning_system = UnifiedLearningSystem()
+            logger.info("[Singletons] ✓ UnifiedLearningSystem created and cached")
+            logger.info("[Singletons] ✓ Tool weights will persist across requests")
+            return _unified_learning_system
+        except ImportError as e:
+            logger.warning(f"[Singletons] UnifiedLearningSystem import failed: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"[Singletons] Failed to create UnifiedLearningSystem: {e}")
             return None

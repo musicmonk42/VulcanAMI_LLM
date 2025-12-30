@@ -1047,6 +1047,21 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"HierarchicalMemory preload failed (will load lazily): {e}")
 
+    # PERF FIX Issue #5: Preload UnifiedLearningSystem singleton at startup
+    # This ensures ensemble weights persist across requests (no more "All weights are zero")
+    try:
+        from vulcan.reasoning.singletons import get_unified_learning_system
+        learning_system = get_unified_learning_system()
+        if learning_system:
+            logger.info("✓ UnifiedLearningSystem singleton preloaded at startup")
+            logger.info("✓ Ensemble weights will persist across requests")
+        else:
+            logger.debug("UnifiedLearningSystem singleton not available (will load lazily)")
+    except ImportError as e:
+        logger.debug(f"UnifiedLearningSystem singleton not available for preload: {e}")
+    except Exception as e:
+        logger.warning(f"UnifiedLearningSystem preload failed (will load lazily): {e}")
+
     # ================================================================
     # PERFORMANCE FIX (Progressive Degradation): Pre-warm all reasoning singletons
     # This prevents query routing from degrading 469ms → 152,048ms over time
