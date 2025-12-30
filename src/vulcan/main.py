@@ -3311,6 +3311,10 @@ Based on your analysis through memory retrieval, multi-modal reasoning, causal m
     if hybrid_executor is None:
         # Try module-level singleton (may have been initialized elsewhere)
         hybrid_executor = get_hybrid_executor()
+        if hybrid_executor is not None:
+            # Register the singleton with app.state for faster access on next request
+            app.state.hybrid_executor = hybrid_executor
+            logger.debug("[VULCAN] Using module-level HybridLLMExecutor singleton")
     if hybrid_executor is None:
         # Final fallback: create via singleton (will be cached for future requests)
         logger.warning("[VULCAN] Creating HybridLLMExecutor via singleton (startup init may have failed)")
@@ -3322,6 +3326,10 @@ Based on your analysis through memory retrieval, multi-modal reasoning, causal m
             ensemble_min_confidence=settings.llm_ensemble_min_confidence,
             openai_max_tokens=settings.llm_openai_max_tokens,
         )
+        # CRITICAL FIX: Register the newly created executor in app.state
+        # This prevents re-creation on every request within the same worker
+        app.state.hybrid_executor = hybrid_executor
+        logger.info("[VULCAN] HybridLLMExecutor registered in app.state for future requests")
 
     # Execute hybrid LLM request
     try:
@@ -5223,6 +5231,10 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
                 if hybrid_executor is None:
                     # Try module-level singleton (may have been initialized elsewhere)
                     hybrid_executor = get_hybrid_executor()
+                    if hybrid_executor is not None:
+                        # Register the singleton with app.state for faster access on next request
+                        app.state.hybrid_executor = hybrid_executor
+                        logger.debug("[VULCAN] Using module-level HybridLLMExecutor singleton")
                 if hybrid_executor is None:
                     # Final fallback: create via singleton (will be cached for future requests)
                     logger.warning("[VULCAN] Creating HybridLLMExecutor via singleton (startup init may have failed)")
@@ -5234,6 +5246,10 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
                         ensemble_min_confidence=settings.llm_ensemble_min_confidence,
                         openai_max_tokens=settings.llm_openai_max_tokens,
                     )
+                    # CRITICAL FIX: Register the newly created executor in app.state
+                    # This prevents re-creation on every request within the same worker
+                    app.state.hybrid_executor = hybrid_executor
+                    logger.info("[VULCAN] HybridLLMExecutor registered in app.state for future requests")
 
                 try:
                     # Build system prompt that emphasizes using reasoning output AND conversation memory
