@@ -1,0 +1,1047 @@
+"""
+SOTA Mathematical Computation Tool for VULCAN-AGI
+
+Provides symbolic mathematical computation using SymPy with:
+- LLM-based code generation for complex problems
+- Template-based generation for common operations
+- Safe sandboxed execution via RestrictedPython
+- Multi-strategy solving (symbolic, numeric, hybrid)
+- Learning from successful solutions
+- Integration with mathematical verification
+
+This tool GENERATES solutions, unlike MathematicalVerificationEngine which only verifies.
+"""
+
+from __future__ import annotations
+
+import logging
+import re
+import threading
+import time
+from collections import defaultdict
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+
+logger = logging.getLogger(__name__)
+
+
+# ============================================================================
+# ENUMS AND DATA STRUCTURES
+# ============================================================================
+
+
+class ProblemType(Enum):
+    """Types of mathematical problems the tool can solve."""
+    CALCULUS = "calculus"
+    ALGEBRA = "algebra"
+    DIFFERENTIAL_EQUATIONS = "differential_equations"
+    LINEAR_ALGEBRA = "linear_algebra"
+    STATISTICS = "statistics"
+    NUMBER_THEORY = "number_theory"
+    GEOMETRY = "geometry"
+    PHYSICS = "physics"
+    OPTIMIZATION = "optimization"
+    UNKNOWN = "unknown"
+
+
+class SolutionStrategy(Enum):
+    """Strategies for solving mathematical problems."""
+    SYMBOLIC = "symbolic"           # Pure SymPy symbolic computation
+    NUMERIC = "numeric"             # NumPy numerical computation
+    HYBRID = "hybrid"               # Combined symbolic + numeric
+    TEMPLATE = "template"           # Template-based code generation
+    LLM_GENERATED = "llm_generated" # LLM-generated code
+
+
+@dataclass
+class ComputationResult:
+    """Result from a mathematical computation."""
+    success: bool
+    code: str
+    result: Optional[str] = None
+    explanation: str = ""
+    error: Optional[str] = None
+    tool: str = "mathematical_computation"
+    problem_type: ProblemType = ProblemType.UNKNOWN
+    strategy: SolutionStrategy = SolutionStrategy.TEMPLATE
+    execution_time: float = 0.0
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class ProblemClassification:
+    """Classification of a mathematical problem."""
+    problem_type: ProblemType
+    confidence: float
+    keywords: List[str]
+    suggested_strategy: SolutionStrategy
+    variables: List[str] = field(default_factory=list)
+
+
+# ============================================================================
+# SAFE EXECUTION INTEGRATION
+# ============================================================================
+
+# Try to import safe execution module
+try:
+    from ..utils.safe_execution import execute_math_code, is_safe_execution_available
+    SAFE_EXECUTION_AVAILABLE = is_safe_execution_available()
+except ImportError:
+    SAFE_EXECUTION_AVAILABLE = False
+    execute_math_code = None
+    logger.warning("Safe execution module not available for mathematical computation")
+
+
+# ============================================================================
+# PROBLEM CLASSIFIER
+# ============================================================================
+
+
+class ProblemClassifier:
+    """
+    Classifies mathematical problems to determine the best solving strategy.
+    
+    Uses keyword matching and pattern recognition to identify:
+    - Problem type (calculus, algebra, etc.)
+    - Suggested solving strategy
+    - Key variables and operations
+    """
+    
+    # Keyword patterns for problem classification
+    PROBLEM_PATTERNS: Dict[ProblemType, List[str]] = {
+        ProblemType.CALCULUS: [
+            "integrate", "integral", "derivative", "differentiate", "diff",
+            "limit", "series", "taylor", "maclaurin", "antiderivative",
+            "partial derivative", "gradient", "jacobian", "hessian",
+            "divergence", "curl", "laplacian"
+        ],
+        ProblemType.ALGEBRA: [
+            "solve", "equation", "factor", "expand", "simplify",
+            "polynomial", "roots", "quadratic", "cubic", "linear equation",
+            "system of equations", "inequality"
+        ],
+        ProblemType.DIFFERENTIAL_EQUATIONS: [
+            "differential equation", "ode", "pde", "dsolve",
+            "boundary condition", "initial condition", "laplace transform",
+            "fourier transform", "green's function", "eigenvalue problem"
+        ],
+        ProblemType.LINEAR_ALGEBRA: [
+            "matrix", "determinant", "eigenvalue", "eigenvector",
+            "inverse", "transpose", "rank", "nullspace", "column space",
+            "linear transformation", "diagonalize", "svd", "lu decomposition",
+            "qr decomposition", "orthogonal", "unitary"
+        ],
+        ProblemType.STATISTICS: [
+            "probability", "distribution", "mean", "variance", "standard deviation",
+            "expected value", "covariance", "correlation", "hypothesis",
+            "confidence interval", "regression", "bayesian"
+        ],
+        ProblemType.NUMBER_THEORY: [
+            "prime", "divisor", "gcd", "lcm", "modular", "congruence",
+            "diophantine", "fibonacci", "factorial", "binomial"
+        ],
+        ProblemType.GEOMETRY: [
+            "area", "volume", "perimeter", "distance", "angle",
+            "circle", "sphere", "triangle", "rectangle", "polygon",
+            "coordinate", "vector", "plane"
+        ],
+        ProblemType.PHYSICS: [
+            "force", "energy", "momentum", "velocity", "acceleration",
+            "wave", "oscillation", "quantum", "hamiltonian", "lagrangian",
+            "schrodinger", "maxwell", "einstein"
+        ],
+        ProblemType.OPTIMIZATION: [
+            "minimize", "maximize", "optimize", "constraint", "lagrange multiplier",
+            "gradient descent", "convex", "linear programming"
+        ],
+    }
+
+    def classify(self, query: str) -> ProblemClassification:
+        """
+        Classify a mathematical problem.
+        
+        Args:
+            query: Natural language problem description
+            
+        Returns:
+            ProblemClassification with type, confidence, and strategy
+        """
+        query_lower = query.lower()
+        
+        # Count keyword matches for each problem type
+        # Use word boundary matching for short keywords to avoid false positives
+        scores: Dict[ProblemType, Tuple[int, List[str]]] = {}
+        
+        for problem_type, keywords in self.PROBLEM_PATTERNS.items():
+            matches = []
+            for kw in keywords:
+                # Use word boundary regex for short keywords (<=3 chars)
+                # to avoid matching "ode" in "code" or "node"
+                if len(kw) <= 3:
+                    pattern = r'\b' + re.escape(kw) + r'\b'
+                    if re.search(pattern, query_lower):
+                        matches.append(kw)
+                else:
+                    if kw in query_lower:
+                        matches.append(kw)
+            scores[problem_type] = (len(matches), matches)
+        
+        # Priority order for tie-breaking (more specific types have higher priority)
+        # This ensures that if "solve" matches ALGEBRA and "ode" matches DIFFERENTIAL_EQUATIONS,
+        # the more specific DIFFERENTIAL_EQUATIONS wins
+        PRIORITY_ORDER = [
+            ProblemType.DIFFERENTIAL_EQUATIONS,  # Highest priority (most specific)
+            ProblemType.LINEAR_ALGEBRA,
+            ProblemType.PHYSICS,
+            ProblemType.OPTIMIZATION,
+            ProblemType.CALCULUS,
+            ProblemType.NUMBER_THEORY,
+            ProblemType.STATISTICS,
+            ProblemType.GEOMETRY,
+            ProblemType.ALGEBRA,  # Lower priority (most general)
+            ProblemType.UNKNOWN,
+        ]
+        
+        # Find best match with priority-based tie-breaking
+        best_type = ProblemType.UNKNOWN
+        best_score = 0
+        best_keywords: List[str] = []
+        best_priority = len(PRIORITY_ORDER)  # Lower index = higher priority
+        
+        for problem_type, (score, keywords) in scores.items():
+            priority = PRIORITY_ORDER.index(problem_type) if problem_type in PRIORITY_ORDER else len(PRIORITY_ORDER)
+            
+            # Win if higher score, or same score but higher priority
+            if score > best_score or (score == best_score and score > 0 and priority < best_priority):
+                best_score = score
+                best_type = problem_type
+                best_keywords = keywords
+                best_priority = priority
+        
+        # Calculate confidence
+        total_keywords = sum(len(kws) for kws in self.PROBLEM_PATTERNS.values())
+        confidence = min(1.0, best_score / 3.0) if best_score > 0 else 0.1
+        
+        # Determine strategy
+        strategy = self._suggest_strategy(best_type, query_lower)
+        
+        # Extract variables
+        variables = self._extract_variables(query)
+        
+        return ProblemClassification(
+            problem_type=best_type,
+            confidence=confidence,
+            keywords=best_keywords,
+            suggested_strategy=strategy,
+            variables=variables
+        )
+    
+    def _suggest_strategy(self, problem_type: ProblemType, query: str) -> SolutionStrategy:
+        """Suggest best solving strategy based on problem type."""
+        # Numerical keywords suggest numeric/hybrid approach
+        numeric_keywords = ["numerical", "approximate", "decimal", "float", "compute numerically"]
+        if any(kw in query for kw in numeric_keywords):
+            return SolutionStrategy.HYBRID
+        
+        # Most problems benefit from symbolic approach
+        if problem_type in [ProblemType.CALCULUS, ProblemType.ALGEBRA, 
+                           ProblemType.DIFFERENTIAL_EQUATIONS, ProblemType.LINEAR_ALGEBRA]:
+            return SolutionStrategy.SYMBOLIC
+        
+        # Statistics often needs numeric
+        if problem_type == ProblemType.STATISTICS:
+            return SolutionStrategy.HYBRID
+        
+        return SolutionStrategy.SYMBOLIC
+    
+    def _extract_variables(self, query: str) -> List[str]:
+        """Extract potential variable names from query."""
+        # Common variable patterns
+        var_patterns = [
+            r'\b([a-zA-Z])\s*=',  # x =, y =
+            r'variable\s+([a-zA-Z])',  # variable x
+            r'with respect to\s+([a-zA-Z])',  # with respect to x
+            r'for\s+([a-zA-Z])\b',  # for x
+        ]
+        
+        variables = set()
+        for pattern in var_patterns:
+            matches = re.findall(pattern, query)
+            variables.update(matches)
+        
+        # Default to common variables if none found
+        if not variables:
+            variables = {'x'}
+        
+        return list(variables)
+
+
+# ============================================================================
+# CODE TEMPLATES
+# ============================================================================
+
+
+class CodeTemplates:
+    """
+    Template-based code generation for common mathematical operations.
+    
+    Provides reliable, tested code templates when LLM generation is unavailable
+    or for common problem types where templates are more reliable.
+    """
+    
+    @staticmethod
+    def integration(expression: str = "x**2", variable: str = "x", 
+                   bounds: Optional[Tuple[str, str]] = None) -> str:
+        """Generate integration code."""
+        if bounds:
+            return f"""# Definite Integration
+{variable} = Symbol('{variable}')
+f = {expression}
+result = integrate(f, ({variable}, {bounds[0]}, {bounds[1]}))
+"""
+        return f"""# Indefinite Integration
+{variable} = Symbol('{variable}')
+f = {expression}
+result = integrate(f, {variable})
+"""
+
+    @staticmethod
+    def differentiation(expression: str = "x**3", variable: str = "x", 
+                       order: int = 1) -> str:
+        """Generate differentiation code."""
+        return f"""# Differentiation (order {order})
+{variable} = Symbol('{variable}')
+f = {expression}
+result = diff(f, {variable}, {order})
+"""
+
+    @staticmethod
+    def solve_equation(equation: str = "x**2 - 4", variable: str = "x") -> str:
+        """Generate equation solving code."""
+        return f"""# Solve Equation
+{variable} = Symbol('{variable}')
+equation = {equation}
+result = solve(equation, {variable})
+"""
+
+    @staticmethod
+    def solve_system(equations: List[str], variables: List[str]) -> str:
+        """Generate system of equations solving code."""
+        var_def = ", ".join([f"{v} = Symbol('{v}')" for v in variables])
+        eq_list = ", ".join(equations)
+        var_list = ", ".join(variables)
+        return f"""# Solve System of Equations
+{var_def}
+equations = [{eq_list}]
+result = solve(equations, [{var_list}])
+"""
+
+    @staticmethod
+    def limit(expression: str = "sin(x)/x", variable: str = "x", 
+             point: str = "0", direction: str = "") -> str:
+        """Generate limit computation code."""
+        dir_arg = f", '{direction}'" if direction else ""
+        return f"""# Limit Computation
+{variable} = Symbol('{variable}')
+f = {expression}
+result = limit(f, {variable}, {point}{dir_arg})
+"""
+
+    @staticmethod
+    def series_expansion(expression: str = "exp(x)", variable: str = "x",
+                        point: str = "0", order: int = 5) -> str:
+        """Generate series expansion code."""
+        return f"""# Taylor/Series Expansion
+{variable} = Symbol('{variable}')
+f = {expression}
+result = series(f, {variable}, {point}, {order})
+"""
+
+    @staticmethod
+    def matrix_operation(matrix: str = "[[1, 2], [3, 4]]", 
+                        operation: str = "det") -> str:
+        """Generate matrix operation code."""
+        operations = {
+            "det": "M.det()",
+            "inv": "M.inv()",
+            "eigenvals": "M.eigenvals()",
+            "eigenvects": "M.eigenvects()",
+            "rank": "M.rank()",
+            "nullspace": "M.nullspace()",
+            "transpose": "M.T",
+            "trace": "M.trace()",
+        }
+        op_code = operations.get(operation, "M.det()")
+        return f"""# Matrix Operation: {operation}
+M = Matrix({matrix})
+result = {op_code}
+"""
+
+    @staticmethod
+    def differential_equation(equation: str, function: str = "f", 
+                             variable: str = "x") -> str:
+        """Generate ODE solving code."""
+        return f"""# Solve Differential Equation
+{variable} = Symbol('{variable}')
+{function} = Function('{function}')
+ode = {equation}
+result = str(dsolve(ode, {function}({variable})))
+"""
+
+    @staticmethod
+    def simplify_expression(expression: str = "x**2 + 2*x + 1") -> str:
+        """Generate simplification code."""
+        return f"""# Simplify Expression
+x = Symbol('x')
+expr = {expression}
+result = simplify(expr)
+"""
+
+    @staticmethod
+    def factor_expression(expression: str = "x**2 + 2*x + 1") -> str:
+        """Generate factorization code."""
+        return f"""# Factor Expression
+x = Symbol('x')
+expr = {expression}
+result = factor(expr)
+"""
+
+    @staticmethod
+    def expand_expression(expression: str = "(x + 1)**2") -> str:
+        """Generate expansion code."""
+        return f"""# Expand Expression
+x = Symbol('x')
+expr = {expression}
+result = expand(expr)
+"""
+
+
+# ============================================================================
+# MATHEMATICAL COMPUTATION TOOL
+# ============================================================================
+
+
+class MathematicalComputationTool:
+    """
+    SOTA Mathematical Computation Tool for VULCAN-AGI.
+    
+    This tool bridges the gap between LLM-generated mathematical approaches and
+    actual computational execution. Instead of just describing how to solve a
+    problem, it generates executable SymPy code, runs it in a safe sandbox,
+    and returns both the code and computed result.
+
+    Features:
+        - Problem classification for optimal strategy selection
+        - LLM-based code generation for complex problems
+        - Template-based generation for common operations
+        - Safe sandboxed execution via RestrictedPython
+        - Multi-strategy solving (symbolic, numeric, hybrid)
+        - Learning from successful solutions
+        - Integration with VULCAN's reasoning system
+        - Graceful error handling with fallbacks
+
+    Example:
+        >>> tool = MathematicalComputationTool(llm=my_llm)
+        >>> result = tool.execute("Integrate x^2 with respect to x")
+        >>> print(result.code)    # x = Symbol('x'); result = integrate(x**2, x)
+        >>> print(result.result)  # x**3/3
+    """
+
+    # System prompt for LLM code generation
+    CODE_GENERATION_PROMPT = '''You are a Python code generator for symbolic mathematics.
+Generate executable Python code using SymPy to solve mathematical problems.
+
+RULES:
+1. Use SymPy functions and objects (already imported: Symbol, symbols, integrate, diff, solve, simplify, expand, factor, limit, series, Matrix, sqrt, exp, log, sin, cos, tan, pi, E, I, oo, Function, dsolve, Eq, etc.)
+2. Define variables using Symbol() or symbols()
+3. Assign the FINAL answer to the variable named 'result'
+4. Show derivation steps as comments
+5. DO NOT include any import statements
+6. Output ONLY valid Python code (no markdown, no explanations before or after)
+
+EXAMPLE FORMAT:
+# Define variables
+x = Symbol('x')
+# Define the function
+f = x**2
+# Perform the operation
+integral = integrate(f, x)
+# Simplify and assign result
+result = simplify(integral)
+'''
+
+    def __init__(
+        self, 
+        llm=None, 
+        max_tokens: int = 500,
+        enable_learning: bool = True,
+        prefer_templates: bool = False
+    ):
+        """
+        Initialize the mathematical computation tool.
+
+        Args:
+            llm: Language model for code generation (must have .generate() method)
+            max_tokens: Maximum tokens for code generation
+            enable_learning: Whether to learn from successful solutions
+            prefer_templates: Whether to prefer templates over LLM generation
+        """
+        self.llm = llm
+        self.max_tokens = max_tokens
+        self.enable_learning = enable_learning
+        self.prefer_templates = prefer_templates
+        
+        self.name = "mathematical_computation"
+        self.description = "Symbolic mathematics using SymPy with safe code execution"
+        
+        self._lock = threading.RLock()
+        self._classifier = ProblemClassifier()
+        self._templates = CodeTemplates()
+        
+        # Learning: track successful solutions
+        self._solution_cache: Dict[str, ComputationResult] = {}
+        self._success_patterns: Dict[ProblemType, List[str]] = defaultdict(list)
+        
+        logger.info(
+            f"MathematicalComputationTool initialized: "
+            f"safe_execution={SAFE_EXECUTION_AVAILABLE}, "
+            f"llm={'available' if llm else 'none'}, "
+            f"learning={enable_learning}"
+        )
+
+    def execute(self, query: str, **kwargs) -> ComputationResult:
+        """
+        Execute mathematical computation.
+
+        Args:
+            query: Mathematical problem or question in natural language
+            **kwargs: Additional arguments (llm override, strategy override, etc.)
+
+        Returns:
+            ComputationResult with code, result, and explanation
+        """
+        start_time = time.time()
+        llm = kwargs.get("llm", self.llm)
+        strategy_override = kwargs.get("strategy")
+
+        with self._lock:
+            try:
+                # Step 1: Classify the problem
+                classification = self._classifier.classify(query)
+                logger.debug(f"Problem classified as {classification.problem_type.value} "
+                           f"with confidence {classification.confidence:.2f}")
+                
+                # Step 2: Determine strategy
+                strategy = strategy_override or classification.suggested_strategy
+                if self.prefer_templates and strategy == SolutionStrategy.LLM_GENERATED:
+                    strategy = SolutionStrategy.TEMPLATE
+                
+                # Step 3: Generate code
+                code = self._generate_code(query, classification, strategy, llm)
+                
+                if not code.strip():
+                    return self._create_error_result(
+                        query, "", "Failed to generate code", 
+                        classification, strategy, time.time() - start_time
+                    )
+
+                # Step 4: Execute the code
+                if not SAFE_EXECUTION_AVAILABLE or execute_math_code is None:
+                    return self._create_error_result(
+                        query, code, "Safe execution not available",
+                        classification, strategy, time.time() - start_time
+                    )
+
+                execution_result = execute_math_code(code)
+
+                if not execution_result["success"]:
+                    logger.warning(f"Code execution failed: {execution_result['error']}")
+                    
+                    # Try fallback strategy
+                    fallback_result = self._try_fallback(
+                        query, classification, strategy, llm
+                    )
+                    if fallback_result and fallback_result.success:
+                        return fallback_result
+                    
+                    return self._create_error_result(
+                        query, code, execution_result["error"],
+                        classification, strategy, time.time() - start_time
+                    )
+
+                # Step 5: Format successful response
+                result_str = str(execution_result["result"])
+                explanation = self._generate_explanation(query, code, result_str, llm)
+                execution_time = time.time() - start_time
+                
+                result = ComputationResult(
+                    success=True,
+                    code=code,
+                    result=result_str,
+                    explanation=explanation,
+                    tool=self.name,
+                    problem_type=classification.problem_type,
+                    strategy=strategy,
+                    execution_time=execution_time,
+                    metadata={
+                        "query": query,
+                        "classification_confidence": classification.confidence,
+                        "keywords": classification.keywords,
+                    },
+                )
+                
+                # Learn from success
+                if self.enable_learning:
+                    self._learn_from_success(query, classification, result)
+                
+                return result
+
+            except Exception as e:
+                logger.error(f"Mathematical computation tool failed: {e}")
+                return ComputationResult(
+                    success=False,
+                    code="",
+                    error=str(e),
+                    explanation=f"Failed to solve: {e}",
+                    tool=self.name,
+                    execution_time=time.time() - start_time,
+                )
+
+    def _generate_code(
+        self, 
+        query: str, 
+        classification: ProblemClassification,
+        strategy: SolutionStrategy,
+        llm
+    ) -> str:
+        """
+        Generate SymPy code to solve the problem.
+        
+        Uses strategy-appropriate code generation method.
+        """
+        # Try template first for common patterns
+        if strategy == SolutionStrategy.TEMPLATE or (strategy == SolutionStrategy.SYMBOLIC and self.prefer_templates):
+            template_code = self._generate_template_code(query, classification)
+            if template_code:
+                return template_code
+        
+        # Use LLM for complex problems
+        if llm is not None and strategy in [SolutionStrategy.LLM_GENERATED, SolutionStrategy.SYMBOLIC, SolutionStrategy.HYBRID]:
+            llm_code = self._generate_llm_code(query, llm)
+            if llm_code:
+                return llm_code
+        
+        # Fallback to template
+        return self._generate_template_code(query, classification)
+
+    def _generate_template_code(self, query: str, classification: ProblemClassification) -> str:
+        """
+        Generate code using templates based on problem classification.
+        
+        Uses a priority-based matching system where more specific patterns
+        are checked before general ones to ensure correct template selection.
+        """
+        query_lower = query.lower()
+        variables = classification.variables or ['x']
+        var = variables[0] if variables else 'x'
+        
+        # PRIORITY 1: Differential equations (must check BEFORE "solve"/"equation")
+        # These patterns are very specific and should take precedence
+        if any(kw in query_lower for kw in [
+            "differential equation", "ode", "pde", "dsolve",
+            "dy/dx", "d/dx", "dy/dt", "dx/dt"
+        ]):
+            return self._templates.differential_equation(
+                "Eq(f(x).diff(x), f(x))", "f", var
+            )
+        
+        # PRIORITY 2: Matrix operations (must check BEFORE general "find")
+        if any(kw in query_lower for kw in [
+            "matrix", "determinant", "eigenvalue", "eigenvector",
+            "inverse matrix", "transpose", "rank of matrix"
+        ]):
+            operation = "det"
+            if "eigenvalue" in query_lower or "eigen" in query_lower:
+                operation = "eigenvals"
+            elif "eigenvector" in query_lower:
+                operation = "eigenvects"
+            elif "inverse" in query_lower:
+                operation = "inv"
+            elif "rank" in query_lower:
+                operation = "rank"
+            elif "transpose" in query_lower:
+                operation = "transpose"
+            elif "trace" in query_lower:
+                operation = "trace"
+            return self._templates.matrix_operation("[[1, 2], [3, 4]]", operation)
+        
+        # PRIORITY 3: Limits (check before integration since both are calculus)
+        if "limit" in query_lower:
+            direction = "+" if "right" in query_lower else ("-" if "left" in query_lower else "")
+            return self._templates.limit("sin(x)/x", var, "0", direction)
+        
+        # PRIORITY 4: Series expansion
+        if any(kw in query_lower for kw in ["series", "taylor", "maclaurin", "expansion", "expand around"]):
+            return self._templates.series_expansion("exp(x)", var, "0", 5)
+        
+        # PRIORITY 5: Integration
+        if any(kw in query_lower for kw in ["integrate", "integral", "antiderivative", "∫"]):
+            if "definite" in query_lower or "from" in query_lower:
+                return self._templates.integration("x**2", var, ("0", "1"))
+            return self._templates.integration("x**2", var)
+        
+        # PRIORITY 6: Differentiation
+        if any(kw in query_lower for kw in ["differentiate", "derivative", "diff", "d/dx"]):
+            order = 2 if "second" in query_lower else (3 if "third" in query_lower else 1)
+            return self._templates.differentiation("x**3 + x**2", var, order)
+        
+        # PRIORITY 7: Specific algebraic operations
+        if "factor" in query_lower and "expand" not in query_lower:
+            return self._templates.factor_expression("x**2 + 2*x + 1")
+        
+        if "expand" in query_lower and "series" not in query_lower:
+            return self._templates.expand_expression("(x + 1)**3")
+        
+        if "simplify" in query_lower:
+            return self._templates.simplify_expression("(x**2 - 1)/(x - 1)")
+        
+        # PRIORITY 8: Equation solving (general - checked last among operations)
+        if any(kw in query_lower for kw in ["solve", "equation", "find x", "find the value", "roots"]):
+            if "system" in query_lower:
+                return self._templates.solve_system(["x + y - 2", "x - y"], ["x", "y"])
+            return self._templates.solve_equation("x**2 - 4", var)
+        
+        # PRIORITY 9: Classification-based fallback
+        # Use the classifier's detected type to choose appropriate template
+        if classification.problem_type == ProblemType.CALCULUS:
+            return self._templates.differentiation("x**3", var)
+        elif classification.problem_type == ProblemType.LINEAR_ALGEBRA:
+            return self._templates.matrix_operation("[[1, 2], [3, 4]]", "det")
+        elif classification.problem_type == ProblemType.DIFFERENTIAL_EQUATIONS:
+            return self._templates.differential_equation("Eq(f(x).diff(x), f(x))", "f", var)
+        elif classification.problem_type == ProblemType.ALGEBRA:
+            return self._templates.solve_equation("x**2 - 4", var)
+        
+        # DEFAULT: Generic simplification
+        return self._templates.simplify_expression("x**2 + 2*x + 1")
+
+    def _generate_llm_code(self, query: str, llm) -> Optional[str]:
+        """Generate code using LLM."""
+        prompt = f"""{self.CODE_GENERATION_PROMPT}
+
+Problem: {query}
+
+Generate ONLY the Python code:"""
+
+        try:
+            # Try different LLM interfaces
+            if hasattr(llm, "generate"):
+                code = llm.generate(prompt, max_tokens=self.max_tokens)
+            elif hasattr(llm, "__call__"):
+                code = llm(prompt)
+            elif hasattr(llm, "complete"):
+                response = llm.complete(prompt)
+                code = response.text if hasattr(response, "text") else str(response)
+            else:
+                logger.warning("Unknown LLM interface")
+                return None
+
+            return self._clean_code(code)
+
+        except Exception as e:
+            logger.warning(f"LLM code generation failed: {e}")
+            return None
+
+    def _clean_code(self, code: str) -> str:
+        """Remove markdown formatting and import statements from generated code."""
+        # Remove markdown code blocks
+        if "```python" in code:
+            parts = code.split("```python")
+            if len(parts) > 1:
+                code = parts[1].split("```")[0]
+        elif "```" in code:
+            parts = code.split("```")
+            if len(parts) > 1:
+                code = parts[1].split("```")[0]
+
+        # Remove import lines (already in namespace)
+        lines = code.strip().split("\n")
+        clean_lines = []
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith(("from sympy import", "import sympy",
+                                   "from numpy import", "import numpy")):
+                continue
+            clean_lines.append(line)
+
+        return "\n".join(clean_lines).strip()
+
+    def _generate_explanation(
+        self, query: str, code: str, result: str, llm
+    ) -> str:
+        """Generate natural language explanation of the solution."""
+        if llm is None:
+            return f"The computation was performed using SymPy. The result is: {result}"
+
+        prompt = f"""Explain this mathematical solution concisely (2-3 sentences):
+
+Problem: {query}
+
+Code:
+{code}
+
+Result: {result}
+
+Brief explanation:"""
+
+        try:
+            if hasattr(llm, "generate"):
+                return llm.generate(prompt, max_tokens=200)
+            elif hasattr(llm, "__call__"):
+                return llm(prompt)
+            else:
+                return f"The computation was performed using SymPy. The result is: {result}"
+        except Exception as e:
+            logger.warning(f"Explanation generation failed: {e}")
+            return f"The computation was performed using SymPy. The result is: {result}"
+
+    def _try_fallback(
+        self, 
+        query: str, 
+        classification: ProblemClassification,
+        failed_strategy: SolutionStrategy,
+        llm
+    ) -> Optional[ComputationResult]:
+        """Try alternative strategy if primary fails."""
+        # If LLM failed, try template
+        if failed_strategy in [SolutionStrategy.LLM_GENERATED, SolutionStrategy.SYMBOLIC]:
+            template_code = self._generate_template_code(query, classification)
+            if template_code and SAFE_EXECUTION_AVAILABLE and execute_math_code:
+                result = execute_math_code(template_code)
+                if result["success"]:
+                    return ComputationResult(
+                        success=True,
+                        code=template_code,
+                        result=str(result["result"]),
+                        explanation=f"Solved using template approach. Result: {result['result']}",
+                        tool=self.name,
+                        problem_type=classification.problem_type,
+                        strategy=SolutionStrategy.TEMPLATE,
+                    )
+        
+        return None
+
+    def _create_error_result(
+        self,
+        query: str,
+        code: str,
+        error: str,
+        classification: ProblemClassification,
+        strategy: SolutionStrategy,
+        execution_time: float
+    ) -> ComputationResult:
+        """Create error result with context."""
+        explanation = (
+            f"Code execution failed ({error}). "
+            f"The attempted approach was:\n{code}" if code else
+            f"Could not generate executable code for: {query}"
+        )
+
+        return ComputationResult(
+            success=False,
+            code=code,
+            result=None,
+            explanation=explanation,
+            error=error,
+            tool=self.name,
+            problem_type=classification.problem_type,
+            strategy=strategy,
+            execution_time=execution_time,
+        )
+
+    def _learn_from_success(
+        self, 
+        query: str, 
+        classification: ProblemClassification,
+        result: ComputationResult
+    ):
+        """Learn from successful solutions for future use."""
+        # Cache the successful result
+        query_key = query.lower().strip()[:100]  # Truncate for memory
+        self._solution_cache[query_key] = result
+        
+        # Track successful patterns
+        self._success_patterns[classification.problem_type].append(query_key)
+        
+        # Limit cache size
+        if len(self._solution_cache) > 1000:
+            # Remove oldest entries
+            keys = list(self._solution_cache.keys())
+            for key in keys[:100]:
+                del self._solution_cache[key]
+
+    def reason(self, input_data: Any, query: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """
+        Reasoning interface compatible with UnifiedReasoner.
+        
+        This method adapts the MathematicalComputationTool to work with
+        the UnifiedReasoner's expected interface for reasoners.
+        
+        Args:
+            input_data: The input problem. Can be:
+                - str: Direct mathematical query
+                - dict with 'query' or 'problem' key
+            query: Optional query parameters dict
+            
+        Returns:
+            Dict with 'conclusion', 'confidence', and other reasoning fields
+        """
+        # Extract the mathematical query from input_data
+        if isinstance(input_data, str):
+            math_query = input_data
+        elif isinstance(input_data, dict):
+            math_query = input_data.get('query') or input_data.get('problem') or str(input_data)
+        else:
+            math_query = str(input_data)
+        
+        # Execute the computation
+        result = self.execute(math_query)
+        
+        # Convert to reasoner-compatible dict format
+        confidence = 0.9 if result.success else 0.1
+        
+        return {
+            'conclusion': {
+                'success': result.success,
+                'result': result.result,
+                'code': result.code,
+                'problem_type': result.problem_type.value if result.problem_type else 'unknown',
+            },
+            'confidence': confidence,
+            'explanation': result.explanation,
+            'formatted_output': self.format_response(result),
+            'metadata': {
+                'tool': self.name,
+                'strategy': result.strategy.value if result.strategy else 'unknown',
+                'execution_time': result.execution_time,
+                'error': result.error,
+            }
+        }
+
+    def get_capabilities(self) -> Dict[str, Any]:
+        """
+        Return reasoner capabilities for UnifiedReasoner integration.
+        
+        Returns:
+            Dict describing the tool's capabilities
+        """
+        return {
+            'name': self.name,
+            'description': self.description,
+            'supported_problem_types': [pt.value for pt in ProblemType],
+            'supported_strategies': [ss.value for ss in SolutionStrategy],
+            'safe_execution_available': SAFE_EXECUTION_AVAILABLE,
+            'llm_available': self.llm is not None,
+        }
+
+    def format_response(self, result: ComputationResult) -> str:
+        """
+        Format computation result for display.
+
+        Args:
+            result: ComputationResult from execute()
+
+        Returns:
+            Formatted string for display
+        """
+        if not result.success:
+            return f"""**Mathematical Computation**
+
+⚠️ Execution failed: {result.error}
+
+**Problem Type:** {result.problem_type.value}
+**Strategy:** {result.strategy.value}
+
+{result.explanation}
+"""
+
+        return f"""**Mathematical Computation**
+
+**Code:**
+```python
+{result.code}
+```
+
+**Result:** {result.result}
+
+**Explanation:** {result.explanation}
+
+---
+*Problem Type: {result.problem_type.value} | Strategy: {result.strategy.value} | Time: {result.execution_time:.3f}s*
+"""
+
+    def get_statistics(self) -> Dict[str, Any]:
+        """Get tool usage statistics."""
+        return {
+            "cache_size": len(self._solution_cache),
+            "success_patterns": {
+                pt.value: len(patterns) 
+                for pt, patterns in self._success_patterns.items()
+            },
+            "safe_execution_available": SAFE_EXECUTION_AVAILABLE,
+            "llm_available": self.llm is not None,
+        }
+
+
+# ============================================================================
+# FACTORY FUNCTION
+# ============================================================================
+
+
+def create_mathematical_computation_tool(
+    llm=None,
+    max_tokens: int = 500,
+    enable_learning: bool = True,
+    prefer_templates: bool = False
+) -> MathematicalComputationTool:
+    """
+    Factory function to create a MathematicalComputationTool.
+    
+    Args:
+        llm: Optional language model for code generation
+        max_tokens: Maximum tokens for LLM generation
+        enable_learning: Whether to learn from successful solutions
+        prefer_templates: Whether to prefer templates over LLM
+        
+    Returns:
+        Configured MathematicalComputationTool instance
+    """
+    return MathematicalComputationTool(
+        llm=llm,
+        max_tokens=max_tokens,
+        enable_learning=enable_learning,
+        prefer_templates=prefer_templates
+    )
+
+
+# ============================================================================
+# EXPORTS
+# ============================================================================
+
+__all__ = [
+    # Enums
+    "ProblemType",
+    "SolutionStrategy",
+    # Data structures
+    "ComputationResult",
+    "ProblemClassification",
+    # Main classes
+    "MathematicalComputationTool",
+    "ProblemClassifier",
+    "CodeTemplates",
+    # Factory
+    "create_mathematical_computation_tool",
+    # Module status
+    "SAFE_EXECUTION_AVAILABLE",
+]

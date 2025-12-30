@@ -71,6 +71,7 @@ class ReasoningType(Enum):
     BAYESIAN = "bayesian"
     ABSTRACT = "abstract"
     HIERARCHICAL = "hierarchical"  # FINAL FIX: Added missing enum member
+    MATHEMATICAL = "mathematical"  # Mathematical computation using SymPy
     UNKNOWN = "unknown"
 
 
