@@ -29,7 +29,7 @@
 
 import asyncio
 import logging
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 # Module metadata
 __version__ = "1.0.1"
@@ -166,6 +166,7 @@ class HybridLLMExecutor:
         temperature: float = 0.7,
         system_prompt: str = "You are VULCAN, an advanced AI assistant.",
         enable_distillation: bool = True,
+        conversation_history: Optional[List[Dict[str, str]]] = None,
     ) -> Dict[str, Any]:
         """
         Execute LLM request using configured mode.
@@ -176,6 +177,9 @@ class HybridLLMExecutor:
             temperature: Sampling temperature
             system_prompt: System prompt for OpenAI
             enable_distillation: Whether to capture responses for knowledge distillation
+            conversation_history: Optional list of previous messages in the conversation.
+                                 Each message should be a dict with 'role' and 'content' keys.
+                                 This enables multi-turn conversation context.
 
         Returns:
             Dict with 'text', 'source', 'systems_used', and optional 'metadata'
@@ -185,24 +189,24 @@ class HybridLLMExecutor:
 
         if self.mode == "local_first":
             result = await self._execute_local_first(
-                loop, prompt, max_tokens, temperature, system_prompt
+                loop, prompt, max_tokens, temperature, system_prompt, conversation_history
             )
         elif self.mode == "openai_first":
             result = await self._execute_openai_first(
-                loop, prompt, max_tokens, temperature, system_prompt
+                loop, prompt, max_tokens, temperature, system_prompt, conversation_history
             )
         elif self.mode == "parallel":
             result = await self._execute_parallel(
-                loop, prompt, max_tokens, temperature, system_prompt
+                loop, prompt, max_tokens, temperature, system_prompt, conversation_history
             )
         elif self.mode == "ensemble":
             result = await self._execute_ensemble(
-                loop, prompt, max_tokens, temperature, system_prompt
+                loop, prompt, max_tokens, temperature, system_prompt, conversation_history
             )
         else:
             self.logger.warning(f"Unknown mode '{self.mode}', defaulting to parallel")
             result = await self._execute_parallel(
-                loop, prompt, max_tokens, temperature, system_prompt
+                loop, prompt, max_tokens, temperature, system_prompt, conversation_history
             )
 
         # Update statistics
@@ -219,7 +223,8 @@ class HybridLLMExecutor:
     # ============================================================
 
     async def _execute_local_first(
-        self, loop, prompt: str, max_tokens: int, temperature: float, system_prompt: str
+        self, loop, prompt: str, max_tokens: int, temperature: float, system_prompt: str,
+        conversation_history: Optional[List[Dict[str, str]]] = None
     ) -> Dict[str, Any]:
         """Try local LLM first, fallback to OpenAI."""
         systems_used = []
@@ -236,7 +241,7 @@ class HybridLLMExecutor:
 
         # Fallback to OpenAI
         openai_result = await self._call_openai(
-            loop, prompt, max_tokens, temperature, system_prompt
+            loop, prompt, max_tokens, temperature, system_prompt, conversation_history
         )
         if openai_result:
             systems_used.append("openai_fallback")
@@ -249,14 +254,15 @@ class HybridLLMExecutor:
         return {"text": "", "source": "none", "systems_used": systems_used}
 
     async def _execute_openai_first(
-        self, loop, prompt: str, max_tokens: int, temperature: float, system_prompt: str
+        self, loop, prompt: str, max_tokens: int, temperature: float, system_prompt: str,
+        conversation_history: Optional[List[Dict[str, str]]] = None
     ) -> Dict[str, Any]:
         """Try OpenAI first, fallback to local LLM."""
         systems_used = []
 
         # Try OpenAI
         openai_result = await self._call_openai(
-            loop, prompt, max_tokens, temperature, system_prompt
+            loop, prompt, max_tokens, temperature, system_prompt, conversation_history
         )
         if openai_result:
             systems_used.append("openai_llm")
@@ -279,7 +285,8 @@ class HybridLLMExecutor:
         return {"text": "", "source": "none", "systems_used": systems_used}
 
     async def _execute_parallel(
-        self, loop, prompt: str, max_tokens: int, temperature: float, system_prompt: str
+        self, loop, prompt: str, max_tokens: int, temperature: float, system_prompt: str,
+        conversation_history: Optional[List[Dict[str, str]]] = None
     ) -> Dict[str, Any]:
         """Run both LLMs simultaneously, use first successful response."""
         systems_used = []
@@ -289,7 +296,7 @@ class HybridLLMExecutor:
 
         async def openai_task():
             return await self._call_openai(
-                loop, prompt, max_tokens, temperature, system_prompt
+                loop, prompt, max_tokens, temperature, system_prompt, conversation_history
             )
 
         # Run both tasks concurrently with timeout
@@ -368,7 +375,8 @@ class HybridLLMExecutor:
         return {"text": "", "source": "none", "systems_used": systems_used}
 
     async def _execute_ensemble(
-        self, loop, prompt: str, max_tokens: int, temperature: float, system_prompt: str
+        self, loop, prompt: str, max_tokens: int, temperature: float, system_prompt: str,
+        conversation_history: Optional[List[Dict[str, str]]] = None
     ) -> Dict[str, Any]:
         """Run both LLMs, combine/select best response based on quality."""
         systems_used = []
@@ -378,7 +386,7 @@ class HybridLLMExecutor:
 
         async def openai_task():
             return await self._call_openai(
-                loop, prompt, max_tokens, temperature, system_prompt
+                loop, prompt, max_tokens, temperature, system_prompt, conversation_history
             )
 
         # Run both tasks concurrently
@@ -495,8 +503,23 @@ class HybridLLMExecutor:
         max_tokens: int,
         temperature: float,
         system_prompt: str,
+        conversation_history: Optional[List[Dict[str, str]]] = None,
     ) -> Optional[str]:
-        """Call OpenAI API."""
+        """
+        Call OpenAI API with conversation history support.
+        
+        Args:
+            loop: The asyncio event loop
+            prompt: The current user prompt
+            max_tokens: Maximum tokens for response
+            temperature: Sampling temperature
+            system_prompt: System prompt for OpenAI
+            conversation_history: Optional list of previous messages for multi-turn context.
+                                 Each message should have 'role' and 'content' keys.
+        
+        Returns:
+            The generated response text, or None if the call fails.
+        """
         openai_client = self.openai_client_getter()
         if not openai_client:
             return None
@@ -506,12 +529,39 @@ class HybridLLMExecutor:
             effective_max_tokens = min(max_tokens, self.openai_max_tokens)
 
             def call_openai():
+                # Build messages array with conversation history
+                messages = [{"role": "system", "content": system_prompt}]
+                
+                # Add conversation history if provided
+                # This enables multi-turn conversation context for the LLM
+                if conversation_history:
+                    for msg in conversation_history:
+                        # Validate message structure
+                        role = msg.get("role", "").lower()
+                        content = msg.get("content", "")
+                        
+                        # Skip messages with empty or whitespace-only content
+                        # to avoid issues with OpenAI API
+                        if not content or not content.strip():
+                            continue
+                        
+                        # Map roles to OpenAI-compatible roles
+                        if role in ("user", "human"):
+                            messages.append({"role": "user", "content": content})
+                        elif role in ("assistant", "ai", "bot"):
+                            messages.append({"role": "assistant", "content": content})
+                        # Skip messages with invalid/unknown roles
+                    
+                    self.logger.debug(
+                        f"OpenAI call with conversation history: {len(conversation_history)} messages"
+                    )
+                
+                # Add current prompt as the final user message
+                messages.append({"role": "user", "content": prompt})
+                
                 completion = openai_client.chat.completions.create(
                     model="gpt-3.5-turbo",
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": prompt},
-                    ],
+                    messages=messages,
                     max_tokens=effective_max_tokens,
                     temperature=temperature,
                 )

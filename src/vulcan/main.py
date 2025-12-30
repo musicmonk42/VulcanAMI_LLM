@@ -5157,11 +5157,15 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
                         "Present the reasoning results clearly and explain how they answer the user's question."
                     )
                     
+                    # CONVERSATION MEMORY FIX: Pass truncated conversation history to enable
+                    # multi-turn context. This ensures the LLM can remember and reference
+                    # previous messages in the conversation.
                     llm_result = await hybrid_executor.execute(
                         prompt=enhanced_prompt,
                         max_tokens=request.max_tokens,
                         temperature=0.7,
                         system_prompt=system_prompt,
+                        conversation_history=truncated_history,
                     )
 
                     response_text = llm_result.get("text", "")

@@ -405,6 +405,89 @@ class TestLLMModule:
         assert MockGraphixVulcanLLM is not None
         assert hasattr(MockGraphixVulcanLLM, "__init__")
 
+    def test_hybrid_llm_executor_accepts_conversation_history(self):
+        """Test that HybridLLMExecutor.execute() accepts conversation_history parameter."""
+        try:
+            from vulcan.llm import HybridLLMExecutor
+        except ImportError:
+            pytest.skip("llm module not available")
+        
+        # Create executor with no LLM (to test parameter acceptance)
+        executor = HybridLLMExecutor(
+            local_llm=None,
+            openai_client_getter=lambda: None,
+            mode="parallel",
+        )
+        
+        # Verify execute method accepts conversation_history parameter
+        import inspect
+        sig = inspect.signature(executor.execute)
+        params = sig.parameters
+        
+        assert "conversation_history" in params, (
+            "HybridLLMExecutor.execute() must accept conversation_history parameter "
+            "to support multi-turn conversation context"
+        )
+        
+        # Verify default is None
+        default = params["conversation_history"].default
+        assert default is None, "conversation_history should default to None"
+
+    @pytest.mark.asyncio
+    async def test_hybrid_llm_executor_conversation_history_format(self):
+        """Test that conversation history is formatted correctly for OpenAI."""
+        try:
+            from vulcan.llm import HybridLLMExecutor
+        except ImportError:
+            pytest.skip("llm module not available")
+        
+        # Track what messages were sent to OpenAI
+        captured_messages = []
+        
+        def mock_openai_getter():
+            """Return a mock OpenAI client that captures messages."""
+            mock_client = MagicMock()
+            mock_completion = MagicMock()
+            mock_completion.choices = [MagicMock()]
+            mock_completion.choices[0].message.content = "Test response"
+            
+            def capture_create(**kwargs):
+                captured_messages.append(kwargs.get("messages", []))
+                return mock_completion
+            
+            mock_client.chat.completions.create = capture_create
+            return mock_client
+        
+        executor = HybridLLMExecutor(
+            local_llm=None,
+            openai_client_getter=mock_openai_getter,
+            mode="openai_first",
+        )
+        
+        # Execute with conversation history
+        history = [
+            {"role": "user", "content": "First question about organs"},
+            {"role": "assistant", "content": "Here's my answer about organs..."},
+        ]
+        
+        result = await executor.execute(
+            prompt="What alternatives are there?",
+            conversation_history=history,
+        )
+        
+        # Verify messages were captured and history was included
+        assert len(captured_messages) > 0, "OpenAI should have been called"
+        messages = captured_messages[0]
+        
+        # Should have: system, history user, history assistant, current user
+        assert len(messages) >= 4, f"Expected at least 4 messages, got {len(messages)}"
+        
+        # Check that history was included
+        roles = [m["role"] for m in messages]
+        assert roles[0] == "system", "First message should be system prompt"
+        assert "user" in roles, "Should include user messages"
+        assert "assistant" in roles, "Should include assistant messages from history"
+
 
 # ============================================================================
 # Test Distillation Module
