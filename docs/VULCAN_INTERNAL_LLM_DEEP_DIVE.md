@@ -2024,7 +2024,373 @@ class LiveFeedbackProcessor:
 
 ---
 
-## 13. Tool Selection System
+## 13. Context Management System
+
+**Location:** `src/context/`
+
+The context management system provides sophisticated memory and context management for LLM generation.
+
+### 13.1 Hierarchical Context Memory
+
+**Location:** `src/context/hierarchical_context.py`
+
+A three-tier memory system for comprehensive context management:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                   HIERARCHICAL CONTEXT MEMORY                        │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │                    EPISODIC MEMORY                           │   │
+│  │  Recent prompt/response pairs with full reasoning traces     │   │
+│  │  - Access tracking (count, last_accessed)                    │   │
+│  │  - Importance scoring                                        │   │
+│  │  - Consolidation flags                                       │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│                              │                                      │
+│                              ▼ consolidate                          │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │                    SEMANTIC MEMORY                           │   │
+│  │  Concept index with clustering and relationships             │   │
+│  │  - Term indexing for fast lookup                             │   │
+│  │  - Frequency and importance tracking                         │   │
+│  │  - Related concepts graph                                    │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│                              │                                      │
+│                              ▼ patterns                             │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │                   PROCEDURAL MEMORY                          │   │
+│  │  Learned patterns, strategies, and procedures                │   │
+│  │  - Strategy signatures                                       │   │
+│  │  - Success rate tracking                                     │   │
+│  │  - Latency metrics                                           │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+#### Memory Data Structures:
+
+```python
+@dataclass
+class EpisodicItem:
+    """Episodic memory with comprehensive metadata."""
+    prompt: Any
+    token: Any
+    trace: Any
+    ts: float = field(default_factory=time.time)
+    importance: float = 1.0
+    access_count: int = 0
+    last_accessed: float = field(default_factory=time.time)
+    consolidated: bool = False
+    meta: Dict[str, Any] = field(default_factory=dict)
+
+@dataclass
+class SemanticEntry:
+    """Semantic memory entry with relationships."""
+    concept: str
+    terms: List[str]
+    freq: int = 1
+    last_seen: float = field(default_factory=time.time)
+    importance: float = 1.0
+    cluster_id: Optional[int] = None
+    related_concepts: List[str] = field(default_factory=list)
+    embedding: Optional[List[float]] = None
+
+@dataclass
+class ProceduralPattern:
+    """Procedural memory pattern."""
+    name: str
+    signature_terms: List[str]
+    freq: int = 1
+    success_rate: float = 1.0
+    avg_latency_ms: float = 0.0
+```
+
+#### Retrieval Strategies:
+
+| Strategy | Description |
+|----------|-------------|
+| `RECENT` | Most recent episodic items |
+| `RELEVANT` | Highest overlap with query terms |
+| `DIVERSE` | Maximize concept diversity |
+| `BALANCED` | Combine recent + relevant |
+
+#### Consolidation Strategies:
+
+| Strategy | Criteria |
+|----------|----------|
+| `FREQUENCY` | Items accessed >= min_freq times |
+| `RECENCY` | Items within half-life window |
+| `IMPORTANCE` | Items with importance > 0.7 |
+| `HYBRID` | Combined scoring of all factors |
+
+#### Pruning Strategies:
+
+| Strategy | Description |
+|----------|-------------|
+| `DECAY` | Time-weighted importance decay |
+| `LRU` | Least recently accessed |
+| `FREQUENCY` | Least frequently accessed |
+| `IMPORTANCE` | Lowest importance score |
+
+#### Key Methods:
+
+```python
+class HierarchicalContext:
+    def retrieve(self, query, max_items=10, strategy=RetrievalStrategy.BALANCED):
+        """Retrieve relevant items from all memory tiers."""
+    
+    def retrieve_context_for_generation(self, query_tokens, max_tokens=2048):
+        """Get generation-ready context bundle with flat concatenation."""
+    
+    def store(self, prompt, token, reasoning_trace, importance=1.0):
+        """Store interaction and update all memory tiers."""
+    
+    def consolidate_memory(self, strategy=ConsolidationStrategy.HYBRID):
+        """Move episodic memories to semantic memory."""
+    
+    def prune_memory(self, strategy=PruningStrategy.DECAY, target_reduction=0.2):
+        """Intelligent memory pruning."""
+    
+    def export_memory(self) -> Dict[str, Any]:
+        """Export for persistence."""
+    
+    def import_memory(self, data: Dict[str, Any]):
+        """Import from exported data."""
+```
+
+### 13.2 Causal Context Selector
+
+**Location:** `src/context/causal_context.py`
+
+Advanced causal reasoning for context selection:
+
+#### Causal Capabilities:
+
+| Capability | Description |
+|------------|-------------|
+| Multi-hop traversal | Navigate causal graph up to N hops |
+| Temporal reasoning | Time-series analysis with decay |
+| Intervention tracking | Do-calculus operations |
+| Counterfactual analysis | "What-if" scenarios |
+| Confounder detection | Identify common causes |
+| Mediator identification | Find intermediate variables |
+
+#### Causal Strength Measurement:
+
+```python
+class CausalStrengthType(Enum):
+    CORRELATION = "correlation"        # Simple correlation
+    GRANGER = "granger"               # Granger causality
+    TRANSFER_ENTROPY = "transfer_entropy"  # Information-theoretic
+    INTERVENTION = "intervention"      # Do-calculus based
+    COUNTERFACTUAL = "counterfactual" # Counterfactual queries
+```
+
+#### Temporal Decay Functions:
+
+```python
+class TemporalDecayFunction(Enum):
+    EXPONENTIAL = "exponential"  # 0.5^(t/half_life)
+    HYPERBOLIC = "hyperbolic"    # 1/(1 + t/3600)
+    POWER_LAW = "power_law"      # 1/(1 + t/3600)^alpha
+    LINEAR = "linear"            # max(0, 1 - t/half_life)
+```
+
+#### Key Methods:
+
+```python
+class CausalContext:
+    def select(self, world_model, query) -> Dict[str, Any]:
+        """Select causally-relevant context."""
+        # Returns: causal_context, concepts, causal_graph,
+        #          interventions, confounders, mediators
+    
+    def record_intervention(self, variable, value, effect_on=None):
+        """Record a causal intervention."""
+    
+    def compute_counterfactual(self, world_model, variable, original_value,
+                                counterfactual_value, outcome_variable):
+        """Compute counterfactual scenario."""
+```
+
+#### Output Structure:
+
+```python
+{
+    "causal_context": [
+        {
+            "source": "episodic|semantic|procedural",
+            "score": float,
+            "item": <original>,
+            "reason": str,
+            "causal_path": List[str],
+            "causal_strength": float,
+            "temporal_relevance": float,
+        }
+    ],
+    "concepts": List[str],
+    "causal_graph": Dict,
+    "interventions": List[Dict],
+    "confounders": List[str],
+    "mediators": List[str],
+    "statistics": CausalStatistics,
+}
+```
+
+---
+
+## 14. Generation Systems
+
+**Location:** `src/generation/`
+
+### 14.1 Safe Generation
+
+**Location:** `src/generation/safe_generation.py`
+
+Multi-layered safety filtering for token generation:
+
+#### Risk Levels:
+
+```python
+class RiskLevel(Enum):
+    SAFE = 0
+    LOW = 1
+    MEDIUM = 2
+    HIGH = 3
+    CRITICAL = 4
+```
+
+#### Validation Categories:
+
+| Category | Description |
+|----------|-------------|
+| `TOXICITY` | Harmful, offensive content |
+| `HALLUCINATION` | Factually incorrect claims |
+| `PROMPT_INJECTION` | Injection attacks |
+| `PII` | Personal identifiable information |
+| `BIAS` | Discriminatory content |
+| `CONSISTENCY` | Logical coherence |
+| `PROFANITY` | Explicit language |
+| `VIOLENCE` | Violent content |
+| `HATE_SPEECH` | Hate speech |
+| `SEXUAL_CONTENT` | Adult content |
+| `MEDICAL_HARM` | Dangerous medical advice |
+| `LEGAL_VIOLATION` | Illegal content |
+
+#### Validator Integration:
+
+```python
+# Integrates with VULCAN validators when available
+from src.vulcan.safety.llm_validators import (
+    ToxicityValidator,
+    HallucinationValidator,
+    PromptInjectionValidator,
+    PIIValidator,
+    BiasValidator,
+    EnhancedSafetyValidator,
+)
+```
+
+#### Features:
+
+- **Multi-tier validation**: Token-level and sequence-level
+- **Adaptive thresholds**: Domain and context-aware
+- **Real-time monitoring**: Alerting for safety events
+- **Audit trails**: Complete provenance tracking
+- **Safe alternatives**: Suggest replacement tokens
+- **Caching**: Performance optimization
+
+### 14.2 Explainable Generation
+
+**Location:** `src/generation/explainable_generation.py`
+
+Comprehensive AI explainability system:
+
+#### Explanation Levels:
+
+```python
+class ExplanationLevel(Enum):
+    MINIMAL = "minimal"           # Just the choice
+    BASIC = "basic"              # Choice + top alternatives
+    STANDARD = "standard"        # Basic + factors + confidence
+    DETAILED = "detailed"        # Standard + attributions + context
+    COMPREHENSIVE = "comprehensive"  # Everything + counterfactuals
+```
+
+#### Attribution Methods:
+
+```python
+class AttributionMethod(Enum):
+    GRADIENT = "gradient"                    # Gradient-based
+    ATTENTION = "attention"                  # Attention weights
+    INTEGRATED_GRADIENTS = "integrated_gradients"
+    SHAPLEY = "shapley"                      # SHAP values
+    LIME = "lime"                            # Local interpretable
+```
+
+#### Explanation Components:
+
+```python
+@dataclass
+class DecisionSummary:
+    token: Token
+    token_str: str
+    position: Optional[int]
+    prob: Optional[float]
+    confidence: Optional[float]
+    entropy: Optional[float]
+    strategy: Optional[str]
+    temperature: Optional[float]
+    perplexity: Optional[float]
+    uncertainty: Optional[float]
+
+@dataclass
+class FeatureAttribution:
+    feature_name: str
+    importance: float
+    contribution: float
+    method: AttributionMethod
+    details: Dict[str, Any]
+
+@dataclass
+class CounterfactualAnalysis:
+    alternative_token: Token
+    alternative_prob: float
+    scenario_description: str
+    outcome_difference: str
+    plausibility: float
+```
+
+#### Key Methods:
+
+```python
+class ExplainableGeneration:
+    def explain(self, token, chain, hidden_state=None, logits=None,
+                candidates=None, prompt_tokens=None, level=ExplanationLevel.STANDARD):
+        """Generate comprehensive explanation for a token decision."""
+    
+    def explain_sequence(self, tokens, explanations):
+        """Generate explanation for full sequence."""
+    
+    def get_feature_attributions(self, token, hidden_state, method=AttributionMethod.ATTENTION):
+        """Get feature importance attributions."""
+    
+    def generate_counterfactuals(self, token, alternatives, context):
+        """Generate what-if scenarios for alternatives."""
+```
+
+### 14.3 Unified Generation
+
+**Location:** `src/generation/unified_generation.py`
+
+Multi-strategy ensemble generation (covered in Section 15).
+
+---
+
+## 15. Tool Selection System
 
 **Location:** `src/vulcan/reasoning/selection/`
 
@@ -2451,7 +2817,407 @@ The autonomous self-improvement system includes:
 
 ---
 
-## 18. Performance Instrumentation
+## 18. LLM Backend Package
+
+**Location:** `src/vulcan/llm/`
+
+The LLM backend package provides multi-backend LLM integration.
+
+### 18.1 Package Structure
+
+```
+src/vulcan/llm/
+├── __init__.py          # Package exports
+├── hybrid_executor.py   # Multi-backend executor
+├── mock_llm.py          # Mock implementation for testing
+└── openai_client.py     # OpenAI API client
+```
+
+### 18.2 OpenAI Client
+
+**Location:** `src/vulcan/llm/openai_client.py`
+
+Lazy-initialized OpenAI client with error tracking:
+
+```python
+# Configuration
+# Environment Variable: OPENAI_API_KEY
+
+# Client Functions
+def get_openai_client() -> Optional[OpenAI]:
+    """Get lazily-initialized OpenAI client."""
+
+def get_openai_init_error() -> Optional[str]:
+    """Get initialization error for diagnostics."""
+
+def initialize_openai_client(api_key: Optional[str] = None) -> bool:
+    """Explicitly initialize with optional key."""
+
+def is_openai_ready() -> bool:
+    """Check if client is ready for use."""
+
+# Availability Check
+OPENAI_AVAILABLE: bool  # True if openai package installed
+```
+
+### 18.3 Mock LLM
+
+**Location:** `src/vulcan/llm/mock_llm.py`
+
+Mock implementation for testing and fallback:
+
+```python
+class MockGraphixVulcanLLM:
+    """Mock LLM for safe execution when real package unavailable."""
+    
+    def __init__(self, config_path: str):
+        self.bridge = MagicMock()  # Mock bridge for reasoning
+    
+    def generate(self, prompt: str, max_tokens: int = 100) -> str:
+        """Return mock response."""
+    
+    def reason(self, query: str, context: Optional[dict] = None) -> str:
+        """Mock reasoning operation."""
+    
+    def explain(self, concept: str) -> str:
+        """Mock explanation operation."""
+    
+    def get_stats(self) -> dict:
+        """Get generation statistics including is_mock flag."""
+
+# Auto-fallback
+GraphixVulcanLLM = RealGraphixVulcanLLM or MockGraphixVulcanLLM
+GRAPHIX_LLM_AVAILABLE: bool
+```
+
+### 18.4 Hybrid LLM Executor
+
+**Location:** `src/vulcan/llm/hybrid_executor.py`
+
+Multi-backend execution with fallback and ensemble modes:
+
+#### Execution Modes:
+
+| Mode | Description |
+|------|-------------|
+| `local_first` | Try local LLM, fallback to OpenAI |
+| `openai_first` | Try OpenAI, fallback to local |
+| `parallel` | Race both, use first success |
+| `ensemble` | Run both, combine/select best |
+
+#### Key Features:
+
+```python
+class HybridLLMExecutor:
+    # Constants
+    MIN_MEANINGFUL_LENGTH = 10
+    ENSEMBLE_LOCAL_RESPONSE_MAX_LENGTH = 500
+    
+    DEFAULT_SYSTEM_PROMPT = (
+        "You are VULCAN, an advanced AI assistant. "
+        "You SHOULD remember and reference information shared earlier..."
+    )
+    
+    def __init__(
+        self,
+        local_llm: Optional[Any] = None,
+        openai_client_getter: Optional[Callable] = None,
+        mode: str = "parallel",
+        timeout: float = 30.0,
+        ensemble_min_confidence: float = 0.7,
+        openai_max_tokens: int = 2000,
+    )
+    
+    async def execute(
+        self,
+        prompt: str,
+        max_tokens: int = 1000,
+        temperature: float = 0.7,
+        system_prompt: Optional[str] = None,
+        enable_distillation: bool = True,  # Capture for training
+        conversation_history: Optional[List[Dict]] = None,
+    ) -> Dict[str, Any]:
+        """Execute with configured mode and distillation capture."""
+```
+
+#### Distillation Integration:
+
+```python
+# When enable_distillation=True and source includes OpenAI:
+if enable_distillation and result.get("source") in ("openai", "parallel_both", "ensemble"):
+    self._capture_for_distillation(prompt, result)
+```
+
+---
+
+## 19. Knowledge Distillation System
+
+**Location:** `src/vulcan/distillation/`
+
+Comprehensive knowledge distillation from OpenAI to local LLM.
+
+### 19.1 Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                KNOWLEDGE DISTILLATION PIPELINE                       │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  User Request (with opt-in)                                         │
+│         │                                                           │
+│         ▼                                                           │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │                  CAPTURE LAYER                               │   │
+│  │  OpenAIKnowledgeDistiller.capture_response()                 │   │
+│  │                                                              │   │
+│  │  Stage 1: Opt-In Check ─────► REJECT if not opted in         │   │
+│  │  Stage 2: PII Redaction ────► Mask emails, phones, SSN       │   │
+│  │  Stage 3: Secret Detection ─► REJECT if API keys found       │   │
+│  │  Stage 4: Governance Check ─► REJECT if sensitive content    │   │
+│  │  Stage 5: Quality Validation─► REJECT if low quality         │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│                              │                                      │
+│                              ▼ (passed all stages)                  │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │                  STORAGE LAYER                               │   │
+│  │  DistillationStorageBackend                                  │   │
+│  │  - JSONL format (appendable)                                 │   │
+│  │  - Optional Fernet encryption                                │   │
+│  │  - Provenance hashes                                         │   │
+│  │  - Retention limits                                          │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│                              │                                      │
+│                              ▼ (training worker reads)              │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │                  TRAINING LAYER                              │   │
+│  │  GovernedTrainer + ConsensusEngine                           │   │
+│  │  - Proposes weight updates                                   │   │
+│  │  - Consensus approval/rejection                              │   │
+│  │  - Rollback on regression                                    │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│                              │                                      │
+│                              ▼                                      │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │                  EVALUATION LAYER                            │   │
+│  │  ShadowModelEvaluator + PromotionGate                        │   │
+│  │  - Golden test set evaluation                                │   │
+│  │  - Regression detection                                      │   │
+│  │  - Promotion/rollback decision                               │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### 19.2 Distillation Example Model
+
+**Location:** `src/vulcan/distillation/models.py`
+
+```python
+@dataclass
+class DistillationExample:
+    """Training example with full provenance tracking."""
+    
+    # Core content
+    instruction: str          # Sanitized prompt (PII redacted)
+    teacher_answer: str       # OpenAI response
+    context: Dict[str, Any]   # Routing metadata, tools used
+    labels: Dict[str, Any]    # Domain, difficulty, validation
+    
+    # Provenance tracking
+    prompt_hash: str          # SHA256 of original prompt
+    response_hash: str        # SHA256 of response
+    teacher_model: str        # e.g., "gpt-3.5-turbo"
+    timestamp: float
+    
+    # Quality metrics
+    quality_score: float
+    validation_passed: bool
+    rejection_reasons: List[str]
+    
+    # Governance
+    session_opted_in: bool
+    retention_expires: Optional[float]
+```
+
+### 19.3 PII Redactor
+
+**Location:** `src/vulcan/distillation/pii_redactor.py`
+
+Detects and masks sensitive information:
+
+#### PII Patterns:
+
+| Type | Pattern |
+|------|---------|
+| Email | `user@domain.com` → `[EMAIL]` |
+| Phone | `(555) 123-4567` → `[PHONE]` |
+| SSN | `123-45-6789` → `[SSN]` |
+| Credit Card | `4111-1111-1111-1111` → `[CREDIT_CARD]` |
+| IP Address | `192.168.1.1` → `[IP_ADDRESS]` |
+
+#### Secret Patterns (Hard Reject):
+
+| Type | Pattern |
+|------|---------|
+| OpenAI Key | `sk-xxxx...` |
+| AWS Access Key | `AKIA...` |
+| GitHub Token | `ghp_...` |
+| Bearer Token | `Bearer xxx...` |
+| JWT | `eyJ...` |
+| Password Fields | `password: xxx` |
+| Connection Strings | `mongodb://...` |
+| Private Keys | `-----BEGIN PRIVATE KEY-----` |
+
+### 19.4 Governance Sensitivity Checker
+
+**Location:** `src/vulcan/distillation/governance_checker.py`
+
+Checks content against governance rules:
+
+#### Sensitive Categories (Never Capture):
+
+| Category | Examples |
+|----------|----------|
+| `auth_credentials` | Login, password, bearer tokens |
+| `payment_info` | Credit cards, CVV, bank accounts |
+| `medical_phi` | Diagnosis, prescriptions, HIPAA |
+| `legal_privileged` | Attorney-client, legal advice |
+
+#### Do-Not-Capture Markers:
+
+```python
+DO_NOT_CAPTURE_MARKERS = [
+    "[CONFIDENTIAL]",
+    "[DO NOT LOG]",
+    "[SENSITIVE]",
+    "[PRIVATE]",
+    "[NO_TRAINING]",
+    "[GOVERNANCE_RESTRICTED]",
+]
+```
+
+### 19.5 Quality Validator
+
+**Location:** `src/vulcan/distillation/quality_validator.py`
+
+Multi-stage quality filtering:
+
+#### Thresholds:
+
+| Threshold | Default | Description |
+|-----------|---------|-------------|
+| `MIN_RESPONSE_LENGTH` | 50 | Minimum chars |
+| `MAX_RESPONSE_LENGTH` | 4000 | Maximum chars |
+| `MIN_QUALITY_SCORE` | 0.65 | Quality threshold |
+| `MAX_BOILERPLATE_RATIO` | 0.4 | Max filler content |
+
+#### Refusal Patterns (Rejected):
+
+```python
+REFUSAL_PATTERNS = [
+    "i cannot", "i can't", "i'm not able to",
+    "as an ai", "as a language model",
+    "i apologize, but", "i'm sorry, but i cannot",
+]
+```
+
+#### Boilerplate Patterns (Reduce Score):
+
+```python
+BOILERPLATE_PATTERNS = [
+    "sure, ", "of course, ", "certainly, ",
+    "great question", "good question",
+    "here's", "let me", "i'd be happy to",
+    "i hope this helps", "feel free to ask",
+]
+```
+
+### 19.6 Shadow Model Evaluator
+
+**Location:** `src/vulcan/distillation/evaluator.py`
+
+Evaluates improvements before promotion:
+
+#### Golden Test Set:
+
+```python
+GOLDEN_PROMPTS = [
+    {"prompt": "What is 2 + 2?", 
+     "expected_contains": ["4"], "domain": "math"},
+    {"prompt": "Write a Python function that adds two numbers.",
+     "expected_contains": ["def", "return", "+"], "domain": "code"},
+    {"prompt": "Explain machine learning in one sentence.",
+     "expected_contains": ["learn", "data"], "domain": "explanation"},
+    {"prompt": "What is the capital of France?",
+     "expected_contains": ["Paris"], "domain": "factual"},
+]
+```
+
+#### Regression Detection:
+
+- Threshold: 10% drop from baseline triggers failure
+- Domain-specific metrics tracked
+- History maintained for trend analysis
+
+### 19.7 Promotion Gate
+
+**Location:** `src/vulcan/distillation/promotion_gate.py`
+
+Explicit gate for weight promotion:
+
+#### Requirements:
+
+| Requirement | Default | Description |
+|-------------|---------|-------------|
+| `MIN_EVAL_SCORE` | 0.7 | Minimum evaluation score |
+| `MAX_REGRESSION_COUNT` | 0 | No regressions allowed |
+| Provenance Record | Required | Full audit trail |
+
+#### Decision Flow:
+
+```python
+def evaluate_for_promotion(eval_results, training_metadata):
+    """
+    Returns (approved: bool, decision_details: Dict)
+    
+    Checks:
+    1. eval_score >= MIN_EVAL_SCORE
+    2. regression_count <= MAX_REGRESSION_COUNT
+    3. provenance_valid == True
+    
+    All must pass for approval.
+    """
+```
+
+### 19.8 Storage Backend
+
+**Location:** `src/vulcan/distillation/storage.py`
+
+JSONL storage with optional encryption:
+
+```python
+class DistillationStorageBackend:
+    def __init__(
+        self,
+        storage_path: str = "data/distillation",
+        use_encryption: bool = False,
+        encryption_key: Optional[str] = None,  # Fernet key
+        max_file_size_mb: int = 100,
+    )
+    
+    def append_example(self, example: Dict[str, Any]) -> bool:
+        """Thread-safe append to JSONL."""
+    
+    def read_batch(self, batch_size: int) -> List[Dict[str, Any]]:
+        """Read batch for training."""
+    
+    def get_stats(self) -> Dict[str, Any]:
+        """Get storage statistics."""
+```
+
+---
+
+## 20. Performance Instrumentation
 
 **Location:** `src/llm_core/graphix_executor.py`
 

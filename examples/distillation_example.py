@@ -86,13 +86,27 @@ async def main():
         print("  ✓ Internal LLM loaded")
         
         # Initialize distillation system (ensemble mode)
+        #
+        # ⚠️  PRODUCTION WARNING ⚠️
+        # The 'require_opt_in=False' setting below is for DEMO PURPOSES ONLY.
+        # In production, you MUST set require_opt_in=True to ensure user consent
+        # is obtained before capturing any data for training.
+        #
+        # Production usage:
+        #     system = initialize_distillation_system(
+        #         graphix_vulcan_llm=llm,
+        #         mode="ensemble",
+        #         require_opt_in=True,  # REQUIRED in production
+        #     )
+        #
         system = initialize_distillation_system(
             graphix_vulcan_llm=llm,
             mode="ensemble",  # Use both local + OpenAI
             storage_path="data/distillation/examples.jsonl",
-            require_opt_in=False,  # For demo purposes only
+            require_opt_in=False,  # ⚠️ DEMO ONLY - Set to True in production!
         )
         print("  ✓ Distillation system initialized (ensemble mode)")
+        print("  ⚠️  NOTE: require_opt_in=False for demo - enable in production!")
         
     except Exception as e:
         print(f"  ✗ Initialization failed: {e}")

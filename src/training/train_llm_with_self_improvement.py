@@ -264,28 +264,36 @@ def load_distillation_batch(
     
     # Convert to training format
     all_tokens = []
+    
+    # Validate tokenizer has required method
+    has_proper_tokenizer = hasattr(tokenizer, 'encode') and callable(getattr(tokenizer, 'encode'))
+    if not has_proper_tokenizer:
+        logger.warning(
+            "[DISTILL] No proper tokenizer available. Distillation training requires "
+            "a tokenizer with an encode() method for quality training. Skipping batch."
+        )
+        return None
+    
     for ex in examples:
-        # Combine instruction and teacher answer
+        # Combine instruction and teacher answer with structured format
         instruction = ex.get("instruction", ex.get("prompt", ""))
         answer = ex.get("teacher_answer", ex.get("response", ex.get("answer", "")))
         
         if not instruction or not answer:
             continue
         
-        combined = f"{instruction} {answer}"
+        # Use structured format with clear delimiters for better training signal
+        # This format helps the model learn the instruction-following pattern
+        combined = f"### Instruction:\n{instruction}\n\n### Response:\n{answer}"
         
-        # Tokenize
+        # Tokenize using the validated tokenizer
         try:
-            if hasattr(tokenizer, 'encode'):
-                tokens = tokenizer.encode(combined)
-            else:
-                # Fallback for simple tokenizers
-                tokens = [ord(c) % 256 for c in combined]
+            tokens = tokenizer.encode(combined)
         except Exception as e:
-            print(f"[DISTILL] Tokenization failed: {e}")
+            logger.warning(f"[DISTILL] Tokenization failed for example: {e}")
             continue
         
-        # Get EOS token
+        # Get EOS token with multiple fallbacks
         eos_id = getattr(tokenizer, 'eos_token_id', getattr(tokenizer, 'eos_id', 0))
         
         # Pad or truncate to seq_len + 1 (need extra token for target)
