@@ -362,9 +362,10 @@ services:
       - SEMANTIC_BRIDGE_ENABLED=${SEMANTIC_BRIDGE_ENABLED:-true}
       - CROSS_DOMAIN_TRANSFER_ENABLED=${CROSS_DOMAIN_TRANSFER_ENABLED:-true}
       - PATTERN_LEARNING_ENABLED=${PATTERN_LEARNING_ENABLED:-true}
-      # Semantic matching configuration (EMERGENCY FIX for Embedding Bottleneck)
-      # Disable slow semantic matching (default: 1 = disabled for fast routing)
-      - VULCAN_DISABLE_SEMANTIC_MATCHING=${VULCAN_DISABLE_SEMANTIC_MATCHING:-1}
+      # Semantic matching configuration (Performance Optimized)
+      # Now safe to enable (default: 0 = enabled) due to Issue #2 and #3 caching fixes
+      # Set to 1 to disable for keyword-only routing (faster but less accurate)
+      - VULCAN_DISABLE_SEMANTIC_MATCHING=${VULCAN_DISABLE_SEMANTIC_MATCHING:-0}
       # OpenAI Response Caching Configuration (Performance Optimization)
       # Enables LRU+TTL caching for OpenAI API responses to reduce costs and latency
       - OPENAI_CACHE_ENABLED=${OPENAI_CACHE_ENABLED:-true}

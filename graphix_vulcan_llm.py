@@ -1006,6 +1006,7 @@ class GraphixVulcanLLM:
                 logger.debug(f"UnifiedReasoner initialization skipped: {e}")
         
         # Vulcan Memory System (hierarchical + specialized memory)
+        # PERF FIX Issue #2: Use singleton HierarchicalMemory to avoid re-initialization
         self.vulcan_memory = None
         self.episodic_memory = None
         self.semantic_memory = None
@@ -1014,7 +1015,20 @@ class GraphixVulcanLLM:
         self.memory_consolidator = None
         if HAS_VULCAN_MEMORY:
             try:
-                self.vulcan_memory = HierarchicalMemory()
+                # Try to use singleton HierarchicalMemory first
+                try:
+                    from vulcan.reasoning.singletons import get_hierarchical_memory
+                    self.vulcan_memory = get_hierarchical_memory()
+                    if self.vulcan_memory:
+                        logger.info("✓ HierarchicalMemory obtained from singleton")
+                except ImportError:
+                    self.vulcan_memory = None
+                
+                # Fallback to direct instantiation if singleton not available
+                if self.vulcan_memory is None:
+                    self.vulcan_memory = HierarchicalMemory()
+                    logger.info("✓ HierarchicalMemory initialized (direct)")
+                
                 self.episodic_memory = EpisodicMemory()
                 self.semantic_memory = SemanticMemory()
                 self.procedural_memory = ProceduralMemory()

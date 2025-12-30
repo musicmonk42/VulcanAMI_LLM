@@ -604,6 +604,23 @@ async def lifespan(app: FastAPI):
         )
         app.state.llm = llm_instance
 
+        # PERFORMANCE FIX (Issue #1): Initialize HybridLLMExecutor ONCE at startup
+        # Previously this was instantiated per-request, adding ~0.5s overhead each time
+        # Now we create a singleton instance that's reused across all requests
+        try:
+            app.state.hybrid_executor = HybridLLMExecutor(
+                local_llm=llm_instance,
+                openai_client_getter=get_openai_client,
+                mode=settings.llm_execution_mode,
+                timeout=settings.llm_parallel_timeout,
+                ensemble_min_confidence=settings.llm_ensemble_min_confidence,
+                openai_max_tokens=settings.llm_openai_max_tokens,
+            )
+            logger.info(f"✓ HybridLLMExecutor initialized at startup (mode={settings.llm_execution_mode})")
+        except Exception as e:
+            logger.warning(f"Failed to initialize HybridLLMExecutor at startup: {e}")
+            app.state.hybrid_executor = None
+
         # Initialize Knowledge Distiller for learning from OpenAI responses
         if settings.enable_knowledge_distillation:
             try:
@@ -1015,6 +1032,35 @@ async def lifespan(app: FastAPI):
         logger.debug(f"Model registry module not available for preload: {e}")
     except Exception as e:
         logger.warning(f"Model registry preload failed (models will load lazily): {e}")
+
+    # PERF FIX Issue #2: Preload HierarchicalMemory singleton at startup
+    # This ensures the memory system (and its embedding model) is initialized once
+    try:
+        from vulcan.reasoning.singletons import get_hierarchical_memory
+        hierarchical_memory = get_hierarchical_memory()
+        if hierarchical_memory:
+            logger.info("✓ HierarchicalMemory singleton preloaded at startup")
+        else:
+            logger.debug("HierarchicalMemory singleton not available (will load lazily)")
+    except ImportError as e:
+        logger.debug(f"HierarchicalMemory singleton not available for preload: {e}")
+    except Exception as e:
+        logger.warning(f"HierarchicalMemory preload failed (will load lazily): {e}")
+
+    # PERF FIX Issue #5: Preload UnifiedLearningSystem singleton at startup
+    # This ensures ensemble weights persist across requests (no more "All weights are zero")
+    try:
+        from vulcan.reasoning.singletons import get_unified_learning_system
+        learning_system = get_unified_learning_system()
+        if learning_system:
+            logger.info("✓ UnifiedLearningSystem singleton preloaded at startup")
+            logger.info("✓ Ensemble weights will persist across requests")
+        else:
+            logger.debug("UnifiedLearningSystem singleton not available (will load lazily)")
+    except ImportError as e:
+        logger.debug(f"UnifiedLearningSystem singleton not available for preload: {e}")
+    except Exception as e:
+        logger.warning(f"UnifiedLearningSystem preload failed (will load lazily): {e}")
 
     # ================================================================
     # PERFORMANCE FIX (Progressive Degradation): Pre-warm all reasoning singletons
@@ -3248,15 +3294,20 @@ Based on your analysis through memory retrieval, multi-modal reasoning, causal m
     # Get local LLM if available
     local_llm = app.state.llm if hasattr(app.state, "llm") else None
 
-    # Create hybrid executor with configured mode
-    hybrid_executor = HybridLLMExecutor(
-        local_llm=local_llm,
-        openai_client_getter=get_openai_client,
-        mode=settings.llm_execution_mode,
-        timeout=settings.llm_parallel_timeout,
-        ensemble_min_confidence=settings.llm_ensemble_min_confidence,
-        openai_max_tokens=settings.llm_openai_max_tokens,
-    )
+    # PERFORMANCE FIX (Issue #1): Use singleton HybridLLMExecutor from app.state
+    # Previously this was instantiated per-request, adding ~0.5s overhead each time
+    hybrid_executor = app.state.hybrid_executor if hasattr(app.state, 'hybrid_executor') else None
+    if hybrid_executor is None:
+        # Fallback: create new executor if not initialized at startup (shouldn't happen)
+        logger.warning("[VULCAN] Creating HybridLLMExecutor per-request (startup init may have failed)")
+        hybrid_executor = HybridLLMExecutor(
+            local_llm=local_llm,
+            openai_client_getter=get_openai_client,
+            mode=settings.llm_execution_mode,
+            timeout=settings.llm_parallel_timeout,
+            ensemble_min_confidence=settings.llm_ensemble_min_confidence,
+            openai_max_tokens=settings.llm_openai_max_tokens,
+        )
 
     # Execute hybrid LLM request
     try:
@@ -5152,15 +5203,20 @@ User Query: {user_message}
 
 Provide a helpful, accurate, and comprehensive response to the user's query. Be concise but thorough."""
 
-                # Use hybrid LLM execution for simultaneous OpenAI + Local LLM
-                hybrid_executor = HybridLLMExecutor(
-                    local_llm=llm,
-                    openai_client_getter=get_openai_client,
-                    mode=settings.llm_execution_mode,
-                    timeout=settings.llm_parallel_timeout,
-                    ensemble_min_confidence=settings.llm_ensemble_min_confidence,
-                    openai_max_tokens=settings.llm_openai_max_tokens,
-                )
+                # PERFORMANCE FIX (Issue #1): Use singleton HybridLLMExecutor from app.state
+                # Previously this was instantiated per-request, adding ~0.5s overhead each time
+                hybrid_executor = app.state.hybrid_executor if hasattr(app.state, 'hybrid_executor') else None
+                if hybrid_executor is None:
+                    # Fallback: create new executor if not initialized at startup (shouldn't happen)
+                    logger.warning("[VULCAN] Creating HybridLLMExecutor per-request (startup init may have failed)")
+                    hybrid_executor = HybridLLMExecutor(
+                        local_llm=llm,
+                        openai_client_getter=get_openai_client,
+                        mode=settings.llm_execution_mode,
+                        timeout=settings.llm_parallel_timeout,
+                        ensemble_min_confidence=settings.llm_ensemble_min_confidence,
+                        openai_max_tokens=settings.llm_openai_max_tokens,
+                    )
 
                 try:
                     # Build system prompt that emphasizes using reasoning output AND conversation memory

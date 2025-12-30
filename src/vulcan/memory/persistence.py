@@ -180,8 +180,8 @@ class SemanticCompressor:
         text = str(content)
 
         if self.model:
-            # Generate embedding
-            embedding = self.model.encode(text[:512])  # Truncate for model limits
+            # PERF FIX Issue #3: Disable progress bar for single-item encoding
+            embedding = self.model.encode(text[:512], show_progress_bar=False)  # Truncate for model limits
 
             # Quantize to reduce size
             quantized = (embedding * 127).astype(np.int8)

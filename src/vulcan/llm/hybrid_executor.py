@@ -831,10 +831,19 @@ class HybridLLMExecutor:
                 system_prompt=system_prompt,
             )
             if cached:
-                self.logger.debug(
-                    f"OpenAI cache HIT (age={cached['cache_age_seconds']:.1f}s)"
+                # PERF FIX Issue #7: Log cache hit at INFO level for visibility
+                self.logger.info(
+                    f"[CACHE HIT] OpenAI response from cache "
+                    f"(age={cached['cache_age_seconds']:.1f}s, saved ~2-5s API call)"
                 )
                 return cached["response"]
+            else:
+                # Log cache miss to help debug cache effectiveness
+                cache_stats = self._openai_cache.get_stats()
+                self.logger.debug(
+                    f"[CACHE MISS] OpenAI cache miss "
+                    f"(cache_size={cache_stats['size']}, hit_rate={cache_stats['hit_rate']:.1%})"
+                )
         
         openai_client = self.openai_client_getter()
         if not openai_client:
@@ -900,7 +909,12 @@ class HybridLLMExecutor:
                     metadata={"model": "gpt-3.5-turbo"},
                     system_prompt=system_prompt,
                 )
-                self.logger.debug("OpenAI response cached")
+                # PERF FIX Issue #7: Log cache storage at INFO level
+                cache_stats = self._openai_cache.get_stats()
+                self.logger.info(
+                    f"[CACHE STORED] OpenAI response cached "
+                    f"(cache_size={cache_stats['size']}, hit_rate={cache_stats['hit_rate']:.1%})"
+                )
             
             return result
         except Exception as e:

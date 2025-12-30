@@ -232,8 +232,10 @@ class GraphRAG:
     def _get_text_embedding(self, text: str) -> np.ndarray:
         """Generate text embedding."""
         if self.embedding_model:
+            # PERF FIX Issue #3: Disable progress bar for single-item encoding
             return self.embedding_model.encode(
-                text, convert_to_numpy=True, normalize_embeddings=True
+                text, convert_to_numpy=True, normalize_embeddings=True,
+                show_progress_bar=False
             )
         else:
             # Mock embedding using hash

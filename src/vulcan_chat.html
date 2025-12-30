@@ -459,6 +459,7 @@
             display: flex;
             gap: 5px;
             padding: 10px 0;
+            align-items: center;
         }
         
         .thinking span {
@@ -471,6 +472,13 @@
         
         .thinking span:nth-child(2) { animation-delay: 0.2s; }
         .thinking span:nth-child(3) { animation-delay: 0.4s; }
+        
+        .thinking-timer {
+            margin-left: 12px;
+            font-size: 0.85em;
+            color: var(--text-tertiary);
+            font-variant-numeric: tabular-nums;
+        }
         
         @keyframes bounce {
             0%, 100% { transform: scale(1); opacity: 0.4; }
@@ -1132,6 +1140,14 @@
             }
         };
         
+        // Custom error class for timeout detection
+        class TimeoutError extends Error {
+            constructor(message) {
+                super(message);
+                this.name = 'TimeoutError';
+            }
+        }
+        
         // Global state
         let baseUrl = '';
         let apiKey = '';
@@ -1142,6 +1158,9 @@
         let busy = false;
         let abortController = null;
         let totalTokensUsed = 0;
+        let thinkingTimer = null;
+        let thinkingStartTime = null;
+        const REQUEST_TIMEOUT_MS = 60000;  // 60 second timeout for long-running requests
         let systemToggles = {
             reasoning: true,
             memory: true,
@@ -1734,7 +1753,45 @@
             return d.innerHTML;
         }
 
+        // Fetch with timeout wrapper to prevent ClientDisconnect errors
+        function fetchWithTimeout(url, options, timeout = REQUEST_TIMEOUT_MS) {
+            let timeoutId;
+            
+            const cleanup = () => {
+                if (timeoutId) {
+                    clearTimeout(timeoutId);
+                    timeoutId = null;
+                }
+            };
+            
+            // If an AbortController signal is provided, clear timeout on abort
+            if (options && options.signal) {
+                options.signal.addEventListener('abort', cleanup, { once: true });
+            }
+            
+            const timeoutPromise = new Promise((_, reject) => {
+                timeoutId = setTimeout(() => {
+                    reject(new TimeoutError(`Request timeout after ${Math.floor(timeout/1000)}s - backend may be overloaded`));
+                }, timeout);
+            });
+            
+            return Promise.race([
+                fetch(url, options).then(
+                    response => { cleanup(); return response; },
+                    error => { cleanup(); throw error; }
+                ),
+                timeoutPromise
+            ]);
+        }
+
+        // Helper to check if an error is a timeout error
+        function isTimeoutError(error) {
+            return error instanceof TimeoutError || error.name === 'TimeoutError';
+        }
+
         // Message Sending
+        let thinkingTimerElement = null;  // Store element reference for timer updates
+        
         function showThinking() {
             const box = document.getElementById('messages');
             const div = document.createElement('div');
@@ -1743,14 +1800,41 @@
             div.innerHTML = `
                 <div class="avatar">🧠</div>
                 <div class="bubble">
-                    <div class="thinking"><span></span><span></span><span></span></div>
+                    <div class="thinking">
+                        <span></span><span></span><span></span>
+                        <span class="thinking-timer" id="thinkingTimer">0s</span>
+                    </div>
                 </div>
             `;
             box.appendChild(div);
             box.scrollTop = box.scrollHeight;
+            
+            // Store element reference for timer updates
+            thinkingTimerElement = document.getElementById('thinkingTimer');
+            
+            // Start the timer (updates every 1s since we only display seconds)
+            thinkingStartTime = Date.now();
+            thinkingTimer = setInterval(() => {
+                if (!thinkingTimerElement) {
+                    // Element removed, stop the timer
+                    clearInterval(thinkingTimer);
+                    thinkingTimer = null;
+                    return;
+                }
+                const elapsed = Math.floor((Date.now() - thinkingStartTime) / 1000);
+                thinkingTimerElement.textContent = `${elapsed}s`;
+            }, 1000);
         }
 
         function hideThinking() {
+            // Stop the timer
+            if (thinkingTimer) {
+                clearInterval(thinkingTimer);
+                thinkingTimer = null;
+            }
+            thinkingStartTime = null;
+            thinkingTimerElement = null;  // Clear element reference
+            
             const el = document.getElementById('thinking');
             if (el) el.remove();
         }
@@ -1865,15 +1949,24 @@
                 
                 let res;
                 try {
-                    res = await fetch(`${baseUrl}/vulcan/v1/chat`, {
+                    res = await fetchWithTimeout(`${baseUrl}/vulcan/v1/chat`, {
                         method: 'POST',
                         headers,
                         body: JSON.stringify(requestBody),
                         signal: abortController.signal
                     });
                 } catch(e) {
-                    console.log('Trying alternative endpoint...');
-                    res = await fetch(`${baseUrl}/v1/chat`, {
+                    // If user aborted, re-throw to outer catch handler
+                    if (e.name === 'AbortError') {
+                        throw e;
+                    }
+                    // If timeout or network error, try alternative endpoint
+                    if (isTimeoutError(e)) {
+                        console.log('Request timeout on primary endpoint, trying alternative...');
+                    } else {
+                        console.log('Trying alternative endpoint...');
+                    }
+                    res = await fetchWithTimeout(`${baseUrl}/v1/chat`, {
                         method: 'POST',
                         headers,
                         body: JSON.stringify(requestBody),
@@ -1883,7 +1976,7 @@
                 
                 if (res.status === 404) {
                     console.log('404, trying /v1/chat...');
-                    res = await fetch(`${baseUrl}/v1/chat`, {
+                    res = await fetchWithTimeout(`${baseUrl}/v1/chat`, {
                         method: 'POST',
                         headers,
                         body: JSON.stringify(requestBody),
@@ -1937,8 +2030,16 @@
                     return;
                 }
                 
-                console.error('Send error:', e);
-                showError(e.message);
+                // Provide better error messages for timeout scenarios
+                let errorMessage = e.message;
+                if (isTimeoutError(e)) {
+                    errorMessage = 'Request timed out - the server may be under heavy load. Please try again.';
+                    console.warn('Request timeout:', e);
+                } else {
+                    console.error('Send error:', e);
+                }
+                
+                showError(errorMessage);
                 checkStatus();
                 
                 // Remove the failed user message
