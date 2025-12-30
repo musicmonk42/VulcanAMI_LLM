@@ -554,6 +554,167 @@ except Exception as e:
 
 
 # -------------------------------------------------------------------
+# Additional LLM Component Imports (Full Integration)
+# -------------------------------------------------------------------
+
+# Unified Reasoning System
+try:
+    from src.vulcan.reasoning.unified_reasoning import UnifiedReasoner
+    logger.info("✓ UnifiedReasoner loaded successfully")
+    HAS_UNIFIED_REASONING = True
+except Exception as e:
+    logger.debug(f"UnifiedReasoner import failed: {e}")
+    HAS_UNIFIED_REASONING = False
+    UnifiedReasoner = None
+
+# Vulcan Memory System
+try:
+    from src.vulcan.memory import (
+        HierarchicalMemory,
+        EpisodicMemory,
+        SemanticMemory,
+        ProceduralMemory,
+        WorkingMemory,
+        MemoryConsolidator,
+        MemoryPersistence,
+    )
+    logger.info("✓ Vulcan Memory System loaded successfully")
+    HAS_VULCAN_MEMORY = True
+except Exception as e:
+    logger.debug(f"Vulcan Memory import failed: {e}")
+    HAS_VULCAN_MEMORY = False
+    HierarchicalMemory = None
+    EpisodicMemory = None
+    SemanticMemory = None
+    ProceduralMemory = None
+    WorkingMemory = None
+    MemoryConsolidator = None
+    MemoryPersistence = None
+
+# Unified Generation System
+try:
+    from src.generation.unified_generation import UnifiedGeneration
+    logger.info("✓ UnifiedGeneration loaded successfully")
+    HAS_UNIFIED_GENERATION = True
+except Exception as e:
+    logger.debug(f"UnifiedGeneration import failed: {e}")
+    HAS_UNIFIED_GENERATION = False
+    UnifiedGeneration = None
+
+# LLM Executor
+try:
+    from src.execution.llm_executor import LLMExecutor
+    logger.info("✓ LLMExecutor loaded successfully")
+    HAS_LLM_EXECUTOR = True
+except Exception as e:
+    logger.debug(f"LLMExecutor import failed: {e}")
+    HAS_LLM_EXECUTOR = False
+    LLMExecutor = None
+
+# GraphixExecutor (production executor)
+try:
+    from src.llm_core.graphix_executor import GraphixExecutor
+    logger.info("✓ GraphixExecutor loaded successfully")
+    HAS_GRAPHIX_EXECUTOR = True
+except Exception as e:
+    logger.debug(f"GraphixExecutor import failed: {e}")
+    HAS_GRAPHIX_EXECUTOR = False
+    GraphixExecutor = None
+
+# Local GPT Provider
+try:
+    from src.local_llm.provider.local_gpt_provider import LocalGPTProvider
+    logger.info("✓ LocalGPTProvider loaded successfully")
+    HAS_LOCAL_GPT = True
+except Exception as e:
+    logger.debug(f"LocalGPTProvider import failed: {e}")
+    HAS_LOCAL_GPT = False
+    LocalGPTProvider = None
+
+# Mathematical Reasoning
+try:
+    from src.vulcan.reasoning.mathematical_computation import MathematicalComputationTool
+    from src.vulcan.reasoning.mathematical_verification import MathematicalVerificationEngine
+    logger.info("✓ Mathematical Reasoning loaded successfully")
+    HAS_MATH_REASONING = True
+except Exception as e:
+    logger.debug(f"Mathematical Reasoning import failed: {e}")
+    HAS_MATH_REASONING = False
+    MathematicalComputationTool = None
+    MathematicalVerificationEngine = None
+
+# Causal Reasoning
+try:
+    from src.vulcan.reasoning.causal_reasoning import CausalReasoning
+    logger.info("✓ CausalReasoning loaded successfully")
+    HAS_CAUSAL_REASONING = True
+except Exception as e:
+    logger.debug(f"CausalReasoning import failed: {e}")
+    HAS_CAUSAL_REASONING = False
+    CausalReasoning = None
+
+# Analogical Reasoning
+try:
+    from src.vulcan.reasoning.analogical_reasoning import AnalogicalReasoning
+    logger.info("✓ AnalogicalReasoning loaded successfully")
+    HAS_ANALOGICAL_REASONING = True
+except Exception as e:
+    logger.debug(f"AnalogicalReasoning import failed: {e}")
+    HAS_ANALOGICAL_REASONING = False
+    AnalogicalReasoning = None
+
+# Probabilistic Reasoning
+try:
+    from src.vulcan.reasoning.probabilistic_reasoning import ProbabilisticReasoning
+    logger.info("✓ ProbabilisticReasoning loaded successfully")
+    HAS_PROBABILISTIC_REASONING = True
+except Exception as e:
+    logger.debug(f"ProbabilisticReasoning import failed: {e}")
+    HAS_PROBABILISTIC_REASONING = False
+    ProbabilisticReasoning = None
+
+# Multimodal Reasoning
+try:
+    from src.vulcan.reasoning.multimodal_reasoning import MultimodalReasoning
+    logger.info("✓ MultimodalReasoning loaded successfully")
+    HAS_MULTIMODAL_REASONING = True
+except Exception as e:
+    logger.debug(f"MultimodalReasoning import failed: {e}")
+    HAS_MULTIMODAL_REASONING = False
+    MultimodalReasoning = None
+
+# Reasoning Integration
+try:
+    from src.vulcan.reasoning.reasoning_integration import ReasoningIntegration
+    logger.info("✓ ReasoningIntegration loaded successfully")
+    HAS_REASONING_INTEGRATION = True
+except Exception as e:
+    logger.debug(f"ReasoningIntegration import failed: {e}")
+    HAS_REASONING_INTEGRATION = False
+    ReasoningIntegration = None
+
+# Dynamic Architecture
+try:
+    from src.execution.dynamic_architecture import DynamicArchitecture
+    logger.info("✓ DynamicArchitecture loaded successfully")
+    HAS_DYNAMIC_ARCHITECTURE = True
+except Exception as e:
+    logger.debug(f"DynamicArchitecture import failed: {e}")
+    HAS_DYNAMIC_ARCHITECTURE = False
+    DynamicArchitecture = None
+
+# Persistent Context
+try:
+    from src.llm_core.persistant_context import PersistentContext
+    logger.info("✓ PersistentContext loaded successfully")
+    HAS_PERSISTENT_CONTEXT = True
+except Exception as e:
+    logger.debug(f"PersistentContext import failed: {e}")
+    HAS_PERSISTENT_CONTEXT = False
+    PersistentContext = None
+
+
+# -------------------------------------------------------------------
 # Configuration Loader
 # -------------------------------------------------------------------
 
@@ -830,6 +991,139 @@ class GraphixVulcanLLM:
                 logger.info("✓ Self-improvement enabled")
             except Exception as e:
                 logger.warning(f"Self-improvement initialization failed: {e}")
+
+        # -----------------------------------------------------------
+        # Extended LLM Component Integration
+        # -----------------------------------------------------------
+        
+        # Unified Reasoning System (orchestrates all reasoning types)
+        self.unified_reasoner = None
+        if HAS_UNIFIED_REASONING:
+            try:
+                self.unified_reasoner = UnifiedReasoner()
+                logger.info("✓ UnifiedReasoner initialized")
+            except Exception as e:
+                logger.debug(f"UnifiedReasoner initialization skipped: {e}")
+        
+        # Vulcan Memory System (hierarchical + specialized memory)
+        self.vulcan_memory = None
+        self.episodic_memory = None
+        self.semantic_memory = None
+        self.procedural_memory = None
+        self.working_memory = None
+        self.memory_consolidator = None
+        if HAS_VULCAN_MEMORY:
+            try:
+                self.vulcan_memory = HierarchicalMemory()
+                self.episodic_memory = EpisodicMemory()
+                self.semantic_memory = SemanticMemory()
+                self.procedural_memory = ProceduralMemory()
+                self.working_memory = WorkingMemory()
+                self.memory_consolidator = MemoryConsolidator()
+                logger.info("✓ Vulcan Memory System initialized")
+            except Exception as e:
+                logger.debug(f"Vulcan Memory initialization skipped: {e}")
+        
+        # Unified Generation (multi-strategy ensemble)
+        self.unified_generation = None
+        if HAS_UNIFIED_GENERATION:
+            try:
+                self.unified_generation = UnifiedGeneration()
+                logger.info("✓ UnifiedGeneration initialized")
+            except Exception as e:
+                logger.debug(f"UnifiedGeneration initialization skipped: {e}")
+        
+        # LLM Executor (advanced graph execution)
+        self.llm_executor = None
+        if HAS_LLM_EXECUTOR:
+            try:
+                self.llm_executor = LLMExecutor()
+                logger.info("✓ LLMExecutor initialized")
+            except Exception as e:
+                logger.debug(f"LLMExecutor initialization skipped: {e}")
+        
+        # GraphixExecutor (production executor with KV cache)
+        self.graphix_executor = None
+        if HAS_GRAPHIX_EXECUTOR:
+            try:
+                self.graphix_executor = GraphixExecutor()
+                logger.info("✓ GraphixExecutor initialized")
+            except Exception as e:
+                logger.debug(f"GraphixExecutor initialization skipped: {e}")
+        
+        # Mathematical Reasoning
+        self.math_computation = None
+        self.math_verification = None
+        if HAS_MATH_REASONING:
+            try:
+                self.math_computation = MathematicalComputationTool(llm=self)
+                self.math_verification = MathematicalVerificationEngine()
+                logger.info("✓ Mathematical Reasoning initialized")
+            except Exception as e:
+                logger.debug(f"Mathematical Reasoning initialization skipped: {e}")
+        
+        # Causal Reasoning
+        self.causal_reasoning = None
+        if HAS_CAUSAL_REASONING:
+            try:
+                self.causal_reasoning = CausalReasoning()
+                logger.info("✓ CausalReasoning initialized")
+            except Exception as e:
+                logger.debug(f"CausalReasoning initialization skipped: {e}")
+        
+        # Analogical Reasoning
+        self.analogical_reasoning = None
+        if HAS_ANALOGICAL_REASONING:
+            try:
+                self.analogical_reasoning = AnalogicalReasoning()
+                logger.info("✓ AnalogicalReasoning initialized")
+            except Exception as e:
+                logger.debug(f"AnalogicalReasoning initialization skipped: {e}")
+        
+        # Probabilistic Reasoning
+        self.probabilistic_reasoning = None
+        if HAS_PROBABILISTIC_REASONING:
+            try:
+                self.probabilistic_reasoning = ProbabilisticReasoning()
+                logger.info("✓ ProbabilisticReasoning initialized")
+            except Exception as e:
+                logger.debug(f"ProbabilisticReasoning initialization skipped: {e}")
+        
+        # Multimodal Reasoning
+        self.multimodal_reasoning = None
+        if HAS_MULTIMODAL_REASONING:
+            try:
+                self.multimodal_reasoning = MultimodalReasoning()
+                logger.info("✓ MultimodalReasoning initialized")
+            except Exception as e:
+                logger.debug(f"MultimodalReasoning initialization skipped: {e}")
+        
+        # Reasoning Integration (connects all reasoning systems)
+        self.reasoning_integration = None
+        if HAS_REASONING_INTEGRATION:
+            try:
+                self.reasoning_integration = ReasoningIntegration()
+                logger.info("✓ ReasoningIntegration initialized")
+            except Exception as e:
+                logger.debug(f"ReasoningIntegration initialization skipped: {e}")
+        
+        # Dynamic Architecture
+        self.dynamic_architecture = None
+        if HAS_DYNAMIC_ARCHITECTURE:
+            try:
+                self.dynamic_architecture = DynamicArchitecture()
+                logger.info("✓ DynamicArchitecture initialized")
+            except Exception as e:
+                logger.debug(f"DynamicArchitecture initialization skipped: {e}")
+        
+        # Persistent Context
+        self.persistent_context = None
+        if HAS_PERSISTENT_CONTEXT:
+            try:
+                self.persistent_context = PersistentContext()
+                logger.info("✓ PersistentContext initialized")
+            except Exception as e:
+                logger.debug(f"PersistentContext initialization skipped: {e}")
 
         # Cognitive Loop
         logger.info("Initializing cognitive loop...")
@@ -1724,15 +2018,18 @@ class GraphixVulcanLLM:
         """
         Get detailed status of all internal LLM components.
         
-        Returns integration status of:
-        - Transformer core
-        - Bridge (world model + consensus)
-        - Safety systems
-        - Context systems (hierarchical + causal)
-        - Reasoning systems
-        - Training systems
+        Returns integration status of all subsystems:
+        - Core: Transformer, Bridge, Cognitive Loop
+        - Safety: Validator, Safe Generation
+        - Context: Hierarchical, Causal, Persistent
+        - Generation: Unified Generation, Explainer
+        - Reasoning: Language, Unified, Causal, Analogical, Probabilistic, Mathematical, Multimodal
+        - Memory: Vulcan Memory System (Hierarchical, Episodic, Semantic, Procedural, Working)
+        - Execution: LLM Executor, Graphix Executor, Dynamic Architecture
+        - Training: Governed Trainer, Self-Improvement
         """
-        return {
+        # Core components (required)
+        core_status = {
             "transformer": {
                 "available": self.transformer is not None,
                 "vocab_size": getattr(self.transformer, 'config', {}).vocab_size 
@@ -1743,32 +2040,105 @@ class GraphixVulcanLLM:
                 "world_model": hasattr(self.bridge, 'world_model'),
                 "consensus": hasattr(self.bridge, 'consensus_approve_token'),
             },
-            "safety": {
-                "validator": self.safety_validator is not None,
-                "safe_generation": self.safe_generation is not None,
-            },
-            "context": {
-                "hierarchical": self.hier_context is not None,
-                "causal": self.causal_context is not None,
-            },
-            "reasoning": {
-                "language_reasoning": self.language_reasoning is not None,
-                "explainer": self.explainer is not None,
-            },
-            "training": {
-                "trainer": self.trainer is not None,
-                "self_improvement": self.self_improvement is not None,
-            },
             "cognitive_loop": self.cog_loop is not None,
-            "all_integrated": all([
-                self.transformer is not None,
-                self.bridge is not None,
-                self.safety_validator is not None,
-                self.hier_context is not None,
-                self.causal_context is not None,
-                self.language_reasoning is not None,
-                self.cog_loop is not None,
-            ]),
+        }
+        
+        # Safety systems
+        safety_status = {
+            "validator": self.safety_validator is not None,
+            "safe_generation": self.safe_generation is not None,
+        }
+        
+        # Context systems
+        context_status = {
+            "hierarchical_context": self.hier_context is not None,
+            "causal_context": self.causal_context is not None,
+            "persistent_context": getattr(self, 'persistent_context', None) is not None,
+        }
+        
+        # Generation systems
+        generation_status = {
+            "explainer": self.explainer is not None,
+            "unified_generation": getattr(self, 'unified_generation', None) is not None,
+        }
+        
+        # Reasoning systems (comprehensive)
+        reasoning_status = {
+            "language_reasoning": self.language_reasoning is not None,
+            "unified_reasoner": getattr(self, 'unified_reasoner', None) is not None,
+            "causal_reasoning": getattr(self, 'causal_reasoning', None) is not None,
+            "analogical_reasoning": getattr(self, 'analogical_reasoning', None) is not None,
+            "probabilistic_reasoning": getattr(self, 'probabilistic_reasoning', None) is not None,
+            "multimodal_reasoning": getattr(self, 'multimodal_reasoning', None) is not None,
+            "math_computation": getattr(self, 'math_computation', None) is not None,
+            "math_verification": getattr(self, 'math_verification', None) is not None,
+            "reasoning_integration": getattr(self, 'reasoning_integration', None) is not None,
+        }
+        
+        # Memory systems (Vulcan Memory)
+        memory_status = {
+            "vulcan_memory": getattr(self, 'vulcan_memory', None) is not None,
+            "episodic_memory": getattr(self, 'episodic_memory', None) is not None,
+            "semantic_memory": getattr(self, 'semantic_memory', None) is not None,
+            "procedural_memory": getattr(self, 'procedural_memory', None) is not None,
+            "working_memory": getattr(self, 'working_memory', None) is not None,
+            "memory_consolidator": getattr(self, 'memory_consolidator', None) is not None,
+        }
+        
+        # Execution systems
+        execution_status = {
+            "llm_executor": getattr(self, 'llm_executor', None) is not None,
+            "graphix_executor": getattr(self, 'graphix_executor', None) is not None,
+            "dynamic_architecture": getattr(self, 'dynamic_architecture', None) is not None,
+        }
+        
+        # Training systems
+        training_status = {
+            "trainer": self.trainer is not None,
+            "self_improvement": self.self_improvement is not None,
+        }
+        
+        # Count available components
+        all_components = []
+        for status_dict in [core_status, safety_status, context_status, 
+                           generation_status, reasoning_status, memory_status,
+                           execution_status, training_status]:
+            if isinstance(status_dict, dict):
+                for k, v in status_dict.items():
+                    if isinstance(v, dict):
+                        all_components.extend(v.values())
+                    else:
+                        all_components.append(v)
+        
+        available_count = sum(1 for c in all_components if c is True or c is not None)
+        total_count = len(all_components)
+        
+        # Core integration check (minimum required components)
+        core_integrated = all([
+            self.transformer is not None,
+            self.bridge is not None,
+            self.safety_validator is not None,
+            self.hier_context is not None,
+            self.causal_context is not None,
+            self.language_reasoning is not None,
+            self.cog_loop is not None,
+        ])
+        
+        return {
+            "core": core_status,
+            "safety": safety_status,
+            "context": context_status,
+            "generation": generation_status,
+            "reasoning": reasoning_status,
+            "memory": memory_status,
+            "execution": execution_status,
+            "training": training_status,
+            "summary": {
+                "available_components": available_count,
+                "total_components": total_count,
+                "integration_percentage": round(available_count / total_count * 100, 1) if total_count > 0 else 0,
+                "core_integrated": core_integrated,
+            },
         }
 
     # -----------------------------------------------------------
