@@ -3307,7 +3307,7 @@ Based on your analysis through memory retrieval, multi-modal reasoning, causal m
 
     # PERFORMANCE FIX (Issue #1): Use singleton HybridLLMExecutor
     # First try app.state, then fall back to module-level singleton
-    hybrid_executor = app.state.hybrid_executor if hasattr(app.state, 'hybrid_executor') and app.state.hybrid_executor else None
+    hybrid_executor = getattr(app.state, 'hybrid_executor', None)
     if hybrid_executor is None:
         # Try module-level singleton (may have been initialized elsewhere)
         hybrid_executor = get_hybrid_executor()
@@ -5219,7 +5219,7 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
 
                 # PERFORMANCE FIX (Issue #1): Use singleton HybridLLMExecutor
                 # First try app.state, then fall back to module-level singleton
-                hybrid_executor = app.state.hybrid_executor if hasattr(app.state, 'hybrid_executor') and app.state.hybrid_executor else None
+                hybrid_executor = getattr(app.state, 'hybrid_executor', None)
                 if hybrid_executor is None:
                     # Try module-level singleton (may have been initialized elsewhere)
                     hybrid_executor = get_hybrid_executor()
