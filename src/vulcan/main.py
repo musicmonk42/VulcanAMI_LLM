@@ -604,6 +604,23 @@ async def lifespan(app: FastAPI):
         )
         app.state.llm = llm_instance
 
+        # PERFORMANCE FIX (Issue #1): Initialize HybridLLMExecutor ONCE at startup
+        # Previously this was instantiated per-request, adding 0.1-0.5s overhead each time
+        # Now we create a singleton instance that's reused across all requests
+        try:
+            app.state.hybrid_executor = HybridLLMExecutor(
+                local_llm=llm_instance,
+                openai_client_getter=get_openai_client,
+                mode=settings.llm_execution_mode,
+                timeout=settings.llm_parallel_timeout,
+                ensemble_min_confidence=settings.llm_ensemble_min_confidence,
+                openai_max_tokens=settings.llm_openai_max_tokens,
+            )
+            logger.info(f"✓ HybridLLMExecutor initialized at startup (mode={settings.llm_execution_mode})")
+        except Exception as e:
+            logger.warning(f"Failed to initialize HybridLLMExecutor at startup: {e}")
+            app.state.hybrid_executor = None
+
         # Initialize Knowledge Distiller for learning from OpenAI responses
         if settings.enable_knowledge_distillation:
             try:
@@ -3248,15 +3265,20 @@ Based on your analysis through memory retrieval, multi-modal reasoning, causal m
     # Get local LLM if available
     local_llm = app.state.llm if hasattr(app.state, "llm") else None
 
-    # Create hybrid executor with configured mode
-    hybrid_executor = HybridLLMExecutor(
-        local_llm=local_llm,
-        openai_client_getter=get_openai_client,
-        mode=settings.llm_execution_mode,
-        timeout=settings.llm_parallel_timeout,
-        ensemble_min_confidence=settings.llm_ensemble_min_confidence,
-        openai_max_tokens=settings.llm_openai_max_tokens,
-    )
+    # PERFORMANCE FIX (Issue #1): Use singleton HybridLLMExecutor from app.state
+    # Previously this was instantiated per-request, adding 0.1-0.5s overhead each time
+    hybrid_executor = getattr(app.state, 'hybrid_executor', None)
+    if hybrid_executor is None:
+        # Fallback: create new executor if not initialized at startup (shouldn't happen)
+        logger.warning("[VULCAN] Creating HybridLLMExecutor per-request (startup init may have failed)")
+        hybrid_executor = HybridLLMExecutor(
+            local_llm=local_llm,
+            openai_client_getter=get_openai_client,
+            mode=settings.llm_execution_mode,
+            timeout=settings.llm_parallel_timeout,
+            ensemble_min_confidence=settings.llm_ensemble_min_confidence,
+            openai_max_tokens=settings.llm_openai_max_tokens,
+        )
 
     # Execute hybrid LLM request
     try:
@@ -5152,15 +5174,20 @@ User Query: {user_message}
 
 Provide a helpful, accurate, and comprehensive response to the user's query. Be concise but thorough."""
 
-                # Use hybrid LLM execution for simultaneous OpenAI + Local LLM
-                hybrid_executor = HybridLLMExecutor(
-                    local_llm=llm,
-                    openai_client_getter=get_openai_client,
-                    mode=settings.llm_execution_mode,
-                    timeout=settings.llm_parallel_timeout,
-                    ensemble_min_confidence=settings.llm_ensemble_min_confidence,
-                    openai_max_tokens=settings.llm_openai_max_tokens,
-                )
+                # PERFORMANCE FIX (Issue #1): Use singleton HybridLLMExecutor from app.state
+                # Previously this was instantiated per-request, adding 0.1-0.5s overhead each time
+                hybrid_executor = getattr(app.state, 'hybrid_executor', None)
+                if hybrid_executor is None:
+                    # Fallback: create new executor if not initialized at startup (shouldn't happen)
+                    logger.warning("[VULCAN] Creating HybridLLMExecutor per-request (startup init may have failed)")
+                    hybrid_executor = HybridLLMExecutor(
+                        local_llm=llm,
+                        openai_client_getter=get_openai_client,
+                        mode=settings.llm_execution_mode,
+                        timeout=settings.llm_parallel_timeout,
+                        ensemble_min_confidence=settings.llm_ensemble_min_confidence,
+                        openai_max_tokens=settings.llm_openai_max_tokens,
+                    )
 
                 try:
                     # Build system prompt that emphasizes using reasoning output AND conversation memory
