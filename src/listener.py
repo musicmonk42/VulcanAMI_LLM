@@ -1587,8 +1587,10 @@ class GraphixListener:
                 # per-query reinitialization. This function handles fallback
                 # internally and registers any new instance with the singleton.
                 runtime_initialized = False
+                set_runtime_func = None
                 try:
                     from vulcan.reasoning.singletons import get_or_create_unified_runtime, set_unified_runtime
+                    set_runtime_func = set_unified_runtime
                     self.runtime = get_or_create_unified_runtime()
                     if self.runtime is not None:
                         runtime_initialized = True
@@ -1601,11 +1603,13 @@ class GraphixListener:
                         self.runtime = FullUnifiedRuntime()
                         # BUG FIX Issue #1: Register fallback instance with singleton
                         # to prevent future duplicate instances
-                        try:
-                            from vulcan.reasoning.singletons import set_unified_runtime
-                            set_unified_runtime(self.runtime)
-                            logger.info("Using full UnifiedRuntime (registered with singleton)")
-                        except ImportError:
+                        if set_runtime_func is not None:
+                            try:
+                                set_runtime_func(self.runtime)
+                                logger.info("Using full UnifiedRuntime (registered with singleton)")
+                            except Exception:
+                                logger.info("Using full UnifiedRuntime from src.unified_runtime")
+                        else:
                             logger.info("Using full UnifiedRuntime from src.unified_runtime")
                     except Exception as e:
                         logger.warning(f"Failed to initialize full UnifiedRuntime: {e}")

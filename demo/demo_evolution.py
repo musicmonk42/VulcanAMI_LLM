@@ -193,7 +193,10 @@ class EvolutionDemo:
             self.runtime = get_or_create_unified_runtime()
             if self.runtime is None:
                 self.runtime = UnifiedRuntime()
-                set_unified_runtime(self.runtime)
+                try:
+                    set_unified_runtime(self.runtime)
+                except Exception:
+                    pass  # Continue even if registration fails
         except ImportError:
             self.runtime = UnifiedRuntime()
         self.logger.info("UnifiedRuntime initialized")
