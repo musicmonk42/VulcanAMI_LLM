@@ -46,11 +46,19 @@ except ImportError as e:
     GRAPHIX_LLM_AVAILABLE = False
 
 try:
-    from vulcan.llm.hybrid_executor import HybridLLMExecutor
+    from vulcan.llm.hybrid_executor import (
+        HybridLLMExecutor,
+        get_or_create_hybrid_executor,
+        get_hybrid_executor,
+        set_hybrid_executor,
+    )
 except ImportError as e:
     logger.warning(f"hybrid_executor module not available: {e}")
     _imports_successful = False
     HybridLLMExecutor = None
+    get_or_create_hybrid_executor = None
+    get_hybrid_executor = None
+    set_hybrid_executor = None
 
 try:
     from vulcan.llm.openai_client import (
@@ -82,6 +90,9 @@ __all__ = [
     "GRAPHIX_LLM_AVAILABLE",
     # Hybrid Executor
     "HybridLLMExecutor",
+    "get_or_create_hybrid_executor",
+    "get_hybrid_executor",
+    "set_hybrid_executor",
     # OpenAI Client
     "get_openai_client",
     "get_openai_init_error",
