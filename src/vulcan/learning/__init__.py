@@ -78,6 +78,17 @@ except ImportError:
     LearningStatePersistence = None
     logger.warning("LearningStatePersistence not available - learning state will not persist")
 
+# BUG FIX: Import shared weight manager for propagating learned weights to Ensemble
+# Without this, the learning system updates weights in its own dictionary,
+# but the reasoning ensemble reads from a separate ToolWeightManager instance.
+try:
+    from ..reasoning.unified_reasoning import get_weight_manager
+    WEIGHT_MANAGER_AVAILABLE = True
+except ImportError:
+    WEIGHT_MANAGER_AVAILABLE = False
+    get_weight_manager = None
+    logger.warning("ToolWeightManager not available - learned weights won't propagate to ensemble")
+
 # Import torch-dependent components conditionally
 if TORCH_AVAILABLE:
     try:
@@ -206,6 +217,16 @@ class UnifiedLearningSystem:
                         f"[Learning] Loaded {len(persisted_weights)} tool weights from disk: "
                         f"{persisted_weights}"
                     )
+                    
+                    # BUG FIX: Propagate persisted weights to shared ToolWeightManager at startup
+                    # This ensures the ensemble uses learned weights from previous sessions
+                    if WEIGHT_MANAGER_AVAILABLE and get_weight_manager:
+                        try:
+                            for tool, adjustment in persisted_weights.items():
+                                get_weight_manager().set_weight(tool, 1.0 + adjustment)
+                            logger.info(f"[Learning] Propagated {len(persisted_weights)} persisted weights to ToolWeightManager")
+                        except Exception as e:
+                            logger.warning(f"[Learning] Failed to propagate persisted weights: {e}")
             except Exception as e:
                 logger.warning(f"[Learning] Failed to initialize persistence: {e}")
                 self._learning_persistence = None
@@ -358,6 +379,17 @@ class UnifiedLearningSystem:
                         )
                     else:
                         logger.info(f"[Learning] Tool '{tool}' weight adjustment: {weight_delta:+.3f} (cumulative: {self.tool_weight_adjustments[tool]:+.3f})")
+                    
+                    # BUG FIX: Propagate weight to shared ToolWeightManager so Ensemble can use it
+                    # Previously, learning updated its own dictionary but Ensemble read from a separate
+                    # ToolWeightManager instance, so learned weights were never applied.
+                    if WEIGHT_MANAGER_AVAILABLE and get_weight_manager:
+                        try:
+                            # Use absolute weight (1.0 + adjustment) since ToolWeightManager expects base weight
+                            get_weight_manager().set_weight(tool, 1.0 + self.tool_weight_adjustments[tool])
+                            logger.debug(f"[Learning] Propagated weight to ToolWeightManager: {tool} = {1.0 + self.tool_weight_adjustments[tool]:.4f}")
+                        except Exception as e:
+                            logger.warning(f"[Learning] Failed to propagate weight to ToolWeightManager: {e}")
                 
                 # PERSISTENCE FIX: Save tool weights to disk after every update
                 # This ensures learning state persists across queries and server restarts
