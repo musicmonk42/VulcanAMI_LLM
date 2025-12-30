@@ -1036,7 +1036,7 @@
                         <label for="enableStreaming">Streaming</label>
                     </div>
                     <div class="toggle-item">
-                        <input type="checkbox" id="enableDistillation" checked>
+                        <input type="checkbox" id="enableDistillation">
                         <label for="enableDistillation">Allow Training</label>
                     </div>
                 </div>
@@ -1149,7 +1149,7 @@
             planning: true,
             causal: true,
             streaming: false,  // Disabled by default since many APIs don't support it
-            distillation: true  // User consent for training data collection
+            distillation: false  // Opt-in for privacy compliance - user must explicitly enable
         };
 
         // Configure marked for markdown rendering
