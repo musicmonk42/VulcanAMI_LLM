@@ -1583,11 +1583,15 @@ class GraphixListener:
 
             # Initialize runtime - prefer full implementation if available
             if FULL_RUNTIME_AVAILABLE:
-                # Use singleton to prevent per-query reinitialization
+                # BUG FIX Issue #1: Use get_or_create_unified_runtime to prevent
+                # per-query reinitialization. This function handles fallback
+                # internally and registers any new instance with the singleton.
                 runtime_initialized = False
+                set_runtime_func = None
                 try:
-                    from vulcan.reasoning.singletons import get_unified_runtime
-                    self.runtime = get_unified_runtime()
+                    from vulcan.reasoning.singletons import get_or_create_unified_runtime, set_unified_runtime
+                    set_runtime_func = set_unified_runtime
+                    self.runtime = get_or_create_unified_runtime()
                     if self.runtime is not None:
                         runtime_initialized = True
                         logger.info("Using full UnifiedRuntime from singleton")
@@ -1597,7 +1601,16 @@ class GraphixListener:
                 if not runtime_initialized:
                     try:
                         self.runtime = FullUnifiedRuntime()
-                        logger.info("Using full UnifiedRuntime from src.unified_runtime")
+                        # BUG FIX Issue #1: Register fallback instance with singleton
+                        # to prevent future duplicate instances
+                        if set_runtime_func is not None:
+                            try:
+                                set_runtime_func(self.runtime)
+                                logger.info("Using full UnifiedRuntime (registered with singleton)")
+                            except Exception:
+                                logger.info("Using full UnifiedRuntime from src.unified_runtime")
+                        else:
+                            logger.info("Using full UnifiedRuntime from src.unified_runtime")
                     except Exception as e:
                         logger.warning(f"Failed to initialize full UnifiedRuntime: {e}")
                         self.runtime = ListenerGraphRuntime(db_path=db_path)

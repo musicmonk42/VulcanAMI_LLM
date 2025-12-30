@@ -1050,12 +1050,113 @@ class HybridLLMExecutor:
 
 
 # ============================================================
+# SINGLETON MANAGEMENT FOR HYBRID LLM EXECUTOR
+# ============================================================
+# This ensures the HybridLLMExecutor is only created once per process,
+# preventing repeated initialization overhead and ensuring consistent state.
+
+_hybrid_executor_instance: Optional["HybridLLMExecutor"] = None
+_hybrid_executor_lock = threading.Lock()
+
+
+def get_or_create_hybrid_executor(
+    local_llm: Optional[Any] = None,
+    openai_client_getter: Optional[Callable] = None,
+    mode: str = "parallel",
+    timeout: float = 30.0,
+    ensemble_min_confidence: float = 0.7,
+    openai_max_tokens: int = 2000,
+    enable_openai_cache: bool = True,
+    force_new: bool = False,
+) -> "HybridLLMExecutor":
+    """
+    Get or create a singleton HybridLLMExecutor instance.
+    
+    This ensures only one executor exists per process, preventing:
+    - Repeated initialization overhead (~0.5s per request)
+    - Lost cache state between requests
+    - Inconsistent configuration
+    
+    Args:
+        local_llm: Vulcan's local LLM instance (only used on first creation)
+        openai_client_getter: Function to get OpenAI client (only used on first creation)
+        mode: Execution mode (only used on first creation unless force_new)
+        timeout: Timeout for parallel/ensemble execution (only used on first creation)
+        ensemble_min_confidence: Minimum confidence for ensemble selection
+        openai_max_tokens: Maximum tokens for OpenAI API calls
+        enable_openai_cache: Enable caching of OpenAI responses
+        force_new: If True, create a new instance even if one exists (for testing)
+        
+    Returns:
+        The singleton HybridLLMExecutor instance
+        
+    Example:
+        # First call creates the instance
+        executor = get_or_create_hybrid_executor(local_llm=my_llm, mode="parallel")
+        
+        # Subsequent calls return the same instance
+        executor2 = get_or_create_hybrid_executor()
+        assert executor is executor2
+    """
+    global _hybrid_executor_instance
+    
+    with _hybrid_executor_lock:
+        if _hybrid_executor_instance is not None and not force_new:
+            # Return existing instance
+            logger.debug("[HybridExecutor] Returning cached singleton instance")
+            return _hybrid_executor_instance
+        
+        # Create new instance
+        logger.info(f"[HybridExecutor] Creating singleton instance (mode={mode})")
+        _hybrid_executor_instance = HybridLLMExecutor(
+            local_llm=local_llm,
+            openai_client_getter=openai_client_getter,
+            mode=mode,
+            timeout=timeout,
+            ensemble_min_confidence=ensemble_min_confidence,
+            openai_max_tokens=openai_max_tokens,
+            enable_openai_cache=enable_openai_cache,
+        )
+        logger.info(f"[HybridExecutor] ✓ Singleton instance created successfully")
+        return _hybrid_executor_instance
+
+
+def get_hybrid_executor() -> Optional["HybridLLMExecutor"]:
+    """
+    Get the existing HybridLLMExecutor singleton without creating a new one.
+    
+    Returns:
+        The singleton instance if it exists, None otherwise
+    """
+    return _hybrid_executor_instance
+
+
+def set_hybrid_executor(executor: "HybridLLMExecutor") -> None:
+    """
+    Set the HybridLLMExecutor singleton instance.
+    
+    This is useful when the executor is created elsewhere (e.g., app startup)
+    and needs to be registered with the singleton.
+    
+    Args:
+        executor: The HybridLLMExecutor instance to set as singleton
+    """
+    global _hybrid_executor_instance
+    with _hybrid_executor_lock:
+        _hybrid_executor_instance = executor
+        logger.info("[HybridExecutor] Singleton instance registered externally")
+
+
+# ============================================================
 # MODULE EXPORTS
 # ============================================================
 
 __all__ = [
     "HybridLLMExecutor",
     "OpenAIResponseCache",
+    "get_or_create_hybrid_executor",
+    "get_hybrid_executor",
+    "set_hybrid_executor",
 ]
 
 

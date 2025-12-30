@@ -53,8 +53,9 @@ def mock_compiler():
 @pytest.fixture
 def executor(mock_runtime, temp_cache_dir, mock_compiler):
     """Create HybridExecutor instance with mocked compiler."""
-    # Patch the GraphCompiler import at the correct location
-    with patch("src.compiler.graph_compiler.GraphCompiler", return_value=mock_compiler):
+    # Patch the GraphCompiler import at the location where it's used
+    # The import happens inside _init_compiler method in src/compiler/hybrid_executor.py
+    with patch.dict('sys.modules', {'src.compiler.graph_compiler': MagicMock(GraphCompiler=MagicMock(return_value=mock_compiler))}):
         executor = HybridExecutor(
             runtime=mock_runtime,
             cache_dir=temp_cache_dir,
@@ -232,7 +233,7 @@ class TestHybridExecutorInitialization:
 
     def test_initialization_basic(self, mock_runtime, temp_cache_dir):
         """Test basic initialization."""
-        with patch("src.compiler.graph_compiler.GraphCompiler"):
+        with patch.dict('sys.modules', {'src.compiler.graph_compiler': MagicMock(GraphCompiler=MagicMock())}):
             executor = HybridExecutor(runtime=mock_runtime, cache_dir=temp_cache_dir)
 
         assert executor.runtime == mock_runtime
@@ -240,7 +241,7 @@ class TestHybridExecutorInitialization:
 
     def test_initialization_custom_params(self, mock_runtime, temp_cache_dir):
         """Test initialization with custom parameters."""
-        with patch("src.compiler.graph_compiler.GraphCompiler"):
+        with patch.dict('sys.modules', {'src.compiler.graph_compiler': MagicMock(GraphCompiler=MagicMock())}):
             executor = HybridExecutor(
                 runtime=mock_runtime,
                 cache_dir=temp_cache_dir,
@@ -452,9 +453,7 @@ class TestCleanup:
 
     def test_cleanup_in_destructor(self, mock_runtime, temp_cache_dir, mock_compiler):
         """Test cleanup in destructor."""
-        with patch(
-            "src.compiler.graph_compiler.GraphCompiler", return_value=mock_compiler
-        ):
+        with patch.dict('sys.modules', {'src.compiler.graph_compiler': MagicMock(GraphCompiler=MagicMock(return_value=mock_compiler))}):
             executor = HybridExecutor(runtime=mock_runtime, cache_dir=temp_cache_dir)
 
             # Should not raise

@@ -171,6 +171,9 @@ from vulcan.llm import (
     MockGraphixVulcanLLM,
     GraphixVulcanLLM,
     HybridLLMExecutor,
+    get_or_create_hybrid_executor,
+    get_hybrid_executor,
+    set_hybrid_executor,
     get_openai_client,
     get_openai_init_error,
     OPENAI_AVAILABLE,
@@ -587,8 +590,10 @@ async def lifespan(app: FastAPI):
         # BUG FIX Issue #27: Use singleton UnifiedRuntime to prevent manifest reload per-query
         if UNIFIED_RUNTIME_AVAILABLE:
             # ISSUE #5 FIX: Use get_or_create_unified_runtime to prevent repeated init/shutdown
+            set_runtime_func = None
             try:
-                from vulcan.reasoning.singletons import get_or_create_unified_runtime
+                from vulcan.reasoning.singletons import get_or_create_unified_runtime, set_unified_runtime
+                set_runtime_func = set_unified_runtime
                 deployment.unified_runtime = get_or_create_unified_runtime()
                 if deployment.unified_runtime:
                     logger.info("✓ UnifiedRuntime initialized via singleton")
@@ -596,7 +601,13 @@ async def lifespan(app: FastAPI):
                     logger.warning("UnifiedRuntime not available")
             except ImportError:
                 deployment.unified_runtime = UnifiedRuntime()
-                logger.info("✓ UnifiedRuntime initialized directly")
+                # BUG FIX Issue #1: Register fallback instance with singleton
+                if set_runtime_func is not None:
+                    try:
+                        set_runtime_func(deployment.unified_runtime)
+                    except Exception:
+                        pass
+                logger.info("✓ UnifiedRuntime initialized directly (registered with singleton)")
 
         # Initialize LLM component
         llm_instance = initialize_component(
@@ -606,9 +617,9 @@ async def lifespan(app: FastAPI):
 
         # PERFORMANCE FIX (Issue #1): Initialize HybridLLMExecutor ONCE at startup
         # Previously this was instantiated per-request, adding ~0.5s overhead each time
-        # Now we create a singleton instance that's reused across all requests
+        # Now we use a module-level singleton that persists across all requests
         try:
-            app.state.hybrid_executor = HybridLLMExecutor(
+            app.state.hybrid_executor = get_or_create_hybrid_executor(
                 local_llm=llm_instance,
                 openai_client_getter=get_openai_client,
                 mode=settings.llm_execution_mode,
@@ -3294,13 +3305,16 @@ Based on your analysis through memory retrieval, multi-modal reasoning, causal m
     # Get local LLM if available
     local_llm = app.state.llm if hasattr(app.state, "llm") else None
 
-    # PERFORMANCE FIX (Issue #1): Use singleton HybridLLMExecutor from app.state
-    # Previously this was instantiated per-request, adding ~0.5s overhead each time
-    hybrid_executor = app.state.hybrid_executor if hasattr(app.state, 'hybrid_executor') else None
+    # PERFORMANCE FIX (Issue #1): Use singleton HybridLLMExecutor
+    # First try app.state, then fall back to module-level singleton
+    hybrid_executor = getattr(app.state, 'hybrid_executor', None)
     if hybrid_executor is None:
-        # Fallback: create new executor if not initialized at startup (shouldn't happen)
-        logger.warning("[VULCAN] Creating HybridLLMExecutor per-request (startup init may have failed)")
-        hybrid_executor = HybridLLMExecutor(
+        # Try module-level singleton (may have been initialized elsewhere)
+        hybrid_executor = get_hybrid_executor()
+    if hybrid_executor is None:
+        # Final fallback: create via singleton (will be cached for future requests)
+        logger.warning("[VULCAN] Creating HybridLLMExecutor via singleton (startup init may have failed)")
+        hybrid_executor = get_or_create_hybrid_executor(
             local_llm=local_llm,
             openai_client_getter=get_openai_client,
             mode=settings.llm_execution_mode,
@@ -5203,13 +5217,16 @@ User Query: {user_message}
 
 Provide a helpful, accurate, and comprehensive response to the user's query. Be concise but thorough."""
 
-                # PERFORMANCE FIX (Issue #1): Use singleton HybridLLMExecutor from app.state
-                # Previously this was instantiated per-request, adding ~0.5s overhead each time
-                hybrid_executor = app.state.hybrid_executor if hasattr(app.state, 'hybrid_executor') else None
+                # PERFORMANCE FIX (Issue #1): Use singleton HybridLLMExecutor
+                # First try app.state, then fall back to module-level singleton
+                hybrid_executor = getattr(app.state, 'hybrid_executor', None)
                 if hybrid_executor is None:
-                    # Fallback: create new executor if not initialized at startup (shouldn't happen)
-                    logger.warning("[VULCAN] Creating HybridLLMExecutor per-request (startup init may have failed)")
-                    hybrid_executor = HybridLLMExecutor(
+                    # Try module-level singleton (may have been initialized elsewhere)
+                    hybrid_executor = get_hybrid_executor()
+                if hybrid_executor is None:
+                    # Final fallback: create via singleton (will be cached for future requests)
+                    logger.warning("[VULCAN] Creating HybridLLMExecutor via singleton (startup init may have failed)")
+                    hybrid_executor = get_or_create_hybrid_executor(
                         local_llm=llm,
                         openai_client_getter=get_openai_client,
                         mode=settings.llm_execution_mode,
