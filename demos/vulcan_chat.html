@@ -1771,8 +1771,7 @@
             
             const timeoutPromise = new Promise((_, reject) => {
                 timeoutId = setTimeout(() => {
-                    timeoutId = null;  // Mark as fired
-                    reject(new TimeoutError(`Request timeout after ${timeout/1000}s - backend may be overloaded`));
+                    reject(new TimeoutError(`Request timeout after ${Math.floor(timeout/1000)}s - backend may be overloaded`));
                 }, timeout);
             });
             
@@ -1791,6 +1790,8 @@
         }
 
         // Message Sending
+        let thinkingTimerElement = null;  // Store element reference for timer updates
+        
         function showThinking() {
             const box = document.getElementById('messages');
             const div = document.createElement('div');
@@ -1808,18 +1809,20 @@
             box.appendChild(div);
             box.scrollTop = box.scrollHeight;
             
+            // Store element reference for timer updates
+            thinkingTimerElement = document.getElementById('thinkingTimer');
+            
             // Start the timer (updates every 1s since we only display seconds)
             thinkingStartTime = Date.now();
             thinkingTimer = setInterval(() => {
-                const timerEl = document.getElementById('thinkingTimer');
-                if (!timerEl) {
+                if (!thinkingTimerElement) {
                     // Element removed, stop the timer
                     clearInterval(thinkingTimer);
                     thinkingTimer = null;
                     return;
                 }
                 const elapsed = Math.floor((Date.now() - thinkingStartTime) / 1000);
-                timerEl.textContent = `${elapsed}s`;
+                thinkingTimerElement.textContent = `${elapsed}s`;
             }, 1000);
         }
 
@@ -1830,6 +1833,7 @@
                 thinkingTimer = null;
             }
             thinkingStartTime = null;
+            thinkingTimerElement = null;  // Clear element reference
             
             const el = document.getElementById('thinking');
             if (el) el.remove();
