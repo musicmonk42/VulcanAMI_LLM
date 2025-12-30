@@ -289,6 +289,9 @@ services:
       - VULCAN_SELF_IMPROVEMENT_AUTO_COMMIT=${VULCAN_SELF_IMPROVEMENT_AUTO_COMMIT:-false}
       # Gap give-up threshold increased from 3 to 10
       - VULCAN_GAP_GIVEUP_THRESHOLD=${VULCAN_GAP_GIVEUP_THRESHOLD:-10}
+      # Semantic matching configuration (EMERGENCY FIX for Embedding Bottleneck)
+      # Disable slow semantic matching (default: 1 = disabled for fast routing)
+      - VULCAN_DISABLE_SEMANTIC_MATCHING=${VULCAN_DISABLE_SEMANTIC_MATCHING:-1}
       # Vulcan Memory System (v46) Configuration
       - MILVUS_HOST=milvus
       - MILVUS_PORT=19530
