@@ -1035,7 +1035,19 @@
                         <input type="checkbox" id="enableStreaming" checked>
                         <label for="enableStreaming">Streaming</label>
                     </div>
+                    <div class="toggle-item">
+                        <input type="checkbox" id="enableDistillation">
+                        <label for="enableDistillation">Allow Training</label>
+                    </div>
                 </div>
+            </div>
+            
+            <div class="setting-group">
+                <label>Privacy Notice</label>
+                <p style="font-size: 0.85em; color: var(--text-tertiary); margin-top: 8px;">
+                    When "Allow Training" is enabled, your conversations may be used to improve the AI model. 
+                    No personally identifiable information is stored. You can disable this at any time.
+                </p>
             </div>
             
             <div class="shortcuts-help">
@@ -1136,7 +1148,8 @@
             safety: true,
             planning: true,
             causal: true,
-            streaming: false  // Disabled by default since many APIs don't support it
+            streaming: false,  // Disabled by default since many APIs don't support it
+            distillation: false  // Opt-in for privacy compliance - user must explicitly enable
         };
 
         // Configure marked for markdown rendering
@@ -1208,6 +1221,7 @@
             document.getElementById('enablePlanning').checked = systemToggles.planning;
             document.getElementById('enableCausal').checked = systemToggles.causal;
             document.getElementById('enableStreaming').checked = systemToggles.streaming;
+            document.getElementById('enableDistillation').checked = systemToggles.distillation;
         }
 
         function saveSettings() {
@@ -1245,6 +1259,7 @@
             systemToggles.planning = document.getElementById('enablePlanning').checked;
             systemToggles.causal = document.getElementById('enableCausal').checked;
             systemToggles.streaming = document.getElementById('enableStreaming').checked;
+            systemToggles.distillation = document.getElementById('enableDistillation').checked;
             
             saveSettings();
             closeSettings();
@@ -1838,6 +1853,8 @@
                     enable_safety: systemToggles.safety,
                     enable_planning: systemToggles.planning,
                     enable_causal: systemToggles.causal,
+                    user_opted_in: systemToggles.distillation,  // User consent for distillation/training
+                    enable_distillation: systemToggles.distillation,  // Alternative name for backend compatibility
                     history: history.slice(-10).map(h => ({ role: h.role, content: h.content }))
                 };
                 

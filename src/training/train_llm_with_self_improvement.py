@@ -87,6 +87,14 @@ except Exception:
         compute_loss_metrics_train,
     )
 
+# Distillation storage import (optional - for knowledge distillation training)
+try:
+    from vulcan.distillation.storage import DistillationStorageBackend
+    DISTILLATION_AVAILABLE = True
+except ImportError:
+    DISTILLATION_AVAILABLE = False
+    DistillationStorageBackend = None
+
 TRAINER_VERSION = "v2-normalized-2025-11-18"
 
 # ============================= Optional Drift Detection Helper ============================= #
@@ -208,6 +216,106 @@ def _calc_val_loss(
         total_valid += m.valid_tokens
     model.train()
     return total_loss_sum / max(total_valid, 1)
+
+
+# ============================= Distillation Training Helper ============================= #
+
+
+def load_distillation_batch(
+    storage: "DistillationStorageBackend",
+    tokenizer: Any,
+    batch_size: int,
+    seq_len: int,
+    device: str = "cpu",
+) -> Optional[Dict[str, torch.Tensor]]:
+    """
+    Load batch from distillation storage and convert to training format.
+    
+    This function reads examples captured from OpenAI by the knowledge distiller
+    and converts them into the format expected by the training loop.
+    
+    Args:
+        storage: DistillationStorageBackend instance
+        tokenizer: Tokenizer instance with encode() and eos_token_id
+        batch_size: Number of examples to load
+        seq_len: Sequence length for training
+        device: Device to place tensors on
+        
+    Returns:
+        Dictionary with X (inputs), Y (targets), source="distillation", or None if no examples
+    """
+    if storage is None:
+        return None
+    
+    # Read examples from storage (non-destructive read)
+    try:
+        examples = storage.read_batch(batch_size)
+    except AttributeError:
+        # Fallback: try read_and_clear if read_batch not available
+        try:
+            examples = storage.read_and_clear(batch_size)
+        except Exception:
+            return None
+    
+    if not examples:
+        return None
+    
+    print(f"[DISTILL] Loaded {len(examples)} examples from distillation storage")
+    
+    # Convert to training format
+    all_tokens = []
+    
+    # Validate tokenizer has required method
+    has_proper_tokenizer = hasattr(tokenizer, 'encode') and callable(getattr(tokenizer, 'encode'))
+    if not has_proper_tokenizer:
+        logger.warning(
+            "[DISTILL] No proper tokenizer available. Distillation training requires "
+            "a tokenizer with an encode() method for quality training. Skipping batch."
+        )
+        return None
+    
+    for ex in examples:
+        # Combine instruction and teacher answer with structured format
+        instruction = ex.get("instruction", ex.get("prompt", ""))
+        answer = ex.get("teacher_answer", ex.get("response", ex.get("answer", "")))
+        
+        if not instruction or not answer:
+            continue
+        
+        # Use structured format with clear delimiters for better training signal
+        # This format helps the model learn the instruction-following pattern
+        combined = f"### Instruction:\n{instruction}\n\n### Response:\n{answer}"
+        
+        # Tokenize using the validated tokenizer
+        try:
+            tokens = tokenizer.encode(combined)
+        except Exception as e:
+            logger.warning(f"[DISTILL] Tokenization failed for example: {e}")
+            continue
+        
+        # Get EOS token with multiple fallbacks
+        eos_id = getattr(tokenizer, 'eos_token_id', getattr(tokenizer, 'eos_id', 0))
+        
+        # Pad or truncate to seq_len + 1 (need extra token for target)
+        if len(tokens) >= seq_len + 1:
+            tokens = tokens[:seq_len + 1]
+        else:
+            pad_len = seq_len + 1 - len(tokens)
+            tokens = tokens + [eos_id] * pad_len
+        
+        all_tokens.append(tokens)
+    
+    if not all_tokens:
+        return None
+    
+    # Convert to tensor
+    batch_tensor = torch.tensor(all_tokens, dtype=torch.long, device=device)
+    
+    # Split into inputs and targets (next-token prediction)
+    X = batch_tensor[:, :-1]  # [batch_size, seq_len]
+    Y = batch_tensor[:, 1:]   # [batch_size, seq_len]
+    
+    return {"X": X, "Y": Y, "source": "distillation", "count": len(all_tokens)}
 
 
 def _compute_awareness(
@@ -746,6 +854,85 @@ def run(args: argparse.Namespace) -> None:
             except Exception as e:
                 print(f"[TRAIN-LOG] Write failed: {e}")
 
+        # ==================== DISTILLATION TRAINING ==================== #
+        # Check for distillation examples periodically
+        if args.distillation_storage and step % args.distillation_interval == 0:
+            try:
+                # Initialize distillation storage if not done
+                if not hasattr(run, '_distill_storage'):
+                    if DISTILLATION_AVAILABLE:
+                        run._distill_storage = DistillationStorageBackend(
+                            storage_path=args.distillation_storage
+                        )
+                        print(f"[DISTILL] Storage initialized: {args.distillation_storage}")
+                    else:
+                        print("[DISTILL] WARNING: Distillation module not available")
+                        run._distill_storage = None
+                
+                if run._distill_storage is not None:
+                    # Try to load a batch from distillation storage
+                    # Note: CorpusDataLoader is passed as tokenizer. The load_distillation_batch
+                    # function handles cases where encode/eos_id may not exist via fallbacks.
+                    distill_batch = load_distillation_batch(
+                        storage=run._distill_storage,
+                        tokenizer=loader,
+                        batch_size=args.batch_size,
+                        seq_len=seq_len,
+                        device=device,
+                    )
+                    
+                    if distill_batch is not None:
+                        X = distill_batch["X"]
+                        Y = distill_batch["Y"]
+                        
+                        # Forward pass
+                        model.train()
+                        optimizer.zero_grad()
+                        logits = model.forward(X)
+                        
+                        # Compute loss (same as regular training)
+                        distill_m: LossMetrics = compute_loss_metrics_train(
+                            logits=logits,
+                            targets=Y,
+                            ignore_index=None,
+                        )
+                        distill_loss = distill_m.loss_per_token
+                        
+                        # Backward and optimize
+                        distill_loss.backward()
+                        
+                        if grad_clip and grad_clip > 0:
+                            nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
+                        
+                        optimizer.step()
+                        
+                        print(
+                            f"[DISTILL] step={step} "
+                            f"loss={distill_loss.item():.4f} "
+                            f"ppl~{math.exp(min(distill_loss.item(), 100.0)):.2f} "
+                            f"examples={distill_batch['count']} "
+                            f"source=openai_distillation"
+                        )
+                        
+                        # Log distillation step
+                        if args.train_log_interval > 0:
+                            distill_entry = {
+                                "step": step,
+                                "loss": float(distill_loss.item()),
+                                "source": "openai_distillation",
+                                "examples": distill_batch["count"],
+                                "timestamp": time.time(),
+                            }
+                            try:
+                                with open(training_log_path, "a", encoding="utf-8") as f:
+                                    f.write(json.dumps(distill_entry) + "\n")
+                            except Exception:
+                                pass
+                
+            except Exception as e:
+                print(f"[DISTILL] Training from distillation failed at step {step}: {e}")
+        # ================ END DISTILLATION TRAINING ================== #
+
     elapsed = time.time() - start_time
     sps = (applied_updates) / elapsed if elapsed > 0 else 0.0
     print(
@@ -854,6 +1041,21 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--resume-optim", type=str, default="")
     p.add_argument("--resume-meta", type=str, default="")
     p.add_argument("--override-lr", action="store_true", default=False)
+
+    # Knowledge distillation training
+    p.add_argument(
+        "--distillation-storage",
+        type=str,
+        default="",
+        help="Path to distillation storage directory for knowledge distillation training. "
+             "When set, trainer will periodically check for captured OpenAI examples."
+    )
+    p.add_argument(
+        "--distillation-interval",
+        type=int,
+        default=10,
+        help="Check distillation storage every N training steps (default: 10)"
+    )
 
     return p
 
