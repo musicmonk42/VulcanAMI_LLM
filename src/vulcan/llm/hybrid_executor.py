@@ -540,6 +540,11 @@ class HybridLLMExecutor:
                         role = msg.get("role", "").lower()
                         content = msg.get("content", "")
                         
+                        # Skip messages with empty or whitespace-only content
+                        # to avoid issues with OpenAI API
+                        if not content or not content.strip():
+                            continue
+                        
                         # Map roles to OpenAI-compatible roles
                         if role in ("user", "human"):
                             messages.append({"role": "user", "content": content})
