@@ -3339,6 +3339,58 @@ async def v1_chat_proxy(request: Request):
 # instead of /vulcan/v1/feedback/thumbs.
 # =============================================================================
 
+# Cache the VULCAN module to avoid repeated imports
+_vulcan_module_cache = None
+
+
+def _get_vulcan_module():
+    """
+    Get the VULCAN module, using a cached version if available.
+    
+    Returns:
+        tuple: (module, error_response) - module if successful, None and JSONResponse if not
+    """
+    global _vulcan_module_cache
+    
+    # Return cached module if available and still valid
+    if _vulcan_module_cache is not None:
+        return _vulcan_module_cache, None
+    
+    try:
+        vulcan_module = importlib.import_module("src.vulcan.main")
+        if not hasattr(vulcan_module, "app"):
+            return None, JSONResponse(
+                status_code=503,
+                content={"error": "VULCAN module not available"}
+            )
+        _vulcan_module_cache = vulcan_module
+        return vulcan_module, None
+    except ImportError as e:
+        logger.error(f"Failed to import VULCAN module: {e}")
+        return None, JSONResponse(
+            status_code=503,
+            content={"error": "VULCAN module unavailable", "detail": str(e)}
+        )
+
+
+def _check_vulcan_deployment(vulcan_module):
+    """
+    Check if the VULCAN deployment is initialized.
+    
+    Returns:
+        JSONResponse or None: error response if not initialized, None if OK
+    """
+    if not hasattr(vulcan_module.app, "state") or not hasattr(vulcan_module.app.state, "deployment"):
+        return JSONResponse(
+            status_code=503,
+            content={
+                "error": "VULCAN not initialized",
+                "detail": "The VULCAN deployment has not been initialized yet."
+            }
+        )
+    return None
+
+
 @app.post("/v1/feedback/thumbs")
 async def v1_feedback_thumbs_proxy(request: Request):
     """
@@ -3357,25 +3409,15 @@ async def v1_feedback_thumbs_proxy(request: Request):
         )
     
     try:
-        # Import VULCAN's feedback handler
-        vulcan_module = importlib.import_module("src.vulcan.main")
-        if not hasattr(vulcan_module, "app"):
-            return JSONResponse(
-                status_code=503,
-                content={"error": "VULCAN module not available"}
-            )
-        
-        vulcan_app = vulcan_module.app
+        # Get VULCAN module (cached)
+        vulcan_module, error_response = _get_vulcan_module()
+        if error_response:
+            return error_response
         
         # Check if deployment is initialized
-        if not hasattr(vulcan_app.state, "deployment"):
-            return JSONResponse(
-                status_code=503,
-                content={
-                    "error": "VULCAN not initialized",
-                    "detail": "The VULCAN deployment has not been initialized yet."
-                }
-            )
+        deployment_error = _check_vulcan_deployment(vulcan_module)
+        if deployment_error:
+            return deployment_error
         
         # Import the handler and request model
         try:
@@ -3425,25 +3467,15 @@ async def v1_feedback_proxy(request: Request):
         )
     
     try:
-        # Import VULCAN's feedback handler
-        vulcan_module = importlib.import_module("src.vulcan.main")
-        if not hasattr(vulcan_module, "app"):
-            return JSONResponse(
-                status_code=503,
-                content={"error": "VULCAN module not available"}
-            )
-        
-        vulcan_app = vulcan_module.app
+        # Get VULCAN module (cached)
+        vulcan_module, error_response = _get_vulcan_module()
+        if error_response:
+            return error_response
         
         # Check if deployment is initialized
-        if not hasattr(vulcan_app.state, "deployment"):
-            return JSONResponse(
-                status_code=503,
-                content={
-                    "error": "VULCAN not initialized",
-                    "detail": "The VULCAN deployment has not been initialized yet."
-                }
-            )
+        deployment_error = _check_vulcan_deployment(vulcan_module)
+        if deployment_error:
+            return deployment_error
         
         # Import the handler and request model
         try:
@@ -3484,25 +3516,15 @@ async def v1_feedback_stats_proxy():
     This forwards feedback stats requests to VULCAN's /v1/feedback/stats endpoint.
     """
     try:
-        # Import VULCAN's feedback stats handler
-        vulcan_module = importlib.import_module("src.vulcan.main")
-        if not hasattr(vulcan_module, "app"):
-            return JSONResponse(
-                status_code=503,
-                content={"error": "VULCAN module not available"}
-            )
-        
-        vulcan_app = vulcan_module.app
+        # Get VULCAN module (cached)
+        vulcan_module, error_response = _get_vulcan_module()
+        if error_response:
+            return error_response
         
         # Check if deployment is initialized
-        if not hasattr(vulcan_app.state, "deployment"):
-            return JSONResponse(
-                status_code=503,
-                content={
-                    "error": "VULCAN not initialized",
-                    "detail": "The VULCAN deployment has not been initialized yet."
-                }
-            )
+        deployment_error = _check_vulcan_deployment(vulcan_module)
+        if deployment_error:
+            return deployment_error
         
         # Import the handler
         try:
