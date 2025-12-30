@@ -44,6 +44,7 @@ _unified_runtime: Optional[Any] = None
 _ai_runtime: Optional[Any] = None
 _multimodal_engine: Optional[Any] = None
 _unified_reasoner: Optional[Any] = None  # BUG FIX: Add singleton for UnifiedReasoner
+_math_verification_engine: Optional[Any] = None  # CACHING FIX: Singleton for MathematicalVerificationEngine
 _singleton_lock = threading.Lock()
 
 
@@ -304,6 +305,7 @@ def reset_all() -> None:
     global _curiosity_engine
     global _world_model, _self_improvement_drive, _unified_runtime
     global _ai_runtime, _multimodal_engine, _unified_reasoner
+    global _math_verification_engine
     
     with _singleton_lock:
         _tool_selector = None
@@ -322,6 +324,7 @@ def reset_all() -> None:
         _ai_runtime = None
         _multimodal_engine = None
         _unified_reasoner = None
+        _math_verification_engine = None
         _instances.clear()
         logger.info("[Singletons] All singletons reset")
 
@@ -560,6 +563,9 @@ def prewarm_all():
     BUG FIX Issues #1-5, #27-28: Now includes WorldModel, SelfImprovementDrive,
     UnifiedRuntime, AIRuntime, and MultiModalReasoningEngine to prevent 
     per-query reinitialization.
+    
+    CACHING FIX: Now includes MathematicalVerificationEngine to prevent
+    "MathematicalVerificationEngine initialized" appearing 4+ times per request.
     """
     logger.info("[Singletons] Pre-warming all singletons...")
     
@@ -603,6 +609,10 @@ def prewarm_all():
     
     mme = get_multimodal_engine()
     results['multimodal_engine'] = mme is not None
+    
+    # CACHING FIX: Pre-warm MathematicalVerificationEngine
+    mve = get_math_verification_engine()
+    results['math_verification_engine'] = mve is not None
     
     success_count = sum(1 for v in results.values() if v)
     logger.info(f"[Singletons] ✓ All singletons pre-warmed ({success_count}/{len(results)} initialized)")
@@ -1008,4 +1018,47 @@ def get_multimodal_engine(enable_learning: bool = True, device: str = "cpu") -> 
             return None
         except Exception as e:
             logger.error(f"[Singletons] Failed to create MultiModalReasoningEngine: {e}")
+            return None
+
+
+# ============================================
+# MATHEMATICAL VERIFICATION ENGINE SINGLETON (CACHING FIX)
+# ============================================
+
+_math_verification_engine_lock = threading.Lock()
+
+
+def get_math_verification_engine() -> Optional[Any]:
+    """
+    Get singleton MathematicalVerificationEngine instance.
+    
+    CACHING FIX: The MathematicalVerificationEngine was being re-initialized
+    4+ times per query ("MathematicalVerificationEngine initialized" appearing
+    repeatedly in logs). This singleton ensures the engine is created once
+    at startup.
+    
+    Returns:
+        MathematicalVerificationEngine instance (singleton), or None if unavailable.
+    """
+    global _math_verification_engine
+    
+    if _math_verification_engine is not None:
+        logger.debug("[Singletons] Returning cached MathematicalVerificationEngine")
+        return _math_verification_engine
+    
+    with _math_verification_engine_lock:
+        if _math_verification_engine is not None:
+            return _math_verification_engine
+        
+        logger.info("[Singletons] Creating global MathematicalVerificationEngine (ONCE)")
+        try:
+            from vulcan.reasoning.mathematical_verification import MathematicalVerificationEngine
+            _math_verification_engine = MathematicalVerificationEngine()
+            logger.info("[Singletons] ✓ MathematicalVerificationEngine created and cached")
+            return _math_verification_engine
+        except ImportError as e:
+            logger.warning(f"[Singletons] MathematicalVerificationEngine import failed: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"[Singletons] Failed to create MathematicalVerificationEngine: {e}")
             return None

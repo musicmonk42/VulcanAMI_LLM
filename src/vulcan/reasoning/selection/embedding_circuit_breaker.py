@@ -54,12 +54,18 @@ class CircuitState(Enum):
 
 
 # Configuration constants
-# PERFORMANCE FIX: Lowered thresholds for faster fail-fast behavior
-# Previous 20s threshold allowed too many slow operations before tripping
-DEFAULT_LATENCY_THRESHOLD_MS = 2000.0  # 2 seconds - fail fast on slow embeddings
-DEFAULT_FAILURE_THRESHOLD = 3  # Number of slow operations before opening circuit
-DEFAULT_RESET_TIMEOUT_S = 30.0  # Time before trying half-open state (reduced from 60s)
-DEFAULT_SUCCESS_THRESHOLD = 2  # Successes needed in half-open to close
+# PERFORMANCE FIX: Aggressive thresholds to prevent 6-30 second embedding delays
+# Evidence from logs: Batches: 100%|██████████| 1/1 [00:20<00:00, 20.23s/it]
+# Issue: SemanticToolMatcher taking 6-30 seconds per query
+#
+# Note: RESET_TIMEOUT is *increased* to 60s because once circuit breaker opens
+# (embeddings are too slow), we want to stay in keyword-only mode longer before
+# retrying embeddings. This is different from QUERY_ROUTING_TIMEOUT (5s) in
+# query_router.py which limits how long we wait for routing to complete.
+DEFAULT_LATENCY_THRESHOLD_MS = 1000.0  # 1 second - aggressive fail-fast on slow embeddings
+DEFAULT_FAILURE_THRESHOLD = 2  # Only 2 slow operations before opening circuit (was 3)
+DEFAULT_RESET_TIMEOUT_S = 60.0  # Wait longer before retrying slow embeddings (was 30s)
+DEFAULT_SUCCESS_THRESHOLD = 3  # More successes needed to confirm recovery (was 2)
 DEFAULT_EMA_ALPHA = 0.3  # Exponential moving average smoothing factor
 
 # Log prefix for consistent output

@@ -791,12 +791,20 @@ class UnifiedReasoner:
 
         # PRIORITY 2 FIX: Initialize Mathematical Verification Engine
         # Connect verification to calculation pipeline for mathematical accuracy
+        # CACHING FIX: Use singleton to prevent repeated initialization
         self.math_verification_engine = None
         self._math_accuracy_integration = None
         if "MathematicalVerificationEngine" in optional_components:
             try:
-                self.math_verification_engine = optional_components["MathematicalVerificationEngine"]()
-                logger.info("MathematicalVerificationEngine initialized for calculation validation")
+                # Use singleton pattern to prevent repeated initialization
+                from vulcan.reasoning.singletons import get_math_verification_engine
+                self.math_verification_engine = get_math_verification_engine()
+                if self.math_verification_engine is not None:
+                    logger.info("MathematicalVerificationEngine obtained from singleton")
+                else:
+                    # Fallback to direct creation
+                    self.math_verification_engine = optional_components["MathematicalVerificationEngine"]()
+                    logger.info("MathematicalVerificationEngine initialized (fallback)")
                 
                 # Try to initialize the learning integration as well
                 try:

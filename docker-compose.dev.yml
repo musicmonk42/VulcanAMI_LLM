@@ -362,6 +362,9 @@ services:
       - SEMANTIC_BRIDGE_ENABLED=${SEMANTIC_BRIDGE_ENABLED:-true}
       - CROSS_DOMAIN_TRANSFER_ENABLED=${CROSS_DOMAIN_TRANSFER_ENABLED:-true}
       - PATTERN_LEARNING_ENABLED=${PATTERN_LEARNING_ENABLED:-true}
+      # Semantic matching configuration (EMERGENCY FIX for Embedding Bottleneck)
+      # Disable slow semantic matching (default: 1 = disabled for fast routing)
+      - VULCAN_DISABLE_SEMANTIC_MATCHING=${VULCAN_DISABLE_SEMANTIC_MATCHING:-1}
     ports:
       # NOTE: Port 8000 conflicts with api-gateway service if both run simultaneously.
       # Use profiles to avoid conflict:

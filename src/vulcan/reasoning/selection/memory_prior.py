@@ -29,11 +29,29 @@ except ImportError:
     SEMANTIC_MATCHER_AVAILABLE = False
     SemanticToolMatcher = None
     logger.warning("SemanticToolMatcher not available")
-
+import os
 
 # Configuration constants for semantic tool matching
 MIN_QUERY_LENGTH_FOR_SEMANTIC_BOOST = 10  # Minimum query text length to apply semantic boost
 MULTIMODAL_CONTENT_BOOST = 0.4  # Strong boost for explicit multimodal content
+
+# EMERGENCY FIX: Environment variable to disable slow semantic matching entirely
+# 
+# DEFAULT: DISABLED (semantic matching off) - this is intentional for performance!
+# 
+# Set VULCAN_DISABLE_SEMANTIC_MATCHING=0 to RE-ENABLE embedding-based tool selection
+# 
+# Background: Semantic matching was causing 6-30 second delays per query:
+#   - Batches: 100%|██████████| 1/1 [00:20<00:00, 20.23s/it]
+#   - [QueryRouter] Query routing timed out after 30.0s
+#   - SLOW ROUTING DETECTED: 30225ms (threshold: 10000ms)
+#
+# With semantic matching disabled, queries complete in 2-5 seconds instead of 30-94 seconds.
+# Keyword-based tool selection is used as fallback, which is fast and still effective.
+#
+# To re-enable semantic matching (if you have optimized embedding model loading):
+#   export VULCAN_DISABLE_SEMANTIC_MATCHING=0
+DISABLE_SEMANTIC_MATCHING = os.environ.get("VULCAN_DISABLE_SEMANTIC_MATCHING", "1").lower() in ("1", "true", "yes")
 
 
 class SimilarityMetric(Enum):
@@ -295,11 +313,17 @@ class BayesianMemoryPrior:
         # CRITICAL FIX: Use RLock for better thread safety
         self.lock = threading.RLock()
 
-        # PERFORMANCE FIX: Use singleton semantic matcher to prevent
-        # repeated model loading that causes query routing degradation
-        # (469ms → 152,048ms over 15 queries)
+        # EMERGENCY FIX: Check if semantic matching is disabled via environment variable
+        # When disabled, use keyword-only matching (fast, no embedding computation)
+        # This prevents the 6-30 second embedding delays observed in production logs
         self.semantic_matcher = None
-        if SEMANTIC_MATCHER_AVAILABLE:
+        
+        if DISABLE_SEMANTIC_MATCHING:
+            logger.warning(
+                "[BayesianMemoryPrior] Semantic matching DISABLED (VULCAN_DISABLE_SEMANTIC_MATCHING=1). "
+                "Using keyword-only tool selection for FAST routing."
+            )
+        elif SEMANTIC_MATCHER_AVAILABLE:
             try:
                 from vulcan.reasoning.singletons import get_semantic_matcher
                 self.semantic_matcher = get_semantic_matcher()

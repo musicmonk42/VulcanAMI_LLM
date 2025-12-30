@@ -255,6 +255,14 @@ spec:
           value: {{ .Values.performanceTuning.selfImprovementAutoCommit | quote }}
         - name: VULCAN_GAP_GIVEUP_THRESHOLD
           value: {{ .Values.performanceTuning.gapGiveupThreshold | quote }}
+        {{- /* Semantic Matching Configuration (EMERGENCY FIX for Embedding Bottleneck) */}}
+        {{- if .Values.performanceTuning.disableSemanticMatching }}
+        - name: VULCAN_DISABLE_SEMANTIC_MATCHING
+          value: "1"
+        {{- else }}
+        - name: VULCAN_DISABLE_SEMANTIC_MATCHING
+          value: "0"
+        {{- end }}
         {{- end }}
         {{- if .Values.memorySystem.enabled }}
         # Vulcan Memory System v46 AWS credentials

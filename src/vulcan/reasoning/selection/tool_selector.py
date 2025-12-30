@@ -1335,14 +1335,10 @@ class ToolSelector:
         
         # Mathematical verification engine for accuracy feedback
         # This enables learning from mathematical reasoning accuracy
+        # CACHING FIX: Use singleton to prevent repeated initialization
         self.math_verifier: Optional["MathematicalVerificationEngine"] = None
         if MATH_VERIFICATION_AVAILABLE and config.get("enable_math_verification", True):
-            try:
-                self.math_verifier = MathematicalVerificationEngine()
-                logger.info("Mathematical verification engine initialized for selection feedback")
-            except Exception as e:
-                logger.warning(f"Failed to initialize math verifier: {e}")
-                self.math_verifier = None
+            self.math_verifier = self._init_math_verifier()
 
         # Execution statistics
         self.execution_history = deque(maxlen=1000)
@@ -1412,6 +1408,38 @@ class ToolSelector:
                 logger.error(f"Failed to load config file: {e}")
 
         return merged_config
+
+    def _init_math_verifier(self) -> Optional["MathematicalVerificationEngine"]:
+        """
+        Initialize MathematicalVerificationEngine with singleton pattern.
+        
+        CACHING FIX: Uses singleton to prevent repeated initialization
+        that was causing "MathematicalVerificationEngine initialized" to
+        appear 4+ times per query.
+        
+        Returns:
+            MathematicalVerificationEngine instance or None on failure
+        """
+        try:
+            # Try singleton first
+            from vulcan.reasoning.singletons import get_math_verification_engine
+            verifier = get_math_verification_engine()
+            if verifier is not None:
+                logger.info("Mathematical verification engine obtained from singleton")
+                return verifier
+        except ImportError:
+            pass  # singletons module not available, continue to fallback
+        except Exception as e:
+            logger.debug(f"Singleton access failed: {e}")
+        
+        # Fallback to direct creation
+        try:
+            verifier = MathematicalVerificationEngine()
+            logger.info("Mathematical verification engine initialized (fallback)")
+            return verifier
+        except Exception as e:
+            logger.warning(f"Failed to initialize math verifier: {e}")
+            return None
 
     def _initialize_tools(self):
         """Initialize reasoning tools"""

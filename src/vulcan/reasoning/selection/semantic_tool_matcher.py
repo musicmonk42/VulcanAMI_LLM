@@ -984,6 +984,9 @@ class SemanticToolMatcher:
         Boost prior probabilities based on semantic matching.
 
         This is the key integration point with BayesianMemoryPrior.
+        
+        PERFORMANCE FIX: If circuit breaker is open (embeddings too slow),
+        falls back to keyword-only matching for fast routing.
 
         Args:
             prior_probs: Original prior probabilities from BayesianMemoryPrior
@@ -996,7 +999,16 @@ class SemanticToolMatcher:
         if available_tools is None:
             available_tools = list(prior_probs.keys())
 
-        # Get semantic matches
+        # PERFORMANCE FIX: Check circuit breaker - use keyword-only if embeddings are slow
+        if CIRCUIT_BREAKER_AVAILABLE:
+            circuit_breaker = get_embedding_circuit_breaker()
+            if circuit_breaker is not None and circuit_breaker.should_skip_embedding():
+                logger.info(
+                    "[SemanticToolMatcher] Circuit breaker OPEN - using keyword-only boost"
+                )
+                return self.boost_prior_keywords_only(prior_probs, query, available_tools)
+
+        # Get semantic matches (uses embeddings)
         matches = self.match_query(query, available_tools)
 
         # Compute boost for each tool
@@ -1058,6 +1070,59 @@ class SemanticToolMatcher:
         if total > 0:
             boosted = {k: v / total for k, v in boosted.items()}
 
+        return boosted
+
+    def boost_prior_keywords_only(
+        self,
+        prior_probs: Dict[str, float],
+        query: str,
+        available_tools: Optional[List[str]] = None,
+    ) -> Dict[str, float]:
+        """
+        FAST keyword-only boost - NO EMBEDDINGS.
+        
+        This method bypasses the slow embedding computation (6-30 seconds)
+        and uses only keyword matching for tool selection. Use this when:
+        - Circuit breaker is open
+        - VULCAN_DISABLE_SEMANTIC_MATCHING=1
+        - Need fast fallback routing
+        
+        Args:
+            prior_probs: Original prior probabilities
+            query: The input query/problem text
+            available_tools: Optional list of available tools
+            
+        Returns:
+            Boosted prior probabilities (keyword-only, no embeddings)
+        """
+        if available_tools is None:
+            available_tools = list(prior_probs.keys())
+        
+        query_lower = query.lower()
+        boosted = {}
+        
+        for tool_name in available_tools:
+            original_prob = prior_probs.get(tool_name, 0.0)
+            keyword_boost = 0.0
+            
+            # Get keywords for this tool
+            if tool_name in TOOL_KEYWORDS:
+                keywords = TOOL_KEYWORDS[tool_name]
+                matches = [kw for kw in keywords if kw in query_lower]
+                if matches:
+                    # Scale boost by number of keyword matches
+                    keyword_boost = min(0.3, len(matches) * 0.1)
+                    logger.debug(
+                        f"[KeywordBoost] {tool_name}: matches={matches}, boost={keyword_boost:.3f}"
+                    )
+            
+            boosted[tool_name] = original_prob + keyword_boost
+        
+        # Normalize
+        total = sum(boosted.values())
+        if total > 0:
+            boosted = {k: v / total for k, v in boosted.items()}
+        
         return boosted
 
     def get_best_match(
