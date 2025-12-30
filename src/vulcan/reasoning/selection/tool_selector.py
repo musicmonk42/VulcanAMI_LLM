@@ -1335,11 +1335,27 @@ class ToolSelector:
         
         # Mathematical verification engine for accuracy feedback
         # This enables learning from mathematical reasoning accuracy
+        # CACHING FIX: Use singleton to prevent repeated initialization
         self.math_verifier: Optional["MathematicalVerificationEngine"] = None
         if MATH_VERIFICATION_AVAILABLE and config.get("enable_math_verification", True):
             try:
-                self.math_verifier = MathematicalVerificationEngine()
-                logger.info("Mathematical verification engine initialized for selection feedback")
+                # Use singleton pattern to prevent repeated initialization
+                from vulcan.reasoning.singletons import get_math_verification_engine
+                self.math_verifier = get_math_verification_engine()
+                if self.math_verifier is not None:
+                    logger.info("Mathematical verification engine obtained from singleton")
+                else:
+                    # Fallback to direct creation
+                    self.math_verifier = MathematicalVerificationEngine()
+                    logger.info("Mathematical verification engine initialized (fallback)")
+            except ImportError:
+                # singletons module not available
+                try:
+                    self.math_verifier = MathematicalVerificationEngine()
+                    logger.info("Mathematical verification engine initialized (no singleton)")
+                except Exception as e:
+                    logger.warning(f"Failed to initialize math verifier: {e}")
+                    self.math_verifier = None
             except Exception as e:
                 logger.warning(f"Failed to initialize math verifier: {e}")
                 self.math_verifier = None

@@ -6284,6 +6284,105 @@ async def save_checkpoint():
 
 
 # ============================================================
+# CACHE MONITORING ENDPOINT (CACHING FIX)
+# ============================================================
+
+
+@app.get("/vulcan/debug/cache-stats")
+async def get_cache_stats():
+    """
+    Get caching statistics for monitoring cache effectiveness.
+    
+    CACHING FIX: This endpoint helps diagnose:
+    - 0% embedding cache hit rate issues
+    - Component re-initialization problems
+    - Model loading happening multiple times
+    
+    Returns cache stats for:
+    - Embedding cache (hits, misses, hit rate)
+    - Component cache (which components are cached)
+    - Model cache (BERT, SentenceTransformer loading status)
+    - Singleton status (all registered singletons)
+    """
+    stats = {
+        "embedding_cache": {},
+        "component_cache": {},
+        "circuit_breaker": {},
+        "singletons": {},
+        "routing_cache": {},
+        "timestamp": time.time(),
+    }
+    
+    # Embedding cache stats
+    try:
+        from vulcan.routing.embedding_cache import get_cache_stats as get_embed_stats
+        stats["embedding_cache"] = get_embed_stats()
+    except Exception as e:
+        stats["embedding_cache"] = {"error": str(e)}
+    
+    # Circuit breaker stats
+    try:
+        from vulcan.reasoning.selection.embedding_circuit_breaker import get_circuit_breaker_stats
+        cb_stats = get_circuit_breaker_stats()
+        if cb_stats:
+            stats["circuit_breaker"] = cb_stats
+        else:
+            stats["circuit_breaker"] = {"status": "not_initialized"}
+    except Exception as e:
+        stats["circuit_breaker"] = {"error": str(e)}
+    
+    # Singleton status
+    try:
+        from vulcan.reasoning.singletons import (
+            _tool_selector, _reasoning_integration, _portfolio_executor,
+            _bayesian_prior, _warm_pool, _cost_model, _semantic_matcher,
+            _problem_decomposer, _semantic_bridge, _unified_runtime,
+            _math_verification_engine, _multimodal_engine, _unified_reasoner,
+        )
+        stats["singletons"] = {
+            "tool_selector": "cached" if _tool_selector is not None else "not_cached",
+            "reasoning_integration": "cached" if _reasoning_integration is not None else "not_cached",
+            "portfolio_executor": "cached" if _portfolio_executor is not None else "not_cached",
+            "bayesian_prior": "cached" if _bayesian_prior is not None else "not_cached",
+            "warm_pool": "cached" if _warm_pool is not None else "not_cached",
+            "cost_model": "cached" if _cost_model is not None else "not_cached",
+            "semantic_matcher": "cached" if _semantic_matcher is not None else "not_cached",
+            "problem_decomposer": "cached" if _problem_decomposer is not None else "not_cached",
+            "semantic_bridge": "cached" if _semantic_bridge is not None else "not_cached",
+            "unified_runtime": "cached" if _unified_runtime is not None else "not_cached",
+            "math_verification_engine": "cached" if _math_verification_engine is not None else "not_cached",
+            "multimodal_engine": "cached" if _multimodal_engine is not None else "not_cached",
+            "unified_reasoner": "cached" if _unified_reasoner is not None else "not_cached",
+        }
+    except Exception as e:
+        stats["singletons"] = {"error": str(e)}
+    
+    # Routing cache stats (from query router)
+    try:
+        from vulcan.routing.query_router import get_query_analyzer
+        analyzer = get_query_analyzer()
+        if hasattr(analyzer, '_safety_cache'):
+            stats["routing_cache"]["safety_cache"] = analyzer._safety_cache.stats()
+        if hasattr(analyzer, '_adversarial_cache'):
+            stats["routing_cache"]["adversarial_cache"] = analyzer._adversarial_cache.stats()
+        if hasattr(analyzer, '_query_count'):
+            stats["routing_cache"]["total_queries"] = analyzer._query_count
+    except Exception as e:
+        stats["routing_cache"] = {"error": str(e)}
+    
+    # Summary
+    cached_count = sum(1 for v in stats.get("singletons", {}).values() if v == "cached")
+    total_count = len(stats.get("singletons", {}))
+    stats["summary"] = {
+        "singletons_cached": f"{cached_count}/{total_count}",
+        "embedding_hit_rate": stats.get("embedding_cache", {}).get("hit_rate", 0),
+        "circuit_breaker_state": stats.get("circuit_breaker", {}).get("state", "unknown"),
+    }
+    
+    return stats
+
+
+# ============================================================
 # ORCHESTRATOR ENDPOINTS
 # ============================================================
 

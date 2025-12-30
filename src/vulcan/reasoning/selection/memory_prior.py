@@ -29,11 +29,19 @@ except ImportError:
     SEMANTIC_MATCHER_AVAILABLE = False
     SemanticToolMatcher = None
     logger.warning("SemanticToolMatcher not available")
-
+import os
 
 # Configuration constants for semantic tool matching
 MIN_QUERY_LENGTH_FOR_SEMANTIC_BOOST = 10  # Minimum query text length to apply semantic boost
 MULTIMODAL_CONTENT_BOOST = 0.4  # Strong boost for explicit multimodal content
+
+# EMERGENCY FIX: Environment variable to disable slow semantic matching entirely
+# Set VULCAN_DISABLE_SEMANTIC_MATCHING=1 to disable embedding-based tool selection
+# This prevents the 6-30 second delays observed in logs:
+#   - Batches: 100%|██████████| 1/1 [00:20<00:00, 20.23s/it]
+#   - [QueryRouter] Query routing timed out after 30.0s
+#   - SLOW ROUTING DETECTED: 30225ms (threshold: 10000ms)
+DISABLE_SEMANTIC_MATCHING = os.environ.get("VULCAN_DISABLE_SEMANTIC_MATCHING", "1").lower() in ("1", "true", "yes")
 
 
 class SimilarityMetric(Enum):
@@ -295,11 +303,17 @@ class BayesianMemoryPrior:
         # CRITICAL FIX: Use RLock for better thread safety
         self.lock = threading.RLock()
 
-        # PERFORMANCE FIX: Use singleton semantic matcher to prevent
-        # repeated model loading that causes query routing degradation
-        # (469ms → 152,048ms over 15 queries)
+        # EMERGENCY FIX: Check if semantic matching is disabled via environment variable
+        # When disabled, use keyword-only matching (fast, no embedding computation)
+        # This prevents the 6-30 second embedding delays observed in production logs
         self.semantic_matcher = None
-        if SEMANTIC_MATCHER_AVAILABLE:
+        
+        if DISABLE_SEMANTIC_MATCHING:
+            logger.warning(
+                "[BayesianMemoryPrior] Semantic matching DISABLED (VULCAN_DISABLE_SEMANTIC_MATCHING=1). "
+                "Using keyword-only tool selection for FAST routing."
+            )
+        elif SEMANTIC_MATCHER_AVAILABLE:
             try:
                 from vulcan.reasoning.singletons import get_semantic_matcher
                 self.semantic_matcher = get_semantic_matcher()
