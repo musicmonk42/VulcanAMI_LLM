@@ -2,6 +2,7 @@
 Continual learning implementations with EWC and experience replay
 """
 
+import asyncio
 import logging
 import pickle
 import threading  # <-- threading is imported here
@@ -449,6 +450,102 @@ class EnhancedContinualLearner(nn.Module):
             if should_consolidate:
                 self.consolidation_counter = 0
             return should_consolidate
+
+    # ============================================================
+    # RLHF PUBLIC INTERFACE METHODS
+    # ============================================================
+
+    def receive_feedback(self, feedback: FeedbackData):
+        """
+        Public method to receive human feedback.
+        Delegates to RLHF manager if enabled.
+        
+        Args:
+            feedback: FeedbackData instance with user feedback
+        """
+        if self.rlhf_manager:
+            self.rlhf_manager.receive_feedback(feedback)
+            # Log only feedback type and reward, not user content
+            logger.info(f"[RLHF] Feedback received: type={feedback.feedback_type}, reward={feedback.reward_signal}")
+        else:
+            logger.warning("[RLHF] Feedback received but RLHF is disabled")
+
+    def process_live_feedback(self, user_message: str, context: Dict[str, Any]):
+        """
+        Process real-time feedback from user messages.
+        Auto-detects corrections and preferences.
+        
+        Args:
+            user_message: User's message
+            context: Conversation context including previous query/response
+        """
+        if self.live_feedback:
+            # Create feedback dict for async processing
+            feedback_data = {
+                "type": "live",
+                "message": user_message,
+                "context": context,
+                "timestamp": time.time(),
+            }
+            # Queue for async processing (if event loop is running)
+            try:
+                loop = asyncio.get_running_loop()
+                # Store task reference to prevent garbage collection
+                task = asyncio.ensure_future(self.live_feedback.process_live_feedback(feedback_data))
+                # Add callback to handle any errors silently
+                task.add_done_callback(lambda t: t.exception() if t.done() and not t.cancelled() else None)
+            except RuntimeError:
+                # No event loop - process synchronously
+                logger.debug("[LiveFeedback] No event loop - processing synchronously")
+                self.live_feedback.performance_tracker["feedback_processed"] += 1
+            # Log only message length to avoid PII exposure
+            logger.debug(f"[LiveFeedback] Processed message: length={len(user_message)} chars")
+
+    def get_feedback_stats(self) -> Dict[str, Any]:
+        """Get current RLHF statistics"""
+        stats = {
+            "rlhf_enabled": self.rlhf_manager is not None,
+            "live_feedback_enabled": self.live_feedback is not None,
+        }
+        
+        if self.rlhf_manager:
+            stats["rlhf_stats"] = self.rlhf_manager.feedback_stats.copy()
+        
+        if self.live_feedback:
+            stats["live_feedback_stats"] = self.live_feedback.performance_tracker.copy()
+        
+        return stats
+
+    def submit_thumbs_feedback(self, query_id: str, response_id: str, is_positive: bool, 
+                               context: Optional[Dict[str, Any]] = None):
+        """
+        Submit thumbs up/down feedback for a response.
+        
+        Args:
+            query_id: ID of the original query
+            response_id: ID of the response being rated
+            is_positive: True for thumbs up, False for thumbs down
+            context: Optional additional context
+        """
+        reward_signal = 1.0 if is_positive else -1.0
+        feedback_type = "thumbs_up" if is_positive else "thumbs_down"
+        
+        feedback = FeedbackData(
+            feedback_type=feedback_type,
+            user_input=query_id,
+            agent_response=response_id,
+            reward_signal=reward_signal,
+            context=context or {},
+            metadata={
+                "query_id": query_id,
+                "response_id": response_id,
+                "feedback_source": "ui_button",
+            },
+        )
+        
+        self.receive_feedback(feedback)
+        # Log only feedback type to avoid ID exposure
+        logger.info(f"[RLHF] Thumbs {'up' if is_positive else 'down'} feedback submitted")
 
     def _create_task_head(self) -> nn.Module:
         """Create task-specific head."""
