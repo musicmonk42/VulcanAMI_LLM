@@ -75,6 +75,39 @@ MAX_TOOL_COUNT = 10000
 
 
 # =============================================================================
+# JSON Serialization Helper
+# =============================================================================
+
+
+def _json_serializer(obj: Any) -> Any:
+    """
+    Custom JSON serializer for objects not natively serializable.
+    
+    This handles edge cases like bytes, datetime objects, and numpy types
+    that might appear in metadata fields.
+    
+    Args:
+        obj: Object to serialize.
+    
+    Returns:
+        JSON-serializable representation.
+    
+    Raises:
+        TypeError: If object cannot be serialized.
+    """
+    if isinstance(obj, bytes):
+        return obj.decode("utf-8", errors="replace")
+    if hasattr(obj, "isoformat"):  # datetime objects
+        return obj.isoformat()
+    if hasattr(obj, "tolist"):  # numpy arrays
+        return obj.tolist()
+    if hasattr(obj, "__dict__"):  # dataclass or similar
+        return str(obj)
+    # Fallback to string representation
+    return str(obj)
+
+
+# =============================================================================
 # Type Definitions
 # =============================================================================
 
@@ -697,7 +730,13 @@ class LearningStatePersistence:
             
             # Write to temp file with explicit encoding
             with open(temp_file, "w", encoding="utf-8") as f:
-                json.dump(state_with_checksum, f, indent=2, default=str, ensure_ascii=False)
+                json.dump(
+                    state_with_checksum, 
+                    f, 
+                    indent=2, 
+                    default=_json_serializer, 
+                    ensure_ascii=False
+                )
                 f.flush()
                 os.fsync(f.fileno())
             
@@ -957,7 +996,7 @@ class LearningStatePersistence:
             Hex-encoded SHA-256 checksum.
         """
         # Create a stable string representation
-        state_str = json.dumps(state, sort_keys=True, default=str)
+        state_str = json.dumps(state, sort_keys=True, default=_json_serializer)
         return hashlib.sha256(state_str.encode("utf-8")).hexdigest()[:16]
     
     def __repr__(self) -> str:

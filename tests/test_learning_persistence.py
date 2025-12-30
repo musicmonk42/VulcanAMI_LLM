@@ -233,7 +233,8 @@ class TestSaveState:
         persistence.save_state(state2)
         
         # Check backup exists
-        backups = list(persistence.storage_path.glob(f"{persistence.filename}{'.backup'}.*"))
+        backup_pattern = f"{persistence.filename}.backup.*"
+        backups = list(persistence.storage_path.glob(backup_pattern))
         assert len(backups) >= 1
 
     def test_save_state_backup_rotation(self, persistence):
@@ -248,7 +249,8 @@ class TestSaveState:
             time.sleep(0.01)  # Ensure different timestamps
         
         # Check backup count
-        backups = list(persistence.storage_path.glob(f"{persistence.filename}.backup.*"))
+        backup_pattern = f"{persistence.filename}.backup.*"
+        backups = list(persistence.storage_path.glob(backup_pattern))
         assert len(backups) <= MAX_BACKUP_COUNT
 
     def test_save_state_updates_cache(self, persistence):
