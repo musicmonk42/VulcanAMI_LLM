@@ -10,6 +10,77 @@ Knowledge distillation allows VULCAN to:
 3. **Train the internal LLM** - Improve local model from captured data
 4. **Reduce costs over time** - Eventually use local LLM for common queries
 
+## ✅ Existing Integration Points (Already Connected!)
+
+**Good news:** The system is already integrated in key locations. Here's what's already working:
+
+### 1. Main Application Server (`src/vulcan/main.py`)
+
+The VULCAN server already uses `HybridLLMExecutor` with distillation enabled by default:
+
+```python
+# Line ~3252: Chat endpoint uses HybridLLMExecutor
+hybrid_executor = HybridLLMExecutor(
+    local_llm=local_llm,
+    openai_client_getter=get_openai_client,
+    mode=settings.llm_execution_mode,  # Configure via settings
+    timeout=settings.llm_parallel_timeout,
+)
+
+# Line ~3264: Execute with distillation (enabled by default!)
+llm_result = await hybrid_executor.execute(
+    prompt=enhanced_prompt,
+    max_tokens=request.max_tokens,
+    temperature=0.7,
+    # enable_distillation=True  # DEFAULT - already enabled!
+)
+```
+
+### 2. Knowledge Distiller Initialization (`src/vulcan/main.py`)
+
+The knowledge distiller is initialized at startup when enabled:
+
+```python
+# Line ~607: Already initializes distiller at startup
+if settings.enable_knowledge_distillation:
+    knowledge_distiller = initialize_knowledge_distiller(
+        local_llm=llm_instance,
+        storage_path=settings.distillation_storage_path,
+        batch_size=settings.distillation_batch_size,
+        training_interval_s=settings.distillation_training_interval_s,
+        auto_train=settings.distillation_auto_train,
+    )
+    app.state.knowledge_distiller = knowledge_distiller
+```
+
+### 3. Training Script (`src/training/train_llm_with_self_improvement.py`)
+
+The training script is fully upgraded with distillation support:
+
+```bash
+# Run training with distillation
+python src/training/train_llm_with_self_improvement.py \
+    --distillation-storage data/distillation \
+    --distillation-interval 10 \
+    --steps 5000
+```
+
+**Training Script Features:**
+- ✅ `--distillation-storage` argument (line ~1047)
+- ✅ `--distillation-interval` argument (line ~1054)
+- ✅ `load_distillation_batch()` function (line ~224)
+- ✅ Distillation training loop (line ~858)
+
+### 4. Full Platform (`src/full_platform.py`)
+
+The full platform also initializes `GraphixVulcanLLM`:
+
+```python
+# Line ~1758: Full platform uses GraphixVulcanLLM
+llm_instance = GraphixVulcanLLM(config_path="configs/llm_config.yaml")
+vulcan_module.app.state.llm = llm_instance
+```
+
 ## Quick Start (3 Steps)
 
 ### Step 1: Initialize System
