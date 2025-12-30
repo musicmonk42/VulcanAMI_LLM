@@ -631,30 +631,40 @@ class HybridLLMExecutor:
             ) > self.MIN_MEANINGFUL_LENGTH
 
             if local_valid and openai_valid:
-                # Both succeeded - prefer OpenAI for language quality
+                # Both succeeded - PREFER LOCAL LLM to reduce OpenAI API costs
+                # OpenAI response is still captured in metadata for distillation
                 systems_used.extend(["vulcan_local_llm", "openai_llm"])
+                self.logger.info(
+                    "[HybridExecutor] Both LLMs succeeded - using LOCAL response (OpenAI captured for distillation)"
+                )
                 return {
-                    "text": results["openai"],
+                    "text": results["local"],  # Use local LLM response
                     "source": "parallel_both",
                     "systems_used": systems_used,
                     "metadata": {
                         "local_response_available": True,
                         "openai_response_available": True,
-                        "local_response_preview": str(results["local"])[:100],
+                        # Store OpenAI response in metadata for knowledge distillation
+                        "openai_response_for_distillation": str(results["openai"])[:2000],
+                        "used_source": "local",
                     },
                 }
-            elif openai_valid:
-                systems_used.append("openai_llm")
-                return {
-                    "text": results["openai"],
-                    "source": "openai",
-                    "systems_used": systems_used,
-                }
             elif local_valid:
+                # Local succeeded, OpenAI failed or not ready
                 systems_used.append("vulcan_local_llm")
+                self.logger.info("[HybridExecutor] Using LOCAL LLM response (OpenAI unavailable)")
                 return {
                     "text": results["local"],
                     "source": "local",
+                    "systems_used": systems_used,
+                }
+            elif openai_valid:
+                # Only OpenAI succeeded - fallback
+                systems_used.append("openai_llm")
+                self.logger.info("[HybridExecutor] Using OpenAI FALLBACK (local LLM unavailable)")
+                return {
+                    "text": results["openai"],
+                    "source": "openai",
                     "systems_used": systems_used,
                 }
 
