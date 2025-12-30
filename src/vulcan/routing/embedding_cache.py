@@ -883,7 +883,20 @@ def get_embeddings_batch_cached(
 
         try:
             if hasattr(model, "encode"):
-                new_embeddings = model.encode(uncached_texts)
+                # PERF FIX Issue #3: Disable progress bar and use optimal batch size
+                # Single items don't need batching; batch_size=1 for minimal overhead
+                # show_progress_bar=False prevents "Batches: 100%|..." from appearing
+                encode_kwargs = {
+                    "show_progress_bar": False,
+                }
+                # Use smaller batch size for single-item encoding to reduce overhead
+                if len(uncached_texts) == 1:
+                    encode_kwargs["batch_size"] = 1
+                else:
+                    # For larger batches, use batch_size=32 for efficiency
+                    encode_kwargs["batch_size"] = min(32, len(uncached_texts))
+                
+                new_embeddings = model.encode(uncached_texts, **encode_kwargs)
             elif hasattr(model, "embed"):
                 new_embeddings = model.embed(uncached_texts)
             else:

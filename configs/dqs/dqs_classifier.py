@@ -452,8 +452,8 @@ class DataQualityClassifier:
             return 0.5, []
 
         try:
-            # Generate embedding
-            embedding = self.embedding_model.encode(text[:512])
+            # PERF FIX Issue #3: Disable progress bar for single-item encoding
+            embedding = self.embedding_model.encode(text[:512], show_progress_bar=False)
 
             # Compare to reference corpus if configured
             if semantic_config['embedding_analysis']['compare_to_corpus']:

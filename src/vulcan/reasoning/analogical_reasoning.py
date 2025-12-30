@@ -530,8 +530,10 @@ class SemanticEnricher:
 
         try:
             if self.embedding_model:
-                # Use sentence transformer model
-                embedding = self.embedding_model.encode(text, convert_to_numpy=True)
+                # PERF FIX Issue #3: Disable progress bar for single-item encoding
+                embedding = self.embedding_model.encode(
+                    text, convert_to_numpy=True, show_progress_bar=False
+                )
             else:
                 # Use TF-IDF fallback
                 embedding = self._fallback_embedding(text)
