@@ -3332,6 +3332,201 @@ async def v1_chat_proxy(request: Request):
 
 
 # =============================================================================
+# VULCAN FEEDBACK PROXY ENDPOINTS
+# =============================================================================
+# These endpoints forward feedback requests to the VULCAN app, which is mounted
+# at /vulcan. This allows the chat interface to call /v1/feedback/thumbs directly
+# instead of /vulcan/v1/feedback/thumbs.
+# =============================================================================
+
+@app.post("/v1/feedback/thumbs")
+async def v1_feedback_thumbs_proxy(request: Request):
+    """
+    Proxy endpoint for VULCAN feedback thumbs API.
+    
+    This forwards thumbs up/down feedback requests to VULCAN's /v1/feedback/thumbs
+    endpoint, providing a consistent API surface for the chat interface.
+    """
+    # Parse request body
+    try:
+        body = await request.json()
+    except json.JSONDecodeError as e:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "Invalid JSON", "detail": str(e)}
+        )
+    
+    try:
+        # Import VULCAN's feedback handler
+        vulcan_module = importlib.import_module("src.vulcan.main")
+        if not hasattr(vulcan_module, "app"):
+            return JSONResponse(
+                status_code=503,
+                content={"error": "VULCAN module not available"}
+            )
+        
+        vulcan_app = vulcan_module.app
+        
+        # Check if deployment is initialized
+        if not hasattr(vulcan_app.state, "deployment"):
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "error": "VULCAN not initialized",
+                    "detail": "The VULCAN deployment has not been initialized yet."
+                }
+            )
+        
+        # Import the handler and request model
+        try:
+            from src.vulcan.main import ThumbsFeedbackRequest, submit_thumbs_feedback
+        except ImportError as e:
+            logger.error(f"Failed to import VULCAN feedback handler: {e}")
+            return JSONResponse(
+                status_code=503,
+                content={"error": "Feedback handler unavailable", "detail": str(e)}
+            )
+        
+        # Validate and create request object
+        try:
+            feedback_request = ThumbsFeedbackRequest(**body)
+        except Exception as e:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "Invalid request", "detail": str(e)}
+            )
+        
+        # Call the feedback endpoint function directly
+        result = await submit_thumbs_feedback(feedback_request)
+        return result
+        
+    except Exception as e:
+        logger.error(f"Feedback thumbs proxy error: {e}", exc_info=True)
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Internal error", "detail": str(e)}
+        )
+
+
+@app.post("/v1/feedback")
+async def v1_feedback_proxy(request: Request):
+    """
+    Proxy endpoint for VULCAN feedback API.
+    
+    This forwards general feedback requests to VULCAN's /v1/feedback endpoint.
+    """
+    # Parse request body
+    try:
+        body = await request.json()
+    except json.JSONDecodeError as e:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "Invalid JSON", "detail": str(e)}
+        )
+    
+    try:
+        # Import VULCAN's feedback handler
+        vulcan_module = importlib.import_module("src.vulcan.main")
+        if not hasattr(vulcan_module, "app"):
+            return JSONResponse(
+                status_code=503,
+                content={"error": "VULCAN module not available"}
+            )
+        
+        vulcan_app = vulcan_module.app
+        
+        # Check if deployment is initialized
+        if not hasattr(vulcan_app.state, "deployment"):
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "error": "VULCAN not initialized",
+                    "detail": "The VULCAN deployment has not been initialized yet."
+                }
+            )
+        
+        # Import the handler and request model
+        try:
+            from src.vulcan.main import FeedbackRequest, submit_feedback
+        except ImportError as e:
+            logger.error(f"Failed to import VULCAN feedback handler: {e}")
+            return JSONResponse(
+                status_code=503,
+                content={"error": "Feedback handler unavailable", "detail": str(e)}
+            )
+        
+        # Validate and create request object
+        try:
+            feedback_request = FeedbackRequest(**body)
+        except Exception as e:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "Invalid request", "detail": str(e)}
+            )
+        
+        # Call the feedback endpoint function directly
+        result = await submit_feedback(feedback_request)
+        return result
+        
+    except Exception as e:
+        logger.error(f"Feedback proxy error: {e}", exc_info=True)
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Internal error", "detail": str(e)}
+        )
+
+
+@app.get("/v1/feedback/stats")
+async def v1_feedback_stats_proxy():
+    """
+    Proxy endpoint for VULCAN feedback stats API.
+    
+    This forwards feedback stats requests to VULCAN's /v1/feedback/stats endpoint.
+    """
+    try:
+        # Import VULCAN's feedback stats handler
+        vulcan_module = importlib.import_module("src.vulcan.main")
+        if not hasattr(vulcan_module, "app"):
+            return JSONResponse(
+                status_code=503,
+                content={"error": "VULCAN module not available"}
+            )
+        
+        vulcan_app = vulcan_module.app
+        
+        # Check if deployment is initialized
+        if not hasattr(vulcan_app.state, "deployment"):
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "error": "VULCAN not initialized",
+                    "detail": "The VULCAN deployment has not been initialized yet."
+                }
+            )
+        
+        # Import the handler
+        try:
+            from src.vulcan.main import get_feedback_stats
+        except ImportError as e:
+            logger.error(f"Failed to import VULCAN feedback stats handler: {e}")
+            return JSONResponse(
+                status_code=503,
+                content={"error": "Feedback stats handler unavailable", "detail": str(e)}
+            )
+        
+        # Call the feedback stats endpoint function directly
+        result = await get_feedback_stats()
+        return result
+        
+    except Exception as e:
+        logger.error(f"Feedback stats proxy error: {e}", exc_info=True)
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Internal error", "detail": str(e)}
+        )
+
+
+# =============================================================================
 # ARENA API ENDPOINTS (INTEGRATED)
 # =============================================================================
 
