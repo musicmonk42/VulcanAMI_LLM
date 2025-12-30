@@ -840,6 +840,9 @@ def get_unified_runtime(config: Optional[Any] = None) -> Optional[Any]:
         try:
             from unified_runtime.unified_runtime_core import UnifiedRuntime
             _unified_runtime = UnifiedRuntime(config=config)
+            # BUG FIX Issue #1: Mark as singleton so __del__ knows to cleanup
+            _unified_runtime._is_singleton = True
+            UnifiedRuntime._singleton_instance = _unified_runtime
             logger.info("[Singletons] ✓ UnifiedRuntime created and cached")
             return _unified_runtime
         except ImportError as e:
@@ -869,6 +872,9 @@ def set_unified_runtime(runtime: Any) -> bool:
     with _unified_runtime_lock:
         if _unified_runtime is None:
             _unified_runtime = runtime
+            # BUG FIX Issue #1: Mark as singleton so __del__ knows to cleanup
+            if hasattr(runtime, '_is_singleton'):
+                runtime._is_singleton = True
             logger.info("[Singletons] UnifiedRuntime registered from external source")
             return True
         elif _unified_runtime is not runtime:
@@ -916,6 +922,9 @@ def get_or_create_unified_runtime(config: Optional[Any] = None) -> Optional[Any]
         try:
             from unified_runtime.unified_runtime_core import UnifiedRuntime
             _unified_runtime = UnifiedRuntime(config=config)
+            # BUG FIX Issue #1: Mark as singleton so __del__ knows to cleanup
+            _unified_runtime._is_singleton = True
+            UnifiedRuntime._singleton_instance = _unified_runtime
             logger.info("[Singletons] ✓ UnifiedRuntime created via fallback and cached")
             return _unified_runtime
         except ImportError as e:
