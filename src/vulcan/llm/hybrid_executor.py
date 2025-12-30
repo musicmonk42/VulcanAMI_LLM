@@ -115,10 +115,11 @@ class OpenAIResponseCache:
         Uses SHA256 hash of combined parameters for efficient lookup.
         """
         # Create deterministic string representation
+        # Use 4 decimal precision for temperature to avoid unintended cache collisions
         key_parts = [
             str(prompt),
             str(max_tokens),
-            f"{temperature:.2f}",  # Round temperature to 2 decimals
+            f"{temperature:.4f}",  # 4 decimal precision for temperature
             str(system_prompt or ""),
         ]
         key_str = "|".join(key_parts)

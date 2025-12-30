@@ -302,7 +302,12 @@ class DistillationStorageBackend:
         
         if self._writer_thread and self._writer_thread.is_alive():
             self._writer_thread.join(timeout=timeout)
-            self.logger.info("Async writer stopped")
+            if self._writer_thread.is_alive():
+                self.logger.warning(
+                    f"Async writer thread did not stop within {timeout}s timeout"
+                )
+            else:
+                self.logger.info("Async writer stopped")
     
     def __del__(self):
         """Cleanup on deletion."""
