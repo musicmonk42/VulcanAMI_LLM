@@ -5,6 +5,8 @@ Continual learning implementations with EWC and experience replay
 import asyncio
 import logging
 import pickle
+import re
+import secrets
 import threading  # <-- threading is imported here
 import time
 from collections import deque
@@ -546,6 +548,154 @@ class EnhancedContinualLearner(nn.Module):
         self.receive_feedback(feedback)
         # Log only feedback type to avoid ID exposure
         logger.info(f"[RLHF] Thumbs {'up' if is_positive else 'down'} feedback submitted")
+
+    # ============================================================
+    # AUTO-DETECTION UTILITIES (Task 2)
+    # ============================================================
+
+    # Patterns for detecting different types of feedback in user messages
+    CORRECTION_PATTERNS = [
+        r"\b(no|wrong|incorrect|mistake|error|that'?s not right)\b",
+        r"\b(actually|correction|should be|meant to say)\b",
+        r"\b(fix|redo|try again|not what i asked)\b",
+    ]
+    
+    POSITIVE_PATTERNS = [
+        r"\b(thanks|thank you|great|perfect|exactly|correct|right|good job|well done)\b",
+        r"\b(awesome|excellent|amazing|helpful|works)\b",
+        r"\b(yes|yep|yeah|that'?s it|bingo)\b",
+    ]
+    
+    NEGATIVE_PATTERNS = [
+        r"\b(bad|terrible|awful|useless|unhelpful|disappointing)\b",
+        r"\b(doesn'?t work|didn'?t work|broken|failed)\b",
+        r"\b(hate|worst|garbage|trash)\b",
+    ]
+    
+    PREFERENCE_PATTERNS = [
+        r"\b(prefer|rather|instead|better if|would like)\b",
+        r"\b(don'?t like|dislike|stop doing|avoid)\b",
+        r"\b(always|never|please don'?t|please do)\b",
+    ]
+
+    def detect_feedback_type(self, user_message: str) -> Dict[str, Any]:
+        """
+        Auto-detect feedback type from user message.
+        
+        Args:
+            user_message: The user's message text
+            
+        Returns:
+            Dict with detected feedback type, confidence, and signals
+        """
+        message_lower = user_message.lower()
+        
+        # Count pattern matches for each type
+        correction_matches = sum(
+            1 for pattern in self.CORRECTION_PATTERNS 
+            if re.search(pattern, message_lower, re.IGNORECASE)
+        )
+        positive_matches = sum(
+            1 for pattern in self.POSITIVE_PATTERNS 
+            if re.search(pattern, message_lower, re.IGNORECASE)
+        )
+        negative_matches = sum(
+            1 for pattern in self.NEGATIVE_PATTERNS 
+            if re.search(pattern, message_lower, re.IGNORECASE)
+        )
+        preference_matches = sum(
+            1 for pattern in self.PREFERENCE_PATTERNS 
+            if re.search(pattern, message_lower, re.IGNORECASE)
+        )
+        
+        # Determine primary feedback type
+        max_matches = max(correction_matches, positive_matches, negative_matches, preference_matches)
+        
+        if max_matches == 0:
+            return {
+                "feedback_type": "neutral",
+                "confidence": 0.0,
+                "signals": {},
+            }
+        
+        # Calculate confidence based on number of matches
+        confidence = min(max_matches / 3.0, 1.0)  # Cap at 1.0
+        
+        if correction_matches == max_matches:
+            feedback_type = "correction"
+        elif positive_matches == max_matches:
+            feedback_type = "positive"
+        elif negative_matches == max_matches:
+            feedback_type = "negative"
+        else:
+            feedback_type = "preference"
+        
+        return {
+            "feedback_type": feedback_type,
+            "confidence": confidence,
+            "signals": {
+                "correction_signals": correction_matches,
+                "positive_signals": positive_matches,
+                "negative_signals": negative_matches,
+                "preference_signals": preference_matches,
+            },
+        }
+
+    def auto_process_user_message(self, user_message: str, context: Dict[str, Any]) -> Optional[FeedbackData]:
+        """
+        Automatically process a user message for implicit feedback.
+        Creates FeedbackData if feedback is detected with sufficient confidence.
+        
+        Args:
+            user_message: The user's message
+            context: Conversation context with previous query/response
+            
+        Returns:
+            FeedbackData if feedback detected, None otherwise
+        """
+        detection = self.detect_feedback_type(user_message)
+        
+        # Only create feedback if confidence is high enough
+        if detection["confidence"] < 0.3:
+            return None
+        
+        feedback_type = detection["feedback_type"]
+        
+        # Map detected type to reward signal
+        reward_map = {
+            "positive": 1.0,
+            "negative": -1.0,
+            "correction": -0.5,  # Corrections indicate something was wrong
+            "preference": 0.0,   # Preferences are informational, not good/bad
+        }
+        
+        reward_signal = reward_map.get(feedback_type, 0.0)
+        
+        # Create feedback data
+        feedback = FeedbackData(
+            feedback_id=f"auto_{int(time.time())}_{secrets.token_hex(4)}",
+            timestamp=time.time(),
+            feedback_type=f"auto_{feedback_type}",
+            content=None,  # Don't store user message content for privacy
+            context=context,
+            agent_response=context.get("previous_response_id"),
+            human_preference=None,
+            reward_signal=reward_signal,
+            metadata={
+                "auto_detected": True,
+                "detection_confidence": detection["confidence"],
+                "signals": detection["signals"],
+            },
+        )
+        
+        # Submit to RLHF system
+        self.receive_feedback(feedback)
+        
+        logger.info(
+            f"[AutoDetect] Detected {feedback_type} feedback with confidence {detection['confidence']:.2f}"
+        )
+        
+        return feedback
 
     def _create_task_head(self) -> nn.Module:
         """Create task-specific head."""

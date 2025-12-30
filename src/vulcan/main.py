@@ -68,6 +68,7 @@ import concurrent.futures
 import asyncio
 import argparse
 import re
+import secrets
 import sys
 import functools
 import datetime
@@ -3635,6 +3636,10 @@ Based on your analysis through memory retrieval, multi-modal reasoning, causal m
         ]
     )
 
+    # Generate response_id for feedback tracking (UI thumbs buttons)
+    response_id = f"resp_{int(time.time())}_{secrets.token_hex(4)}"
+    query_id = routing_plan.query_id if routing_plan else f"q_{int(time.time())}"
+
     response_data = {
         "response": response_text,
         "systems_used": systems_used,
@@ -3652,6 +3657,9 @@ Based on your analysis through memory retrieval, multi-modal reasoning, causal m
             if (reasoning_insights or world_model_insights or meta_reasoning_insights)
             else None
         ),
+        # RLHF INTEGRATION: Include IDs for feedback (Task 4 - UI thumbs buttons)
+        "query_id": query_id,
+        "response_id": response_id,
     }
 
     # Add routing layer stats if available
@@ -5408,6 +5416,36 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
             # Schedule GC as a background task (non-blocking)
             asyncio.create_task(_post_request_gc())
 
+        # Generate response_id for feedback tracking (UI thumbs buttons)
+        response_id = f"resp_{int(time.time())}_{secrets.token_hex(4)}"
+        query_id = routing_stats.get("query_id") if routing_stats else f"q_{int(time.time())}"
+
+        # ================================================================
+        # STEP 11: Process live feedback for auto-detection (Task 3)
+        # ================================================================
+        try:
+            learning_system = None
+            if hasattr(deployment, "collective") and hasattr(deployment.collective.deps, "learning"):
+                learning_system = deployment.collective.deps.learning
+            
+            if learning_system and hasattr(learning_system, "continual_learner") and learning_system.continual_learner:
+                learner = learning_system.continual_learner
+                
+                # Store context for future feedback processing
+                feedback_context = {
+                    "query_id": query_id,
+                    "response_id": response_id,
+                    "previous_response_id": response_id,
+                    "systems_used": systems_used,
+                    "reasoning_type": metadata.get("reasoning_type"),
+                }
+                
+                # Process live feedback (async, non-blocking)
+                if hasattr(learner, "process_live_feedback"):
+                    learner.process_live_feedback(user_message, feedback_context)
+        except Exception as e:
+            logger.debug(f"[VULCAN/v1/chat] Live feedback processing skipped: {e}")
+
         return {
             "response": response_text,
             "metadata": metadata,
@@ -5421,6 +5459,9 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
             "agent_pool_stats": agent_pool_stats if agent_pool_stats else None,
             # JOB-TO-RESPONSE GAP FIX: Include timing breakdown for debugging slow requests
             "timing_breakdown": timing_breakdown if latency_ms > SLOW_REQUEST_THRESHOLD_MS else None,
+            # RLHF INTEGRATION: Include IDs for feedback (Task 4 - UI thumbs buttons)
+            "query_id": query_id,
+            "response_id": response_id,
         }
 
     except Exception as e:
@@ -7014,7 +7055,6 @@ async def submit_feedback(request: FeedbackRequest):
             learner = learning_system.continual_learner
             if hasattr(learner, "receive_feedback"):
                 from vulcan.learning.learning_types import FeedbackData
-                import secrets
                 
                 # human_preference is the user's preferred response (None if not a preference comparison)
                 human_preference = request.context.get("preferred_response") if request.context else None
