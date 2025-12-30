@@ -171,9 +171,11 @@ result = factor(x**2 + 2*x + 1)
 x = Symbol('x'
 result = integrate(x, x)
 ''')
-        assert result['success'] is False
-        assert result['error'] is not None
-        assert 'syntax' in result['error'].lower() or 'compilation' in result['error'].lower()
+        assert result['success'] is False, "Should fail on syntax error"
+        assert result['error'] is not None, "Error message should be present"
+        error_lower = result['error'].lower()
+        assert 'syntax' in error_lower or 'compilation' in error_lower, \
+            f"Error should mention syntax or compilation, got: {result['error']}"
 
     def test_undefined_name_error(self):
         """Test that undefined names are caught."""

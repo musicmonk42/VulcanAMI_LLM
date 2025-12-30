@@ -263,7 +263,7 @@ class SafeCodeExecutor:
                     "Piecewise": sp.Piecewise,
                     "Function": sp.Function,
                     "Lambda": sp.Lambda,
-                    # Assumptions
+                    # Assumptions (optional - may not exist in all SymPy versions)
                     "Assumptions": getattr(sp, "Assumptions", None),
                     "assuming": getattr(sp, "assuming", None),
                     # Utilities
@@ -273,6 +273,10 @@ class SafeCodeExecutor:
                     "nsimplify": sp.nsimplify,
                 }
             )
+            
+            # Log missing optional features for debugging
+            if getattr(sp, "Assumptions", None) is None:
+                logger.debug("SymPy 'Assumptions' not available in this version")
 
         # Add NumPy functions if available - for numerical computations
         if NUMPY_AVAILABLE and np is not None:
@@ -353,7 +357,8 @@ class SafeCodeExecutor:
             exec(byte_code.code, execution_namespace)
 
             # Extract result (code should assign to 'result' or 'answer')
-            # Note: Use 'in' check to handle falsy values like 0, False, empty string
+            # Check if result variables exist in namespace (regardless of their truthiness)
+            # This correctly handles falsy values like 0, False, empty string
             if "result" in execution_namespace:
                 result = execution_namespace["result"]
             elif "answer" in execution_namespace:

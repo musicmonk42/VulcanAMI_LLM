@@ -1542,6 +1542,8 @@ result = simplify(integral)
                     tool=self.name,
                     metadata={
                         "query": query,
+                        # Limit to first 10 keys to keep metadata manageable
+                        # and avoid serializing large namespace contents
                         "execution_namespace_keys": list(
                             execution_result.get("namespace", {}).keys()
                         )[:10],
