@@ -106,6 +106,15 @@ class HybridLLMExecutor:
     ENSEMBLE_LOCAL_RESPONSE_MAX_LENGTH = 500
     # Valid execution modes
     VALID_MODES = ("local_first", "openai_first", "parallel", "ensemble")
+    
+    # Default system prompt that explicitly allows conversation memory
+    # MEMORY FIX: The default prompt tells the model to remember information from conversation
+    DEFAULT_SYSTEM_PROMPT = (
+        "You are VULCAN, an advanced AI assistant. "
+        "You SHOULD remember and reference information shared earlier in this conversation. "
+        "When a user shares their name, location, preferences, or any personal details during this session, "
+        "you may recall and use that information naturally in your responses."
+    )
 
     # ============================================================
     # INITIALIZATION
@@ -159,21 +168,12 @@ class HybridLLMExecutor:
     # MAIN EXECUTION METHOD
     # ============================================================
 
-    # Default system prompt that explicitly allows conversation memory
-    # MEMORY FIX: The default prompt now tells the model to remember information from conversation
-    DEFAULT_SYSTEM_PROMPT = (
-        "You are VULCAN, an advanced AI assistant. "
-        "You SHOULD remember and reference information shared earlier in this conversation. "
-        "When a user shares their name, location, preferences, or any personal details during this session, "
-        "you may recall and use that information naturally in your responses."
-    )
-
     async def execute(
         self,
         prompt: str,
         max_tokens: int = 1000,
         temperature: float = 0.7,
-        system_prompt: str = None,
+        system_prompt: Optional[str] = None,
         enable_distillation: bool = True,
         conversation_history: Optional[List[Dict[str, str]]] = None,
     ) -> Dict[str, Any]:

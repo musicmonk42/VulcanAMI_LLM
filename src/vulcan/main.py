@@ -3259,11 +3259,17 @@ Based on your analysis through memory retrieval, multi-modal reasoning, causal m
 
     # Execute hybrid LLM request
     try:
+        # MEMORY FIX: Updated system prompt to allow conversation memory
         llm_result = await hybrid_executor.execute(
             prompt=enhanced_prompt,
             max_tokens=request.max_tokens,
             temperature=0.7,
-            system_prompt="You are VULCAN, an advanced AI assistant. Respond based on the cognitive analysis provided.",
+            system_prompt=(
+                "You are VULCAN, an advanced AI assistant. "
+                "You SHOULD remember and reference information shared earlier in this conversation. "
+                "When a user shares personal details during this session, you may recall them naturally. "
+                "Respond based on the cognitive analysis provided."
+            ),
         )
 
         response_text = llm_result.get("text", "")
