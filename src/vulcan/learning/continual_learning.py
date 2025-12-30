@@ -2,8 +2,11 @@
 Continual learning implementations with EWC and experience replay
 """
 
+import asyncio
 import logging
 import pickle
+import re
+import secrets
 import threading  # <-- threading is imported here
 import time
 from collections import deque
@@ -32,6 +35,18 @@ try:
 except ImportError:
     HIERARCHICAL_AVAILABLE = False
     HierarchicalMemory = None
+
+# Knowledge Crystallizer integration
+try:
+    from ..knowledge_crystallizer import (
+        KnowledgeCrystallizer,
+        ExecutionTrace,
+        KNOWLEDGE_CRYSTALLIZER_AVAILABLE,
+    )
+except ImportError:
+    KNOWLEDGE_CRYSTALLIZER_AVAILABLE = False
+    KnowledgeCrystallizer = None
+    ExecutionTrace = None
 
 from ..config import EMBEDDING_DIM, HIDDEN_DIM, LATENT_DIM
 from ..security_fixes import safe_pickle_load
@@ -373,6 +388,18 @@ class EnhancedContinualLearner(nn.Module):
         # Live feedback processor
         self.live_feedback = LiveFeedbackProcessor(self, self.config)
 
+        # Knowledge Crystallizer integration
+        if KNOWLEDGE_CRYSTALLIZER_AVAILABLE:
+            try:
+                self.knowledge_crystallizer = KnowledgeCrystallizer()
+                logger.info("[KnowledgeCrystallizer] Initialized successfully")
+            except Exception as e:
+                logger.warning(f"[KnowledgeCrystallizer] Failed to initialize: {e}")
+                self.knowledge_crystallizer = None
+        else:
+            self.knowledge_crystallizer = None
+            logger.debug("[KnowledgeCrystallizer] Module not available")
+
         # Parameter history
         self.param_history = ParameterHistoryManager(config=self.config)
 
@@ -449,6 +476,457 @@ class EnhancedContinualLearner(nn.Module):
             if should_consolidate:
                 self.consolidation_counter = 0
             return should_consolidate
+
+    # ============================================================
+    # RLHF PUBLIC INTERFACE METHODS
+    # ============================================================
+
+    def receive_feedback(self, feedback: FeedbackData):
+        """
+        Public method to receive human feedback.
+        Delegates to RLHF manager if enabled.
+        
+        Args:
+            feedback: FeedbackData instance with user feedback
+        """
+        if self.rlhf_manager:
+            self.rlhf_manager.receive_feedback(feedback)
+            # Log only feedback type and reward, not user content
+            logger.info(f"[RLHF] Feedback received: type={feedback.feedback_type}, reward={feedback.reward_signal}")
+        else:
+            logger.warning("[RLHF] Feedback received but RLHF is disabled")
+
+    def process_live_feedback(self, user_message: str, context: Dict[str, Any]):
+        """
+        Process real-time feedback from user messages.
+        Auto-detects corrections and preferences.
+        
+        Args:
+            user_message: User's message
+            context: Conversation context including previous query/response
+        """
+        if self.live_feedback:
+            # Create feedback dict for async processing
+            feedback_data = {
+                "type": "live",
+                "message": user_message,
+                "context": context,
+                "timestamp": time.time(),
+            }
+            # Queue for async processing (if event loop is running)
+            try:
+                loop = asyncio.get_running_loop()
+                # Store task reference to prevent garbage collection
+                task = asyncio.ensure_future(self.live_feedback.process_live_feedback(feedback_data))
+                # Add callback to handle any errors silently
+                task.add_done_callback(lambda t: t.exception() if t.done() and not t.cancelled() else None)
+            except RuntimeError:
+                # No event loop - process synchronously
+                logger.debug("[LiveFeedback] No event loop - processing synchronously")
+                self.live_feedback.performance_tracker["feedback_processed"] += 1
+            # Log only message length to avoid PII exposure
+            logger.debug(f"[LiveFeedback] Processed message: length={len(user_message)} chars")
+
+    def get_feedback_stats(self) -> Dict[str, Any]:
+        """Get current RLHF statistics"""
+        stats = {
+            "rlhf_enabled": self.rlhf_manager is not None,
+            "live_feedback_enabled": self.live_feedback is not None,
+        }
+        
+        if self.rlhf_manager:
+            stats["rlhf_stats"] = self.rlhf_manager.feedback_stats.copy()
+        
+        if self.live_feedback:
+            stats["live_feedback_stats"] = self.live_feedback.performance_tracker.copy()
+        
+        return stats
+
+    def submit_thumbs_feedback(self, query_id: str, response_id: str, is_positive: bool, 
+                               context: Optional[Dict[str, Any]] = None):
+        """
+        Submit thumbs up/down feedback for a response.
+        
+        Args:
+            query_id: ID of the original query
+            response_id: ID of the response being rated
+            is_positive: True for thumbs up, False for thumbs down
+            context: Optional additional context
+        """
+        reward_signal = 1.0 if is_positive else -1.0
+        feedback_type = "thumbs_up" if is_positive else "thumbs_down"
+        
+        feedback = FeedbackData(
+            feedback_type=feedback_type,
+            user_input=query_id,
+            agent_response=response_id,
+            reward_signal=reward_signal,
+            context=context or {},
+            metadata={
+                "query_id": query_id,
+                "response_id": response_id,
+                "feedback_source": "ui_button",
+            },
+        )
+        
+        self.receive_feedback(feedback)
+        # Log only feedback type to avoid ID exposure
+        logger.info(f"[RLHF] Thumbs {'up' if is_positive else 'down'} feedback submitted")
+
+    # ============================================================
+    # AUTO-DETECTION UTILITIES (Task 2)
+    # ============================================================
+
+    # Patterns for detecting different types of feedback in user messages
+    CORRECTION_PATTERNS = [
+        r"\b(no|wrong|incorrect|mistake|error|that'?s not right)\b",
+        r"\b(actually|correction|should be|meant to say)\b",
+        r"\b(fix|redo|try again|not what i asked)\b",
+    ]
+    
+    POSITIVE_PATTERNS = [
+        r"\b(thanks|thank you|great|perfect|exactly|correct|right|good job|well done)\b",
+        r"\b(awesome|excellent|amazing|helpful|works)\b",
+        r"\b(yes|yep|yeah|that'?s it|bingo)\b",
+    ]
+    
+    NEGATIVE_PATTERNS = [
+        r"\b(bad|terrible|awful|useless|unhelpful|disappointing)\b",
+        r"\b(doesn'?t work|didn'?t work|broken|failed)\b",
+        r"\b(hate|worst|garbage|trash)\b",
+    ]
+    
+    PREFERENCE_PATTERNS = [
+        r"\b(prefer|rather|instead|better if|would like)\b",
+        r"\b(don'?t like|dislike|stop doing|avoid)\b",
+        r"\b(always|never|please don'?t|please do)\b",
+    ]
+
+    def detect_feedback_type(self, user_message: str) -> Dict[str, Any]:
+        """
+        Auto-detect feedback type from user message.
+        
+        Args:
+            user_message: The user's message text
+            
+        Returns:
+            Dict with detected feedback type, confidence, and signals
+        """
+        message_lower = user_message.lower()
+        
+        # Count pattern matches for each type
+        correction_matches = sum(
+            1 for pattern in self.CORRECTION_PATTERNS 
+            if re.search(pattern, message_lower, re.IGNORECASE)
+        )
+        positive_matches = sum(
+            1 for pattern in self.POSITIVE_PATTERNS 
+            if re.search(pattern, message_lower, re.IGNORECASE)
+        )
+        negative_matches = sum(
+            1 for pattern in self.NEGATIVE_PATTERNS 
+            if re.search(pattern, message_lower, re.IGNORECASE)
+        )
+        preference_matches = sum(
+            1 for pattern in self.PREFERENCE_PATTERNS 
+            if re.search(pattern, message_lower, re.IGNORECASE)
+        )
+        
+        # Determine primary feedback type
+        max_matches = max(correction_matches, positive_matches, negative_matches, preference_matches)
+        
+        if max_matches == 0:
+            return {
+                "feedback_type": "neutral",
+                "confidence": 0.0,
+                "signals": {},
+            }
+        
+        # Calculate confidence based on number of matches
+        confidence = min(max_matches / 3.0, 1.0)  # Cap at 1.0
+        
+        if correction_matches == max_matches:
+            feedback_type = "correction"
+        elif positive_matches == max_matches:
+            feedback_type = "positive"
+        elif negative_matches == max_matches:
+            feedback_type = "negative"
+        else:
+            feedback_type = "preference"
+        
+        return {
+            "feedback_type": feedback_type,
+            "confidence": confidence,
+            "signals": {
+                "correction_signals": correction_matches,
+                "positive_signals": positive_matches,
+                "negative_signals": negative_matches,
+                "preference_signals": preference_matches,
+            },
+        }
+
+    def auto_process_user_message(self, user_message: str, context: Dict[str, Any]) -> Optional[FeedbackData]:
+        """
+        Automatically process a user message for implicit feedback.
+        Creates FeedbackData if feedback is detected with sufficient confidence.
+        
+        Args:
+            user_message: The user's message
+            context: Conversation context with previous query/response
+            
+        Returns:
+            FeedbackData if feedback detected, None otherwise
+        """
+        detection = self.detect_feedback_type(user_message)
+        
+        # Only create feedback if confidence is high enough
+        if detection["confidence"] < 0.3:
+            return None
+        
+        feedback_type = detection["feedback_type"]
+        
+        # Map detected type to reward signal
+        reward_map = {
+            "positive": 1.0,
+            "negative": -1.0,
+            "correction": -0.5,  # Corrections indicate something was wrong
+            "preference": 0.0,   # Preferences are informational, not good/bad
+        }
+        
+        reward_signal = reward_map.get(feedback_type, 0.0)
+        
+        # Create feedback data
+        feedback = FeedbackData(
+            feedback_id=f"auto_{int(time.time())}_{secrets.token_hex(4)}",
+            timestamp=time.time(),
+            feedback_type=f"auto_{feedback_type}",
+            content=None,  # Don't store user message content for privacy
+            context=context,
+            agent_response=context.get("previous_response_id"),
+            human_preference=None,
+            reward_signal=reward_signal,
+            metadata={
+                "auto_detected": True,
+                "detection_confidence": detection["confidence"],
+                "signals": detection["signals"],
+            },
+        )
+        
+        # Submit to RLHF system
+        self.receive_feedback(feedback)
+        
+        logger.info(
+            f"[AutoDetect] Detected {feedback_type} feedback with confidence {detection['confidence']:.2f}"
+        )
+        
+        return feedback
+
+    # =========================================================================
+    # KNOWLEDGE CRYSTALLIZER INTEGRATION
+    # =========================================================================
+
+    def crystallize_from_execution(
+        self,
+        query: str,
+        response: str,
+        success: bool,
+        tools_used: Optional[List[str]] = None,
+        strategy: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Crystallize knowledge from an execution trace.
+        
+        The Knowledge Crystallizer extracts reusable principles from execution traces.
+        It follows the pattern: EXAMINE → SELECT → APPLY → REMEMBER
+        
+        ExecutionTrace structure (from knowledge_crystallizer_core.py):
+        - trace_id: str - Unique identifier
+        - actions: List[Dict] - Actions performed during execution
+        - outcomes: Dict - Results/outcomes of the execution
+        - context: Dict - Context information
+        - success: bool - Whether execution was successful
+        - metadata: Dict - Additional metadata
+        - domain: str - Domain/category of the execution
+        
+        Args:
+            query: The user's query
+            response: The system's response
+            success: Whether the execution was successful
+            tools_used: List of tools used in the response
+            strategy: The strategy/approach used (reasoning_type)
+            metadata: Additional metadata about the execution
+            
+        Returns:
+            Crystallization result dict or None if crystallizer unavailable
+        """
+        if not self.knowledge_crystallizer:
+            logger.debug("[KnowledgeCrystallizer] Not available, skipping crystallization")
+            return None
+        
+        try:
+            # Import ExecutionTrace from knowledge_crystallizer_core (not principle_extractor)
+            from ..knowledge_crystallizer.knowledge_crystallizer_core import ExecutionTrace as CoreExecutionTrace
+            
+            # Create trace_id from query hash + timestamp
+            trace_id = f"exec_{int(time.time())}_{secrets.token_hex(4)}"
+            
+            # Build actions list representing what VULCAN did
+            actions = []
+            if tools_used:
+                for tool in tools_used:
+                    actions.append({
+                        "type": "tool_invocation",
+                        "tool": tool,
+                        "timestamp": time.time(),
+                    })
+            if strategy:
+                actions.append({
+                    "type": "reasoning",
+                    "strategy": strategy,
+                    "timestamp": time.time(),
+                })
+            
+            # Build outcomes dict
+            outcomes = {
+                "success": success,
+                "response_length": len(response) if response else 0,
+                "tools_count": len(tools_used) if tools_used else 0,
+            }
+            
+            # Build context
+            context = {
+                "query": query[:500] if query else "",  # Truncate for privacy
+                "strategy": strategy,
+                "tools_available": tools_used or [],
+            }
+            
+            # Determine domain from strategy/tools
+            domain = "general"
+            if strategy:
+                if "math" in strategy.lower() or "calculation" in strategy.lower():
+                    domain = "math"
+                elif "code" in strategy.lower() or "programming" in strategy.lower():
+                    domain = "programming"
+                elif "reason" in strategy.lower():
+                    domain = "reasoning"
+            
+            # Create the ExecutionTrace with proper structure
+            trace = CoreExecutionTrace(
+                trace_id=trace_id,
+                actions=actions,
+                outcomes=outcomes,
+                context=context,
+                success=success,
+                metadata=metadata or {},
+                domain=domain,
+                timestamp=time.time(),
+            )
+            
+            # Attempt crystallization
+            result = self.knowledge_crystallizer.crystallize(trace)
+            
+            if result and hasattr(result, 'principles') and result.principles:
+                logger.info(
+                    f"[KnowledgeCrystallizer] Crystallized {len(result.principles)} principles "
+                    f"from trace {trace_id} (confidence: {result.confidence:.2f})"
+                )
+                # Return as dict for easier handling
+                return result.to_dict() if hasattr(result, 'to_dict') else {
+                    "principles": len(result.principles),
+                    "confidence": result.confidence,
+                    "mode": result.mode.value if hasattr(result.mode, 'value') else str(result.mode),
+                }
+            else:
+                logger.debug(f"[KnowledgeCrystallizer] No principles extracted from trace {trace_id}")
+                return None
+                
+        except ImportError as e:
+            logger.warning(f"[KnowledgeCrystallizer] Import error: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"[KnowledgeCrystallizer] Crystallization failed: {e}")
+            return None
+
+    def apply_crystallized_knowledge(
+        self,
+        query: str,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Apply crystallized knowledge to enhance a query/response.
+        
+        Uses KnowledgeCrystallizer.apply_knowledge() to find applicable principles
+        and adapt them to the current problem context.
+        
+        Args:
+            query: The user's query
+            context: Additional context (domain, constraints, etc.)
+            
+        Returns:
+            ApplicationResult dict with principle_used, solution, confidence, etc.
+            or None if no applicable knowledge found
+        """
+        if not self.knowledge_crystallizer:
+            return None
+        
+        try:
+            # Build problem specification for apply_knowledge
+            problem = {
+                "query": query,
+                "context": context or {},
+                "domain": context.get("domain", "general") if context else "general",
+            }
+            
+            # Query the crystallizer for applicable knowledge
+            result = self.knowledge_crystallizer.apply_knowledge(problem)
+            
+            if result and result.principle_used:
+                logger.debug(
+                    f"[KnowledgeCrystallizer] Applied principle with confidence {result.confidence:.2f}"
+                )
+                return result.to_dict() if hasattr(result, 'to_dict') else {
+                    "principle_used": str(result.principle_used),
+                    "solution": result.solution,
+                    "confidence": result.confidence,
+                    "adaptations": result.adaptations,
+                    "warnings": result.warnings,
+                }
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"[KnowledgeCrystallizer] Apply failed: {e}")
+            return None
+
+    def get_crystallizer_stats(self) -> Dict[str, Any]:
+        """Get statistics from the Knowledge Crystallizer."""
+        if not self.knowledge_crystallizer:
+            return {
+                "available": False,
+                "reason": "KnowledgeCrystallizer not initialized",
+            }
+        
+        try:
+            stats = {
+                "available": True,
+                "principles_count": 0,
+                "contraindications_count": 0,
+            }
+            
+            # Get stats from crystallizer if available
+            if hasattr(self.knowledge_crystallizer, "get_stats"):
+                stats.update(self.knowledge_crystallizer.get_stats())
+            elif hasattr(self.knowledge_crystallizer, "knowledge_base"):
+                kb = self.knowledge_crystallizer.knowledge_base
+                if hasattr(kb, "get_all_principles"):
+                    stats["principles_count"] = len(kb.get_all_principles())
+            
+            return stats
+            
+        except Exception as e:
+            logger.error(f"[KnowledgeCrystallizer] Stats failed: {e}")
+            return {"available": True, "error": str(e)}
 
     def _create_task_head(self) -> nn.Module:
         """Create task-specific head."""

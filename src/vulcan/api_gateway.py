@@ -1358,6 +1358,11 @@ class APIGateway:
         self.app.router.add_get("/v1/status", self.system_status)
         self.app.router.add_post("/v1/configure", self.configure_system)
 
+        # RLHF Feedback endpoints
+        self.app.router.add_post("/v1/feedback", self.submit_feedback)
+        self.app.router.add_post("/v1/feedback/thumbs", self.submit_thumbs_feedback)
+        self.app.router.add_get("/v1/feedback/stats", self.get_feedback_stats)
+
         self.app.router.add_get("/ws", self.websocket_handler)
 
         self.app.router.add_post("/graphql", self.graphql_handler)
@@ -2150,6 +2155,215 @@ class APIGateway:
             logger.error(f"Reasoning failed: {e}\n{traceback.format_exc()}")
             return web.json_response(
                 {"error": "Reasoning failed", "message": str(e)}, status=500
+            )
+
+    # ============================================================
+    # RLHF FEEDBACK ENDPOINTS
+    # ============================================================
+
+    async def submit_feedback(self, request):
+        """
+        Submit human feedback for RLHF learning.
+        
+        Expected JSON body:
+        {
+            "feedback_type": "rating" | "correction" | "preference" | "thumbs",
+            "query_id": "string",
+            "response_id": "string",
+            "reward_signal": float (-1.0 to 1.0),
+            "content": any (optional feedback content),
+            "context": dict (optional context)
+        }
+        """
+        try:
+            data = await request.json()
+        except json.JSONDecodeError:
+            return web.json_response({"error": "Invalid JSON"}, status=400)
+
+        feedback_type = data.get("feedback_type", "rating")
+        query_id = data.get("query_id")
+        response_id = data.get("response_id")
+        reward_signal = data.get("reward_signal", 0.0)
+        content = data.get("content")
+        context = data.get("context", {})
+
+        if not query_id or not response_id:
+            return web.json_response(
+                {"error": "query_id and response_id are required"}, status=400
+            )
+
+        try:
+            # Get the learning system from deployment
+            learning_system = None
+            if hasattr(self.deployment, "collective") and hasattr(
+                self.deployment.collective.deps, "learning"
+            ):
+                learning_system = self.deployment.collective.deps.learning
+            
+            if learning_system is None:
+                return web.json_response(
+                    {"error": "Learning system not available"}, status=503
+                )
+
+            # Check if continual_learner has the receive_feedback method
+            if hasattr(learning_system, "continual_learner") and learning_system.continual_learner:
+                learner = learning_system.continual_learner
+                if hasattr(learner, "receive_feedback"):
+                    from vulcan.learning.learning_types import FeedbackData
+                    
+                    # human_preference is the user's preferred response (None if not a preference comparison)
+                    human_preference = context.get("preferred_response") if context else None
+                    
+                    feedback = FeedbackData(
+                        feedback_id=f"fb_{int(time.time())}_{secrets.token_hex(4)}",
+                        timestamp=time.time(),
+                        feedback_type=feedback_type,
+                        content=content,
+                        context=context,
+                        agent_response=response_id,
+                        human_preference=human_preference,
+                        reward_signal=float(reward_signal),
+                        metadata={
+                            "query_id": query_id,
+                            "response_id": response_id,
+                            "source": "api",
+                        },
+                    )
+                    
+                    learner.receive_feedback(feedback)
+                    
+                    return web.json_response({
+                        "status": "accepted",
+                        "feedback_id": feedback.feedback_id,
+                        "message": "Feedback submitted successfully"
+                    })
+
+            return web.json_response(
+                {"error": "RLHF feedback not available on this system"}, status=503
+            )
+
+        except Exception as e:
+            logger.error(f"Feedback submission failed: {e}\n{traceback.format_exc()}")
+            return web.json_response(
+                {"error": "Feedback submission failed", "message": str(e)}, status=500
+            )
+
+    async def submit_thumbs_feedback(self, request):
+        """
+        Submit thumbs up/down feedback (simplified endpoint for UI buttons).
+        
+        Expected JSON body:
+        {
+            "query_id": "string",
+            "response_id": "string",
+            "is_positive": boolean (true = thumbs up, false = thumbs down)
+        }
+        """
+        try:
+            data = await request.json()
+        except json.JSONDecodeError:
+            return web.json_response({"error": "Invalid JSON"}, status=400)
+
+        query_id = data.get("query_id")
+        response_id = data.get("response_id")
+        is_positive = data.get("is_positive", True)
+
+        if not query_id or not response_id:
+            return web.json_response(
+                {"error": "query_id and response_id are required"}, status=400
+            )
+
+        try:
+            # Get the learning system from deployment
+            learning_system = None
+            if hasattr(self.deployment, "collective") and hasattr(
+                self.deployment.collective.deps, "learning"
+            ):
+                learning_system = self.deployment.collective.deps.learning
+            
+            if learning_system is None:
+                return web.json_response(
+                    {"error": "Learning system not available"}, status=503
+                )
+
+            # Check if continual_learner has the submit_thumbs_feedback method
+            if hasattr(learning_system, "continual_learner") and learning_system.continual_learner:
+                learner = learning_system.continual_learner
+                if hasattr(learner, "submit_thumbs_feedback"):
+                    learner.submit_thumbs_feedback(
+                        query_id=query_id,
+                        response_id=response_id,
+                        is_positive=is_positive,
+                    )
+                    
+                    return web.json_response({
+                        "status": "accepted",
+                        "feedback_type": "thumbs_up" if is_positive else "thumbs_down",
+                        "message": f"Thumbs {'up' if is_positive else 'down'} recorded"
+                    })
+
+            return web.json_response(
+                {"error": "Thumbs feedback not available on this system"}, status=503
+            )
+
+        except Exception as e:
+            logger.error(f"Thumbs feedback failed: {e}\n{traceback.format_exc()}")
+            return web.json_response(
+                {"error": "Thumbs feedback failed", "message": str(e)}, status=500
+            )
+
+    async def get_feedback_stats(self, request):
+        """
+        Get RLHF feedback statistics.
+        
+        Returns current feedback stats including:
+        - Total feedback received
+        - Positive/negative feedback counts
+        - Correction counts
+        - Preference learning stats
+        """
+        try:
+            # Get the learning system from deployment
+            learning_system = None
+            if hasattr(self.deployment, "collective") and hasattr(
+                self.deployment.collective.deps, "learning"
+            ):
+                learning_system = self.deployment.collective.deps.learning
+            
+            # Return consistent response even if learning system unavailable
+            if learning_system is None:
+                return web.json_response({
+                    "status": "ok",
+                    "stats": {
+                        "rlhf_enabled": False,
+                        "live_feedback_enabled": False,
+                        "message": "Learning system not available"
+                    }
+                })
+
+            # Check if continual_learner has the get_feedback_stats method
+            if hasattr(learning_system, "continual_learner") and learning_system.continual_learner:
+                learner = learning_system.continual_learner
+                if hasattr(learner, "get_feedback_stats"):
+                    stats = learner.get_feedback_stats()
+                    return web.json_response({
+                        "status": "ok",
+                        "stats": stats
+                    })
+
+            return web.json_response({
+                "status": "ok",
+                "stats": {
+                    "rlhf_enabled": False,
+                    "live_feedback_enabled": False,
+                    "message": "RLHF not configured"
+                }
+            })
+
+        except Exception as e:
+            logger.error(f"Failed to get feedback stats: {e}\n{traceback.format_exc()}")
+            return web.json_response(
+                {"error": "Failed to get feedback stats", "message": str(e)}, status=500
             )
 
     async def search_memory(self, request):

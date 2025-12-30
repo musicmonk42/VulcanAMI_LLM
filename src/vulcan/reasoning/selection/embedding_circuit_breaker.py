@@ -9,7 +9,7 @@ operations when performance degrades, falling back to keyword-based selection.
 
 Key Features:
 - Tracks embedding latency with exponential moving average
-- Opens circuit when latency exceeds threshold (e.g., 5 seconds)
+- Opens circuit when latency exceeds threshold (default: 2 seconds)
 - Half-open state allows testing if embeddings have recovered
 - Automatic reset after recovery timeout
 - Thread-safe implementation
@@ -54,11 +54,11 @@ class CircuitState(Enum):
 
 
 # Configuration constants
-# CPU OPTIMIZATION: Increased thresholds to match actual embedding performance
-# Production logs showed embeddings taking 10-15s under CPU load
-DEFAULT_LATENCY_THRESHOLD_MS = 20000.0  # 20 seconds - increased from 15s for more headroom
-DEFAULT_FAILURE_THRESHOLD = 5  # Number of slow operations before opening circuit (increased from 3)
-DEFAULT_RESET_TIMEOUT_S = 60.0  # Time before trying half-open state
+# PERFORMANCE FIX: Lowered thresholds for faster fail-fast behavior
+# Previous 20s threshold allowed too many slow operations before tripping
+DEFAULT_LATENCY_THRESHOLD_MS = 2000.0  # 2 seconds - fail fast on slow embeddings
+DEFAULT_FAILURE_THRESHOLD = 3  # Number of slow operations before opening circuit
+DEFAULT_RESET_TIMEOUT_S = 30.0  # Time before trying half-open state (reduced from 60s)
 DEFAULT_SUCCESS_THRESHOLD = 2  # Successes needed in half-open to close
 DEFAULT_EMA_ALPHA = 0.3  # Exponential moving average smoothing factor
 

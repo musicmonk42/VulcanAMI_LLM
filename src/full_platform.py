@@ -2629,7 +2629,6 @@ _demos_dir = Path(__file__).parent.parent / "demos"
 if _demos_dir.exists():
     app.mount("/demos", StaticFiles(directory=str(_demos_dir)), name="demos")
     logger.info(f"✓ Mounted demos files from {_demos_dir} at /demos")
-    logger.info("  → vulcan_chat.html available at /demos/vulcan_chat.html")
 
 # Mount static directory at /static for the main chat interface and static assets
 # The root endpoint (/) serves static/index.html directly
@@ -2637,13 +2636,14 @@ _static_dir = Path(__file__).parent.parent / "static"
 if _static_dir.exists():
     app.mount("/static", StaticFiles(directory=str(_static_dir)), name="static")
     logger.info(f"✓ Mounted static files from {_static_dir} at /static")
+    logger.info("  → Chat interface available at / (serves static/index.html)")
 
 
-# Convenience redirect: /vulcan_chat.html -> /demos/vulcan_chat.html
+# Convenience redirect: /vulcan_chat.html -> / (main chat interface)
 @app.get("/vulcan_chat.html")
 async def vulcan_chat_redirect():
-    """Redirect /vulcan_chat.html to /demos/vulcan_chat.html for convenience."""
-    return RedirectResponse(url="/demos/vulcan_chat.html", status_code=301)
+    """Redirect /vulcan_chat.html to root for backward compatibility."""
+    return RedirectResponse(url="/", status_code=301)
 
 
 # Request logging and metrics middleware
@@ -2685,18 +2685,14 @@ async def log_requests(request: Request, call_next):
 @app.get("/")
 async def root():
     """
-    Root endpoint serves the chat interface (vulcan_chat.html).
+    Root endpoint serves the chat interface (static/index.html).
     For platform status, visit /status instead.
     """
     static_index = Path(__file__).parent.parent / "static" / "index.html"
     if static_index.exists():
         return FileResponse(static_index, media_type="text/html")
-    # Fallback to demos directory if static/index.html doesn't exist
-    demos_chat = Path(__file__).parent.parent / "demos" / "vulcan_chat.html"
-    if demos_chat.exists():
-        return FileResponse(demos_chat, media_type="text/html")
     return HTMLResponse(
-        content="<h1>Chat interface not found</h1><p>Neither <code>static/index.html</code> nor <code>demos/vulcan_chat.html</code> were found. Please check your installation.</p>",
+        content="<h1>Chat interface not found</h1><p><code>static/index.html</code> was not found. Please check your installation.</p>",
         status_code=404
     )
 

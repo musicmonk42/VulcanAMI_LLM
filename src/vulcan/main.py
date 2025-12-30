@@ -68,6 +68,7 @@ import concurrent.futures
 import asyncio
 import argparse
 import re
+import secrets
 import sys
 import functools
 import datetime
@@ -3259,11 +3260,17 @@ Based on your analysis through memory retrieval, multi-modal reasoning, causal m
 
     # Execute hybrid LLM request
     try:
+        # MEMORY FIX: Updated system prompt to allow conversation memory
         llm_result = await hybrid_executor.execute(
             prompt=enhanced_prompt,
             max_tokens=request.max_tokens,
             temperature=0.7,
-            system_prompt="You are VULCAN, an advanced AI assistant. Respond based on the cognitive analysis provided.",
+            system_prompt=(
+                "You are VULCAN, an advanced AI assistant. "
+                "You SHOULD remember and reference information shared earlier in this conversation. "
+                "When a user shares personal details during this session, you may recall them naturally. "
+                "Respond based on the cognitive analysis provided."
+            ),
         )
 
         response_text = llm_result.get("text", "")
@@ -3629,6 +3636,10 @@ Based on your analysis through memory retrieval, multi-modal reasoning, causal m
         ]
     )
 
+    # Generate response_id for feedback tracking (UI thumbs buttons)
+    response_id = f"resp_{int(time.time())}_{secrets.token_hex(4)}"
+    query_id = routing_plan.query_id if routing_plan else f"q_{int(time.time())}"
+
     response_data = {
         "response": response_text,
         "systems_used": systems_used,
@@ -3646,6 +3657,9 @@ Based on your analysis through memory retrieval, multi-modal reasoning, causal m
             if (reasoning_insights or world_model_insights or meta_reasoning_insights)
             else None
         ),
+        # RLHF INTEGRATION: Include IDs for feedback (Task 4 - UI thumbs buttons)
+        "query_id": query_id,
+        "response_id": response_id,
     }
 
     # Add routing layer stats if available
@@ -5149,9 +5163,13 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
                 )
 
                 try:
-                    # Build system prompt that emphasizes using reasoning output
+                    # Build system prompt that emphasizes using reasoning output AND conversation memory
+                    # MEMORY FIX: Explicitly allow the model to remember and use information from the conversation
                     system_prompt = (
                         "You are VULCAN, an advanced AI assistant powered by specialized reasoning engines. "
+                        "IMPORTANT: You SHOULD remember and reference information shared earlier in this conversation. "
+                        "When a user shares their name, location, preferences, or any personal details during this session, "
+                        "you may recall and use that information naturally in your responses. This is expected behavior. "
                         "When reasoning analysis is provided in the prompt, you MUST incorporate it directly into your response. "
                         "Do NOT ignore or paraphrase away the specific conclusions, probabilities, proofs, or causal analyses provided. "
                         "Present the reasoning results clearly and explain how they answer the user's question."
@@ -5398,6 +5416,64 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
             # Schedule GC as a background task (non-blocking)
             asyncio.create_task(_post_request_gc())
 
+        # Generate response_id for feedback tracking (UI thumbs buttons)
+        response_id = f"resp_{int(time.time())}_{secrets.token_hex(4)}"
+        query_id = routing_stats.get("query_id") if routing_stats else f"q_{int(time.time())}"
+
+        # ================================================================
+        # STEP 11: Process live feedback for auto-detection (Task 3)
+        # ================================================================
+        try:
+            learning_system = None
+            if hasattr(deployment, "collective") and hasattr(deployment.collective.deps, "learning"):
+                learning_system = deployment.collective.deps.learning
+            
+            if learning_system and hasattr(learning_system, "continual_learner") and learning_system.continual_learner:
+                learner = learning_system.continual_learner
+                
+                # Store context for future feedback processing
+                feedback_context = {
+                    "query_id": query_id,
+                    "response_id": response_id,
+                    "previous_response_id": response_id,
+                    "systems_used": systems_used,
+                    "reasoning_type": metadata.get("reasoning_type"),
+                }
+                
+                # Process live feedback (async, non-blocking)
+                if hasattr(learner, "process_live_feedback"):
+                    learner.process_live_feedback(user_message, feedback_context)
+        except Exception as e:
+            logger.debug(f"[VULCAN/v1/chat] Live feedback processing skipped: {e}")
+
+        # ================================================================
+        # STEP 12: Crystallize knowledge from execution (Knowledge Crystallizer)
+        # ================================================================
+        try:
+            learning_system = None
+            if hasattr(deployment, "collective") and hasattr(deployment.collective.deps, "learning"):
+                learning_system = deployment.collective.deps.learning
+            
+            if learning_system and hasattr(learning_system, "continual_learner") and learning_system.continual_learner:
+                learner = learning_system.continual_learner
+                
+                # Crystallize knowledge from this execution (non-blocking)
+                if hasattr(learner, "crystallize_from_execution"):
+                    learner.crystallize_from_execution(
+                        query=user_message,
+                        response=response_text,
+                        success=metadata.get("safety_status") == "safe",
+                        tools_used=systems_used,
+                        strategy=metadata.get("reasoning_type"),
+                        metadata={
+                            "query_id": query_id,
+                            "response_id": response_id,
+                            "latency_ms": latency_ms,
+                        },
+                    )
+        except Exception as e:
+            logger.debug(f"[VULCAN/v1/chat] Knowledge crystallization skipped: {e}")
+
         return {
             "response": response_text,
             "metadata": metadata,
@@ -5411,6 +5487,9 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
             "agent_pool_stats": agent_pool_stats if agent_pool_stats else None,
             # JOB-TO-RESPONSE GAP FIX: Include timing breakdown for debugging slow requests
             "timing_breakdown": timing_breakdown if latency_ms > SLOW_REQUEST_THRESHOLD_MS else None,
+            # RLHF INTEGRATION: Include IDs for feedback (Task 4 - UI thumbs buttons)
+            "query_id": query_id,
+            "response_id": response_id,
         }
 
     except Exception as e:
@@ -6952,6 +7031,192 @@ async def get_hardware_status():
 
     except Exception as e:
         logger.error(f"Failed to get hardware status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================
+# RLHF FEEDBACK ENDPOINTS
+# ============================================================
+
+
+class FeedbackRequest(BaseModel):
+    """Request model for submitting feedback."""
+    feedback_type: str = Field(default="rating", description="Type of feedback: rating, correction, preference, thumbs")
+    query_id: str = Field(..., description="ID of the original query")
+    response_id: str = Field(..., description="ID of the response being rated")
+    reward_signal: float = Field(default=0.0, ge=-1.0, le=1.0, description="Reward signal from -1.0 to 1.0")
+    content: Optional[Any] = Field(default=None, description="Optional feedback content")
+    context: Optional[Dict[str, Any]] = Field(default=None, description="Optional context")
+
+
+class ThumbsFeedbackRequest(BaseModel):
+    """Request model for thumbs up/down feedback."""
+    query_id: str = Field(..., description="ID of the original query")
+    response_id: str = Field(..., description="ID of the response being rated")
+    is_positive: bool = Field(default=True, description="True for thumbs up, False for thumbs down")
+
+
+@app.post("/v1/feedback")
+async def submit_feedback(request: FeedbackRequest):
+    """
+    Submit human feedback for RLHF learning.
+    
+    This endpoint accepts feedback on AI responses to improve future performance
+    through Reinforcement Learning from Human Feedback (RLHF).
+    """
+    if not hasattr(app.state, "deployment"):
+        raise HTTPException(status_code=503, detail="System not initialized")
+
+    try:
+        deployment = app.state.deployment
+        
+        # Try to get learning system
+        learning_system = None
+        if hasattr(deployment, "collective") and hasattr(deployment.collective.deps, "learning"):
+            learning_system = deployment.collective.deps.learning
+        
+        if learning_system is None:
+            raise HTTPException(status_code=503, detail="Learning system not available")
+
+        # Check if continual_learner has the receive_feedback method
+        if hasattr(learning_system, "continual_learner") and learning_system.continual_learner:
+            learner = learning_system.continual_learner
+            if hasattr(learner, "receive_feedback"):
+                from vulcan.learning.learning_types import FeedbackData
+                
+                # human_preference is the user's preferred response (None if not a preference comparison)
+                human_preference = request.context.get("preferred_response") if request.context else None
+                
+                feedback = FeedbackData(
+                    feedback_id=f"fb_{int(time.time())}_{secrets.token_hex(4)}",
+                    timestamp=time.time(),
+                    feedback_type=request.feedback_type,
+                    content=request.content,
+                    context=request.context or {},
+                    agent_response=request.response_id,
+                    human_preference=human_preference,
+                    reward_signal=float(request.reward_signal),
+                    metadata={
+                        "query_id": request.query_id,
+                        "response_id": request.response_id,
+                        "source": "api",
+                    },
+                )
+                
+                learner.receive_feedback(feedback)
+                
+                return {
+                    "status": "accepted",
+                    "feedback_id": feedback.feedback_id,
+                    "message": "Feedback submitted successfully"
+                }
+
+        raise HTTPException(status_code=503, detail="RLHF feedback not available on this system")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Feedback submission failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/v1/feedback/thumbs")
+async def submit_thumbs_feedback(request: ThumbsFeedbackRequest):
+    """
+    Submit thumbs up/down feedback (simplified endpoint for UI buttons).
+    
+    This is a simplified endpoint for submitting binary feedback (thumbs up/down)
+    on AI responses, typically triggered by UI buttons.
+    """
+    if not hasattr(app.state, "deployment"):
+        raise HTTPException(status_code=503, detail="System not initialized")
+
+    try:
+        deployment = app.state.deployment
+        
+        # Try to get learning system
+        learning_system = None
+        if hasattr(deployment, "collective") and hasattr(deployment.collective.deps, "learning"):
+            learning_system = deployment.collective.deps.learning
+        
+        if learning_system is None:
+            raise HTTPException(status_code=503, detail="Learning system not available")
+
+        # Check if continual_learner has the submit_thumbs_feedback method
+        if hasattr(learning_system, "continual_learner") and learning_system.continual_learner:
+            learner = learning_system.continual_learner
+            if hasattr(learner, "submit_thumbs_feedback"):
+                learner.submit_thumbs_feedback(
+                    query_id=request.query_id,
+                    response_id=request.response_id,
+                    is_positive=request.is_positive,
+                )
+                
+                return {
+                    "status": "accepted",
+                    "feedback_type": "thumbs_up" if request.is_positive else "thumbs_down",
+                    "message": f"Thumbs {'up' if request.is_positive else 'down'} recorded"
+                }
+
+        raise HTTPException(status_code=503, detail="Thumbs feedback not available on this system")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Thumbs feedback failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/v1/feedback/stats")
+async def get_feedback_stats():
+    """
+    Get RLHF feedback statistics.
+    
+    Returns current feedback stats including total feedback received,
+    positive/negative counts, and RLHF learning status.
+    """
+    if not hasattr(app.state, "deployment"):
+        raise HTTPException(status_code=503, detail="System not initialized")
+
+    try:
+        deployment = app.state.deployment
+        
+        # Try to get learning system
+        learning_system = None
+        if hasattr(deployment, "collective") and hasattr(deployment.collective.deps, "learning"):
+            learning_system = deployment.collective.deps.learning
+        
+        if learning_system is None:
+            return {
+                "status": "ok",
+                "stats": {
+                    "rlhf_enabled": False,
+                    "live_feedback_enabled": False,
+                    "message": "Learning system not available"
+                }
+            }
+
+        # Check if continual_learner has the get_feedback_stats method
+        if hasattr(learning_system, "continual_learner") and learning_system.continual_learner:
+            learner = learning_system.continual_learner
+            if hasattr(learner, "get_feedback_stats"):
+                stats = learner.get_feedback_stats()
+                return {
+                    "status": "ok",
+                    "stats": stats
+                }
+
+        return {
+            "status": "ok",
+            "stats": {
+                "rlhf_enabled": False,
+                "live_feedback_enabled": False,
+                "message": "RLHF not configured"
+            }
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to get feedback stats: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

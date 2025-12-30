@@ -1219,13 +1219,11 @@ class APIRequestHandler(BaseHTTPRequestHandler):
         return None
 
     def _handle_root(self):
-        """Handle root path - serve vulcan_chat.html."""
-        # Try to find the HTML file in multiple locations
+        """Handle root path - serve static/index.html (chat interface)."""
+        # Try to find the HTML file in the canonical location first
         possible_paths = [
-            os.path.join(os.path.dirname(__file__), "vulcan_chat.html"),
-            os.path.join(os.getcwd(), "demos", "vulcan_chat.html"),
-            os.path.join(os.getcwd(), "vulcan_chat.html"),
-            os.path.join(os.getcwd(), "src", "vulcan_chat.html"),
+            os.path.join(os.getcwd(), "static", "index.html"),
+            os.path.join(os.path.dirname(__file__), "..", "static", "index.html"),
         ]
         
         html_path = None
@@ -1287,7 +1285,7 @@ class APIRequestHandler(BaseHTTPRequestHandler):
 
     def _handle_chat(self, data: Dict):
         """
-        Handle chat request from vulcan_chat.html.
+        Handle chat request from the chat interface (static/index.html).
         
         Expected request format:
         {
