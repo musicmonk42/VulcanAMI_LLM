@@ -1,6 +1,6 @@
 # VulcanAMI Documentation Index
 
-**Version:** 2.3.0  
+**Version:** 2.4.0  
 **Last Updated:** December 30, 2024
 
 Welcome to the VulcanAMI/GraphixVulcan documentation. This index organizes all documentation for easy navigation.
@@ -38,12 +38,13 @@ Welcome to the VulcanAMI/GraphixVulcan documentation. This index organizes all d
 | [QUICK_START_WINDOWS.md](QUICK_START_WINDOWS.md) | Windows-specific setup |
 | [UNIFIED_STARTUP_GUIDE.md](UNIFIED_STARTUP_GUIDE.md) | All-in-one startup |
 
-### Architecture & Design (9 docs)
+### Architecture & Design (10 docs)
 
 | Document | Description |
 |----------|-------------|
 | [ARCHITECTURE_OVERVIEW.md](ARCHITECTURE_OVERVIEW.md) ⭐ | Platform architecture deep dive |
 | [VULCAN_INTERNAL_LLM_DEEP_DIVE.md](VULCAN_INTERNAL_LLM_DEEP_DIVE.md) ⭐ | Ultra deep dive into internal LLM |
+| [INTEGRATION_GUIDE.md](INTEGRATION_GUIDE.md) ⭐ | Distillation system integration guide |
 | [COMPREHENSIVE_REPO_OVERVIEW.md](COMPREHENSIVE_REPO_OVERVIEW.md) | Repository structure |
 | [ONTOLOGY.md](ONTOLOGY.md) | Node type definitions |
 | [EXECUTION_ENGINE.md](EXECUTION_ENGINE.md) | Graph execution details |
