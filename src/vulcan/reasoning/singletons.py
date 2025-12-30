@@ -45,6 +45,7 @@ _ai_runtime: Optional[Any] = None
 _multimodal_engine: Optional[Any] = None
 _unified_reasoner: Optional[Any] = None  # BUG FIX: Add singleton for UnifiedReasoner
 _math_verification_engine: Optional[Any] = None  # CACHING FIX: Singleton for MathematicalVerificationEngine
+_hierarchical_memory: Optional[Any] = None  # PERF FIX Issue #2: Singleton for HierarchicalMemory
 _singleton_lock = threading.Lock()
 
 
@@ -305,7 +306,7 @@ def reset_all() -> None:
     global _curiosity_engine
     global _world_model, _self_improvement_drive, _unified_runtime
     global _ai_runtime, _multimodal_engine, _unified_reasoner
-    global _math_verification_engine
+    global _math_verification_engine, _hierarchical_memory
     
     with _singleton_lock:
         _tool_selector = None
@@ -325,6 +326,7 @@ def reset_all() -> None:
         _multimodal_engine = None
         _unified_reasoner = None
         _math_verification_engine = None
+        _hierarchical_memory = None
         _instances.clear()
         logger.info("[Singletons] All singletons reset")
 
@@ -1070,4 +1072,61 @@ def get_math_verification_engine() -> Optional[Any]:
             return None
         except Exception as e:
             logger.error(f"[Singletons] Failed to create MathematicalVerificationEngine: {e}")
+            return None
+
+
+# ============================================
+# HIERARCHICAL MEMORY SINGLETON (Issue #2)
+# ============================================
+
+_hierarchical_memory_lock = threading.Lock()
+
+
+def get_hierarchical_memory(config: Optional[Any] = None) -> Optional[Any]:
+    """
+    Get singleton HierarchicalMemory instance.
+    
+    PERF FIX Issue #2: The HierarchicalMemory was being re-instantiated in
+    multiple places (GraphixVulcanLLM, agent_pool, etc.), causing:
+    - "[HierarchicalMemory] Using model from global registry" appearing per request
+    - Repeated embedding model loading/initialization overhead
+    - Memory accumulation from multiple instances
+    
+    This singleton ensures HierarchicalMemory is created once at startup and
+    shared across all components.
+    
+    Args:
+        config: Optional MemoryConfig for first-time initialization.
+               If None, uses default MemoryConfig.
+        
+    Returns:
+        HierarchicalMemory instance (singleton), or None if unavailable.
+    """
+    global _hierarchical_memory
+    
+    if _hierarchical_memory is not None:
+        logger.debug("[Singletons] Returning cached HierarchicalMemory")
+        return _hierarchical_memory
+    
+    with _hierarchical_memory_lock:
+        if _hierarchical_memory is not None:
+            return _hierarchical_memory
+        
+        logger.info("[Singletons] Creating global HierarchicalMemory (ONCE)")
+        try:
+            from vulcan.memory.hierarchical import HierarchicalMemory
+            from vulcan.memory.base import MemoryConfig
+            
+            # Use provided config or create default
+            if config is None:
+                config = MemoryConfig(max_working_memory=50)
+            
+            _hierarchical_memory = HierarchicalMemory(config)
+            logger.info("[Singletons] ✓ HierarchicalMemory created and cached")
+            return _hierarchical_memory
+        except ImportError as e:
+            logger.warning(f"[Singletons] HierarchicalMemory import failed: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"[Singletons] Failed to create HierarchicalMemory: {e}")
             return None

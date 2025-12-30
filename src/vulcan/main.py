@@ -1033,6 +1033,20 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Model registry preload failed (models will load lazily): {e}")
 
+    # PERF FIX Issue #2: Preload HierarchicalMemory singleton at startup
+    # This ensures the memory system (and its embedding model) is initialized once
+    try:
+        from vulcan.reasoning.singletons import get_hierarchical_memory
+        hierarchical_memory = get_hierarchical_memory()
+        if hierarchical_memory:
+            logger.info("✓ HierarchicalMemory singleton preloaded at startup")
+        else:
+            logger.debug("HierarchicalMemory singleton not available (will load lazily)")
+    except ImportError as e:
+        logger.debug(f"HierarchicalMemory singleton not available for preload: {e}")
+    except Exception as e:
+        logger.warning(f"HierarchicalMemory preload failed (will load lazily): {e}")
+
     # ================================================================
     # PERFORMANCE FIX (Progressive Degradation): Pre-warm all reasoning singletons
     # This prevents query routing from degrading 469ms → 152,048ms over time

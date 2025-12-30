@@ -837,10 +837,23 @@ class AgentPoolManager:
         self.agent_processes: Dict[str, multiprocessing.Process] = {}
 
         # MEMORY LEAK FIX: Use specialized memory systems instead of unbounded list
-        # Create memory config for provenance tracking
+        # PERF FIX Issue #2: Use singleton HierarchicalMemory to avoid re-initialization
         memory_config = MemoryConfig(max_working_memory=50)
         self.working_memory = WorkingMemory(memory_config)
-        self.long_term_memory = HierarchicalMemory(memory_config)
+        
+        # Try to use singleton HierarchicalMemory first
+        try:
+            from vulcan.reasoning.singletons import get_hierarchical_memory
+            self.long_term_memory = get_hierarchical_memory(memory_config)
+            if self.long_term_memory:
+                logger.info("[AgentPool] Using singleton HierarchicalMemory")
+        except ImportError:
+            self.long_term_memory = None
+        
+        # Fallback to direct instantiation if singleton not available
+        if self.long_term_memory is None:
+            self.long_term_memory = HierarchicalMemory(memory_config)
+            logger.info("[AgentPool] HierarchicalMemory initialized (direct)")
         
         # Keep legacy provenance tracking for backward compatibility
         max_provenance = self.config.get("max_provenance_records", SIMPLE_MODE_MAX_PROVENANCE)
