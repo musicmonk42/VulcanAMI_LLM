@@ -873,8 +873,8 @@ def set_unified_runtime(runtime: Any) -> bool:
         if _unified_runtime is None:
             _unified_runtime = runtime
             # BUG FIX Issue #1: Mark as singleton so __del__ knows to cleanup
-            if hasattr(runtime, '_is_singleton'):
-                runtime._is_singleton = True
+            # Note: _is_singleton is always initialized in UnifiedRuntime.__init__()
+            runtime._is_singleton = True
             logger.info("[Singletons] UnifiedRuntime registered from external source")
             return True
         elif _unified_runtime is not runtime:

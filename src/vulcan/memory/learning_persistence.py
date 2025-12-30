@@ -57,6 +57,9 @@ logger = logging.getLogger(__name__)
 # Configuration Constants
 # =============================================================================
 
+# Railway volume mount point path constant
+RAILWAY_VOLUME_PATH = "/mnt/vulcan-data"
+
 # Default storage path - tries environment variable first, then Railway volume,
 # then falls back to a local data directory for better out-of-box experience
 # BUG FIX Issue #3: Ensure learning state persists by using accessible default path
@@ -68,8 +71,8 @@ def _get_default_storage_path() -> str:
         return env_path
     
     # Then try Railway volume mount
-    if Path("/mnt/vulcan-data").exists() or os.environ.get("RAILWAY_ENVIRONMENT"):
-        return "/mnt/vulcan-data"
+    if Path(RAILWAY_VOLUME_PATH).exists() or os.environ.get("RAILWAY_ENVIRONMENT"):
+        return RAILWAY_VOLUME_PATH
     
     # Finally fall back to local data directory (more likely to work)
     return os.path.join(os.getcwd(), "data", "vulcan-learning")

@@ -4299,8 +4299,10 @@ async def route_query_async(
     if EMBEDDING_CACHE_AVAILABLE and embedding_cache_is_simple_query is not None:
         try:
             is_simple = embedding_cache_is_simple_query(query)
-        except Exception:
-            pass  # Fall back to default timeout on any error
+        except (TypeError, ValueError, AttributeError):
+            # These are the expected errors from embedding cache functions
+            # Fall back to default timeout on any expected error
+            pass
     
     # Use provided timeout, or SIMPLE timeout for simple queries, or default
     if timeout is not None:
