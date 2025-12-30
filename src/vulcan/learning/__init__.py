@@ -369,7 +369,32 @@ class UnifiedLearningSystem:
         else:
             logger.warning(f"[Learning] No tools recorded for {query_id} - cannot learn from selection")
         
-        # 4. Feed to MetaLearner for pattern detection
+        # 4. Store interaction in learning persistence for query/answer history
+        # This enables learning from past interactions and semantic search
+        if self._learning_persistence:
+            try:
+                # Extract query and answer from outcome if available
+                query_text = outcome.get('query', outcome.get('prompt', ''))
+                answer_text = outcome.get('answer', outcome.get('response', ''))
+                
+                if query_text or answer_text:
+                    self._learning_persistence.add_interaction(
+                        query_id=query_id,
+                        query=query_text,
+                        answer=answer_text,
+                        tools_used=tools,
+                        success=(status == 'success'),
+                        latency_ms=outcome.get('total_ms', routing_ms),
+                        metadata={
+                            'query_type': query_type,
+                            'complexity': outcome.get('complexity', 0.0),
+                            'routing_ms': routing_ms,
+                        }
+                    )
+            except Exception as e:
+                logger.debug(f"[Learning] Failed to store interaction: {e}")
+        
+        # 5. Feed to MetaLearner for pattern detection
         if self.meta_learner:
             try:
                 if hasattr(self.meta_learner, 'update_from_outcome'):

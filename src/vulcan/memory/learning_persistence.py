@@ -126,12 +126,26 @@ class StateMetadata(TypedDict, total=False):
     hostname: Optional[str]
 
 
+class InteractionRecord(TypedDict, total=False):
+    """Type definition for a query/answer interaction record."""
+    
+    query_id: str
+    query: str
+    answer: str
+    tools_used: List[str]
+    success: bool
+    timestamp: float
+    latency_ms: float
+    metadata: Dict[str, Any]
+
+
 class LearningState(TypedDict, total=False):
     """Type definition for the complete learning state."""
     
     tool_weights: Dict[str, float]
     concept_library: Dict[str, Any]
     contraindications: Dict[str, Any]
+    interaction_history: List[InteractionRecord]
     metadata: StateMetadata
 
 
@@ -536,6 +550,122 @@ class LearningStatePersistence:
             state = self.load_state()
             state["contraindications"] = copy.deepcopy(contraindications)
             return self.save_state(state)
+    
+    def add_interaction(
+        self,
+        query_id: str,
+        query: str,
+        answer: str,
+        tools_used: Optional[List[str]] = None,
+        success: bool = True,
+        latency_ms: float = 0.0,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> bool:
+        """
+        Add an interaction (query/answer pair) to the persistent history.
+        
+        This enables learning from past interactions by storing queries
+        and their responses for later analysis and retrieval.
+        
+        Args:
+            query_id: Unique identifier for the query.
+            query: The user's query text.
+            answer: The system's response text.
+            tools_used: List of tools used to generate the answer.
+            success: Whether the interaction was successful.
+            latency_ms: Response latency in milliseconds.
+            metadata: Additional metadata about the interaction.
+        
+        Returns:
+            True if the interaction was added successfully.
+        
+        Example:
+            >>> persistence.add_interaction(
+            ...     query_id="q123",
+            ...     query="What is machine learning?",
+            ...     answer="Machine learning is...",
+            ...     tools_used=["general", "search"],
+            ...     success=True,
+            ...     latency_ms=150.5
+            ... )
+            True
+        """
+        interaction: InteractionRecord = {
+            "query_id": query_id,
+            "query": query,
+            "answer": answer,
+            "tools_used": tools_used or [],
+            "success": success,
+            "timestamp": time.time(),
+            "latency_ms": latency_ms,
+            "metadata": metadata or {},
+        }
+        
+        with self._lock:
+            state = self.load_state()
+            
+            # Initialize interaction_history if not present (schema migration)
+            if "interaction_history" not in state:
+                state["interaction_history"] = []
+            
+            # Add to history (keep last 1000 interactions to prevent unbounded growth)
+            state["interaction_history"].append(interaction)
+            if len(state["interaction_history"]) > 1000:
+                state["interaction_history"] = state["interaction_history"][-1000:]
+            
+            success = self.save_state(state)
+            if success:
+                logger.debug(
+                    f"[LearningStatePersistence] Added interaction {query_id}"
+                )
+            return success
+    
+    def get_interaction_history(
+        self,
+        limit: int = 100,
+        success_only: bool = False,
+    ) -> List[Dict[str, Any]]:
+        """
+        Get recent interaction history.
+        
+        Args:
+            limit: Maximum number of interactions to return.
+            success_only: If True, only return successful interactions.
+        
+        Returns:
+            List of interaction records, most recent first.
+        
+        Example:
+            >>> history = persistence.get_interaction_history(limit=10)
+            >>> print(len(history))
+            10
+        """
+        state = self.load_state()
+        history = state.get("interaction_history", [])
+        
+        if success_only:
+            history = [h for h in history if h.get("success", True)]
+        
+        # Return most recent first
+        return list(reversed(history[-limit:]))
+    
+    def get_interactions_by_tool(self, tool_name: str) -> List[Dict[str, Any]]:
+        """
+        Get interactions that used a specific tool.
+        
+        Args:
+            tool_name: Name of the tool to filter by.
+        
+        Returns:
+            List of interaction records that used the specified tool.
+        """
+        state = self.load_state()
+        history = state.get("interaction_history", [])
+        
+        return [
+            h for h in history 
+            if tool_name in h.get("tools_used", [])
+        ]
     
     def clear_state(self) -> bool:
         """
@@ -943,6 +1073,7 @@ class LearningStatePersistence:
             "tool_weights": {},
             "concept_library": {},
             "contraindications": {},
+            "interaction_history": [],
             "metadata": {
                 "version": "1.0",
                 "schema_version": SCHEMA_VERSION,

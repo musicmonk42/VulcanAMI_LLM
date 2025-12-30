@@ -41,4 +41,8 @@ data:
   MEMORY_STORE_PATH: {{ .Values.memorySystem.paths.memoryStore | quote }}
   CACHE_ROOT: {{ .Values.memorySystem.paths.cacheRoot | quote }}
   CONFIG_PATH: {{ .Values.memorySystem.paths.configPath | quote }}
+  # Learning State Persistence Configuration
+  # Path for persisting learning state (tool weights, concepts, contraindications)
+  # This ensures learning persists across queries and server restarts
+  VULCAN_STORAGE_PATH: {{ .Values.memorySystem.paths.memoryStore | quote }}
 {{- end }}

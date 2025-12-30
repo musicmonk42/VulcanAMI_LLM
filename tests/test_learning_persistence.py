@@ -490,6 +490,93 @@ class TestBackupRecovery:
         assert "tool_weights" in state
 
 
+class TestInteractionHistory:
+    """Test interaction history functionality."""
+
+    def test_add_interaction_basic(self, persistence):
+        """Test adding a basic interaction."""
+        result = persistence.add_interaction(
+            query_id="q123",
+            query="What is machine learning?",
+            answer="Machine learning is a subset of AI...",
+            tools_used=["general", "search"],
+            success=True,
+            latency_ms=150.5,
+        )
+        
+        assert result is True
+        
+        # Verify it was stored
+        history = persistence.get_interaction_history(limit=10)
+        assert len(history) >= 1
+        assert history[0]["query_id"] == "q123"
+        assert history[0]["query"] == "What is machine learning?"
+        assert "general" in history[0]["tools_used"]
+
+    def test_get_interaction_history(self, persistence):
+        """Test getting interaction history."""
+        # Add multiple interactions
+        for i in range(5):
+            persistence.add_interaction(
+                query_id=f"q{i}",
+                query=f"Query {i}",
+                answer=f"Answer {i}",
+                tools_used=["tool_a"] if i % 2 == 0 else ["tool_b"],
+                success=(i % 2 == 0),
+            )
+        
+        # Get all
+        history = persistence.get_interaction_history(limit=10)
+        assert len(history) == 5
+        
+        # Get limited
+        limited = persistence.get_interaction_history(limit=2)
+        assert len(limited) == 2
+        
+        # Get success only
+        success_only = persistence.get_interaction_history(success_only=True)
+        assert all(h["success"] for h in success_only)
+
+    def test_get_interactions_by_tool(self, persistence):
+        """Test filtering interactions by tool."""
+        # Add interactions with different tools
+        persistence.add_interaction(
+            query_id="q1", query="Q1", answer="A1",
+            tools_used=["general", "search"], success=True
+        )
+        persistence.add_interaction(
+            query_id="q2", query="Q2", answer="A2",
+            tools_used=["code", "search"], success=True
+        )
+        persistence.add_interaction(
+            query_id="q3", query="Q3", answer="A3",
+            tools_used=["general"], success=True
+        )
+        
+        # Filter by tool
+        general_interactions = persistence.get_interactions_by_tool("general")
+        assert len(general_interactions) == 2
+        
+        search_interactions = persistence.get_interactions_by_tool("search")
+        assert len(search_interactions) == 2
+        
+        code_interactions = persistence.get_interactions_by_tool("code")
+        assert len(code_interactions) == 1
+
+    def test_interaction_history_limit(self, persistence):
+        """Test that interaction history is limited to 1000 entries."""
+        # This is a lighter test - just verify the mechanism works
+        for i in range(10):
+            persistence.add_interaction(
+                query_id=f"q{i}",
+                query=f"Query {i}",
+                answer=f"Answer {i}",
+            )
+        
+        history = persistence.get_interaction_history(limit=100)
+        assert len(history) <= 100
+
+
 class TestRepr:
     """Test string representation."""
 

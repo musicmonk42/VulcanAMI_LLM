@@ -329,6 +329,11 @@ test-memory: ## Run memory system integration tests
 	pytest src/persistant_memory_v46/tests/ -v --tb=short || echo "No persistant_memory_v46 tests found"
 	pytest src/gvulcan/tests/ -v --tb=short || echo "No gvulcan tests found"
 
+.PHONY: test-learning-persistence
+test-learning-persistence: ## Run learning state persistence tests
+	@echo "$(GREEN)Running learning persistence tests...$(NC)"
+	pytest tests/test_learning_persistence.py -v --tb=short
+
 .PHONY: k8s-bootstrap-milvus
 k8s-bootstrap-milvus: ## Bootstrap Milvus collections in Kubernetes
 	@echo "$(GREEN)Bootstrapping Milvus collections...$(NC)"
@@ -354,6 +359,17 @@ memory-status: ## Check memory system status
 	@docker compose -f $(DOCKER_COMPOSE_PROD) exec milvus curl -s http://localhost:9091/healthz || echo "Milvus not running"
 	@echo "Checking S3/MinIO connectivity..."
 	@docker compose -f $(DOCKER_COMPOSE_PROD) exec minio curl -s http://localhost:9000/minio/health/live || echo "MinIO not running"
+
+.PHONY: learning-status
+learning-status: ## Check learning persistence status
+	@echo "$(GREEN)Checking learning persistence status...$(NC)"
+	@if [ -f /mnt/vulcan-data/learning_state.json ]; then \
+		echo "Learning state file exists:"; \
+		cat /mnt/vulcan-data/learning_state.json | head -20; \
+	else \
+		echo "Learning state file not found at default path"; \
+		echo "Check VULCAN_STORAGE_PATH environment variable"; \
+	fi
 
 ################################################################################
 # CI/CD

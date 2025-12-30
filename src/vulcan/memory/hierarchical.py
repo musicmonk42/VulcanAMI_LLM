@@ -1754,3 +1754,136 @@ class PersistentHierarchicalMemory:
             )
 
         return results
+
+    def store_interaction(
+        self,
+        query_id: str,
+        query: str,
+        answer: str,
+        tools_used: Optional[List[str]] = None,
+        success: bool = True,
+        latency_ms: float = 0.0,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """
+        Store a query/answer interaction in both memory tiers and learning persistence.
+        
+        This ensures interactions are:
+        1. Available for semantic search via GraphRAG
+        2. Persisted to disk for recovery via LearningStatePersistence
+        3. Used for learning (tool weight updates)
+        
+        Args:
+            query_id: Unique identifier for the query.
+            query: The user's query text.
+            answer: The system's response text.
+            tools_used: List of tools used to generate the answer.
+            success: Whether the interaction was successful.
+            latency_ms: Response latency in milliseconds.
+            metadata: Additional metadata about the interaction.
+        """
+        # Create interaction record
+        interaction_content = {
+            "query_id": query_id,
+            "query": query,
+            "answer": answer,
+            "tools_used": tools_used or [],
+            "success": success,
+            "timestamp": time.time(),
+            "latency_ms": latency_ms,
+            "metadata": metadata or {},
+        }
+        
+        # Store in GraphRAG for semantic retrieval
+        try:
+            doc_id = f"interaction_{query_id}"
+            combined_text = f"Query: {query}\n\nAnswer: {answer}"
+            self.graph_rag.add_document(
+                doc_id=doc_id,
+                content=combined_text,
+                metadata={
+                    "type": "interaction",
+                    "query_id": query_id,
+                    "tools_used": tools_used or [],
+                    "success": success,
+                    "timestamp": interaction_content["timestamp"],
+                },
+                auto_chunk=True,
+            )
+            logger.debug(f"Stored interaction {query_id} in GraphRAG")
+        except Exception as e:
+            logger.warning(f"Failed to store interaction in GraphRAG: {e}")
+        
+        # Store in episodic memory for quick access
+        try:
+            from .base import Memory, MemoryType
+            memory_item = Memory(
+                id=f"interaction_{query_id}",
+                type=MemoryType.EPISODIC,
+                content=interaction_content,
+                importance=0.7 if success else 0.4,
+                metadata={"interaction": True, "tools": tools_used or []},
+            )
+            self.episodic.add(memory_item)
+        except Exception as e:
+            logger.debug(f"Failed to store interaction in episodic memory: {e}")
+        
+        # Store in learning persistence for recovery
+        try:
+            from .learning_persistence import LearningStatePersistence
+            persistence = LearningStatePersistence()
+            persistence.add_interaction(
+                query_id=query_id,
+                query=query,
+                answer=answer,
+                tools_used=tools_used,
+                success=success,
+                latency_ms=latency_ms,
+                metadata=metadata,
+            )
+        except Exception as e:
+            logger.debug(f"Failed to store interaction in learning persistence: {e}")
+
+    def search_interactions(
+        self,
+        query: str,
+        k: int = 10,
+        success_only: bool = False,
+    ) -> List[Dict[str, Any]]:
+        """
+        Search for similar past interactions.
+        
+        Args:
+            query: Search query text.
+            k: Maximum number of results to return.
+            success_only: If True, only return successful interactions.
+        
+        Returns:
+            List of matching interaction records.
+        """
+        results = []
+        
+        try:
+            # Search GraphRAG for semantic matches
+            rag_results = self.graph_rag.retrieve(
+                query=query,
+                k=k,
+                parent_child_context=True,
+            )
+            
+            for result in rag_results:
+                metadata = getattr(result, 'metadata', {})
+                if metadata.get('type') == 'interaction':
+                    if success_only and not metadata.get('success', True):
+                        continue
+                    results.append({
+                        'query_id': metadata.get('query_id'),
+                        'content': getattr(result, 'content', ''),
+                        'score': getattr(result, 'score', 0.0),
+                        'tools_used': metadata.get('tools_used', []),
+                        'success': metadata.get('success', True),
+                    })
+        except Exception as e:
+            logger.warning(f"Failed to search interactions in GraphRAG: {e}")
+        
+        return results[:k]
