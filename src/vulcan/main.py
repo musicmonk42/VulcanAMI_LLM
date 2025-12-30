@@ -605,7 +605,7 @@ async def lifespan(app: FastAPI):
         app.state.llm = llm_instance
 
         # PERFORMANCE FIX (Issue #1): Initialize HybridLLMExecutor ONCE at startup
-        # Previously this was instantiated per-request, adding 0.1-0.5s overhead each time
+        # Previously this was instantiated per-request, adding ~0.5s overhead each time
         # Now we create a singleton instance that's reused across all requests
         try:
             app.state.hybrid_executor = HybridLLMExecutor(
@@ -3266,8 +3266,8 @@ Based on your analysis through memory retrieval, multi-modal reasoning, causal m
     local_llm = app.state.llm if hasattr(app.state, "llm") else None
 
     # PERFORMANCE FIX (Issue #1): Use singleton HybridLLMExecutor from app.state
-    # Previously this was instantiated per-request, adding 0.1-0.5s overhead each time
-    hybrid_executor = getattr(app.state, 'hybrid_executor', None)
+    # Previously this was instantiated per-request, adding ~0.5s overhead each time
+    hybrid_executor = app.state.hybrid_executor if hasattr(app.state, 'hybrid_executor') else None
     if hybrid_executor is None:
         # Fallback: create new executor if not initialized at startup (shouldn't happen)
         logger.warning("[VULCAN] Creating HybridLLMExecutor per-request (startup init may have failed)")
@@ -5175,8 +5175,8 @@ User Query: {user_message}
 Provide a helpful, accurate, and comprehensive response to the user's query. Be concise but thorough."""
 
                 # PERFORMANCE FIX (Issue #1): Use singleton HybridLLMExecutor from app.state
-                # Previously this was instantiated per-request, adding 0.1-0.5s overhead each time
-                hybrid_executor = getattr(app.state, 'hybrid_executor', None)
+                # Previously this was instantiated per-request, adding ~0.5s overhead each time
+                hybrid_executor = app.state.hybrid_executor if hasattr(app.state, 'hybrid_executor') else None
                 if hybrid_executor is None:
                     # Fallback: create new executor if not initialized at startup (shouldn't happen)
                     logger.warning("[VULCAN] Creating HybridLLMExecutor per-request (startup init may have failed)")
