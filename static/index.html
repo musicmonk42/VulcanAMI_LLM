@@ -1747,11 +1747,28 @@
 
         // Fetch with timeout wrapper to prevent ClientDisconnect errors
         function fetchWithTimeout(url, options, timeout = REQUEST_TIMEOUT_MS) {
+            let timeoutId;
+            
+            const cleanup = () => {
+                if (timeoutId) {
+                    clearTimeout(timeoutId);
+                    timeoutId = null;
+                }
+            };
+            
+            const timeoutPromise = new Promise((_, reject) => {
+                timeoutId = setTimeout(() => {
+                    timeoutId = null;  // Mark as fired
+                    reject(new Error(`Request timeout after ${timeout/1000}s - backend may be overloaded`));
+                }, timeout);
+            });
+            
             return Promise.race([
-                fetch(url, options),
-                new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error(`Request timeout after ${timeout/1000}s - backend may be overloaded`)), timeout)
-                )
+                fetch(url, options).then(
+                    response => { cleanup(); return response; },
+                    error => { cleanup(); throw error; }
+                ),
+                timeoutPromise
             ]);
         }
 
@@ -1773,13 +1790,19 @@
             box.appendChild(div);
             box.scrollTop = box.scrollHeight;
             
-            // Start the timer
+            // Start the timer (updates every 1s since we only display seconds)
             thinkingStartTime = Date.now();
             thinkingTimer = setInterval(() => {
-                const elapsed = Math.floor((Date.now() - thinkingStartTime) / 1000);
                 const timerEl = document.getElementById('thinkingTimer');
-                if (timerEl) timerEl.textContent = `${elapsed}s`;
-            }, 100);
+                if (!timerEl) {
+                    // Element removed, stop the timer
+                    clearInterval(thinkingTimer);
+                    thinkingTimer = null;
+                    return;
+                }
+                const elapsed = Math.floor((Date.now() - thinkingStartTime) / 1000);
+                timerEl.textContent = `${elapsed}s`;
+            }, 1000);
         }
 
         function hideThinking() {
@@ -1911,6 +1934,10 @@
                         signal: abortController.signal
                     });
                 } catch(e) {
+                    // If user aborted, re-throw to outer catch handler
+                    if (e.name === 'AbortError') {
+                        throw e;
+                    }
                     // If timeout or network error, try alternative endpoint
                     if (e.message && e.message.includes('timeout')) {
                         console.log('Request timeout on primary endpoint, trying alternative...');
