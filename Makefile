@@ -439,6 +439,33 @@ enable-distillation: ## Enable Knowledge Distillation hybrid routing (Fix #6)
 	@echo "DISTILLATION_ESCALATION_THRESHOLD=0.40"
 	@echo "DISTILLATION_HYBRID_ROUTING=true"
 
+.PHONY: monitor-distillation
+monitor-distillation: ## Monitor distillation capture and training progress
+	@echo "$(GREEN)Starting distillation monitoring...$(NC)"
+	PYTHONPATH=src python scripts/monitor_distillation.py --continuous --interval 30 || \
+		echo "$(YELLOW)Note: Run 'python scripts/monitor_distillation.py' for one-time status$(NC)"
+
+.PHONY: distillation-status
+distillation-status: ## Show current distillation system status
+	@echo "$(GREEN)Checking distillation system status...$(NC)"
+	PYTHONPATH=src python scripts/monitor_distillation.py || \
+		echo "$(YELLOW)Note: Ensure the distillation system is initialized$(NC)"
+
+.PHONY: enable-openai-cache
+enable-openai-cache: ## Enable OpenAI response caching (Performance Optimization)
+	@echo "$(GREEN)Enabling OpenAI response caching...$(NC)"
+	@echo "Add these to your .env file:"
+	@echo ""
+	@echo "# OpenAI Response Caching (reduces costs and latency by ~95% for repeated queries)"
+	@echo "OPENAI_CACHE_ENABLED=true"
+	@echo "OPENAI_CACHE_MAX_SIZE=1000"
+	@echo "OPENAI_CACHE_TTL_SECONDS=3600"
+	@echo ""
+	@echo "# Distillation Async Writes (reduces storage latency by ~90%)"
+	@echo "DISTILLATION_ASYNC_WRITES=true"
+	@echo "DISTILLATION_ASYNC_BUFFER_SIZE=100"
+	@echo "DISTILLATION_ASYNC_FLUSH_INTERVAL=5.0"
+
 .PHONY: enable-ray
 enable-ray: ## Enable Ray workers for distributed execution (Fix #3)
 	@echo "$(GREEN)Enabling Ray workers...$(NC)"

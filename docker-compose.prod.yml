@@ -292,6 +292,16 @@ services:
       # Semantic matching configuration (EMERGENCY FIX for Embedding Bottleneck)
       # Disable slow semantic matching (default: 1 = disabled for fast routing)
       - VULCAN_DISABLE_SEMANTIC_MATCHING=${VULCAN_DISABLE_SEMANTIC_MATCHING:-1}
+      # OpenAI Response Caching Configuration (Performance Optimization)
+      # Enables LRU+TTL caching for OpenAI API responses to reduce costs and latency
+      - OPENAI_CACHE_ENABLED=${OPENAI_CACHE_ENABLED:-true}
+      - OPENAI_CACHE_MAX_SIZE=${OPENAI_CACHE_MAX_SIZE:-1000}
+      - OPENAI_CACHE_TTL_SECONDS=${OPENAI_CACHE_TTL_SECONDS:-3600}
+      # Distillation Storage Async Write Configuration
+      # Enables non-blocking writes to reduce request latency
+      - DISTILLATION_ASYNC_WRITES=${DISTILLATION_ASYNC_WRITES:-true}
+      - DISTILLATION_ASYNC_BUFFER_SIZE=${DISTILLATION_ASYNC_BUFFER_SIZE:-100}
+      - DISTILLATION_ASYNC_FLUSH_INTERVAL=${DISTILLATION_ASYNC_FLUSH_INTERVAL:-5.0}
       # Vulcan Memory System (v46) Configuration
       - MILVUS_HOST=milvus
       - MILVUS_PORT=19530

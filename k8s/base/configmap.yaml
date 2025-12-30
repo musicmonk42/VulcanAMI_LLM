@@ -70,6 +70,16 @@ data:
   # Disable slow semantic matching (default: 1 = disabled for fast routing)
   # Set to 0 to re-enable embedding-based tool selection (may cause slow queries)
   VULCAN_DISABLE_SEMANTIC_MATCHING: "1"
+  # OpenAI Response Caching Configuration (Performance Optimization)
+  # Enables LRU+TTL caching for OpenAI API responses to reduce costs and latency
+  OPENAI_CACHE_ENABLED: "true"
+  OPENAI_CACHE_MAX_SIZE: "1000"
+  OPENAI_CACHE_TTL_SECONDS: "3600"
+  # Distillation Storage Async Write Configuration
+  # Enables non-blocking writes to reduce request latency
+  DISTILLATION_ASYNC_WRITES: "true"
+  DISTILLATION_ASYNC_BUFFER_SIZE: "100"
+  DISTILLATION_ASYNC_FLUSH_INTERVAL: "5.0"
   # Vulcan Memory System v46 Configuration
   MILVUS_HOST: "milvus-service"
   MILVUS_PORT: "19530"

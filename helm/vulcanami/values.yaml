@@ -360,3 +360,21 @@ performanceTuning:
   # Disable slow semantic matching (default: true = disabled for fast routing)
   # Set to false to re-enable embedding-based tool selection (may cause slow queries)
   disableSemanticMatching: true
+
+# OpenAI Response Caching Configuration
+# Enables LRU+TTL caching for OpenAI API responses to reduce costs and latency
+openaiCache:
+  enabled: true
+  # Maximum number of cached responses (LRU eviction when exceeded)
+  maxSize: 1000
+  # Time-to-live for cached responses in seconds (1 hour default)
+  ttlSeconds: 3600
+
+# Distillation Async Storage Configuration
+# Enables non-blocking writes to reduce request latency during ensemble mode
+distillationStorage:
+  asyncWritesEnabled: true
+  # Buffer size for async writes (flushes when full)
+  asyncBufferSize: 100
+  # Flush interval for async writes in seconds
+  asyncFlushIntervalSeconds: 5.0
