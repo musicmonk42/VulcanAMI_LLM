@@ -36,11 +36,21 @@ MIN_QUERY_LENGTH_FOR_SEMANTIC_BOOST = 10  # Minimum query text length to apply s
 MULTIMODAL_CONTENT_BOOST = 0.4  # Strong boost for explicit multimodal content
 
 # EMERGENCY FIX: Environment variable to disable slow semantic matching entirely
-# Set VULCAN_DISABLE_SEMANTIC_MATCHING=1 to disable embedding-based tool selection
-# This prevents the 6-30 second delays observed in logs:
+# 
+# DEFAULT: DISABLED (semantic matching off) - this is intentional for performance!
+# 
+# Set VULCAN_DISABLE_SEMANTIC_MATCHING=0 to RE-ENABLE embedding-based tool selection
+# 
+# Background: Semantic matching was causing 6-30 second delays per query:
 #   - Batches: 100%|██████████| 1/1 [00:20<00:00, 20.23s/it]
 #   - [QueryRouter] Query routing timed out after 30.0s
 #   - SLOW ROUTING DETECTED: 30225ms (threshold: 10000ms)
+#
+# With semantic matching disabled, queries complete in 2-5 seconds instead of 30-94 seconds.
+# Keyword-based tool selection is used as fallback, which is fast and still effective.
+#
+# To re-enable semantic matching (if you have optimized embedding model loading):
+#   export VULCAN_DISABLE_SEMANTIC_MATCHING=0
 DISABLE_SEMANTIC_MATCHING = os.environ.get("VULCAN_DISABLE_SEMANTIC_MATCHING", "1").lower() in ("1", "true", "yes")
 
 
