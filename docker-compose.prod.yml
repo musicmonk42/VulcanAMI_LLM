@@ -293,6 +293,16 @@ services:
       # Now safe to enable (default: 0 = enabled) due to Issue #2 and #3 caching fixes
       # Set to 1 to disable for keyword-only routing (faster but less accurate)
       - VULCAN_DISABLE_SEMANTIC_MATCHING=${VULCAN_DISABLE_SEMANTIC_MATCHING:-0}
+      # Local LLM Skip Configuration (Performance Fix for 37-73s response times)
+      # Set to "true" to skip local LLM when it consistently returns None
+      # Saves 5-30 seconds per request by going directly to OpenAI
+      - SKIP_LOCAL_LLM=${SKIP_LOCAL_LLM:-false}
+      # Arena enabled/disabled (set to "false" to bypass Arena entirely)
+      - ARENA_ENABLED=${ARENA_ENABLED:-true}
+      # Arena timeout in seconds (coordinates with circuit breaker at 45s)
+      - ARENA_TIMEOUT=${ARENA_TIMEOUT:-60.0}
+      # Query routing timeout in seconds (embedding takes 4-5s)
+      - QUERY_ROUTING_TIMEOUT=${QUERY_ROUTING_TIMEOUT:-10.0}
       # OpenAI Response Caching Configuration (Performance Optimization)
       # Enables LRU+TTL caching for OpenAI API responses to reduce costs and latency
       - OPENAI_CACHE_ENABLED=${OPENAI_CACHE_ENABLED:-true}
