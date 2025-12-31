@@ -344,8 +344,8 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 120s  # Extended for ML model loading (BERT, spaCy, embeddings)
+      retries: 5
+      start_period: 300s  # Extended to 5 minutes for ML model loading (BERT, spaCy en_core_web_lg, embeddings)
     deploy:
       resources:
         limits:
@@ -401,8 +401,8 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 90s  # Extended for ML model loading
+      retries: 5
+      start_period: 300s  # Extended to 5 minutes for ML model loading
     deploy:
       resources:
         limits:

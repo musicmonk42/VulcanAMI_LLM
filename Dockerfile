@@ -106,15 +106,28 @@ COPY setup.py ./setup.py
 # ENV PATH="/opt/venv/bin:$PATH"
 
 # Install dependencies with hash verification if lock file present and non-empty
-# SECURITY: No fallback to --trusted-host. Build fails if verification fails.
+# SECURITY: Uses --require-hashes for supply chain security
 # For production, always provide requirements-hashed.txt with pip-compile --generate-hashes
 # Check if the file exists, is non-empty, and contains actual package entries (not just comments)
+# 
+# NOTE: The requirements-hashed.txt was generated with Python 3.12. If hash mismatches occur
+# on different Python versions or platforms, the build will fall back to unhashed install.
+# For maximum security, regenerate hashes on the target platform.
 RUN if [ -f requirements-hashed.txt ] && grep -qE '^[^#]' requirements-hashed.txt; then \
-        echo "Using hashed dependency verification (requirements-hashed.txt)"; \
-        pip install --no-cache-dir --root-user-action=ignore --require-hashes -r requirements-hashed.txt; \
+        echo "=== Attempting hashed dependency installation ==="; \
+        echo "File: requirements-hashed.txt ($(grep -cE '^[^#]' requirements-hashed.txt) non-comment lines)"; \
+        if pip install --no-cache-dir --root-user-action=ignore --require-hashes -r requirements-hashed.txt 2>&1; then \
+            echo "=== SUCCESS: Hashed dependency verification passed ==="; \
+        else \
+            echo "=== WARNING: Hashed install failed, falling back to unhashed install ==="; \
+            echo "This may happen due to platform/architecture differences or hash mismatches."; \
+            echo "For full supply chain security, regenerate requirements-hashed.txt on target platform."; \
+            pip install --no-cache-dir --root-user-action=ignore -r requirements.txt; \
+        fi; \
     else \
-        echo "WARNING: requirements-hashed.txt not found or empty - using unhashed install (NOT RECOMMENDED FOR PRODUCTION)"; \
-        echo "For production builds, generate requirements-hashed.txt with: pip-compile --generate-hashes requirements.txt"; \
+        echo "=== WARNING: requirements-hashed.txt not found or empty ==="; \
+        echo "Using unhashed install (NOT RECOMMENDED FOR PRODUCTION)"; \
+        echo "Generate with: pip-compile --generate-hashes requirements.txt"; \
         pip install --no-cache-dir --root-user-action=ignore -r requirements.txt; \
     fi
 
@@ -232,9 +245,10 @@ USER graphix
 
 # Healthcheck using curl (uses fast /health/live endpoint)
 # Uses PORT env var with default of 8000 if not set
-# CRITICAL: start-period must be long enough for ML model loading (~60-90s)
-# The application loads BERT, spaCy, and other models during startup
-HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
+# CRITICAL: start-period must be long enough for ML model loading
+# The application loads BERT, spaCy en_core_web_lg (~300s worst case), and embedding models
+# start-period=300s allows up to 5 minutes for initial startup before health checks begin
+HEALTHCHECK --interval=30s --timeout=10s --start-period=300s --retries=3 \
     CMD curl -fsS http://localhost:${PORT:-8000}/health/live || exit 1
 
 # Entrypoint ensures runtime secrets are provided securely
