@@ -1165,12 +1165,15 @@ The system supports multiple embedding backends with automatic fallback:
 ```python
 # Priority order:
 1. Global Model Registry (singleton, shared across components)
-2. SentenceTransformer models:
+2. memory_prior.get_global_embedding_model() - Module-level singleton
+3. SentenceTransformer models:
    - "all-MiniLM-L6-v2" (fast, 384 dimensions)
    - "all-mpnet-base-v2" (better quality, 768 dimensions)
    - "paraphrase-MiniLM-L6-v2" (alternative)
-3. Hash-based fallback (128 dimensions)
+4. Hash-based fallback (128 dimensions)
 ```
+
+**Bug #4 Fix**: The `memory_prior.py` module provides `get_global_embedding_model()` function which ensures the SentenceTransformer is loaded only ONCE per process, preventing performance degradation from repeated model loading.
 
 #### Memory Operations:
 
@@ -2938,6 +2941,19 @@ class HybridLLMExecutor:
         conversation_history: Optional[List[Dict]] = None,
     ) -> Dict[str, Any]:
         """Execute with configured mode and distillation capture."""
+    
+    def generate(
+        self,
+        prompt: str,
+        context: Optional[Dict[str, Any]] = None,
+        max_tokens: int = 500,
+    ) -> str:
+        """
+        Synchronous generation using local LLM only.
+        
+        Raises RuntimeError if local_llm is None.
+        Does NOT fall back to OpenAI - errors are propagated.
+        """
 ```
 
 #### Distillation Integration:

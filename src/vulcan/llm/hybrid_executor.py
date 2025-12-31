@@ -41,6 +41,7 @@ import logging
 import os
 import threading
 import time
+import traceback
 from collections import OrderedDict
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
@@ -1118,6 +1119,58 @@ class HybridLLMExecutor:
         self.mode = mode_lower
         self.logger.info(f"Execution mode changed to: {mode_lower}")
         return True
+
+    def generate(self, prompt: str, context: Optional[Dict[str, Any]] = None, max_tokens: int = 500) -> str:
+        """
+        Synchronous generation using the local LLM.
+        
+        BUG #1 FIX: This method provides explicit error handling and logging
+        instead of silently falling back to OpenAI. Errors are raised, not hidden.
+        
+        Args:
+            prompt: The input prompt for generation
+            context: Optional context dictionary (currently unused, for API compatibility)
+            max_tokens: Maximum number of tokens to generate
+            
+        Returns:
+            Generated text from the local LLM
+            
+        Raises:
+            RuntimeError: If the local model is not initialized
+            Exception: Propagates any exception from the local model generation
+        """
+        if self.local_llm is None:
+            self.logger.error("[HybridExecutor] local_llm is None!")
+            raise RuntimeError("Local model not initialized")
+        
+        self.logger.info(f"[HybridExecutor] Starting local generation...")
+        
+        try:
+            response = self.local_llm.generate(
+                prompt=prompt,
+                max_tokens=max_tokens
+            )
+            
+            # Handle different response types
+            if hasattr(response, 'text'):
+                result = response.text
+            elif isinstance(response, dict) and 'text' in response:
+                result = response['text']
+            elif isinstance(response, str):
+                result = response
+            else:
+                result = str(response)
+            
+            self.logger.info(f"[HybridExecutor] ✓ Local generation succeeded: {len(result)} chars")
+            return result
+            
+        except Exception as e:
+            self.logger.error("=" * 80)
+            self.logger.error(f"[HybridExecutor] GENERATION FAILED: {type(e).__name__}")
+            self.logger.error(f"Error: {str(e)}")
+            self.logger.error(f"Traceback:\n{traceback.format_exc()}")
+            self.logger.error("=" * 80)
+            raise  # Don't hide the error
 
     def __repr__(self) -> str:
         return (
