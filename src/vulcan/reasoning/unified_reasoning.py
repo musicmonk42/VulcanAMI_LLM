@@ -769,6 +769,7 @@ class UnifiedReasoner:
         # Runtime integration - PRODUCTION FIX: Skip heavy runtime in test environments
         # unless VULCAN_FORCE_PRODUCTION_REASONING is set to 'true'
         # Bug #3 Fix: Default to PRODUCTION mode unless explicitly in test
+        # ISSUE #2 FIX: Use singleton to prevent re-initialization per query
         self.runtime = None
         if "UnifiedRuntime" in optional_components:
             # Use improved environment detection (Bug #3 fix)
@@ -778,10 +779,22 @@ class UnifiedReasoner:
             # Initialize runtime if not explicitly in test mode and not skipped
             if not in_test and not skip_via_config:
                 try:
+                    # ISSUE #2 FIX: Use singleton pattern to prevent manifest reload per-query
+                    # Previously: self.runtime = optional_components["UnifiedRuntime"]()
+                    # This was causing UnifiedRuntime re-initialization on every query
+                    from vulcan.reasoning.singletons import get_or_create_unified_runtime
+                    self.runtime = get_or_create_unified_runtime()
+                    if self.runtime:
+                        # DAEMON FIX: Make runtime threads daemon
+                        self._daemonize_component_threads(self.runtime)
+                        logger.info("UnifiedRuntime obtained from singleton (PRODUCTION mode)")
+                    else:
+                        logger.warning("UnifiedRuntime singleton returned None")
+                except ImportError:
+                    # Fallback to direct instantiation if singletons module not available
                     self.runtime = optional_components["UnifiedRuntime"]()
-                    # DAEMON FIX: Make runtime threads daemon
                     self._daemonize_component_threads(self.runtime)
-                    logger.info("UnifiedRuntime initialized in PRODUCTION mode")
+                    logger.info("UnifiedRuntime initialized directly (singleton unavailable)")
                 except Exception as e:
                     logger.warning(f"Error initializing runtime: {e}")
                     self.runtime = None

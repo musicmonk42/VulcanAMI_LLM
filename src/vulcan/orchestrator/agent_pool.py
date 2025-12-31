@@ -2625,11 +2625,29 @@ class AgentPoolManager:
             if is_reasoning_task and selected_tools and not node_results and not REASONING_AVAILABLE:
                 logger.info(f"[REASONING] INVOKING engines for task {task_id}, tools={selected_tools}")
                 try:
-                    from vulcan.reasoning.unified_reasoning import UnifiedReasoner as DirectUnifiedReasoner, ReasoningStrategy
                     from vulcan.reasoning.reasoning_types import ReasoningType
+                    from vulcan.reasoning.unified_reasoning import ReasoningStrategy
                     
-                    # Get or create reasoning instance
-                    reasoning = DirectUnifiedReasoner()
+                    # Helper function to create fallback UnifiedReasoner instance
+                    def _create_fallback_reasoner():
+                        from vulcan.reasoning.unified_reasoning import UnifiedReasoner as DirectUnifiedReasoner
+                        return DirectUnifiedReasoner()
+                    
+                    # ISSUE #2 FIX: Use singleton UnifiedReasoner to prevent re-initialization per query
+                    # Previously: reasoning = DirectUnifiedReasoner()
+                    # This was causing UnifiedRuntime and other components to be re-initialized on every query
+                    try:
+                        from vulcan.reasoning.singletons import get_unified_reasoner
+                        reasoning = get_unified_reasoner()
+                        if reasoning is None:
+                            # Fallback to direct instantiation if singleton fails
+                            reasoning = _create_fallback_reasoner()
+                            logger.warning("[REASONING] Using direct UnifiedReasoner instantiation (singleton unavailable)")
+                        else:
+                            logger.debug("[REASONING] Using singleton UnifiedReasoner")
+                    except ImportError:
+                        reasoning = _create_fallback_reasoner()
+                        logger.warning("[REASONING] Using direct UnifiedReasoner instantiation (singletons module unavailable)")
                     
                     # Extract query from parameters
                     query_text = parameters.get("prompt", "") or parameters.get("query", "")

@@ -174,6 +174,7 @@ from vulcan.llm import (
     get_or_create_hybrid_executor,
     get_hybrid_executor,
     set_hybrid_executor,
+    verify_hybrid_executor_setup,
     get_openai_client,
     get_openai_init_error,
     OPENAI_AVAILABLE,
@@ -628,6 +629,13 @@ async def lifespan(app: FastAPI):
                 openai_max_tokens=settings.llm_openai_max_tokens,
             )
             logger.info(f"✓ HybridLLMExecutor initialized at startup (mode={settings.llm_execution_mode})")
+            
+            # FIX #1 VERIFICATION: Verify internal LLM connection
+            verification = verify_hybrid_executor_setup()
+            if verification["status"] == "PASS":
+                logger.info(f"✓ HybridExecutor verification: {verification['message']}")
+            else:
+                logger.warning(f"⚠ HybridExecutor verification: {verification['message']}")
         except Exception as e:
             logger.warning(f"Failed to initialize HybridLLMExecutor at startup: {e}")
             app.state.hybrid_executor = None

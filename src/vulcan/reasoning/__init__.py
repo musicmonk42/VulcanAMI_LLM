@@ -412,24 +412,45 @@ def create_unified_reasoner(
     enable_safety: bool = True,
 ) -> Optional["UnifiedReasoner"]:
     """
-    Convenience function to create a UnifiedReasoner with error handling.
+    Convenience function to get or create a UnifiedReasoner with error handling.
+
+    ISSUE #2 FIX: Now uses singleton pattern to prevent re-initialization per query.
+    The first call with specific config creates the singleton instance; subsequent
+    calls return the cached instance (ignoring config).
 
     Args:
-        config: Configuration dictionary
-        enable_learning: Enable learning components
-        enable_safety: Enable safety validation
+        config: Configuration dictionary (only used on first call)
+        enable_learning: Enable learning components (only used on first call)
+        enable_safety: Enable safety validation (only used on first call)
 
     Returns:
-        UnifiedReasoner instance or None if unavailable
+        UnifiedReasoner instance (singleton) or None if unavailable
     """
     if not UNIFIED_AVAILABLE:
         logger.error("Cannot create UnifiedReasoner - component not available")
         return None
 
-    try:
+    # Helper function to create fallback instance
+    def _create_fallback_instance():
+        logger.warning("Singleton UnifiedReasoner unavailable - creating new instance")
         return UnifiedReasoner(
             config=config, enable_learning=enable_learning, enable_safety=enable_safety
         )
+
+    try:
+        # ISSUE #2 FIX: Use singleton to prevent re-initialization per query
+        from .singletons import get_unified_reasoner
+        reasoner = get_unified_reasoner(
+            config=config, enable_learning=enable_learning, enable_safety=enable_safety
+        )
+        if reasoner is not None:
+            return reasoner
+        
+        # Fallback to direct instantiation if singleton returns None
+        return _create_fallback_instance()
+    except ImportError:
+        # singletons module not available, fall back to direct instantiation
+        return _create_fallback_instance()
     except Exception as e:
         logger.error(f"Failed to create UnifiedReasoner: {e}")
         return None

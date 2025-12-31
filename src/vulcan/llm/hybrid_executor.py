@@ -38,6 +38,7 @@
 import asyncio
 import hashlib
 import logging
+import os
 import threading
 import time
 from collections import OrderedDict
@@ -48,6 +49,12 @@ __version__ = "1.2.0"
 __author__ = "VULCAN-AGI Team"
 
 logger = logging.getLogger(__name__)
+
+# ============================================================
+# CONFIGURATION
+# ============================================================
+# Default path for GraphixVulcanLLM config, can be overridden via environment variable
+LLM_CONFIG_PATH = os.environ.get("VULCAN_LLM_CONFIG_PATH", "configs/llm_config.yaml")
 
 # ============================================================
 # COMPONENT REGISTRY INTEGRATION
@@ -1143,12 +1150,35 @@ def get_or_create_hybrid_executor(
                 else:
                     logger.warning(
                         "[HybridExecutor] No internal LLM found in global registry - "
-                        "will fall back to OpenAI only"
+                        "will try direct GraphixVulcanLLM import"
                     )
             except Exception as e:
                 logger.warning(f"[HybridExecutor] Failed to fetch internal LLM from registry: {e}")
         elif effective_local_llm is None and _get_component_from_registry is None:
             logger.debug("[HybridExecutor] Component registry not available for auto-fetch")
+        
+        # FIX #1: If still no LLM, try direct import of GraphixVulcanLLM as fallback
+        # This handles cases where the component registry hasn't been initialized yet
+        if effective_local_llm is None:
+            try:
+                # Try importing GraphixVulcanLLM directly
+                from graphix_vulcan_llm import GraphixVulcanLLM
+                logger.info(f"[HybridExecutor] Attempting direct GraphixVulcanLLM instantiation (config={LLM_CONFIG_PATH})...")
+                effective_local_llm = GraphixVulcanLLM(config_path=LLM_CONFIG_PATH)
+                logger.info("[HybridExecutor] ✓ Direct GraphixVulcanLLM instantiation successful")
+                
+                # Register in component registry for future use
+                if _get_component_from_registry is not None:
+                    try:
+                        from vulcan.utils_main.components import set_component
+                        set_component("llm", effective_local_llm)
+                        logger.info("[HybridExecutor] ✓ Registered GraphixVulcanLLM in component registry")
+                    except Exception as reg_e:
+                        logger.debug(f"[HybridExecutor] Could not register LLM in registry: {reg_e}")
+            except ImportError as ie:
+                logger.warning(f"[HybridExecutor] GraphixVulcanLLM not available for import: {ie}")
+            except Exception as e:
+                logger.warning(f"[HybridExecutor] Failed to create GraphixVulcanLLM directly: {e}")
         
         # Create new instance
         has_local = effective_local_llm is not None
@@ -1198,6 +1228,60 @@ def set_hybrid_executor(executor: "HybridLLMExecutor") -> None:
         logger.info("[HybridExecutor] Singleton instance registered externally")
 
 
+def verify_hybrid_executor_setup() -> dict:
+    """
+    Verify that HybridExecutor has access to internal LLM.
+    
+    FIX #1 VERIFICATION: This function can be called after startup to verify
+    that the internal LLM is properly connected to the HybridExecutor.
+    
+    Returns:
+        Dictionary with verification results:
+        - has_internal_llm: bool - Whether internal LLM is available
+        - internal_llm_type: str - Type name of internal LLM (or None)
+        - internal_llm_vocab_size: int - Vocab size if available
+        - status: str - "PASS" or "FAIL"
+        - message: str - Human-readable status message
+    """
+    result = {
+        "has_internal_llm": False,
+        "internal_llm_type": None,
+        "internal_llm_vocab_size": None,
+        "status": "FAIL",
+        "message": "HybridExecutor not initialized"
+    }
+    
+    executor = get_hybrid_executor()
+    if executor is None:
+        result["message"] = "HybridExecutor singleton not created yet"
+        return result
+    
+    # Check internal model
+    has_internal = executor.local_llm is not None
+    result["has_internal_llm"] = has_internal
+    
+    if has_internal:
+        result["internal_llm_type"] = type(executor.local_llm).__name__
+        
+        # Try to get vocab size
+        vocab_size = getattr(executor.local_llm, 'vocab_size', None)
+        if vocab_size is None and hasattr(executor.local_llm, 'config'):
+            vocab_size = getattr(executor.local_llm.config, 'vocab_size', None)
+        result["internal_llm_vocab_size"] = vocab_size
+        
+        result["status"] = "PASS"
+        result["message"] = f"✓ Internal LLM connected: {result['internal_llm_type']}"
+        if vocab_size:
+            result["message"] += f" (vocab_size={vocab_size})"
+        logger.info(f"[HybridExecutor] VERIFICATION PASSED: {result['message']}")
+    else:
+        result["status"] = "FAIL"
+        result["message"] = "❌ Internal LLM is None - queries will fall back to OpenAI"
+        logger.warning(f"[HybridExecutor] VERIFICATION FAILED: {result['message']}")
+    
+    return result
+
+
 # ============================================================
 # MODULE EXPORTS
 # ============================================================
@@ -1208,6 +1292,7 @@ __all__ = [
     "get_or_create_hybrid_executor",
     "get_hybrid_executor",
     "set_hybrid_executor",
+    "verify_hybrid_executor_setup",
 ]
 
 
