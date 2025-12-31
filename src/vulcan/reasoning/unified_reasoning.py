@@ -2204,9 +2204,33 @@ class UnifiedReasoner:
         # If all weights are zero, fall back to uniform weights to prevent np.average error
         total_weight = sum(weights)
         if total_weight <= 0:
+            # BUG #3 FIX: Log detailed diagnostics when all weights are zero
             logger.warning("[Ensemble] All weights are zero - using uniform weights")
+            logger.warning(f"[Ensemble] Weight breakdown: {list(zip([r[0].value for r in results], weights))}")
+            
+            # BUG #3 FIX: Log what's in the ToolWeightManager to debug weight propagation
+            try:
+                wm = get_weight_manager()
+                raw_weights = wm.get_raw_weights()
+                logger.warning(f"[Ensemble] ToolWeightManager raw weights: {raw_weights}")
+                
+                # Log individual weight components to find the zero source
+                for reasoning_type, result in results:
+                    tool_name = reasoning_type.value if reasoning_type else "unknown"
+                    shared = wm.get_weight(tool_name, default=1.0)
+                    conf = result.confidence
+                    logger.warning(
+                        f"[Ensemble] {tool_name}: confidence={conf:.4f}, shared_weight={shared:.4f}, "
+                        f"product={conf * shared:.4f}"
+                    )
+            except Exception as e:
+                logger.warning(f"[Ensemble] Could not log weight debug info: {e}")
+            
             # Ensure weights list matches number of results
             weights = [1.0 / len(results)] * len(results) if results else [1.0]
+        else:
+            # BUG #3 FIX: Log when weights ARE working correctly
+            logger.info(f"[Ensemble] Using learned weights: {dict(zip([r[0].value for r in results], weights))}")
         
         ensemble_conclusion = self._weighted_voting(conclusions, weights)
         ensemble_confidence = (
@@ -2920,27 +2944,35 @@ class UnifiedReasoner:
     def _get_reasoning_type_weight(self, reasoning_type: ReasoningType) -> float:
         """Get historical performance weight for reasoning type.
         
-        BUG #5 FIX: Now also checks the shared ToolWeightManager for learned
-        weights from the Learning system.
+        BUG #3 FIX: Improved weight retrieval with better logging and fallback.
+        The previous implementation could return 0 in edge cases.
         """
 
         if not self.enable_learning:
             return 1.0
 
         try:
-            # BUG #5 FIX: First check shared weight manager for learned weights
+            # BUG #3 FIX: First check shared weight manager for learned weights
             tool_name = reasoning_type.value if reasoning_type else "unknown"
-            shared_weight = get_weight_manager().get_weight(tool_name)
-            if shared_weight > 0:
-                logger.debug(f"[Ensemble] Using shared weight for {tool_name}: {shared_weight:.4f}")
-                # Combine with historical performance
-                historical_weight = self._get_historical_weight(reasoning_type)
-                return (shared_weight + historical_weight) / 2
+            shared_weight = get_weight_manager().get_weight(tool_name, default=1.0)
             
-            # Fall back to historical weight
-            return self._get_historical_weight(reasoning_type)
+            # BUG #3 FIX: Always use at least 1.0 as minimum weight to prevent zero products
+            # The default is 1.0, so this should normally be satisfied
+            if shared_weight <= 0:
+                logger.warning(f"[Ensemble] Weight for {tool_name} is {shared_weight:.4f}, using 1.0 minimum")
+                shared_weight = 1.0
+            
+            logger.debug(f"[Ensemble] Using weight for {tool_name}: {shared_weight:.4f}")
+            
+            # Combine with historical performance if available
+            historical_weight = self._get_historical_weight(reasoning_type)
+            combined = (shared_weight + historical_weight) / 2
+            
+            # BUG #3 FIX: Ensure we never return 0 or negative
+            return max(0.1, combined)
+            
         except Exception as e:
-            logger.warning(f"Weight calculation failed: {e}")
+            logger.warning(f"Weight calculation failed for {reasoning_type}: {e}")
             return 1.0
     
     def _get_historical_weight(self, reasoning_type: ReasoningType) -> float:

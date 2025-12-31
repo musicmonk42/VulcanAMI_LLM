@@ -324,24 +324,28 @@ class BayesianMemoryPrior:
                 "Using keyword-only tool selection."
             )
         elif SEMANTIC_MATCHER_AVAILABLE:
+            # BUG #4 FIX: Use singleton pattern ONLY - never create new SemanticToolMatcher instances
+            # Creating new instances causes embedding model to reload (50ms → 6400ms degradation)
             try:
                 from vulcan.reasoning.singletons import get_semantic_matcher
                 self.semantic_matcher = get_semantic_matcher()
                 if self.semantic_matcher is not None:
-                    logger.info("[BayesianMemoryPrior] Semantic matching ENABLED (using cached model from registry)")
+                    logger.info("[BayesianMemoryPrior] Semantic matching ENABLED (using singleton from registry)")
                 else:
-                    # Fallback to direct creation if singleton fails
-                    self.semantic_matcher = SemanticToolMatcher()
-                    logger.info("[BayesianMemoryPrior] Semantic tool matcher initialized (fallback)")
-            except ImportError:
-                # singletons module not available, fallback to direct creation
-                try:
-                    self.semantic_matcher = SemanticToolMatcher()
-                    logger.info("[BayesianMemoryPrior] Semantic tool matcher initialized (no singleton)")
-                except Exception as e:
-                    logger.warning(f"Failed to initialize semantic matcher: {e}")
+                    # BUG #4 FIX: Do NOT fallback to direct creation - this causes model reload
+                    # Instead, log warning and continue without semantic matching
+                    logger.warning(
+                        "[BayesianMemoryPrior] Singleton SemanticToolMatcher not available. "
+                        "Using keyword-only matching to prevent embedding model reload."
+                    )
+            except ImportError as e:
+                # BUG #4 FIX: Do NOT create new SemanticToolMatcher - causes model reload
+                logger.warning(
+                    f"[BayesianMemoryPrior] Singletons module not available: {e}. "
+                    "Using keyword-only matching to prevent embedding model reload."
+                )
             except Exception as e:
-                logger.warning(f"Failed to initialize semantic matcher: {e}")
+                logger.warning(f"Failed to get semantic matcher singleton: {e}")
 
         # Load historical data if available
         self._load_from_memory_system()

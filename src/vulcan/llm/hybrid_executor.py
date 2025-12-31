@@ -786,30 +786,81 @@ class HybridLLMExecutor:
     async def _call_local_llm(
         self, loop, prompt: str, max_tokens: int
     ) -> Optional[str]:
-        """Call Vulcan's local LLM."""
+        """Call Vulcan's local LLM.
+        
+        BUG #1 FIX: Added detailed error logging to expose why local model
+        generation fails silently. Previously, exceptions were caught and
+        logged at debug level, hiding the real cause of 100% OpenAI fallback.
+        """
+        import traceback
+        import time as time_module
+        
+        # BUG #1 FIX: Log entry point with model state
+        self.logger.info("=" * 60)
+        self.logger.info("[HybridExecutor] ATTEMPTING LOCAL LLM GENERATION")
+        self.logger.info(f"[HybridExecutor] local_llm is None: {self.local_llm is None}")
+        
         if not self.local_llm:
+            self.logger.error("[HybridExecutor] CRITICAL: local_llm is None - cannot generate!")
+            self.logger.info("=" * 60)
             return None
+        
+        # BUG #1 FIX: Log detailed model state
+        self.logger.info(f"[HybridExecutor] local_llm type: {type(self.local_llm).__name__}")
+        self.logger.info(f"[HybridExecutor] local_llm has generate: {hasattr(self.local_llm, 'generate')}")
+        
+        # Check for common model state issues
+        if hasattr(self.local_llm, 'model'):
+            self.logger.info(f"[HybridExecutor] internal model: {type(self.local_llm.model).__name__ if self.local_llm.model else 'None'}")
+        if hasattr(self.local_llm, 'tokenizer'):
+            self.logger.info(f"[HybridExecutor] tokenizer: {type(self.local_llm.tokenizer).__name__ if self.local_llm.tokenizer else 'None'}")
+        if hasattr(self.local_llm, 'device'):
+            self.logger.info(f"[HybridExecutor] device: {self.local_llm.device}")
 
         try:
+            self.logger.info(f"[HybridExecutor] Calling generate(prompt_len={len(prompt)}, max_tokens={max_tokens})...")
+            start_time = time_module.perf_counter()
+            
             result = await loop.run_in_executor(
                 None, self.local_llm.generate, prompt, max_tokens
             )
+            
+            elapsed = time_module.perf_counter() - start_time
+            self.logger.info(f"[HybridExecutor] generate() returned in {elapsed:.2f}s")
 
             # Handle None result (returned when event loop conflict is detected)
             if result is None:
-                self.logger.debug("Local LLM returned None - triggering fallback")
+                self.logger.warning("[HybridExecutor] Local LLM returned None - triggering fallback")
+                self.logger.info("=" * 60)
                 return None
 
+            # BUG #1 FIX: Log successful generation
             if hasattr(result, "text"):
+                self.logger.info(f"[HybridExecutor] ✓ LOCAL GENERATION SUCCEEDED ({len(result.text)} chars)")
+                self.logger.info("=" * 60)
                 return result.text
             elif isinstance(result, str):
+                self.logger.info(f"[HybridExecutor] ✓ LOCAL GENERATION SUCCEEDED ({len(result)} chars)")
+                self.logger.info("=" * 60)
                 return result
             elif isinstance(result, dict) and "text" in result:
+                self.logger.info(f"[HybridExecutor] ✓ LOCAL GENERATION SUCCEEDED ({len(result['text'])} chars)")
+                self.logger.info("=" * 60)
                 return result["text"]
             else:
-                return str(result)
+                result_str = str(result)
+                self.logger.info(f"[HybridExecutor] ✓ LOCAL GENERATION SUCCEEDED ({len(result_str)} chars, converted)")
+                self.logger.info("=" * 60)
+                return result_str
+                
         except Exception as e:
-            self.logger.debug(f"Local LLM call failed: {e}")
+            # BUG #1 FIX: Log FULL error details - this is critical for debugging
+            self.logger.error("=" * 60)
+            self.logger.error("[HybridExecutor] LOCAL MODEL GENERATION FAILED!")
+            self.logger.error(f"[HybridExecutor] Exception type: {type(e).__name__}")
+            self.logger.error(f"[HybridExecutor] Exception message: {str(e)}")
+            self.logger.error(f"[HybridExecutor] Full traceback:\n{traceback.format_exc()}")
+            self.logger.error("=" * 60)
             return None
 
     async def _call_openai(

@@ -60,22 +60,62 @@ logger = logging.getLogger(__name__)
 # Railway volume mount point path constant
 RAILWAY_VOLUME_PATH = "/mnt/vulcan-data"
 
-# Default storage path - tries environment variable first, then Railway volume,
-# then falls back to a local data directory for better out-of-box experience
-# BUG FIX Issue #3: Ensure learning state persists by using accessible default path
+# BUG #2 FIX: Aggressive storage path discovery with actual write test
+# The previous implementation checked if paths existed but didn't verify write access
 def _get_default_storage_path() -> str:
-    """Get default storage path with fallback to local directory."""
-    # First try environment variable
-    env_path = os.environ.get("VULCAN_STORAGE_PATH")
-    if env_path:
-        return env_path
+    """Get default storage path with VERIFIED write access.
     
-    # Then try Railway volume mount
-    if Path(RAILWAY_VOLUME_PATH).exists() or os.environ.get("RAILWAY_ENVIRONMENT"):
-        return RAILWAY_VOLUME_PATH
+    BUG #2 FIX: Previous implementation returned paths without testing write access,
+    causing "Storage unavailable, state cached in memory only" on every query.
+    This version actually tests write access before returning a path.
+    """
+    import tempfile
     
-    # Finally fall back to local data directory (more likely to work)
-    return os.path.join(os.getcwd(), "data", "vulcan-learning")
+    # Candidate paths in order of preference
+    candidates = [
+        # 1. Environment variable (highest priority)
+        os.environ.get("VULCAN_STORAGE_PATH"),
+        # 2. Railway volume mount
+        RAILWAY_VOLUME_PATH,
+        # 3. User home directory (usually writable)
+        os.path.expanduser("~/vulcan-data"),
+        # 4. Current working directory data folder
+        os.path.join(os.getcwd(), "data", "vulcan-learning"),
+        # 5. Temp directory (last resort - always writable)
+        os.path.join(tempfile.gettempdir(), "vulcan-data"),
+    ]
+    
+    for candidate in candidates:
+        if candidate is None:
+            continue
+            
+        try:
+            # BUG #2 FIX: Actually try to create directory AND write a test file
+            candidate_path = Path(candidate)
+            candidate_path.mkdir(parents=True, exist_ok=True)
+            
+            # Write test to verify actual write access
+            test_file = candidate_path / ".write_test_vulcan"
+            test_file.write_text("test", encoding="utf-8")
+            test_file.unlink()  # Clean up test file
+            
+            logger.info(f"[LearningStatePersistence] ✓ Found writable storage: {candidate}")
+            return candidate
+            
+        except (OSError, PermissionError, IOError) as e:
+            logger.debug(f"[LearningStatePersistence] Cannot use {candidate}: {e}")
+            continue
+    
+    # BUG #2 FIX: If all else fails, use temp directory which should always work
+    fallback = os.path.join(tempfile.gettempdir(), "vulcan-data")
+    try:
+        Path(fallback).mkdir(parents=True, exist_ok=True)
+        logger.warning(f"[LearningStatePersistence] Using temp fallback: {fallback}")
+        return fallback
+    except Exception as e:
+        logger.error(f"[LearningStatePersistence] CRITICAL: Cannot create any storage path: {e}")
+        # Return the temp path anyway - let it fail at runtime with a clear error
+        return fallback
 
 DEFAULT_STORAGE_PATH = _get_default_storage_path()
 
@@ -813,11 +853,22 @@ class LearningStatePersistence:
             try:
                 test_file.write_text("test", encoding="utf-8")
                 test_file.unlink()
-            except (OSError, PermissionError):
+                logger.info(f"[LearningStatePersistence] ✓ Storage directory verified: {self.storage_path}")
+            except (OSError, PermissionError) as write_err:
+                # BUG #2 FIX: If write fails, try to find an alternate writable path
                 logger.warning(
                     f"[LearningStatePersistence] Storage directory not writable: "
-                    f"{self.storage_path}"
+                    f"{self.storage_path} - {write_err}"
                 )
+                
+                # Try alternate paths
+                alternate_path = self._find_writable_alternate()
+                if alternate_path:
+                    logger.info(f"[LearningStatePersistence] Switching to writable alternate: {alternate_path}")
+                    self.storage_path = Path(alternate_path)
+                    self.state_file = self.storage_path / self.filename
+                    return True
+                
                 return False
             
             return True
@@ -827,7 +878,47 @@ class LearningStatePersistence:
                 f"[LearningStatePersistence] Cannot create storage directory "
                 f"{self.storage_path}: {e}"
             )
+            
+            # BUG #2 FIX: Try alternate paths on failure
+            alternate_path = self._find_writable_alternate()
+            if alternate_path:
+                logger.info(f"[LearningStatePersistence] Switching to writable alternate: {alternate_path}")
+                self.storage_path = Path(alternate_path)
+                self.state_file = self.storage_path / self.filename
+                return True
+            
             return False
+    
+    def _find_writable_alternate(self) -> Optional[str]:
+        """
+        BUG #2 FIX: Find an alternate writable storage path.
+        
+        Returns:
+            Writable path or None if no writable path found.
+        """
+        import tempfile
+        
+        alternates = [
+            os.path.expanduser("~/vulcan-data"),
+            os.path.join(os.getcwd(), "data", "vulcan-learning"),
+            os.path.join(tempfile.gettempdir(), "vulcan-data"),
+        ]
+        
+        for path in alternates:
+            if path == str(self.storage_path):
+                continue  # Skip the path we already tried
+                
+            try:
+                p = Path(path)
+                p.mkdir(parents=True, exist_ok=True)
+                test_file = p / ".write_test"
+                test_file.write_text("test", encoding="utf-8")
+                test_file.unlink()
+                return path
+            except (OSError, PermissionError):
+                continue
+        
+        return None
     
     def _load_from_file(self, file_path: Path) -> Optional[LearningState]:
         """
