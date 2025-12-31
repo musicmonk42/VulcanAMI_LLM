@@ -662,11 +662,20 @@ class SemanticToolMatcher:
 
         PERFORMANCE FIX: Uses global model registry to ensure SentenceTransformer
         is loaded exactly ONCE per process and shared across all components.
+        
+        BUG #4 FIX: Added prominent logging to track model loads.
+        If you see "Loading embedding model" more than ONCE in logs, 
+        there's a singleton violation causing performance degradation.
         """
         if cls._shared_model is None and not cls._model_load_attempted:
             with cls._shared_model_lock:
                 if cls._shared_model is None and not cls._model_load_attempted:
                     cls._model_load_attempted = True
+                    
+                    # BUG #4 FIX: Log prominently that we're loading the model
+                    logger.info("=" * 60)
+                    logger.info("[SemanticToolMatcher] Loading embedding model (ONE TIME ONLY)")
+                    logger.info("=" * 60)
 
                     # First, try to use global model registry (process-wide singleton)
                     try:
@@ -677,7 +686,7 @@ class SemanticToolMatcher:
                         cls._shared_model = get_sentence_transformer("all-MiniLM-L6-v2")
                         if cls._shared_model is not None:
                             logger.info(
-                                "[SemanticToolMatcher] Using model from global registry"
+                                "[SemanticToolMatcher] ✓ Model obtained from global registry"
                             )
                     except ImportError as e:
                         logger.debug(
@@ -702,7 +711,7 @@ class SemanticToolMatcher:
                                 if shared is not None:
                                     cls._shared_model = shared
                                     logger.info(
-                                        "[SemanticToolMatcher] Using shared model from MultiTierFeatureExtractor"
+                                        "[SemanticToolMatcher] ✓ Using shared model from MultiTierFeatureExtractor"
                                     )
                             except AttributeError as e:
                                 logger.debug(
@@ -717,13 +726,14 @@ class SemanticToolMatcher:
                     if cls._shared_model is None:
                         try:
                             from sentence_transformers import SentenceTransformer
-
-                            logger.info(
-                                "[SemanticToolMatcher] Loading embedding model (fallback)..."
+                            
+                            # BUG #4 FIX: Log this prominently - it means registry failed
+                            logger.warning(
+                                "[SemanticToolMatcher] WARNING: Loading model directly (registry failed)"
                             )
                             cls._shared_model = SentenceTransformer("all-MiniLM-L6-v2")
                             logger.info(
-                                "[SemanticToolMatcher] Embedding model loaded (fallback)"
+                                "[SemanticToolMatcher] ✓ Embedding model loaded (direct fallback)"
                             )
                         except ImportError:
                             logger.warning(
@@ -731,6 +741,16 @@ class SemanticToolMatcher:
                             )
                         except Exception as e:
                             logger.error(f"Failed to load embedding model: {e}")
+                    
+                    # BUG #4 FIX: Log completion prominently
+                    if cls._shared_model is not None:
+                        logger.info("=" * 60)
+                        logger.info("[SemanticToolMatcher] ✓ Model loaded and cached")
+                        logger.info("=" * 60)
+                    else:
+                        logger.error("=" * 60)
+                        logger.error("[SemanticToolMatcher] ✗ FAILED to load embedding model")
+                        logger.error("=" * 60)
 
         return cls._shared_model
 
