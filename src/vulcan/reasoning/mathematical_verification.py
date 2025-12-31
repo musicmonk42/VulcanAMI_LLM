@@ -574,9 +574,10 @@ class MathematicalVerificationEngine:
             # Validate input
             input_errors = problem.validate()
             if input_errors:
+                # FIX: Use minimum confidence floor instead of 0.0
                 return VerificationResult(
                     status=MathVerificationStatus.FAILED,
-                    confidence=0.0,
+                    confidence=0.1,
                     errors=[MathErrorType.PROBABILITY_AXIOM_VIOLATION],
                     explanation="; ".join(input_errors),
                 )
@@ -983,16 +984,18 @@ class MathematicalVerificationEngine:
                 explanation="Numerical overflow in calculation",
             )
         except ValueError as e:
+            # FIX: Use minimum confidence floor instead of 0.0
             return VerificationResult(
                 status=MathVerificationStatus.FAILED,
-                confidence=0.0,
+                confidence=0.1,
                 explanation=f"Expression parsing failed: {str(e)}",
             )
         except Exception as e:
             logger.warning(f"Unexpected error in verify_arithmetic: {e}")
+            # FIX: Use minimum confidence floor instead of 0.0
             return VerificationResult(
                 status=MathVerificationStatus.FAILED,
-                confidence=0.0,
+                confidence=0.1,
                 explanation=f"Expression evaluation failed: {str(e)}",
             )
 
@@ -1346,9 +1349,10 @@ class MathematicalToolOrchestrator:
         valid_results = [(tool, r) for tool, r in results if r is not None]
         
         if not valid_results:
+            # FIX: Use minimum confidence floor instead of 0.0
             return VerificationResult(
                 status=MathVerificationStatus.FAILED,
-                confidence=0.0,
+                confidence=0.1,
                 explanation="No tools available for verification",
             )
         

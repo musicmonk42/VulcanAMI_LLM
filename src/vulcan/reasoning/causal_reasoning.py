@@ -687,7 +687,8 @@ class EnhancedCausalReasoning(CausalReasoningEngine):
                 direct_effects={},
                 total_effects={},
                 causal_paths=[],
-                confidence=0.0,
+                # FIX: Use minimum confidence floor instead of 0.0
+                confidence=0.1,
                 explanation="No causal DAG available",
             )
             # CRITICAL FIX: Record intervention

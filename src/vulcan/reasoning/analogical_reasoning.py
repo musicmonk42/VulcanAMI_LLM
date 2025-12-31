@@ -1209,10 +1209,11 @@ class AnalogicalReasoner(AbstractReasoner):
             return self.analogy_cache[cache_key]
 
         if source_domain not in self.domain_knowledge:
+            # FIX: Return minimum confidence floor instead of 0.0
             return {
                 "found": False,
                 "reason": "Unknown source domain",
-                "confidence": 0.0,
+                "confidence": 0.1,
             }
 
         source = self.domain_knowledge[source_domain]
@@ -1247,7 +1248,8 @@ class AnalogicalReasoner(AbstractReasoner):
                 mapping = self._semantic_mapping(source, target_structure)
         except Exception as e:
             logger.error(f"Mapping failed: {e}")
-            return {"found": False, "reason": f"Mapping error: {e}", "confidence": 0.0}
+            # FIX: Return minimum confidence floor instead of 0.0
+            return {"found": False, "reason": f"Mapping error: {e}", "confidence": 0.1}
 
         query_time = time.time() - start_time
 
