@@ -837,20 +837,20 @@ class HybridLLMExecutor:
         ) > self.MIN_MEANINGFUL_LENGTH
 
         if local_valid and openai_valid:
-            # Both succeeded - VULCAN reasoning is primary, OpenAI is language polish only
-            systems_used.extend(["vulcan_local_llm", "openai_language_polish"])
+            # Both succeeded - VULCAN reasoning is primary, OpenAI available for knowledge distillation
+            systems_used.extend(["vulcan_local_llm", "openai_distillation_capture"])
 
-            # ARCHITECTURE: VULCAN does ALL reasoning. OpenAI only improves language quality.
-            # Use VULCAN's response as the primary content, OpenAI just polishes language.
+            # ARCHITECTURE: VULCAN does ALL reasoning. OpenAI response is captured for
+            # knowledge distillation purposes only - to help train VULCAN to generate
+            # better language in the future.
             local_str = str(local_result)
             openai_str = str(openai_result)
 
-            # VULCAN's reasoning is authoritative - use it as primary response
-            # OpenAI is only used if VULCAN's response needs language improvement
+            # VULCAN's reasoning is authoritative - use it as the response
             combined_response = local_str  # VULCAN is primary
             
             self.logger.info(
-                "[HybridExecutor] ✓ VULCAN reasoning is primary - OpenAI captured for language reference only"
+                "[HybridExecutor] ✓ VULCAN reasoning is primary - OpenAI response captured for distillation"
             )
 
             return {
@@ -862,7 +862,9 @@ class HybridLLMExecutor:
                     "vulcan_reasoning_primary": True,
                     "local_length": len(local_str),
                     "openai_length": len(openai_str),
-                    "openai_role": "language_reference_only",
+                    "openai_role": "distillation_capture",
+                    # Store OpenAI response for knowledge distillation training
+                    "openai_response_for_distillation": openai_str[:2000],
                 },
             }
         elif openai_valid:
