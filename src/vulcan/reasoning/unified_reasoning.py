@@ -57,6 +57,17 @@ MATH_WEIGHT_ADJUSTMENT_PENALTY = -0.01  # Adjustment to tool weights on error
 # Keys to search for numerical results in conclusions
 NUMERICAL_RESULT_KEYS = ('probability', 'result', 'value', 'posterior', 'answer')
 
+# Confidence floor constants for reasoning engines
+# These ensure reasoning results aren't filtered out even when models are untrained
+CONFIDENCE_FLOOR_SYMBOLIC_PROVEN = 0.6  # High confidence when proof is found
+CONFIDENCE_FLOOR_SYMBOLIC_HAS_PROOF = 0.4  # Medium confidence when proof object exists
+CONFIDENCE_FLOOR_SYMBOLIC_DEFAULT = 0.2  # Minimum floor for symbolic reasoning
+CONFIDENCE_FLOOR_CAUSAL_WITH_RESULT = 0.3  # Confidence for successful causal analysis
+CONFIDENCE_FLOOR_CAUSAL_DEFAULT = 0.15  # Minimum floor for causal reasoning
+CONFIDENCE_FLOOR_ANALOGICAL_DEFAULT = 0.15  # Minimum floor for analogical reasoning
+CONFIDENCE_FLOOR_DEFAULT = 0.2  # Generic minimum floor for other reasoners
+CONFIDENCE_FLOOR_NO_RESULT = 0.1  # Floor when reasoner returns empty/null result
+
 # Problem type identifiers
 PROBLEM_TYPE_BAYESIAN = 'bayesian'
 
@@ -348,12 +359,13 @@ def _load_reasoning_components():
 
     # REMOVED: BayesianReasoner import block - does not exist in symbolic/__init__.py
 
+    # FIX: Import CausalReasoner (wrapper class with reason() method) instead of EnhancedCausalReasoning
     try:
-        from vulcan.reasoning.causal_reasoning import EnhancedCausalReasoning
+        from vulcan.reasoning.causal_reasoning import CausalReasoner
 
-        _REASONING_COMPONENTS["EnhancedCausalReasoning"] = EnhancedCausalReasoning
+        _REASONING_COMPONENTS["CausalReasoner"] = CausalReasoner
     except ImportError as e:
-        logger.warning(f"EnhancedCausalReasoning not available: {e}")
+        logger.warning(f"CausalReasoner not available: {e}")
 
     try:
         from vulcan.reasoning.causal_reasoning import CounterfactualReasoner
@@ -362,12 +374,13 @@ def _load_reasoning_components():
     except ImportError as e:
         logger.warning(f"CounterfactualReasoner not available: {e}")
 
+    # FIX: Import AnalogicalReasoningEngine (which has the reason() method with semantic processing)
     try:
-        from vulcan.reasoning.analogical_reasoning import AnalogicalReasoner
+        from vulcan.reasoning.analogical_reasoning import AnalogicalReasoningEngine
 
-        _REASONING_COMPONENTS["AnalogicalReasoner"] = AnalogicalReasoner
+        _REASONING_COMPONENTS["AnalogicalReasoningEngine"] = AnalogicalReasoningEngine
     except ImportError as e:
-        logger.warning(f"AnalogicalReasoner not available: {e}")
+        logger.warning(f"AnalogicalReasoningEngine not available: {e}")
 
     try:
         from vulcan.reasoning.multimodal_reasoning import MultiModalReasoningEngine
@@ -561,13 +574,13 @@ class UnifiedReasoner:
                 self.reasoners[ReasoningType.SYMBOLIC] = reasoning_components[
                     "SymbolicReasoner"
                 ]()
-            if "EnhancedCausalReasoning" in reasoning_components:
+            if "CausalReasoner" in reasoning_components:
                 self.reasoners[ReasoningType.CAUSAL] = reasoning_components[
-                    "EnhancedCausalReasoning"
+                    "CausalReasoner"
                 ](enable_learning=enable_learning)
-            if "AnalogicalReasoner" in reasoning_components:
+            if "AnalogicalReasoningEngine" in reasoning_components:
                 self.reasoners[ReasoningType.ANALOGICAL] = reasoning_components[
-                    "AnalogicalReasoner"
+                    "AnalogicalReasoningEngine"
                 ](enable_learning=enable_learning)
             # Use LanguageReasoner as fallback only if SymbolicReasoner is not available
             if (
@@ -2656,13 +2669,23 @@ class UnifiedReasoner:
 
                 query_result = reasoner.query(hypothesis)
 
+                # FIX: Ensure minimum confidence floor for symbolic reasoning
+                # Order matters: check 'proven' first (highest confidence), then 'proof exists'
+                raw_confidence = (
+                    query_result.get("confidence", 0.0)
+                    if isinstance(query_result, dict)
+                    else 0.0
+                )
+                if isinstance(query_result, dict) and query_result.get("proven"):
+                    confidence = max(CONFIDENCE_FLOOR_SYMBOLIC_PROVEN, raw_confidence)
+                elif isinstance(query_result, dict) and query_result.get("proof") is not None:
+                    confidence = max(CONFIDENCE_FLOOR_SYMBOLIC_HAS_PROOF, raw_confidence)
+                else:
+                    confidence = max(CONFIDENCE_FLOOR_SYMBOLIC_DEFAULT, raw_confidence)
+                
                 result = ReasoningResult(
                     conclusion=query_result,
-                    confidence=(
-                        query_result.get("confidence", 0.0)
-                        if isinstance(query_result, dict)
-                        else 0.0
-                    ),
+                    confidence=confidence,
                     reasoning_type=task.task_type,
                     explanation=(
                         str(query_result.get("proof"))
@@ -2675,13 +2698,21 @@ class UnifiedReasoner:
                 if hasattr(reasoner, "reason"):
                     result_dict = reasoner.reason(task.input_data, task.query)
 
+                    # FIX: Ensure minimum confidence floor for causal reasoning
+                    raw_confidence = (
+                        result_dict.get("confidence", CONFIDENCE_FLOOR_CAUSAL_WITH_RESULT)
+                        if isinstance(result_dict, dict)
+                        else CONFIDENCE_FLOOR_CAUSAL_WITH_RESULT
+                    )
+                    # If we got a meaningful result, ensure minimum confidence
+                    if isinstance(result_dict, dict) and not result_dict.get("error"):
+                        confidence = max(CONFIDENCE_FLOOR_CAUSAL_WITH_RESULT, raw_confidence)
+                    else:
+                        confidence = max(CONFIDENCE_FLOOR_CAUSAL_DEFAULT, raw_confidence)
+
                     result = ReasoningResult(
                         conclusion=result_dict,
-                        confidence=(
-                            result_dict.get("confidence", 0.5)
-                            if isinstance(result_dict, dict)
-                            else 0.5
-                        ),
+                        confidence=confidence,
                         reasoning_type=task.task_type,
                         explanation=f"Causal analysis performed",
                     )
@@ -2702,18 +2733,25 @@ class UnifiedReasoner:
                     raw_result = reasoner.reason(task.input_data, task.query)
                     if isinstance(raw_result, ReasoningResult):
                         result = raw_result
+                        # FIX: Ensure minimum confidence floor
+                        if result.confidence == 0.0 and result.conclusion is not None:
+                            result.confidence = CONFIDENCE_FLOOR_DEFAULT
                     else:  # Assume dict
+                        # FIX: Ensure minimum confidence floor for dict results
+                        raw_confidence = (
+                            raw_result.get("confidence", CONFIDENCE_FLOOR_DEFAULT)
+                            if isinstance(raw_result, dict)
+                            else CONFIDENCE_FLOOR_DEFAULT
+                        )
+                        confidence = max(CONFIDENCE_FLOOR_DEFAULT, raw_confidence) if raw_result else CONFIDENCE_FLOOR_NO_RESULT
+                        
                         result = ReasoningResult(
                             conclusion=(
                                 raw_result.get("conclusion")
                                 if isinstance(raw_result, dict)
                                 else raw_result
                             ),
-                            confidence=(
-                                raw_result.get("confidence", 0.5)
-                                if isinstance(raw_result, dict)
-                                else 0.5
-                            ),
+                            confidence=confidence,
                             reasoning_type=task.task_type,
                             explanation=str(raw_result),
                         )

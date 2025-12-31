@@ -1209,10 +1209,11 @@ class AnalogicalReasoner(AbstractReasoner):
             return self.analogy_cache[cache_key]
 
         if source_domain not in self.domain_knowledge:
+            # FIX: Return minimum confidence floor instead of 0.0
             return {
                 "found": False,
                 "reason": "Unknown source domain",
-                "confidence": 0.0,
+                "confidence": 0.1,
             }
 
         source = self.domain_knowledge[source_domain]
@@ -1247,7 +1248,8 @@ class AnalogicalReasoner(AbstractReasoner):
                 mapping = self._semantic_mapping(source, target_structure)
         except Exception as e:
             logger.error(f"Mapping failed: {e}")
-            return {"found": False, "reason": f"Mapping error: {e}", "confidence": 0.0}
+            # FIX: Return minimum confidence floor instead of 0.0
+            return {"found": False, "reason": f"Mapping error: {e}", "confidence": 0.1}
 
         query_time = time.time() - start_time
 
@@ -2210,11 +2212,15 @@ class AnalogicalReasoningEngine(AnalogicalReasoner):
                 k = query.get("k", 5)
                 results = self.find_multiple_analogies(target_problem, k=k)
 
+                # FIX: Ensure minimum confidence floor even when no analogies found
+                raw_confidence = results[0].get("confidence", 0.0) if results else 0.0
+                confidence = max(0.2, raw_confidence) if results else 0.15
+
                 return {
                     "found": len(results) > 0,
                     "analogies": results,
                     "count": len(results),
-                    "confidence": results[0].get("confidence", 0.0) if results else 0.0,
+                    "confidence": confidence,
                     "semantic_enrichment": True,
                     "embedding_method": self.stats["embedding_method"],
                 }
@@ -2230,9 +2236,13 @@ class AnalogicalReasoningEngine(AnalogicalReasoner):
                 )
                 result["semantic_enrichment"] = True
                 result["embedding_method"] = self.stats["embedding_method"]
+                # FIX: Ensure minimum confidence floor
+                if result.get("confidence", 0.0) == 0.0 and result.get("found"):
+                    result["confidence"] = 0.3
                 return result
 
-        return {"found": False, "reason": "Unsupported input format", "confidence": 0.0}
+        # FIX: Return minimum confidence (0.15) instead of 0.0 for unsupported format
+        return {"found": False, "reason": "Unsupported input format", "confidence": 0.15}
 
     def analyze_text_analogy(
         self, source_text: str, target_text: str

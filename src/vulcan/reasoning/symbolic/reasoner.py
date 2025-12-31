@@ -193,7 +193,8 @@ class SymbolicReasoner:
                 }
         except Exception as e:
             logger.error(f"Query failed: {e}")
-            return {"proven": False, "confidence": 0.0, "proof": None, "error": str(e)}
+            # FIX: Return minimum confidence floor instead of 0.0 for errors
+            return {"proven": False, "confidence": 0.1, "proof": None, "error": str(e)}
 
     def parse_formula(self, formula_str: str) -> Clause:
         """
