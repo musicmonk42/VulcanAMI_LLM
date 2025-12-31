@@ -373,7 +373,7 @@ async def execute_via_arena(
     FIX #2: Now includes:
     - Circuit breaker to skip Arena after consecutive timeouts
     - Concurrency limiting (MAX_CONCURRENT_ARENA simultaneous requests)
-    - Proper timeout (GENERATOR_TIMEOUT = 30s instead of 120s)
+    - Proper timeout (GENERATOR_TIMEOUT = 45s to allow Arena completion)
     - Logging when Arena is bypassed due to performance issues
 
     Arena handles:

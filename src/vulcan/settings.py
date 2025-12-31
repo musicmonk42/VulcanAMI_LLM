@@ -179,9 +179,9 @@ class Settings(BaseSettings):
         default="default-secret-key-for-dev", env="GRAPHIX_API_KEY"
     )
     # PERFORMANCE FIX: Arena timeout reduced to 60s based on production analysis
-    # Evidence from logs shows Arena circuit breaker at 30s causes wasted work
+    # Evidence from logs shows Arena circuit breaker causes wasted work
     # while 120s is too long. 60s balances completion vs. responsiveness.
-    # Circuit breaker in client.py has GENERATOR_TIMEOUT=30s - this must be higher
+    # Circuit breaker in client.py has GENERATOR_TIMEOUT=45s - this should be higher
     # to allow Arena operations to complete before we give up entirely.
     arena_timeout: float = Field(default=60.0, env="ARENA_TIMEOUT")
     # Whether to enable Arena routing for complex queries
