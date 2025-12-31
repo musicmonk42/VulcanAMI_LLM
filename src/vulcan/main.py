@@ -4014,12 +4014,46 @@ Do NOT generate generic answers - USE the specific analysis below.
 
 
 def _format_dict_result(reasoning_type: str, result: Dict[str, Any]) -> str:
-    """Format a dictionary result from a reasoning engine."""
+    """Format a dictionary result from a reasoning engine.
+    
+    BUG FIX: Enhanced to handle ReasoningResult-structured dicts with
+    conclusion, confidence, explanation, reasoning_type, and reasoning_steps.
+    """
     lines = []
     
     # Handle common result keys
     if "conclusion" in result:
-        lines.append(f"Conclusion: {result['conclusion']}")
+        conclusion = result['conclusion']
+        # Format conclusion nicely - handle nested dicts/complex structures
+        if isinstance(conclusion, dict):
+            lines.append("Conclusion:")
+            for k, v in conclusion.items():
+                if v is not None:
+                    lines.append(f"  - {k}: {v}")
+        else:
+            lines.append(f"Conclusion: {conclusion}")
+    
+    # BUG FIX: Add explanation if present (from ReasoningResult)
+    if "explanation" in result and result["explanation"]:
+        lines.append(f"Explanation: {result['explanation']}")
+    
+    # BUG FIX: Add reasoning type if present (from ReasoningResult)
+    if "reasoning_type" in result and result["reasoning_type"]:
+        lines.append(f"Reasoning Type: {result['reasoning_type']}")
+    
+    # BUG FIX: Format reasoning chain steps if present
+    if "reasoning_steps" in result:
+        steps = result["reasoning_steps"]
+        if isinstance(steps, list) and steps:
+            lines.append("Reasoning Chain:")
+            for i, step in enumerate(steps, 1):
+                if isinstance(step, dict):
+                    step_type = step.get('step_type', 'unknown')
+                    step_expl = step.get('explanation', '')
+                    step_conf = step.get('confidence', 0.0)
+                    lines.append(f"  {i}. [{step_type}] {step_expl} (confidence: {step_conf:.2f})")
+                else:
+                    lines.append(f"  {i}. {step}")
     
     if "premises" in result:
         premises = result["premises"]
@@ -4039,7 +4073,12 @@ def _format_dict_result(reasoning_type: str, result: Dict[str, Any]) -> str:
         lines.append(f"Probability: {result['probability']}")
     
     if "confidence" in result:
-        lines.append(f"Confidence: {result['confidence']}")
+        conf_val = result['confidence']
+        # Format confidence as percentage if it's a float between 0 and 1
+        if isinstance(conf_val, float) and 0 <= conf_val <= 1:
+            lines.append(f"Confidence: {conf_val:.1%}")
+        else:
+            lines.append(f"Confidence: {conf_val}")
     
     if "causal_path" in result:
         path = result["causal_path"]
@@ -4063,9 +4102,14 @@ def _format_dict_result(reasoning_type: str, result: Dict[str, Any]) -> str:
         lines.append(f"Mapping: {result['source_domain']} → {result['target_domain']}")
     
     # If no specific keys matched, format all key-value pairs
+    # BUG FIX: Skip already-handled keys to avoid duplication
+    handled_keys = {'conclusion', 'explanation', 'reasoning_type', 'reasoning_steps', 
+                    'premises', 'proof_steps', 'probability', 'confidence', 
+                    'causal_path', 'intervention', 'counterfactual', 'analogies',
+                    'source_domain', 'target_domain'}
     if not lines:
         for key, value in result.items():
-            if value is not None:
+            if value is not None and key not in handled_keys:
                 if isinstance(value, (list, tuple)) and len(value) > MAX_ANALOGIES_TO_SHOW:
                     value_str = str(value[:MAX_ANALOGIES_TO_SHOW]) + f"... ({len(value)} total)"
                 else:
@@ -4793,16 +4837,54 @@ async def unified_chat(request: UnifiedChatRequest):
                     )
                     
                     if unified_result:
-                        # Extract reasoning results
-                        if hasattr(unified_result, 'result') and unified_result.result:
-                            _reasoning["unified"] = unified_result.result
+                        # Extract reasoning results from ReasoningResult object
+                        # BUG FIX: ReasoningResult has 'conclusion' attribute, NOT 'result'
+                        # This was causing all VULCAN reasoning output to be discarded
+                        if hasattr(unified_result, 'conclusion') and unified_result.conclusion is not None:
+                            # Include full reasoning context: conclusion, confidence, explanation
+                            _reasoning["unified"] = {
+                                "conclusion": unified_result.conclusion,
+                                "confidence": getattr(unified_result, 'confidence', 0.0),
+                                "explanation": getattr(unified_result, 'explanation', ''),
+                                "reasoning_type": str(getattr(unified_result, 'reasoning_type', 'unknown')),
+                            }
+                            # Also include reasoning chain steps if available
+                            if hasattr(unified_result, 'reasoning_chain') and unified_result.reasoning_chain:
+                                chain = unified_result.reasoning_chain
+                                if hasattr(chain, 'steps') and chain.steps:
+                                    _reasoning["unified"]["reasoning_steps"] = [
+                                        {
+                                            "step_type": str(step.step_type) if hasattr(step, 'step_type') else 'unknown',
+                                            "explanation": getattr(step, 'explanation', ''),
+                                            "confidence": getattr(step, 'confidence', 0.0),
+                                        }
+                                        for step in chain.steps[:5]  # Limit to first 5 steps to avoid context overflow
+                                    ]
+                            # BUG FIX: Log successful extraction for debugging
+                            logger.info(
+                                f"[VULCAN/v1/chat] Extracted reasoning: "
+                                f"conclusion_type={type(unified_result.conclusion).__name__}, "
+                                f"confidence={_reasoning['unified'].get('confidence', 0):.2f}, "
+                                f"has_steps={bool(_reasoning['unified'].get('reasoning_steps'))}"
+                            )
                         elif isinstance(unified_result, dict):
                             _reasoning["unified"] = unified_result
+                            logger.info(f"[VULCAN/v1/chat] Extracted dict reasoning with keys: {list(unified_result.keys())}")
                         else:
-                            _reasoning["unified"] = str(unified_result)
+                            # Fallback: stringify the result
+                            _reasoning["unified"] = {
+                                "conclusion": str(unified_result),
+                                "confidence": getattr(unified_result, 'confidence', 0.0),
+                            }
+                            logger.info(f"[VULCAN/v1/chat] Fallback stringified reasoning result")
                         
-                        # Track which tool was used
-                        tool_used = getattr(unified_result, 'selected_tool', 'adaptive')
+                        # Track which reasoning type was used
+                        # BUG FIX: ReasoningResult has 'reasoning_type' attribute, NOT 'selected_tool'
+                        reasoning_type = getattr(unified_result, 'reasoning_type', None)
+                        if reasoning_type:
+                            tool_used = reasoning_type.value if hasattr(reasoning_type, 'value') else str(reasoning_type)
+                        else:
+                            tool_used = 'adaptive'
                         _systems.append(f"unified_reasoning_{tool_used}")
                         
                         # Track confidence and strategy
@@ -5197,10 +5279,20 @@ async def unified_chat(request: UnifiedChatRequest):
                 if reasoning_results:
                     try:
                         reasoning_str = _format_reasoning_results(reasoning_results)
+                        # BUG FIX: Log reasoning output to verify it's reaching this point
+                        logger.info(
+                            f"[VULCAN] Reasoning results formatted: "
+                            f"keys={list(reasoning_results.keys())}, "
+                            f"reasoning_str_len={len(reasoning_str)}"
+                        )
+                        if len(reasoning_str) > 0:
+                            logger.debug(f"[VULCAN] reasoning_str preview: {reasoning_str[:500]}...")
                     except Exception as e:
                         logger.warning(f"Failed to format reasoning results: {e}")
                         # Fallback to simple formatting
                         reasoning_str = f"\nReasoning Insights: {str(reasoning_results)}"
+                else:
+                    logger.info("[VULCAN] No reasoning_results available for LLM context")
 
                 # Build enhanced prompt with explicit instruction to USE reasoning output
                 # The prompt structure is critical for getting the LLM to incorporate
