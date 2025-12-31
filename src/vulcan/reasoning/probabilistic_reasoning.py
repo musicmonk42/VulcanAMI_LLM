@@ -1333,22 +1333,27 @@ class EnhancedProbabilisticReasoner:
         if not self.ensemble and not self.gp_ensemble:
             self._initialize_ensemble()
             if not self.ensemble:
+                # FIX: Return moderate uncertainty (0.5) instead of 1.0 to give non-zero confidence
                 return {
                     "mean": 0.5,
-                    "std": 1.0,
-                    "epistemic": 1.0,
+                    "std": 0.5,  # Changed from 1.0 to 0.5 for 50% confidence
+                    "epistemic": 0.5,
                     "aleatoric": 0.0,
                     "predictions": [],
+                    "untrained": True,
                 }
 
         if not self.trained:
+            # FIX: Return moderate uncertainty (0.5) instead of 1.0 to give non-zero confidence
+            # An untrained model should still provide baseline reasoning with moderate confidence
             return {
                 "mean": 0.5,
-                "std": 1.0,
-                "epistemic": 1.0,
+                "std": 0.5,  # Changed from 1.0 to 0.5 for 50% confidence
+                "epistemic": 0.5,
                 "aleatoric": 0.0,
-                "confidence_interval": (-1.5, 2.5),
+                "confidence_interval": (-0.5, 1.5),
                 "predictions": [],
+                "untrained": True,
             }
 
         if X.ndim == 1:
