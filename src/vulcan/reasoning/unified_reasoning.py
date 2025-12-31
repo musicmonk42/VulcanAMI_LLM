@@ -171,8 +171,22 @@ class ToolWeightManager:
             return self._weights.get(tool, default)
     
     def set_weight(self, tool: str, value: float) -> None:
-        """Set absolute weight value for a tool."""
+        """Set absolute weight value for a tool.
+        
+        BUG #1 FIX: Floor weight at a minimum positive value to prevent
+        the "death spiral" where accumulated penalties cause tools to have
+        zero or negative weights, breaking the ensemble calculations.
+        """
         with self._update_lock:
+            # BUG #1 FIX: Ensure weight is always positive (minimum 0.1)
+            # This prevents the death spiral where negative weights cause
+            # "All weights are zero" ensemble fallback
+            if value < 0.1:
+                logger.warning(
+                    f"[WeightManager] Flooring negative/low weight for '{tool}': "
+                    f"{value:.4f} -> 0.1"
+                )
+                value = 0.1
             self._weights[tool] = value
             logger.debug(f"[WeightManager] {tool} = {value:.4f}")
     
@@ -181,11 +195,23 @@ class ToolWeightManager:
         
         ISSUE #7 FIX: Initialize from 1.0 (neutral weight) instead of 0.0
         so that tools start with sensible weights before learning adjusts them.
+        
+        BUG #1 FIX: Floor the result at 0.1 to prevent death spiral.
         """
         with self._update_lock:
             # Start from 1.0 (neutral) instead of 0.0
             current = self._weights.get(tool, 1.0)
-            self._weights[tool] = current + delta
+            new_weight = current + delta
+            
+            # BUG #1 FIX: Floor at minimum positive weight
+            if new_weight < 0.1:
+                logger.warning(
+                    f"[WeightManager] Flooring weight after adjustment for '{tool}': "
+                    f"{current:.4f} + {delta:.4f} = {new_weight:.4f} -> 0.1"
+                )
+                new_weight = 0.1
+                
+            self._weights[tool] = new_weight
             logger.info(f"[WeightManager] {tool}: {current:.4f} → {self._weights[tool]:.4f}")
     
     def get_all_weights(self, tools: List[str]) -> Dict[str, float]:
@@ -2573,6 +2599,11 @@ class UnifiedReasoner:
         """
         FIX: Calculate utility of a reasoning result using measured costs
         instead of placeholders.
+        
+        BUG #1 FIX: Ensure utility is always positive to prevent negative weights
+        in ensemble calculations. The utility model can return negative values when
+        penalties (time, energy, risk) outweigh quality, but negative utility weights
+        cause the ensemble to fail with "All weights are zero" fallback.
         """
         if not self.utility_model:
             return result.confidence
@@ -2580,13 +2611,26 @@ class UnifiedReasoner:
         try:
             energy_mj = self._estimate_energy(execution_time_ms)
 
-            return self.utility_model.compute_utility(
+            raw_utility = self.utility_model.compute_utility(
                 quality=result.confidence,
                 time=execution_time_ms,
                 energy=energy_mj,
                 risk=1 - result.confidence,
                 context=context,
             )
+            
+            # BUG #1 FIX: Floor utility at a small positive value to prevent
+            # negative weights in ensemble. Use 0.01 as minimum to ensure
+            # tools with poor utility still contribute (just minimally) rather
+            # than being completely ignored or causing negative weight products.
+            if raw_utility <= 0:
+                logger.debug(
+                    f"[Ensemble] Utility was {raw_utility:.4f}, flooring to 0.01 "
+                    f"(confidence={result.confidence:.2f}, time={execution_time_ms:.0f}ms)"
+                )
+                return 0.01
+            
+            return raw_utility
         except Exception as e:
             logger.warning(f"Utility calculation failed: {e}")
             return result.confidence

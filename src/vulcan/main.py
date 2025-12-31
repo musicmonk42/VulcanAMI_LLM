@@ -5222,6 +5222,98 @@ async def unified_chat(request: UnifiedChatRequest):
             )
 
         # ================================================================
+        # STEP 6.6: FALLBACK - Direct Reasoning Invocation (GraphixArena Pattern)
+        # BUG #2 FIX: When agent pool jobs don't complete in time, invoke reasoning
+        # directly using the proven GraphixArena pattern. This ensures reasoning
+        # results are available for the LLM context even if agent pool is slow.
+        # ================================================================
+        if not reasoning_results and not agent_reasoning_output:
+            logger.warning(
+                "[VULCAN/v1/chat] No reasoning results from parallel tasks or agent pool. "
+                "Invoking direct reasoning (GraphixArena pattern)..."
+            )
+            try:
+                # Import reasoning integration components
+                from vulcan.reasoning.reasoning_integration import apply_reasoning
+                from vulcan.reasoning import create_unified_reasoner, ReasoningType
+                
+                # Determine query type and complexity for reasoning selection
+                query_type = metadata.get("query_type", "general")
+                complexity = metadata.get("complexity", 0.5)
+                
+                # Apply reasoning selection (determines which tools to use)
+                integration_result = apply_reasoning(
+                    query=user_message[:4096],  # Limit query length
+                    query_type=query_type,
+                    complexity=complexity,
+                    context=context,
+                )
+                
+                logger.info(
+                    f"[VULCAN/v1/chat] Direct reasoning selection: "
+                    f"tools={integration_result.selected_tools}, "
+                    f"strategy={integration_result.reasoning_strategy}, "
+                    f"confidence={integration_result.confidence:.2f}"
+                )
+                
+                # Invoke actual reasoning engine
+                reasoner = create_unified_reasoner(
+                    enable_learning=True,
+                    enable_safety=True,
+                )
+                
+                if reasoner is not None:
+                    # Map query_type to ReasoningType
+                    type_map = {
+                        "causal": ReasoningType.CAUSAL,
+                        "symbolic": ReasoningType.SYMBOLIC,
+                        "analogical": ReasoningType.ANALOGICAL,
+                        "probabilistic": ReasoningType.PROBABILISTIC,
+                        "counterfactual": ReasoningType.COUNTERFACTUAL,
+                        "reasoning": ReasoningType.HYBRID,
+                        "general": ReasoningType.HYBRID,
+                    }
+                    reasoning_type_enum = type_map.get(query_type, ReasoningType.HYBRID)
+                    
+                    # Execute reasoning synchronously
+                    reasoning_result = await loop.run_in_executor(
+                        None,
+                        lambda: reasoner.reason(
+                            input_data=user_message,
+                            query={"query": user_message, "context": context},
+                            reasoning_type=reasoning_type_enum,
+                        )
+                    )
+                    
+                    if reasoning_result:
+                        # Extract reasoning output (same format as GraphixArena)
+                        direct_reasoning_output = {
+                            "conclusion": getattr(reasoning_result, "conclusion", None),
+                            "confidence": getattr(reasoning_result, "confidence", 0.5),
+                            "reasoning_type": str(getattr(reasoning_result, "reasoning_type", "hybrid")),
+                            "explanation": getattr(reasoning_result, "explanation", None),
+                        }
+                        
+                        # Add to reasoning_results
+                        reasoning_results["direct_reasoning"] = direct_reasoning_output
+                        systems_used.append("direct_reasoning_engine")
+                        
+                        logger.info(
+                            f"[VULCAN/v1/chat] Direct reasoning complete: "
+                            f"type={direct_reasoning_output.get('reasoning_type')}, "
+                            f"confidence={direct_reasoning_output.get('confidence'):.2f}"
+                        )
+                    else:
+                        logger.warning("[VULCAN/v1/chat] Direct reasoning returned None")
+                else:
+                    logger.warning("[VULCAN/v1/chat] Could not create unified reasoner")
+                    
+            except ImportError as ie:
+                logger.warning(f"[VULCAN/v1/chat] Reasoning integration not available: {ie}")
+            except Exception as e:
+                logger.warning(f"[VULCAN/v1/chat] Direct reasoning invocation failed: {e}")
+
+        # ================================================================
         # STEP 7: Generate Response using LLM with full context
         # ================================================================
         # TIMING: Start measuring context building

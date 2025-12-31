@@ -346,6 +346,54 @@ class TestValidation:
         with pytest.raises(ValidationError, match="Tool name must be string"):
             persistence.update_tool_weights(invalid_weights)
 
+    def test_negative_weight_floored_on_save(self, persistence):
+        """BUG #1 TEST: Weights too negative should be floored to prevent death spiral."""
+        # Attempt to save a weight that would cause death spiral (adjustment < -0.9)
+        extreme_negative_weights = {"tool": -0.95}  # Would make absolute weight = 0.05
+        
+        result = persistence.update_tool_weights(extreme_negative_weights)
+        assert result is True
+        
+        # Should be floored to MIN_TOOL_WEIGHT_VALUE (-0.9)
+        loaded = persistence.get_tool_weights()
+        assert loaded["tool"] == -0.9  # Floored to prevent death spiral
+
+    def test_moderate_negative_weight_preserved(self, persistence):
+        """BUG #1 TEST: Moderate negative weights should be preserved (they're valid adjustments)."""
+        moderate_negative_weights = {"tool": -0.5}  # Absolute weight = 0.5, fine
+        
+        result = persistence.update_tool_weights(moderate_negative_weights)
+        assert result is True
+        
+        # Should be preserved as-is
+        loaded = persistence.get_tool_weights()
+        assert loaded["tool"] == -0.5
+
+    def test_legacy_negative_weight_reset_on_load(self, persistence):
+        """BUG #1 TEST: Legacy corrupted negative weights should be reset on load."""
+        # Simulate legacy state with extremely negative weight (would cause death spiral)
+        legacy_state = {
+            "tool_weights": {"corrupted_tool": -1.5},  # Way below threshold
+            "concept_library": {},
+            "contraindications": {},
+            "metadata": {
+                "version": "1.0",
+                "schema_version": "1.0.0",
+            }
+        }
+        
+        # Write legacy state directly to file
+        with open(persistence.state_file, "w", encoding="utf-8") as f:
+            import json
+            json.dump(legacy_state, f)
+        
+        # Clear cache to force reload
+        persistence._cached_state = None
+        
+        # Load should reset the corrupted weight
+        state = persistence.load_state()
+        assert state["tool_weights"]["corrupted_tool"] == 0.0  # Reset to default adjustment
+
 
 class TestGetStats:
     """Test get_stats functionality."""
