@@ -129,8 +129,18 @@ BACKUP_SUFFIX = ".backup"
 # Validation constraints
 MAX_TOOL_NAME_LENGTH = 256
 MAX_TOOL_WEIGHT_VALUE = 1.0
-MIN_TOOL_WEIGHT_VALUE = -1.0
+# BUG #1 FIX: Changed from -1.0 to -0.9 to prevent tool weight "death spiral"
+# The persistence stores weight ADJUSTMENTS (cumulative deltas from 1.0).
+# If adjustment = -1.0, then absolute weight = 1.0 + (-1.0) = 0.0, breaking ensemble.
+# Setting minimum to -0.9 ensures absolute weight >= 0.1 (positive, usable).
+MIN_TOOL_WEIGHT_VALUE = -0.9
 MAX_TOOL_COUNT = 10000
+
+# Weight reset threshold - adjustments below this indicate legacy corruption
+# (from old code that may have stored absolute values instead of adjustments)
+# The absolute weight would be 1.0 + adjustment, so adjustment of -1.0 = absolute 0.0
+WEIGHT_RESET_THRESHOLD = -0.9
+WEIGHT_DEFAULT_VALUE = 0.0  # Default adjustment is 0.0 (absolute weight = 1.0)
 
 
 # =============================================================================
@@ -571,12 +581,25 @@ class LearningStatePersistence:
             >>> print(success)
             True
         """
-        # Validate tool weights
-        self._validate_tool_weights(tool_weights)
+        # BUG #1 FIX: Floor weights at minimum value before validation and save
+        # This prevents the "death spiral" where accumulated penalties push weights negative
+        floored_weights = {}
+        for tool, weight in tool_weights.items():
+            if weight < MIN_TOOL_WEIGHT_VALUE:
+                logger.warning(
+                    f"[LearningStatePersistence] Flooring weight for '{tool}': "
+                    f"{weight:.4f} -> {MIN_TOOL_WEIGHT_VALUE:.2f}"
+                )
+                floored_weights[tool] = MIN_TOOL_WEIGHT_VALUE
+            else:
+                floored_weights[tool] = weight
+        
+        # Validate tool weights (now with floored values)
+        self._validate_tool_weights(floored_weights)
         
         with self._lock:
             state = self.load_state()
-            state["tool_weights"] = copy.deepcopy(tool_weights)
+            state["tool_weights"] = copy.deepcopy(floored_weights)
             return self.save_state(state)
     
     def get_tool_weights(self) -> Dict[str, float]:
@@ -1171,6 +1194,25 @@ class LearningStatePersistence:
         
         # Update load count
         state["metadata"]["load_count"] = state["metadata"].get("load_count", 0) + 1
+        
+        # BUG #1 FIX: Reset negative/low weights to prevent tool weight death spiral
+        # When weights go negative due to accumulated penalties, tools become unusable
+        # as the ensemble ignores them entirely. Reset any weight below threshold to default.
+        if "tool_weights" in state:
+            reset_count = 0
+            for tool, weight in list(state["tool_weights"].items()):
+                if weight < WEIGHT_RESET_THRESHOLD:
+                    old_weight = weight
+                    state["tool_weights"][tool] = WEIGHT_DEFAULT_VALUE
+                    reset_count += 1
+                    logger.warning(
+                        f"[LearningStatePersistence] Reset negative weight for '{tool}': "
+                        f"{old_weight:.4f} -> {WEIGHT_DEFAULT_VALUE:.1f}"
+                    )
+            if reset_count > 0:
+                logger.info(
+                    f"[LearningStatePersistence] Reset {reset_count} negative/low weights to default"
+                )
         
         # Schema migration would go here for future versions
         current_schema = state.get("metadata", {}).get("schema_version", "1.0.0")
