@@ -44,10 +44,20 @@ from collections import OrderedDict
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 # Module metadata
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 __author__ = "VULCAN-AGI Team"
 
 logger = logging.getLogger(__name__)
+
+# ============================================================
+# COMPONENT REGISTRY INTEGRATION
+# ============================================================
+# Import component registry getter for auto-fetching internal LLM
+# This import is at module level to avoid repeated import overhead
+try:
+    from vulcan.utils_main.components import get_component as _get_component_from_registry
+except ImportError:
+    _get_component_from_registry = None
 
 
 # ============================================================
@@ -1121,14 +1131,13 @@ def get_or_create_hybrid_executor(
             logger.debug("[HybridExecutor] Returning cached singleton instance")
             return _hybrid_executor_instance
         
-        # CRITICAL FIX: If local_llm is not provided, attempt to fetch from global registry
+        # Auto-fetch local LLM from component registry if not provided
         # This ensures HybridExecutor can access the internal LLM even when called
         # without explicit parameters (e.g., during singleton creation on first request)
         effective_local_llm = local_llm
-        if effective_local_llm is None:
+        if effective_local_llm is None and _get_component_from_registry is not None:
             try:
-                from vulcan.utils_main.components import get_component
-                effective_local_llm = get_component("llm")
+                effective_local_llm = _get_component_from_registry("llm")
                 if effective_local_llm is not None:
                     logger.info("[HybridExecutor] ✓ Auto-fetched internal LLM from global registry")
                 else:
@@ -1136,10 +1145,10 @@ def get_or_create_hybrid_executor(
                         "[HybridExecutor] No internal LLM found in global registry - "
                         "will fall back to OpenAI only"
                     )
-            except ImportError:
-                logger.debug("[HybridExecutor] Component registry not available")
             except Exception as e:
                 logger.warning(f"[HybridExecutor] Failed to fetch internal LLM from registry: {e}")
+        elif effective_local_llm is None and _get_component_from_registry is None:
+            logger.debug("[HybridExecutor] Component registry not available for auto-fetch")
         
         # Create new instance
         has_local = effective_local_llm is not None
