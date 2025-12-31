@@ -57,12 +57,20 @@ logger = logging.getLogger(__name__)
 # Default path for GraphixVulcanLLM config, can be overridden via environment variable
 LLM_CONFIG_PATH = os.environ.get("VULCAN_LLM_CONFIG_PATH", "configs/llm_config.yaml")
 
-# PERFORMANCE FIX: Skip local LLM when it consistently returns None
-# ISSUE-001: Local LLM returns None 100% of the time, wasting 5-30s per request
-# Default changed to True to reduce response time from 37-73s to 5-10s
-# This environment variable can be used even before settings module is loaded
-# Set SKIP_LOCAL_LLM=false only if local LLM is confirmed working
-_skip_local_llm_env = os.environ.get("SKIP_LOCAL_LLM", "true").lower()
+# ARCHITECTURE FIX: VULCAN should be primary brain, OpenAI is language fallback only
+# 
+# Previous behavior (WRONG): SKIP_LOCAL_LLM=true by default, bypassing VULCAN entirely
+# New behavior (CORRECT): SKIP_LOCAL_LLM=false by default, VULCAN runs first
+#
+# The correct architecture is:
+# 1. VULCAN reasoning engines analyze query (symbolic, probabilistic, causal, math)
+# 2. GraphixVulcanLLM tries to generate response using VULCAN's internal model
+# 3. If internal model succeeds with sufficient confidence -> return VULCAN response
+# 4. If internal model fails or low confidence -> OpenAI generates language ONLY
+#    (OpenAI should NOT reason, only express VULCAN's reasoning in fluent prose)
+#
+# Set SKIP_LOCAL_LLM=true ONLY if you want to bypass VULCAN entirely for testing
+_skip_local_llm_env = os.environ.get("SKIP_LOCAL_LLM", "false").lower()
 SKIP_LOCAL_LLM = _skip_local_llm_env in ("true", "1", "yes")
 
 # ============================================================
@@ -352,11 +360,14 @@ def _should_skip_local_llm() -> bool:
     """
     Check if local LLM should be skipped based on configuration.
     
-    PERFORMANCE FIX: When local LLM consistently returns None, skipping it
-    saves 5-30 seconds per request by avoiding wasted CPU cycles.
+    ARCHITECTURE: VULCAN is the primary brain, OpenAI is language fallback only.
+    By default, this returns False so VULCAN reasoning runs first.
+    
+    Set SKIP_LOCAL_LLM=true environment variable ONLY if you want to bypass
+    VULCAN entirely for testing purposes.
     
     Returns:
-        True if local LLM should be skipped
+        True if local LLM should be skipped (default: False)
     """
     # Environment variable takes precedence (set at module load time)
     if SKIP_LOCAL_LLM:
@@ -698,14 +709,15 @@ class HybridLLMExecutor:
             )
 
             if local_valid and openai_valid:
-                # Both succeeded - PREFER LOCAL LLM to reduce OpenAI API costs
-                # OpenAI response is still captured in metadata for distillation
+                # Both succeeded - PREFER VULCAN (primary brain) over OpenAI (language fallback)
+                # OpenAI response is still captured in metadata for knowledge distillation
                 systems_used.extend(["vulcan_local_llm", "openai_llm"])
                 self.logger.info(
-                    "[HybridExecutor] Both LLMs succeeded - using LOCAL response (OpenAI captured for distillation)"
+                    "[HybridExecutor] ✓ VULCAN is primary brain - using VULCAN response "
+                    "(OpenAI captured for knowledge distillation only)"
                 )
                 return {
-                    "text": results["local"],  # Use local LLM response
+                    "text": results["local"],  # Use VULCAN's internal LLM response
                     "source": "parallel_both",
                     "systems_used": systems_used,
                     "metadata": {
@@ -719,7 +731,7 @@ class HybridLLMExecutor:
             elif local_valid:
                 # Local succeeded, OpenAI failed or not ready
                 systems_used.append("vulcan_local_llm")
-                self.logger.info("[HybridExecutor] Using LOCAL LLM response (OpenAI failed or timed out)")
+                self.logger.info("[HybridExecutor] ✓ Using VULCAN internal LLM response (primary brain)")
                 return {
                     "text": results["local"],
                     "source": "local",
@@ -728,10 +740,12 @@ class HybridLLMExecutor:
             elif openai_valid:
                 # Only OpenAI succeeded - local LLM returned None or invalid response
                 systems_used.append("openai_llm")
-                # FIX: More accurate log message explaining why fallback happened
+                # Log architecture warning: OpenAI is fallback, not primary
                 local_reason = "returned None" if results["local"] is None else "returned invalid response"
-                self.logger.info(
-                    f"[HybridExecutor] Using OpenAI (local LLM {local_reason})"
+                self.logger.warning(
+                    f"[HybridExecutor] VULCAN internal LLM {local_reason} - "
+                    f"falling back to OpenAI for language generation. "
+                    f"This means VULCAN reasoning may not be fully utilized."
                 )
                 return {
                     "text": results["openai"],
@@ -842,8 +856,8 @@ class HybridLLMExecutor:
     ) -> Optional[str]:
         """Call Vulcan's local LLM.
         
-        PERFORMANCE FIX: Now respects SKIP_LOCAL_LLM setting to avoid wasting
-        5-30 seconds per request when local LLM consistently returns None.
+        ARCHITECTURE: VULCAN is primary brain, OpenAI is language fallback only.
+        This method attempts to use VULCAN's internal LLM first.
         
         BUG #1 FIX: Added detailed error logging to expose why local model
         generation fails silently. Previously, exceptions were caught and
@@ -852,10 +866,11 @@ class HybridLLMExecutor:
         import traceback
         import time as time_module
         
-        # PERFORMANCE FIX: Check if local LLM should be skipped
+        # Check if local LLM should be skipped (default: False, VULCAN runs first)
         if _should_skip_local_llm():
-            self.logger.info(
-                "[HybridExecutor] SKIP_LOCAL_LLM enabled - skipping local LLM to save 5-30s"
+            self.logger.warning(
+                "[HybridExecutor] SKIP_LOCAL_LLM=true - VULCAN brain bypassed! "
+                "Set SKIP_LOCAL_LLM=false to enable VULCAN reasoning."
             )
             return None
         

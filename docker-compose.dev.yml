@@ -366,11 +366,11 @@ services:
       # Now safe to enable (default: 0 = enabled) due to Issue #2 and #3 caching fixes
       # Set to 1 to disable for keyword-only routing (faster but less accurate)
       - VULCAN_DISABLE_SEMANTIC_MATCHING=${VULCAN_DISABLE_SEMANTIC_MATCHING:-0}
-      # Local LLM Skip Configuration (Performance Fix for 37-73s response times)
-      # PERFORMANCE FIX: Set to "true" by default because local LLM returns None 100%
-      # of the time in production, wasting 5-30 seconds per request (ISSUE-001).
-      # Set to "false" only if local LLM is confirmed working in your environment.
-      - SKIP_LOCAL_LLM=${SKIP_LOCAL_LLM:-true}
+      # Local LLM Configuration (VULCAN is primary brain)
+      # ARCHITECTURE: VULCAN reasoning runs first, OpenAI is language fallback only
+      # Set to "false" (default) to enable VULCAN as primary brain
+      # Set to "true" only if you want to bypass VULCAN entirely (testing/cost control)
+      - SKIP_LOCAL_LLM=${SKIP_LOCAL_LLM:-false}
       # Arena enabled/disabled
       # PERFORMANCE FIX: Set to "false" by default because Arena operations timeout
       # at 30-53 seconds with 66% timeout rate (ISSUE-005), causing cascade failures.

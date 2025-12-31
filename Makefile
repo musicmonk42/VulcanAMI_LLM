@@ -538,13 +538,14 @@ enable-performance-tuning: ## Enable all performance tuning settings (PR Fixes)
 	@echo "VULCAN_DISABLE_SEMANTIC_MATCHING=0"
 
 .PHONY: enable-llm-fast-path
-enable-llm-fast-path: ## Enable LLM fast path (skip local LLM, reduce response time by 5-30s)
-	@echo "$(GREEN)Enabling LLM fast path configuration...$(NC)"
-	@echo "Use these settings to reduce response time from 37-73s to 5-15s."
+enable-llm-fast-path: ## Enable LLM fast path (skip VULCAN, reduce response time but lose reasoning)
+	@echo "$(GREEN)WARNING: This disables VULCAN's primary brain!$(NC)"
+	@echo "VULCAN is the primary brain - OpenAI should only be language fallback."
+	@echo "Only use this for testing or cost control when you don't need VULCAN reasoning."
 	@echo ""
 	@echo "Add to your .env file:"
 	@echo ""
-	@echo "# Skip local LLM when it consistently returns None (saves 5-30s per request)"
+	@echo "# Skip VULCAN brain (bypasses reasoning, uses OpenAI for everything)"
 	@echo "SKIP_LOCAL_LLM=true"
 	@echo ""
 	@echo "# Arena timeout coordinated with circuit breaker (default: 60s)"
@@ -556,7 +557,8 @@ enable-llm-fast-path: ## Enable LLM fast path (skip local LLM, reduce response t
 	@echo "# Query routing timeout (embedding takes 4-5s, default: 10s)"
 	@echo "QUERY_ROUTING_TIMEOUT=10.0"
 	@echo ""
-	@echo "$(YELLOW)Note: Set SKIP_LOCAL_LLM=true only if local LLM consistently returns None$(NC)"
+	@echo "$(YELLOW)WARNING: SKIP_LOCAL_LLM=true bypasses VULCAN reasoning!$(NC)"
+	@echo "$(YELLOW)Use SKIP_LOCAL_LLM=false (default) to enable VULCAN as primary brain.$(NC)"
 
 .PHONY: enable-semantic-matching
 enable-semantic-matching: ## Enable semantic matching for accurate tool selection (Issue #4 Fix)

@@ -129,11 +129,11 @@ class Settings(BaseSettings):
     llm_execution_mode: str = Field(default="parallel", env="LLM_EXECUTION_MODE")
     # Timeout for parallel/ensemble execution (seconds)
     llm_parallel_timeout: float = Field(default=30.0, env="LLM_PARALLEL_TIMEOUT")
-    # PERFORMANCE FIX: Skip local LLM entirely when it consistently returns None
-    # When True: Skips local LLM attempts entirely, goes directly to OpenAI
-    # ISSUE-001: Local LLM returns None 100% of the time, wasting 5-30s per request
-    # Default changed to True to reduce response time from 37-73s to 5-10s
-    skip_local_llm: bool = Field(default=True, env="SKIP_LOCAL_LLM")
+    # ARCHITECTURE: VULCAN is primary brain, OpenAI is language fallback only
+    # When False (default): VULCAN reasoning runs first, OpenAI for language if needed
+    # When True: Bypasses VULCAN entirely (NOT recommended - loses reasoning capability)
+    # Set SKIP_LOCAL_LLM=true ONLY if you want OpenAI for everything (testing/cost control)
+    skip_local_llm: bool = Field(default=False, env="SKIP_LOCAL_LLM")
     # For ensemble mode: minimum confidence threshold for response selection
     llm_ensemble_min_confidence: float = Field(
         default=0.7, env="LLM_ENSEMBLE_MIN_CONFIDENCE"

@@ -267,11 +267,11 @@ spec:
         - name: VULCAN_DISABLE_SEMANTIC_MATCHING
           value: "0"
         {{- end }}
-        {{- /* Local LLM Skip Configuration (Performance Fix for 37-73s response times) */}}
-        {{- if .Values.performanceTuning.skipLocalLlm }}
+        {{- /* Local LLM Configuration (VULCAN is primary brain) */}}
+        {{- /* ARCHITECTURE: VULCAN reasoning runs first, OpenAI is language fallback only */}}
+        {{- /* Set skipLocalLlm: true only to bypass VULCAN entirely (testing/cost control) */}}
         - name: SKIP_LOCAL_LLM
-          value: "true"
-        {{- end }}
+          value: {{ .Values.performanceTuning.skipLocalLlm | default false | quote }}
         {{- /* Arena Configuration (Performance Tuning) */}}
         - name: ARENA_ENABLED
           value: {{ .Values.performanceTuning.arenaEnabled | quote }}
