@@ -1306,227 +1306,211 @@ class GraphixVulcanLLM:
             if self.monitor:
                 self.monitor.record_cache_miss()
 
+        logger.info(f"Generating up to {max_steps} tokens...")
+
+        # Call generate method - NO try-except to let errors propagate
+        gen_result = self.cog_loop.generate(
+            prompt=prompt,
+            max_tokens=max_steps,
+            stream_callback=stream_callback if stream else None,
+            stop_strings=tuple(stop_strings or []),
+            stop_tokens=tuple(stop_tokens or []),
+        )
+
+        # Check what we got
+        result_type_name = type(gen_result).__name__
+        has_anext = hasattr(gen_result, "__anext__")
+        has_tokens = hasattr(gen_result, "tokens")
+
+        logger.debug(
+            f"CognitiveLoop returned: type={result_type_name}, has___anext__={has_anext}, has_tokens={has_tokens}"
+        )
+
+        # EMERGENCY FIX: Check if we're in an async context where run_until_complete would fail
+        # This happens when generate() is called from run_in_executor() in HybridLLMExecutor
+        if self._check_running_loop():
+            logger.warning(
+                "Event loop already running - skipping local generation to trigger OpenAI fallback"
+            )
+            return None  # Triggers OpenAI fallback in HybridLLMExecutor
+
+        # Create a new event loop for this synchronous context
+        # Note: We don't call set_event_loop() to avoid affecting the thread's default loop
+        loop = asyncio.new_event_loop()
+
         try:
-            logger.info(f"Generating up to {max_steps} tokens...")
+            # Process based on type
+            if inspect.iscoroutine(gen_result):
+                logger.debug("DETECTED COROUTINE - AWAITING")
+                loop_result = loop.run_until_complete(gen_result)
 
-            # Call generate method
-            gen_result = self.cog_loop.generate(
-                prompt=prompt,
-                max_tokens=max_steps,
-                stream_callback=stream_callback if stream else None,
-                stop_strings=tuple(stop_strings or []),
-                stop_tokens=tuple(stop_tokens or []),
-            )
-
-            # Check what we got
-            result_type_name = type(gen_result).__name__
-            has_anext = hasattr(gen_result, "__anext__")
-            has_tokens = hasattr(gen_result, "tokens")
-
-            logger.debug(
-                f"CognitiveLoop returned: type={result_type_name}, has___anext__={has_anext}, has_tokens={has_tokens}"
-            )
-
-            # EMERGENCY FIX: Check if we're in an async context where run_until_complete would fail
-            # This happens when generate() is called from run_in_executor() in HybridLLMExecutor
-            if self._check_running_loop():
-                logger.warning(
-                    "Event loop already running - skipping local generation to trigger OpenAI fallback"
+                # Check if the coroutine returned an async generator!
+                result_type_after_await = type(loop_result).__name__
+                logger.debug(
+                    f"After awaiting coroutine: type={result_type_after_await}, has_tokens={hasattr(loop_result, 'tokens')}"
                 )
-                return None  # Triggers OpenAI fallback in HybridLLMExecutor
 
-            # Create a new event loop for this synchronous context
-            # Note: We don't call set_event_loop() to avoid affecting the thread's default loop
-            loop = asyncio.new_event_loop()
+                # If it returned an async generator, consume it
+                if hasattr(loop_result, "__anext__"):
+                    logger.debug("COROUTINE RETURNED ASYNC GENERATOR - CONSUMING IT")
 
-            try:
-                # Process based on type
-                if inspect.iscoroutine(gen_result):
-                    logger.debug("DETECTED COROUTINE - AWAITING")
-                    loop_result = loop.run_until_complete(gen_result)
-
-                    # Check if the coroutine returned an async generator!
-                    result_type_after_await = type(loop_result).__name__
-                    logger.debug(
-                        f"After awaiting coroutine: type={result_type_after_await}, has_tokens={hasattr(loop_result, 'tokens')}"
-                    )
-
-                    # If it returned an async generator, consume it
-                    if hasattr(loop_result, "__anext__"):
-                        logger.debug("COROUTINE RETURNED ASYNC GENERATOR - CONSUMING IT")
-
-                        async def consume_nested_generator():
-                            results = []
-                            count = 0
-
-                            async for item in loop_result:
-                                count += 1
-                                results.append(item)
-
-                            logger.debug(f"Consumed {count} items from nested generator")
-
-                            if not results:
-                                raise ValueError("Nested generator yielded no items!")
-
-                            return results[-1]
-
-                        loop_result = loop.run_until_complete(consume_nested_generator())
-                        logger.debug(
-                            f"After consuming nested generator: type={type(loop_result).__name__}, has_tokens={hasattr(loop_result, 'tokens')}"
-                        )
-
-                elif has_anext:
-                    logger.debug("DETECTED ASYNC GENERATOR - CONSUMING")
-
-                    async def consume_generator():
+                    async def consume_nested_generator():
                         results = []
                         count = 0
 
-                        async for item in gen_result:
+                        async for item in loop_result:
                             count += 1
                             results.append(item)
 
-                        logger.debug(f"Consumed {count} items")
+                        logger.debug(f"Consumed {count} items from nested generator")
 
                         if not results:
-                            raise ValueError("Generator yielded no items!")
+                            raise ValueError("Nested generator yielded no items!")
 
                         return results[-1]
 
-                    loop_result = loop.run_until_complete(consume_generator())
-
-                elif has_tokens:
-                    logger.debug("DETECTED DIRECT RESULT OBJECT")
-                    loop_result = gen_result
-
-                else:
-                    raise TypeError(
-                        f"Unknown return type: type={result_type_name}, "
-                        f"has___anext__={has_anext}, has_tokens={has_tokens}"
+                    loop_result = loop.run_until_complete(consume_nested_generator())
+                    logger.debug(
+                        f"After consuming nested generator: type={type(loop_result).__name__}, has_tokens={hasattr(loop_result, 'tokens')}"
                     )
-            finally:
-                # Clean up the event loop we created
-                loop.close()
 
-            # Final check
-            final_type = type(loop_result).__name__
-            final_has_tokens = hasattr(loop_result, "tokens")
-            logger.debug(
-                f"Final result: type={final_type}, has_tokens={final_has_tokens}"
+            elif has_anext:
+                logger.debug("DETECTED ASYNC GENERATOR - CONSUMING")
+
+                async def consume_generator():
+                    results = []
+                    count = 0
+
+                    async for item in gen_result:
+                        count += 1
+                        results.append(item)
+
+                    logger.debug(f"Consumed {count} items")
+
+                    if not results:
+                        raise ValueError("Generator yielded no items!")
+
+                    return results[-1]
+
+                loop_result = loop.run_until_complete(consume_generator())
+
+            elif has_tokens:
+                logger.debug("DETECTED DIRECT RESULT OBJECT")
+                loop_result = gen_result
+
+            else:
+                raise TypeError(
+                    f"Unknown return type: type={result_type_name}, "
+                    f"has___anext__={has_anext}, has_tokens={has_tokens}"
+                )
+        finally:
+            # Clean up the event loop we created
+            loop.close()
+
+        # Final check
+        final_type = type(loop_result).__name__
+        final_has_tokens = hasattr(loop_result, "tokens")
+        logger.debug(
+            f"Final result: type={final_type}, has_tokens={final_has_tokens}"
+        )
+
+        if not final_has_tokens:
+            raise AttributeError(
+                f"Result STILL missing 'tokens'! Type: {final_type}"
             )
 
-            if not final_has_tokens:
-                raise AttributeError(
-                    f"Result STILL missing 'tokens'! Type: {final_type}"
+        # Extract data
+        tokens = list(loop_result.tokens)
+        text = loop_result.text
+        reasoning_trace = loop_result.reasoning_trace
+        safety_events = loop_result.safety_events
+        metrics = loop_result.metrics
+        stopped_reason = loop_result.stopped_reason
+        duration_seconds = loop_result.duration_seconds
+
+        logger.info(f"✓ Generated {len(text)} chars")
+
+        # Explanation
+        explanation = None
+        if explain and tokens:
+            try:
+                hidden_state = self.transformer.encode(tokens).get(
+                    "last_hidden_state"
                 )
+                explanation = self.explainer.explain(
+                    token=tokens[-1],
+                    chain=reasoning_trace,
+                    hidden_state=hidden_state,
+                    logits=None,
+                    candidates=None,
+                    prompt_tokens=tokens,
+                )
+            except Exception as e:
+                logger.warning(f"Explanation generation failed: {e}")
+                explanation = {"error": str(e)}
 
-            # Extract data
-            tokens = list(loop_result.tokens)
-            text = loop_result.text
-            reasoning_trace = loop_result.reasoning_trace
-            safety_events = loop_result.safety_events
-            metrics = loop_result.metrics
-            stopped_reason = loop_result.stopped_reason
-            duration_seconds = loop_result.duration_seconds
+        # Build result
+        result = GenerationResult(
+            tokens=tokens,
+            text=text,
+            reasoning_trace=reasoning_trace,
+            safety_events=safety_events,
+            explanation=explanation,
+            metrics=metrics,
+            stopped_reason=stopped_reason,
+            duration_seconds=duration_seconds,
+            metadata={
+                "config": self.config["generation"],
+                "prompt_length": (
+                    len(prompt) if isinstance(prompt, (list, str)) else 0
+                ),
+            },
+        )
 
-            logger.info(f"✓ Successfully extracted {len(tokens)} tokens")
+        # Update state
+        with self._lock:
+            self._last_generation = result
+            self._total_tokens_generated += len(tokens)
+            self._generation_sessions += 1
 
-            # Explanation
-            explanation = None
-            if explain and tokens:
-                try:
-                    hidden_state = self.transformer.encode(tokens).get(
-                        "last_hidden_state"
-                    )
-                    explanation = self.explainer.explain(
-                        token=tokens[-1],
-                        chain=reasoning_trace,
-                        hidden_state=hidden_state,
-                        logits=None,
-                        candidates=None,
-                        prompt_tokens=tokens,
-                    )
-                except Exception as e:
-                    logger.warning(f"Explanation generation failed: {e}")
-                    explanation = {"error": str(e)}
+        # Monitor
+        if self.monitor:
+            self.monitor.record_generation(len(tokens), duration_seconds)
 
-            # Build result
-            result = GenerationResult(
-                tokens=tokens,
-                text=text,
-                reasoning_trace=reasoning_trace,
-                safety_events=safety_events,
-                explanation=explanation,
-                metrics=metrics,
-                stopped_reason=stopped_reason,
-                duration_seconds=duration_seconds,
-                metadata={
-                    "config": self.config["generation"],
-                    "prompt_length": (
-                        len(prompt) if isinstance(prompt, (list, str)) else 0
-                    ),
+        # Cache
+        if use_cache and self.cache and not stream:
+            self.cache.put(str(prompt), result, max_tokens=max_steps)
+
+        # Store in memory (hierarchical context)
+        try:
+            self.hier_context.store_generation(
+                prompt,
+                text,
+                {
+                    "trace_len": len(reasoning_trace),
+                    "safety_events": len(safety_events),
                 },
             )
-
-            # Update state
-            with self._lock:
-                self._last_generation = result
-                self._total_tokens_generated += len(tokens)
-                self._generation_sessions += 1
-
-            # Monitor
-            if self.monitor:
-                self.monitor.record_generation(len(tokens), duration_seconds)
-
-            # Cache
-            if use_cache and self.cache and not stream:
-                self.cache.put(str(prompt), result, max_tokens=max_steps)
-
-            # Store in memory (hierarchical context)
-            try:
-                self.hier_context.store_generation(
-                    prompt,
-                    text,
-                    {
-                        "trace_len": len(reasoning_trace),
-                        "safety_events": len(safety_events),
-                    },
-                )
-            except Exception as e:
-                logger.warning(f"Hierarchical memory storage failed: {e}")
-            
-            # Update causal context with generation info for causal reasoning
-            try:
-                self.causal_context.update(
-                    query=str(prompt),
-                    response=text,
-                    reasoning_trace=reasoning_trace,
-                    metadata={
-                        "tokens_generated": len(tokens),
-                        "duration": duration_seconds,
-                        "stopped_reason": stopped_reason,
-                    }
-                )
-            except Exception as e:
-                logger.debug(f"Causal context update skipped: {e}")
-
-            logger.info(result.summary())
-            return result
-
         except Exception as e:
-            logger.error(f"Generation failed: {e}", exc_info=True)
-            if self.monitor:
-                self.monitor.record_error()
-            return GenerationResult(
-                tokens=[],
-                text="",
-                reasoning_trace=[],
-                safety_events=[],
-                explanation={"error": str(e)},
-                metrics={"error": str(e)},
-                stopped_reason="error",
-                duration_seconds=time.time() - start,
+            logger.warning(f"Hierarchical memory storage failed: {e}")
+        
+        # Update causal context with generation info for causal reasoning
+        try:
+            self.causal_context.update(
+                query=str(prompt),
+                response=text,
+                reasoning_trace=reasoning_trace,
+                metadata={
+                    "tokens_generated": len(tokens),
+                    "duration": duration_seconds,
+                    "stopped_reason": stopped_reason,
+                }
             )
+        except Exception as e:
+            logger.debug(f"Causal context update skipped: {e}")
+
+        logger.info(result.summary())
+        return result
 
     # --- PATCH A START ---
     def stream(
