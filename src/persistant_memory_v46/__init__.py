@@ -50,7 +50,7 @@ __all__ = [
 
 def create_memory_system(
     s3_bucket: str,
-    embedding_model: str = "llm_embeddings",
+    embedding_model: str = "all-MiniLM-L6-v2",  # FIX: Changed from invalid "llm_embeddings" to valid model
     compression: str = "zstd",
     encryption: str = "AES256",
     **kwargs,
@@ -160,7 +160,7 @@ def quick_start(s3_bucket: str, **kwargs):
     defaults = {
         "compression": "zstd",
         "encryption": "AES256",
-        "embedding_model": "llm_embeddings",
+        "embedding_model": "all-MiniLM-L6-v2",  # FIX: Changed from invalid "llm_embeddings" to valid model
         "packfile_size_mb": 32,
         "compaction_strategy": "adaptive",
         "bloom_filter": True,

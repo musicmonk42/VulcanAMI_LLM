@@ -1642,7 +1642,8 @@ class PersistentHierarchicalMemory:
         self.lsm_compactor = MerkleLSM(32, "adaptive", True)
 
         # Graph-based retrieval augmented generation
-        self.graph_rag = GraphRAG("llm_embeddings", "disk_based_tier_c", True)
+        # FIX: Changed from invalid "llm_embeddings" to valid model "all-MiniLM-L6-v2"
+        self.graph_rag = GraphRAG("all-MiniLM-L6-v2", "disk_based_tier_c", True)
 
         # Unlearning engine for privacy and data deletion
         self.unlearning_engine = UnlearningEngine(merkle_graph=self.lsm_compactor)
