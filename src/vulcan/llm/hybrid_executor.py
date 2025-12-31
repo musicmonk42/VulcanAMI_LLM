@@ -41,6 +41,7 @@ import logging
 import os
 import threading
 import time
+import traceback
 from collections import OrderedDict
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
@@ -1138,10 +1139,8 @@ class HybridLLMExecutor:
             RuntimeError: If the local model is not initialized
             Exception: Propagates any exception from the local model generation
         """
-        import traceback
-        
         if self.local_llm is None:
-            self.logger.error("[HybridExecutor] internal_llm is None!")
+            self.logger.error("[HybridExecutor] local_llm is None!")
             raise RuntimeError("Local model not initialized")
         
         self.logger.info(f"[HybridExecutor] Starting local generation...")
