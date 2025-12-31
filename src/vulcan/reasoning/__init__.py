@@ -412,21 +412,40 @@ def create_unified_reasoner(
     enable_safety: bool = True,
 ) -> Optional["UnifiedReasoner"]:
     """
-    Convenience function to create a UnifiedReasoner with error handling.
+    Convenience function to get or create a UnifiedReasoner with error handling.
+
+    ISSUE #2 FIX: Now uses singleton pattern to prevent re-initialization per query.
+    The first call with specific config creates the singleton instance; subsequent
+    calls return the cached instance (ignoring config).
 
     Args:
-        config: Configuration dictionary
-        enable_learning: Enable learning components
-        enable_safety: Enable safety validation
+        config: Configuration dictionary (only used on first call)
+        enable_learning: Enable learning components (only used on first call)
+        enable_safety: Enable safety validation (only used on first call)
 
     Returns:
-        UnifiedReasoner instance or None if unavailable
+        UnifiedReasoner instance (singleton) or None if unavailable
     """
     if not UNIFIED_AVAILABLE:
         logger.error("Cannot create UnifiedReasoner - component not available")
         return None
 
     try:
+        # ISSUE #2 FIX: Use singleton to prevent re-initialization per query
+        from .singletons import get_unified_reasoner
+        reasoner = get_unified_reasoner(
+            config=config, enable_learning=enable_learning, enable_safety=enable_safety
+        )
+        if reasoner is not None:
+            return reasoner
+        
+        # Fallback to direct instantiation if singleton fails
+        logger.warning("Singleton UnifiedReasoner unavailable - creating new instance")
+        return UnifiedReasoner(
+            config=config, enable_learning=enable_learning, enable_safety=enable_safety
+        )
+    except ImportError:
+        # singletons module not available, fall back to direct instantiation
         return UnifiedReasoner(
             config=config, enable_learning=enable_learning, enable_safety=enable_safety
         )
