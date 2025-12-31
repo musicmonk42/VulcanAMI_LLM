@@ -1292,7 +1292,12 @@ class GraphixVulcanLLM:
         max_steps = max_tokens or self.config["generation"]["max_tokens"]
         
         # FIX #1: Add debugging to expose why generate() may return None
-        prompt_len = len(prompt) if isinstance(prompt, (str, list)) else 0
+        if isinstance(prompt, str):
+            prompt_len = len(prompt)
+        elif isinstance(prompt, (list, tuple)):
+            prompt_len = f"{len(prompt)} items"
+        else:
+            prompt_len = "unknown"
         logger.info(f"[DEBUG] generate() called with prompt_len={prompt_len}, max_tokens={max_steps}")
 
         # Check cache
@@ -1515,8 +1520,10 @@ class GraphixVulcanLLM:
             logger.debug(f"Causal context update skipped: {e}")
 
         # FIX #1: Add final logging to show successful generation
-        logger.info(f"[DEBUG] generate() returning: type={type(result).__name__}, len={len(result.text) if result and result.text else 'None'}")
-        logger.info(result.summary())
+        result_len = len(result.text) if result is not None and hasattr(result, 'text') and result.text else 'None'
+        logger.info(f"[DEBUG] generate() returning: type={type(result).__name__}, len={result_len}")
+        if result is not None:
+            logger.info(result.summary())
         return result
 
     # --- PATCH A START ---

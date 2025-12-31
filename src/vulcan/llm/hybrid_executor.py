@@ -622,10 +622,15 @@ class HybridLLMExecutor:
             "[HybridExecutor] ⚠️ VULCAN internal LLM failed - using OpenAI with FULL reasoning capability. "
             "OpenAI will reason independently since VULCAN reasoning is unavailable."
         )
-        # Use the full reasoning fallback prompt instead of the language-only prompt
+        # Combine the fallback prompt with any context from the original system prompt
+        fallback_system_prompt = self.FULL_REASONING_FALLBACK_PROMPT
+        if system_prompt and system_prompt != self.DEFAULT_SYSTEM_PROMPT:
+            # Preserve any additional context from the original system prompt
+            fallback_system_prompt = f"{self.FULL_REASONING_FALLBACK_PROMPT}\n\nAdditional context: {system_prompt}"
+        
         openai_result = await self._call_openai(
             loop, prompt, max_tokens, temperature, 
-            self.FULL_REASONING_FALLBACK_PROMPT,  # FIX #4: Use full reasoning prompt
+            fallback_system_prompt,
             conversation_history
         )
         if openai_result:

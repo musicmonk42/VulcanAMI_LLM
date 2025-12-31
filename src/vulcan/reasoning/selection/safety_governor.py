@@ -354,6 +354,11 @@ class SafetyValidator:
             "meta_reasoning",
         }
     )
+    
+    # FIX #3: Forbidden inputs that should be skipped during string matching
+    # These terms are meant for numeric validation, not text matching
+    # (e.g., "infinite wisdom" should not be blocked)
+    FORBIDDEN_INPUTS_TEXT_SKIP = frozenset({"nan", "inf", "infinite"})
 
     def __init__(self):
         # CRITICAL FIX: Pre-compile patterns to avoid ReDoS
@@ -1182,9 +1187,9 @@ class SafetyGovernor:
                         problem_str = str(context.problem).lower()
                         found = []
                         for forb in contract.forbidden_inputs:
-                            # Skip nan/inf string checks - these should only block actual NaN/inf values
-                            # in numeric computations, not occurrences in text
-                            if forb in ("nan", "inf", "infinite"):
+                            # Skip numeric validation terms during text matching
+                            # (e.g., "infinite wisdom" should not be blocked)
+                            if forb in SafetyValidator.FORBIDDEN_INPUTS_TEXT_SKIP:
                                 continue
                             if forb in problem_str:
                                 found.append(forb)
