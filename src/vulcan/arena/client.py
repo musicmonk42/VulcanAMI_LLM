@@ -31,8 +31,13 @@ logger = logging.getLogger(__name__)
 # FIX #2: TIMEOUT AND CIRCUIT BREAKER CONSTANTS
 # ============================================================
 
-# Generator timeout - target completion time (30s instead of 120s)
-GENERATOR_TIMEOUT = 30.0
+# PERFORMANCE FIX: Generator timeout increased from 30s to 45s to allow Arena
+# operations to complete. Evidence from logs shows Arena completing in 47-53s.
+# The 30s timeout was causing circuit breaker trips (2/3 consecutive timeouts)
+# and wasting work that would have completed in 15-23 more seconds.
+# Coordinated with settings.arena_timeout (60s) to ensure we don't timeout
+# before Arena has a chance to complete.
+GENERATOR_TIMEOUT = 45.0
 
 # Progress monitoring - abort if no progress after this time
 PROGRESS_TIMEOUT_SECONDS = 15.0

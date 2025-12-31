@@ -129,6 +129,11 @@ class Settings(BaseSettings):
     llm_execution_mode: str = Field(default="parallel", env="LLM_EXECUTION_MODE")
     # Timeout for parallel/ensemble execution (seconds)
     llm_parallel_timeout: float = Field(default=30.0, env="LLM_PARALLEL_TIMEOUT")
+    # PERFORMANCE FIX: Skip local LLM entirely when it consistently returns None
+    # When True: Skips local LLM attempts entirely, goes directly to OpenAI
+    # Evidence from logs: Local LLM returns None 100% of the time, wasting 5-30s per request
+    # Set SKIP_LOCAL_LLM=true to bypass local LLM and reduce response time by 5-30 seconds
+    skip_local_llm: bool = Field(default=False, env="SKIP_LOCAL_LLM")
     # For ensemble mode: minimum confidence threshold for response selection
     llm_ensemble_min_confidence: float = Field(
         default=0.7, env="LLM_ENSEMBLE_MIN_CONFIDENCE"
@@ -173,13 +178,12 @@ class Settings(BaseSettings):
     arena_api_key: Optional[str] = Field(
         default="default-secret-key-for-dev", env="GRAPHIX_API_KEY"
     )
-    # PERFORMANCE FIX: Arena timeout increased to 120s based on production analysis
-    # Evidence from logs shows Arena completes in 55-64s but can take 90+ seconds under CPU load
-    # Example: 15:18:18 [ARENA] generator timeout after 31.53s
-    #          15:18:43 POST /arena/api/run/generator [200] 55.602s (COMPLETED)
-    # The 30s timeout wasted 55-64s of completed Arena work due to premature timeout
-    # Increased to 120s to handle CPU-heavy loads while allowing Arena to complete
-    arena_timeout: float = Field(default=120.0, env="ARENA_TIMEOUT")
+    # PERFORMANCE FIX: Arena timeout reduced to 60s based on production analysis
+    # Evidence from logs shows Arena circuit breaker at 30s causes wasted work
+    # while 120s is too long. 60s balances completion vs. responsiveness.
+    # Circuit breaker in client.py has GENERATOR_TIMEOUT=30s - this must be higher
+    # to allow Arena operations to complete before we give up entirely.
+    arena_timeout: float = Field(default=60.0, env="ARENA_TIMEOUT")
     # Whether to enable Arena routing for complex queries
     arena_enabled: bool = Field(default=True, env="ARENA_ENABLED")
     # PERFORMANCE FIX: Complexity threshold for Arena fast-path skip

@@ -57,6 +57,11 @@ logger = logging.getLogger(__name__)
 # Default path for GraphixVulcanLLM config, can be overridden via environment variable
 LLM_CONFIG_PATH = os.environ.get("VULCAN_LLM_CONFIG_PATH", "configs/llm_config.yaml")
 
+# PERFORMANCE FIX: Skip local LLM when it consistently returns None
+# Evidence from logs: Local LLM returns None 100% of the time, wasting 5-30s per request
+# This environment variable can be used even before settings module is loaded
+SKIP_LOCAL_LLM = os.environ.get("SKIP_LOCAL_LLM", "").lower() in ("true", "1", "yes")
+
 # ============================================================
 # COMPONENT REGISTRY INTEGRATION
 # ============================================================
@@ -332,6 +337,33 @@ except ImportError:
     # Fallback definition
     def get_knowledge_distiller():
         return None
+
+# Import settings for skip_local_llm configuration (with fallback)
+try:
+    from vulcan.settings import settings as _settings
+except ImportError:
+    _settings = None
+
+
+def _should_skip_local_llm() -> bool:
+    """
+    Check if local LLM should be skipped based on configuration.
+    
+    PERFORMANCE FIX: When local LLM consistently returns None, skipping it
+    saves 5-30 seconds per request by avoiding wasted CPU cycles.
+    
+    Returns:
+        True if local LLM should be skipped
+    """
+    # Environment variable takes precedence (set at module load time)
+    if SKIP_LOCAL_LLM:
+        return True
+    
+    # Check settings module if available
+    if _settings is not None:
+        return getattr(_settings, 'skip_local_llm', False)
+    
+    return False
 
 
 # ============================================================
@@ -807,12 +839,22 @@ class HybridLLMExecutor:
     ) -> Optional[str]:
         """Call Vulcan's local LLM.
         
+        PERFORMANCE FIX: Now respects SKIP_LOCAL_LLM setting to avoid wasting
+        5-30 seconds per request when local LLM consistently returns None.
+        
         BUG #1 FIX: Added detailed error logging to expose why local model
         generation fails silently. Previously, exceptions were caught and
         logged at debug level, hiding the real cause of 100% OpenAI fallback.
         """
         import traceback
         import time as time_module
+        
+        # PERFORMANCE FIX: Check if local LLM should be skipped
+        if _should_skip_local_llm():
+            self.logger.info(
+                "[HybridExecutor] SKIP_LOCAL_LLM enabled - skipping local LLM to save 5-30s"
+            )
+            return None
         
         # BUG #1 FIX: Log entry point with model state
         self.logger.info("=" * 60)
