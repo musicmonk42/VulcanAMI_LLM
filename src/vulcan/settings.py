@@ -131,9 +131,9 @@ class Settings(BaseSettings):
     llm_parallel_timeout: float = Field(default=30.0, env="LLM_PARALLEL_TIMEOUT")
     # PERFORMANCE FIX: Skip local LLM entirely when it consistently returns None
     # When True: Skips local LLM attempts entirely, goes directly to OpenAI
-    # Evidence from logs: Local LLM returns None 100% of the time, wasting 5-30s per request
-    # Set SKIP_LOCAL_LLM=true to bypass local LLM and reduce response time by 5-30 seconds
-    skip_local_llm: bool = Field(default=False, env="SKIP_LOCAL_LLM")
+    # ISSUE-001: Local LLM returns None 100% of the time, wasting 5-30s per request
+    # Default changed to True to reduce response time from 37-73s to 5-10s
+    skip_local_llm: bool = Field(default=True, env="SKIP_LOCAL_LLM")
     # For ensemble mode: minimum confidence threshold for response selection
     llm_ensemble_min_confidence: float = Field(
         default=0.7, env="LLM_ENSEMBLE_MIN_CONFIDENCE"
@@ -184,8 +184,11 @@ class Settings(BaseSettings):
     # Circuit breaker in client.py has GENERATOR_TIMEOUT=45s - this should be higher
     # to allow Arena operations to complete before we give up entirely.
     arena_timeout: float = Field(default=60.0, env="ARENA_TIMEOUT")
-    # Whether to enable Arena routing for complex queries
-    arena_enabled: bool = Field(default=True, env="ARENA_ENABLED")
+    # PERFORMANCE FIX: Disable Arena by default due to 30-53 second timeouts
+    # ISSUE-005: Arena operations timeout at 30-53 seconds with 66% timeout rate
+    # Default changed to False to reduce response time from 37-73s to 5-10s
+    # Set ARENA_ENABLED=true only for complex multi-agent tournament scenarios
+    arena_enabled: bool = Field(default=False, env="ARENA_ENABLED")
     # PERFORMANCE FIX: Complexity threshold for Arena fast-path skip
     # Queries with complexity < this value skip Arena entirely for faster response
     # This prevents unnecessary Arena overhead for very simple queries
