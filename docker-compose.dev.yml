@@ -399,7 +399,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 120s  # Extended for ML model loading (BERT, spaCy, embeddings)
+      start_period: 300s  # Extended to 5 minutes for ML model loading (BERT, spaCy en_core_web_lg, embeddings)
     restart: unless-stopped
     deploy:
       resources:
@@ -595,7 +595,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 90s  # Extended for ML model loading
+      start_period: 300s  # Extended to 5 minutes for ML model loading
     restart: unless-stopped
     deploy:
       resources:

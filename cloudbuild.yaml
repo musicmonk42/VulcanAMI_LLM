@@ -47,14 +47,19 @@ substitutions:
   _IMAGE_NAME: 'gcr.io/${PROJECT_ID}/vulcanami-llm'
 
 # Build configuration
+# Using N1_HIGHCPU_32 for large ML builds with many dependencies
+# This provides 32 vCPUs and 28.8 GB RAM, needed for installing PyTorch, transformers, etc.
+# Alternative options: E2_HIGHCPU_8 (smaller/cheaper), E2_HIGHCPU_32 (larger)
 options:
   logging: CLOUD_LOGGING_ONLY
-  machineType: 'E2_HIGHCPU_8'
+  machineType: 'N1_HIGHCPU_32'
+  diskSizeGb: 200
 
 # Images to be pushed to the registry
 images:
   - '${_IMAGE_NAME}:${SHORT_SHA}'
   - '${_IMAGE_NAME}:latest'
 
-# Build timeout (30 minutes)
-timeout: '1800s'
+# Build timeout (60 minutes) - increased to handle large dependency installation
+# The requirements.txt includes 469+ packages including ML libraries (PyTorch, transformers, etc.)
+timeout: '3600s'

@@ -155,13 +155,21 @@ spec:
             cpu: 2000m
             memory: 4Gi
         # Using fast health endpoints for quicker probe responses
-        # NOTE: initialDelaySeconds must be long enough for ML model loading (~60-90s)
-        # The application loads BERT, spaCy en_core_web_lg, and embedding models at startup
+        # Startup probe: allows up to 5 minutes (30 * 10s) for ML model loading
+        # This prevents liveness/readiness probes from killing slow-starting containers
+        startupProbe:
+          httpGet:
+            path: /health/live
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 10
+          failureThreshold: 30
         livenessProbe:
           httpGet:
             path: /health/live
             port: 8000
-          initialDelaySeconds: 120
+          initialDelaySeconds: 30
           periodSeconds: 10
           timeoutSeconds: 10
           failureThreshold: 3
@@ -169,7 +177,7 @@ spec:
           httpGet:
             path: /health/ready
             port: 8000
-          initialDelaySeconds: 90
+          initialDelaySeconds: 30
           periodSeconds: 10
           timeoutSeconds: 10
           failureThreshold: 3

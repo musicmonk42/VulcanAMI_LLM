@@ -85,7 +85,7 @@ livenessProbe:
   httpGet:
     path: /health/live
     port: 8000
-  initialDelaySeconds: 120
+  initialDelaySeconds: 30
   periodSeconds: 10
   timeoutSeconds: 10
   failureThreshold: 3
@@ -94,10 +94,22 @@ readinessProbe:
   httpGet:
     path: /health/ready
     port: 8000
-  initialDelaySeconds: 90
+  initialDelaySeconds: 30
   periodSeconds: 10
   timeoutSeconds: 10
   failureThreshold: 3
+
+# Startup probe: allows up to 5 minutes (30 * 10s) for ML model loading
+# This prevents liveness/readiness probes from killing slow-starting containers
+# The probe succeeds once the /health/live endpoint responds
+startupProbe:
+  httpGet:
+    path: /health/live
+    port: 8000
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 10
+  failureThreshold: 30
 
 # Pod Disruption Budget (prevents all pods from being terminated during maintenance)
 podDisruptionBudget:
