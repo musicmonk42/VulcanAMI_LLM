@@ -8,6 +8,7 @@ Fixed version with proper resource management and cache eviction.
 """
 
 import logging
+import os
 import pickle
 import threading
 import time
@@ -21,6 +22,46 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
+# ============================================================
+# BUG #4 FIX: Global singleton for embeddings
+# ============================================================
+# This ensures the embedding model is loaded ONCE per process,
+# preventing 50ms→6400ms performance degradation from repeated loading.
+# ============================================================
+
+_GLOBAL_EMBEDDING_MODEL = None
+_EMBEDDING_LOCK = threading.Lock()
+
+
+def get_global_embedding_model():
+    """
+    Get or create the global embedding model singleton.
+    
+    BUG #4 FIX: This function ensures the SentenceTransformer model
+    is loaded only ONCE per process, preventing expensive reloads that
+    cause performance degradation.
+    
+    Returns:
+        SentenceTransformer model instance, or None if unavailable.
+    """
+    global _GLOBAL_EMBEDDING_MODEL
+    if _GLOBAL_EMBEDDING_MODEL is None:
+        with _EMBEDDING_LOCK:
+            # Double-check after acquiring lock
+            if _GLOBAL_EMBEDDING_MODEL is None:
+                try:
+                    from sentence_transformers import SentenceTransformer
+                    _GLOBAL_EMBEDDING_MODEL = SentenceTransformer('all-MiniLM-L6-v2')
+                    logger.info("[Embeddings] Loaded model ONCE (global singleton)")
+                except ImportError as e:
+                    logger.warning(f"[Embeddings] sentence-transformers not available: {e}")
+                    return None
+                except Exception as e:
+                    logger.error(f"[Embeddings] Failed to load model: {e}")
+                    return None
+    return _GLOBAL_EMBEDDING_MODEL
+
+
 # Import semantic tool matcher for query-based tool selection
 try:
     from .semantic_tool_matcher import SemanticToolMatcher
@@ -29,7 +70,6 @@ except ImportError:
     SEMANTIC_MATCHER_AVAILABLE = False
     SemanticToolMatcher = None
     logger.warning("SemanticToolMatcher not available")
-import os
 
 # Configuration constants for semantic tool matching
 MIN_QUERY_LENGTH_FOR_SEMANTIC_BOOST = 10  # Minimum query text length to apply semantic boost
