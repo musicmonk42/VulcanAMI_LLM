@@ -1138,9 +1138,9 @@ class HybridLLMExecutor:
         if self.local_llm is None:
             raise RuntimeError("No local model")
         
-        logger.info(f"[HybridExecutor] Calling local model...")
+        self.logger.info(f"[HybridExecutor] Calling local model...")
         response = self.local_llm.generate(prompt, max_tokens)
-        logger.info(f"[HybridExecutor] ✓ Success")
+        self.logger.info(f"[HybridExecutor] ✓ Success")
         return response
 
     def __repr__(self) -> str:
