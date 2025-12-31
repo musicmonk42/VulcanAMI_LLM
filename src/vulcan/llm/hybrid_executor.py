@@ -595,7 +595,13 @@ class HybridLLMExecutor:
         self, loop, prompt: str, max_tokens: int, temperature: float, system_prompt: str,
         conversation_history: Optional[List[Dict[str, str]]] = None
     ) -> Dict[str, Any]:
-        """Run both LLMs simultaneously, use first successful response."""
+        """Run both LLMs simultaneously and wait for both to complete.
+        
+        FIX: Changed from FIRST_COMPLETED to ALL_COMPLETED to ensure the local LLM
+        has a chance to complete even if OpenAI is faster. Previously, OpenAI would
+        complete in ~1s and the local LLM task would be cancelled, causing 100%
+        fallback to OpenAI in parallel mode.
+        """
         systems_used = []
 
         async def local_task():
@@ -613,9 +619,11 @@ class HybridLLMExecutor:
                 asyncio.create_task(openai_task()),
             ]
 
-            # Wait for first successful result or all to complete
+            # FIX: Wait for ALL tasks to complete (with timeout) instead of FIRST_COMPLETED
+            # This ensures the local LLM has a chance to produce a result even if OpenAI
+            # completes faster. The timeout still prevents waiting forever.
             done, pending = await asyncio.wait(
-                tasks, timeout=self.timeout, return_when=asyncio.FIRST_COMPLETED
+                tasks, timeout=self.timeout, return_when=asyncio.ALL_COMPLETED
             )
 
             results = {"local": None, "openai": None}
@@ -631,7 +639,7 @@ class HybridLLMExecutor:
                 except Exception as e:
                     self.logger.debug(f"Task failed: {e}")
 
-            # Cancel pending tasks and clean up
+            # Cancel any pending tasks (only happens if timeout was reached)
             for task in pending:
                 task.cancel()
                 try:
@@ -647,6 +655,12 @@ class HybridLLMExecutor:
             openai_valid = results["openai"] is not None and len(
                 str(results["openai"]).strip()
             ) > self.MIN_MEANINGFUL_LENGTH
+
+            # Log status of both results for debugging
+            self.logger.debug(
+                f"[HybridExecutor] Parallel results: local_valid={local_valid}, "
+                f"openai_valid={openai_valid}, local_result_type={type(results['local']).__name__}"
+            )
 
             if local_valid and openai_valid:
                 # Both succeeded - PREFER LOCAL LLM to reduce OpenAI API costs
@@ -670,16 +684,20 @@ class HybridLLMExecutor:
             elif local_valid:
                 # Local succeeded, OpenAI failed or not ready
                 systems_used.append("vulcan_local_llm")
-                self.logger.info("[HybridExecutor] Using LOCAL LLM response (OpenAI unavailable)")
+                self.logger.info("[HybridExecutor] Using LOCAL LLM response (OpenAI failed or timed out)")
                 return {
                     "text": results["local"],
                     "source": "local",
                     "systems_used": systems_used,
                 }
             elif openai_valid:
-                # Only OpenAI succeeded - fallback
+                # Only OpenAI succeeded - local LLM returned None or invalid response
                 systems_used.append("openai_llm")
-                self.logger.info("[HybridExecutor] Using OpenAI FALLBACK (local LLM unavailable)")
+                # FIX: More accurate log message explaining why fallback happened
+                local_reason = "returned None" if results["local"] is None else "returned invalid response"
+                self.logger.info(
+                    f"[HybridExecutor] Using OpenAI (local LLM {local_reason})"
+                )
                 return {
                     "text": results["openai"],
                     "source": "openai",
