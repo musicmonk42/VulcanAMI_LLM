@@ -372,15 +372,21 @@ performanceTuning:
   # Now safe to enable (default: false = enabled) due to Issue #2 and #3 caching fixes
   # Set to true to disable for keyword-only routing (faster but less accurate)
   disableSemanticMatching: false
-  # Skip local LLM when it consistently returns None (saves 5-30s per request)
-  # Set to true if local LLM is not working properly and always falling back to OpenAI
-  skipLocalLlm: false
-  # Arena enabled flag - set to false to bypass Arena entirely for faster response
-  arenaEnabled: true
+  # PERFORMANCE FIX: Skip local LLM by default (ISSUE-001)
+  # Local LLM returns None 100% of the time, wasting 5-30s per request
+  # Default changed to true to reduce response time from 37-73s to 5-10s
+  # Set to false only if local LLM is confirmed working in your environment
+  skipLocalLlm: true
+  # PERFORMANCE FIX: Arena disabled by default (ISSUE-005)
+  # Arena operations timeout at 30-53s with 66% timeout rate, causing cascade failures
+  # Default changed to false to reduce response time from 37-73s to 5-10s
+  # Set to true only for complex multi-agent tournament scenarios
+  arenaEnabled: false
   # Arena timeout in seconds (default: 60s, coordinates with circuit breaker at 45s)
   arenaTimeout: 60.0
-  # Query routing timeout in seconds (default: 10s for embedding completion)
-  queryRoutingTimeout: 10.0
+  # PERFORMANCE FIX: Query routing timeout increased (ISSUE-003)
+  # 10s timeout caused 66-80% timeout rate; 30s allows embedding completion
+  queryRoutingTimeout: 30.0
 
 # OpenAI Response Caching Configuration
 # Enables LRU+TTL caching for OpenAI API responses to reduce costs and latency

@@ -367,15 +367,21 @@ services:
       # Set to 1 to disable for keyword-only routing (faster but less accurate)
       - VULCAN_DISABLE_SEMANTIC_MATCHING=${VULCAN_DISABLE_SEMANTIC_MATCHING:-0}
       # Local LLM Skip Configuration (Performance Fix for 37-73s response times)
-      # Set to "true" to skip local LLM when it consistently returns None
-      # Saves 5-30 seconds per request by going directly to OpenAI
-      - SKIP_LOCAL_LLM=${SKIP_LOCAL_LLM:-false}
-      # Arena enabled/disabled (set to "false" to bypass Arena entirely)
-      - ARENA_ENABLED=${ARENA_ENABLED:-true}
+      # PERFORMANCE FIX: Set to "true" by default because local LLM returns None 100%
+      # of the time in production, wasting 5-30 seconds per request (ISSUE-001).
+      # Set to "false" only if local LLM is confirmed working in your environment.
+      - SKIP_LOCAL_LLM=${SKIP_LOCAL_LLM:-true}
+      # Arena enabled/disabled
+      # PERFORMANCE FIX: Set to "false" by default because Arena operations timeout
+      # at 30-53 seconds with 66% timeout rate (ISSUE-005), causing cascade failures.
+      # Set to "true" only for complex multi-agent tournament scenarios.
+      - ARENA_ENABLED=${ARENA_ENABLED:-false}
       # Arena timeout in seconds (coordinates with circuit breaker at 45s)
       - ARENA_TIMEOUT=${ARENA_TIMEOUT:-60.0}
-      # Query routing timeout in seconds (embedding takes 4-5s)
-      - QUERY_ROUTING_TIMEOUT=${QUERY_ROUTING_TIMEOUT:-10.0}
+      # Query routing timeout in seconds
+      # PERFORMANCE FIX: Increased from 10s to 30s to reduce timeout rate.
+      # Evidence: ISSUE-003 shows 66-80% of queries timeout at 10s threshold.
+      - QUERY_ROUTING_TIMEOUT=${QUERY_ROUTING_TIMEOUT:-30.0}
       # OpenAI Response Caching Configuration (Performance Optimization)
       # Enables LRU+TTL caching for OpenAI API responses to reduce costs and latency
       - OPENAI_CACHE_ENABLED=${OPENAI_CACHE_ENABLED:-true}

@@ -646,16 +646,16 @@ CACHE_STATS_LOG_INTERVAL: int = 10
 # If routing takes longer than this, a fallback plan is returned.
 # This prevents indefinite delays observed in production.
 #
-# PERFORMANCE FIX: Increased from 5s to 10s based on production analysis.
+# PERFORMANCE FIX: Increased from 10s to 30s based on production analysis (ISSUE-003).
 # Evidence from logs shows:
-# - Embedding computation taking 4-5 seconds consistently
-# - 5s timeout causes 80%+ timeout rate on queries
+# - Embedding computation taking 7-10 seconds due to cold cache
+# - 10s timeout causes 66-80% timeout rate on queries
 # - Fallback path works but loses semantic matching benefits
 #
-# 10s allows most embedding operations to complete while still providing
-# reasonable response times. Circuit breaker handles stuck operations.
+# 30s allows embedding completion while still providing reasonable response times.
+# Circuit breaker handles stuck operations.
 QUERY_ROUTING_TIMEOUT_SECONDS: float = (
-    10.0  # 10 seconds max - balanced timeout for embedding completion
+    30.0  # 30 seconds max - allows embedding completion
 )
 
 # PERFORMANCE FIX Issue #2: Reduced timeout for simple queries

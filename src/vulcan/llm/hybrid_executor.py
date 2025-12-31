@@ -58,9 +58,12 @@ logger = logging.getLogger(__name__)
 LLM_CONFIG_PATH = os.environ.get("VULCAN_LLM_CONFIG_PATH", "configs/llm_config.yaml")
 
 # PERFORMANCE FIX: Skip local LLM when it consistently returns None
-# Evidence from logs: Local LLM returns None 100% of the time, wasting 5-30s per request
+# ISSUE-001: Local LLM returns None 100% of the time, wasting 5-30s per request
+# Default changed to True to reduce response time from 37-73s to 5-10s
 # This environment variable can be used even before settings module is loaded
-SKIP_LOCAL_LLM = os.environ.get("SKIP_LOCAL_LLM", "").lower() in ("true", "1", "yes")
+# Set SKIP_LOCAL_LLM=false only if local LLM is confirmed working
+_skip_local_llm_env = os.environ.get("SKIP_LOCAL_LLM", "true").lower()
+SKIP_LOCAL_LLM = _skip_local_llm_env in ("true", "1", "yes")
 
 # ============================================================
 # COMPONENT REGISTRY INTEGRATION
