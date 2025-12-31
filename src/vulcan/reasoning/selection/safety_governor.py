@@ -360,15 +360,18 @@ class SafetyValidator:
         # Use simpler, non-backtracking patterns
         # FIX #2: Make patterns context-aware to reduce false positives
         # These patterns now require more specific context to trigger
+        # NOT blocking: "aerosol injection", "dependency injection", "harm" in ethics
         self.unsafe_patterns_compiled = [
-            # Require context for injection types - "sql injection", "code injection", not "aerosol injection"
+            # Require context for injection types - "sql injection", "code injection"
             re.compile(r"(?i)\b(sql[_\s-]?injection|code[_\s-]?injection|xss|command[_\s-]?injection)\b"),
-            # Attack patterns require harmful intent context
-            re.compile(r"(?i)\b(attack|exploit)\s+(someone|users?|system|people|vulnerability)\b"),
-            re.compile(r"(?i)\b(malware|virus|trojan|ransomware)\s+(attack|payload|distribution|creation)\b"),
-            re.compile(r"(?i)\b(hack|breach|compromise|backdoor)\s+(into|system|account|database)\b"),
-            re.compile(r"(?i)\b(steal|theft|fraud|scam)\s+(data|money|credentials|identity)\b"),
-            re.compile(r"(?i)\b(illegal|illicit)\s+(access|activity|drugs|weapons)\b"),
+            # Attack patterns require harmful intent context  
+            re.compile(r"(?i)\b(malware|virus|trojan|ransomware)\s+\w*\s*(attack|payload|distribution|creation|code)?\b"),
+            re.compile(r"(?i)\b(attack|exploit)\s+\w*\s*(someone|users?|system|people|vulnerability|target|computer)?\b"),
+            re.compile(r"(?i)\b(hack|breach|compromise|backdoor)\s+\w*\s*(into|the)?\s*(system|account|database)?\b"),
+            re.compile(r"(?i)\b(steal|theft|fraud|scam)\s+\w*\s*(data|money|credentials|identity|user)?\b"),
+            # Direct harm and destruction still blocked
+            re.compile(r"(?i)\b(destroy|damage)\s+\w*\s*(infrastructure|system|data|critical)\b"),
+            re.compile(r"(?i)\b(illegal|illicit)\s+\w*\s*(access|activity|drugs|weapons)\b"),
         ]
         
         # Original broad patterns for high-risk terms that need less context

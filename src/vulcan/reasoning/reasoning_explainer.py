@@ -282,12 +282,13 @@ class SafetyAwareReasoning:
             # Require context for injection types - "sql injection", "code injection"
             re.compile(r"\b(sql[_\s-]?injection|code[_\s-]?injection|xss|command[_\s-]?injection)\b", re.IGNORECASE),
             # Attack patterns require harmful intent context  
-            re.compile(r"\b(attack|exploit)\s+(someone|users?|system|people|vulnerability)\b", re.IGNORECASE),
-            re.compile(r"\b(malware|virus|trojan|ransomware)\s+(attack|payload|distribution|creation)\b", re.IGNORECASE),
-            re.compile(r"\b(hack|breach|compromise|backdoor)\s+(into|system|account|database)\b", re.IGNORECASE),
-            re.compile(r"\b(steal|theft|fraud|scam)\s+(data|money|credentials|identity)\b", re.IGNORECASE),
-            # Direct harm still blocked
-            re.compile(r"\b(harm|kill|destroy)\s+(people|someone|humans|users)\b", re.IGNORECASE),
+            re.compile(r"\b(malware|virus|trojan|ransomware)\s+\w*\s*(attack|payload|distribution|creation)?\b", re.IGNORECASE),
+            re.compile(r"\b(attack|exploit)\s+\w*\s*(someone|users?|system|people|vulnerability|target)?\b", re.IGNORECASE),
+            re.compile(r"\b(hack|breach|compromise|backdoor)\s+\w*\s*(into|the)?\s*(system|account|database)?\b", re.IGNORECASE),
+            re.compile(r"\b(steal|theft|fraud|scam)\s+\w*\s*(data|money|credentials|identity|user)?\b", re.IGNORECASE),
+            # Direct harm and destruction still blocked
+            re.compile(r"\b(destroy|damage)\s+\w*\s*(infrastructure|system|data|critical)\b", re.IGNORECASE),
+            re.compile(r"\b(harm|kill)\s+\w*\s*(people|someone|humans|users)\b", re.IGNORECASE),
         ]
 
         self._sensitive_patterns = [
