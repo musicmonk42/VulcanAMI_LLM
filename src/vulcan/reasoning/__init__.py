@@ -430,6 +430,13 @@ def create_unified_reasoner(
         logger.error("Cannot create UnifiedReasoner - component not available")
         return None
 
+    # Helper function to create fallback instance
+    def _create_fallback_instance():
+        logger.warning("Singleton UnifiedReasoner unavailable - creating new instance")
+        return UnifiedReasoner(
+            config=config, enable_learning=enable_learning, enable_safety=enable_safety
+        )
+
     try:
         # ISSUE #2 FIX: Use singleton to prevent re-initialization per query
         from .singletons import get_unified_reasoner
@@ -439,16 +446,11 @@ def create_unified_reasoner(
         if reasoner is not None:
             return reasoner
         
-        # Fallback to direct instantiation if singleton fails
-        logger.warning("Singleton UnifiedReasoner unavailable - creating new instance")
-        return UnifiedReasoner(
-            config=config, enable_learning=enable_learning, enable_safety=enable_safety
-        )
+        # Fallback to direct instantiation if singleton returns None
+        return _create_fallback_instance()
     except ImportError:
         # singletons module not available, fall back to direct instantiation
-        return UnifiedReasoner(
-            config=config, enable_learning=enable_learning, enable_safety=enable_safety
-        )
+        return _create_fallback_instance()
     except Exception as e:
         logger.error(f"Failed to create UnifiedReasoner: {e}")
         return None

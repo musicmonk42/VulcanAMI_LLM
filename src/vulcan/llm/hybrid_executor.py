@@ -38,6 +38,7 @@
 import asyncio
 import hashlib
 import logging
+import os
 import threading
 import time
 from collections import OrderedDict
@@ -48,6 +49,12 @@ __version__ = "1.2.0"
 __author__ = "VULCAN-AGI Team"
 
 logger = logging.getLogger(__name__)
+
+# ============================================================
+# CONFIGURATION
+# ============================================================
+# Default path for GraphixVulcanLLM config, can be overridden via environment variable
+LLM_CONFIG_PATH = os.environ.get("VULCAN_LLM_CONFIG_PATH", "configs/llm_config.yaml")
 
 # ============================================================
 # COMPONENT REGISTRY INTEGRATION
@@ -1156,8 +1163,8 @@ def get_or_create_hybrid_executor(
             try:
                 # Try importing GraphixVulcanLLM directly
                 from graphix_vulcan_llm import GraphixVulcanLLM
-                logger.info("[HybridExecutor] Attempting direct GraphixVulcanLLM instantiation...")
-                effective_local_llm = GraphixVulcanLLM(config_path="configs/llm_config.yaml")
+                logger.info(f"[HybridExecutor] Attempting direct GraphixVulcanLLM instantiation (config={LLM_CONFIG_PATH})...")
+                effective_local_llm = GraphixVulcanLLM(config_path=LLM_CONFIG_PATH)
                 logger.info("[HybridExecutor] ✓ Direct GraphixVulcanLLM instantiation successful")
                 
                 # Register in component registry for future use

@@ -2628,6 +2628,11 @@ class AgentPoolManager:
                     from vulcan.reasoning.reasoning_types import ReasoningType
                     from vulcan.reasoning.unified_reasoning import ReasoningStrategy
                     
+                    # Helper function to create fallback UnifiedReasoner instance
+                    def _create_fallback_reasoner():
+                        from vulcan.reasoning.unified_reasoning import UnifiedReasoner as DirectUnifiedReasoner
+                        return DirectUnifiedReasoner()
+                    
                     # ISSUE #2 FIX: Use singleton UnifiedReasoner to prevent re-initialization per query
                     # Previously: reasoning = DirectUnifiedReasoner()
                     # This was causing UnifiedRuntime and other components to be re-initialized on every query
@@ -2636,14 +2641,12 @@ class AgentPoolManager:
                         reasoning = get_unified_reasoner()
                         if reasoning is None:
                             # Fallback to direct instantiation if singleton fails
-                            from vulcan.reasoning.unified_reasoning import UnifiedReasoner as DirectUnifiedReasoner
-                            reasoning = DirectUnifiedReasoner()
+                            reasoning = _create_fallback_reasoner()
                             logger.warning("[REASONING] Using direct UnifiedReasoner instantiation (singleton unavailable)")
                         else:
                             logger.debug("[REASONING] Using singleton UnifiedReasoner")
                     except ImportError:
-                        from vulcan.reasoning.unified_reasoning import UnifiedReasoner as DirectUnifiedReasoner
-                        reasoning = DirectUnifiedReasoner()
+                        reasoning = _create_fallback_reasoner()
                         logger.warning("[REASONING] Using direct UnifiedReasoner instantiation (singletons module unavailable)")
                     
                     # Extract query from parameters
