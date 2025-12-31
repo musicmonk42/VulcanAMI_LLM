@@ -44,10 +44,20 @@ from collections import OrderedDict
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 # Module metadata
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 __author__ = "VULCAN-AGI Team"
 
 logger = logging.getLogger(__name__)
+
+# ============================================================
+# COMPONENT REGISTRY INTEGRATION
+# ============================================================
+# Import component registry getter for auto-fetching internal LLM
+# This import is at module level to avoid repeated import overhead
+try:
+    from vulcan.utils_main.components import get_component as _get_component_from_registry
+except ImportError:
+    _get_component_from_registry = None
 
 
 # ============================================================
@@ -1087,8 +1097,13 @@ def get_or_create_hybrid_executor(
     - Lost cache state between requests
     - Inconsistent configuration
     
+    IMPORTANT: If local_llm is not provided, this function will automatically
+    attempt to fetch it from the global component registry. This ensures the
+    HybridExecutor always has access to the internal LLM when available.
+    
     Args:
-        local_llm: Vulcan's local LLM instance (only used on first creation)
+        local_llm: Vulcan's local LLM instance (only used on first creation).
+                   If None, will attempt to fetch from global component registry.
         openai_client_getter: Function to get OpenAI client (only used on first creation)
         mode: Execution mode (only used on first creation unless force_new)
         timeout: Timeout for parallel/ensemble execution (only used on first creation)
@@ -1116,10 +1131,33 @@ def get_or_create_hybrid_executor(
             logger.debug("[HybridExecutor] Returning cached singleton instance")
             return _hybrid_executor_instance
         
+        # Auto-fetch local LLM from component registry if not provided
+        # This ensures HybridExecutor can access the internal LLM even when called
+        # without explicit parameters (e.g., during singleton creation on first request)
+        effective_local_llm = local_llm
+        if effective_local_llm is None and _get_component_from_registry is not None:
+            try:
+                effective_local_llm = _get_component_from_registry("llm")
+                if effective_local_llm is not None:
+                    logger.info("[HybridExecutor] ✓ Auto-fetched internal LLM from global registry")
+                else:
+                    logger.warning(
+                        "[HybridExecutor] No internal LLM found in global registry - "
+                        "will fall back to OpenAI only"
+                    )
+            except Exception as e:
+                logger.warning(f"[HybridExecutor] Failed to fetch internal LLM from registry: {e}")
+        elif effective_local_llm is None and _get_component_from_registry is None:
+            logger.debug("[HybridExecutor] Component registry not available for auto-fetch")
+        
         # Create new instance
-        logger.info(f"[HybridExecutor] Creating singleton instance (mode={mode})")
+        has_local = effective_local_llm is not None
+        logger.info(
+            f"[HybridExecutor] Creating singleton instance "
+            f"(mode={mode}, has_local_llm={has_local})"
+        )
         _hybrid_executor_instance = HybridLLMExecutor(
-            local_llm=local_llm,
+            local_llm=effective_local_llm,
             openai_client_getter=openai_client_getter,
             mode=mode,
             timeout=timeout,
@@ -1127,7 +1165,10 @@ def get_or_create_hybrid_executor(
             openai_max_tokens=openai_max_tokens,
             enable_openai_cache=enable_openai_cache,
         )
-        logger.info(f"[HybridExecutor] ✓ Singleton instance created successfully")
+        logger.info(
+            f"[HybridExecutor] ✓ Singleton instance created successfully "
+            f"(internal_llm_available={has_local})"
+        )
         return _hybrid_executor_instance
 
 
