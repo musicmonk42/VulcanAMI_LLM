@@ -5233,7 +5233,9 @@ async def unified_chat(request: UnifiedChatRequest):
                 "Invoking direct reasoning (GraphixArena pattern)..."
             )
             try:
-                # Import reasoning integration components
+                # NOTE: Imports are inside try-except intentionally because these modules
+                # may not be available in all deployments. If they're not available,
+                # we gracefully fall back to agent pool results (or no reasoning).
                 from vulcan.reasoning.reasoning_integration import apply_reasoning
                 from vulcan.reasoning import create_unified_reasoner, ReasoningType
                 

@@ -384,7 +384,6 @@ class TestValidation:
         
         # Write legacy state directly to file
         with open(persistence.state_file, "w", encoding="utf-8") as f:
-            import json
             json.dump(legacy_state, f)
         
         # Clear cache to force reload
