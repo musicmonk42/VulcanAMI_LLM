@@ -2217,7 +2217,7 @@ class UnifiedReasoner:
                 # Log individual weight components to find the zero source
                 for reasoning_type, result in results:
                     tool_name = reasoning_type.value if reasoning_type else "unknown"
-                    shared = wm.get_weight(tool_name)
+                    shared = wm.get_weight(tool_name, default=1.0)
                     conf = result.confidence
                     logger.warning(
                         f"[Ensemble] {tool_name}: confidence={conf:.4f}, shared_weight={shared:.4f}, "
