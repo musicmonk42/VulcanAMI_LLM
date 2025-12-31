@@ -537,6 +537,27 @@ enable-performance-tuning: ## Enable all performance tuning settings (PR Fixes)
 	@echo "# Set to 1 to disable for keyword-only routing (faster but less accurate)"
 	@echo "VULCAN_DISABLE_SEMANTIC_MATCHING=0"
 
+.PHONY: enable-llm-fast-path
+enable-llm-fast-path: ## Enable LLM fast path (skip local LLM, reduce response time by 5-30s)
+	@echo "$(GREEN)Enabling LLM fast path configuration...$(NC)"
+	@echo "Use these settings to reduce response time from 37-73s to 5-15s."
+	@echo ""
+	@echo "Add to your .env file:"
+	@echo ""
+	@echo "# Skip local LLM when it consistently returns None (saves 5-30s per request)"
+	@echo "SKIP_LOCAL_LLM=true"
+	@echo ""
+	@echo "# Arena timeout coordinated with circuit breaker (default: 60s)"
+	@echo "ARENA_TIMEOUT=60.0"
+	@echo ""
+	@echo "# Arena enabled (set to false to bypass Arena entirely)"
+	@echo "ARENA_ENABLED=true"
+	@echo ""
+	@echo "# Query routing timeout (embedding takes 4-5s, default: 10s)"
+	@echo "QUERY_ROUTING_TIMEOUT=10.0"
+	@echo ""
+	@echo "$(YELLOW)Note: Set SKIP_LOCAL_LLM=true only if local LLM consistently returns None$(NC)"
+
 .PHONY: enable-semantic-matching
 enable-semantic-matching: ## Enable semantic matching for accurate tool selection (Issue #4 Fix)
 	@echo "$(GREEN)Enabling semantic matching...$(NC)"

@@ -267,6 +267,18 @@ spec:
         - name: VULCAN_DISABLE_SEMANTIC_MATCHING
           value: "0"
         {{- end }}
+        {{- /* Local LLM Skip Configuration (Performance Fix for 37-73s response times) */}}
+        {{- if .Values.performanceTuning.skipLocalLlm }}
+        - name: SKIP_LOCAL_LLM
+          value: "true"
+        {{- end }}
+        {{- /* Arena Configuration (Performance Tuning) */}}
+        - name: ARENA_ENABLED
+          value: {{ .Values.performanceTuning.arenaEnabled | quote }}
+        - name: ARENA_TIMEOUT
+          value: {{ .Values.performanceTuning.arenaTimeout | quote }}
+        - name: QUERY_ROUTING_TIMEOUT
+          value: {{ .Values.performanceTuning.queryRoutingTimeout | quote }}
         {{- end }}
         {{- if .Values.memorySystem.enabled }}
         # Vulcan Memory System v46 AWS credentials
