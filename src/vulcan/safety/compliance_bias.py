@@ -1746,10 +1746,33 @@ class BiasDetector:
     
     Note: If PyTorch is not available, bias detection will use simplified
     heuristic-based methods instead of neural models.
+    
+    FIX: Implements singleton pattern to prevent multiple re-initializations
+    which was causing ~15% CPU overhead from initializing 3-6x per session.
     """
+    
+    # Singleton pattern implementation
+    _instance = None
+    _instance_lock = threading.RLock()
+    _initialized = False
+
+    def __new__(cls):
+        with cls._instance_lock:
+            if cls._instance is None:
+                cls._instance = super().__new__(cls)
+            return cls._instance
 
     def __init__(self, config: Optional[Dict[str, Any]] = None):
-        """Initialize bias detector with models."""
+        """Initialize bias detector with models (singleton - only runs once)."""
+        # Thread-safe check for re-initialization (fixes race condition)
+        with BiasDetector._instance_lock:
+            if BiasDetector._initialized:
+                logger.debug("BiasDetector singleton already initialized, reusing existing instance")
+                return
+            
+            # Mark as initialized immediately to prevent race conditions
+            BiasDetector._initialized = True
+            
         self.config = config or {}
         self.bias_history = deque(maxlen=1000)
         self.bias_thresholds = {

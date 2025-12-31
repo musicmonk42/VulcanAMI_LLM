@@ -536,7 +536,8 @@ class CodeKnowledgeStore:
         
         try:
             from persistant_memory_v46 import GraphRAG
-            return GraphRAG(embedding_model="llm_embeddings")
+            # FIX: Changed from invalid "llm_embeddings" to valid model "all-MiniLM-L6-v2"
+            return GraphRAG(embedding_model="all-MiniLM-L6-v2")
         except ImportError:
             logger.debug("GraphRAG not available, using local cache only")
         except Exception as e:
