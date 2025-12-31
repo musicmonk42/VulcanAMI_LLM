@@ -3867,6 +3867,15 @@ _gc_request_counter = 0
 MAX_REASONING_RESULT_LENGTH = 1500  # Maximum characters per reasoning result
 MAX_ANALOGIES_TO_SHOW = 5  # Maximum analogies to include in formatted output
 MAX_LIST_ITEMS_TO_SHOW = 10  # Maximum list items to show before truncation
+MAX_REASONING_STEPS = 5  # Maximum reasoning chain steps to include in context
+
+# _format_dict_result keys that have explicit formatting (avoid duplicate output)
+_HANDLED_DICT_RESULT_KEYS = frozenset({
+    'conclusion', 'explanation', 'reasoning_type', 'reasoning_steps',
+    'premises', 'proof_steps', 'probability', 'confidence',
+    'causal_path', 'intervention', 'counterfactual', 'analogies',
+    'source_domain', 'target_domain'
+})
 
 
 def _truncate_history(
@@ -4102,14 +4111,10 @@ def _format_dict_result(reasoning_type: str, result: Dict[str, Any]) -> str:
         lines.append(f"Mapping: {result['source_domain']} → {result['target_domain']}")
     
     # If no specific keys matched, format all key-value pairs
-    # BUG FIX: Skip already-handled keys to avoid duplication
-    handled_keys = {'conclusion', 'explanation', 'reasoning_type', 'reasoning_steps', 
-                    'premises', 'proof_steps', 'probability', 'confidence', 
-                    'causal_path', 'intervention', 'counterfactual', 'analogies',
-                    'source_domain', 'target_domain'}
+    # Use module-level constant for handled keys
     if not lines:
         for key, value in result.items():
-            if value is not None and key not in handled_keys:
+            if value is not None and key not in _HANDLED_DICT_RESULT_KEYS:
                 if isinstance(value, (list, tuple)) and len(value) > MAX_ANALOGIES_TO_SHOW:
                     value_str = str(value[:MAX_ANALOGIES_TO_SHOW]) + f"... ({len(value)} total)"
                 else:
@@ -4858,7 +4863,7 @@ async def unified_chat(request: UnifiedChatRequest):
                                             "explanation": getattr(step, 'explanation', ''),
                                             "confidence": getattr(step, 'confidence', 0.0),
                                         }
-                                        for step in chain.steps[:5]  # Limit to first 5 steps to avoid context overflow
+                                        for step in chain.steps[:MAX_REASONING_STEPS]  # Limit steps to avoid context overflow
                                     ]
                             # BUG FIX: Log successful extraction for debugging
                             logger.info(
@@ -4881,8 +4886,9 @@ async def unified_chat(request: UnifiedChatRequest):
                         # Track which reasoning type was used
                         # BUG FIX: ReasoningResult has 'reasoning_type' attribute, NOT 'selected_tool'
                         reasoning_type = getattr(unified_result, 'reasoning_type', None)
-                        if reasoning_type:
-                            tool_used = reasoning_type.value if hasattr(reasoning_type, 'value') else str(reasoning_type)
+                        if reasoning_type is not None:
+                            # Use isinstance for type-safe enum check
+                            tool_used = reasoning_type.value if isinstance(reasoning_type, EnumBase) else str(reasoning_type)
                         else:
                             tool_used = 'adaptive'
                         _systems.append(f"unified_reasoning_{tool_used}")
