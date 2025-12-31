@@ -116,10 +116,10 @@ COPY setup.py ./setup.py
 RUN if [ -f requirements-hashed.txt ] && grep -qE '^[^#]' requirements-hashed.txt; then \
         echo "=== Attempting hashed dependency installation ==="; \
         echo "File: requirements-hashed.txt ($(grep -cE '^[^#]' requirements-hashed.txt) non-comment lines)"; \
-        if pip install --no-cache-dir --root-user-action=ignore --require-hashes -r requirements-hashed.txt 2>&1; then \
+        if pip install --no-cache-dir --root-user-action=ignore --require-hashes -r requirements-hashed.txt; then \
             echo "=== SUCCESS: Hashed dependency verification passed ==="; \
         else \
-            echo "=== WARNING: Hashed install failed, falling back to unhashed install ==="; \
+            echo "=== WARNING: Hashed install failed (exit code: $?), falling back to unhashed install ==="; \
             echo "This may happen due to platform/architecture differences or hash mismatches."; \
             echo "For full supply chain security, regenerate requirements-hashed.txt on target platform."; \
             pip install --no-cache-dir --root-user-action=ignore -r requirements.txt; \
