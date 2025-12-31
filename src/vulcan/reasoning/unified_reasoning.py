@@ -3421,11 +3421,13 @@ class UnifiedReasoner:
             logger.warning(f"Audit entry failed: {e}")
 
     def _create_safety_result(self, reason: str) -> ReasoningResult:
-        """Create result for safety-filtered output"""
-
+        """Create result for safety-filtered output with minimal confidence"""
+        # FIX CRITICAL-7: Return minimal confidence (0.1) instead of 0.0
+        # This prevents downstream threshold failures while still indicating
+        # that the result was filtered for safety reasons
         return ReasoningResult(
             conclusion={"filtered": True, "reason": reason},
-            confidence=0.0,
+            confidence=0.1,  # Changed from 0.0 to prevent threshold failures
             reasoning_type=ReasoningType.UNKNOWN,
             explanation=f"Safety filter applied: {reason}",
         )
