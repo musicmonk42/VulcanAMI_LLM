@@ -1296,7 +1296,8 @@ class UnifiedReasoner:
             stats = reasoning_stats[result.reasoning_type]
             stats["count"] += 1
 
-            if result.confidence > 0.5:
+            # FIX #3: Changed > 0.5 to >= 0.5 so exactly 0.5 confidence counts as success
+            if result.confidence >= 0.5:
                 stats["successes"] += 1
 
             alpha = 0.1

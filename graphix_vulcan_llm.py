@@ -1290,6 +1290,10 @@ class GraphixVulcanLLM:
         """High-level safe generation - FIXED nested async pattern"""
         start = time.time()
         max_steps = max_tokens or self.config["generation"]["max_tokens"]
+        
+        # FIX #1: Add debugging to expose why generate() may return None
+        prompt_len = len(prompt) if isinstance(prompt, (str, list)) else 0
+        logger.info(f"[DEBUG] generate() called with prompt_len={prompt_len}, max_tokens={max_steps}")
 
         # Check cache
         if use_cache and self.cache and not stream:
@@ -1330,7 +1334,8 @@ class GraphixVulcanLLM:
         # This happens when generate() is called from run_in_executor() in HybridLLMExecutor
         if self._check_running_loop():
             logger.warning(
-                "Event loop already running - skipping local generation to trigger OpenAI fallback"
+                "[DEBUG] generate() returning None - Event loop already running. "
+                "This triggers OpenAI fallback in HybridLLMExecutor."
             )
             return None  # Triggers OpenAI fallback in HybridLLMExecutor
 
@@ -1509,6 +1514,8 @@ class GraphixVulcanLLM:
         except Exception as e:
             logger.debug(f"Causal context update skipped: {e}")
 
+        # FIX #1: Add final logging to show successful generation
+        logger.info(f"[DEBUG] generate() returning: type={type(result).__name__}, len={len(result.text) if result and result.text else 'None'}")
         logger.info(result.summary())
         return result
 

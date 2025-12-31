@@ -358,12 +358,23 @@ class SafetyValidator:
     def __init__(self):
         # CRITICAL FIX: Pre-compile patterns to avoid ReDoS
         # Use simpler, non-backtracking patterns
+        # FIX #2: Make patterns context-aware to reduce false positives
+        # These patterns now require more specific context to trigger
         self.unsafe_patterns_compiled = [
-            re.compile(r"(?i)\b(attack|exploit|vulnerability|injection)\b"),
+            # Require context for injection types - "sql injection", "code injection", not "aerosol injection"
+            re.compile(r"(?i)\b(sql[_\s-]?injection|code[_\s-]?injection|xss|command[_\s-]?injection)\b"),
+            # Attack patterns require harmful intent context
+            re.compile(r"(?i)\b(attack|exploit)\s+(someone|users?|system|people|vulnerability)\b"),
+            re.compile(r"(?i)\b(malware|virus|trojan|ransomware)\s+(attack|payload|distribution|creation)\b"),
+            re.compile(r"(?i)\b(hack|breach|compromise|backdoor)\s+(into|system|account|database)\b"),
+            re.compile(r"(?i)\b(steal|theft|fraud|scam)\s+(data|money|credentials|identity)\b"),
+            re.compile(r"(?i)\b(illegal|illicit)\s+(access|activity|drugs|weapons)\b"),
+        ]
+        
+        # Original broad patterns for high-risk terms that need less context
+        self.high_risk_patterns_compiled = [
             re.compile(r"(?i)\b(malware|virus|trojan|ransomware)\b"),
-            re.compile(r"(?i)\b(hack|breach|compromise|backdoor)\b"),
-            re.compile(r"(?i)\b(steal|theft|fraud|scam)\b"),
-            re.compile(r"(?i)\b(illegal|illicit|prohibited|banned)\b"),
+            re.compile(r"(?i)\b(steal|theft|fraud)\b"),
         ]
 
         # FIX #3: Sensitive patterns - check for actual sensitive data
@@ -1161,14 +1172,19 @@ class SafetyGovernor:
                 if context.tool_name in self.contracts:
                     contract = self.contracts[context.tool_name]
 
-                    # Only check forbidden inputs, not time/energy budgets
+                    # FIX #3: Only check for actual NaN/inf values in numeric data, 
+                    # not string matches like "infinite wisdom" or "nanometer"
+                    # The original check was too broad - blocking legitimate queries
                     if contract.forbidden_inputs:
                         problem_str = str(context.problem).lower()
-                        found = [
-                            forb
-                            for forb in contract.forbidden_inputs
-                            if forb in problem_str
-                        ]
+                        found = []
+                        for forb in contract.forbidden_inputs:
+                            # Skip nan/inf string checks - these should only block actual NaN/inf values
+                            # in numeric computations, not occurrences in text
+                            if forb in ("nan", "inf", "infinite"):
+                                continue
+                            if forb in problem_str:
+                                found.append(forb)
                         if found:
                             self._record_violation(
                                 context.tool_name,

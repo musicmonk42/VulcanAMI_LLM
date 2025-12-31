@@ -275,12 +275,19 @@ class SafetyAwareReasoning:
             self.safety_validator = None
 
         # Compile regex patterns once for performance
+        # FIX #2: Make patterns context-aware to reduce false positives
+        # These patterns now require more specific context to trigger
+        # NOT blocking: "aerosol injection", "dependency injection", "harm" in ethics
         self._unsafe_patterns = [
-            re.compile(r"\b(attack|exploit|vulnerability|injection)\b", re.IGNORECASE),
-            re.compile(r"\b(malware|virus|trojan|ransomware)\b", re.IGNORECASE),
-            re.compile(r"\b(hack|breach|compromise|backdoor)\b", re.IGNORECASE),
-            re.compile(r"\b(steal|theft|fraud|scam)\b", re.IGNORECASE),
-            re.compile(r"\b(harm|damage|destroy|kill)\b", re.IGNORECASE),
+            # Require context for injection types - "sql injection", "code injection"
+            re.compile(r"\b(sql[_\s-]?injection|code[_\s-]?injection|xss|command[_\s-]?injection)\b", re.IGNORECASE),
+            # Attack patterns require harmful intent context  
+            re.compile(r"\b(attack|exploit)\s+(someone|users?|system|people|vulnerability)\b", re.IGNORECASE),
+            re.compile(r"\b(malware|virus|trojan|ransomware)\s+(attack|payload|distribution|creation)\b", re.IGNORECASE),
+            re.compile(r"\b(hack|breach|compromise|backdoor)\s+(into|system|account|database)\b", re.IGNORECASE),
+            re.compile(r"\b(steal|theft|fraud|scam)\s+(data|money|credentials|identity)\b", re.IGNORECASE),
+            # Direct harm still blocked
+            re.compile(r"\b(harm|kill|destroy)\s+(people|someone|humans|users)\b", re.IGNORECASE),
         ]
 
         self._sensitive_patterns = [
