@@ -57,6 +57,17 @@ MATH_WEIGHT_ADJUSTMENT_PENALTY = -0.01  # Adjustment to tool weights on error
 # Keys to search for numerical results in conclusions
 NUMERICAL_RESULT_KEYS = ('probability', 'result', 'value', 'posterior', 'answer')
 
+# Confidence floor constants for reasoning engines
+# These ensure reasoning results aren't filtered out even when models are untrained
+CONFIDENCE_FLOOR_SYMBOLIC_PROVEN = 0.6  # High confidence when proof is found
+CONFIDENCE_FLOOR_SYMBOLIC_HAS_PROOF = 0.4  # Medium confidence when proof object exists
+CONFIDENCE_FLOOR_SYMBOLIC_DEFAULT = 0.2  # Minimum floor for symbolic reasoning
+CONFIDENCE_FLOOR_CAUSAL_WITH_RESULT = 0.3  # Confidence for successful causal analysis
+CONFIDENCE_FLOOR_CAUSAL_DEFAULT = 0.15  # Minimum floor for causal reasoning
+CONFIDENCE_FLOOR_ANALOGICAL_DEFAULT = 0.15  # Minimum floor for analogical reasoning
+CONFIDENCE_FLOOR_DEFAULT = 0.2  # Generic minimum floor for other reasoners
+CONFIDENCE_FLOOR_NO_RESULT = 0.1  # Floor when reasoner returns empty/null result
+
 # Problem type identifiers
 PROBLEM_TYPE_BAYESIAN = 'bayesian'
 
@@ -2659,18 +2670,18 @@ class UnifiedReasoner:
                 query_result = reasoner.query(hypothesis)
 
                 # FIX: Ensure minimum confidence floor for symbolic reasoning
+                # Order matters: check 'proven' first (highest confidence), then 'proof exists'
                 raw_confidence = (
                     query_result.get("confidence", 0.0)
                     if isinstance(query_result, dict)
                     else 0.0
                 )
-                # If we got a result (even if not proven), give baseline confidence
-                if isinstance(query_result, dict) and query_result.get("proof") is not None:
-                    confidence = max(0.4, raw_confidence)  # Has proof
-                elif isinstance(query_result, dict) and query_result.get("proven"):
-                    confidence = max(0.6, raw_confidence)  # Proven
+                if isinstance(query_result, dict) and query_result.get("proven"):
+                    confidence = max(CONFIDENCE_FLOOR_SYMBOLIC_PROVEN, raw_confidence)
+                elif isinstance(query_result, dict) and query_result.get("proof") is not None:
+                    confidence = max(CONFIDENCE_FLOOR_SYMBOLIC_HAS_PROOF, raw_confidence)
                 else:
-                    confidence = max(0.2, raw_confidence)  # Minimum floor
+                    confidence = max(CONFIDENCE_FLOOR_SYMBOLIC_DEFAULT, raw_confidence)
                 
                 result = ReasoningResult(
                     conclusion=query_result,
@@ -2689,15 +2700,15 @@ class UnifiedReasoner:
 
                     # FIX: Ensure minimum confidence floor for causal reasoning
                     raw_confidence = (
-                        result_dict.get("confidence", 0.3)
+                        result_dict.get("confidence", CONFIDENCE_FLOOR_CAUSAL_WITH_RESULT)
                         if isinstance(result_dict, dict)
-                        else 0.3
+                        else CONFIDENCE_FLOOR_CAUSAL_WITH_RESULT
                     )
                     # If we got a meaningful result, ensure minimum confidence
                     if isinstance(result_dict, dict) and not result_dict.get("error"):
-                        confidence = max(0.3, raw_confidence)
+                        confidence = max(CONFIDENCE_FLOOR_CAUSAL_WITH_RESULT, raw_confidence)
                     else:
-                        confidence = max(0.15, raw_confidence)
+                        confidence = max(CONFIDENCE_FLOOR_CAUSAL_DEFAULT, raw_confidence)
 
                     result = ReasoningResult(
                         conclusion=result_dict,
@@ -2724,15 +2735,15 @@ class UnifiedReasoner:
                         result = raw_result
                         # FIX: Ensure minimum confidence floor
                         if result.confidence == 0.0 and result.conclusion is not None:
-                            result.confidence = 0.25
+                            result.confidence = CONFIDENCE_FLOOR_DEFAULT
                     else:  # Assume dict
                         # FIX: Ensure minimum confidence floor for dict results
                         raw_confidence = (
-                            raw_result.get("confidence", 0.3)
+                            raw_result.get("confidence", CONFIDENCE_FLOOR_DEFAULT)
                             if isinstance(raw_result, dict)
-                            else 0.3
+                            else CONFIDENCE_FLOOR_DEFAULT
                         )
-                        confidence = max(0.2, raw_confidence) if raw_result else 0.1
+                        confidence = max(CONFIDENCE_FLOOR_DEFAULT, raw_confidence) if raw_result else CONFIDENCE_FLOOR_NO_RESULT
                         
                         result = ReasoningResult(
                             conclusion=(
