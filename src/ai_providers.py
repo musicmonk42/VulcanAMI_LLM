@@ -51,6 +51,31 @@ MAX_PROMPT_LENGTH = 100000
 MAX_MODEL_NAME_LENGTH = 100
 CLEANUP_INTERVAL = 3600  # 1 hour
 
+# --- OpenAI Language-Only Mode ---
+# When enabled, OpenAI is restricted to ONLY language generation operations
+# (GENERATE, CHAT, COMPLETE). Operations like EMBED, DECODE, and IMAGE_GENERATE
+# will raise NotImplementedError for OpenAI and should use alternative providers.
+# This supports running the full platform without using OpenAI for non-language tasks.
+OPENAI_LANGUAGE_ONLY = os.environ.get("OPENAI_LANGUAGE_ONLY", "true").lower() in ("true", "1", "yes")
+
+# Operations that are considered "language" operations (allowed when OPENAI_LANGUAGE_ONLY=true)
+OPENAI_LANGUAGE_OPERATIONS = {
+    "GENERATE",
+    "CHAT",
+    "COMPLETE",
+    "SUMMARIZE",
+    "TRANSLATE",
+    "CLASSIFY",  # Text classification is language-related
+}
+
+# Operations that are NOT language-only (blocked when OPENAI_LANGUAGE_ONLY=true)
+OPENAI_NON_LANGUAGE_OPERATIONS = {
+    "EMBED",
+    "DECODE",  # Audio transcription
+    "IMAGE_GENERATE",
+    "IMAGE_EDIT",
+}
+
 # Provider API endpoints
 PROVIDER_ENDPOINTS = {
     "openai": "https://api.openai.com/v1",
@@ -376,7 +401,18 @@ class OpenAIClient(ProviderClient):
         }
 
     def embed(self, text: str, model: str = "text-embedding-ada-002") -> Dict:
-        """Create embeddings."""
+        """Create embeddings.
+        
+        Note: When OPENAI_LANGUAGE_ONLY=true (default), this method raises
+        NotImplementedError. Use a local embedding model or alternative provider instead.
+        """
+        if OPENAI_LANGUAGE_ONLY:
+            raise NotImplementedError(
+                "OpenAI embeddings are disabled when OPENAI_LANGUAGE_ONLY=true. "
+                "OpenAI is restricted to language generation only. "
+                "Use a local embedding model (e.g., sentence-transformers) or set OPENAI_LANGUAGE_ONLY=false."
+            )
+        
         url = f"{self.endpoint}/embeddings"
         data = {"model": model, "input": text}
 
@@ -426,7 +462,18 @@ class OpenAIClient(ProviderClient):
         }
 
     def decode(self, audio_file: bytes, model: str = "whisper-1") -> Dict:
-        """Transcribe audio with proper multipart handling."""
+        """Transcribe audio with proper multipart handling.
+        
+        Note: When OPENAI_LANGUAGE_ONLY=true (default), this method raises
+        NotImplementedError. Use a local audio transcription model instead.
+        """
+        if OPENAI_LANGUAGE_ONLY:
+            raise NotImplementedError(
+                "OpenAI audio transcription (Whisper) is disabled when OPENAI_LANGUAGE_ONLY=true. "
+                "OpenAI is restricted to language generation only. "
+                "Use a local audio transcription model or set OPENAI_LANGUAGE_ONLY=false."
+            )
+        
         url = f"{self.endpoint}/audio/transcriptions"
 
         # Generate secure boundary
@@ -463,7 +510,18 @@ class OpenAIClient(ProviderClient):
         return {"text": response.get("text", ""), "model": model}
 
     def image_generate(self, prompt: str, model: str = "dall-e-3", **params) -> Dict:
-        """Generate an image."""
+        """Generate an image.
+        
+        Note: When OPENAI_LANGUAGE_ONLY=true (default), this method raises
+        NotImplementedError. Use a local image generation model instead.
+        """
+        if OPENAI_LANGUAGE_ONLY:
+            raise NotImplementedError(
+                "OpenAI image generation (DALL-E) is disabled when OPENAI_LANGUAGE_ONLY=true. "
+                "OpenAI is restricted to language generation only. "
+                "Use a local image generation model or set OPENAI_LANGUAGE_ONLY=false."
+            )
+        
         url = f"{self.endpoint}/images/generations"
 
         data = {
@@ -1039,7 +1097,10 @@ class AIRuntime:
             self.providers["openai"] = OpenAIClient(
                 os.environ["OPENAI_API_KEY"], self.http_pool
             )
-            logger.info("OpenAI provider initialized")
+            if OPENAI_LANGUAGE_ONLY:
+                logger.info("OpenAI provider initialized (LANGUAGE-ONLY mode - embeddings/images/audio disabled)")
+            else:
+                logger.info("OpenAI provider initialized (full mode - all operations enabled)")
 
         if os.environ.get("ANTHROPIC_API_KEY"):
             self.providers["anthropic"] = AnthropicClient(
@@ -1560,7 +1621,18 @@ def quick_embed(
     """Quick embedding helper using singleton runtime.
     
     Note: Uses singleton runtime which should not be shutdown between calls.
+    
+    When OPENAI_LANGUAGE_ONLY=true (default), this function will fail if provider="openai".
+    Use provider="cohere" or a local embedding model instead.
     """
+    # Check if trying to use OpenAI in language-only mode
+    if provider == "openai" and OPENAI_LANGUAGE_ONLY:
+        raise RuntimeError(
+            "OpenAI embeddings are disabled when OPENAI_LANGUAGE_ONLY=true. "
+            "Use provider='cohere' or a local embedding model instead, "
+            "or set OPENAI_LANGUAGE_ONLY=false."
+        )
+    
     runtime = create_runtime()
     task = AITask(
         operation=OperationType.EMBED,

@@ -1478,103 +1478,50 @@ class ConsistencyValidator:
 
 
 # --- Start Production LLM Client Integration ---
-# This class implements the actual integration logic for the LLM API (e.g., OpenAI).
-# This is a production wrapper.
+# DISABLED: OpenAI is NOT permitted for code generation or reasoning.
+# The self-improvement pipeline must use VULCAN's internal capabilities only.
+# OpenAI is ONLY permitted for language interpretation/polish (not implemented here).
 
 
 class CodeLLMClient:
-    """Production wrapper for the LLM API, using OpenAI's structure (v1.0+ compatible)."""
+    """
+    DISABLED: External LLM code generation is prohibited.
+    
+    OpenAI and other external LLMs are NOT permitted for:
+    - Code generation (this is reasoning)
+    - Code improvement (this is reasoning)
+    - Any form of independent analysis
+    
+    OpenAI is ONLY permitted for interpreting VULCAN's reasoning into natural language.
+    The self-improvement system must use VULCAN's internal capabilities.
+    """
 
     def __init__(self, api_key: str):
         self.api_key = api_key
         self.last_tokens_used = 0
-        self.model_name = "gpt-4o-mini"  # Cost-effective model for code tasks
+        self.model_name = "DISABLED"
         self.client = None
-
-        if not api_key:
-            logger.error("VULCAN_LLM_API_KEY is missing. LLM calls will fail.")
-        else:
-            try:
-                from openai import OpenAI
-
-                self.client = OpenAI(api_key=api_key)
-                logger.info(f"OpenAI client initialized with model: {self.model_name}")
-            except ImportError:
-                logger.error(
-                    "OpenAI library not installed or incompatible version. Run: pip install openai>=1.0.0"
-                )
-            except Exception as e:
-                logger.error(f"Failed to initialize OpenAI client: {e}")
+        
+        # Log that external LLM code generation is disabled
+        logger.warning(
+            "[CodeLLMClient] DISABLED - External LLM code generation is prohibited. "
+            "Self-improvement must use VULCAN's internal reasoning capabilities. "
+            "OpenAI is ONLY permitted for language interpretation, not code generation."
+        )
 
     def generate_code(self, prompt: str) -> str:
-        """Makes a real API call to generate structured code based on the prompt."""
-
-        if not self.api_key or not self.client:
-            raise RuntimeError("LLM API key is not configured. Cannot generate code.")
-
-        try:
-            # Add system message for better code generation with strict format
-            system_msg = """You are a code improvement assistant for the VULCAN-AGI system.
-
-CRITICAL: You MUST format your response EXACTLY as follows:
-
-FILE: path/to/file.py
-```python
-# Complete file content here
-```
-
-Rules:
-1. FILE: must be on its own line with the relative path from repo root
-2. Code must be in a ```python code block
-3. Provide the COMPLETE updated file content, not just changes
-4. Only modify ONE file per response
-5. Ensure the code is syntactically correct Python
-6. If you cannot make a meaningful improvement, still provide a valid FILE: and code block with minimal changes
-
-Example response format:
-FILE: src/utils/helper.py
-```python
-# helper.py - Utility functions
-import logging
-
-def example():
-    pass
-```"""
-
-            logger.info(f"Sending prompt to LLM ({len(prompt)} chars)")
-
-            response = self.client.chat.completions.create(
-                model=self.model_name,
-                messages=[
-                    {"role": "system", "content": system_msg},
-                    {"role": "user", "content": prompt},
-                ],
-                temperature=0.1,
-                max_tokens=4096,
-            )
-
-            # Extract token usage for cost tracking
-            if response.usage:
-                self.last_tokens_used = response.usage.total_tokens
-                logger.info(
-                    f"LLM response received: {self.last_tokens_used} tokens used"
-                )
-
-            result = response.choices[0].message.content
-
-            # Log response preview for debugging
-            if result:
-                preview = result[:500].replace("\n", "\\n")
-                logger.debug(f"LLM Response preview: {preview}...")
-            else:
-                logger.warning("LLM returned empty response")
-
-            return result or ""
-
-        except Exception as e:
-            error_type = type(e).__name__
-            logger.error(f"LLM API Error ({error_type}): {e}")
-            raise RuntimeError(f"LLM API Error: {e}") from e
+        """
+        DISABLED: External LLM code generation is prohibited.
+        
+        Raises:
+            RuntimeError: Always - external LLM code generation is not permitted.
+        """
+        raise RuntimeError(
+            "[VULCAN Policy] External LLM code generation is DISABLED. "
+            "OpenAI and other external LLMs are NOT permitted to generate code. "
+            "The self-improvement system must use VULCAN's internal reasoning capabilities. "
+            "OpenAI is ONLY permitted for interpreting VULCAN's reasoning into natural language."
+        )
 
 
 # --- End Production LLM Client Integration ---
