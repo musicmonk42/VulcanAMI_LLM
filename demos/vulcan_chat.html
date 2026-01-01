@@ -1017,6 +1017,14 @@
             </div>
             
             <div class="setting-group">
+                <label for="requestTimeout">Request Timeout (seconds)</label>
+                <input type="number" id="requestTimeout" value="120" min="30" max="300">
+                <p style="font-size: 0.8em; color: var(--text-tertiary); margin-top: 4px;">
+                    How long to wait for a response before timing out (30-300 seconds)
+                </p>
+            </div>
+            
+            <div class="setting-group">
                 <label>System Features</label>
                 <div class="toggles-grid">
                     <div class="toggle-item">

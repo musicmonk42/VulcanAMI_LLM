@@ -656,15 +656,28 @@ class HybridLLMExecutor:
             "OpenAI can ONLY interpret VULCAN's results, NOT reason independently."
         )
         systems_used.append("vulcan_local_llm_failed")
+        
+        # FIX #2 CRITICAL: Provide a more informative error message to the user
+        # Instead of just saying "failed", tell them what might be wrong and how to debug
+        error_text = (
+            "[VULCAN Internal Error] The internal reasoning system failed to generate a response.\n\n"
+            "Possible causes:\n"
+            "• The internal LLM model is not properly initialized\n"
+            "• There may be a configuration issue with GraphixVulcanLLM\n"
+            "• The model may have encountered an async context conflict\n\n"
+            "External AI reasoning fallback is disabled by design (VULCAN handles all reasoning).\n"
+            "Please check the server logs for detailed error information."
+        )
+        
         return {
-            "text": "[VULCAN Internal Error] The internal reasoning system failed to generate a response. "
-                    "External AI reasoning is not permitted. Please check the internal LLM configuration.",
+            "text": error_text,
             "source": "error_no_fallback",
             "systems_used": systems_used,
             "error": True,
             "metadata": {
-                "reason": "VULCAN internal LLM returned None - OpenAI reasoning fallback prohibited",
+                "reason": "VULCAN internal LLM returned None or raised exception - OpenAI reasoning fallback prohibited",
                 "vulcan_llm_failed": True,
+                "suggestion": "Check server logs for 'LOCAL MODEL GENERATION FAILED' or 'CRITICAL' errors",
             },
         }
 
