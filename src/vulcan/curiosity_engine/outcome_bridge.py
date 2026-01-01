@@ -356,9 +356,10 @@ class OutcomeBridge:
         """
         tools = tools if tools is not None else []
         
-        # Log the outcome with tools
-        logger.info(
-            f"[QueryOutcome] Recorded: {query_id}, status={status}, "
+        # FIX MINOR-1: Use DEBUG level here since record_query_outcome already logs at INFO
+        # This prevents duplicate "[QueryOutcome] Recorded:" log entries
+        logger.debug(
+            f"[QueryOutcome] Bridge record: {query_id}, status={status}, "
             f"routing={routing_ms:.0f}ms, total={total_ms:.0f}ms, "
             f"complexity={complexity:.2f}, type={query_type}, tools={tools}"
         )
