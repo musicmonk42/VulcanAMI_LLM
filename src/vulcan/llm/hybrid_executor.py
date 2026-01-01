@@ -76,12 +76,42 @@ LLM_CONFIG_PATH = os.environ.get("VULCAN_LLM_CONFIG_PATH", "configs/llm_config.y
 # if language polish mode is enabled.
 OPENAI_FALLBACK_CONFIDENCE = 0.6
 
-# ARCHITECTURE: VULCAN does ALL reasoning. OpenAI is for language polish ONLY.
+# ============================================================
+# OPENAI LANGUAGE FORMATTING MODE
+# ============================================================
+# When OPENAI_LANGUAGE_FORMATTING=true:
+#   - Route ALL natural language output formatting to OpenAI (gpt-4o-mini)
+#   - VULCAN's reasoning systems still do ALL thinking/reasoning
+#   - OpenAI is used ONLY for converting structured output to natural language
+#   - Every (input, output) pair is captured for distillation training
+#
+# Benefits:
+#   - Fast response times (~2-5 seconds vs 60+ seconds with internal LLM on CPU)
+#   - VULCAN LLM learns from OpenAI outputs via distillation over time
+#   - Eventually: mostly local, fast, private as VULCAN LLM improves
+#
+# POLICY CONSTRAINTS:
+#   - OpenAI MUST NOT reason independently — only format VULCAN's output
+#   - OpenAI MUST NOT generate code
+#   - All reasoning happens in VULCAN's mind BEFORE OpenAI is called
+#
+_openai_language_formatting_env = os.environ.get("OPENAI_LANGUAGE_FORMATTING", "false").lower()
+OPENAI_LANGUAGE_FORMATTING = _openai_language_formatting_env in ("true", "1", "yes")
+
+# Legacy polish mode - kept for backwards compatibility
+_openai_language_polish_env = os.environ.get("OPENAI_LANGUAGE_POLISH", "false").lower()
+OPENAI_LANGUAGE_POLISH = _openai_language_polish_env in ("true", "1", "yes")
+
+# ARCHITECTURE: VULCAN does ALL reasoning. OpenAI is for language output ONLY.
 # 
 # The correct flow is:
 # 1. VULCAN reasoning engines analyze query (symbolic, probabilistic, causal, math)
-# 2. GraphixVulcanLLM generates response using VULCAN's internal model
-# 3. If VULCAN succeeds -> return VULCAN response (optionally polish with OpenAI)
+# 2. If OPENAI_LANGUAGE_FORMATTING=true:
+#    - OpenAI (gpt-4o-mini) formats the reasoning output as natural language
+#    - Response is captured for distillation
+# 3. Otherwise:
+#    - GraphixVulcanLLM generates response using VULCAN's internal model
+#    - If OPENAI_LANGUAGE_POLISH=true, OpenAI can polish the output
 # 4. If VULCAN fails -> return error (NO OpenAI reasoning fallback)
 #
 # SKIP_LOCAL_LLM is deprecated - VULCAN must always run for reasoning.
@@ -761,8 +791,10 @@ class HybridLLMExecutor:
             return await self.execute(prompt, max_tokens=max_tokens)
         
         # Determine if we should use OpenAI for formatting
+        # Priority: explicit parameter > OPENAI_LANGUAGE_FORMATTING > OPENAI_LANGUAGE_POLISH
         if use_openai_formatting is None:
-            use_openai_formatting = os.environ.get("OPENAI_LANGUAGE_POLISH", "false").lower() in ("true", "1", "yes")
+            # Use module-level constants (evaluated at import time from env vars)
+            use_openai_formatting = OPENAI_LANGUAGE_FORMATTING or OPENAI_LANGUAGE_POLISH
         
         systems_used = ["vulcan_reasoning"]
         
@@ -821,6 +853,159 @@ class HybridLLMExecutor:
             "metadata": {
                 "reasoning_output": reasoning_output.to_dict(),
                 "query": prompt,
+            },
+        }
+
+    async def format_output_for_user(
+        self,
+        reasoning_output: Dict[str, Any],
+        original_prompt: str,
+        max_tokens: int = 500,
+    ) -> Dict[str, Any]:
+        """
+        Route VULCAN's reasoning output to OpenAI for language formatting.
+        
+        This is the PRIMARY entry point for the new OpenAI Language Formatting
+        architecture. VULCAN's reasoning is ALREADY COMPLETE at this point.
+        This method ONLY handles OUTPUT FORMATTING.
+        
+        ARCHITECTURE:
+            VULCAN Mind (orchestrator, agents, symbolic reasoning)
+                │
+                │ produces
+                ▼
+            Structured Output (dict with result, confidence, method, etc.)
+                │
+                │ sent to
+                ▼
+            OpenAI gpt-4o-mini (language formatting ONLY)
+                │
+                │ produces
+                ▼
+            Natural Language Response → returned to user
+                │
+                │ captured as training pair
+                ▼
+            Distillation Store → VULCAN LLM learns async
+        
+        POLICY CONSTRAINTS:
+        - OpenAI MUST NOT reason independently — only format VULCAN's output
+        - OpenAI MUST NOT generate code
+        - All reasoning happens in VULCAN's mind BEFORE this is called
+        - Every (input, output) pair is captured for distillation
+        
+        Args:
+            reasoning_output: VULCAN's structured reasoning output (dict with result,
+                            method, confidence, reasoning_trace, error, etc.)
+            original_prompt: The user's original question (for context in formatting)
+            max_tokens: Maximum tokens for response (default: 500)
+            
+        Returns:
+            Dict with:
+            - text: Formatted natural language response
+            - source: "openai_formatting" or "internal_formatting"
+            - systems_used: List of systems used
+            - metadata: Additional context including reasoning output
+            - distillation_captured: Whether response was captured for training
+        """
+        loop = asyncio.get_running_loop()
+        systems_used = ["vulcan_reasoning"]
+        
+        # Convert dict to VulcanReasoningOutput if needed
+        if isinstance(reasoning_output, dict):
+            structured_output = VulcanReasoningOutput(
+                query_id=reasoning_output.get("query_id", hashlib.sha256(original_prompt.encode()).hexdigest()[:16]),
+                success=reasoning_output.get("success", True),
+                result=reasoning_output.get("result"),
+                result_type=reasoning_output.get("result_type", "unknown"),
+                method_used=reasoning_output.get("method", "unknown"),
+                confidence=reasoning_output.get("confidence", 0.0),
+                reasoning_trace=reasoning_output.get("reasoning_trace", []),
+                error=reasoning_output.get("error"),
+                metadata=reasoning_output.get("metadata", {}),
+            )
+        elif isinstance(reasoning_output, VulcanReasoningOutput):
+            structured_output = reasoning_output
+        else:
+            self.logger.warning(
+                f"[HybridExecutor] Unexpected reasoning_output type: {type(reasoning_output).__name__}"
+            )
+            structured_output = VulcanReasoningOutput(
+                query_id=hashlib.sha256(original_prompt.encode()).hexdigest()[:16],
+                success=True,
+                result=str(reasoning_output),
+                result_type="converted",
+                method_used="unknown",
+                confidence=0.5,
+            )
+        
+        # Check if reasoning succeeded
+        if not structured_output.success:
+            error_text = self._format_reasoning_error(structured_output)
+            return {
+                "text": error_text,
+                "source": "vulcan_reasoning_error",
+                "systems_used": systems_used,
+                "error": True,
+                "distillation_captured": False,
+                "metadata": {
+                    "reasoning_output": structured_output.to_dict(),
+                    "query": original_prompt,
+                },
+            }
+        
+        # Use OpenAI for formatting (fast path)
+        distillation_captured = False
+        try:
+            formatted = await self._format_with_openai_for_output(
+                reasoning_output=structured_output,
+                original_query=original_prompt,
+                loop=loop,
+            )
+            
+            if formatted and len(formatted.strip()) > self.MIN_MEANINGFUL_LENGTH:
+                systems_used.append("openai_formatting")
+                
+                # Capture for distillation (VULCAN LLM learns from this)
+                if self._distillation_enabled:
+                    self._capture_formatting_for_distillation(
+                        input_data=structured_output.to_dict(),
+                        output_text=formatted,
+                        original_prompt=original_prompt,
+                    )
+                    distillation_captured = True
+                    self.logger.info("[HybridExecutor] ✓ Captured (reasoning, response) pair for VULCAN LLM distillation")
+                
+                self.logger.info("[HybridExecutor] ✓ OpenAI formatted VULCAN's output (fast path: ~2-5s)")
+                
+                return {
+                    "text": formatted,
+                    "source": "openai_formatting",
+                    "systems_used": systems_used,
+                    "distillation_captured": distillation_captured,
+                    "metadata": {
+                        "reasoning_output": structured_output.to_dict(),
+                        "query": original_prompt,
+                        "openai_model": "gpt-4o-mini",
+                        "openai_role": "formatting_only",
+                    },
+                }
+        except Exception as e:
+            self.logger.warning(f"[HybridExecutor] OpenAI formatting failed: {e}, using internal fallback")
+        
+        # Fallback to internal formatting (no external API)
+        formatted = self._format_structured_output_sync(structured_output)
+        systems_used.append("internal_formatting")
+        
+        return {
+            "text": formatted,
+            "source": "internal_formatting",
+            "systems_used": systems_used,
+            "distillation_captured": distillation_captured,
+            "metadata": {
+                "reasoning_output": structured_output.to_dict(),
+                "query": original_prompt,
+                "fallback_reason": "openai_unavailable",
             },
         }
 
@@ -901,7 +1086,8 @@ class HybridLLMExecutor:
             
             # Step 2: Optionally use OpenAI to polish the language
             # Both internal LLM and OpenAI serve the same role - language generation
-            use_language_polish = os.environ.get("OPENAI_LANGUAGE_POLISH", "false").lower() in ("true", "1", "yes")
+            # Use module-level constants (evaluated at import time from env vars)
+            use_language_polish = OPENAI_LANGUAGE_POLISH
             
             if use_language_polish:
                 try:
@@ -2134,12 +2320,20 @@ def verify_hybrid_executor_setup() -> dict:
 # ============================================================
 
 __all__ = [
+    # Main class
     "HybridLLMExecutor",
+    # Structured output format
+    "VulcanReasoningOutput",
+    # Cache
     "OpenAIResponseCache",
+    # Singleton management
     "get_or_create_hybrid_executor",
     "get_hybrid_executor",
     "set_hybrid_executor",
     "verify_hybrid_executor_setup",
+    # Configuration constants
+    "OPENAI_LANGUAGE_FORMATTING",
+    "OPENAI_LANGUAGE_POLISH",
 ]
 
 
