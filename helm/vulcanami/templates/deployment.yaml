@@ -279,6 +279,9 @@ spec:
           value: {{ .Values.performanceTuning.arenaTimeout | quote }}
         - name: QUERY_ROUTING_TIMEOUT
           value: {{ .Values.performanceTuning.queryRoutingTimeout | quote }}
+        {{- /* VULCAN LLM Timeout Configuration (TIMEOUT FIX per Claude diagnosis) */}}
+        - name: VULCAN_LLM_TIMEOUT
+          value: {{ .Values.performanceTuning.vulcanLlmTimeout | default 30.0 | quote }}
         {{- end }}
         {{- if .Values.memorySystem.enabled }}
         # Vulcan Memory System v46 AWS credentials

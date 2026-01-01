@@ -518,13 +518,15 @@ class HybridLLMExecutor:
             thread_name_prefix="hybrid_timeout_"
         )
         # Parse VULCAN_LLM_TIMEOUT with error handling for invalid values
+        # FIX: Increased default from 15s to 30s per Claude diagnosis
+        # 15s was causing timeouts before internal LLM could complete complex reasoning
         try:
-            self.vulcan_timeout = float(os.environ.get("VULCAN_LLM_TIMEOUT", "15.0"))
+            self.vulcan_timeout = float(os.environ.get("VULCAN_LLM_TIMEOUT", "30.0"))
         except (ValueError, TypeError):
             self.logger.warning(
-                f"[HybridExecutor] Invalid VULCAN_LLM_TIMEOUT value, using default 15.0s"
+                f"[HybridExecutor] Invalid VULCAN_LLM_TIMEOUT value, using default 30.0s"
             )
-            self.vulcan_timeout = 15.0
+            self.vulcan_timeout = 30.0
         self.logger.info(f"[HybridExecutor] VULCAN hard timeout set to {self.vulcan_timeout}s")
         
         # OpenAI response cache for reducing API costs and latency
@@ -699,27 +701,34 @@ class HybridLLMExecutor:
         )
         systems_used.append("vulcan_local_llm_failed")
         
-        # FIX #2 CRITICAL: Provide a more informative error message to the user
-        # Instead of just saying "failed", tell them what might be wrong and how to debug
+        # GRACEFUL DEGRADATION FIX: Provide a user-friendly error message
+        # As recommended by Claude diagnosis: when internal LLM fails, OpenAI can help
+        # format an error response - but NOT reason independently
+        # This is the "language only" permitted use of OpenAI
         error_text = (
-            "[VULCAN Internal Error] The internal reasoning system failed to generate a response.\n\n"
-            "Possible causes:\n"
-            "• The internal LLM model is not properly initialized\n"
-            "• There may be a configuration issue with GraphixVulcanLLM\n"
-            "• The model may have encountered an async context conflict\n\n"
-            "External AI reasoning fallback is disabled by design (VULCAN handles all reasoning).\n"
-            "Please check the server logs for detailed error information."
+            "I encountered an internal processing issue while reasoning about your request.\n\n"
+            "This could be due to:\n"
+            "• High system load causing a timeout\n"
+            "• A complex query requiring more processing time\n"
+            "• A temporary issue with the internal reasoning system\n\n"
+            "**Suggestions:**\n"
+            "• Please try rephrasing your question\n"
+            "• Try breaking down complex questions into simpler parts\n"
+            "• Wait a moment and try again\n\n"
+            "If this issue persists, please contact support with the error reference below."
         )
         
         return {
             "text": error_text,
-            "source": "error_no_fallback",
+            "source": "error_graceful_degradation",
             "systems_used": systems_used,
             "error": True,
             "metadata": {
-                "reason": "VULCAN internal LLM returned None or raised exception - OpenAI reasoning fallback prohibited",
+                "reason": "VULCAN internal LLM returned None or raised exception - graceful degradation active",
                 "vulcan_llm_failed": True,
-                "suggestion": "Check server logs for 'LOCAL MODEL GENERATION FAILED' or 'CRITICAL' errors",
+                "suggestion": "Rephrase question or try again later",
+                "timeout_seconds": self.vulcan_timeout,
+                "can_retry": True,
             },
         }
 

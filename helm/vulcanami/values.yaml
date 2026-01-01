@@ -395,6 +395,9 @@ performanceTuning:
   # PERFORMANCE FIX: Query routing timeout increased (ISSUE-003)
   # 10s timeout caused 66-80% timeout rate; 30s allows embedding completion
   queryRoutingTimeout: 30.0
+  # VULCAN Internal LLM Timeout (TIMEOUT FIX per Claude diagnosis)
+  # Increased from 15s to 30s to allow complex reasoning to complete
+  vulcanLlmTimeout: 30.0
 
 # OpenAI Response Caching Configuration
 # Enables LRU+TTL caching for OpenAI API responses to reduce costs and latency
