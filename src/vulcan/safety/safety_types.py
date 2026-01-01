@@ -6,6 +6,7 @@ Contains all shared enums, dataclasses, and base interfaces used across safety c
 
 import hashlib
 import json
+import logging
 import time
 import traceback
 import uuid
@@ -13,6 +14,9 @@ from dataclasses import asdict, dataclass, field, fields
 from datetime import datetime
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Tuple
+
+# Module logger for SafetyConfig debug messages
+_logger = logging.getLogger(__name__)
 
 # ============================================================
 # ENUMERATIONS
@@ -849,8 +853,7 @@ class SafetyConfig:
             if key in valid_fields:
                 filtered_data[key] = value
             else:
-                import logging
-                logging.getLogger(__name__).debug(
+                _logger.debug(
                     f"SafetyConfig.from_dict: Ignoring unknown parameter '{key}'"
                 )
         
