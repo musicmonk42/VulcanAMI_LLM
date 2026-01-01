@@ -700,3 +700,111 @@ class DistributionShift:
         # Validate timestamp
         if self.timestamp < 0 or self.timestamp > time.time() + 86400:
             raise ValueError(f"Invalid timestamp: {self.timestamp}")
+
+
+# =============================================================================
+# Helper Functions for Type-Safe Attribute Access
+# =============================================================================
+
+def get_reasoning_attr(result: Any, attr: str, default: Any = None) -> Any:
+    """
+    Safely extract an attribute from a ReasoningResult object or dictionary.
+    
+    This helper function handles the case where reasoning results may be either:
+    1. A ReasoningResult dataclass object (with attributes)
+    2. A dictionary (with keys)
+    3. Any other object (returns default)
+    
+    BUG FIX: This resolves the "'ReasoningResult' object has no attribute 'get'" error
+    that occurs when code assumes a ReasoningResult is a dictionary.
+    
+    Args:
+        result: The reasoning result (ReasoningResult, dict, or other)
+        attr: The attribute/key name to extract
+        default: Default value if attribute not found (default: None)
+        
+    Returns:
+        The attribute value or the default
+        
+    Example:
+        >>> result = ReasoningResult(conclusion="yes", confidence=0.9, ...)
+        >>> get_reasoning_attr(result, "confidence", 0.5)
+        0.9
+        >>> get_reasoning_attr({"confidence": 0.8}, "confidence", 0.5)
+        0.8
+    """
+    if result is None:
+        return default
+    
+    # Handle ReasoningResult dataclass
+    if isinstance(result, ReasoningResult):
+        return getattr(result, attr, default)
+    
+    # Handle dictionary
+    if isinstance(result, dict):
+        return result.get(attr, default)
+    
+    # Handle other objects with attributes (fallback)
+    if hasattr(result, attr):
+        return getattr(result, attr, default)
+    
+    return default
+
+
+def reasoning_result_to_dict(result: Any) -> Dict[str, Any]:
+    """
+    Convert a ReasoningResult object to a dictionary safely.
+    
+    BUG FIX: This helper ensures that ReasoningResult objects can be safely
+    converted to dictionaries for serialization or dict-based operations.
+    
+    Args:
+        result: The reasoning result (ReasoningResult, dict, or other)
+        
+    Returns:
+        A dictionary representation of the result
+        
+    Example:
+        >>> result = ReasoningResult(conclusion="yes", confidence=0.9, ...)
+        >>> reasoning_result_to_dict(result)
+        {"conclusion": "yes", "confidence": 0.9, ...}
+    """
+    if result is None:
+        return {}
+    
+    # Already a dict
+    if isinstance(result, dict):
+        return result
+    
+    # Handle ReasoningResult dataclass
+    if isinstance(result, ReasoningResult):
+        result_dict = {
+            "conclusion": result.conclusion,
+            "confidence": result.confidence,
+            "reasoning_type": result.reasoning_type.value if result.reasoning_type else None,
+            "explanation": result.explanation,
+            "uncertainty": result.uncertainty,
+            "evidence": result.evidence,
+            "safety_status": result.safety_status,
+            "metadata": result.metadata,
+        }
+        # Include reasoning_chain if present
+        if result.reasoning_chain:
+            result_dict["reasoning_chain"] = {
+                "chain_id": result.reasoning_chain.chain_id,
+                "steps_count": len(result.reasoning_chain.steps),
+                "total_confidence": result.reasoning_chain.total_confidence,
+            }
+        return result_dict
+    
+    # Fallback: try to convert any object with common attributes
+    result_dict = {}
+    for attr in ["conclusion", "confidence", "reasoning_type", "explanation"]:
+        if hasattr(result, attr):
+            value = getattr(result, attr)
+            # Handle enum values
+            if hasattr(value, "value"):
+                value = value.value
+            result_dict[attr] = value
+    
+    return result_dict if result_dict else {"value": str(result)}

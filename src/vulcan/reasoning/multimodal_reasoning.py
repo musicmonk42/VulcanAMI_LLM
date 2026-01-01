@@ -39,6 +39,8 @@ from .reasoning_types import (
     ReasoningResult,
     ReasoningStep,
     ReasoningType,
+    get_reasoning_attr,
+    reasoning_result_to_dict,
 )
 
 logger = logging.getLogger(__name__)
@@ -864,15 +866,18 @@ class MultiModalReasoningEngine:
                     # Perform modality-specific reasoning
                     result = reasoner.reason({"input": data.raw_data, "query": query})
 
-                    # Make sure result is a dictionary
-                    if not isinstance(result, dict):
+                    # BUG FIX: Convert ReasoningResult to dict for consistent handling
+                    # This fixes "'ReasoningResult' object has no attribute 'get'" error
+                    if isinstance(result, ReasoningResult):
+                        result = reasoning_result_to_dict(result)
+                    elif not isinstance(result, dict):
                         result = {"conclusion": result, "confidence": 0.5}
 
                     step = ReasoningStep(
                         step_id=f"{modality.value}_{uuid.uuid4().hex[:8]}",
-                        step_type=getattr(
-                            result, "reasoning_type", ReasoningType.UNKNOWN
-                        ),
+                        step_type=result.get("reasoning_type", ReasoningType.UNKNOWN) 
+                            if isinstance(result.get("reasoning_type"), ReasoningType)
+                            else ReasoningType.UNKNOWN,
                         input_data=data.raw_data,
                         output_data=result,
                         confidence=result.get("confidence", 0.5),
@@ -975,14 +980,17 @@ class MultiModalReasoningEngine:
                     reasoner = self.modality_reasoners[modality]
                     result = reasoner.reason({"input": data.raw_data, "query": query})
 
-                    if not isinstance(result, dict):
+                    # BUG FIX: Convert ReasoningResult to dict for consistent handling
+                    if isinstance(result, ReasoningResult):
+                        result = reasoning_result_to_dict(result)
+                    elif not isinstance(result, dict):
                         result = {"conclusion": result, "confidence": 0.5}
 
                     step = ReasoningStep(
                         step_id=f"{modality.value}_{uuid.uuid4().hex[:8]}",
-                        step_type=getattr(
-                            result, "reasoning_type", ReasoningType.UNKNOWN
-                        ),
+                        step_type=result.get("reasoning_type", ReasoningType.UNKNOWN) 
+                            if isinstance(result.get("reasoning_type"), ReasoningType)
+                            else ReasoningType.UNKNOWN,
                         input_data=data.raw_data,
                         output_data=result,
                         confidence=result.get("confidence", 0.5),
@@ -1666,14 +1674,15 @@ class MultiModalReasoningEngine:
         weights = []
 
         for modality, result in results.items():
-            conclusion_data = result.get("conclusion", result)
+            # BUG FIX: Use helper to safely get attributes from dict or ReasoningResult
+            conclusion_data = get_reasoning_attr(result, "conclusion", result)
             conclusions.append(conclusion_data)
 
             # Use learned importance weights if available
             if self.enable_learning:
                 weights.append(self.modality_importance[modality])
             else:
-                weights.append(result.get("confidence", 0.5))
+                weights.append(get_reasoning_attr(result, "confidence", 0.5))
 
         if not conclusions:
             return None
