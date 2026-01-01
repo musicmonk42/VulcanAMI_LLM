@@ -267,12 +267,14 @@ class DynamicArchitecture:
 
         # Try to fetch initial layers
         layers = self._get_layers()
-        # FIXED: Only initialize shadow with 1 layer if model exists AND has layers
-        # Otherwise leave it empty so tests can start from 0 layers
-        if layers is None and self.model is not None:
-            # Model exists but has no layers - initialize one default layer
+        # FIX MAJOR-11: Initialize with at least 1 layer to prevent "0 layers" warning
+        # The architecture needs at least one layer to function properly.
+        # For tests that need 0 layers, use constraints.min_layers = 0 and remove_layer()
+        if layers is None:
+            # No model layers available - initialize shadow with one default layer
+            # This prevents the "DynamicArchitecture initialized with 0 layers" warning
             self._shadow_layers = [self._mk_layer(0)]
-        # If model is None, leave _shadow_layers empty ([])
+            logger.debug("DynamicArchitecture: Using shadow layer (no model provided)")
 
         # Take initial snapshot
         initial_snap_id = self._snapshot(description="Initial state")

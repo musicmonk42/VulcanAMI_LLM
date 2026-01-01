@@ -2194,49 +2194,50 @@ class APIGateway:
 
         try:
             # Get the learning system from deployment
+            # FIX MAJOR-4: Use deps.continual instead of deps.learning
+            # The ContinualLearner is stored as deps.continual, not deps.learning
             learning_system = None
             if hasattr(self.deployment, "collective") and hasattr(
-                self.deployment.collective.deps, "learning"
+                self.deployment.collective.deps, "continual"
             ):
-                learning_system = self.deployment.collective.deps.learning
+                learning_system = self.deployment.collective.deps.continual
             
             if learning_system is None:
                 return web.json_response(
                     {"error": "Learning system not available"}, status=503
                 )
 
-            # Check if continual_learner has the receive_feedback method
-            if hasattr(learning_system, "continual_learner") and learning_system.continual_learner:
-                learner = learning_system.continual_learner
-                if hasattr(learner, "receive_feedback"):
-                    from vulcan.learning.learning_types import FeedbackData
-                    
-                    # human_preference is the user's preferred response (None if not a preference comparison)
-                    human_preference = context.get("preferred_response") if context else None
-                    
-                    feedback = FeedbackData(
-                        feedback_id=f"fb_{int(time.time())}_{secrets.token_hex(4)}",
-                        timestamp=time.time(),
-                        feedback_type=feedback_type,
-                        content=content,
-                        context=context,
-                        agent_response=response_id,
-                        human_preference=human_preference,
-                        reward_signal=float(reward_signal),
-                        metadata={
-                            "query_id": query_id,
-                            "response_id": response_id,
-                            "source": "api",
-                        },
-                    )
-                    
-                    learner.receive_feedback(feedback)
-                    
-                    return web.json_response({
-                        "status": "accepted",
-                        "feedback_id": feedback.feedback_id,
-                        "message": "Feedback submitted successfully"
-                    })
+            # FIX MAJOR-4: learning_system IS the ContinualLearner, check its methods directly
+            if hasattr(learning_system, "receive_feedback"):
+                learner = learning_system
+                from vulcan.learning.learning_types import FeedbackData
+                
+                # human_preference is the user's preferred response (None if not a preference comparison)
+                human_preference = context.get("preferred_response") if context else None
+                
+                feedback = FeedbackData(
+                    feedback_id=f"fb_{int(time.time())}_{secrets.token_hex(4)}",
+                    timestamp=time.time(),
+                    feedback_type=feedback_type,
+                    content=content,
+                    context=context,
+                    agent_response=response_id,
+                    human_preference=human_preference,
+                    reward_signal=float(reward_signal),
+                    metadata={
+                        "query_id": query_id,
+                        "response_id": response_id,
+                        "source": "api",
+                    },
+                )
+                
+                learner.receive_feedback(feedback)
+                
+                return web.json_response({
+                    "status": "accepted",
+                    "feedback_id": feedback.feedback_id,
+                    "message": "Feedback submitted successfully"
+                })
 
             return web.json_response(
                 {"error": "RLHF feedback not available on this system"}, status=503
@@ -2275,32 +2276,31 @@ class APIGateway:
 
         try:
             # Get the learning system from deployment
+            # FIX MAJOR-4: Use deps.continual instead of deps.learning
             learning_system = None
             if hasattr(self.deployment, "collective") and hasattr(
-                self.deployment.collective.deps, "learning"
+                self.deployment.collective.deps, "continual"
             ):
-                learning_system = self.deployment.collective.deps.learning
+                learning_system = self.deployment.collective.deps.continual
             
             if learning_system is None:
                 return web.json_response(
                     {"error": "Learning system not available"}, status=503
                 )
 
-            # Check if continual_learner has the submit_thumbs_feedback method
-            if hasattr(learning_system, "continual_learner") and learning_system.continual_learner:
-                learner = learning_system.continual_learner
-                if hasattr(learner, "submit_thumbs_feedback"):
-                    learner.submit_thumbs_feedback(
-                        query_id=query_id,
-                        response_id=response_id,
-                        is_positive=is_positive,
-                    )
-                    
-                    return web.json_response({
-                        "status": "accepted",
-                        "feedback_type": "thumbs_up" if is_positive else "thumbs_down",
-                        "message": f"Thumbs {'up' if is_positive else 'down'} recorded"
-                    })
+            # FIX MAJOR-4: learning_system IS the ContinualLearner, check its methods directly
+            if hasattr(learning_system, "submit_thumbs_feedback"):
+                learning_system.submit_thumbs_feedback(
+                    query_id=query_id,
+                    response_id=response_id,
+                    is_positive=is_positive,
+                )
+                
+                return web.json_response({
+                    "status": "accepted",
+                    "feedback_type": "thumbs_up" if is_positive else "thumbs_down",
+                    "message": f"Thumbs {'up' if is_positive else 'down'} recorded"
+                })
 
             return web.json_response(
                 {"error": "Thumbs feedback not available on this system"}, status=503
@@ -2324,11 +2324,12 @@ class APIGateway:
         """
         try:
             # Get the learning system from deployment
+            # FIX MAJOR-4: Use deps.continual instead of deps.learning
             learning_system = None
             if hasattr(self.deployment, "collective") and hasattr(
-                self.deployment.collective.deps, "learning"
+                self.deployment.collective.deps, "continual"
             ):
-                learning_system = self.deployment.collective.deps.learning
+                learning_system = self.deployment.collective.deps.continual
             
             # Return consistent response even if learning system unavailable
             if learning_system is None:
@@ -2341,15 +2342,13 @@ class APIGateway:
                     }
                 })
 
-            # Check if continual_learner has the get_feedback_stats method
-            if hasattr(learning_system, "continual_learner") and learning_system.continual_learner:
-                learner = learning_system.continual_learner
-                if hasattr(learner, "get_feedback_stats"):
-                    stats = learner.get_feedback_stats()
-                    return web.json_response({
-                        "status": "ok",
-                        "stats": stats
-                    })
+            # FIX MAJOR-4: learning_system IS the ContinualLearner, check its methods directly
+            if hasattr(learning_system, "get_feedback_stats"):
+                stats = learning_system.get_feedback_stats()
+                return web.json_response({
+                    "status": "ok",
+                    "stats": stats
+                })
 
             return web.json_response({
                 "status": "ok",

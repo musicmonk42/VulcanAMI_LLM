@@ -5713,12 +5713,14 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
         # STEP 11: Process live feedback for auto-detection (Task 3)
         # ================================================================
         try:
+            # FIX MAJOR-4: Use deps.continual instead of deps.learning
             learning_system = None
-            if hasattr(deployment, "collective") and hasattr(deployment.collective.deps, "learning"):
-                learning_system = deployment.collective.deps.learning
+            if hasattr(deployment, "collective") and hasattr(deployment.collective.deps, "continual"):
+                learning_system = deployment.collective.deps.continual
             
-            if learning_system and hasattr(learning_system, "continual_learner") and learning_system.continual_learner:
-                learner = learning_system.continual_learner
+            # FIX MAJOR-4: learning_system IS the ContinualLearner
+            if learning_system:
+                learner = learning_system
                 
                 # Store context for future feedback processing
                 feedback_context = {
@@ -5739,12 +5741,14 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
         # STEP 12: Crystallize knowledge from execution (Knowledge Crystallizer)
         # ================================================================
         try:
+            # FIX MAJOR-4: Use deps.continual instead of deps.learning
             learning_system = None
-            if hasattr(deployment, "collective") and hasattr(deployment.collective.deps, "learning"):
-                learning_system = deployment.collective.deps.learning
+            if hasattr(deployment, "collective") and hasattr(deployment.collective.deps, "continual"):
+                learning_system = deployment.collective.deps.continual
             
-            if learning_system and hasattr(learning_system, "continual_learner") and learning_system.continual_learner:
-                learner = learning_system.continual_learner
+            # FIX MAJOR-4: learning_system IS the ContinualLearner
+            if learning_system:
+                learner = learning_system
                 
                 # Crystallize knowledge from this execution (non-blocking)
                 if hasattr(learner, "crystallize_from_execution"):
@@ -7458,46 +7462,45 @@ async def submit_feedback(request: FeedbackRequest):
     try:
         deployment = app.state.deployment
         
-        # Try to get learning system
+        # FIX MAJOR-4: Use deps.continual instead of deps.learning
         learning_system = None
-        if hasattr(deployment, "collective") and hasattr(deployment.collective.deps, "learning"):
-            learning_system = deployment.collective.deps.learning
+        if hasattr(deployment, "collective") and hasattr(deployment.collective.deps, "continual"):
+            learning_system = deployment.collective.deps.continual
         
         if learning_system is None:
             raise HTTPException(status_code=503, detail="Learning system not available")
 
-        # Check if continual_learner has the receive_feedback method
-        if hasattr(learning_system, "continual_learner") and learning_system.continual_learner:
-            learner = learning_system.continual_learner
-            if hasattr(learner, "receive_feedback"):
-                from vulcan.learning.learning_types import FeedbackData
-                
-                # human_preference is the user's preferred response (None if not a preference comparison)
-                human_preference = request.context.get("preferred_response") if request.context else None
-                
-                feedback = FeedbackData(
-                    feedback_id=f"fb_{int(time.time())}_{secrets.token_hex(4)}",
-                    timestamp=time.time(),
-                    feedback_type=request.feedback_type,
-                    content=request.content,
-                    context=request.context or {},
-                    agent_response=request.response_id,
-                    human_preference=human_preference,
-                    reward_signal=float(request.reward_signal),
-                    metadata={
-                        "query_id": request.query_id,
-                        "response_id": request.response_id,
-                        "source": "api",
-                    },
-                )
-                
-                learner.receive_feedback(feedback)
-                
-                return {
-                    "status": "accepted",
-                    "feedback_id": feedback.feedback_id,
-                    "message": "Feedback submitted successfully"
-                }
+        # FIX MAJOR-4: learning_system IS the ContinualLearner, check its methods directly
+        if hasattr(learning_system, "receive_feedback"):
+            learner = learning_system
+            from vulcan.learning.learning_types import FeedbackData
+            
+            # human_preference is the user's preferred response (None if not a preference comparison)
+            human_preference = request.context.get("preferred_response") if request.context else None
+            
+            feedback = FeedbackData(
+                feedback_id=f"fb_{int(time.time())}_{secrets.token_hex(4)}",
+                timestamp=time.time(),
+                feedback_type=request.feedback_type,
+                content=request.content,
+                context=request.context or {},
+                agent_response=request.response_id,
+                human_preference=human_preference,
+                reward_signal=float(request.reward_signal),
+                metadata={
+                    "query_id": request.query_id,
+                    "response_id": request.response_id,
+                    "source": "api",
+                },
+            )
+            
+            learner.receive_feedback(feedback)
+            
+            return {
+                "status": "accepted",
+                "feedback_id": feedback.feedback_id,
+                "message": "Feedback submitted successfully"
+            }
 
         raise HTTPException(status_code=503, detail="RLHF feedback not available on this system")
 
@@ -7522,29 +7525,27 @@ async def submit_thumbs_feedback(request: ThumbsFeedbackRequest):
     try:
         deployment = app.state.deployment
         
-        # Try to get learning system
+        # FIX MAJOR-4: Use deps.continual instead of deps.learning
         learning_system = None
-        if hasattr(deployment, "collective") and hasattr(deployment.collective.deps, "learning"):
-            learning_system = deployment.collective.deps.learning
+        if hasattr(deployment, "collective") and hasattr(deployment.collective.deps, "continual"):
+            learning_system = deployment.collective.deps.continual
         
         if learning_system is None:
             raise HTTPException(status_code=503, detail="Learning system not available")
 
-        # Check if continual_learner has the submit_thumbs_feedback method
-        if hasattr(learning_system, "continual_learner") and learning_system.continual_learner:
-            learner = learning_system.continual_learner
-            if hasattr(learner, "submit_thumbs_feedback"):
-                learner.submit_thumbs_feedback(
-                    query_id=request.query_id,
-                    response_id=request.response_id,
-                    is_positive=request.is_positive,
-                )
-                
-                return {
-                    "status": "accepted",
-                    "feedback_type": "thumbs_up" if request.is_positive else "thumbs_down",
-                    "message": f"Thumbs {'up' if request.is_positive else 'down'} recorded"
-                }
+        # FIX MAJOR-4: learning_system IS the ContinualLearner, check its methods directly
+        if hasattr(learning_system, "submit_thumbs_feedback"):
+            learning_system.submit_thumbs_feedback(
+                query_id=request.query_id,
+                response_id=request.response_id,
+                is_positive=request.is_positive,
+            )
+            
+            return {
+                "status": "accepted",
+                "feedback_type": "thumbs_up" if request.is_positive else "thumbs_down",
+                "message": f"Thumbs {'up' if request.is_positive else 'down'} recorded"
+            }
 
         raise HTTPException(status_code=503, detail="Thumbs feedback not available on this system")
 
@@ -7569,10 +7570,10 @@ async def get_feedback_stats():
     try:
         deployment = app.state.deployment
         
-        # Try to get learning system
+        # FIX MAJOR-4: Use deps.continual instead of deps.learning
         learning_system = None
-        if hasattr(deployment, "collective") and hasattr(deployment.collective.deps, "learning"):
-            learning_system = deployment.collective.deps.learning
+        if hasattr(deployment, "collective") and hasattr(deployment.collective.deps, "continual"):
+            learning_system = deployment.collective.deps.continual
         
         if learning_system is None:
             return {
@@ -7584,15 +7585,13 @@ async def get_feedback_stats():
                 }
             }
 
-        # Check if continual_learner has the get_feedback_stats method
-        if hasattr(learning_system, "continual_learner") and learning_system.continual_learner:
-            learner = learning_system.continual_learner
-            if hasattr(learner, "get_feedback_stats"):
-                stats = learner.get_feedback_stats()
-                return {
-                    "status": "ok",
-                    "stats": stats
-                }
+        # FIX MAJOR-4: learning_system IS the ContinualLearner, check its methods directly
+        if hasattr(learning_system, "get_feedback_stats"):
+            stats = learning_system.get_feedback_stats()
+            return {
+                "status": "ok",
+                "stats": stats
+            }
 
         return {
             "status": "ok",
