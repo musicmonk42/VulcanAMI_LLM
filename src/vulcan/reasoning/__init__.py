@@ -43,7 +43,12 @@ except ImportError as e:
         MULTIMODAL = "multimodal"
 
     class ReasoningStrategy(Enum):
-        """Fallback ReasoningStrategy enum"""
+        """Fallback ReasoningStrategy enum.
+        
+        Note: This fallback is kept for defensive programming in case
+        reasoning_types.py fails to import (e.g., due to missing dependencies).
+        In normal operation, ReasoningStrategy is imported from reasoning_types.py.
+        """
 
         SEQUENTIAL = "sequential"
         PARALLEL = "parallel"

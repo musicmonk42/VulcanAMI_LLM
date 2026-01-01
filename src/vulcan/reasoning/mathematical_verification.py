@@ -1488,8 +1488,9 @@ result = simplify(integral)
         """
         # LLM INTERFACE FIX: Detect and warn when a string is passed instead of an object
         if llm is not None and isinstance(llm, str):
+            llm_preview = llm[:50] + '...' if len(llm) > 50 else llm
             logger.error(
-                f"LLM Interface Bug Detected: 'llm' parameter received a string ('{llm[:50]}...') "
+                f"LLM Interface Bug Detected: 'llm' parameter received a string ('{llm_preview}') "
                 f"instead of an LLM client object. This is likely a configuration error. "
                 f"Pass an actual LLM client instance or None to use templates only. Setting llm=None."
             )
@@ -1521,8 +1522,9 @@ result = simplify(integral)
         
         # LLM INTERFACE FIX: Detect if llm override is a string (common config error)
         if llm is not None and isinstance(llm, str):
+            llm_preview = llm[:50] + '...' if len(llm) > 50 else llm
             logger.warning(
-                f"LLM Interface Bug in execute(): 'llm' kwarg received a string ('{llm[:50]}') "
+                f"LLM Interface Bug in execute(): 'llm' kwarg received a string ('{llm_preview}') "
                 f"instead of an LLM client object. Using templates as fallback."
             )
             llm = None

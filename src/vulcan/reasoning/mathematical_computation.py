@@ -504,8 +504,10 @@ result = simplify(integral)
         # This catches a common configuration error where a model name like "gpt-3.5-turbo"
         # is passed instead of an actual LLM client object
         if llm is not None and isinstance(llm, str):
+            # Truncate long strings for logging but don't add "..." for short ones
+            llm_preview = llm[:50] + '...' if len(llm) > 50 else llm
             logger.error(
-                f"LLM Interface Bug Detected: 'llm' parameter received a string ('{llm[:50]}...') "
+                f"LLM Interface Bug Detected: 'llm' parameter received a string ('{llm_preview}') "
                 f"instead of an LLM client object. This is likely a configuration error. "
                 f"Pass an actual LLM client instance (e.g., OpenAI(), GraphixVulcanLLM()) "
                 f"or None to use templates only. Setting llm=None as fallback."
@@ -552,8 +554,9 @@ result = simplify(integral)
 
         # LLM INTERFACE FIX: Detect if llm override is a string (common config error)
         if llm is not None and isinstance(llm, str):
+            llm_preview = llm[:50] + '...' if len(llm) > 50 else llm
             logger.warning(
-                f"LLM Interface Bug in execute(): 'llm' kwarg received a string ('{llm[:50]}') "
+                f"LLM Interface Bug in execute(): 'llm' kwarg received a string ('{llm_preview}') "
                 f"instead of an LLM client object. Using templates as fallback."
             )
             llm = None
@@ -760,21 +763,31 @@ result = simplify(integral)
         return self._templates.simplify_expression("x**2 + 2*x + 1")
 
     def _generate_llm_code(self, query: str, llm) -> Optional[str]:
-        """Generate code using LLM.
+        """
+        Generate code using LLM.
         
-        FIX MAJOR-12: Added support for OpenAI-compatible interfaces including:
+        This method supports multiple LLM interfaces:
         - OpenAI client (chat.completions.create)
         - LangChain LLMs (invoke, predict)
         - HuggingFace (generate, __call__)
         - Custom interfaces (complete)
         
+        FIX MAJOR-12: Added support for OpenAI-compatible interfaces.
         LLM INTERFACE FIX: Added early detection of string LLM parameters
         to provide clear error messages instead of confusing attribute errors.
+        
+        Args:
+            query: The mathematical problem to solve
+            llm: LLM client object (NOT a model name string)
+            
+        Returns:
+            Generated Python code string, or None if generation fails
         """
         # LLM INTERFACE FIX: Early detection of string parameter
         if isinstance(llm, str):
+            llm_preview = llm[:50] + '...' if len(llm) > 50 else llm
             logger.error(
-                f"LLM Interface Bug: _generate_llm_code received a string ('{llm[:50]}') "
+                f"LLM Interface Bug: _generate_llm_code received a string ('{llm_preview}') "
                 f"instead of an LLM client object. This indicates a configuration error upstream. "
                 f"The 'llm' parameter should be an instantiated client object, not a model name."
             )
