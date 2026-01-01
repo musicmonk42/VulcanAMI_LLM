@@ -646,6 +646,8 @@ class CognitiveLoop:
                     f"Falling back to simple word split. Prompt length: {len(prompt)}"
                 )
                 # Fallback to simple word splitting to avoid complete failure
+                # Note: Token type is Union[int, str], so string tokens from word split are valid
+                # This matches the existing fallback behavior in _tokenize() method
                 init_tokens = list(prompt.split())
         else:
             init_tokens = prompt[:]
