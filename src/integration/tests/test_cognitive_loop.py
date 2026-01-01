@@ -337,11 +337,11 @@ class TestPerformanceOptimizations:
     def test_encoding_cache_initialization(self):
         """Test that encoding cache is properly initialized."""
         from src.integration.cognitive_loop import EncodingCache
-        
+
         cache = EncodingCache(max_size=100, ttl_seconds=30.0)
         assert cache.max_size == 100
         assert cache.ttl_seconds == 30.0
-        
+
         stats = cache.get_stats()
         assert stats["size"] == 0
         assert stats["hits"] == 0
@@ -350,16 +350,16 @@ class TestPerformanceOptimizations:
     def test_encoding_cache_put_get(self):
         """Test encoding cache put and get operations."""
         from src.integration.cognitive_loop import EncodingCache
-        
+
         cache = EncodingCache(max_size=100, ttl_seconds=30.0)
         tokens = ["hello", "world"]
         value = {"hidden": [1.0, 2.0, 3.0]}
-        
+
         cache.put(tokens, value)
         result = cache.get(tokens)
-        
+
         assert result == value
-        
+
         stats = cache.get_stats()
         assert stats["size"] == 1
         assert stats["hits"] == 1
@@ -367,26 +367,26 @@ class TestPerformanceOptimizations:
     def test_encoding_cache_miss(self):
         """Test encoding cache miss."""
         from src.integration.cognitive_loop import EncodingCache
-        
+
         cache = EncodingCache(max_size=100, ttl_seconds=30.0)
         result = cache.get(["nonexistent"])
-        
+
         assert result is None
-        
+
         stats = cache.get_stats()
         assert stats["misses"] == 1
 
     def test_logits_cache_operations(self):
         """Test logits cache put and get operations."""
         from src.integration.cognitive_loop import LogitsCache
-        
+
         cache = LogitsCache(max_size=50, ttl_seconds=15.0)
         tokens = [1, 2, 3]
         logits = [0.1, 0.5, 0.4]
-        
+
         cache.put(tokens, logits)
         result = cache.get(tokens)
-        
+
         assert result == logits
 
     def test_cognitive_loop_performance_stats(self):
@@ -395,9 +395,9 @@ class TestPerformanceOptimizations:
         transformer = MockTransformer()
         safety = MockSafety()
         loop = CognitiveLoop(bridge, transformer, safety)
-        
+
         stats = loop.get_performance_stats()
-        
+
         assert "encoding_cache" in stats
         assert "perf_metrics" in stats
         assert "context_cache_step" in stats
@@ -408,10 +408,10 @@ class TestPerformanceOptimizations:
         transformer = MockTransformer()
         safety = MockSafety()
         loop = CognitiveLoop(bridge, transformer, safety)
-        
+
         # Clear caches should not raise
         loop.clear_caches()
-        
+
         # Verify caches are cleared
         assert loop._cached_context is None
         assert loop._context_cache_step == -1
@@ -422,10 +422,10 @@ class TestPerformanceOptimizations:
         transformer = MockTransformer()
         safety = MockSafety()
         loop = CognitiveLoop(bridge, transformer, safety)
-        
+
         logits = [0.1, 0.5, 0.3, 0.1]
         generated = [1, 2]
-        
+
         chosen_idx, filtered = loop._sample_optimized(
             logits=logits,
             generated_tokens=generated,
@@ -433,7 +433,7 @@ class TestPerformanceOptimizations:
             top_k=4,
             top_p=0.9,
         )
-        
+
         assert 0 <= chosen_idx < len(logits)
         assert len(filtered) == len(logits)
 
@@ -441,7 +441,7 @@ class TestPerformanceOptimizations:
         """Test vectorized softmax with numpy."""
         logits = [1.0, 2.0, 3.0, 4.0, 5.0]
         probs = softmax(logits)
-        
+
         assert len(probs) == len(logits)
         assert abs(sum(probs) - 1.0) < 1e-5
         # Probabilities should be monotonically increasing with logits
@@ -452,11 +452,11 @@ class TestPerformanceOptimizations:
         """Test vectorized top-k filtering."""
         logits = [1.0, 5.0, 2.0, 4.0, 3.0]
         filtered = apply_top_k(logits, 3)
-        
+
         # Check that we kept top 3 values
         non_inf_count = sum(1 for x in filtered if x > float("-inf"))
         assert non_inf_count == 3
-        
+
         # Check that top values are kept
         assert filtered[1] == 5.0  # Highest
         assert filtered[3] == 4.0  # Second highest
@@ -465,10 +465,68 @@ class TestPerformanceOptimizations:
         """Test vectorized nucleus sampling."""
         logits = [1.0, 2.0, 3.0, 4.0, 5.0]
         filtered = apply_top_p(logits, 0.5)
-        
+
         # Should filter out some low-probability tokens
         inf_count = sum(1 for x in filtered if x == float("-inf"))
         assert inf_count > 0
+
+
+class TestAsyncSafeTimeout:
+    """Test _async_safe timeout functionality."""
+
+    @pytest.mark.asyncio
+    async def test_async_safe_timeout_triggers(self):
+        """Test that _async_safe times out blocking operations."""
+        import time
+
+        def blocking_function():
+            time.sleep(5)  # Simulate a long-running blocking operation
+            return 'completed'
+
+        runtime = LoopRuntimeConfig(async_operation_timeout_seconds=0.5)  # Short timeout
+        loop = CognitiveLoop(MockBridge(), MockTransformer(), MockSafety(), runtime_config=runtime)
+
+        start = time.time()
+        result = await loop._async_safe(blocking_function, (), 'default_value')
+        elapsed = time.time() - start
+
+        # Should return default value after timeout
+        assert result == 'default_value', f"Expected 'default_value', got {result}"
+        # Should complete quickly (within timeout + buffer)
+        assert elapsed < 2.0, f"Expected timeout in ~0.5s, took {elapsed:.2f}s"
+
+    @pytest.mark.asyncio
+    async def test_async_safe_succeeds_without_timeout(self):
+        """Test that _async_safe returns result for fast operations."""
+        def fast_function():
+            return 'fast_result'
+
+        runtime = LoopRuntimeConfig(async_operation_timeout_seconds=10.0)
+        loop = CognitiveLoop(MockBridge(), MockTransformer(), MockSafety(), runtime_config=runtime)
+
+        result = await loop._async_safe(fast_function, (), 'default_value')
+
+        assert result == 'fast_result'
+
+    @pytest.mark.asyncio
+    async def test_async_safe_custom_timeout_override(self):
+        """Test that custom timeout parameter overrides config."""
+        import time
+
+        def slow_function():
+            time.sleep(5)
+            return 'slow_result'
+
+        # Config has long timeout, but we override with short timeout
+        runtime = LoopRuntimeConfig(async_operation_timeout_seconds=60.0)
+        loop = CognitiveLoop(MockBridge(), MockTransformer(), MockSafety(), runtime_config=runtime)
+
+        start = time.time()
+        result = await loop._async_safe(slow_function, (), 'default', timeout=0.5)
+        elapsed = time.time() - start
+
+        assert result == 'default'
+        assert elapsed < 2.0
 
 
 if __name__ == "__main__":

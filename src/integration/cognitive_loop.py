@@ -102,6 +102,7 @@ class LoopRuntimeConfig:
     aggressive_cache_threshold: int = 10  # Step after which to use aggressive caching
     aggressive_context_cache_interval: int = 20  # Context cache interval after warmup
     world_model_update_interval: int = 5  # Update world model every N steps
+    async_operation_timeout_seconds: float = 10.0  # Timeout for individual async operations in _async_safe()
 
 
 @dataclass
@@ -973,6 +974,10 @@ class CognitiveLoop:
         candidates: List[Any] = []
         retrieved_context: Dict[str, Any] = {}
         hidden_state: Any = None
+        
+        # DIAG: Log entry into _step for debugging hangs
+        if step % self.runtime.log_interval == 0 or self.runtime.enable_verbose_logging:
+            logger.info(f"[DIAG] _step({step}) started, prompt_tokens_len={len(prompt_tokens)}")
 
         if self.sampling.use_beam_search:
             t_beam = time.time()
@@ -1778,16 +1783,40 @@ class CognitiveLoop:
         avg_delta = sum(diffs) / len(diffs)
         return -avg_delta
 
-    async def _async_safe(self, fn: Optional[Callable], args: Any, default: Any) -> Any:
+    async def _async_safe(self, fn: Optional[Callable], args: Any, default: Any, timeout: Optional[float] = None) -> Any:
+        """Execute a function asynchronously with timeout protection.
+        
+        Args:
+            fn: The function to execute (can be sync or async)
+            args: Arguments to pass to the function
+            default: Default value to return on failure or timeout
+            timeout: Optional timeout override. If None, uses runtime.async_operation_timeout_seconds
+            
+        Returns:
+            The function result, or default on failure/timeout
+        """
         if fn is None:
             return default
         args_tuple = args if isinstance(args, tuple) else (args,)
+        # Use provided timeout or fall back to config
+        op_timeout = timeout if timeout is not None else self.runtime.async_operation_timeout_seconds
         try:
             if asyncio.iscoroutinefunction(fn):
-                return await fn(*args_tuple)
+                if op_timeout is not None and op_timeout > 0:
+                    return await asyncio.wait_for(fn(*args_tuple), timeout=op_timeout)
+                else:
+                    return await fn(*args_tuple)
             else:
                 loop = asyncio.get_event_loop()
-                return await loop.run_in_executor(None, fn, *args_tuple)
+                coro = loop.run_in_executor(None, fn, *args_tuple)
+                if op_timeout is not None and op_timeout > 0:
+                    return await asyncio.wait_for(coro, timeout=op_timeout)
+                else:
+                    return await coro
+        except asyncio.TimeoutError:
+            fn_name = getattr(fn, '__name__', str(fn))
+            logger.warning(f"Async operation '{fn_name}' timed out after {op_timeout}s, returning default")
+            return default
         except Exception as e:
             # Log async operation failures
             logger.warning(f"Async safe operation failed, returning default: {e}")
