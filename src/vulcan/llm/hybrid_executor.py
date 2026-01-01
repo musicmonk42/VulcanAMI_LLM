@@ -86,6 +86,10 @@ SKIP_LOCAL_LLM = _skip_local_llm_env in ("true", "1", "yes")
 VULCAN_HARD_TIMEOUT = float(os.environ.get("VULCAN_LLM_HARD_TIMEOUT", "120.0"))  # 2 minutes (was 30s)
 PER_TOKEN_TIMEOUT = float(os.environ.get("VULCAN_LLM_PER_TOKEN_TIMEOUT", "30.0"))  # 30s per token (was 10s)
 
+# Fast mode timeout for output formatting (when reasoning is already done)
+# This can be shorter since no reasoning hooks run per-token
+FAST_MODE_MAX_TIMEOUT_SECONDS = float(os.environ.get("VULCAN_LLM_FAST_TIMEOUT", "60.0"))  # 60 seconds
+
 # ============================================================
 # COMPONENT REGISTRY INTEGRATION
 # ============================================================
@@ -1178,7 +1182,8 @@ class HybridLLMExecutor:
                 return self.local_llm.generate_fast(prompt, max_tokens)
             
             # Use hard timeout (should be faster than standard generate)
-            fast_timeout = min(self.vulcan_timeout, 60.0)  # Max 60s for fast mode
+            # Fast mode uses FAST_MODE_MAX_TIMEOUT_SECONDS since no reasoning hooks run
+            fast_timeout = min(self.vulcan_timeout, FAST_MODE_MAX_TIMEOUT_SECONDS)
             future = self._timeout_executor.submit(generate_fast_sync)
             
             try:

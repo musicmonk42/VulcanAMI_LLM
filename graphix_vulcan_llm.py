@@ -1981,7 +1981,9 @@ class GraphixVulcanLLM:
         max_steps = max_tokens or self.config["generation"]["max_tokens"]
         
         # Enable output formatting mode on CognitiveLoop's runtime config
-        original_mode = getattr(self.cog_loop.runtime, 'output_formatting_mode', False)
+        # Note: Using direct attribute access since output_formatting_mode is a defined field
+        # in LoopRuntimeConfig (defaults to False for backwards compatibility)
+        original_mode = self.cog_loop.runtime.output_formatting_mode
         self.cog_loop.runtime.output_formatting_mode = True
         
         try:

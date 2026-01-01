@@ -1144,7 +1144,7 @@ class CognitiveLoop:
             if self.runtime.output_formatting_mode:
                 # Fast path: Skip bridge.before_execution() and world_model.update()
                 # These are reasoning hooks that add ~5ms+ overhead per token
-                retrieved_context = self._cached_context or {}
+                retrieved_context = self._cached_context if self._cached_context is not None else {}
                 sub_times["context_retrieval_ms"] = 0.0
                 sub_times["wm_update_ms"] = 0.0
                 if is_first_token:
