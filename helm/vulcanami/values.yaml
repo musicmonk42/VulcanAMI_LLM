@@ -159,6 +159,14 @@ llm:
     checkIntervalSeconds: 120
     maxCostPerSession: 2.0
     maxCostPerDay: 10.0
+  # GraphixVulcanLLM Configuration (Internal LLM - v2.0.3)
+  # CRITICAL FIX: Timeout wrapper prevents silent failures during generation
+  graphixVulcan:
+    # Generation timeout in seconds (prevents infinite hangs)
+    # If generation takes longer than this, TimeoutError is raised
+    generationTimeout: 60.0
+    # Enable verbose logging for debugging generation issues
+    verboseLogging: false
 
 # Distillation Configuration (Architectural Fix #6)
 # Enables "Master and Apprentice" pattern for CPU optimization

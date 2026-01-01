@@ -1,7 +1,7 @@
 # VulcanAMI Platform Troubleshooting Guide
 
-**Version:** 2.2.0  
-**Last Updated:** December 23, 2024
+**Version:** 2.3.0  
+**Last Updated:** January 1, 2026
 
 This guide provides solutions for common issues encountered when developing, deploying, and operating the VulcanAMI/GraphixVulcan platform.
 
@@ -519,6 +519,54 @@ Requirements for JWT secret:
 
 ## 5. Performance Issues
 
+### Issue: GraphixVulcanLLM Silent Failure / Generation Hangs
+
+**Symptoms:**
+- Chat requests timeout after 60 seconds with no response
+- Logs show "Generating up to X tokens..." but nothing after that
+- CPU usage stays high (95-99%) during generation
+- No error messages, just silence
+
+**Root Cause (Fixed in v2.0.3):**
+This was caused by the async CognitiveLoop being called from within an event loop context (via `run_in_executor`). The code couldn't create a new event loop when one was already running, causing a silent hang.
+
+**Solution:**
+
+This issue was fixed in GraphixVulcanLLM v2.0.3. If you're experiencing this issue, ensure you have the latest version:
+
+```bash
+# Check your version
+python -c "from graphix_vulcan_llm import GraphixVulcanLLM; print(GraphixVulcanLLM.VERSION)"
+# Should output: 2.0.3
+
+# If older, update the repository
+git pull origin main
+```
+
+**Key Fixes in v2.0.3:**
+1. **Timeout wrapper**: Generation now has a configurable timeout (default 60s) to prevent infinite hangs
+2. **Threaded async execution**: When called from an async context, generation runs in a separate thread with its own event loop
+3. **Improved error logging**: Silent failures now log detailed error messages
+
+**Configuration (Optional):**
+```bash
+# Set generation timeout (default: 60 seconds)
+# In your .env or environment:
+VULCAN_LLM_GENERATION_TIMEOUT=60.0
+```
+
+**For Helm deployments:**
+```yaml
+# In values.yaml under the llm section
+llm:
+  # ... other llm settings ...
+  graphixVulcan:
+    generationTimeout: 60.0
+    verboseLogging: false
+```
+
+---
+
 ### Issue: Slow responses
 
 **Symptoms:**
@@ -831,5 +879,5 @@ For more detailed information, see:
 
 ---
 
-**Document Version:** 2.2.0  
-**Last Updated:** December 23, 2024
+**Document Version:** 2.3.0  
+**Last Updated:** January 1, 2026
