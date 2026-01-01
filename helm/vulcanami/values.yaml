@@ -398,6 +398,25 @@ performanceTuning:
   # VULCAN Internal LLM Timeout (TIMEOUT FIX per Claude diagnosis)
   # Increased from 15s to 30s to allow complex reasoning to complete
   vulcanLlmTimeout: 30.0
+  # VULCAN Hard Timeout for LLM operations (seconds)
+  # Absolute maximum time VULCAN reasoning can take (increased for CPU execution)
+  vulcanLlmHardTimeout: 120.0
+  # VULCAN Per-Token Timeout for CPU execution (seconds)
+  # Internal LLM can take 3+ seconds per token on CPU
+  vulcanLlmPerTokenTimeout: 30.0
+
+# Hybrid Output Configuration (VULCAN reasoning + OpenAI formatting)
+# Implements the hybrid output pattern where VULCAN does all reasoning,
+# and OpenAI is used only for prose formatting (not reasoning)
+hybridOutput:
+  # Enable OpenAI for output formatting (not reasoning)
+  # When true, OpenAI converts VULCAN's structured output to natural language
+  # This bypasses the slow internal LLM for prose generation (2-5s vs 30s+)
+  openaiLanguagePolish: false
+  # Maximum tokens for formatting (shorter than reasoning)
+  formattingMaxTokens: 500
+  # Temperature for formatting (low for consistent output)
+  formattingTemperature: 0.3
 
 # OpenAI Response Caching Configuration
 # Enables LRU+TTL caching for OpenAI API responses to reduce costs and latency

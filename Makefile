@@ -560,6 +560,27 @@ enable-llm-fast-path: ## Enable LLM fast path (skip VULCAN, reduce response time
 	@echo "$(YELLOW)WARNING: SKIP_LOCAL_LLM=true bypasses VULCAN reasoning!$(NC)"
 	@echo "$(YELLOW)Use SKIP_LOCAL_LLM=false (default) to enable VULCAN as primary brain.$(NC)"
 
+.PHONY: enable-hybrid-output
+enable-hybrid-output: ## Enable hybrid output (VULCAN reasoning + OpenAI formatting)
+	@echo "$(GREEN)Enabling hybrid output mode...$(NC)"
+	@echo "This uses VULCAN for all reasoning, OpenAI only for output formatting."
+	@echo "Improves response time: 30s+ -> 2-5s for the prose generation step."
+	@echo ""
+	@echo "Add to your .env file:"
+	@echo ""
+	@echo "# Hybrid Output Configuration"
+	@echo "# VULCAN does ALL reasoning, OpenAI formats output to prose"
+	@echo "OPENAI_LANGUAGE_POLISH=true"
+	@echo ""
+	@echo "# Hard timeout for VULCAN LLM operations (2 minutes for complex reasoning)"
+	@echo "VULCAN_LLM_HARD_TIMEOUT=120.0"
+	@echo ""
+	@echo "# Per-token timeout for CPU execution (internal LLM is slow on CPU)"
+	@echo "VULCAN_LLM_PER_TOKEN_TIMEOUT=30.0"
+	@echo ""
+	@echo "$(GREEN)POLICY: OpenAI ONLY formats output - it does NOT reason.$(NC)"
+	@echo "$(GREEN)VULCAN's reasoning systems do all thinking; OpenAI just generates prose.$(NC)"
+
 .PHONY: enable-semantic-matching
 enable-semantic-matching: ## Enable semantic matching for accurate tool selection (Issue #4 Fix)
 	@echo "$(GREEN)Enabling semantic matching...$(NC)"

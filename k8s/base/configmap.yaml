@@ -91,6 +91,17 @@ data:
   # TIMEOUT FIX: Increased from 15s to 30s per Claude diagnosis
   # 15s was causing timeouts before internal LLM could complete complex reasoning
   VULCAN_LLM_TIMEOUT: "30.0"
+  # Hard timeout for VULCAN LLM operations (2 minutes)
+  # This is the absolute maximum time VULCAN reasoning can take
+  VULCAN_LLM_HARD_TIMEOUT: "120.0"
+  # Per-token timeout for CPU execution (30s per token)
+  # Internal LLM can take 3+ seconds per token on CPU
+  VULCAN_LLM_PER_TOKEN_TIMEOUT: "30.0"
+  # OpenAI Language Polish Configuration
+  # When enabled, OpenAI formats VULCAN's structured output as natural language
+  # OpenAI is NOT used for reasoning - only for output formatting
+  # This bypasses the slow internal LLM for prose generation (2-5s vs 30s+)
+  OPENAI_LANGUAGE_POLISH: "false"
   # OpenAI Response Caching Configuration (Performance Optimization)
   # Enables LRU+TTL caching for OpenAI API responses to reduce costs and latency
   OPENAI_CACHE_ENABLED: "true"

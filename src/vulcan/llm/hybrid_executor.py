@@ -83,8 +83,8 @@ SKIP_LOCAL_LLM = _skip_local_llm_env in ("true", "1", "yes")
 # ============================================================
 # FIX: Increased timeouts to prevent premature timeouts during CPU-intensive
 # symbolic reasoning. The internal LLM can take 3+ seconds per token on CPU.
-VULCAN_HARD_TIMEOUT = float(os.environ.get("VULCAN_HARD_TIMEOUT", "120.0"))  # 2 minutes (was 30s)
-PER_TOKEN_TIMEOUT = float(os.environ.get("VULCAN_PER_TOKEN_TIMEOUT", "30.0"))  # 30s per token (was 10s)
+VULCAN_HARD_TIMEOUT = float(os.environ.get("VULCAN_LLM_HARD_TIMEOUT", "120.0"))  # 2 minutes (was 30s)
+PER_TOKEN_TIMEOUT = float(os.environ.get("VULCAN_LLM_PER_TOKEN_TIMEOUT", "30.0"))  # 30s per token (was 10s)
 
 # ============================================================
 # COMPONENT REGISTRY INTEGRATION
@@ -812,12 +812,9 @@ class HybridLLMExecutor:
 
     def _format_reasoning_error(self, reasoning_output: "VulcanReasoningOutput") -> str:
         """Format a reasoning error for user display."""
-        import hashlib
-        import time as time_module
-        
-        # Generate error reference
+        # Generate error reference using module-level imports (hashlib, time)
         error_ref = hashlib.sha256(
-            f"{time_module.time()}:{reasoning_output.query_id}".encode()
+            f"{time.time()}:{reasoning_output.query_id}".encode()
         ).hexdigest()[:12].upper()
         
         error_text = (
@@ -1327,7 +1324,7 @@ VULCAN's output:
 Write a natural, helpful response based on VULCAN's results."""
 
         try:
-            # Use gpt-4o-mini for fast and cheap formatting
+            # Use OpenAI for fast and cheap formatting (currently gpt-3.5-turbo, configured in _call_openai)
             response = await self._call_openai(
                 loop=loop,
                 prompt=user_prompt,
