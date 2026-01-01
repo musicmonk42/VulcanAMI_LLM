@@ -297,12 +297,13 @@ class SafetyAwareReasoning:
             re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"),  # Email
         ]
 
-    def reason_safely(self, input_data: Any, **kwargs) -> Dict[str, Any]:
+    def reason_safely(self, input_data: Any, is_creative: bool = False, **kwargs) -> Dict[str, Any]:
         """
         Reason with comprehensive safety checks
 
         Args:
             input_data: Input data to reason about
+            is_creative: If True, skip confidence filtering for creative tasks (P0.2 FIX)
             **kwargs: Additional arguments for reasoning
 
         Returns:
@@ -355,8 +356,9 @@ class SafetyAwareReasoning:
                 }
 
             # Output validation
+            # P0.2 FIX: Pass is_creative flag to skip confidence filtering for creative tasks
             if self.enable_safety:
-                output_validation = self.validate_output(result)
+                output_validation = self.validate_output(result, is_creative=is_creative)
                 if not output_validation["is_safe"]:
                     self.safety_violations.append(
                         {
@@ -461,12 +463,14 @@ class SafetyAwareReasoning:
             "sanitized_input": input_data,
         }
 
-    def validate_output(self, result: Any) -> Dict[str, Any]:
+    def validate_output(self, result: Any, is_creative: bool = False) -> Dict[str, Any]:
         """
         Validate output result - CRITICAL: Comprehensive implementation
 
         Args:
             result: Result to validate
+            is_creative: If True, skip confidence filtering for creative tasks
+                        (P0.2 FIX: Creative tasks like poems/sonnets don't need high confidence)
 
         Returns:
             Dictionary with is_safe and reason
@@ -477,13 +481,21 @@ class SafetyAwareReasoning:
 
         # Check if result has required structure for ReasoningResult
         if isinstance(result, ReasoningResult):
-            # Check confidence threshold - low confidence is treated as unsafe
-            if hasattr(result, "confidence"):
-                if result.confidence < 0.3:
-                    return {
-                        "is_safe": False,
-                        "reason": f"Confidence too low: {result.confidence:.2f} (threshold: 0.3)",
-                    }
+            # P0.2 FIX: Skip confidence filtering for creative tasks
+            # Creative tasks (writing poems, sonnets, stories, etc.) should not be
+            # filtered based on confidence because:
+            # 1. Creative output quality is subjective, not measurable by confidence
+            # 2. Low confidence from fallback shouldn't block creative generation
+            # 3. OpenAI fallback (with 0.6 confidence from P1.2) handles these well
+            if not is_creative:
+                # Check confidence threshold - low confidence is treated as unsafe
+                # Only for non-creative tasks where confidence is meaningful
+                if hasattr(result, "confidence"):
+                    if result.confidence < 0.3:
+                        return {
+                            "is_safe": False,
+                            "reason": f"Confidence too low: {result.confidence:.2f} (threshold: 0.3)",
+                        }
 
             # Check for error indicators in conclusion
             if hasattr(result, "conclusion"):
