@@ -494,11 +494,24 @@ result = simplify(integral)
         Initialize the mathematical computation tool.
 
         Args:
-            llm: Language model for code generation (must have .generate() method)
+            llm: Language model for code generation (must have .generate() method).
+                 WARNING: This should be an LLM client object, NOT a string model name.
             max_tokens: Maximum tokens for code generation
             enable_learning: Whether to learn from successful solutions
             prefer_templates: Whether to prefer templates over LLM generation
         """
+        # LLM INTERFACE FIX: Detect and warn when a string is passed instead of an object
+        # This catches a common configuration error where a model name like "gpt-3.5-turbo"
+        # is passed instead of an actual LLM client object
+        if llm is not None and isinstance(llm, str):
+            logger.error(
+                f"LLM Interface Bug Detected: 'llm' parameter received a string ('{llm[:50]}...') "
+                f"instead of an LLM client object. This is likely a configuration error. "
+                f"Pass an actual LLM client instance (e.g., OpenAI(), GraphixVulcanLLM()) "
+                f"or None to use templates only. Setting llm=None as fallback."
+            )
+            llm = None  # Set to None to use template fallback
+        
         self.llm = llm
         self.max_tokens = max_tokens
         self.enable_learning = enable_learning
@@ -536,6 +549,14 @@ result = simplify(integral)
         start_time = time.time()
         llm = kwargs.get("llm", self.llm)
         strategy_override = kwargs.get("strategy")
+
+        # LLM INTERFACE FIX: Detect if llm override is a string (common config error)
+        if llm is not None and isinstance(llm, str):
+            logger.warning(
+                f"LLM Interface Bug in execute(): 'llm' kwarg received a string ('{llm[:50]}') "
+                f"instead of an LLM client object. Using templates as fallback."
+            )
+            llm = None
 
         with self._lock:
             try:
@@ -746,7 +767,19 @@ result = simplify(integral)
         - LangChain LLMs (invoke, predict)
         - HuggingFace (generate, __call__)
         - Custom interfaces (complete)
+        
+        LLM INTERFACE FIX: Added early detection of string LLM parameters
+        to provide clear error messages instead of confusing attribute errors.
         """
+        # LLM INTERFACE FIX: Early detection of string parameter
+        if isinstance(llm, str):
+            logger.error(
+                f"LLM Interface Bug: _generate_llm_code received a string ('{llm[:50]}') "
+                f"instead of an LLM client object. This indicates a configuration error upstream. "
+                f"The 'llm' parameter should be an instantiated client object, not a model name."
+            )
+            return None
+        
         prompt = f"""{self.CODE_GENERATION_PROMPT}
 
 Problem: {query}
@@ -805,8 +838,14 @@ Generate ONLY the Python code:"""
                 logger.debug("Using complete interface")
             else:
                 # FIX MAJOR-12: Log available attributes to help debugging
+                # LLM INTERFACE FIX: Provide clearer error message
                 available_attrs = [attr for attr in dir(llm) if not attr.startswith("_")]
-                logger.warning(f"Unknown LLM interface. Available attrs: {available_attrs[:DEBUG_LOG_MAX_ATTRS]}...")
+                llm_type = type(llm).__name__
+                logger.warning(
+                    f"Unknown LLM interface (type={llm_type}). "
+                    f"Expected an LLM client with one of: chat.completions, create, invoke, predict, generate, or complete. "
+                    f"Available attrs: {available_attrs[:DEBUG_LOG_MAX_ATTRS]}..."
+                )
                 return None
 
             if code is None:

@@ -109,6 +109,25 @@ class UtilityContext(Enum):
     CONSERVATIVE = "conservative"  # Risk-averse mode
 
 
+class ReasoningStrategy(Enum):
+    """
+    Strategy for combining multiple reasoning types.
+    
+    CIRCULAR IMPORT FIX: Moved from unified_reasoning.py to reasoning_types.py
+    to prevent circular imports when __init__.py tries to import this enum
+    before unified_reasoning.py is fully loaded.
+    """
+
+    SEQUENTIAL = "sequential"  # Execute reasoners in sequence
+    PARALLEL = "parallel"  # Execute reasoners in parallel
+    ENSEMBLE = "ensemble"  # Combine results from multiple reasoners
+    HIERARCHICAL = "hierarchical"  # Use hierarchical reasoning structure
+    ADAPTIVE = "adaptive"  # Adapt strategy based on input characteristics
+    HYBRID = "hybrid"  # Custom hybrid approach
+    PORTFOLIO = "portfolio"  # Portfolio-based execution
+    UTILITY_BASED = "utility_based"  # Utility-maximizing selection
+
+
 @dataclass
 class ReasoningStep:
     """Single step in a reasoning chain"""

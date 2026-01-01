@@ -30,11 +30,14 @@ import numpy as np
 from .reasoning_explainer import ReasoningExplainer, SafetyAwareReasoning
 
 # Core reasoning imports
+# CIRCULAR IMPORT FIX: ReasoningStrategy now imported from reasoning_types.py
+# to prevent circular imports when __init__.py imports from this module
 from .reasoning_types import (
     ReasoningChain,
     ReasoningResult,
     ReasoningStep,
     ReasoningType,
+    ReasoningStrategy,  # CIRCULAR IMPORT FIX: Moved here from local definition
 )
 
 logger = logging.getLogger(__name__)
@@ -587,17 +590,9 @@ def _load_optional_components():
     return components
 
 
-class ReasoningStrategy(Enum):
-    """Strategy for combining multiple reasoning types"""
-
-    SEQUENTIAL = "sequential"
-    PARALLEL = "parallel"
-    ENSEMBLE = "ensemble"
-    HIERARCHICAL = "hierarchical"
-    ADAPTIVE = "adaptive"
-    HYBRID = "hybrid"
-    PORTFOLIO = "portfolio"
-    UTILITY_BASED = "utility_based"
+# CIRCULAR IMPORT FIX: ReasoningStrategy is now imported from reasoning_types.py
+# The local definition has been removed to prevent circular imports.
+# See line ~35 where ReasoningStrategy is imported from reasoning_types.
 
 
 @dataclass
