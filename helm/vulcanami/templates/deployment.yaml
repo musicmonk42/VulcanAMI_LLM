@@ -282,6 +282,17 @@ spec:
         {{- /* VULCAN LLM Timeout Configuration (TIMEOUT FIX per Claude diagnosis) */}}
         - name: VULCAN_LLM_TIMEOUT
           value: {{ .Values.performanceTuning.vulcanLlmTimeout | default 30.0 | quote }}
+        {{- /* VULCAN Hard Timeout for CPU-intensive reasoning */}}
+        - name: VULCAN_LLM_HARD_TIMEOUT
+          value: {{ .Values.performanceTuning.vulcanLlmHardTimeout | default 120.0 | quote }}
+        {{- /* VULCAN Per-Token Timeout for CPU execution */}}
+        - name: VULCAN_LLM_PER_TOKEN_TIMEOUT
+          value: {{ .Values.performanceTuning.vulcanLlmPerTokenTimeout | default 30.0 | quote }}
+        {{- end }}
+        {{- if .Values.hybridOutput }}
+        {{- /* Hybrid Output Configuration (OpenAI for formatting only) */}}
+        - name: OPENAI_LANGUAGE_POLISH
+          value: {{ .Values.hybridOutput.openaiLanguagePolish | default false | quote }}
         {{- end }}
         {{- if .Values.memorySystem.enabled }}
         # Vulcan Memory System v46 AWS credentials

@@ -67,6 +67,9 @@ query routing delays, cascade timeouts, and learning system issues.
 | ARENA_COMPLEXITY_THRESHOLD | No | Complexity threshold for Arena fast-path skip | "0.1" |
 | VULCAN_SELF_IMPROVEMENT_AUTO_COMMIT | No | Auto-commit self-improvements to Git | "false" |
 | VULCAN_GAP_GIVEUP_THRESHOLD | No | Attempts before marking gap as deferred | "10" |
+| VULCAN_LLM_HARD_TIMEOUT | No | Hard timeout for VULCAN LLM operations (seconds) | "120.0" |
+| VULCAN_LLM_PER_TOKEN_TIMEOUT | No | Per-token timeout for CPU execution (seconds) | "30.0" |
+| OPENAI_LANGUAGE_POLISH | No | Enable OpenAI for output formatting (not reasoning) | "false" |
 
 **Performance Tuning Notes:**
 
@@ -84,6 +87,18 @@ query routing delays, cascade timeouts, and learning system issues.
 
 - **VULCAN_GAP_GIVEUP_THRESHOLD**: Increased from 3 to 10 to prevent premature give-up
   on complex learning gaps.
+
+- **VULCAN_LLM_HARD_TIMEOUT**: Hard timeout (120s) for VULCAN LLM operations.
+  This prevents indefinite hangs during CPU-intensive reasoning. The internal LLM
+  can take 3+ seconds per token on CPU.
+
+- **VULCAN_LLM_PER_TOKEN_TIMEOUT**: Per-token timeout (30s) for CPU execution.
+  Allows for slower token generation on CPU-bound systems.
+
+- **OPENAI_LANGUAGE_POLISH**: When set to "true", enables OpenAI to format VULCAN's
+  structured reasoning output as natural language prose. OpenAI is NOT used for
+  reasoning - only for output formatting. This bypasses the slow internal LLM
+  for the final prose generation step while keeping reasoning pure.
 
 ## 3. Profiles
 development:
