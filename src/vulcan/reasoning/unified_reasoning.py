@@ -71,6 +71,79 @@ CONFIDENCE_FLOOR_NO_RESULT = 0.1  # Floor when reasoner returns empty/null resul
 # Problem type identifiers
 PROBLEM_TYPE_BAYESIAN = 'bayesian'
 
+# P0.2 FIX: Creative Task Detection
+# These keywords indicate creative tasks that should bypass confidence filtering.
+# Creative tasks like poems, sonnets, stories don't need high confidence scores
+# because their quality is subjective and not measurable by confidence.
+# Using more specific terms to reduce false positives (per code review feedback).
+CREATIVE_TASK_KEYWORDS = (
+    # Specific creative forms (high confidence these are creative)
+    'poem', 'sonnet', 'haiku', 'verse', 'stanza', 'poetry', 'limerick',
+    'story', 'tale', 'narrative', 'fiction', 'novel',
+    'song', 'lyrics', 'ballad', 'melody',
+    'script', 'screenplay', 'dialogue', 'monologue',
+    # Creative writing verbs (when combined with content types)
+    'compose', 'craft', 'author',
+    # Explicit creative markers
+    'creative writing', 'creative', 'artistic', 'imaginative',
+)
+
+# Maximum text length to check for creative keywords (performance optimization)
+MAX_CREATIVE_CHECK_LENGTH = 2000
+
+
+def _is_creative_task(task: 'ReasoningTask') -> bool:
+    """
+    Detect if a task is creative (P0.2 FIX).
+    
+    Creative tasks like writing poems, sonnets, stories should not have their
+    output filtered based on confidence scores because:
+    1. Creative output quality is subjective, not measurable by confidence
+    2. OpenAI fallback responses handle creative tasks well
+    3. Low confidence from fallback shouldn't block creative generation
+    
+    Args:
+        task: The reasoning task to check
+        
+    Returns:
+        True if the task is creative, False otherwise
+    """
+    # Check task metadata for explicit creative flag
+    if task.metadata and task.metadata.get('is_creative', False):
+        return True
+    
+    # Check query dict for creative flag
+    if task.query and isinstance(task.query, dict):
+        if task.query.get('is_creative', False):
+            return True
+        if task.query.get('creative', False):
+            return True
+    
+    # Detect creative keywords in input data and query
+    # Limit text length to prevent performance issues with large inputs
+    text_to_check = ""
+    if task.input_data:
+        input_str = str(task.input_data)[:MAX_CREATIVE_CHECK_LENGTH]
+        text_to_check += input_str.lower()
+    if task.query:
+        query_str = str(task.query)[:MAX_CREATIVE_CHECK_LENGTH]
+        text_to_check += " " + query_str.lower()
+    
+    # Check for creative keywords using word boundary matching
+    # This prevents false positives like 'rewrite' matching 'write'
+    import re
+    for keyword in CREATIVE_TASK_KEYWORDS:
+        # Use word boundary regex for single-word keywords
+        if ' ' not in keyword:
+            pattern = r'\b' + re.escape(keyword) + r'\b'
+            if re.search(pattern, text_to_check):
+                return True
+        else:
+            # Multi-word keywords: direct substring match is fine
+            if keyword in text_to_check:
+                return True
+    
+    return False
 
 def _is_test_environment() -> bool:
     """
@@ -1203,7 +1276,9 @@ class UnifiedReasoner:
 
             if self.enable_safety and self.safety_wrapper:
                 try:
-                    safe_output = self.safety_wrapper.validate_output(result)
+                    # P0.2 FIX: Detect creative tasks and skip confidence filtering
+                    is_creative = _is_creative_task(task)
+                    safe_output = self.safety_wrapper.validate_output(result, is_creative=is_creative)
                     if not safe_output["is_safe"]:
                         result = self._create_safety_result(
                             f"Output filtered: {safe_output['reason']}"

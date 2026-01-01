@@ -57,6 +57,13 @@ logger = logging.getLogger(__name__)
 # Default path for GraphixVulcanLLM config, can be overridden via environment variable
 LLM_CONFIG_PATH = os.environ.get("VULCAN_LLM_CONFIG_PATH", "configs/llm_config.yaml")
 
+# ISSUE P1.2 FIX: OpenAI Fallback Confidence
+# When the internal VULCAN LLM fails and OpenAI provides full reasoning as fallback,
+# we assign this confidence value. Previously, fallback responses defaulted to 10%
+# which caused all responses to be filtered out by confidence thresholds.
+# 0.6 is reasonable because OpenAI is a capable LLM providing full reasoning.
+OPENAI_FALLBACK_CONFIDENCE = 0.6
+
 # ARCHITECTURE FIX: VULCAN should be primary brain, OpenAI is language fallback only
 # 
 # Previous behavior (WRONG): SKIP_LOCAL_LLM=true by default, bypassing VULCAN entirely
@@ -639,9 +646,16 @@ class HybridLLMExecutor:
                 "text": openai_result,
                 "source": "openai_full_reasoning_fallback",
                 "systems_used": systems_used,
+                # ISSUE P1.2 FIX: Give OpenAI fallback reasonable confidence (not 10%)
+                # When OpenAI provides full reasoning as a fallback, it should have
+                # moderate confidence since OpenAI is a capable LLM.
+                # Previously, fallback responses defaulted to 10% confidence which
+                # caused all responses to be filtered out.
+                "confidence": OPENAI_FALLBACK_CONFIDENCE,
                 "metadata": {
                     "openai_role": "full_reasoning_fallback",
                     "reason": "VULCAN internal LLM returned None - OpenAI provided full reasoning",
+                    "vulcan_llm_failed": True,  # Flag for learning system
                 },
             }
 
@@ -805,9 +819,12 @@ class HybridLLMExecutor:
                     "text": results["openai"],
                     "source": "openai_full_reasoning_fallback",
                     "systems_used": systems_used,
+                    # ISSUE P1.2 FIX: Give OpenAI fallback reasonable confidence
+                    "confidence": OPENAI_FALLBACK_CONFIDENCE,
                     "metadata": {
                         "openai_role": "full_reasoning_fallback",
                         "reason": f"VULCAN internal LLM {local_reason} - OpenAI provided full reasoning",
+                        "vulcan_llm_failed": True,
                     },
                 }
 
@@ -897,9 +914,12 @@ class HybridLLMExecutor:
                 "text": openai_result,
                 "source": "openai_full_reasoning_fallback",
                 "systems_used": systems_used,
+                # ISSUE P1.2 FIX: Give OpenAI fallback reasonable confidence
+                "confidence": OPENAI_FALLBACK_CONFIDENCE,
                 "metadata": {
                     "openai_role": "full_reasoning_fallback",
                     "reason": "VULCAN internal LLM failed - OpenAI provided full reasoning",
+                    "vulcan_llm_failed": True,
                 },
             }
         elif local_valid:
