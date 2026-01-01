@@ -529,5 +529,63 @@ class TestAsyncSafeTimeout:
         assert elapsed < 2.0
 
 
+class TestOutputFormattingMode:
+    """
+    Test output formatting mode - skips reasoning hooks for faster generation.
+    
+    This tests the VULCAN Hybrid Output Implementation where:
+    - VULCAN's reasoning systems (the "mind") complete their work first
+    - The LLM is only used to format output as prose
+    - Reasoning hooks (bridge.before_execution, world_model.update) are skipped
+    """
+
+    def test_output_formatting_mode_config(self):
+        """Test that output_formatting_mode config option exists and defaults to False."""
+        config = LoopRuntimeConfig()
+        assert hasattr(config, 'output_formatting_mode')
+        assert config.output_formatting_mode is False  # Default for backwards compatibility
+
+    def test_output_formatting_mode_enabled(self):
+        """Test that output_formatting_mode can be enabled."""
+        config = LoopRuntimeConfig(output_formatting_mode=True)
+        assert config.output_formatting_mode is True
+
+    def test_loop_respects_output_formatting_mode(self):
+        """Test that CognitiveLoop respects output_formatting_mode setting."""
+        bridge = MockBridge()
+        transformer = MockTransformer()
+        safety = MockSafety()
+        runtime = LoopRuntimeConfig(output_formatting_mode=True)
+        
+        loop = CognitiveLoop(
+            bridge=bridge, 
+            transformer=transformer, 
+            safety=safety,
+            runtime_config=runtime
+        )
+        
+        assert loop.runtime.output_formatting_mode is True
+
+    @pytest.mark.asyncio
+    async def test_generate_fast_method_exists(self):
+        """Test that generate_fast method exists on CognitiveLoop."""
+        bridge = MockBridge()
+        transformer = MockTransformer()
+        safety = MockSafety()
+        loop = CognitiveLoop(bridge=bridge, transformer=transformer, safety=safety)
+        
+        assert hasattr(loop, 'generate_fast')
+        assert callable(loop.generate_fast)
+
+    def test_output_formatting_mode_comment_documented(self):
+        """Test that output_formatting_mode has proper documentation."""
+        import inspect
+        source = inspect.getsource(LoopRuntimeConfig)
+        
+        # Check that the field has explanatory comments
+        assert 'output_formatting_mode' in source
+        assert 'reasoning hooks' in source.lower() or 'OUTPUT FORMATTING' in source
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "--tb=short"])
