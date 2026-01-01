@@ -431,6 +431,10 @@ else:
 # error that occurs when agent_reasoning_output is a ReasoningResult dataclass
 # instead of a dictionary. The code was calling .get() on ReasoningResult objects
 # which don't have that method (they have attributes instead).
+#
+# NOTE: These are defined inline rather than imported from vulcan.reasoning.reasoning_types
+# to avoid circular imports during module initialization. The vulcan.reasoning module
+# may not be fully loaded when main.py initializes its top-level code.
 
 def _get_reasoning_attr(result: Any, attr: str, default: Any = None) -> Any:
     """

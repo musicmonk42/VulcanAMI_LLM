@@ -9,7 +9,7 @@ import json
 import time
 import traceback
 import uuid
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, fields
 from datetime import datetime
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -834,14 +834,33 @@ class SafetyConfig:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "SafetyConfig":
-        """Create configuration from dictionary."""
+        """Create configuration from dictionary.
+        
+        BUG FIX: Filters out unknown parameters to prevent 
+        "got an unexpected keyword argument" errors when callers pass
+        legacy parameters like 'max_risk_score' or 'require_validation'.
+        """
+        # Get valid field names for SafetyConfig dataclass
+        valid_fields = {f.name for f in fields(cls)}
+        
+        # Filter to only valid fields, log warning for unknown ones
+        filtered_data = {}
+        for key, value in data.items():
+            if key in valid_fields:
+                filtered_data[key] = value
+            else:
+                import logging
+                logging.getLogger(__name__).debug(
+                    f"SafetyConfig.from_dict: Ignoring unknown parameter '{key}'"
+                )
+        
         # Handle compliance standards enum conversion
-        if "compliance_standards" in data:
-            data["compliance_standards"] = [
+        if "compliance_standards" in filtered_data:
+            filtered_data["compliance_standards"] = [
                 ComplianceStandard(s) if isinstance(s, str) else s
-                for s in data["compliance_standards"]
+                for s in filtered_data["compliance_standards"]
             ]
-        return cls(**data)
+        return cls(**filtered_data)
 
 
 # ============================================================

@@ -8,7 +8,7 @@ import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 # Import ModalityType - with fallback if config.py doesn't exist
 try:
@@ -706,7 +706,11 @@ class DistributionShift:
 # Helper Functions for Type-Safe Attribute Access
 # =============================================================================
 
-def get_reasoning_attr(result: Any, attr: str, default: Any = None) -> Any:
+def get_reasoning_attr(
+    result: Union["ReasoningResult", Dict[str, Any], None], 
+    attr: str, 
+    default: Any = None
+) -> Any:
     """
     Safely extract an attribute from a ReasoningResult object or dictionary.
     
@@ -719,7 +723,7 @@ def get_reasoning_attr(result: Any, attr: str, default: Any = None) -> Any:
     that occurs when code assumes a ReasoningResult is a dictionary.
     
     Args:
-        result: The reasoning result (ReasoningResult, dict, or other)
+        result: The reasoning result (ReasoningResult, dict, or None)
         attr: The attribute/key name to extract
         default: Default value if attribute not found (default: None)
         
@@ -751,7 +755,9 @@ def get_reasoning_attr(result: Any, attr: str, default: Any = None) -> Any:
     return default
 
 
-def reasoning_result_to_dict(result: Any) -> Dict[str, Any]:
+def reasoning_result_to_dict(
+    result: Union["ReasoningResult", Dict[str, Any], None]
+) -> Dict[str, Any]:
     """
     Convert a ReasoningResult object to a dictionary safely.
     
@@ -759,7 +765,7 @@ def reasoning_result_to_dict(result: Any) -> Dict[str, Any]:
     converted to dictionaries for serialization or dict-based operations.
     
     Args:
-        result: The reasoning result (ReasoningResult, dict, or other)
+        result: The reasoning result (ReasoningResult, dict, or None)
         
     Returns:
         A dictionary representation of the result
