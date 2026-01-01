@@ -12,16 +12,22 @@ Composition:
 - ENHANCED with PEFT (LoRA) structure, Top-P sampling, and Gradient Checkpointing logic.
 - FIXED: Added SimpleTokenizer for string-to-token-ID conversion
 - FIXED: Improved get_logits() API for easier usage
+- v2.0.5: Added INFO-level checkpoint logging for hang diagnosis
 """
 
 import bisect  # For Top-P sampling
 import hashlib  # For tokenizer hashing
 import json  # Used for simplified save/load structure
+import logging
 import math
 import random
+import time
 from dataclasses import asdict, dataclass
 from functools import lru_cache  # Enhancement 2: IR caching
 from typing import Any, Dict, List, Optional, Sequence, Union
+
+# Initialize logger
+logger = logging.getLogger(__name__)
 
 # Handle both absolute and relative imports gracefully
 try:
@@ -787,6 +793,7 @@ class GraphixTransformer:
         """Standard forward pass through the transformer.
 
         FIXED: Now properly converts string inputs to token IDs
+        v2.0.5: Added INFO-level checkpoint logging for hang diagnosis (first call only)
 
         Args:
             tokens: Input tokens (string, list of strings, or list of token IDs)
@@ -798,6 +805,8 @@ class GraphixTransformer:
                 - cache_stats: KV cache statistics
                 - metrics: Execution metrics
         """
+        start_time = time.time()
+        
         # FIXED: Normalize to token IDs (handles strings now)
         token_ids = self._normalize_tokens(tokens)
 
@@ -817,6 +826,12 @@ class GraphixTransformer:
         }
 
         result = self.executor.execute(graph_ir, inputs=inputs)
+        
+        # Log execution time for debugging hang issues
+        elapsed_ms = (time.time() - start_time) * 1000
+        if elapsed_ms > 100:  # Only log slow forward passes (>100ms)
+            logger.info(f"[TRANSFORMER] forward() completed in {elapsed_ms:.1f}ms (tokens={len(token_ids)})")
+        
         return result
 
     def get_embeddings(self, text: str) -> List[float]:
@@ -954,6 +969,7 @@ class GraphixTransformer:
         """Generate text continuation from prompt.
 
         FIXED: Now properly handles string prompts and returns decoded text
+        v2.0.5: Added INFO-level checkpoint logging for hang diagnosis
 
         Args:
             prompt: Input prompt string
@@ -964,29 +980,56 @@ class GraphixTransformer:
         Returns:
             Generated text string
         """
+        start_time = time.time()
+        logger.info(f"[TRANSFORMER] generate() START: max_tokens={max_new_tokens}, temp={temperature}")
+        
         # FIXED: Convert prompt to token IDs
+        logger.info("[TRANSFORMER] Tokenizing prompt...")
+        tokenize_start = time.time()
         token_ids: List[int] = self._normalize_tokens(prompt)
+        logger.info(f"[TRANSFORMER] Tokenized: {len(token_ids)} tokens in {(time.time() - tokenize_start)*1000:.1f}ms")
 
         for step in range(max_new_tokens):
+            step_start = time.time()
+            
+            # Log first step at INFO level, others at DEBUG
+            if step == 0:
+                logger.info(f"[TRANSFORMER] Step {step}: forward pass (FIRST TOKEN)...")
+            
             # 1. Forward pass (uses current full sequence)
             # The executor implicitly uses KV caching for efficiency if available
             result = self.forward(token_ids)
             hidden_state = result.get("hidden_states")
+            
+            if step == 0:
+                logger.info(f"[TRANSFORMER] Step {step}: forward done, getting logits...")
 
             # 2. Get logits for the next token
             logits = self.executor.get_logits(hidden_state, token_ids)
+            
+            if step == 0:
+                logger.info(f"[TRANSFORMER] Step {step}: logits obtained, sampling...")
 
             # 3. Sample the next token
             next_token_id = self._generate_next_token(logits, temperature, top_p)
+            
+            if step == 0:
+                step_ms = (time.time() - step_start) * 1000
+                logger.info(f"[TRANSFORMER] Step {step} DONE: token={next_token_id} in {step_ms:.1f}ms")
 
             # Stop condition (if applicable, e.g., EOS token)
             if next_token_id == 0 and len(token_ids) > 1:
+                logger.info(f"[TRANSFORMER] EOS token detected at step {step}, stopping")
                 break
 
             token_ids.append(next_token_id)
 
         # FIXED: Decode token IDs back to text
-        return self.tokenizer.decode(token_ids)
+        logger.info(f"[TRANSFORMER] Decoding {len(token_ids)} tokens...")
+        decoded = self.tokenizer.decode(token_ids)
+        total_time = time.time() - start_time
+        logger.info(f"[TRANSFORMER] generate() DONE: {len(token_ids)} tokens, {len(decoded)} chars in {total_time:.2f}s")
+        return decoded
 
     # --------------------- Training Call --------------------- #
 

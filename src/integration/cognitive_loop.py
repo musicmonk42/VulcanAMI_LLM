@@ -35,6 +35,42 @@ except ImportError:
 # Initialize logger for this module
 logger = logging.getLogger(__name__)
 
+
+# =========================== CHECKPOINT HELPER =========================== #
+# Helper class for consistent checkpoint logging during token generation.
+# Logs elapsed time since generation started to help diagnose hang locations.
+
+
+class _Checkpoint:
+    """Checkpoint helper for consistent timing and logging during token generation.
+    
+    Usage:
+        _cp = _Checkpoint()
+        _cp.reset()  # Call at start of generate()
+        _cp.log("Starting tokenization...")
+        tokens = await self._tokenize(prompt)
+        _cp.log(f"Tokenization done: {len(tokens)} tokens")
+    
+    All logs are at INFO level so they appear in production logs.
+    """
+    
+    def __init__(self):
+        self.start: Optional[float] = None
+    
+    def reset(self):
+        """Reset the checkpoint timer. Call at start of generate()."""
+        self.start = time.time()
+    
+    def log(self, msg: str):
+        """Log a checkpoint message with elapsed time."""
+        elapsed = time.time() - (self.start or time.time())
+        logger.info(f"[CHECKPOINT {elapsed:.3f}s] {msg}")
+
+
+# Global checkpoint instance for token generation
+_cp = _Checkpoint()
+
+
 Token = Union[int, str]
 Tokens = List[Token]
 SpeculativeFunction = Callable[
@@ -625,6 +661,11 @@ class CognitiveLoop:
         stop_tokens: Optional[Tuple[Token, ...]] = None,
         stop_strings: Optional[Tuple[str, ...]] = None,
     ) -> Union[AsyncGenerator[Dict[str, Any], None], CognitiveLoopResult]:
+        # Reset checkpoint timer at the start of each generation
+        _cp.reset()
+        prompt_len = len(prompt) if isinstance(prompt, str) else len(prompt)
+        _cp.log(f"generate() START: prompt_len={prompt_len}, max_tokens={max_tokens or self.sampling.max_tokens}")
+        
         start = time.time()
         max_steps = max_tokens or self.sampling.max_tokens
         stop_tok_set = set(stop_tokens or ()) | set(self.sampling.stop_tokens)
@@ -636,11 +677,14 @@ class CognitiveLoop:
         
         if isinstance(prompt, str):
             try:
+                _cp.log("Calling _tokenize()...")
                 init_tokens = await asyncio.wait_for(
                     self._tokenize(prompt),
                     timeout=TOKENIZE_TIMEOUT
                 )
+                _cp.log(f"_tokenize() done: {len(init_tokens)} tokens")
             except asyncio.TimeoutError:
+                _cp.log(f"_tokenize() TIMEOUT after {TOKENIZE_TIMEOUT}s! Using word split fallback.")
                 logger.error(
                     f"[CognitiveLoop] Tokenization timed out after {TOKENIZE_TIMEOUT}s! "
                     f"Falling back to simple word split. Prompt length: {len(prompt)}"
@@ -651,6 +695,7 @@ class CognitiveLoop:
                 init_tokens = list(prompt.split())
         else:
             init_tokens = prompt[:]
+            _cp.log(f"Using pre-tokenized input: {len(init_tokens)} tokens")
 
         generated: Tokens = []
         reasoning_trace: List[Dict[str, Any]] = []
@@ -672,6 +717,8 @@ class CognitiveLoop:
 
         temperature = self.sampling.temperature
         top_k = self.sampling.top_k
+        
+        _cp.log(f"Creating _generator() async generator: max_steps={max_steps}")
 
         if self.sampling.use_beam_search:
             self._beam_state = [
@@ -1006,6 +1053,7 @@ class CognitiveLoop:
         is_first_token = (step == 0)
         should_log = is_first_token or (step % self.runtime.log_interval == 0) or self.runtime.enable_verbose_logging
         if is_first_token:
+            _cp.log(f"_step({step}) START (FIRST TOKEN), prompt_tokens_len={len(prompt_tokens)}")
             logger.info(f"[DIAG] _step({step}) STARTED (FIRST TOKEN), prompt_tokens_len={len(prompt_tokens)}")
         elif should_log:
             logger.debug(f"[DIAG] _step({step}) started, prompt_tokens_len={len(prompt_tokens)}")
@@ -1042,11 +1090,13 @@ class CognitiveLoop:
             if should_refresh_context:
                 t_ctx = time.time()
                 if is_first_token:
+                    _cp.log("Calling bridge.before_execution...")
                     logger.info("[DIAG] Step 0: Calling bridge.before_execution...")
                 retrieved_context = await self._async_safe(
                     self.bridge.before_execution, {"prompt_tokens": prompt_tokens}, {}
                 )
                 if is_first_token:
+                    _cp.log(f"bridge.before_execution() done in {(time.time() - t_ctx)*1000:.1f}ms")
                     logger.info(f"[DIAG] Step 0: bridge.before_execution completed in {(time.time() - t_ctx)*1000:.1f}ms")
                 ctx_time = (time.time() - t_ctx) * 1000
                 sub_times["context_retrieval_ms"] = ctx_time
@@ -1108,9 +1158,11 @@ class CognitiveLoop:
                 sub_times["encode_cache_hit"] = True
                 self._perf_metrics["encoding_cache_hits"] += 1
                 if is_first_token:
+                    _cp.log("transformer.encode() cache HIT")
                     logger.info("[DIAG] Step 0: Encoding cache HIT")
             else:
                 if is_first_token:
+                    _cp.log("Calling transformer.encode()...")
                     logger.info("[DIAG] Step 0: Calling transformer.encode...")
                 hidden_state = await self._async_safe(
                     self.transformer.encode, prompt_tokens, None
@@ -1121,6 +1173,7 @@ class CognitiveLoop:
                 sub_times["encode_ms"] = (time.time() - t_enc) * 1000
                 sub_times["encode_cache_hit"] = False
                 if is_first_token:
+                    _cp.log(f"transformer.encode() done in {sub_times['encode_ms']:.1f}ms")
                     logger.info(f"[DIAG] Step 0: transformer.encode completed in {sub_times['encode_ms']:.1f}ms")
                 
             self._perf_metrics["total_encode_time_ms"] += sub_times["encode_ms"]
@@ -1172,9 +1225,11 @@ class CognitiveLoop:
                 sub_times["logits_cache_hit"] = True
                 self._perf_metrics["logits_cache_hits"] += 1
                 if is_first_token:
+                    _cp.log("_obtain_logits() cache HIT")
                     logger.info("[DIAG] Step 0: Logits cache HIT")
             else:
                 if is_first_token:
+                    _cp.log("Calling _obtain_logits()...")
                     logger.info("[DIAG] Step 0: Calling _obtain_logits...")
                 logits = await self._obtain_logits(hidden_state, prompt_tokens, candidates)
                 # Store in cache for future use
@@ -1184,6 +1239,7 @@ class CognitiveLoop:
                 sub_times["logits_cache_hit"] = False
                 if is_first_token:
                     logits_len = len(logits) if logits else 0
+                    _cp.log(f"_obtain_logits() done in {sub_times['get_logits_ms']:.1f}ms (len={logits_len})")
                     logger.info(f"[DIAG] Step 0: _obtain_logits completed in {sub_times['get_logits_ms']:.1f}ms (len={logits_len})")
             
             token_info["logits"] = logits if self.runtime.attach_logits else None
@@ -1199,6 +1255,7 @@ class CognitiveLoop:
             else:
                 t_sample = time.time()
                 if is_first_token:
+                    _cp.log("Sampling token...")
                     logger.info("[DIAG] Step 0: Sampling token...")
                 chosen_index, adjusted_logits = self._sample_optimized(
                     logits=logits,
@@ -1212,6 +1269,7 @@ class CognitiveLoop:
                 self._perf_metrics["total_sample_time_ms"] += sub_times["sample_ms"]
                 self._perf_metrics["tokens_generated"] += 1
                 if is_first_token:
+                    _cp.log(f"Sampling done in {sub_times['sample_ms']:.1f}ms, token={token}")
                     logger.info(f"[DIAG] Step 0: Sampling completed in {sub_times['sample_ms']:.1f}ms, token={token}")
 
             token_info["chosen_index"] = chosen_index

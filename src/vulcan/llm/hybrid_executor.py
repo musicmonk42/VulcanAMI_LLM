@@ -44,10 +44,11 @@ import threading
 import time
 import traceback
 from collections import OrderedDict
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 # Module metadata
-__version__ = "1.2.0"
+__version__ = "1.3.0"
 __author__ = "VULCAN-AGI Team"
 
 logger = logging.getLogger(__name__)
@@ -444,10 +445,17 @@ class HybridLLMExecutor:
     
     # Prompt template when VULCAN reasoning succeeds and needs language polish
     LANGUAGE_ONLY_PROMPT_TEMPLATE = (
-        "Express the following VULCAN reasoning result in clear, natural language. "
-        "Do NOT add any independent reasoning or analysis - simply make it readable:\n\n"
-        "VULCAN Reasoning Result:\n{reasoning_result}\n\n"
-        "Express this in conversational language:"
+        "You are a language polisher. Your ONLY job is to improve the clarity and grammar "
+        "of the text below.\n\n"
+        "RULES:\n"
+        "- Do NOT add new information or reasoning\n"
+        "- Do NOT change the meaning\n"
+        "- Do NOT expand on ideas\n"
+        "- Do NOT answer questions or add explanations\n"
+        "- ONLY fix grammar, punctuation, and clarity\n"
+        "- Keep approximately the same length\n\n"
+        "Text to polish:\n{reasoning_result}\n\n"
+        "Polished version:"
     )
     
     # NOTE: FULL_REASONING_FALLBACK_PROMPT has been REMOVED
@@ -501,6 +509,16 @@ class HybridLLMExecutor:
         self.ensemble_min_confidence = ensemble_min_confidence
         self.openai_max_tokens = openai_max_tokens
         self.logger = logging.getLogger("HybridLLMExecutor")
+        
+        # HARD TIMEOUT FIX: ThreadPoolExecutor for VULCAN calls
+        # asyncio.wait_for() only checks timeouts between await points
+        # ThreadPoolExecutor.submit().result(timeout=X) provides TRUE hard timeout
+        self._timeout_executor = ThreadPoolExecutor(
+            max_workers=4,
+            thread_name_prefix="hybrid_timeout_"
+        )
+        self.vulcan_timeout = float(os.environ.get("VULCAN_LLM_TIMEOUT", "15.0"))  # Hard 15s limit for VULCAN
+        self.logger.info(f"[HybridExecutor] VULCAN hard timeout set to {self.vulcan_timeout}s")
         
         # OpenAI response cache for reducing API costs and latency
         self._enable_openai_cache = enable_openai_cache
@@ -781,11 +799,23 @@ class HybridLLMExecutor:
 
         try:
             self.logger.info(f"[HybridExecutor] Calling generate(prompt_len={len(prompt)}, max_tokens={max_tokens})...")
+            self.logger.info(f"[HybridExecutor] Using HARD timeout: {self.vulcan_timeout}s")
             start_time = time_module.perf_counter()
             
-            result = await loop.run_in_executor(
-                None, self.local_llm.generate, prompt, max_tokens
-            )
+            # HARD TIMEOUT FIX: Use ThreadPoolExecutor for TRUE hard timeout
+            # asyncio.wait_for() only checks between await points
+            # ThreadPoolExecutor.submit().result(timeout=X) fires even on sync blocks
+            def generate_sync():
+                return self.local_llm.generate(prompt, max_tokens)
+            
+            future = self._timeout_executor.submit(generate_sync)
+            try:
+                result = future.result(timeout=self.vulcan_timeout)
+            except FuturesTimeoutError:
+                self.logger.error(f"[HybridExecutor] ❌ HARD TIMEOUT after {self.vulcan_timeout}s!")
+                self.logger.info("=" * 60)
+                future.cancel()
+                return None
             
             elapsed = time_module.perf_counter() - start_time
             self.logger.info(f"[HybridExecutor] generate() returned in {elapsed:.2f}s")
