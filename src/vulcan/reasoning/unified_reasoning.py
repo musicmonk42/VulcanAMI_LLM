@@ -75,13 +75,21 @@ PROBLEM_TYPE_BAYESIAN = 'bayesian'
 # These keywords indicate creative tasks that should bypass confidence filtering.
 # Creative tasks like poems, sonnets, stories don't need high confidence scores
 # because their quality is subjective and not measurable by confidence.
+# Using more specific terms to reduce false positives (per code review feedback).
 CREATIVE_TASK_KEYWORDS = (
-    'write', 'compose', 'create', 'craft', 'generate', 'author', 'produce',
-    'poem', 'sonnet', 'haiku', 'verse', 'stanza', 'poetry',
-    'story', 'tale', 'narrative', 'essay', 'article',
-    'song', 'lyrics', 'script', 'dialogue',
-    'creative', 'artistic', 'imaginative',
+    # Specific creative forms (high confidence these are creative)
+    'poem', 'sonnet', 'haiku', 'verse', 'stanza', 'poetry', 'limerick',
+    'story', 'tale', 'narrative', 'fiction', 'novel',
+    'song', 'lyrics', 'ballad', 'melody',
+    'script', 'screenplay', 'dialogue', 'monologue',
+    # Creative writing verbs (when combined with content types)
+    'compose', 'craft', 'author',
+    # Explicit creative markers
+    'creative writing', 'creative', 'artistic', 'imaginative',
 )
+
+# Maximum text length to check for creative keywords (performance optimization)
+MAX_CREATIVE_CHECK_LENGTH = 2000
 
 
 def _is_creative_task(task: 'ReasoningTask') -> bool:
@@ -112,15 +120,30 @@ def _is_creative_task(task: 'ReasoningTask') -> bool:
             return True
     
     # Detect creative keywords in input data and query
+    # Limit text length to prevent performance issues with large inputs
     text_to_check = ""
     if task.input_data:
-        text_to_check += str(task.input_data).lower()
+        input_str = str(task.input_data)[:MAX_CREATIVE_CHECK_LENGTH]
+        text_to_check += input_str.lower()
     if task.query:
-        text_to_check += " " + str(task.query).lower()
+        query_str = str(task.query)[:MAX_CREATIVE_CHECK_LENGTH]
+        text_to_check += " " + query_str.lower()
     
-    # Check for creative keywords
-    return any(keyword in text_to_check for keyword in CREATIVE_TASK_KEYWORDS)
-
+    # Check for creative keywords using word boundary matching
+    # This prevents false positives like 'rewrite' matching 'write'
+    import re
+    for keyword in CREATIVE_TASK_KEYWORDS:
+        # Use word boundary regex for single-word keywords
+        if ' ' not in keyword:
+            pattern = r'\b' + re.escape(keyword) + r'\b'
+            if re.search(pattern, text_to_check):
+                return True
+        else:
+            # Multi-word keywords: direct substring match is fine
+            if keyword in text_to_check:
+                return True
+    
+    return False
 
 def _is_test_environment() -> bool:
     """
