@@ -1,6 +1,6 @@
 # VulcanAMI Platform Troubleshooting Guide
 
-**Version:** 2.3.0  
+**Version:** 2.4.0  
 **Last Updated:** January 1, 2026
 
 This guide provides solutions for common issues encountered when developing, deploying, and operating the VulcanAMI/GraphixVulcan platform.
@@ -548,6 +548,24 @@ git pull origin main
 2. **Threaded async execution**: When called from an async context, generation runs in a separate thread with its own event loop
 3. **Improved error logging**: Silent failures now log detailed error messages
 
+**Diagnostic Logging (v2.0.4+):**
+
+When debugging generation hangs, look for checkpoint logs at INFO level:
+
+```
+13:43:56.143 - [INFO] [DIAG] About to call CognitiveLoop.generate()...
+13:43:56.144 - [INFO] [DIAG] _consume_async_result: type=<class 'coroutine'>
+13:43:56.144 - [INFO] [DIAG] DETECTED COROUTINE - AWAITING...
+13:43:56.145 - [INFO] [DIAG-STEP-0] Starting _step for FIRST token
+13:43:56.145 - [INFO] [DIAG-STEP-0] Calling bridge.before_execution...
+[LAST LOG BEFORE HANG IDENTIFIES BLOCKING OPERATION]
+```
+
+The LAST checkpoint log before the silence identifies the exact blocking operation. Common hang locations:
+- `bridge.before_execution` - Bridge initialization hang
+- `transformer.encode` - Transformer encoding hang
+- `obtain_logits` - Logits computation hang
+
 **Configuration (Optional):**
 ```bash
 # Set generation timeout (default: 60 seconds)
@@ -879,5 +897,5 @@ For more detailed information, see:
 
 ---
 
-**Document Version:** 2.3.0  
+**Document Version:** 2.4.0  
 **Last Updated:** January 1, 2026
