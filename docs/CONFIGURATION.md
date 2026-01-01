@@ -89,16 +89,18 @@ query routing delays, cascade timeouts, and learning system issues.
   on complex learning gaps.
 
 - **VULCAN_LLM_HARD_TIMEOUT**: Hard timeout (120s) for VULCAN LLM operations.
-  This prevents indefinite hangs during CPU-intensive reasoning. The internal LLM
-  can take 3+ seconds per token on CPU.
+  This prevents indefinite hangs during CPU-intensive language generation. The internal LLM
+  can take 3+ seconds per token on CPU. Note: The internal LLM is for language
+  generation, not reasoning. Reasoning is done by VULCAN's reasoning systems.
 
 - **VULCAN_LLM_PER_TOKEN_TIMEOUT**: Per-token timeout (30s) for CPU execution.
   Allows for slower token generation on CPU-bound systems.
 
-- **OPENAI_LANGUAGE_POLISH**: When set to "true", enables OpenAI to format VULCAN's
-  structured reasoning output as natural language prose. OpenAI is NOT used for
-  reasoning - only for output formatting. This bypasses the slow internal LLM
-  for the final prose generation step while keeping reasoning pure.
+- **OPENAI_LANGUAGE_POLISH**: When set to "true", enables OpenAI to polish the
+  internal LLM's language output. Both the internal LLM and OpenAI serve the same
+  conceptual role - language generation from VULCAN's reasoning results. OpenAI
+  can provide additional polish but neither LLM does the actual reasoning - that's
+  done by VULCAN's reasoning systems (symbolic, causal, probabilistic, mathematical).
 
 ## 3. Profiles
 development:

@@ -1,39 +1,49 @@
 # ============================================================
 # VULCAN-AGI Hybrid LLM Executor Module
-# VULCAN does ALL reasoning - OpenAI is for language polish ONLY
+# VULCAN's reasoning systems do ALL thinking - LLMs are for language only
 # ============================================================
 #
 # ARCHITECTURE:
-#     - VULCAN internal LLM handles ALL reasoning
-#     - OpenAI is ONLY permitted for language interpretation/polish
-#     - NO external AI fallback for reasoning - if VULCAN fails, return error
+#     - VULCAN's reasoning systems (symbolic, probabilistic, causal, 
+#       mathematical) handle ALL reasoning/thinking
+#     - The internal LLM (GraphixVulcanLLM) is for LANGUAGE GENERATION,
+#       converting structured reasoning outputs to natural language prose
+#     - OpenAI is ALSO for language generation - same role as internal LLM
+#     - Neither LLM (internal nor OpenAI) does "thinking" - they are
+#       language output formatters for VULCAN's reasoning results
+#
+# KEY INSIGHT:
+#     Neither GraphixVulcanLLM nor OpenAI is "the mind." They're output
+#     formatters. VULCAN's reasoning systems already did the thinking
+#     before any LLM is invoked.
 #
 # PERMITTED OPENAI USAGE:
-#     - When VULCAN succeeds and OPENAI_LANGUAGE_POLISH=true:
-#       OpenAI can polish VULCAN's output into clearer language
+#     - When OPENAI_LANGUAGE_POLISH=true:
+#       OpenAI can polish the language output into clearer prose
 #     - OpenAI must NOT reason, analyze, or generate independent responses
 #
-# PROHIBITED OPENAI USAGE:
-#     - Reasoning fallback when VULCAN fails
-#     - Independent problem-solving
-#     - Code generation
-#     - Any form of independent analysis
+# INTERNAL LLM ROLE:
+#     - Primary language generation from VULCAN's reasoning outputs
+#     - Same conceptual role as OpenAI - converting structured results
+#       to natural language
+#     - Not for reasoning - reasoning is done by VULCAN's reasoning systems
 #
 # CONFIGURATION:
-#     - OPENAI_LANGUAGE_POLISH=false (default) - Return VULCAN output directly
-#     - OPENAI_LANGUAGE_POLISH=true - Polish VULCAN output with OpenAI
+#     - OPENAI_LANGUAGE_POLISH=false (default) - Use internal LLM for output
+#     - OPENAI_LANGUAGE_POLISH=true - Polish internal LLM output with OpenAI
 #
 # USAGE:
 #     from vulcan.llm.hybrid_executor import HybridLLMExecutor
 #     
 #     executor = HybridLLMExecutor(local_llm=my_llm)
 #     result = await executor.execute("What is 2+2?")
-#     print(result["text"])  # VULCAN's reasoning result
+#     print(result["text"])  # Language output from VULCAN's reasoning
 #
 # VERSION HISTORY:
 #     1.0.0 - Extracted from main.py for modular architecture
 #     1.1.0 - Added OpenAI response caching with LRU and TTL
 #     1.2.0 - Removed OpenAI reasoning fallback - VULCAN only for reasoning
+#     1.3.0 - Clarified that internal LLM is for language, not reasoning
 # ============================================================
 
 import asyncio
@@ -50,7 +60,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 # Module metadata
-__version__ = "1.4.0"
+__version__ = "1.5.0"
 __author__ = "VULCAN-AGI Team"
 
 logger = logging.getLogger(__name__)
@@ -82,7 +92,7 @@ SKIP_LOCAL_LLM = _skip_local_llm_env in ("true", "1", "yes")
 # TIMEOUT CONFIGURATION - INCREASED FOR CPU EXECUTION
 # ============================================================
 # FIX: Increased timeouts to prevent premature timeouts during CPU-intensive
-# symbolic reasoning. The internal LLM can take 3+ seconds per token on CPU.
+# language generation. The internal LLM can take 3+ seconds per token on CPU.
 VULCAN_HARD_TIMEOUT = float(os.environ.get("VULCAN_LLM_HARD_TIMEOUT", "120.0"))  # 2 minutes (was 30s)
 PER_TOKEN_TIMEOUT = float(os.environ.get("VULCAN_LLM_PER_TOKEN_TIMEOUT", "30.0"))  # 30s per token (was 10s)
 
@@ -869,32 +879,33 @@ class HybridLLMExecutor:
         self, loop, prompt: str, max_tokens: int, temperature: float, system_prompt: str,
         conversation_history: Optional[List[Dict[str, str]]] = None
     ) -> Dict[str, Any]:
-        """VULCAN does ALL reasoning. OpenAI can ONLY interpret the result into language.
+        """VULCAN's reasoning systems do ALL thinking. LLMs are for language output only.
         
         ARCHITECTURE:
-        1. VULCAN internal LLM does ALL reasoning
-        2. If VULCAN succeeds, optionally use OpenAI to polish the language (NOT reason)
-        3. If VULCAN fails, return an error - NO fallback to OpenAI for reasoning
+        1. VULCAN's reasoning systems (symbolic, probabilistic, causal, math) do thinking
+        2. Internal LLM generates language output from the reasoning results
+        3. If enabled, OpenAI can polish the language (same role as internal LLM)
+        4. Neither internal LLM nor OpenAI does reasoning - they format output
         
-        OpenAI is ONLY permitted to interpret/express VULCAN's results in natural language.
-        OpenAI must NEVER reason, analyze, or generate independent responses.
+        OpenAI is permitted to polish language output but must NOT reason independently.
+        The internal LLM has the same conceptual role - language generation, not reasoning.
         """
         systems_used = []
 
-        # Step 1: VULCAN does ALL the reasoning
+        # Step 1: Internal LLM generates language output (reasoning already done by VULCAN systems)
         local_result = await self._call_local_llm(loop, prompt, max_tokens)
         
         if self._is_valid_response(local_result):
             systems_used.append("vulcan_local_llm")
-            self.logger.info("[HybridExecutor] ✓ VULCAN reasoning succeeded")
+            self.logger.info("[HybridExecutor] ✓ Internal LLM language generation succeeded")
             
-            # Step 2: Optionally use OpenAI to polish the language (NOT for reasoning)
-            # This is the ONLY permitted use of OpenAI - language interpretation
+            # Step 2: Optionally use OpenAI to polish the language
+            # Both internal LLM and OpenAI serve the same role - language generation
             use_language_polish = os.environ.get("OPENAI_LANGUAGE_POLISH", "false").lower() in ("true", "1", "yes")
             
             if use_language_polish:
                 try:
-                    # Use OpenAI ONLY to express VULCAN's result in better language
+                    # Use OpenAI to express the result in better language
                     polish_prompt = self.LANGUAGE_ONLY_PROMPT_TEMPLATE.format(reasoning_result=local_result)
                     polished = await self._call_openai(
                         loop, polish_prompt, max_tokens, temperature, 
@@ -902,7 +913,7 @@ class HybridLLMExecutor:
                     )
                     if polished and len(polished.strip()) > self.MIN_MEANINGFUL_LENGTH:
                         systems_used.append("openai_language_polish")
-                        self.logger.info("[HybridExecutor] ✓ OpenAI polished VULCAN's language (no reasoning)")
+                        self.logger.info("[HybridExecutor] ✓ OpenAI polished language output")
                         
                         # DISTILLATION: Capture training example for Internal LLM to learn
                         # Student learns to produce polished output directly
@@ -923,20 +934,22 @@ class HybridLLMExecutor:
                             },
                         }
                 except Exception as e:
-                    self.logger.warning(f"[HybridExecutor] Language polish failed, using raw VULCAN result: {e}")
+                    self.logger.warning(f"[HybridExecutor] Language polish failed, using raw output: {e}")
             
-            # Return VULCAN's result directly (no polish)
+            # Return internal LLM's result directly (no polish)
             return {
                 "text": local_result,
                 "source": "local",
                 "systems_used": systems_used,
             }
 
-        # VULCAN FAILED - NO OPENAI FALLBACK FOR REASONING
-        # OpenAI is NOT permitted to reason. If VULCAN fails, we return an error.
+        # Internal LLM language generation failed
+        # Note: This doesn't mean reasoning failed - reasoning is done by VULCAN's reasoning systems
+        # The internal LLM is only for language output, same role as OpenAI
         self.logger.error(
-            "[HybridExecutor] ❌ VULCAN internal LLM failed - NO EXTERNAL REASONING FALLBACK. "
-            "OpenAI can ONLY interpret VULCAN's results, NOT reason independently."
+            "[HybridExecutor] ❌ Internal LLM language generation failed. "
+            "Note: The internal LLM is for language output, not reasoning. "
+            "Reasoning is done by VULCAN's reasoning systems (symbolic, causal, etc.)."
         )
         systems_used.append("vulcan_local_llm_failed")
         
