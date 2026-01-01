@@ -1654,6 +1654,7 @@ You receive JSON containing:
 Make this human-readable. Nothing more."""
 
         # Build the user prompt with VULCAN's structured output
+        output_dict = None
         try:
             output_dict = reasoning_output.to_dict()
             output_json = json.dumps(output_dict, indent=2, default=str)
@@ -1685,7 +1686,7 @@ Write a natural, helpful response based on VULCAN's results."""
                 
                 # Capture training pair for distillation (VULCAN LLM learns from this)
                 self._capture_formatting_for_distillation(
-                    input_data=output_dict if isinstance(output_dict, dict) else {"raw": output_json},
+                    input_data=output_dict if output_dict is not None else {"raw": output_json},
                     output_text=response,
                     original_prompt=original_query,
                 )
