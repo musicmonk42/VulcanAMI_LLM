@@ -688,14 +688,19 @@ class CognitiveLoop:
             nonlocal temperature, top_k, errors, beam_metadata, speculative_stats, safety_interventions, generated
 
             last_reasoning_meta: Dict[str, Any] = {}
-            # PERF: Only log at start, not every step
-            logger.debug(
+            # DIAGNOSTIC FIX: Log generator start at INFO level so we can see it in production logs
+            logger.info(
                 f"[DIAG] Generator starting: max_steps={max_steps}, enable_stream={self.runtime.enable_stream}"
             )
 
             for step in range(max_steps):
-                # PERF: Reduced logging frequency - only log every 10 steps at debug level
-                if step % 10 == 0:
+                # DIAGNOSTIC FIX: Log step 0 at INFO level (critical for diagnosing first token hang)
+                # Other steps are logged at DEBUG level to reduce noise
+                if step == 0:
+                    logger.info(
+                        f"[DIAG] Generator loop step={step} (FIRST TOKEN), generated_len={len(generated)}"
+                    )
+                elif step % 10 == 0:
                     logger.debug(
                         f"[DIAG] Generator loop step={step}, generated_len={len(generated)}"
                     )
@@ -730,8 +735,10 @@ class CognitiveLoop:
                     return
 
                 try:
-                    # PERF: Removed per-step logging - only log at debug level every 10 steps
-                    if step % 10 == 0:
+                    # DIAGNOSTIC FIX: Log step 0 call at INFO level for diagnosing first token hang
+                    if step == 0:
+                        logger.info(f"[DIAG] Generator: Calling _step({step}) for FIRST TOKEN...")
+                    elif step % 10 == 0:
                         logger.debug(f"[DIAG] Generator: Calling _step({step})...")
                     step_result = await self._step(
                         prompt_tokens=init_tokens + generated,
@@ -741,7 +748,9 @@ class CognitiveLoop:
                         stop_strings=stop_str_patterns,
                         step=step,
                     )
-                    # PERF: Removed per-step return logging
+                    # DIAGNOSTIC FIX: Log step 0 completion at INFO level
+                    if step == 0:
+                        logger.info(f"[DIAG] Generator: _step({step}) completed for FIRST TOKEN")
                     errors = 0
                 except Exception as e:
                     print(f"Error during cognitive step: {e}\n{traceback.format_exc()}")
@@ -993,10 +1002,12 @@ class CognitiveLoop:
         hidden_state: Any = None
         
         # DIAG: Log entry into _step for debugging hangs
-        # Compute logging flag: always log step 0 (for debugging first token issues),
-        # otherwise log at configured interval or if verbose logging is enabled
-        should_log = (step == 0) or (step % self.runtime.log_interval == 0) or self.runtime.enable_verbose_logging
-        if should_log:
+        # DIAGNOSTIC FIX: Use INFO level for step 0 so it always appears in production logs
+        is_first_token = (step == 0)
+        should_log = is_first_token or (step % self.runtime.log_interval == 0) or self.runtime.enable_verbose_logging
+        if is_first_token:
+            logger.info(f"[DIAG] _step({step}) STARTED (FIRST TOKEN), prompt_tokens_len={len(prompt_tokens)}")
+        elif should_log:
             logger.debug(f"[DIAG] _step({step}) started, prompt_tokens_len={len(prompt_tokens)}")
 
         if self.sampling.use_beam_search:
@@ -1030,13 +1041,13 @@ class CognitiveLoop:
             
             if should_refresh_context:
                 t_ctx = time.time()
-                if step == 0:
-                    logger.debug("[DIAG] Step 0: Calling bridge.before_execution...")
+                if is_first_token:
+                    logger.info("[DIAG] Step 0: Calling bridge.before_execution...")
                 retrieved_context = await self._async_safe(
                     self.bridge.before_execution, {"prompt_tokens": prompt_tokens}, {}
                 )
-                if step == 0:
-                    logger.debug(f"[DIAG] Step 0: bridge.before_execution completed in {(time.time() - t_ctx)*1000:.1f}ms")
+                if is_first_token:
+                    logger.info(f"[DIAG] Step 0: bridge.before_execution completed in {(time.time() - t_ctx)*1000:.1f}ms")
                 ctx_time = (time.time() - t_ctx) * 1000
                 sub_times["context_retrieval_ms"] = ctx_time
                 self._perf_metrics["total_context_time_ms"] += ctx_time
@@ -1067,16 +1078,16 @@ class CognitiveLoop:
                 if step == 0 or step % wm_update_interval == 0:
                     try:
                         t_wm_up = time.time()
-                        if step == 0:
-                            logger.debug("[DIAG] Step 0: Calling world_model.update...")
+                        if is_first_token:
+                            logger.info("[DIAG] Step 0: Calling world_model.update...")
                         await self._async_safe(
                             self.bridge.world_model.update,
                             {"tokens": prompt_tokens},
                             None,
                         )
                         sub_times["wm_update_ms"] = (time.time() - t_wm_up) * 1000
-                        if step == 0:
-                            logger.debug(f"[DIAG] Step 0: world_model.update completed in {sub_times['wm_update_ms']:.1f}ms")
+                        if is_first_token:
+                            logger.info(f"[DIAG] Step 0: world_model.update completed in {sub_times['wm_update_ms']:.1f}ms")
                         else:
                             logger.debug(
                                 f"[PERF] World model updated in {sub_times['wm_update_ms']:.1f}ms"
@@ -1096,11 +1107,11 @@ class CognitiveLoop:
                 sub_times["encode_ms"] = 0.1  # Cache hit
                 sub_times["encode_cache_hit"] = True
                 self._perf_metrics["encoding_cache_hits"] += 1
-                if step == 0:
-                    logger.debug("[DIAG] Step 0: Encoding cache HIT")
+                if is_first_token:
+                    logger.info("[DIAG] Step 0: Encoding cache HIT")
             else:
-                if step == 0:
-                    logger.debug("[DIAG] Step 0: Calling transformer.encode...")
+                if is_first_token:
+                    logger.info("[DIAG] Step 0: Calling transformer.encode...")
                 hidden_state = await self._async_safe(
                     self.transformer.encode, prompt_tokens, None
                 )
@@ -1109,8 +1120,8 @@ class CognitiveLoop:
                     self._encoding_cache.put(prompt_tokens, hidden_state)
                 sub_times["encode_ms"] = (time.time() - t_enc) * 1000
                 sub_times["encode_cache_hit"] = False
-                if step == 0:
-                    logger.debug(f"[DIAG] Step 0: transformer.encode completed in {sub_times['encode_ms']:.1f}ms")
+                if is_first_token:
+                    logger.info(f"[DIAG] Step 0: transformer.encode completed in {sub_times['encode_ms']:.1f}ms")
                 
             self._perf_metrics["total_encode_time_ms"] += sub_times["encode_ms"]
             # PERF: Only log slow encodes (>50ms)
@@ -1160,20 +1171,20 @@ class CognitiveLoop:
                 sub_times["get_logits_ms"] = 0.1  # Cache hit
                 sub_times["logits_cache_hit"] = True
                 self._perf_metrics["logits_cache_hits"] += 1
-                if step == 0:
-                    logger.debug("[DIAG] Step 0: Logits cache HIT")
+                if is_first_token:
+                    logger.info("[DIAG] Step 0: Logits cache HIT")
             else:
-                if step == 0:
-                    logger.debug("[DIAG] Step 0: Calling _obtain_logits...")
+                if is_first_token:
+                    logger.info("[DIAG] Step 0: Calling _obtain_logits...")
                 logits = await self._obtain_logits(hidden_state, prompt_tokens, candidates)
                 # Store in cache for future use
                 if logits:
                     self._logits_cache.put(prompt_tokens, logits)
                 sub_times["get_logits_ms"] = (time.time() - t_logits) * 1000
                 sub_times["logits_cache_hit"] = False
-                if step == 0:
+                if is_first_token:
                     logits_len = len(logits) if logits else 0
-                    logger.debug(f"[DIAG] Step 0: _obtain_logits completed in {sub_times['get_logits_ms']:.1f}ms (len={logits_len})")
+                    logger.info(f"[DIAG] Step 0: _obtain_logits completed in {sub_times['get_logits_ms']:.1f}ms (len={logits_len})")
             
             token_info["logits"] = logits if self.runtime.attach_logits else None
 
@@ -1187,8 +1198,8 @@ class CognitiveLoop:
                 prompt_tokens.extend(accepted_tokens)
             else:
                 t_sample = time.time()
-                if step == 0:
-                    logger.debug("[DIAG] Step 0: Sampling token...")
+                if is_first_token:
+                    logger.info("[DIAG] Step 0: Sampling token...")
                 chosen_index, adjusted_logits = self._sample_optimized(
                     logits=logits,
                     generated_tokens=prompt_tokens,
@@ -1200,8 +1211,8 @@ class CognitiveLoop:
                 sub_times["sample_ms"] = (time.time() - t_sample) * 1000
                 self._perf_metrics["total_sample_time_ms"] += sub_times["sample_ms"]
                 self._perf_metrics["tokens_generated"] += 1
-                if step == 0:
-                    logger.debug(f"[DIAG] Step 0: Sampling completed in {sub_times['sample_ms']:.1f}ms, token={token}")
+                if is_first_token:
+                    logger.info(f"[DIAG] Step 0: Sampling completed in {sub_times['sample_ms']:.1f}ms, token={token}")
 
             token_info["chosen_index"] = chosen_index
 
@@ -1376,10 +1387,10 @@ class CognitiveLoop:
 
         token_info["token"] = token
         
-        # DIAG: Log completion of step 0
-        if step == 0:
+        # DIAG: Log completion of step 0 at INFO level for production visibility
+        if is_first_token:
             total_step_time = (time.time() - t0) * 1000
-            logger.debug(f"[DIAG] Step 0 COMPLETED: token={token}, total_time={total_step_time:.1f}ms")
+            logger.info(f"[DIAG] Step 0 COMPLETED: token={token}, total_time={total_step_time:.1f}ms")
         
         return {"token": token, "info": token_info}
 

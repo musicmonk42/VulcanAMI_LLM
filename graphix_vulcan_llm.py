@@ -1279,6 +1279,9 @@ class GraphixVulcanLLM:
         The first token has a special timeout (_FIRST_TOKEN_TIMEOUT_SECONDS) because
         if the first token never arrives, the generation is completely broken.
         
+        DIAGNOSTIC FIX: Critical checkpoint logs are now at INFO level to ensure
+        they always appear in production logs, enabling root cause analysis of hangs.
+        
         Args:
             gen_result: The async result to consume
             timeout: Maximum time in seconds for the operation to complete.
@@ -1297,14 +1300,14 @@ class GraphixVulcanLLM:
             async def _consume():
                 result = gen_result
                 
-                # DIAG: Log what we received (debug level to reduce production noise)
-                logger.debug(f"[DIAG] _consume_async_result: type={type(result).__name__}")
+                # DIAG: Log what we received - INFO level for critical checkpoint visibility
+                logger.info(f"[DIAG] _consume_async_result: type={type(result).__name__}")
                 
                 # If it's a coroutine, await it first
                 # CRITICAL FIX: Add timeout to coroutine await to prevent hang during
                 # CognitiveLoop.generate() setup phase (tokenization, initialization, etc.)
                 if inspect.iscoroutine(result):
-                    logger.debug("[DIAG] DETECTED COROUTINE - AWAITING...")
+                    logger.info("[DIAG] DETECTED COROUTINE - AWAITING...")
                     # Use a shorter timeout for the coroutine setup phase
                     # This catches hangs during tokenization/initialization
                     coroutine_setup_timeout = min(
@@ -1322,14 +1325,14 @@ class GraphixVulcanLLM:
                             f"CognitiveLoop.generate() setup timed out after {coroutine_setup_timeout}s - "
                             "likely blocked during tokenization or initialization"
                         ) from None
-                    logger.debug(
+                    logger.info(
                         f"[DIAG] After awaiting coroutine: type={type(result).__name__}, "
                         f"has_tokens={hasattr(result, 'tokens')}"
                     )
                 
                 # Now check if we have an async generator (streaming mode)
                 if hasattr(result, "__anext__"):
-                    logger.debug("[DIAG] DETECTED ASYNC GENERATOR - CONSUMING WITH PER-TOKEN TIMEOUT")
+                    logger.info("[DIAG] DETECTED ASYNC GENERATOR - CONSUMING WITH PER-TOKEN TIMEOUT")
                     items = []
                     count = 0
                     
@@ -1348,7 +1351,7 @@ class GraphixVulcanLLM:
                                 token_timeout = first_token_timeout if count == 0 else subsequent_token_timeout
                                 
                                 if count == 0:
-                                    logger.debug(f"[DIAG] Awaiting FIRST token (timeout={token_timeout}s)...")
+                                    logger.info(f"[DIAG] Awaiting FIRST token (timeout={token_timeout}s)...")
                                 
                                 item = await asyncio.wait_for(
                                     async_iter.__anext__(),
@@ -1359,7 +1362,7 @@ class GraphixVulcanLLM:
                                 items.append(item)
                                 
                                 if count == 1:
-                                    logger.debug(f"[DIAG] ✓ First token received! type={type(item).__name__}")
+                                    logger.info(f"[DIAG] ✓ First token received! type={type(item).__name__}")
                                 elif count % 50 == 0:
                                     logger.debug(f"[DIAG] Progress: {count} tokens consumed")
                                 
@@ -1370,7 +1373,7 @@ class GraphixVulcanLLM:
                                     
                             except StopAsyncIteration:
                                 # Generator finished normally
-                                logger.debug(f"[DIAG] Generator finished after {count} items")
+                                logger.info(f"[DIAG] Generator finished after {count} items")
                                 break
                             except asyncio.TimeoutError:
                                 if count == 0:
@@ -1403,7 +1406,7 @@ class GraphixVulcanLLM:
                         else:
                             raise
                     
-                    logger.debug(f"[DIAG] Consumed {count} items from async generator")
+                    logger.info(f"[DIAG] Consumed {count} items from async generator")
                     
                     if not items:
                         raise ValueError("Generator yielded no items!")
@@ -1412,7 +1415,7 @@ class GraphixVulcanLLM:
                 
                 # If result already has tokens, it's the final result
                 if hasattr(result, "tokens"):
-                    logger.debug("[DIAG] DETECTED DIRECT RESULT OBJECT")
+                    logger.info("[DIAG] DETECTED DIRECT RESULT OBJECT")
                     return result
                 
                 raise TypeError(
@@ -1606,6 +1609,7 @@ class GraphixVulcanLLM:
         logger.info(f"Generating up to {max_steps} tokens...")
 
         # Call generate method - NO try-except to let errors propagate
+        logger.info("[DIAG] Calling CognitiveLoop.generate()...")
         gen_result = self.cog_loop.generate(
             prompt=prompt,
             max_tokens=max_steps,
@@ -1613,14 +1617,15 @@ class GraphixVulcanLLM:
             stop_strings=tuple(stop_strings or []),
             stop_tokens=tuple(stop_tokens or []),
         )
+        logger.info("[DIAG] CognitiveLoop.generate() returned")
 
         # Check what we got
         result_type_name = type(gen_result).__name__
         has_anext = hasattr(gen_result, "__anext__")
         has_tokens = hasattr(gen_result, "tokens")
 
-        logger.debug(
-            f"CognitiveLoop returned: type={result_type_name}, has___anext__={has_anext}, has_tokens={has_tokens}"
+        logger.info(
+            f"[DIAG] CognitiveLoop returned: type={result_type_name}, has___anext__={has_anext}, has_tokens={has_tokens}"
         )
 
         # FIX #1 CRITICAL: If result already has tokens, use it directly without async handling
@@ -1629,7 +1634,7 @@ class GraphixVulcanLLM:
         is_synchronous_result = has_tokens and not has_anext and not inspect.iscoroutine(gen_result)
         
         if is_synchronous_result:
-            logger.info(f"[DEBUG] Using synchronous result directly (type={result_type_name})")
+            logger.info(f"[DIAG] Using synchronous result directly (type={result_type_name})")
             loop_result = gen_result
         else:
             # Need async handling - check if we can safely create an event loop
@@ -1638,11 +1643,12 @@ class GraphixVulcanLLM:
             if has_running_loop:
                 # CRITICAL FIX: Event loop already running - run async code in a new thread
                 # This commonly happens when called from HybridLLMExecutor.run_in_executor()
-                logger.info("[DEBUG] Event loop running - using threaded async execution")
+                logger.info("[DIAG] Event loop running - using threaded async execution")
                 loop_result = self._run_async_in_thread(gen_result, timeout=timeout)
             else:
                 # Create a new event loop for this synchronous context
                 # Note: We don't call set_event_loop() to avoid affecting the thread's default loop
+                logger.info("[DIAG] Creating new event loop for async consumption...")
                 loop = asyncio.new_event_loop()
 
                 try:
@@ -1650,7 +1656,9 @@ class GraphixVulcanLLM:
                     async def run_with_timeout():
                         return await self._consume_async_result(gen_result, timeout)
                     
+                    logger.info("[DIAG] Starting run_until_complete...")
                     loop_result = loop.run_until_complete(run_with_timeout())
+                    logger.info("[DIAG] run_until_complete finished")
                 finally:
                     # Clean up the event loop we created
                     loop.close()
@@ -1658,8 +1666,8 @@ class GraphixVulcanLLM:
         # Final check
         final_type = type(loop_result).__name__
         final_has_tokens = hasattr(loop_result, "tokens")
-        logger.debug(
-            f"Final result: type={final_type}, has_tokens={final_has_tokens}"
+        logger.info(
+            f"[DIAG] Final result: type={final_type}, has_tokens={final_has_tokens}"
         )
 
         if not final_has_tokens:
