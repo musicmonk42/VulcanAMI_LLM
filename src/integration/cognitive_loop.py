@@ -1364,11 +1364,16 @@ class CognitiveLoop:
             except Exception as e:
                 logger.warning(f"Failed to call vocab_size method: {e}")
                 vocab_size = None
-        # Ensure vocab_size is an integer
+        # Ensure vocab_size is an integer - handle float values that represent whole numbers
         if vocab_size is not None and not isinstance(vocab_size, int):
             try:
-                vocab_size = int(vocab_size)
-            except (TypeError, ValueError):
+                if isinstance(vocab_size, float) and vocab_size.is_integer():
+                    # Float that represents a whole number (e.g., 50257.0)
+                    vocab_size = int(vocab_size)
+                else:
+                    vocab_size = int(vocab_size)
+            except (TypeError, ValueError, AttributeError):
+                logger.warning(f"Could not convert vocab_size to int: {type(vocab_size).__name__}")
                 vocab_size = None
         if vocab_size is None and self.vocab and hasattr(self.vocab, "size"):
             vocab_size = await self._async_safe(self.vocab.size, (), 200)

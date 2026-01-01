@@ -557,10 +557,12 @@ VULCAN_LLM_GENERATION_TIMEOUT=60.0
 
 **For Helm deployments:**
 ```yaml
-# In values.yaml
+# In values.yaml under the llm section
 llm:
+  # ... other llm settings ...
   graphixVulcan:
     generationTimeout: 60.0
+    verboseLogging: false
 ```
 
 ---

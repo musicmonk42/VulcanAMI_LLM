@@ -1246,6 +1246,10 @@ class GraphixVulcanLLM:
             )
             return False  # No running loop - safe to proceed
 
+    # Constants for async handling
+    _MAX_GENERATOR_ITEMS = 10000  # Safety limit for async generator consumption
+    _THREAD_OVERHEAD_BUFFER = 5.0  # Extra seconds for thread overhead
+
     async def _consume_async_result(self, gen_result, timeout: Optional[float] = 60.0) -> Any:
         """Consume an async result (coroutine or async generator) with timeout protection.
         
@@ -1256,13 +1260,15 @@ class GraphixVulcanLLM:
         
         Args:
             gen_result: The async result to consume
-            timeout: Maximum time in seconds (None for no timeout)
+            timeout: Maximum time in seconds for the operation to complete.
+                    If None, no timeout is applied (operation can run indefinitely).
+                    Default is 60.0 seconds.
             
         Returns:
             The final result (typically a CognitiveLoopResult)
             
         Raises:
-            asyncio.TimeoutError: If operation exceeds timeout
+            TimeoutError: If operation exceeds the specified timeout
             ValueError: If generator yields no items
         """
         try:
@@ -1288,8 +1294,8 @@ class GraphixVulcanLLM:
                         count += 1
                         items.append(item)
                         # Safety: don't accumulate too many items
-                        if count > 10000:
-                            logger.warning("Excessive items in async generator - breaking")
+                        if count > self._MAX_GENERATOR_ITEMS:
+                            logger.warning(f"Exceeded max generator items ({self._MAX_GENERATOR_ITEMS}) - breaking")
                             break
                     
                     logger.debug(f"Consumed {count} items from async generator")
@@ -1317,7 +1323,7 @@ class GraphixVulcanLLM:
                 
         except asyncio.TimeoutError:
             logger.error(f"[TIMEOUT] Async generation exceeded {timeout}s limit")
-            raise TimeoutError(f"Generation timed out after {timeout} seconds")
+            raise TimeoutError(f"Generation timed out after {timeout} seconds") from None
 
     def _run_async_in_thread(self, gen_result, timeout: Optional[float] = 60.0) -> Any:
         """Run async generation in a separate thread with its own event loop.
@@ -1330,7 +1336,9 @@ class GraphixVulcanLLM:
         
         Args:
             gen_result: The async result to consume
-            timeout: Maximum time in seconds
+            timeout: Maximum time in seconds for generation to complete.
+                    If None, no timeout is applied (operation can run indefinitely).
+                    Default is 60.0 seconds.
             
         Returns:
             The final result from async generation
@@ -1358,12 +1366,12 @@ class GraphixVulcanLLM:
             future = executor.submit(run_in_new_loop)
             try:
                 # Wait with an extra buffer for thread overhead
-                thread_timeout = (timeout + 5.0) if timeout else None
+                thread_timeout = (timeout + self._THREAD_OVERHEAD_BUFFER) if timeout else None
                 result = future.result(timeout=thread_timeout)
                 return result
             except FuturesTimeoutError:
                 logger.error(f"[TIMEOUT] Threaded async generation exceeded {timeout}s limit")
-                raise TimeoutError(f"Generation timed out after {timeout} seconds")
+                raise TimeoutError(f"Generation timed out after {timeout} seconds") from None
             except Exception as e:
                 logger.error(f"[ERROR] Threaded async generation failed: {type(e).__name__}: {e}")
                 raise RuntimeError(f"Generation failed: {e}") from e
