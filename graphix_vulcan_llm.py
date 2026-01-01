@@ -1295,21 +1295,21 @@ class GraphixVulcanLLM:
             async def _consume():
                 result = gen_result
                 
-                # DIAG: Log what we received
-                logger.info(f"[DIAG] _consume_async_result: type={type(result).__name__}")
+                # DIAG: Log what we received (debug level to reduce production noise)
+                logger.debug(f"[DIAG] _consume_async_result: type={type(result).__name__}")
                 
                 # If it's a coroutine, await it first
                 if inspect.iscoroutine(result):
-                    logger.info("[DIAG] DETECTED COROUTINE - AWAITING...")
+                    logger.debug("[DIAG] DETECTED COROUTINE - AWAITING...")
                     result = await result
-                    logger.info(
+                    logger.debug(
                         f"[DIAG] After awaiting coroutine: type={type(result).__name__}, "
                         f"has_tokens={hasattr(result, 'tokens')}"
                     )
                 
                 # Now check if we have an async generator (streaming mode)
                 if hasattr(result, "__anext__"):
-                    logger.info("[DIAG] DETECTED ASYNC GENERATOR - CONSUMING WITH PER-TOKEN TIMEOUT")
+                    logger.debug("[DIAG] DETECTED ASYNC GENERATOR - CONSUMING WITH PER-TOKEN TIMEOUT")
                     items = []
                     count = 0
                     
@@ -1328,7 +1328,7 @@ class GraphixVulcanLLM:
                                 token_timeout = first_token_timeout if count == 0 else subsequent_token_timeout
                                 
                                 if count == 0:
-                                    logger.info(f"[DIAG] Awaiting FIRST token (timeout={token_timeout}s)...")
+                                    logger.debug(f"[DIAG] Awaiting FIRST token (timeout={token_timeout}s)...")
                                 
                                 item = await asyncio.wait_for(
                                     async_iter.__anext__(),
@@ -1339,7 +1339,7 @@ class GraphixVulcanLLM:
                                 items.append(item)
                                 
                                 if count == 1:
-                                    logger.info(f"[DIAG] ✓ First token received! type={type(item).__name__}")
+                                    logger.debug(f"[DIAG] ✓ First token received! type={type(item).__name__}")
                                 elif count % 50 == 0:
                                     logger.debug(f"[DIAG] Progress: {count} tokens consumed")
                                 
@@ -1350,16 +1350,14 @@ class GraphixVulcanLLM:
                                     
                             except StopAsyncIteration:
                                 # Generator finished normally
-                                logger.info(f"[DIAG] Generator finished after {count} items")
+                                logger.debug(f"[DIAG] Generator finished after {count} items")
                                 break
                             except asyncio.TimeoutError:
                                 if count == 0:
                                     # CRITICAL: First token never arrived - this is the bug!
                                     logger.error(
                                         f"[DIAG] ❌ FIRST TOKEN NEVER ARRIVED after {first_token_timeout}s! "
-                                        "The async generator is blocked on its first internal await. "
-                                        "Check: transformer.encode(), bridge.before_execution(), "
-                                        "or world_model.update() for blocking operations."
+                                        "The async generator is blocked on its first internal await."
                                     )
                                     # Use custom exception to avoid being caught by outer asyncio.TimeoutError handler
                                     raise FirstTokenTimeoutError(
@@ -1385,7 +1383,7 @@ class GraphixVulcanLLM:
                         else:
                             raise
                     
-                    logger.info(f"[DIAG] Consumed {count} items from async generator")
+                    logger.debug(f"[DIAG] Consumed {count} items from async generator")
                     
                     if not items:
                         raise ValueError("Generator yielded no items!")
@@ -1394,7 +1392,7 @@ class GraphixVulcanLLM:
                 
                 # If result already has tokens, it's the final result
                 if hasattr(result, "tokens"):
-                    logger.info("[DIAG] DETECTED DIRECT RESULT OBJECT")
+                    logger.debug("[DIAG] DETECTED DIRECT RESULT OBJECT")
                     return result
                 
                 raise TypeError(

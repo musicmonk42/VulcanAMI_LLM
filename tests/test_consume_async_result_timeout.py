@@ -3,6 +3,12 @@ Tests for _consume_async_result timeout handling in GraphixVulcanLLM.
 
 These tests verify that the per-token timeout protection works correctly
 to prevent the 60-second hang issue when the first token never arrives.
+
+NOTE: These tests use a mock implementation of _consume_async_result rather than
+importing from graphix_vulcan_llm.py because:
+1. The actual implementation has complex dependencies (CognitiveLoop, bridge, transformer)
+2. We want to test the timeout logic in isolation without those dependencies
+3. The mock implementation mirrors the critical timeout logic that we're testing
 """
 
 import asyncio
@@ -15,6 +21,8 @@ import pytest
 
 
 # Custom exception for first-token timeout (mirrors the one in graphix_vulcan_llm.py)
+# This is intentionally duplicated here because importing from graphix_vulcan_llm
+# would bring in many heavy dependencies that we don't need for these unit tests.
 class FirstTokenTimeoutError(Exception):
     """Raised when the first token never arrives within the timeout period."""
     pass
@@ -68,7 +76,16 @@ async def mock_slow_subsequent_token_generator() -> AsyncGenerator[Dict[str, Any
 
 
 class MockGraphixVulcanLLM:
-    """Minimal mock of GraphixVulcanLLM with just the _consume_async_result method."""
+    """Minimal mock of GraphixVulcanLLM with just the _consume_async_result method.
+    
+    This mock implements the core timeout logic from the real GraphixVulcanLLM class,
+    allowing us to test the per-token timeout behavior in isolation without the
+    heavy dependencies required by the full implementation (CognitiveLoop, transformer,
+    bridge, etc.).
+    
+    The implementation here should be kept in sync with the actual _consume_async_result
+    method in graphix_vulcan_llm.py to ensure the tests accurately reflect the real behavior.
+    """
     
     _MAX_GENERATOR_ITEMS = 10000
     _FIRST_TOKEN_TIMEOUT_SECONDS = 2.0  # Short timeout for testing
