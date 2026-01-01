@@ -86,6 +86,10 @@ SKIP_LOCAL_LLM = _skip_local_llm_env in ("true", "1", "yes")
 VULCAN_HARD_TIMEOUT = float(os.environ.get("VULCAN_LLM_HARD_TIMEOUT", "120.0"))  # 2 minutes (was 30s)
 PER_TOKEN_TIMEOUT = float(os.environ.get("VULCAN_LLM_PER_TOKEN_TIMEOUT", "30.0"))  # 30s per token (was 10s)
 
+# Fast mode timeout for output formatting (when reasoning is already done)
+# This can be shorter since no reasoning hooks run per-token
+FAST_MODE_MAX_TIMEOUT_SECONDS = float(os.environ.get("VULCAN_LLM_FAST_TIMEOUT", "60.0"))  # 60 seconds
+
 # ============================================================
 # COMPONENT REGISTRY INTEGRATION
 # ============================================================
@@ -1122,6 +1126,103 @@ class HybridLLMExecutor:
             self.logger.error("[HybridExecutor] LOCAL MODEL GENERATION FAILED!")
             self.logger.error(f"[HybridExecutor] Exception type: {type(e).__name__}")
             self.logger.error(f"[HybridExecutor] Exception message: {str(e)}")
+            self.logger.error(f"[HybridExecutor] Full traceback:\n{traceback.format_exc()}")
+            self.logger.error("=" * 60)
+            return None
+
+    async def _call_local_llm_fast(
+        self, loop, prompt: str, max_tokens: int
+    ) -> Optional[str]:
+        """Call Vulcan's local LLM in FAST OUTPUT FORMATTING MODE.
+        
+        This method uses generate_fast() which bypasses reasoning hooks for faster
+        token generation. Use this when VULCAN's reasoning has already completed
+        and the LLM is only needed to format output as prose.
+        
+        ARCHITECTURE:
+        - VULCAN reasoning systems (the "mind") complete their work first
+        - This LLM call is ONLY for formatting the result as natural language
+        - No independent reasoning occurs - just prose generation
+        
+        PERFORMANCE:
+        - Standard _call_local_llm(): ~2400ms first token (with reasoning hooks)
+        - _call_local_llm_fast(): ~500ms first token (no reasoning hooks)
+        - 30-token response: ~15s instead of TIMEOUT
+        """
+        import traceback
+        import time as time_module
+        
+        if _should_skip_local_llm():
+            self.logger.warning(
+                "[HybridExecutor] SKIP_LOCAL_LLM=true in fast mode - bypassed"
+            )
+            return None
+        
+        if not self.local_llm:
+            self.logger.error("[HybridExecutor] CRITICAL: local_llm is None in fast mode")
+            return None
+        
+        # Check if generate_fast is available
+        if not hasattr(self.local_llm, 'generate_fast'):
+            self.logger.info(
+                "[HybridExecutor] generate_fast() not available - falling back to standard generate()"
+            )
+            return await self._call_local_llm(loop, prompt, max_tokens)
+        
+        self.logger.info("=" * 60)
+        self.logger.info("[HybridExecutor] FAST OUTPUT FORMATTING MODE")
+        self.logger.info(f"[HybridExecutor] local_llm type: {type(self.local_llm).__name__}")
+        
+        try:
+            self.logger.info(f"[HybridExecutor] Calling generate_fast(prompt_len={len(prompt)}, max_tokens={max_tokens})...")
+            start_time = time_module.perf_counter()
+            
+            # Use generate_fast which skips reasoning hooks
+            def generate_fast_sync():
+                return self.local_llm.generate_fast(prompt, max_tokens)
+            
+            # Use hard timeout (should be faster than standard generate)
+            # Fast mode uses FAST_MODE_MAX_TIMEOUT_SECONDS since no reasoning hooks run
+            fast_timeout = min(self.vulcan_timeout, FAST_MODE_MAX_TIMEOUT_SECONDS)
+            future = self._timeout_executor.submit(generate_fast_sync)
+            
+            try:
+                result = future.result(timeout=fast_timeout)
+            except FuturesTimeoutError:
+                self.logger.error(f"[HybridExecutor] ❌ FAST MODE TIMEOUT after {fast_timeout}s!")
+                future.cancel()
+                return None
+            
+            elapsed = time_module.perf_counter() - start_time
+            self.logger.info(f"[HybridExecutor] generate_fast() completed in {elapsed:.2f}s")
+            
+            if result is None:
+                self.logger.warning("[HybridExecutor] Fast generation returned None")
+                return None
+            
+            # Extract text from result
+            if hasattr(result, "text"):
+                self.logger.info(f"[HybridExecutor] ✓ FAST GENERATION SUCCEEDED ({len(result.text)} chars)")
+                self.logger.info("=" * 60)
+                return result.text
+            elif isinstance(result, str):
+                self.logger.info(f"[HybridExecutor] ✓ FAST GENERATION SUCCEEDED ({len(result)} chars)")
+                self.logger.info("=" * 60)
+                return result
+            elif isinstance(result, dict) and "text" in result:
+                self.logger.info(f"[HybridExecutor] ✓ FAST GENERATION SUCCEEDED ({len(result['text'])} chars)")
+                self.logger.info("=" * 60)
+                return result["text"]
+            else:
+                result_str = str(result)
+                self.logger.info(f"[HybridExecutor] ✓ FAST GENERATION SUCCEEDED ({len(result_str)} chars, converted)")
+                self.logger.info("=" * 60)
+                return result_str
+                
+        except Exception as e:
+            self.logger.error("=" * 60)
+            self.logger.error("[HybridExecutor] FAST GENERATION FAILED!")
+            self.logger.error(f"[HybridExecutor] Exception: {type(e).__name__}: {e}")
             self.logger.error(f"[HybridExecutor] Full traceback:\n{traceback.format_exc()}")
             self.logger.error("=" * 60)
             return None

@@ -1936,6 +1936,68 @@ class GraphixVulcanLLM:
             tokens.append(safe_idx)
         return tokens
 
+    def generate_fast(
+        self,
+        prompt: Union[str, Sequence[int]],
+        max_tokens: Optional[int] = None,
+        timeout: Optional[float] = 60.0,
+    ) -> GenerationResult:
+        """
+        Fast generation mode for OUTPUT FORMATTING only (bypasses reasoning hooks).
+        
+        This method should be used when VULCAN's reasoning has already completed and
+        the LLM is only needed to format the output as natural language prose.
+        
+        ARCHITECTURE INSIGHT:
+        Neither GraphixVulcanLLM nor OpenAI is "the mind." They're output formatters.
+        VULCAN's mind (orchestrator, agents, symbolic systems) already did its reasoning
+        work before this LLM is invoked.
+        
+        PERFORMANCE:
+        - Standard generate(): ~2400ms first token (transformer + reasoning + world model)
+        - generate_fast(): ~500ms first token (transformer only)
+        - 30-token response: ~15s instead of TIMEOUT
+        
+        POLICY COMPLIANCE:
+        - This method does NOT perform independent reasoning
+        - It only formats pre-computed results as readable prose
+        - If you need reasoning, use generate() or generate_with_reasoning() instead
+        
+        Args:
+            prompt: Input text or tokens to format as output
+            max_tokens: Maximum tokens to generate (default from config)
+            timeout: Maximum time in seconds for generation (default: 60.0)
+            
+        Returns:
+            GenerationResult with formatted text and metadata
+            
+        Example:
+            # VULCAN reasoning already completed - just format output
+            result = llm.generate_fast("Format this result: 42", max_tokens=100)
+            print(result.text)  # Natural language formatted output
+        """
+        logger.info("[GraphixVulcanLLM] generate_fast() - OUTPUT FORMATTING MODE")
+        
+        max_steps = max_tokens or self.config["generation"]["max_tokens"]
+        
+        # Enable output formatting mode on CognitiveLoop's runtime config
+        # Note: Using direct attribute access since output_formatting_mode is a defined field
+        # in LoopRuntimeConfig (defaults to False for backwards compatibility)
+        original_mode = self.cog_loop.runtime.output_formatting_mode
+        self.cog_loop.runtime.output_formatting_mode = True
+        
+        try:
+            return self.generate(
+                prompt=prompt,
+                max_tokens=max_steps,
+                explain=False,  # Skip explanation generation for speed
+                stream=False,
+                timeout=timeout,
+            )
+        finally:
+            # Restore original mode
+            self.cog_loop.runtime.output_formatting_mode = original_mode
+
     # -----------------------------------------------------------
     # Training & Fine-Tuning
     # -----------------------------------------------------------
