@@ -37,6 +37,18 @@ from typing import (
     Union,
 )
 
+
+# Custom exception for first-token timeout (to distinguish from general asyncio timeouts)
+class FirstTokenTimeoutError(Exception):
+    """Raised when the first token never arrives within the timeout period.
+    
+    This is a critical error that indicates the async generator is completely blocked
+    on its first internal await. This is distinct from general timeouts because it
+    indicates a fundamental problem with the token generation pipeline.
+    """
+    pass
+
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -1250,6 +1262,9 @@ class GraphixVulcanLLM:
     _MAX_GENERATOR_ITEMS = 10000  # Safety limit for async generator consumption
     _THREAD_OVERHEAD_BUFFER = 5.0  # Extra seconds for thread overhead
 
+    # Timeout for waiting for the first token from an async generator
+    _FIRST_TOKEN_TIMEOUT_SECONDS = 30.0
+
     async def _consume_async_result(self, gen_result, timeout: Optional[float] = 60.0) -> Any:
         """Consume an async result (coroutine or async generator) with timeout protection.
         
@@ -1257,6 +1272,10 @@ class GraphixVulcanLLM:
         - Coroutines that need to be awaited
         - Async generators that need to be consumed
         - Nested async generators (coroutine returning an async generator)
+        
+        CRITICAL FIX: Added per-token timeout to detect hangs in the async generator.
+        The first token has a special timeout (_FIRST_TOKEN_TIMEOUT_SECONDS) because
+        if the first token never arrives, the generation is completely broken.
         
         Args:
             gen_result: The async result to consume
@@ -1276,29 +1295,97 @@ class GraphixVulcanLLM:
             async def _consume():
                 result = gen_result
                 
+                # DIAG: Log what we received
+                logger.info(f"[DIAG] _consume_async_result: type={type(result).__name__}")
+                
                 # If it's a coroutine, await it first
                 if inspect.iscoroutine(result):
-                    logger.debug("DETECTED COROUTINE - AWAITING")
+                    logger.info("[DIAG] DETECTED COROUTINE - AWAITING...")
                     result = await result
-                    logger.debug(
-                        f"After awaiting coroutine: type={type(result).__name__}, "
+                    logger.info(
+                        f"[DIAG] After awaiting coroutine: type={type(result).__name__}, "
                         f"has_tokens={hasattr(result, 'tokens')}"
                     )
                 
                 # Now check if we have an async generator (streaming mode)
                 if hasattr(result, "__anext__"):
-                    logger.debug("DETECTED ASYNC GENERATOR - CONSUMING")
+                    logger.info("[DIAG] DETECTED ASYNC GENERATOR - CONSUMING WITH PER-TOKEN TIMEOUT")
                     items = []
                     count = 0
-                    async for item in result:
-                        count += 1
-                        items.append(item)
-                        # Safety: don't accumulate too many items
-                        if count > self._MAX_GENERATOR_ITEMS:
-                            logger.warning(f"Exceeded max generator items ({self._MAX_GENERATOR_ITEMS}) - breaking")
-                            break
                     
-                    logger.debug(f"Consumed {count} items from async generator")
+                    # CRITICAL FIX: Use per-token timeout, especially for the first token
+                    # The first token timeout is critical because if it never arrives,
+                    # the generator is completely blocked
+                    first_token_timeout = self._FIRST_TOKEN_TIMEOUT_SECONDS
+                    subsequent_token_timeout = 10.0  # Subsequent tokens should be faster
+                    
+                    try:
+                        # Consume the async generator with per-item timeout
+                        async_iter = result.__aiter__()
+                        while True:
+                            try:
+                                # Use shorter timeout for first token to fail fast
+                                token_timeout = first_token_timeout if count == 0 else subsequent_token_timeout
+                                
+                                if count == 0:
+                                    logger.info(f"[DIAG] Awaiting FIRST token (timeout={token_timeout}s)...")
+                                
+                                item = await asyncio.wait_for(
+                                    async_iter.__anext__(),
+                                    timeout=token_timeout
+                                )
+                                
+                                count += 1
+                                items.append(item)
+                                
+                                if count == 1:
+                                    logger.info(f"[DIAG] ✓ First token received! type={type(item).__name__}")
+                                elif count % 50 == 0:
+                                    logger.debug(f"[DIAG] Progress: {count} tokens consumed")
+                                
+                                # Safety: don't accumulate too many items
+                                if count > self._MAX_GENERATOR_ITEMS:
+                                    logger.warning(f"Exceeded max generator items ({self._MAX_GENERATOR_ITEMS}) - breaking")
+                                    break
+                                    
+                            except StopAsyncIteration:
+                                # Generator finished normally
+                                logger.info(f"[DIAG] Generator finished after {count} items")
+                                break
+                            except asyncio.TimeoutError:
+                                if count == 0:
+                                    # CRITICAL: First token never arrived - this is the bug!
+                                    logger.error(
+                                        f"[DIAG] ❌ FIRST TOKEN NEVER ARRIVED after {first_token_timeout}s! "
+                                        "The async generator is blocked on its first internal await. "
+                                        "Check: transformer.encode(), bridge.before_execution(), "
+                                        "or world_model.update() for blocking operations."
+                                    )
+                                    # Use custom exception to avoid being caught by outer asyncio.TimeoutError handler
+                                    raise FirstTokenTimeoutError(
+                                        f"First token never arrived after {first_token_timeout}s - "
+                                        "async generator blocked on first await"
+                                    ) from None
+                                else:
+                                    # Subsequent token timeout - less critical but still a problem
+                                    logger.warning(
+                                        f"[DIAG] Token {count+1} timed out after {subsequent_token_timeout}s - "
+                                        f"returning {count} tokens collected so far"
+                                    )
+                                    break
+                    except FirstTokenTimeoutError:
+                        # Re-raise immediately - don't catch this as a generic exception
+                        raise
+                    except Exception as e:
+                        if count > 0:
+                            logger.warning(
+                                f"[DIAG] Generator error after {count} tokens: {e}, "
+                                "returning collected tokens"
+                            )
+                        else:
+                            raise
+                    
+                    logger.info(f"[DIAG] Consumed {count} items from async generator")
                     
                     if not items:
                         raise ValueError("Generator yielded no items!")
@@ -1307,7 +1394,7 @@ class GraphixVulcanLLM:
                 
                 # If result already has tokens, it's the final result
                 if hasattr(result, "tokens"):
-                    logger.debug("DETECTED DIRECT RESULT OBJECT")
+                    logger.info("[DIAG] DETECTED DIRECT RESULT OBJECT")
                     return result
                 
                 raise TypeError(
@@ -1317,13 +1404,21 @@ class GraphixVulcanLLM:
                 )
             
             if timeout:
-                return await asyncio.wait_for(_consume(), timeout=timeout)
+                try:
+                    return await asyncio.wait_for(_consume(), timeout=timeout)
+                except FirstTokenTimeoutError:
+                    # Re-raise our custom first-token timeout without wrapping
+                    raise
+                except asyncio.TimeoutError:
+                    # Generic timeout - convert to TimeoutError
+                    logger.error(f"[TIMEOUT] Async generation exceeded {timeout}s limit")
+                    raise TimeoutError(f"Generation timed out after {timeout} seconds") from None
             else:
                 return await _consume()
                 
-        except asyncio.TimeoutError:
-            logger.error(f"[TIMEOUT] Async generation exceeded {timeout}s limit")
-            raise TimeoutError(f"Generation timed out after {timeout} seconds") from None
+        except FirstTokenTimeoutError as e:
+            # Convert custom exception to standard TimeoutError for API compatibility
+            raise TimeoutError(str(e)) from e
 
     def _run_async_in_thread(self, gen_result, timeout: Optional[float] = 60.0) -> Any:
         """Run async generation in a separate thread with its own event loop.

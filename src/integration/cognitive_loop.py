@@ -976,7 +976,10 @@ class CognitiveLoop:
         hidden_state: Any = None
         
         # DIAG: Log entry into _step for debugging hangs
-        if step % self.runtime.log_interval == 0 or self.runtime.enable_verbose_logging:
+        # CRITICAL: Always log step 0 to help debug "first token never arrives" issues
+        is_first_step = (step == 0)
+        should_log = is_first_step or (step % self.runtime.log_interval == 0) or self.runtime.enable_verbose_logging
+        if should_log:
             logger.info(f"[DIAG] _step({step}) started, prompt_tokens_len={len(prompt_tokens)}")
 
         if self.sampling.use_beam_search:
@@ -1010,9 +1013,13 @@ class CognitiveLoop:
             
             if should_refresh_context:
                 t_ctx = time.time()
+                if is_first_step:
+                    logger.info("[DIAG] Step 0: Calling bridge.before_execution...")
                 retrieved_context = await self._async_safe(
                     self.bridge.before_execution, {"prompt_tokens": prompt_tokens}, {}
                 )
+                if is_first_step:
+                    logger.info(f"[DIAG] Step 0: bridge.before_execution completed in {(time.time() - t_ctx)*1000:.1f}ms")
                 ctx_time = (time.time() - t_ctx) * 1000
                 sub_times["context_retrieval_ms"] = ctx_time
                 self._perf_metrics["total_context_time_ms"] += ctx_time
@@ -1043,16 +1050,20 @@ class CognitiveLoop:
                 if step == 0 or step % wm_update_interval == 0:
                     try:
                         t_wm_up = time.time()
+                        if is_first_step:
+                            logger.info("[DIAG] Step 0: Calling world_model.update...")
                         await self._async_safe(
                             self.bridge.world_model.update,
                             {"tokens": prompt_tokens},
                             None,
                         )
                         sub_times["wm_update_ms"] = (time.time() - t_wm_up) * 1000
-                        # PERF: Only log at debug level
-                        logger.debug(
-                            f"[PERF] World model updated in {sub_times['wm_update_ms']:.1f}ms"
-                        )
+                        if is_first_step:
+                            logger.info(f"[DIAG] Step 0: world_model.update completed in {sub_times['wm_update_ms']:.1f}ms")
+                        else:
+                            logger.debug(
+                                f"[PERF] World model updated in {sub_times['wm_update_ms']:.1f}ms"
+                            )
                     except Exception as e:
                         # World model update is optional; log errors but continue
                         logger.debug(f"World model update failed: {e}")
@@ -1068,7 +1079,11 @@ class CognitiveLoop:
                 sub_times["encode_ms"] = 0.1  # Cache hit
                 sub_times["encode_cache_hit"] = True
                 self._perf_metrics["encoding_cache_hits"] += 1
+                if is_first_step:
+                    logger.info("[DIAG] Step 0: Encoding cache HIT")
             else:
+                if is_first_step:
+                    logger.info("[DIAG] Step 0: Calling transformer.encode...")
                 hidden_state = await self._async_safe(
                     self.transformer.encode, prompt_tokens, None
                 )
@@ -1077,6 +1092,8 @@ class CognitiveLoop:
                     self._encoding_cache.put(prompt_tokens, hidden_state)
                 sub_times["encode_ms"] = (time.time() - t_enc) * 1000
                 sub_times["encode_cache_hit"] = False
+                if is_first_step:
+                    logger.info(f"[DIAG] Step 0: transformer.encode completed in {sub_times['encode_ms']:.1f}ms")
                 
             self._perf_metrics["total_encode_time_ms"] += sub_times["encode_ms"]
             # PERF: Only log slow encodes (>50ms)
@@ -1126,13 +1143,20 @@ class CognitiveLoop:
                 sub_times["get_logits_ms"] = 0.1  # Cache hit
                 sub_times["logits_cache_hit"] = True
                 self._perf_metrics["logits_cache_hits"] += 1
+                if is_first_step:
+                    logger.info("[DIAG] Step 0: Logits cache HIT")
             else:
+                if is_first_step:
+                    logger.info("[DIAG] Step 0: Calling _obtain_logits...")
                 logits = await self._obtain_logits(hidden_state, prompt_tokens, candidates)
                 # Store in cache for future use
                 if logits:
                     self._logits_cache.put(prompt_tokens, logits)
                 sub_times["get_logits_ms"] = (time.time() - t_logits) * 1000
                 sub_times["logits_cache_hit"] = False
+                if is_first_step:
+                    logits_len = len(logits) if logits else 0
+                    logger.info(f"[DIAG] Step 0: _obtain_logits completed in {sub_times['get_logits_ms']:.1f}ms (len={logits_len})")
             
             token_info["logits"] = logits if self.runtime.attach_logits else None
 
@@ -1146,6 +1170,8 @@ class CognitiveLoop:
                 prompt_tokens.extend(accepted_tokens)
             else:
                 t_sample = time.time()
+                if is_first_step:
+                    logger.info("[DIAG] Step 0: Sampling token...")
                 chosen_index, adjusted_logits = self._sample_optimized(
                     logits=logits,
                     generated_tokens=prompt_tokens,
@@ -1157,6 +1183,8 @@ class CognitiveLoop:
                 sub_times["sample_ms"] = (time.time() - t_sample) * 1000
                 self._perf_metrics["total_sample_time_ms"] += sub_times["sample_ms"]
                 self._perf_metrics["tokens_generated"] += 1
+                if is_first_step:
+                    logger.info(f"[DIAG] Step 0: Sampling completed in {sub_times['sample_ms']:.1f}ms, token={token}")
 
             token_info["chosen_index"] = chosen_index
 
@@ -1330,6 +1358,12 @@ class CognitiveLoop:
             token_info["audit_record"] = audit_record
 
         token_info["token"] = token
+        
+        # DIAG: Log completion of step 0
+        if is_first_step:
+            total_step_time = (time.time() - t0) * 1000
+            logger.info(f"[DIAG] Step 0 COMPLETED: token={token}, total_time={total_step_time:.1f}ms")
+        
         return {"token": token, "info": token_info}
 
     async def _select_candidates(self, hidden_state: Any, context: Any) -> List[Any]:
