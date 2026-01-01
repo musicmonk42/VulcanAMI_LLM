@@ -27,6 +27,18 @@ logger = logging.getLogger(__name__)
 
 
 # ============================================================================
+# CONSTANTS
+# ============================================================================
+
+# Default OpenAI model for chat completions (MAJOR-12 fix)
+# Using gpt-3.5-turbo as default since it's more widely available than gpt-4
+DEFAULT_OPENAI_MODEL = "gpt-3.5-turbo"
+
+# Maximum attributes to log when debugging unknown LLM interface
+DEBUG_LOG_MAX_ATTRS = 10
+
+
+# ============================================================================
 # ENUMS AND DATA STRUCTURES
 # ============================================================================
 
@@ -749,7 +761,7 @@ Generate ONLY the Python code:"""
             # 1. OpenAI-style client (chat.completions.create)
             if hasattr(llm, "chat") and hasattr(llm.chat, "completions"):
                 response = llm.chat.completions.create(
-                    model=getattr(llm, "model", "gpt-4"),
+                    model=getattr(llm, "model", DEFAULT_OPENAI_MODEL),
                     messages=[{"role": "user", "content": prompt}],
                     max_tokens=self.max_tokens,
                 )
@@ -794,7 +806,7 @@ Generate ONLY the Python code:"""
             else:
                 # FIX MAJOR-12: Log available attributes to help debugging
                 available_attrs = [attr for attr in dir(llm) if not attr.startswith("_")]
-                logger.warning(f"Unknown LLM interface. Available attrs: {available_attrs[:10]}...")
+                logger.warning(f"Unknown LLM interface. Available attrs: {available_attrs[:DEBUG_LOG_MAX_ATTRS]}...")
                 return None
 
             if code is None:
