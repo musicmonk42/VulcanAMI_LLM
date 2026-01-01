@@ -447,6 +447,17 @@ class HybridLLMExecutor:
         "VULCAN Reasoning Result:\n{reasoning_result}\n\n"
         "Express this in conversational language:"
     )
+    
+    # FIX #4: Full reasoning fallback prompt when VULCAN internal LLM fails completely
+    # When VULCAN's internal model returns None, OpenAI must be a FULL FALLBACK with reasoning
+    # capability, not just a "language wrapper" around nothing.
+    FULL_REASONING_FALLBACK_PROMPT = (
+        "You are an AI assistant helping with the VULCAN platform. "
+        "VULCAN's internal reasoning system is currently unavailable, so you need to provide "
+        "a complete, helpful response using your own capabilities. "
+        "Please provide a thoughtful, accurate, and helpful response to the user's question. "
+        "Be clear, concise, and informative."
+    )
 
     # ============================================================
     # INITIALIZATION
@@ -590,7 +601,7 @@ class HybridLLMExecutor:
         self, loop, prompt: str, max_tokens: int, temperature: float, system_prompt: str,
         conversation_history: Optional[List[Dict[str, str]]] = None
     ) -> Dict[str, Any]:
-        """Try local LLM first, fallback to OpenAI for language generation only."""
+        """Try local LLM first, fallback to OpenAI with FULL reasoning capability if needed."""
         systems_used = []
 
         # Try local LLM (VULCAN is primary brain)
@@ -604,23 +615,33 @@ class HybridLLMExecutor:
                 "systems_used": systems_used,
             }
 
-        # Fallback to OpenAI - LANGUAGE GENERATION ONLY, NOT REASONING
+        # FIX #4: When VULCAN internal LLM fails, OpenAI must be a FULL fallback with reasoning
+        # The Core Problem was: OpenAI had nothing to express because VULCAN returned None
+        # Now: OpenAI provides FULL reasoning capability as fallback
         self.logger.warning(
-            "[HybridExecutor] ⚠️ VULCAN LLM failed - OpenAI fallback for LANGUAGE ONLY. "
-            "OpenAI must NOT reason independently."
+            "[HybridExecutor] ⚠️ VULCAN internal LLM failed - using OpenAI with FULL reasoning capability. "
+            "OpenAI will reason independently since VULCAN reasoning is unavailable."
         )
+        # Combine the fallback prompt with any context from the original system prompt
+        fallback_system_prompt = self.FULL_REASONING_FALLBACK_PROMPT
+        if system_prompt and system_prompt != self.DEFAULT_SYSTEM_PROMPT:
+            # Preserve any additional context from the original system prompt
+            fallback_system_prompt = f"{self.FULL_REASONING_FALLBACK_PROMPT}\n\nAdditional context: {system_prompt}"
+        
         openai_result = await self._call_openai(
-            loop, prompt, max_tokens, temperature, system_prompt, conversation_history
+            loop, prompt, max_tokens, temperature, 
+            fallback_system_prompt,
+            conversation_history
         )
         if openai_result:
-            systems_used.append("openai_language_only")
+            systems_used.append("openai_full_reasoning_fallback")
             return {
                 "text": openai_result,
-                "source": "openai_language_only",
+                "source": "openai_full_reasoning_fallback",
                 "systems_used": systems_used,
                 "metadata": {
-                    "openai_role": "language_generation_only",
-                    "warning": "OpenAI used for language only - VULCAN reasoning unavailable",
+                    "openai_role": "full_reasoning_fallback",
+                    "reason": "VULCAN internal LLM returned None - OpenAI provided full reasoning",
                 },
             }
 
@@ -772,23 +793,21 @@ class HybridLLMExecutor:
                     "systems_used": systems_used,
                 }
             elif openai_valid:
-                # ARCHITECTURE: OpenAI is ONLY for language generation, NOT reasoning
-                # When VULCAN internal LLM fails, OpenAI should only express what
-                # VULCAN's reasoning engines produced - it should NOT reason independently.
-                systems_used.append("openai_language_only")
+                # FIX #4: When VULCAN internal LLM fails, OpenAI should provide FULL reasoning
+                # The logs show "VULCAN internal LLM returned None" 100% of the time
+                systems_used.append("openai_full_reasoning_fallback")
                 local_reason = "returned None" if results["local"] is None else "returned invalid response"
                 self.logger.warning(
                     f"[HybridExecutor] ⚠️ VULCAN internal LLM {local_reason}. "
-                    f"OpenAI is being used for LANGUAGE GENERATION ONLY. "
-                    f"OpenAI must NOT reason independently - it only expresses VULCAN's reasoning."
+                    f"OpenAI providing FULL REASONING as fallback (not just language generation)."
                 )
                 return {
                     "text": results["openai"],
-                    "source": "openai_language_only",  # Clarify this is language-only, not reasoning
+                    "source": "openai_full_reasoning_fallback",
                     "systems_used": systems_used,
                     "metadata": {
-                        "openai_role": "language_generation_only",
-                        "warning": "OpenAI used for language only - VULCAN reasoning may be limited",
+                        "openai_role": "full_reasoning_fallback",
+                        "reason": f"VULCAN internal LLM {local_reason} - OpenAI provided full reasoning",
                     },
                 }
 
@@ -868,19 +887,19 @@ class HybridLLMExecutor:
                 },
             }
         elif openai_valid:
-            # ARCHITECTURE: OpenAI is ONLY for language, NOT reasoning
-            systems_used.append("openai_language_only")
+            # FIX #4: When VULCAN internal LLM fails, OpenAI should provide FULL reasoning
+            systems_used.append("openai_full_reasoning_fallback")
             self.logger.warning(
                 "[HybridExecutor] ⚠️ VULCAN LLM failed in ensemble mode. "
-                "OpenAI is being used for LANGUAGE ONLY - it must NOT reason independently."
+                "OpenAI providing FULL REASONING as fallback."
             )
             return {
                 "text": openai_result,
-                "source": "openai_language_only",
+                "source": "openai_full_reasoning_fallback",
                 "systems_used": systems_used,
                 "metadata": {
-                    "openai_role": "language_generation_only",
-                    "warning": "OpenAI used for language only - VULCAN reasoning unavailable",
+                    "openai_role": "full_reasoning_fallback",
+                    "reason": "VULCAN internal LLM failed - OpenAI provided full reasoning",
                 },
             }
         elif local_valid:

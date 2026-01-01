@@ -2179,10 +2179,11 @@ class ToolSelector:
             )
 
             # Update memory prior
+            # FIX #3: Changed > 0.5 to >= 0.5 so exactly 0.5 confidence doesn't fail
             self.memory_prior.update(
                 features=request.features,
                 tool_used=result.selected_tool,
-                success=result.confidence > 0.5,
+                success=result.confidence >= 0.5,
                 confidence=result.calibrated_confidence,
                 execution_time=result.execution_time_ms,
                 energy_used=result.energy_used_mj,
@@ -2194,7 +2195,7 @@ class ToolSelector:
                 self.calibrator.update_calibration(
                     result.selected_tool,
                     result.confidence,
-                    result.confidence > 0.5,  # Simplified success metric
+                    result.confidence >= 0.5,  # FIX #3: Changed > to >= for threshold
                 )
 
             # Mathematical verification for probabilistic/Bayesian results
@@ -2433,7 +2434,8 @@ class ToolSelector:
                 tool_stats = self.performance_metrics[result.selected_tool]
                 tool_stats["count"] += 1
 
-                if result.confidence > 0.5:
+                # FIX #3: Changed > 0.5 to >= 0.5 so exactly 0.5 confidence counts as success
+                if result.confidence >= 0.5:
                     tool_stats["successes"] += 1
 
                 # Update running averages

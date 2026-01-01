@@ -384,9 +384,16 @@ class FallbackChain:
         self.cost_weight = 0.3
         self.success_weight = 0.7
 
-        logger.info(
-            "FallbackChain initialized with %d strategies", len(self.strategies)
-        )
+        # FIX MINOR-3: Use DEBUG level when initialized with 0 strategies (normal during startup)
+        # INFO level is used when strategies are provided at init time
+        if len(self.strategies) > 0:
+            logger.info(
+                "FallbackChain initialized with %d strategies", len(self.strategies)
+            )
+        else:
+            logger.debug(
+                "FallbackChain initialized with 0 strategies (will be populated later)"
+            )
 
     def execute_with_fallbacks(
         self, problem_graph

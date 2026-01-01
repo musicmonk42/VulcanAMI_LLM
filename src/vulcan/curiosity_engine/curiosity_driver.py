@@ -92,7 +92,8 @@ class CuriosityDriverConfig:
 
     # PERFORMANCE FIX: Idle detection and backoff settings
     # Maximum consecutive empty cycles before entering dormant mode
-    max_empty_cycles: int = 3
+    # FIX MINOR-2: Increased from 3 to 10 to prevent premature dormant mode
+    max_empty_cycles: int = 10
 
     # Progressive backoff intervals in seconds when no work is found
     # Applied after consecutive empty cycles: 1st=5s, 2nd=15s, 3rd=60s, 4th+=300s

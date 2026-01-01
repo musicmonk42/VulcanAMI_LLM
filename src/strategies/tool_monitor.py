@@ -327,9 +327,10 @@ class ToolMonitor:
 
         # EMERGENCY STABILIZATION: Disable monitoring thread to reduce CPU overhead
         # Set monitoring flag to False and skip thread creation entirely
+        # FIX MINOR-6: Use WARNING level to make it clear this is intentionally disabled
         self.monitoring = False
         self.monitor_thread = None  # Thread not created - no zombie thread
-        logger.info("ToolMonitor monitoring thread disabled for emergency stabilization")
+        logger.warning("ToolMonitor monitoring thread disabled for emergency stabilization")
 
         # Alert thresholds
         self.thresholds = {
@@ -610,7 +611,8 @@ class ToolMonitor:
 
         # EMERGENCY STABILIZATION: Disable polling to reduce CPU overhead
         # This loop now exits immediately to stop resource monitoring
-        logger.info("ToolMonitor monitoring loop disabled for emergency stabilization")
+        # FIX MINOR-6: Use WARNING level for consistency
+        logger.warning("ToolMonitor monitoring loop disabled for emergency stabilization")
         return
 
     def _update_resource_metrics(self):

@@ -2690,18 +2690,54 @@ class AgentPoolManager:
                             "selected_tools": selected_tools,
                         }
                     
-                    # Return reasoning result directly
-                    return {
+                    # FIX CRITICAL-2: Build result and update stats BEFORE returning
+                    # Previously, this early return bypassed stats update, causing
+                    # "6 jobs submitted, 0 completed" - jobs would "disappear"
+                    duration = time.time() - start_time
+                    result = {
                         "status": "completed",
                         "reasoning_invoked": True,
                         "reasoning_output": reasoning_result,
                         "tools_used": selected_tools,
-                        "execution_time": time.time() - start_time,
+                        "execution_time": duration,
                         "agent_id": agent_id,
                         "task_id": task_id,
                         "nodes_processed": len(nodes),
                         "node_results": node_results,
                     }
+                    
+                    # Update agent metadata (was missing in early return)
+                    metadata.record_task_completion(success=True, duration_s=duration)
+                    
+                    # Update provenance (was missing in early return)
+                    if provenance:
+                        provenance.complete("success", result=result)
+                        resource_consumption = {"cpu_seconds": duration}
+                        if PSUTIL_AVAILABLE:
+                            try:
+                                resource_consumption["memory_mb"] = (
+                                    psutil.Process().memory_info().rss / 1024 / 1024
+                                )
+                            except Exception:
+                                pass
+                        provenance.update_resource_consumption(resource_consumption)
+                    
+                    # Update statistics (was missing in early return - CRITICAL FIX)
+                    with self.stats_lock:
+                        self.stats["total_jobs_completed"] += 1
+                        current_stats = dict(self.stats)
+                    
+                    logger.info(
+                        f"[AgentPool] Reasoning job completed: task={task_id}, agent={agent_id}. "
+                        f"Stats: submitted={current_stats['total_jobs_submitted']}, "
+                        f"completed={current_stats['total_jobs_completed']}, "
+                        f"failed={current_stats['total_jobs_failed']}"
+                    )
+                    
+                    # Persist state to Redis
+                    self._persist_state_to_redis()
+                    
+                    return result
                 except Exception as e:
                     logger.error(f"[REASONING] Invocation FAILED: {e}", exc_info=True)
                     # Fall through to generic execution

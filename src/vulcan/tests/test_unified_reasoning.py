@@ -984,7 +984,9 @@ class TestUnifiedReasoner:
 
         # Should return error result, not crash
         assert isinstance(result, ReasoningResult)
-        assert result.confidence == 0.0
+        # FIX CRITICAL-7: Changed from 0.0 to <= 0.1 to allow minimal fallback confidence
+        # The system now returns 0.1 instead of 0.0 to prevent downstream threshold failures
+        assert result.confidence <= 0.1
 
     @pytest.mark.timeout(5)
     def test_timeout_handling(self, reasoner):

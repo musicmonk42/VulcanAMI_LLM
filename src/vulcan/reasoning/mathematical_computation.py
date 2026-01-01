@@ -27,6 +27,18 @@ logger = logging.getLogger(__name__)
 
 
 # ============================================================================
+# CONSTANTS
+# ============================================================================
+
+# Default OpenAI model for chat completions (MAJOR-12 fix)
+# Using gpt-3.5-turbo as default since it's more widely available than gpt-4
+DEFAULT_OPENAI_MODEL = "gpt-3.5-turbo"
+
+# Maximum attributes to log when debugging unknown LLM interface
+DEBUG_LOG_MAX_ATTRS = 10
+
+
+# ============================================================================
 # ENUMS AND DATA STRUCTURES
 # ============================================================================
 
@@ -727,7 +739,14 @@ result = simplify(integral)
         return self._templates.simplify_expression("x**2 + 2*x + 1")
 
     def _generate_llm_code(self, query: str, llm) -> Optional[str]:
-        """Generate code using LLM."""
+        """Generate code using LLM.
+        
+        FIX MAJOR-12: Added support for OpenAI-compatible interfaces including:
+        - OpenAI client (chat.completions.create)
+        - LangChain LLMs (invoke, predict)
+        - HuggingFace (generate, __call__)
+        - Custom interfaces (complete)
+        """
         prompt = f"""{self.CODE_GENERATION_PROMPT}
 
 Problem: {query}
@@ -735,18 +754,65 @@ Problem: {query}
 Generate ONLY the Python code:"""
 
         try:
-            # Try different LLM interfaces
-            if hasattr(llm, "generate"):
+            code = None
+            
+            # Try different LLM interfaces in order of specificity
+            
+            # 1. OpenAI-style client (chat.completions.create)
+            if hasattr(llm, "chat") and hasattr(llm.chat, "completions"):
+                response = llm.chat.completions.create(
+                    model=getattr(llm, "model", DEFAULT_OPENAI_MODEL),
+                    messages=[{"role": "user", "content": prompt}],
+                    max_tokens=self.max_tokens,
+                )
+                code = response.choices[0].message.content
+                logger.debug("Using OpenAI chat.completions interface")
+                
+            # 2. Direct create method (OpenAI Completion API)
+            elif hasattr(llm, "create"):
+                response = llm.create(prompt=prompt, max_tokens=self.max_tokens)
+                if hasattr(response, "choices") and response.choices:
+                    code = response.choices[0].text if hasattr(response.choices[0], "text") else str(response.choices[0])
+                else:
+                    code = str(response)
+                logger.debug("Using OpenAI create interface")
+                
+            # 3. LangChain-style invoke
+            elif hasattr(llm, "invoke"):
+                response = llm.invoke(prompt)
+                code = response.content if hasattr(response, "content") else str(response)
+                logger.debug("Using LangChain invoke interface")
+                
+            # 4. LangChain-style predict  
+            elif hasattr(llm, "predict"):
+                code = llm.predict(prompt)
+                logger.debug("Using LangChain predict interface")
+                
+            # 5. GraphixVulcanLLM-style generate
+            elif hasattr(llm, "generate"):
                 code = llm.generate(prompt, max_tokens=self.max_tokens)
+                logger.debug("Using generate interface")
+                
+            # 6. Direct callable
             elif hasattr(llm, "__call__"):
                 code = llm(prompt)
+                logger.debug("Using callable interface")
+                
+            # 7. Generic complete method
             elif hasattr(llm, "complete"):
                 response = llm.complete(prompt)
                 code = response.text if hasattr(response, "text") else str(response)
+                logger.debug("Using complete interface")
             else:
-                logger.warning("Unknown LLM interface")
+                # FIX MAJOR-12: Log available attributes to help debugging
+                available_attrs = [attr for attr in dir(llm) if not attr.startswith("_")]
+                logger.warning(f"Unknown LLM interface. Available attrs: {available_attrs[:DEBUG_LOG_MAX_ATTRS]}...")
                 return None
 
+            if code is None:
+                logger.warning("LLM returned None response")
+                return None
+                
             return self._clean_code(code)
 
         except Exception as e:

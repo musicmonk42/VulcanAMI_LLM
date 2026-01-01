@@ -354,16 +354,35 @@ class SafetyValidator:
             "meta_reasoning",
         }
     )
+    
+    # FIX #3: Forbidden inputs that should be skipped during string matching
+    # These terms are meant for numeric validation, not text matching
+    # (e.g., "infinite wisdom" should not be blocked)
+    FORBIDDEN_INPUTS_TEXT_SKIP = frozenset({"nan", "inf", "infinite"})
 
     def __init__(self):
         # CRITICAL FIX: Pre-compile patterns to avoid ReDoS
         # Use simpler, non-backtracking patterns
+        # FIX #2: Make patterns context-aware to reduce false positives
+        # These patterns now require more specific context to trigger
+        # NOT blocking: "aerosol injection", "dependency injection", "harm" in ethics
         self.unsafe_patterns_compiled = [
-            re.compile(r"(?i)\b(attack|exploit|vulnerability|injection)\b"),
+            # Require context for injection types - "sql injection", "code injection"
+            re.compile(r"(?i)\b(sql[_\s-]?injection|code[_\s-]?injection|xss|command[_\s-]?injection)\b"),
+            # Attack patterns require harmful intent context  
+            re.compile(r"(?i)\b(malware|virus|trojan|ransomware)\s+\w*\s*(attack|payload|distribution|creation|code)?\b"),
+            re.compile(r"(?i)\b(attack|exploit)\s+\w*\s*(someone|users?|system|people|vulnerability|target|computer)?\b"),
+            re.compile(r"(?i)\b(hack|breach|compromise|backdoor)\s+\w*\s*(into|the)?\s*(system|account|database)?\b"),
+            re.compile(r"(?i)\b(steal|theft|fraud|scam)\s+\w*\s*(data|money|credentials|identity|user)?\b"),
+            # Direct harm and destruction still blocked
+            re.compile(r"(?i)\b(destroy|damage)\s+\w*\s*(infrastructure|system|data|critical)\b"),
+            re.compile(r"(?i)\b(illegal|illicit)\s+\w*\s*(access|activity|drugs|weapons)\b"),
+        ]
+        
+        # Original broad patterns for high-risk terms that need less context
+        self.high_risk_patterns_compiled = [
             re.compile(r"(?i)\b(malware|virus|trojan|ransomware)\b"),
-            re.compile(r"(?i)\b(hack|breach|compromise|backdoor)\b"),
-            re.compile(r"(?i)\b(steal|theft|fraud|scam)\b"),
-            re.compile(r"(?i)\b(illegal|illicit|prohibited|banned)\b"),
+            re.compile(r"(?i)\b(steal|theft|fraud)\b"),
         ]
 
         # FIX #3: Sensitive patterns - check for actual sensitive data
@@ -1161,14 +1180,19 @@ class SafetyGovernor:
                 if context.tool_name in self.contracts:
                     contract = self.contracts[context.tool_name]
 
-                    # Only check forbidden inputs, not time/energy budgets
+                    # FIX #3: Only check for actual NaN/inf values in numeric data, 
+                    # not string matches like "infinite wisdom" or "nanometer"
+                    # The original check was too broad - blocking legitimate queries
                     if contract.forbidden_inputs:
                         problem_str = str(context.problem).lower()
-                        found = [
-                            forb
-                            for forb in contract.forbidden_inputs
-                            if forb in problem_str
-                        ]
+                        found = []
+                        for forb in contract.forbidden_inputs:
+                            # Skip numeric validation terms during text matching
+                            # (e.g., "infinite wisdom" should not be blocked)
+                            if forb in SafetyValidator.FORBIDDEN_INPUTS_TEXT_SKIP:
+                                continue
+                            if forb in problem_str:
+                                found.append(forb)
                         if found:
                             self._record_violation(
                                 context.tool_name,
