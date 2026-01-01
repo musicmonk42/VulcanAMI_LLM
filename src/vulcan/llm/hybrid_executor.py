@@ -447,7 +447,7 @@ class HybridLLMExecutor:
         "NEVER answer questions using your own knowledge - only express what VULCAN's reasoning provides."
     )
     
-    # Fallback prompt when VULCAN reasoning is available but needs language polish
+    # Prompt template when VULCAN reasoning succeeds and needs language polish
     LANGUAGE_ONLY_PROMPT_TEMPLATE = (
         "Express the following VULCAN reasoning result in clear, natural language. "
         "Do NOT add any independent reasoning or analysis - simply make it readable:\n\n"
@@ -455,16 +455,9 @@ class HybridLLMExecutor:
         "Express this in conversational language:"
     )
     
-    # FIX #4: Full reasoning fallback prompt when VULCAN internal LLM fails completely
-    # When VULCAN's internal model returns None, OpenAI must be a FULL FALLBACK with reasoning
-    # capability, not just a "language wrapper" around nothing.
-    FULL_REASONING_FALLBACK_PROMPT = (
-        "You are an AI assistant helping with the VULCAN platform. "
-        "VULCAN's internal reasoning system is currently unavailable, so you need to provide "
-        "a complete, helpful response using your own capabilities. "
-        "Please provide a thoughtful, accurate, and helpful response to the user's question. "
-        "Be clear, concise, and informative."
-    )
+    # NOTE: FULL_REASONING_FALLBACK_PROMPT has been REMOVED
+    # OpenAI is NOT permitted to do reasoning. If VULCAN fails, we return an error.
+    # OpenAI can ONLY interpret/polish what VULCAN produces - nothing else.
 
     # ============================================================
     # INITIALIZATION
@@ -608,329 +601,126 @@ class HybridLLMExecutor:
         self, loop, prompt: str, max_tokens: int, temperature: float, system_prompt: str,
         conversation_history: Optional[List[Dict[str, str]]] = None
     ) -> Dict[str, Any]:
-        """Try local LLM first, fallback to OpenAI with FULL reasoning capability if needed."""
+        """VULCAN does ALL reasoning. OpenAI can ONLY interpret the result into language.
+        
+        ARCHITECTURE:
+        1. VULCAN internal LLM does ALL reasoning
+        2. If VULCAN succeeds, optionally use OpenAI to polish the language (NOT reason)
+        3. If VULCAN fails, return an error - NO fallback to OpenAI for reasoning
+        
+        OpenAI is ONLY permitted to interpret/express VULCAN's results in natural language.
+        OpenAI must NEVER reason, analyze, or generate independent responses.
+        """
         systems_used = []
 
-        # Try local LLM (VULCAN is primary brain)
+        # Step 1: VULCAN does ALL the reasoning
         local_result = await self._call_local_llm(loop, prompt, max_tokens)
+        
         if self._is_valid_response(local_result):
             systems_used.append("vulcan_local_llm")
-            self.logger.info("[HybridExecutor] ✓ Using VULCAN reasoning (primary brain)")
+            self.logger.info("[HybridExecutor] ✓ VULCAN reasoning succeeded")
+            
+            # Step 2: Optionally use OpenAI to polish the language (NOT for reasoning)
+            # This is the ONLY permitted use of OpenAI - language interpretation
+            use_language_polish = os.environ.get("OPENAI_LANGUAGE_POLISH", "false").lower() in ("true", "1", "yes")
+            
+            if use_language_polish:
+                try:
+                    # Use OpenAI ONLY to express VULCAN's result in better language
+                    polish_prompt = self.LANGUAGE_ONLY_PROMPT_TEMPLATE.format(reasoning_result=local_result)
+                    polished = await self._call_openai(
+                        loop, polish_prompt, max_tokens, temperature, 
+                        self.DEFAULT_SYSTEM_PROMPT, conversation_history
+                    )
+                    if polished and len(polished.strip()) > self.MIN_MEANINGFUL_LENGTH:
+                        systems_used.append("openai_language_polish")
+                        self.logger.info("[HybridExecutor] ✓ OpenAI polished VULCAN's language (no reasoning)")
+                        return {
+                            "text": polished,
+                            "source": "vulcan_with_openai_polish",
+                            "systems_used": systems_used,
+                            "metadata": {
+                                "vulcan_raw_result": local_result[:1000],  # Store raw result
+                                "openai_role": "language_polish_only",
+                            },
+                        }
+                except Exception as e:
+                    self.logger.warning(f"[HybridExecutor] Language polish failed, using raw VULCAN result: {e}")
+            
+            # Return VULCAN's result directly (no polish)
             return {
                 "text": local_result,
                 "source": "local",
                 "systems_used": systems_used,
             }
 
-        # FIX #4: When VULCAN internal LLM fails, OpenAI must be a FULL fallback with reasoning
-        # The Core Problem was: OpenAI had nothing to express because VULCAN returned None
-        # Now: OpenAI provides FULL reasoning capability as fallback
-        self.logger.warning(
-            "[HybridExecutor] ⚠️ VULCAN internal LLM failed - using OpenAI with FULL reasoning capability. "
-            "OpenAI will reason independently since VULCAN reasoning is unavailable."
+        # VULCAN FAILED - NO OPENAI FALLBACK FOR REASONING
+        # OpenAI is NOT permitted to reason. If VULCAN fails, we return an error.
+        self.logger.error(
+            "[HybridExecutor] ❌ VULCAN internal LLM failed - NO EXTERNAL REASONING FALLBACK. "
+            "OpenAI can ONLY interpret VULCAN's results, NOT reason independently."
         )
-        # Combine the fallback prompt with any context from the original system prompt
-        fallback_system_prompt = self.FULL_REASONING_FALLBACK_PROMPT
-        if system_prompt and system_prompt != self.DEFAULT_SYSTEM_PROMPT:
-            # Preserve any additional context from the original system prompt
-            fallback_system_prompt = f"{self.FULL_REASONING_FALLBACK_PROMPT}\n\nAdditional context: {system_prompt}"
-        
-        openai_result = await self._call_openai(
-            loop, prompt, max_tokens, temperature, 
-            fallback_system_prompt,
-            conversation_history
-        )
-        if openai_result:
-            systems_used.append("openai_full_reasoning_fallback")
-            return {
-                "text": openai_result,
-                "source": "openai_full_reasoning_fallback",
-                "systems_used": systems_used,
-                # ISSUE P1.2 FIX: Give OpenAI fallback reasonable confidence (not 10%)
-                # When OpenAI provides full reasoning as a fallback, it should have
-                # moderate confidence since OpenAI is a capable LLM.
-                # Previously, fallback responses defaulted to 10% confidence which
-                # caused all responses to be filtered out.
-                "confidence": OPENAI_FALLBACK_CONFIDENCE,
-                "metadata": {
-                    "openai_role": "full_reasoning_fallback",
-                    "reason": "VULCAN internal LLM returned None - OpenAI provided full reasoning",
-                    "vulcan_llm_failed": True,  # Flag for learning system
-                },
-            }
-
-        return {"text": "", "source": "none", "systems_used": systems_used}
+        systems_used.append("vulcan_local_llm_failed")
+        return {
+            "text": "[VULCAN Internal Error] The internal reasoning system failed to generate a response. "
+                    "External AI reasoning is not permitted. Please check the internal LLM configuration.",
+            "source": "error_no_fallback",
+            "systems_used": systems_used,
+            "error": True,
+            "metadata": {
+                "reason": "VULCAN internal LLM returned None - OpenAI reasoning fallback prohibited",
+                "vulcan_llm_failed": True,
+            },
+        }
 
     async def _execute_openai_first(
         self, loop, prompt: str, max_tokens: int, temperature: float, system_prompt: str,
         conversation_history: Optional[List[Dict[str, str]]] = None
     ) -> Dict[str, Any]:
         """
-        DEPRECATED MODE: OpenAI should NEVER be used for reasoning.
-        This mode is kept for backwards compatibility but logs a strong warning.
-        VULCAN should ALWAYS be tried first for reasoning.
+        DISABLED MODE: OpenAI-first mode is no longer available.
+        This mode has been disabled because VULCAN should handle ALL reasoning internally.
+        External AI usage is prohibited.
         """
         self.logger.error(
-            "[HybridExecutor] ❌ openai_first mode is NOT RECOMMENDED! "
-            "VULCAN should ALWAYS do reasoning. OpenAI is for language generation ONLY. "
-            "Consider switching to 'local_first' or 'parallel' mode."
+            "[HybridExecutor] ❌ openai_first mode is DISABLED! "
+            "External AI usage is prohibited. VULCAN handles ALL reasoning internally. "
+            "Falling back to local_first mode."
         )
-        systems_used = []
-
-        # Even in openai_first mode, we should note that OpenAI is NOT for reasoning
-        openai_result = await self._call_openai(
+        # Redirect to local_first mode instead
+        return await self._execute_local_first(
             loop, prompt, max_tokens, temperature, system_prompt, conversation_history
         )
-        if openai_result:
-            systems_used.append("openai_language_only")
-            return {
-                "text": openai_result,
-                "source": "openai_language_only",
-                "systems_used": systems_used,
-                "metadata": {
-                    "openai_role": "language_generation_only",
-                    "warning": "openai_first mode used - VULCAN reasoning bypassed (NOT RECOMMENDED)",
-                },
-            }
-
-        # Fallback to local (which is actually the correct choice)
-        local_result = await self._call_local_llm(loop, prompt, max_tokens)
-        if self._is_valid_response(local_result):
-            systems_used.append("vulcan_local_llm")
-            self.logger.info("[HybridExecutor] ✓ Falling back to VULCAN reasoning (correct behavior)")
-            return {
-                "text": local_result,
-                "source": "local",
-                "systems_used": systems_used,
-            }
-
-        return {"text": "", "source": "none", "systems_used": systems_used}
 
     async def _execute_parallel(
         self, loop, prompt: str, max_tokens: int, temperature: float, system_prompt: str,
         conversation_history: Optional[List[Dict[str, str]]] = None
     ) -> Dict[str, Any]:
-        """Run both LLMs simultaneously and wait for both to complete.
+        """Execute using VULCAN internal LLM only - NO EXTERNAL AI.
         
-        FIX: Changed from FIRST_COMPLETED to ALL_COMPLETED to ensure the local LLM
-        has a chance to complete even if OpenAI is faster. Previously, OpenAI would
-        complete in ~1s and the local LLM task would be cancelled, causing 100%
-        fallback to OpenAI in parallel mode.
+        ARCHITECTURE: External AI has been removed. Only VULCAN internal LLM is used.
+        The 'parallel' mode now simply delegates to local_first since there's nothing
+        to run in parallel.
         """
-        systems_used = []
-
-        async def local_task():
-            return await self._call_local_llm(loop, prompt, max_tokens)
-
-        async def openai_task():
-            return await self._call_openai(
-                loop, prompt, max_tokens, temperature, system_prompt, conversation_history
-            )
-
-        # Run both tasks concurrently with timeout
-        try:
-            tasks = [
-                asyncio.create_task(local_task()),
-                asyncio.create_task(openai_task()),
-            ]
-
-            # FIX: Wait for ALL tasks to complete (with timeout) instead of FIRST_COMPLETED
-            # This ensures the local LLM has a chance to produce a result even if OpenAI
-            # completes faster. The timeout still prevents waiting forever.
-            done, pending = await asyncio.wait(
-                tasks, timeout=self.timeout, return_when=asyncio.ALL_COMPLETED
-            )
-
-            results = {"local": None, "openai": None}
-
-            for task in done:
-                try:
-                    result = task.result()
-                    # Determine which task completed
-                    if task == tasks[0]:
-                        results["local"] = result
-                    else:
-                        results["openai"] = result
-                except Exception as e:
-                    self.logger.debug(f"Task failed: {e}")
-
-            # Cancel any pending tasks (only happens if timeout was reached)
-            for task in pending:
-                task.cancel()
-                try:
-                    await task
-                except asyncio.CancelledError:
-                    pass
-                except Exception:
-                    # Ignore any other exceptions from cancelled tasks
-                    pass
-
-            # Select the best available result
-            local_valid = self._is_valid_response(results["local"])
-            openai_valid = results["openai"] is not None and len(
-                str(results["openai"]).strip()
-            ) > self.MIN_MEANINGFUL_LENGTH
-
-            # Log status of both results for debugging
-            self.logger.debug(
-                f"[HybridExecutor] Parallel results: local_valid={local_valid}, "
-                f"openai_valid={openai_valid}, local_result_type={type(results['local']).__name__}"
-            )
-
-            if local_valid and openai_valid:
-                # Both succeeded - PREFER VULCAN (primary brain) over OpenAI (language fallback)
-                # OpenAI response is still captured in metadata for knowledge distillation
-                systems_used.extend(["vulcan_local_llm", "openai_llm"])
-                self.logger.info(
-                    "[HybridExecutor] ✓ VULCAN is primary brain - using VULCAN response "
-                    "(OpenAI captured for knowledge distillation only)"
-                )
-                return {
-                    "text": results["local"],  # Use VULCAN's internal LLM response
-                    "source": "parallel_both",
-                    "systems_used": systems_used,
-                    "metadata": {
-                        "local_response_available": True,
-                        "openai_response_available": True,
-                        # Store OpenAI response in metadata for knowledge distillation
-                        "openai_response_for_distillation": str(results["openai"])[:2000],
-                        "used_source": "local",
-                    },
-                }
-            elif local_valid:
-                # Local succeeded, OpenAI failed or not ready
-                systems_used.append("vulcan_local_llm")
-                self.logger.info("[HybridExecutor] ✓ Using VULCAN internal LLM response (primary brain)")
-                return {
-                    "text": results["local"],
-                    "source": "local",
-                    "systems_used": systems_used,
-                }
-            elif openai_valid:
-                # FIX #4: When VULCAN internal LLM fails, OpenAI should provide FULL reasoning
-                # The logs show "VULCAN internal LLM returned None" 100% of the time
-                systems_used.append("openai_full_reasoning_fallback")
-                local_reason = "returned None" if results["local"] is None else "returned invalid response"
-                self.logger.warning(
-                    f"[HybridExecutor] ⚠️ VULCAN internal LLM {local_reason}. "
-                    f"OpenAI providing FULL REASONING as fallback (not just language generation)."
-                )
-                return {
-                    "text": results["openai"],
-                    "source": "openai_full_reasoning_fallback",
-                    "systems_used": systems_used,
-                    # ISSUE P1.2 FIX: Give OpenAI fallback reasonable confidence
-                    "confidence": OPENAI_FALLBACK_CONFIDENCE,
-                    "metadata": {
-                        "openai_role": "full_reasoning_fallback",
-                        "reason": f"VULCAN internal LLM {local_reason} - OpenAI provided full reasoning",
-                        "vulcan_llm_failed": True,
-                    },
-                }
-
-        except asyncio.TimeoutError:
-            self.logger.warning("Parallel execution timed out")
-
-        return {"text": "", "source": "none", "systems_used": systems_used}
+        self.logger.info("[HybridExecutor] Parallel mode redirecting to local_first (external AI disabled)")
+        return await self._execute_local_first(
+            loop, prompt, max_tokens, temperature, system_prompt, conversation_history
+        )
 
     async def _execute_ensemble(
         self, loop, prompt: str, max_tokens: int, temperature: float, system_prompt: str,
         conversation_history: Optional[List[Dict[str, str]]] = None
     ) -> Dict[str, Any]:
-        """Run both LLMs, combine/select best response based on quality."""
-        systems_used = []
-
-        async def local_task():
-            return await self._call_local_llm(loop, prompt, max_tokens)
-
-        async def openai_task():
-            return await self._call_openai(
-                loop, prompt, max_tokens, temperature, system_prompt, conversation_history
-            )
-
-        # Run both tasks concurrently
-        try:
-            local_result, openai_result = await asyncio.wait_for(
-                asyncio.gather(local_task(), openai_task(), return_exceptions=True),
-                timeout=self.timeout,
-            )
-
-            # Handle exceptions from gather
-            if isinstance(local_result, Exception):
-                self.logger.debug(f"Local LLM failed: {local_result}")
-                local_result = None
-            if isinstance(openai_result, Exception):
-                self.logger.debug(f"OpenAI failed: {openai_result}")
-                openai_result = None
-
-        except asyncio.TimeoutError:
-            self.logger.warning("Ensemble execution timed out")
-            return {"text": "", "source": "none", "systems_used": systems_used}
-
-        local_valid = self._is_valid_response(local_result)
-        openai_valid = openai_result is not None and len(
-            str(openai_result).strip()
-        ) > self.MIN_MEANINGFUL_LENGTH
-
-        if local_valid and openai_valid:
-            # Both succeeded - VULCAN reasoning is primary, OpenAI available for knowledge distillation
-            systems_used.extend(["vulcan_local_llm", "openai_distillation_capture"])
-
-            # ARCHITECTURE: VULCAN does ALL reasoning. OpenAI response is captured for
-            # knowledge distillation purposes only - to help train VULCAN to generate
-            # better language in the future.
-            local_str = str(local_result)
-            openai_str = str(openai_result)
-
-            # VULCAN's reasoning is authoritative - use it as the response
-            combined_response = local_str  # VULCAN is primary
-            
-            self.logger.info(
-                "[HybridExecutor] ✓ VULCAN reasoning is primary - OpenAI response captured for distillation"
-            )
-
-            return {
-                "text": combined_response,
-                "source": "ensemble_vulcan_primary",
-                "systems_used": systems_used,
-                "metadata": {
-                    "ensemble_mode": True,
-                    "vulcan_reasoning_primary": True,
-                    "local_length": len(local_str),
-                    "openai_length": len(openai_str),
-                    "openai_role": "distillation_capture",
-                    # Store OpenAI response for knowledge distillation training
-                    "openai_response_for_distillation": openai_str[:2000],
-                },
-            }
-        elif openai_valid:
-            # FIX #4: When VULCAN internal LLM fails, OpenAI should provide FULL reasoning
-            systems_used.append("openai_full_reasoning_fallback")
-            self.logger.warning(
-                "[HybridExecutor] ⚠️ VULCAN LLM failed in ensemble mode. "
-                "OpenAI providing FULL REASONING as fallback."
-            )
-            return {
-                "text": openai_result,
-                "source": "openai_full_reasoning_fallback",
-                "systems_used": systems_used,
-                # ISSUE P1.2 FIX: Give OpenAI fallback reasonable confidence
-                "confidence": OPENAI_FALLBACK_CONFIDENCE,
-                "metadata": {
-                    "openai_role": "full_reasoning_fallback",
-                    "reason": "VULCAN internal LLM failed - OpenAI provided full reasoning",
-                    "vulcan_llm_failed": True,
-                },
-            }
-        elif local_valid:
-            systems_used.append("vulcan_local_llm")
-            return {
-                "text": local_result,
-                "source": "local",
-                "systems_used": systems_used,
-            }
-
-        return {"text": "", "source": "none", "systems_used": systems_used}
+        """Ensemble mode now delegates to local_first.
+        
+        ARCHITECTURE: OpenAI is NOT permitted for reasoning.
+        Ensemble mode previously ran both LLMs, but now only VULCAN is allowed to reason.
+        OpenAI can only be used for language polish (if enabled), not as a reasoning participant.
+        """
+        self.logger.info("[HybridExecutor] Ensemble mode redirecting to local_first (OpenAI reasoning prohibited)")
+        return await self._execute_local_first(
+            loop, prompt, max_tokens, temperature, system_prompt, conversation_history
+        )
 
     # ============================================================
     # LLM CALL METHODS
