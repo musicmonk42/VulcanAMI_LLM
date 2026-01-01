@@ -630,8 +630,23 @@ class CognitiveLoop:
         stop_tok_set = set(stop_tokens or ()) | set(self.sampling.stop_tokens)
         stop_str_patterns = tuple(stop_strings or ()) + self.sampling.stop_strings
 
+        # CRITICAL FIX: Add timeout to tokenization to prevent hang during generate() setup
+        # Tokenization should complete in a few seconds at most
+        TOKENIZE_TIMEOUT = 10.0  # 10 seconds max for tokenization
+        
         if isinstance(prompt, str):
-            init_tokens = await self._tokenize(prompt)
+            try:
+                init_tokens = await asyncio.wait_for(
+                    self._tokenize(prompt),
+                    timeout=TOKENIZE_TIMEOUT
+                )
+            except asyncio.TimeoutError:
+                logger.error(
+                    f"[CognitiveLoop] Tokenization timed out after {TOKENIZE_TIMEOUT}s! "
+                    f"Falling back to simple word split. Prompt length: {len(prompt)}"
+                )
+                # Fallback to simple word splitting to avoid complete failure
+                init_tokens = list(prompt.split())
         else:
             init_tokens = prompt[:]
 
