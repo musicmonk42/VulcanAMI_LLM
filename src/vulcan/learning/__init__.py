@@ -37,6 +37,19 @@ WEIGHT_DECAY_INTERVAL_SECONDS = 3600  # Apply decay every hour
 WEIGHT_DECAY_EPSILON = 0.001  # Weights below this threshold are considered zero
 MAX_DECAY_INTERVALS = 168  # Cap decay at 1 week (168 hours) to prevent precision issues
 
+# ISSUE P0.3 FIX: Corrupted Weight Detection Constants
+# These constants control when tool weights are considered "corrupted" and need reset.
+# Corruption typically occurs from the "death spiral" bug (P0.1) where LLM failures
+# were incorrectly penalizing tools, causing all weights to degrade.
+WEIGHT_CORRUPTION_THRESHOLD = 0.01  # Weights below this (when not zero) indicate corruption
+WEIGHT_CORRUPTION_NEGATIVE_THRESHOLD = -0.05  # Any weight below this is definitely corrupted
+WEIGHT_CORRUPTION_MIN_COUNT = 3  # Minimum corrupted weights to trigger reset
+WEIGHT_CORRUPTION_PERCENTAGE = 0.5  # If this percentage of weights are corrupted, reset all
+
+# ISSUE P0.1 FIX: LLM Fallback Detection Constants
+# Used to detect when a response came from OpenAI fallback (LLM failure, not tool failure)
+LLM_FALLBACK_LOW_CONFIDENCE_THRESHOLD = 0.1  # Default low confidence indicates fallback
+
 # Make torch import conditional to allow module import even without torch
 try:
     import torch
@@ -223,14 +236,15 @@ class UnifiedLearningSystem:
                     # This indicates a "death spiral" has occurred and weights need reset
                     corrupted_weights = []
                     for tool, weight in persisted_weights.items():
-                        # Weights below 0.01 (absolute) indicate severe degradation
-                        # Normal weights should be around 0.0 (adjustment) or 1.0 (absolute)
-                        if weight < -0.05 or (weight < 0.01 and weight != 0.0):
+                        # Use defined constants for corruption detection thresholds
+                        if weight < WEIGHT_CORRUPTION_NEGATIVE_THRESHOLD or (
+                            weight < WEIGHT_CORRUPTION_THRESHOLD and weight != 0.0
+                        ):
                             corrupted_weights.append((tool, weight))
                     
-                    if len(corrupted_weights) >= 3 or (
+                    if len(corrupted_weights) >= WEIGHT_CORRUPTION_MIN_COUNT or (
                         len(corrupted_weights) > 0 and 
-                        len(corrupted_weights) >= len(persisted_weights) * 0.5
+                        len(corrupted_weights) >= len(persisted_weights) * WEIGHT_CORRUPTION_PERCENTAGE
                     ):
                         # More than half of weights are corrupted, or 3+ corrupted - reset all
                         logger.warning(
@@ -425,7 +439,7 @@ class UnifiedLearningSystem:
                 metadata.get('openai_role') == 'full_reasoning_fallback' or
                 metadata.get('vulcan_llm_failed', False) or
                 # Low confidence from fallback (default 10% indicates fallback)
-                (outcome.get('confidence', 1.0) <= 0.1 and source != 'local')
+                (outcome.get('confidence', 1.0) <= LLM_FALLBACK_LOW_CONFIDENCE_THRESHOLD and source != 'local')
             )
             
             if is_system_error and status != 'success':
