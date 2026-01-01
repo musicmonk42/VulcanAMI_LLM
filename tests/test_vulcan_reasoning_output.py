@@ -465,8 +465,11 @@ class TestErrorFormatting:
         error_text = executor._format_reasoning_error(output)
         
         assert "issue" in error_text.lower() or "error" in error_text.lower()
-        # Should include error reference
-        assert any(c.isupper() and c.isalnum() for c in error_text)
+        # Should include error reference code (12 uppercase hex characters like "A1B2C3D4E5F6")
+        # The error reference helps users report issues for support investigation
+        import re
+        assert re.search(r'\*\*[A-F0-9]{12}\*\*', error_text), \
+            f"Error reference not found in: {error_text}"
 
     def test_format_error_no_message(self, executor):
         """Test formatting errors with no error message."""
