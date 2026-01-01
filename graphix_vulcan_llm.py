@@ -1349,87 +1349,98 @@ class GraphixVulcanLLM:
             f"CognitiveLoop returned: type={result_type_name}, has___anext__={has_anext}, has_tokens={has_tokens}"
         )
 
-        # EMERGENCY FIX: Check if we're in an async context where run_until_complete would fail
-        # This happens when generate() is called from run_in_executor() in HybridLLMExecutor
-        if self._check_running_loop():
-            logger.warning(
-                "[DEBUG] generate() returning None - Event loop already running. "
-                "This triggers OpenAI fallback in HybridLLMExecutor."
-            )
-            return None  # Triggers OpenAI fallback in HybridLLMExecutor
-
-        # Create a new event loop for this synchronous context
-        # Note: We don't call set_event_loop() to avoid affecting the thread's default loop
-        loop = asyncio.new_event_loop()
-
-        try:
-            # Process based on type
-            if inspect.iscoroutine(gen_result):
-                logger.debug("DETECTED COROUTINE - AWAITING")
-                loop_result = loop.run_until_complete(gen_result)
-
-                # Check if the coroutine returned an async generator!
-                result_type_after_await = type(loop_result).__name__
-                logger.debug(
-                    f"After awaiting coroutine: type={result_type_after_await}, has_tokens={hasattr(loop_result, 'tokens')}"
+        # FIX #1 CRITICAL: If result already has tokens, use it directly without async handling
+        # This is the common case when using the fallback synchronous CognitiveLoop
+        # or when running from run_in_executor() where the generation completed synchronously
+        if has_tokens and not has_anext and not inspect.iscoroutine(gen_result):
+            logger.info(f"[DEBUG] Using synchronous result directly (type={result_type_name})")
+            loop_result = gen_result
+        else:
+            # Need async handling - check if we can safely create an event loop
+            if self._check_running_loop():
+                # FIX #1 CRITICAL: Instead of returning None, raise an informative error
+                # This allows HybridLLMExecutor to provide a proper error message
+                error_msg = (
+                    "Cannot process async result: event loop already running in current thread. "
+                    "This typically happens when generate() is called from within an async context. "
+                    "Consider using generate_async() instead, or ensure generate() is called "
+                    "from a synchronous context (e.g., via run_in_executor)."
                 )
+                logger.error(f"[DEBUG] {error_msg}")
+                raise RuntimeError(error_msg)
 
-                # If it returned an async generator, consume it
-                if hasattr(loop_result, "__anext__"):
-                    logger.debug("COROUTINE RETURNED ASYNC GENERATOR - CONSUMING IT")
+            # Create a new event loop for this synchronous context
+            # Note: We don't call set_event_loop() to avoid affecting the thread's default loop
+            loop = asyncio.new_event_loop()
 
-                    async def consume_nested_generator():
+            try:
+                # Process based on type
+                if inspect.iscoroutine(gen_result):
+                    logger.debug("DETECTED COROUTINE - AWAITING")
+                    loop_result = loop.run_until_complete(gen_result)
+
+                    # Check if the coroutine returned an async generator!
+                    result_type_after_await = type(loop_result).__name__
+                    logger.debug(
+                        f"After awaiting coroutine: type={result_type_after_await}, has_tokens={hasattr(loop_result, 'tokens')}"
+                    )
+
+                    # If it returned an async generator, consume it
+                    if hasattr(loop_result, "__anext__"):
+                        logger.debug("COROUTINE RETURNED ASYNC GENERATOR - CONSUMING IT")
+
+                        async def consume_nested_generator():
+                            results = []
+                            count = 0
+
+                            async for item in loop_result:
+                                count += 1
+                                results.append(item)
+
+                            logger.debug(f"Consumed {count} items from nested generator")
+
+                            if not results:
+                                raise ValueError("Nested generator yielded no items!")
+
+                            return results[-1]
+
+                        loop_result = loop.run_until_complete(consume_nested_generator())
+                        logger.debug(
+                            f"After consuming nested generator: type={type(loop_result).__name__}, has_tokens={hasattr(loop_result, 'tokens')}"
+                        )
+
+                elif has_anext:
+                    logger.debug("DETECTED ASYNC GENERATOR - CONSUMING")
+
+                    async def consume_generator():
                         results = []
                         count = 0
 
-                        async for item in loop_result:
+                        async for item in gen_result:
                             count += 1
                             results.append(item)
 
-                        logger.debug(f"Consumed {count} items from nested generator")
+                        logger.debug(f"Consumed {count} items")
 
                         if not results:
-                            raise ValueError("Nested generator yielded no items!")
+                            raise ValueError("Generator yielded no items!")
 
                         return results[-1]
 
-                    loop_result = loop.run_until_complete(consume_nested_generator())
-                    logger.debug(
-                        f"After consuming nested generator: type={type(loop_result).__name__}, has_tokens={hasattr(loop_result, 'tokens')}"
+                    loop_result = loop.run_until_complete(consume_generator())
+
+                elif has_tokens:
+                    logger.debug("DETECTED DIRECT RESULT OBJECT")
+                    loop_result = gen_result
+
+                else:
+                    raise TypeError(
+                        f"Unknown return type: type={result_type_name}, "
+                        f"has___anext__={has_anext}, has_tokens={has_tokens}"
                     )
-
-            elif has_anext:
-                logger.debug("DETECTED ASYNC GENERATOR - CONSUMING")
-
-                async def consume_generator():
-                    results = []
-                    count = 0
-
-                    async for item in gen_result:
-                        count += 1
-                        results.append(item)
-
-                    logger.debug(f"Consumed {count} items")
-
-                    if not results:
-                        raise ValueError("Generator yielded no items!")
-
-                    return results[-1]
-
-                loop_result = loop.run_until_complete(consume_generator())
-
-            elif has_tokens:
-                logger.debug("DETECTED DIRECT RESULT OBJECT")
-                loop_result = gen_result
-
-            else:
-                raise TypeError(
-                    f"Unknown return type: type={result_type_name}, "
-                    f"has___anext__={has_anext}, has_tokens={has_tokens}"
-                )
-        finally:
-            # Clean up the event loop we created
-            loop.close()
+            finally:
+                # Clean up the event loop we created
+                loop.close()
 
         # Final check
         final_type = type(loop_result).__name__
