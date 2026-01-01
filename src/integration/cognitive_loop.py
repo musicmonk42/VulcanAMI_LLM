@@ -1802,14 +1802,14 @@ class CognitiveLoop:
         op_timeout = timeout if timeout is not None else self.runtime.async_operation_timeout_seconds
         try:
             if asyncio.iscoroutinefunction(fn):
-                if op_timeout:
+                if op_timeout is not None and op_timeout > 0:
                     return await asyncio.wait_for(fn(*args_tuple), timeout=op_timeout)
                 else:
                     return await fn(*args_tuple)
             else:
                 loop = asyncio.get_event_loop()
                 coro = loop.run_in_executor(None, fn, *args_tuple)
-                if op_timeout:
+                if op_timeout is not None and op_timeout > 0:
                     return await asyncio.wait_for(coro, timeout=op_timeout)
                 else:
                     return await coro
