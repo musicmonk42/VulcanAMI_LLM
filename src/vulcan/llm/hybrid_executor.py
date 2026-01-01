@@ -966,15 +966,8 @@ class HybridLLMExecutor:
             if formatted and len(formatted.strip()) > self.MIN_MEANINGFUL_LENGTH:
                 systems_used.append("openai_formatting")
                 
-                # Capture for distillation (VULCAN LLM learns from this)
-                if self._distillation_enabled:
-                    self._capture_formatting_for_distillation(
-                        input_data=structured_output.to_dict(),
-                        output_text=formatted,
-                        original_prompt=original_prompt,
-                    )
-                    distillation_captured = True
-                    self.logger.info("[HybridExecutor] ✓ Captured (reasoning, response) pair for VULCAN LLM distillation")
+                # Note: _format_with_openai_for_output already handles distillation capture
+                distillation_captured = self._distillation_enabled
                 
                 self.logger.info("[HybridExecutor] ✓ OpenAI formatted VULCAN's output (fast path: ~2-5s)")
                 

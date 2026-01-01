@@ -491,3 +491,204 @@ class TestErrorFormatting:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "--tb=short"])
+
+
+class TestFormatOutputForUser:
+    """Test the new format_output_for_user method for OpenAI language formatting."""
+
+    @pytest.fixture
+    def mock_openai_client(self):
+        """Create a mock OpenAI client."""
+        mock_client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.choices = [
+            MagicMock(message=MagicMock(content="Based on VULCAN's analysis, the answer is 42."))
+        ]
+        mock_client.chat.completions.create.return_value = mock_response
+        return mock_client
+
+    @pytest.fixture
+    def executor_with_openai(self, mock_openai_client):
+        """Create executor with mocked OpenAI."""
+        executor = HybridLLMExecutor(
+            local_llm=MagicMock(),
+            openai_client_getter=lambda: mock_openai_client,
+            mode="parallel",
+        )
+        return executor
+
+    @pytest.fixture
+    def executor_without_openai(self):
+        """Create executor without OpenAI access."""
+        executor = HybridLLMExecutor(
+            local_llm=MagicMock(),
+            openai_client_getter=lambda: None,  # No OpenAI
+            mode="parallel",
+        )
+        return executor
+
+    @pytest.mark.asyncio
+    async def test_format_output_with_dict_input(self, executor_with_openai):
+        """Test format_output_for_user with dict input."""
+        # Mock the OpenAI formatting call
+        executor_with_openai._call_openai_formatting = AsyncMock(
+            return_value="VULCAN calculated the result: **42**"
+        )
+        
+        reasoning_output = {
+            "success": True,
+            "result": 42,
+            "method": "calculation",
+            "confidence": 0.95,
+            "reasoning_trace": ["Step 1", "Step 2"],
+        }
+        
+        result = await executor_with_openai.format_output_for_user(
+            reasoning_output=reasoning_output,
+            original_prompt="What is 6 times 7?",
+        )
+        
+        assert result is not None
+        assert "text" in result
+        assert result["source"] == "openai_formatting"
+        assert "openai_formatting" in result["systems_used"]
+        assert result["metadata"]["openai_role"] == "formatting_only"
+
+    @pytest.mark.asyncio
+    async def test_format_output_with_vulcan_reasoning_output(self, executor_with_openai):
+        """Test format_output_for_user with VulcanReasoningOutput input."""
+        executor_with_openai._call_openai_formatting = AsyncMock(
+            return_value="The integral of x² is x³/3 + C."
+        )
+        
+        reasoning_output = VulcanReasoningOutput(
+            query_id="test-001",
+            success=True,
+            result="x**3/3 + C",
+            result_type="mathematical",
+            method_used="symbolic_integration",
+            confidence=0.95,
+        )
+        
+        result = await executor_with_openai.format_output_for_user(
+            reasoning_output=reasoning_output,
+            original_prompt="What is the integral of x^2?",
+        )
+        
+        assert result["source"] == "openai_formatting"
+        assert "vulcan_reasoning" in result["systems_used"]
+        assert result["metadata"]["reasoning_output"]["result"] == "x**3/3 + C"
+
+    @pytest.mark.asyncio
+    async def test_format_output_fallback_when_openai_unavailable(self, executor_without_openai):
+        """Test fallback to internal formatting when OpenAI is unavailable."""
+        reasoning_output = {
+            "success": True,
+            "result": 42,
+            "confidence": 0.9,
+        }
+        
+        result = await executor_without_openai.format_output_for_user(
+            reasoning_output=reasoning_output,
+            original_prompt="What is 6*7?",
+        )
+        
+        assert result is not None
+        assert result["source"] == "internal_formatting"
+        assert "internal_formatting" in result["systems_used"]
+        assert result["metadata"]["fallback_reason"] == "openai_unavailable"
+
+    @pytest.mark.asyncio
+    async def test_format_output_error_handling(self, executor_with_openai):
+        """Test error handling for failed reasoning."""
+        reasoning_output = {
+            "success": False,
+            "result": None,
+            "error": "Timeout during computation",
+        }
+        
+        result = await executor_with_openai.format_output_for_user(
+            reasoning_output=reasoning_output,
+            original_prompt="Complex query",
+        )
+        
+        assert result is not None
+        assert result.get("error") is True
+        assert result["source"] == "vulcan_reasoning_error"
+        assert "timeout" in result["text"].lower() or "issue" in result["text"].lower()
+
+    @pytest.mark.asyncio
+    async def test_format_output_distillation_capture(self, executor_with_openai):
+        """Test that distillation capture is tracked."""
+        executor_with_openai._call_openai_formatting = AsyncMock(
+            return_value="The answer based on VULCAN's reasoning is: **100**"
+        )
+        executor_with_openai._distillation_enabled = True
+        
+        # Mock the capture method to track calls
+        capture_calls = []
+        original_capture = executor_with_openai._capture_formatting_for_distillation
+        def mock_capture(*args, **kwargs):
+            capture_calls.append((args, kwargs))
+            return original_capture(*args, **kwargs)
+        executor_with_openai._capture_formatting_for_distillation = mock_capture
+        
+        reasoning_output = {
+            "success": True,
+            "result": 100,
+            "confidence": 0.99,
+        }
+        
+        result = await executor_with_openai.format_output_for_user(
+            reasoning_output=reasoning_output,
+            original_prompt="What is 10*10?",
+        )
+        
+        assert result["distillation_captured"] is True
+        # Capture is called from _format_with_openai_for_output
+        assert len(capture_calls) >= 1
+
+    @pytest.mark.asyncio
+    async def test_format_output_with_converted_type(self, executor_with_openai):
+        """Test handling of non-standard input types (converted to string)."""
+        executor_with_openai._call_openai_formatting = AsyncMock(
+            return_value="Result: raw string value"
+        )
+        
+        # Pass an unexpected type (e.g., a plain string)
+        result = await executor_with_openai.format_output_for_user(
+            reasoning_output="plain string result",
+            original_prompt="Test query",
+        )
+        
+        assert result is not None
+        # Should handle gracefully
+        assert "text" in result
+
+
+class TestOpenAILanguageFormattingConfig:
+    """Test OPENAI_LANGUAGE_FORMATTING configuration."""
+
+    def test_config_constants_exist(self):
+        """Test that configuration constants are defined."""
+        from vulcan.llm.hybrid_executor import (
+            OPENAI_LANGUAGE_FORMATTING,
+            OPENAI_LANGUAGE_POLISH,
+        )
+        
+        # Should be boolean values (False by default without env vars)
+        assert isinstance(OPENAI_LANGUAGE_FORMATTING, bool)
+        assert isinstance(OPENAI_LANGUAGE_POLISH, bool)
+
+    def test_config_default_values(self):
+        """Test default configuration values."""
+        from vulcan.llm.hybrid_executor import (
+            OPENAI_LANGUAGE_FORMATTING,
+            OPENAI_LANGUAGE_POLISH,
+        )
+        
+        # Default should be False (disabled)
+        # Note: This test assumes no env vars are set
+        assert OPENAI_LANGUAGE_FORMATTING is False
+        assert OPENAI_LANGUAGE_POLISH is False
+

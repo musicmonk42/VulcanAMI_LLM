@@ -392,6 +392,13 @@ services:
       - DISTILLATION_ASYNC_WRITES=${DISTILLATION_ASYNC_WRITES:-true}
       - DISTILLATION_ASYNC_BUFFER_SIZE=${DISTILLATION_ASYNC_BUFFER_SIZE:-100}
       - DISTILLATION_ASYNC_FLUSH_INTERVAL=${DISTILLATION_ASYNC_FLUSH_INTERVAL:-5.0}
+      # OpenAI Language Formatting Configuration
+      # When true, routes ALL natural language output formatting to OpenAI (gpt-4o-mini)
+      # This provides fast responses (~2-5s) while VULCAN LLM learns via distillation
+      # POLICY: OpenAI ONLY formats VULCAN's reasoning output - no independent reasoning
+      - OPENAI_LANGUAGE_FORMATTING=${OPENAI_LANGUAGE_FORMATTING:-false}
+      # Legacy polish mode (for backwards compatibility)
+      - OPENAI_LANGUAGE_POLISH=${OPENAI_LANGUAGE_POLISH:-false}
     ports:
       # NOTE: Port 8000 conflicts with api-gateway service if both run simultaneously.
       # Use profiles to avoid conflict:
