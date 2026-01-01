@@ -548,7 +548,7 @@ git pull origin main
 2. **Threaded async execution**: When called from an async context, generation runs in a separate thread with its own event loop
 3. **Improved error logging**: Silent failures now log detailed error messages
 
-**Diagnostic Logging (v2.0.4+):**
+**Diagnostic Logging (Added in v2.0.4):**
 
 When debugging generation hangs, look for checkpoint logs at INFO level:
 

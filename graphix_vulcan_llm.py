@@ -3,8 +3,8 @@ from __future__ import annotations
 """
 GraphixVulcanLLM - FIXED Silent Failure Issue
 
-Version: 2.0.3
-Date: 2026-01-01 05:12 UTC
+Version: 2.0.4
+Date: 2026-01-01 14:30 UTC
 User: musicmonk42
 
 CRITICAL FIX: Silent failure when generate() called with event loop already running
@@ -12,6 +12,11 @@ CRITICAL FIX: Silent failure when generate() called with event loop already runn
 - Added _run_async_in_thread() for async execution when event loop is running
 - Added _consume_async_result() for proper async result handling with timeout
 - Improved error logging and propagation
+
+v2.0.4: Added INFO-level diagnostic logging for token generation hang root cause analysis
+- Checkpoint logging before/after CognitiveLoop.generate() call
+- Checkpoint logging in _consume_async_result() for coroutine/async generator handling
+- First token logging in cognitive_loop.py _step() method
 """
 
 import asyncio
@@ -951,10 +956,10 @@ class GraphixVulcanLLM:
     """
     Fully Optimized LLM over Graphix-VULCAN components.
 
-    Version 2.0.3 - Critical fix for silent failure with event loop conflicts
+    Version 2.0.4 - Added INFO-level diagnostic logging for hang root cause analysis
     """
 
-    VERSION = "2.0.3"
+    VERSION = "2.0.4"
 
     def __init__(
         self,
