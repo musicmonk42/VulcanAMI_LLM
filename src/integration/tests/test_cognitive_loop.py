@@ -471,5 +471,63 @@ class TestPerformanceOptimizations:
         assert inf_count > 0
 
 
+class TestAsyncSafeTimeout:
+    """Test _async_safe timeout functionality."""
+
+    @pytest.mark.asyncio
+    async def test_async_safe_timeout_triggers(self):
+        """Test that _async_safe times out blocking operations."""
+        import time
+        
+        def blocking_function():
+            time.sleep(5)  # Simulate a long-running blocking operation
+            return 'completed'
+        
+        runtime = LoopRuntimeConfig(async_operation_timeout_seconds=0.5)  # Short timeout
+        loop = CognitiveLoop(MockBridge(), MockTransformer(), MockSafety(), runtime_config=runtime)
+        
+        start = time.time()
+        result = await loop._async_safe(blocking_function, (), 'default_value')
+        elapsed = time.time() - start
+        
+        # Should return default value after timeout
+        assert result == 'default_value', f"Expected 'default_value', got {result}"
+        # Should complete quickly (within timeout + buffer)
+        assert elapsed < 2.0, f"Expected timeout in ~0.5s, took {elapsed:.2f}s"
+
+    @pytest.mark.asyncio
+    async def test_async_safe_succeeds_without_timeout(self):
+        """Test that _async_safe returns result for fast operations."""
+        def fast_function():
+            return 'fast_result'
+        
+        runtime = LoopRuntimeConfig(async_operation_timeout_seconds=10.0)
+        loop = CognitiveLoop(MockBridge(), MockTransformer(), MockSafety(), runtime_config=runtime)
+        
+        result = await loop._async_safe(fast_function, (), 'default_value')
+        
+        assert result == 'fast_result'
+
+    @pytest.mark.asyncio
+    async def test_async_safe_custom_timeout_override(self):
+        """Test that custom timeout parameter overrides config."""
+        import time
+        
+        def slow_function():
+            time.sleep(5)
+            return 'slow_result'
+        
+        # Config has long timeout, but we override with short timeout
+        runtime = LoopRuntimeConfig(async_operation_timeout_seconds=60.0)
+        loop = CognitiveLoop(MockBridge(), MockTransformer(), MockSafety(), runtime_config=runtime)
+        
+        start = time.time()
+        result = await loop._async_safe(slow_function, (), 'default', timeout=0.5)
+        elapsed = time.time() - start
+        
+        assert result == 'default'
+        assert elapsed < 2.0
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "--tb=short"])
