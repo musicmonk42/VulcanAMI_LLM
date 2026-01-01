@@ -1402,23 +1402,77 @@ class HybridLLMExecutor:
         Returns:
             Formatted natural language response, or None if formatting fails
         """
+        # Use the dedicated formatting method with gpt-4o-mini
+        return await self._format_with_openai_for_output(
+            reasoning_output=reasoning_output,
+            original_query=original_query,
+            loop=loop,
+        )
+    
+    async def _format_with_openai_for_output(
+        self, 
+        reasoning_output: "VulcanReasoningOutput",
+        original_query: str,
+        loop,
+    ) -> Optional[str]:
+        """
+        Use OpenAI (gpt-4o-mini) to format VULCAN's reasoning output as natural language.
+        
+        This is the primary method for language formatting with distillation capture.
+        
+        ARCHITECTURE:
+            VULCAN Mind (orchestrator, agents, symbolic reasoning)
+                │
+                │ produces
+                ▼
+            Structured Output (JSON/dict with results, confidence, method, etc.)
+                │
+                │ sent to
+                ▼
+            OpenAI gpt-4o-mini (language formatting ONLY)
+                │
+                │ produces
+                ▼
+            Natural Language Response → returned to user
+                │
+                │ captured as training pair
+                ▼
+            Distillation Store → VULCAN LLM learns async
+        
+        POLICY COMPLIANCE:
+        - OpenAI MUST NOT reason independently — only format VULCAN's output
+        - OpenAI MUST NOT generate code
+        - All reasoning happens in VULCAN's mind BEFORE this method is called
+        - Every (input, output) pair is captured for distillation
+        
+        Args:
+            reasoning_output: The structured output from VULCAN's reasoning systems
+            original_query: The user's original question (for context)
+            loop: The asyncio event loop
+            
+        Returns:
+            Formatted natural language response, or None if formatting fails
+        """
+        # STRICT SYSTEM PROMPT - OpenAI is ONLY for language formatting
         system_prompt = """You are a language formatter for VULCAN AI.
 
-ROLE: Convert VULCAN's structured reasoning output into clear, natural language.
+YOUR ONLY ROLE: Convert VULCAN's structured reasoning output into clear, natural language.
 
-RULES:
-- DO NOT perform independent reasoning or analysis
-- DO NOT add information beyond what VULCAN provided
-- DO NOT generate code unless VULCAN's result contains code
-- ONLY format VULCAN's results as readable prose
-- If VULCAN's result is mathematical, present it clearly with the answer
-- If VULCAN's output indicates an error, explain it helpfully
+STRICT RULES:
+1. DO NOT perform any independent reasoning or analysis
+2. DO NOT add information not present in VULCAN's output
+3. DO NOT generate code
+4. DO NOT speculate beyond the provided data
+5. ONLY format and present VULCAN's results as readable prose
 
-FORMAT:
-- Start directly with the answer or explanation
-- Be concise but complete
-- Use markdown formatting where appropriate (e.g., for code blocks, math)
-"""
+You receive JSON containing:
+- result: The computed answer
+- method_used: How VULCAN solved it  
+- confidence: VULCAN's confidence (0-1)
+- reasoning_trace: Steps taken (optional)
+- error: Error message if failed
+
+Make this human-readable. Nothing more."""
 
         # Build the user prompt with VULCAN's structured output
         try:
@@ -1428,9 +1482,9 @@ FORMAT:
             self.logger.warning(f"Failed to serialize reasoning output: {e}")
             output_json = str(reasoning_output)
 
-        user_prompt = f"""Format this VULCAN reasoning output for the user.
+        user_prompt = f"""Format this VULCAN output for the user.
 
-Original question: {original_query}
+User's question: {original_query}
 
 VULCAN's output:
 {output_json}
@@ -1438,18 +1492,25 @@ VULCAN's output:
 Write a natural, helpful response based on VULCAN's results."""
 
         try:
-            # Use OpenAI for fast and cheap formatting (currently gpt-3.5-turbo, configured in _call_openai)
-            response = await self._call_openai(
+            # Use gpt-4o-mini for fast and cheap formatting
+            response = await self._call_openai_formatting(
                 loop=loop,
                 prompt=user_prompt,
+                system_prompt=system_prompt,
                 max_tokens=500,
                 temperature=0.3,  # Low temp for consistent formatting
-                system_prompt=system_prompt,
-                use_cache=True,
             )
             
             if response and len(response.strip()) > self.MIN_MEANINGFUL_LENGTH:
-                self.logger.info("[HybridExecutor] ✓ OpenAI formatted VULCAN's structured output")
+                self.logger.info("[HybridExecutor] ✓ OpenAI (gpt-4o-mini) formatted VULCAN's structured output")
+                
+                # Capture training pair for distillation (VULCAN LLM learns from this)
+                self._capture_formatting_for_distillation(
+                    input_data=output_dict if isinstance(output_dict, dict) else {"raw": output_json},
+                    output_text=response,
+                    original_prompt=original_query,
+                )
+                
                 return response
             else:
                 self.logger.warning("[HybridExecutor] OpenAI returned empty/short response for formatting")
@@ -1458,6 +1519,113 @@ Write a natural, helpful response based on VULCAN's results."""
         except Exception as e:
             self.logger.warning(f"[HybridExecutor] OpenAI formatting failed: {e}")
             return None
+    
+    async def _call_openai_formatting(
+        self,
+        loop,
+        prompt: str,
+        system_prompt: str,
+        max_tokens: int = 500,
+        temperature: float = 0.3,
+    ) -> Optional[str]:
+        """
+        Call OpenAI API specifically for output formatting using gpt-4o-mini.
+        
+        This method uses gpt-4o-mini which is:
+        - Fast (~2-5 seconds response time)
+        - Cheap (much cheaper than gpt-4)
+        - Good enough for language formatting (not reasoning)
+        
+        Args:
+            loop: The asyncio event loop
+            prompt: The user prompt with VULCAN's output to format
+            system_prompt: System prompt enforcing formatting-only behavior
+            max_tokens: Maximum tokens for response (default: 500)
+            temperature: Sampling temperature (default: 0.3 for consistency)
+            
+        Returns:
+            Formatted response text, or None if call fails
+        """
+        openai_client = self.openai_client_getter()
+        if not openai_client:
+            self.logger.debug("[HybridExecutor] OpenAI client not available for formatting")
+            return None
+        
+        try:
+            def call_openai_mini():
+                completion = openai_client.chat.completions.create(
+                    model="gpt-4o-mini",  # Fast and cheap for formatting
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": prompt}
+                    ],
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                )
+                return completion.choices[0].message.content
+            
+            result = await loop.run_in_executor(None, call_openai_mini)
+            return result
+            
+        except Exception as e:
+            self.logger.debug(f"[HybridExecutor] OpenAI formatting call failed: {e}")
+            return None
+    
+    def _capture_formatting_for_distillation(
+        self,
+        input_data: Dict[str, Any],
+        output_text: str,
+        original_prompt: str,
+    ) -> None:
+        """
+        Capture (input, output) pair for VULCAN LLM training via distillation.
+        
+        This is how VULCAN LLM learns to format language over time.
+        Every OpenAI formatting response becomes a training example.
+        
+        Args:
+            input_data: VULCAN's structured reasoning output (dict)
+            output_text: OpenAI's formatted natural language response
+            original_prompt: The user's original question
+        """
+        from datetime import datetime
+        
+        training_example = {
+            "timestamp": datetime.utcnow().isoformat(),
+            "input": {
+                "prompt": original_prompt,
+                "reasoning_output": input_data,
+            },
+            "output": output_text,
+            "source": "openai_formatting",
+            "model": "gpt-4o-mini",
+        }
+        
+        # Use existing distillation infrastructure
+        try:
+            distiller = get_knowledge_distiller()
+            if distiller is not None:
+                # Capture via the distillation system
+                distiller.capture_response(
+                    prompt=original_prompt,
+                    openai_response=output_text,
+                    local_response=json.dumps(input_data, default=str) if isinstance(input_data, dict) else str(input_data),
+                    metadata={
+                        "capture_type": "output_formatting",
+                        "model": "gpt-4o-mini",
+                        "source": "openai_formatting",
+                    },
+                    teacher_model="gpt-4o-mini",
+                )
+                self.logger.debug(f"[Distillation] ✓ Captured formatting example for VULCAN LLM training")
+            else:
+                # Fallback: store in local queue
+                self._distillation_queue.append(training_example)
+                self.logger.debug(
+                    f"[Distillation] Queued formatting example (queue_size={len(self._distillation_queue)})"
+                )
+        except Exception as e:
+            self.logger.debug(f"[Distillation] Failed to capture formatting example: {e}")
 
     def _format_structured_output_sync(
         self,
