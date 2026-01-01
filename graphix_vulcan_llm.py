@@ -1352,7 +1352,9 @@ class GraphixVulcanLLM:
         # FIX #1 CRITICAL: If result already has tokens, use it directly without async handling
         # This is the common case when using the fallback synchronous CognitiveLoop
         # or when running from run_in_executor() where the generation completed synchronously
-        if has_tokens and not has_anext and not inspect.iscoroutine(gen_result):
+        is_synchronous_result = has_tokens and not has_anext and not inspect.iscoroutine(gen_result)
+        
+        if is_synchronous_result:
             logger.info(f"[DEBUG] Using synchronous result directly (type={result_type_name})")
             loop_result = gen_result
         else:
