@@ -517,7 +517,14 @@ class HybridLLMExecutor:
             max_workers=4,
             thread_name_prefix="hybrid_timeout_"
         )
-        self.vulcan_timeout = float(os.environ.get("VULCAN_LLM_TIMEOUT", "15.0"))  # Hard 15s limit for VULCAN
+        # Parse VULCAN_LLM_TIMEOUT with error handling for invalid values
+        try:
+            self.vulcan_timeout = float(os.environ.get("VULCAN_LLM_TIMEOUT", "15.0"))
+        except (ValueError, TypeError):
+            self.logger.warning(
+                f"[HybridExecutor] Invalid VULCAN_LLM_TIMEOUT value, using default 15.0s"
+            )
+            self.vulcan_timeout = 15.0
         self.logger.info(f"[HybridExecutor] VULCAN hard timeout set to {self.vulcan_timeout}s")
         
         # OpenAI response cache for reducing API costs and latency
@@ -538,6 +545,13 @@ class HybridLLMExecutor:
         self._local_successes = 0
         self._openai_successes = 0
         self._failures = 0
+        
+        # Distillation queue for capturing polish training examples
+        # When OpenAI polishes Internal LLM output, we capture the pair for training
+        self._distillation_queue: List[Dict[str, Any]] = []
+        self._distillation_enabled = os.environ.get("ENABLE_DISTILLATION", "true").lower() in ("true", "1", "yes")
+        if self._distillation_enabled:
+            self.logger.info("[HybridExecutor] Distillation capture enabled")
 
     # ============================================================
     # MAIN EXECUTION METHOD
@@ -648,6 +662,16 @@ class HybridLLMExecutor:
                     if polished and len(polished.strip()) > self.MIN_MEANINGFUL_LENGTH:
                         systems_used.append("openai_language_polish")
                         self.logger.info("[HybridExecutor] ✓ OpenAI polished VULCAN's language (no reasoning)")
+                        
+                        # DISTILLATION: Capture training example for Internal LLM to learn
+                        # Student learns to produce polished output directly
+                        if self._distillation_enabled:
+                            self._capture_polish_for_distillation(
+                                prompt=prompt,
+                                internal_output=local_result,
+                                teacher_output=polished,
+                            )
+                        
                         return {
                             "text": polished,
                             "source": "vulcan_with_openai_polish",
@@ -813,7 +837,6 @@ class HybridLLMExecutor:
                 result = future.result(timeout=self.vulcan_timeout)
             except FuturesTimeoutError:
                 self.logger.error(f"[HybridExecutor] ❌ HARD TIMEOUT after {self.vulcan_timeout}s!")
-                self.logger.info("=" * 60)
                 future.cancel()
                 return None
             
@@ -823,7 +846,6 @@ class HybridLLMExecutor:
             # Handle None result (returned when event loop conflict is detected)
             if result is None:
                 self.logger.warning("[HybridExecutor] Local LLM returned None - triggering fallback")
-                self.logger.info("=" * 60)
                 return None
 
             # BUG #1 FIX: Log successful generation
@@ -1029,6 +1051,103 @@ class HybridLLMExecutor:
         except Exception as e:
             self.logger.debug(f"Failed to capture response for distillation: {e}")
 
+    def _capture_polish_for_distillation(
+        self,
+        prompt: str,
+        internal_output: str,
+        teacher_output: str,
+    ) -> bool:
+        """
+        Capture training example for Internal LLM to learn from OpenAI polish.
+        
+        When OpenAI polishes Internal LLM output, we capture the pair:
+        - Student input: The prompt + Internal LLM's raw output
+        - Teacher output: OpenAI's polished version
+        
+        Over time, Internal LLM learns to produce polished output directly,
+        reducing OpenAI dependency.
+        
+        Args:
+            prompt: The original user prompt
+            internal_output: What Internal LLM generated (student)
+            teacher_output: What OpenAI polished it to (teacher)
+            
+        Returns:
+            True if captured, False if skipped/failed
+        """
+        # Skip if outputs are too similar (nothing to learn)
+        if internal_output.strip() == teacher_output.strip():
+            self.logger.debug("[Distillation] Skipping - outputs identical")
+            return False
+        
+        # Skip very short outputs
+        if len(internal_output.strip()) < 20 or len(teacher_output.strip()) < 20:
+            self.logger.debug("[Distillation] Skipping - outputs too short")
+            return False
+        
+        example = {
+            "prompt": prompt,
+            "internal_output": internal_output,
+            "teacher_output": teacher_output,
+            "timestamp": time.time(),
+            "prompt_hash": hashlib.sha256(prompt.encode()).hexdigest()[:16],
+            "capture_type": "polish_learning",
+        }
+        
+        # Try real distillation system first
+        try:
+            distiller = get_knowledge_distiller()
+            if distiller is not None:
+                # Use existing distillation pipeline
+                captured = distiller.capture_response(
+                    prompt=prompt,
+                    openai_response=teacher_output,
+                    local_response=internal_output,
+                    metadata={
+                        "capture_type": "polish_learning",
+                        "mode": self.mode,
+                    },
+                )
+                if captured:
+                    self.logger.info(f"[Distillation] ✓ Captured polish example: {example['prompt_hash']}")
+                    return True
+                else:
+                    self.logger.debug("[Distillation] Example rejected by quality filters")
+                    return False
+        except ImportError:
+            pass
+        except Exception as e:
+            self.logger.debug(f"[Distillation] Real distiller failed: {e}")
+        
+        # Fallback: queue locally for batch processing
+        self._distillation_queue.append(example)
+        self.logger.info(
+            f"[Distillation] Queued locally: {len(self._distillation_queue)} examples "
+            f"(hash={example['prompt_hash']})"
+        )
+        return True
+
+    def get_distillation_queue(self) -> List[Dict[str, Any]]:
+        """
+        Get queued distillation examples for batch training.
+        
+        Retrieves and clears the local queue of polish training examples.
+        These can be used to train Internal LLM to produce polished outputs.
+        
+        Returns:
+            List of distillation examples, each containing:
+            - prompt: Original user prompt
+            - internal_output: What Internal LLM generated
+            - teacher_output: What OpenAI polished it to
+            - timestamp: When captured
+            - prompt_hash: Hash for deduplication
+        """
+        queue = self._distillation_queue.copy()
+        self._distillation_queue.clear()
+        if queue:
+            self.logger.info(f"[Distillation] Retrieved {len(queue)} examples from queue")
+        return queue
+
     def _update_stats(self, result: Dict[str, Any]):
         """Update execution statistics."""
         source = result.get("source", "none")
@@ -1045,10 +1164,10 @@ class HybridLLMExecutor:
 
     def get_stats(self) -> Dict[str, Any]:
         """
-        Get execution statistics including cache statistics.
+        Get execution statistics including cache and distillation statistics.
         
         Returns:
-            Dictionary with execution and cache statistics
+            Dictionary with execution, cache, and distillation statistics
         """
         stats = {
             "total_executions": self._execution_count,
@@ -1058,6 +1177,8 @@ class HybridLLMExecutor:
             "mode": self.mode,
             "has_local_llm": self.local_llm is not None,
             "openai_cache_enabled": self._enable_openai_cache,
+            "distillation_enabled": self._distillation_enabled,
+            "distillation_queue_size": len(self._distillation_queue),
         }
         
         # Add cache statistics if cache is enabled

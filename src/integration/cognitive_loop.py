@@ -55,15 +55,21 @@ class _Checkpoint:
     """
     
     def __init__(self):
-        self.start: Optional[float] = None
+        self.start: float = 0.0  # Will be set by reset()
     
     def reset(self):
         """Reset the checkpoint timer. Call at start of generate()."""
         self.start = time.time()
     
     def log(self, msg: str):
-        """Log a checkpoint message with elapsed time."""
-        elapsed = time.time() - (self.start or time.time())
+        """Log a checkpoint message with elapsed time.
+        
+        If reset() wasn't called, logs a warning and uses current time as reference.
+        """
+        if self.start == 0.0:
+            logger.warning("[CHECKPOINT] reset() not called, using current time as reference")
+            self.start = time.time()
+        elapsed = time.time() - self.start
         logger.info(f"[CHECKPOINT {elapsed:.3f}s] {msg}")
 
 

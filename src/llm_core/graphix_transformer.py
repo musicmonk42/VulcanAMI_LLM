@@ -570,6 +570,9 @@ class GraphixTransformerConfig:
 class GraphixTransformer:
     """Main transformer model class with IR-based execution."""
 
+    # Configuration constants for diagnostic logging
+    SLOW_FORWARD_THRESHOLD_MS = 100.0  # Log forward passes slower than this (ms)
+
     # Enhancement 2: Caching helper for IR (uses class method for config hashing)
     @staticmethod
     @lru_cache(maxsize=1)
@@ -829,7 +832,7 @@ class GraphixTransformer:
         
         # Log execution time for debugging hang issues
         elapsed_ms = (time.time() - start_time) * 1000
-        if elapsed_ms > 100:  # Only log slow forward passes (>100ms)
+        if elapsed_ms > self.SLOW_FORWARD_THRESHOLD_MS:
             logger.info(f"[TRANSFORMER] forward() completed in {elapsed_ms:.1f}ms (tokens={len(token_ids)})")
         
         return result
