@@ -639,9 +639,16 @@ class HybridLLMExecutor:
                 "text": openai_result,
                 "source": "openai_full_reasoning_fallback",
                 "systems_used": systems_used,
+                # ISSUE P1.2 FIX: Give OpenAI fallback reasonable confidence (not 10%)
+                # When OpenAI provides full reasoning as a fallback, it should have
+                # moderate confidence (0.6) since OpenAI is a capable LLM.
+                # Previously, fallback responses defaulted to 10% confidence which
+                # caused all responses to be filtered out.
+                "confidence": 0.6,
                 "metadata": {
                     "openai_role": "full_reasoning_fallback",
                     "reason": "VULCAN internal LLM returned None - OpenAI provided full reasoning",
+                    "vulcan_llm_failed": True,  # Flag for learning system
                 },
             }
 
@@ -805,9 +812,12 @@ class HybridLLMExecutor:
                     "text": results["openai"],
                     "source": "openai_full_reasoning_fallback",
                     "systems_used": systems_used,
+                    # ISSUE P1.2 FIX: Give OpenAI fallback reasonable confidence
+                    "confidence": 0.6,
                     "metadata": {
                         "openai_role": "full_reasoning_fallback",
                         "reason": f"VULCAN internal LLM {local_reason} - OpenAI provided full reasoning",
+                        "vulcan_llm_failed": True,
                     },
                 }
 
@@ -897,9 +907,12 @@ class HybridLLMExecutor:
                 "text": openai_result,
                 "source": "openai_full_reasoning_fallback",
                 "systems_used": systems_used,
+                # ISSUE P1.2 FIX: Give OpenAI fallback reasonable confidence
+                "confidence": 0.6,
                 "metadata": {
                     "openai_role": "full_reasoning_fallback",
                     "reason": "VULCAN internal LLM failed - OpenAI provided full reasoning",
+                    "vulcan_llm_failed": True,
                 },
             }
         elif local_valid:

@@ -1717,12 +1717,16 @@ class ProbabilisticReasoner(EnhancedProbabilisticReasoner):
 
             confidence = max(0.0, min(1.0, 1.0 - std_val))
 
-            conclusion_bool = bool(mean_val > threshold)
+            # ISSUE P1.1 FIX: Changed > to >= so exactly 0.5 counts as meeting threshold
+            # Previously: mean_val > threshold would fail when mean_val == threshold
+            # This caused "not above the threshold of 0.5" when value IS 0.5
+            conclusion_bool = bool(mean_val >= threshold)
 
             # The core reasoning result
             conclusion = {
                 "is_above_threshold": conclusion_bool,
-                "details": f"Mean value {mean_val:.3f} {'is' if conclusion_bool else 'is not'} above threshold {threshold}",
+                # ISSUE P1.1 FIX: Updated message to match >= threshold logic
+                "details": f"Mean value {mean_val:.3f} {'meets' if conclusion_bool else 'is below'} threshold {threshold}",
             }
 
             # Additional metadata for diagnostics and explanation

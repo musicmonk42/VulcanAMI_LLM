@@ -218,15 +218,40 @@ class UnifiedLearningSystem:
                         f"{persisted_weights}"
                     )
                     
-                    # BUG FIX: Propagate persisted weights to shared ToolWeightManager at startup
-                    # This ensures the ensemble uses learned weights from previous sessions
-                    if WEIGHT_MANAGER_AVAILABLE and get_weight_manager:
-                        try:
-                            for tool, adjustment in persisted_weights.items():
-                                get_weight_manager().set_weight(tool, 1.0 + adjustment)
-                            logger.info(f"[Learning] Propagated {len(persisted_weights)} persisted weights to ToolWeightManager")
-                        except Exception as e:
-                            logger.warning(f"[Learning] Failed to propagate persisted weights: {e}")
+                    # ISSUE P0.3 FIX: Detect and fix corrupted tool weights
+                    # Check if weights are severely degraded (near-zero or negative)
+                    # This indicates a "death spiral" has occurred and weights need reset
+                    corrupted_weights = []
+                    for tool, weight in persisted_weights.items():
+                        # Weights below 0.01 (absolute) indicate severe degradation
+                        # Normal weights should be around 0.0 (adjustment) or 1.0 (absolute)
+                        if weight < -0.05 or (weight < 0.01 and weight != 0.0):
+                            corrupted_weights.append((tool, weight))
+                    
+                    if len(corrupted_weights) >= 3 or (
+                        len(corrupted_weights) > 0 and 
+                        len(corrupted_weights) >= len(persisted_weights) * 0.5
+                    ):
+                        # More than half of weights are corrupted, or 3+ corrupted - reset all
+                        logger.warning(
+                            f"[Learning] CORRUPTED WEIGHTS DETECTED: {len(corrupted_weights)} of "
+                            f"{len(persisted_weights)} weights are severely degraded. "
+                            f"Corrupted: {corrupted_weights}. RESETTING ALL WEIGHTS."
+                        )
+                        self.tool_weight_adjustments.clear()
+                        if self._learning_persistence:
+                            self._learning_persistence.clear_state()
+                        logger.info("[Learning] Tool weights reset to defaults (0.0) due to corruption")
+                    else:
+                        # BUG FIX: Propagate persisted weights to shared ToolWeightManager at startup
+                        # This ensures the ensemble uses learned weights from previous sessions
+                        if WEIGHT_MANAGER_AVAILABLE and get_weight_manager:
+                            try:
+                                for tool, adjustment in persisted_weights.items():
+                                    get_weight_manager().set_weight(tool, 1.0 + adjustment)
+                                logger.info(f"[Learning] Propagated {len(persisted_weights)} persisted weights to ToolWeightManager")
+                            except Exception as e:
+                                logger.warning(f"[Learning] Failed to propagate persisted weights: {e}")
             except Exception as e:
                 logger.warning(f"[Learning] Failed to initialize persistence: {e}")
                 self._learning_persistence = None
@@ -358,6 +383,10 @@ class UnifiedLearningSystem:
         # ISSUE #9 FIX: Skip weight adjustment for system/code bugs (AttributeError, TypeError, etc.)
         #   These errors indicate code bugs, not tool performance issues. Penalizing tools for
         #   code bugs causes incorrect weight drift that deprioritizes working tools.
+        # ISSUE P0.1 FIX: Skip weight adjustment when LLM (not tool) fails
+        #   The root cause of the "death spiral" is penalizing tools when the INTERNAL LLM
+        #   returns None and falls back to OpenAI. This is an LLM failure, not a tool failure.
+        #   Tools were selected correctly but the LLM timed out or failed to generate.
         if tools:  # Only if tools were recorded
             # Check if this is a system/code bug vs tool performance failure
             error_type = outcome.get('error_type', '')
@@ -376,6 +405,29 @@ class UnifiedLearningSystem:
                 for pattern in system_error_patterns
             )
             
+            # ISSUE P0.1 FIX: Check if this was an LLM fallback (not a tool failure)
+            # When the internal LLM fails and falls back to OpenAI, we should NOT penalize
+            # tools. The tools were selected correctly; the LLM just failed to generate.
+            # Penalizing tools for LLM failures causes the "death spiral" where all tool
+            # weights become near-zero or negative.
+            source = outcome.get('source', '')
+            systems_used = outcome.get('systems_used', [])
+            metadata = outcome.get('metadata', {})
+            
+            # Check various indicators of LLM fallback
+            is_llm_fallback = (
+                # Direct source indicators
+                source in ('openai_full_reasoning_fallback', 'openai_fallback', 'openai') or
+                # System used indicators
+                'openai_full_reasoning_fallback' in systems_used or
+                'openai_fallback' in systems_used or
+                # Metadata indicators
+                metadata.get('openai_role') == 'full_reasoning_fallback' or
+                metadata.get('vulcan_llm_failed', False) or
+                # Low confidence from fallback (default 10% indicates fallback)
+                (outcome.get('confidence', 1.0) <= 0.1 and source != 'local')
+            )
+            
             if is_system_error and status != 'success':
                 logger.info(
                     f"[Learning] SKIPPING weight adjustment for system error: "
@@ -383,6 +435,14 @@ class UnifiedLearningSystem:
                     f"Tools {tools} not penalized for code bug."
                 )
                 # Don't adjust weights - this was a code bug, not tool performance
+                weight_delta = 0.0
+            elif is_llm_fallback and status != 'success':
+                # ISSUE P0.1 FIX: Don't penalize tools when LLM failed
+                logger.info(
+                    f"[Learning] SKIPPING weight adjustment for LLM fallback: "
+                    f"source={source}, systems={systems_used}. "
+                    f"Tools {tools} not penalized - internal LLM failed, not tool selection."
+                )
                 weight_delta = 0.0
             else:
                 weight_delta = WEIGHT_ADJUSTMENT_SUCCESS if status == 'success' else WEIGHT_ADJUSTMENT_FAILURE
