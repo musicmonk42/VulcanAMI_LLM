@@ -425,6 +425,80 @@ else:
     logger.warning("Redis library not available. Using in-process state.")
 
 # ============================================================
+# REASONING RESULT HELPER FUNCTIONS
+# ============================================================
+# BUG FIX: These helpers resolve the "'ReasoningResult' object has no attribute 'get'"
+# error that occurs when agent_reasoning_output is a ReasoningResult dataclass
+# instead of a dictionary. The code was calling .get() on ReasoningResult objects
+# which don't have that method (they have attributes instead).
+#
+# NOTE: These are defined inline rather than imported from vulcan.reasoning.reasoning_types
+# to avoid circular imports during module initialization. The vulcan.reasoning module
+# may not be fully loaded when main.py initializes its top-level code.
+
+def _get_reasoning_attr(result: Any, attr: str, default: Any = None) -> Any:
+    """
+    Safely extract an attribute from a ReasoningResult object or dictionary.
+    
+    This helper handles the case where reasoning results may be either:
+    1. A dataclass object with attributes (like ReasoningResult)
+    2. A dictionary with keys
+    3. Any other object
+    
+    Args:
+        result: The reasoning result (ReasoningResult, dict, or other)
+        attr: The attribute/key name to extract
+        default: Default value if attribute not found
+        
+    Returns:
+        The attribute value or the default
+    """
+    if result is None:
+        return default
+    
+    # Handle dictionary
+    if isinstance(result, dict):
+        return result.get(attr, default)
+    
+    # Handle objects with attributes (dataclasses, named tuples, etc.)
+    if hasattr(result, attr):
+        return getattr(result, attr, default)
+    
+    return default
+
+
+def _reasoning_result_to_dict(result: Any) -> Dict[str, Any]:
+    """
+    Convert a ReasoningResult object or similar to a dictionary safely.
+    
+    Args:
+        result: The reasoning result to convert
+        
+    Returns:
+        A dictionary representation of the result
+    """
+    if result is None:
+        return {}
+    
+    # Already a dict
+    if isinstance(result, dict):
+        return result
+    
+    # Handle objects with common reasoning attributes
+    result_dict = {}
+    for attr in ["conclusion", "confidence", "reasoning_type", "explanation", 
+                 "uncertainty", "evidence", "safety_status", "metadata"]:
+        if hasattr(result, attr):
+            value = getattr(result, attr, None)
+            # Handle enum values
+            if hasattr(value, "value"):
+                value = value.value
+            result_dict[attr] = value
+    
+    return result_dict if result_dict else {"value": str(result)}
+
+
+# ============================================================
 # LIFESPAN MANAGER
 # ============================================================
 # Note: HTTP session management is now handled by vulcan.arena.http_session
@@ -3249,15 +3323,16 @@ async def chat(request: ChatRequest):
     # Merge agent reasoning output into reasoning_insights (preserving existing data)
     if agent_reasoning_output:
         # Add agent-based reasoning as a distinct category (merges with existing insights)
+        # BUG FIX: Use helper to handle both dict and ReasoningResult objects
         reasoning_insights["agent_reasoning"] = {
-            "conclusion": agent_reasoning_output.get("conclusion"),
-            "confidence": agent_reasoning_output.get("confidence"),
-            "reasoning_type": agent_reasoning_output.get("reasoning_type"),
-            "explanation": agent_reasoning_output.get("explanation"),
+            "conclusion": _get_reasoning_attr(agent_reasoning_output, "conclusion"),
+            "confidence": _get_reasoning_attr(agent_reasoning_output, "confidence"),
+            "reasoning_type": _get_reasoning_attr(agent_reasoning_output, "reasoning_type"),
+            "explanation": _get_reasoning_attr(agent_reasoning_output, "explanation"),
         }
         logger.info(
             f"[VULCAN] Agent reasoning injected into context: "
-            f"type={agent_reasoning_output.get('reasoning_type')}"
+            f"type={_get_reasoning_attr(agent_reasoning_output, 'reasoning_type')}"
         )
 
     # ================================================================
@@ -5210,15 +5285,16 @@ async def unified_chat(request: UnifiedChatRequest):
         # Merge agent reasoning output into reasoning_results (preserving existing data)
         if agent_reasoning_output:
             # Add agent-based reasoning as a distinct category (merges with existing results)
+            # BUG FIX: Use helper to handle both dict and ReasoningResult objects
             reasoning_results["agent_reasoning"] = {
-                "conclusion": agent_reasoning_output.get("conclusion"),
-                "confidence": agent_reasoning_output.get("confidence"),
-                "reasoning_type": agent_reasoning_output.get("reasoning_type"),
-                "explanation": agent_reasoning_output.get("explanation"),
+                "conclusion": _get_reasoning_attr(agent_reasoning_output, "conclusion"),
+                "confidence": _get_reasoning_attr(agent_reasoning_output, "confidence"),
+                "reasoning_type": _get_reasoning_attr(agent_reasoning_output, "reasoning_type"),
+                "explanation": _get_reasoning_attr(agent_reasoning_output, "explanation"),
             }
             logger.info(
                 f"[VULCAN/v1/chat] Agent reasoning injected into context: "
-                f"type={agent_reasoning_output.get('reasoning_type')}"
+                f"type={_get_reasoning_attr(agent_reasoning_output, 'reasoning_type')}"
             )
 
         # ================================================================

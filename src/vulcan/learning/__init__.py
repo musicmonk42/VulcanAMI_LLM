@@ -355,49 +355,80 @@ class UnifiedLearningSystem:
         # 3. Update tool weights based on success/failure
         # ISSUE #15 FIX: Use lock to prevent race conditions in concurrent async calls
         # ISSUE #5 FIX: Apply weight bounds to prevent death spiral
+        # ISSUE #9 FIX: Skip weight adjustment for system/code bugs (AttributeError, TypeError, etc.)
+        #   These errors indicate code bugs, not tool performance issues. Penalizing tools for
+        #   code bugs causes incorrect weight drift that deprioritizes working tools.
         if tools:  # Only if tools were recorded
-            weight_delta = WEIGHT_ADJUSTMENT_SUCCESS if status == 'success' else WEIGHT_ADJUSTMENT_FAILURE
-            with self._weight_lock:
-                # Apply periodic weight decay first (moves weights towards 0)
-                self._apply_weight_decay_if_needed()
-                
-                for tool in tools:
-                    if tool not in self.tool_weight_adjustments:
-                        self.tool_weight_adjustments[tool] = 0.0
+            # Check if this is a system/code bug vs tool performance failure
+            error_type = outcome.get('error_type', '')
+            error_message = outcome.get('error', '') or outcome.get('error_message', '')
+            
+            # System error patterns that indicate code bugs (not tool performance issues)
+            system_error_patterns = [
+                'AttributeError', 'TypeError', 'KeyError', 'NameError',
+                'ImportError', 'ModuleNotFoundError', 'SyntaxError',
+                "has no attribute", "object is not", "is not defined",
+                "unexpected keyword argument", "missing required"
+            ]
+            
+            is_system_error = any(
+                pattern in error_type or pattern in error_message 
+                for pattern in system_error_patterns
+            )
+            
+            if is_system_error and status != 'success':
+                logger.info(
+                    f"[Learning] SKIPPING weight adjustment for system error: "
+                    f"type={error_type}, message={error_message[:100] if error_message else 'N/A'}. "
+                    f"Tools {tools} not penalized for code bug."
+                )
+                # Don't adjust weights - this was a code bug, not tool performance
+                weight_delta = 0.0
+            else:
+                weight_delta = WEIGHT_ADJUSTMENT_SUCCESS if status == 'success' else WEIGHT_ADJUSTMENT_FAILURE
+            
+            if weight_delta != 0.0:  # Only process if there's a weight change
+                with self._weight_lock:
+                    # Apply periodic weight decay first (moves weights towards 0)
+                    self._apply_weight_decay_if_needed()
                     
-                    new_weight = self.tool_weight_adjustments[tool] + weight_delta
+                    for tool in tools:
+                        if tool not in self.tool_weight_adjustments:
+                            self.tool_weight_adjustments[tool] = 0.0
+                        
+                        new_weight = self.tool_weight_adjustments[tool] + weight_delta
+                        
+                        # ISSUE #5 FIX: Clamp weight to bounds to prevent death spiral
+                        old_weight = self.tool_weight_adjustments[tool]
+                        self.tool_weight_adjustments[tool] = max(MIN_TOOL_WEIGHT, min(MAX_TOOL_WEIGHT, new_weight))
+                        
+                        # Log if weight was clamped
+                        if self.tool_weight_adjustments[tool] != new_weight:
+                            logger.info(
+                                f"[Learning] Tool '{tool}' weight CLAMPED: {old_weight:+.3f} + {weight_delta:+.3f} = "
+                                f"{new_weight:+.3f} -> {self.tool_weight_adjustments[tool]:+.3f} (bounds: [{MIN_TOOL_WEIGHT}, {MAX_TOOL_WEIGHT}])"
+                            )
+                        else:
+                            logger.info(f"[Learning] Tool '{tool}' weight adjustment: {weight_delta:+.3f} (cumulative: {self.tool_weight_adjustments[tool]:+.3f})")
+                        
+                        # BUG FIX: Propagate weight to shared ToolWeightManager so Ensemble can use it
+                        # Previously, learning updated its own dictionary but Ensemble read from a separate
+                        # ToolWeightManager instance, so learned weights were never applied.
+                        if WEIGHT_MANAGER_AVAILABLE and get_weight_manager:
+                            try:
+                                # Use absolute weight (1.0 + adjustment) since ToolWeightManager expects base weight
+                                get_weight_manager().set_weight(tool, 1.0 + self.tool_weight_adjustments[tool])
+                                logger.debug(f"[Learning] Propagated weight to ToolWeightManager: {tool} = {1.0 + self.tool_weight_adjustments[tool]:.4f}")
+                            except Exception as e:
+                                logger.warning(f"[Learning] Failed to propagate weight to ToolWeightManager: {e}")
                     
-                    # ISSUE #5 FIX: Clamp weight to bounds to prevent death spiral
-                    old_weight = self.tool_weight_adjustments[tool]
-                    self.tool_weight_adjustments[tool] = max(MIN_TOOL_WEIGHT, min(MAX_TOOL_WEIGHT, new_weight))
-                    
-                    # Log if weight was clamped
-                    if self.tool_weight_adjustments[tool] != new_weight:
-                        logger.info(
-                            f"[Learning] Tool '{tool}' weight CLAMPED: {old_weight:+.3f} + {weight_delta:+.3f} = "
-                            f"{new_weight:+.3f} -> {self.tool_weight_adjustments[tool]:+.3f} (bounds: [{MIN_TOOL_WEIGHT}, {MAX_TOOL_WEIGHT}])"
-                        )
-                    else:
-                        logger.info(f"[Learning] Tool '{tool}' weight adjustment: {weight_delta:+.3f} (cumulative: {self.tool_weight_adjustments[tool]:+.3f})")
-                    
-                    # BUG FIX: Propagate weight to shared ToolWeightManager so Ensemble can use it
-                    # Previously, learning updated its own dictionary but Ensemble read from a separate
-                    # ToolWeightManager instance, so learned weights were never applied.
-                    if WEIGHT_MANAGER_AVAILABLE and get_weight_manager:
+                    # PERSISTENCE FIX: Save tool weights to disk after every update
+                    # This ensures learning state persists across queries and server restarts
+                    if self._learning_persistence:
                         try:
-                            # Use absolute weight (1.0 + adjustment) since ToolWeightManager expects base weight
-                            get_weight_manager().set_weight(tool, 1.0 + self.tool_weight_adjustments[tool])
-                            logger.debug(f"[Learning] Propagated weight to ToolWeightManager: {tool} = {1.0 + self.tool_weight_adjustments[tool]:.4f}")
+                            self._learning_persistence.update_tool_weights(self.tool_weight_adjustments)
                         except Exception as e:
-                            logger.warning(f"[Learning] Failed to propagate weight to ToolWeightManager: {e}")
-                
-                # PERSISTENCE FIX: Save tool weights to disk after every update
-                # This ensures learning state persists across queries and server restarts
-                if self._learning_persistence:
-                    try:
-                        self._learning_persistence.update_tool_weights(self.tool_weight_adjustments)
-                    except Exception as e:
-                        logger.warning(f"[Learning] Failed to persist tool weights: {e}")
+                            logger.warning(f"[Learning] Failed to persist tool weights: {e}")
         else:
             logger.warning(f"[Learning] No tools recorded for {query_id} - cannot learn from selection")
         

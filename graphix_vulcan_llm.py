@@ -1215,15 +1215,29 @@ class GraphixVulcanLLM:
         return self._event_loop
 
     def _check_running_loop(self) -> bool:
-        """Check if there's already a running event loop.
+        """Check if there's already a running event loop in the current thread.
 
         Returns True if a loop is already running (and run_until_complete would fail),
         False if it's safe to create and run a new loop.
+        
+        BUG FIX: Added thread context logging to help debug why internal LLM
+        returns None when called from HybridLLMExecutor.run_in_executor().
         """
+        import threading
+        thread_name = threading.current_thread().name
+        thread_id = threading.current_thread().ident
+        
         try:
-            asyncio.get_running_loop()
+            running_loop = asyncio.get_running_loop()
+            # Log detailed context to help debug the issue
+            logger.debug(
+                f"[_check_running_loop] Event loop FOUND in thread '{thread_name}' (id={thread_id})"
+            )
             return True  # Loop is running - not safe to use run_until_complete
         except RuntimeError:
+            logger.debug(
+                f"[_check_running_loop] No event loop in thread '{thread_name}' (id={thread_id}) - safe to proceed"
+            )
             return False  # No running loop - safe to proceed
 
     def _run_async(self, coro):

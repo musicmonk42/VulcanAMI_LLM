@@ -62,8 +62,14 @@ class CircuitState(Enum):
 # (embeddings are too slow), we want to stay in keyword-only mode longer before
 # retrying embeddings. This is different from QUERY_ROUTING_TIMEOUT (5s) in
 # query_router.py which limits how long we wait for routing to complete.
-DEFAULT_LATENCY_THRESHOLD_MS = 1000.0  # 1 second - aggressive fail-fast on slow embeddings
-DEFAULT_FAILURE_THRESHOLD = 2  # Only 2 slow operations before opening circuit (was 3)
+#
+# BUG FIX Issue #4: Increased DEFAULT_LATENCY_THRESHOLD_MS from 1000ms to 5000ms
+# The previous 1000ms threshold was too aggressive and caused the circuit breaker
+# to trip on normal embeddings (observed: 3168ms). On CPU-only or slower hardware,
+# embedding generation can take 3-5 seconds which is acceptable. The 5000ms threshold
+# still catches truly slow operations (>5s) while allowing normal operation.
+DEFAULT_LATENCY_THRESHOLD_MS = 5000.0  # 5 seconds - more realistic for CPU-only deployments
+DEFAULT_FAILURE_THRESHOLD = 3  # 3 slow operations before opening circuit (was 2 - too sensitive)
 DEFAULT_RESET_TIMEOUT_S = 60.0  # Wait longer before retrying slow embeddings (was 30s)
 DEFAULT_SUCCESS_THRESHOLD = 3  # More successes needed to confirm recovery (was 2)
 DEFAULT_EMA_ALPHA = 0.3  # Exponential moving average smoothing factor
