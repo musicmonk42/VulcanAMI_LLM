@@ -702,9 +702,13 @@ class HybridLLMExecutor:
         systems_used.append("vulcan_local_llm_failed")
         
         # GRACEFUL DEGRADATION FIX: Provide a user-friendly error message
-        # As recommended by Claude diagnosis: when internal LLM fails, OpenAI can help
-        # format an error response - but NOT reason independently
-        # This is the "language only" permitted use of OpenAI
+        # Generate a unique error reference for tracking
+        import hashlib
+        import time as time_module
+        error_ref = hashlib.sha256(
+            f"{time_module.time()}:{prompt[:50]}".encode()
+        ).hexdigest()[:12].upper()
+        
         error_text = (
             "I encountered an internal processing issue while reasoning about your request.\n\n"
             "This could be due to:\n"
@@ -715,7 +719,7 @@ class HybridLLMExecutor:
             "• Please try rephrasing your question\n"
             "• Try breaking down complex questions into simpler parts\n"
             "• Wait a moment and try again\n\n"
-            "If this issue persists, please contact support with the error reference below."
+            f"If this issue persists, please contact support with error reference: **{error_ref}**"
         )
         
         return {
@@ -729,6 +733,7 @@ class HybridLLMExecutor:
                 "suggestion": "Rephrase question or try again later",
                 "timeout_seconds": self.vulcan_timeout,
                 "can_retry": True,
+                "error_reference": error_ref,
             },
         }
 
