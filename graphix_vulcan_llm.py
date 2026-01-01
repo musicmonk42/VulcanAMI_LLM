@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 """
-GraphixVulcanLLM - COMPLETE FIXED VERSION (Async Generator Handling)
+GraphixVulcanLLM - FIXED Silent Failure Issue
 
-Version: 2.0.2
-Date: 2025-11-17 06:27:31 UTC
+Version: 2.0.3
+Date: 2026-01-01 05:12 UTC
 User: musicmonk42
 
-CRITICAL FIX: Properly handle async generator from CognitiveLoop.generate()
+CRITICAL FIX: Silent failure when generate() called with event loop already running
+- Added timeout wrapper to prevent infinite hangs
+- Added _run_async_in_thread() for async execution when event loop is running
+- Added _consume_async_result() for proper async result handling with timeout
+- Improved error logging and propagation
 """
 
 import asyncio
@@ -124,7 +128,9 @@ except Exception as e:
         def apply_update(self, gradients: Dict[str, Any]) -> None:
             logger.debug(f"Applied gradient update: {len(gradients)} params")
 
+        @property
         def vocab_size(self) -> int:
+            """Return vocabulary size as a property (not a method) for compatibility."""
             return self.config.vocab_size
 
         def __call__(self, batch: Dict[str, Any]) -> float:
@@ -933,10 +939,10 @@ class GraphixVulcanLLM:
     """
     Fully Optimized LLM over Graphix-VULCAN components.
 
-    Version 2.0.2 - Critical fix for async generator handling
+    Version 2.0.3 - Critical fix for silent failure with event loop conflicts
     """
 
-    VERSION = "2.0.2"
+    VERSION = "2.0.3"
 
     def __init__(
         self,
@@ -1240,6 +1246,128 @@ class GraphixVulcanLLM:
             )
             return False  # No running loop - safe to proceed
 
+    async def _consume_async_result(self, gen_result, timeout: Optional[float] = 60.0) -> Any:
+        """Consume an async result (coroutine or async generator) with timeout protection.
+        
+        This method handles:
+        - Coroutines that need to be awaited
+        - Async generators that need to be consumed
+        - Nested async generators (coroutine returning an async generator)
+        
+        Args:
+            gen_result: The async result to consume
+            timeout: Maximum time in seconds (None for no timeout)
+            
+        Returns:
+            The final result (typically a CognitiveLoopResult)
+            
+        Raises:
+            asyncio.TimeoutError: If operation exceeds timeout
+            ValueError: If generator yields no items
+        """
+        try:
+            # Wrap the consumption in a timeout
+            async def _consume():
+                result = gen_result
+                
+                # If it's a coroutine, await it first
+                if inspect.iscoroutine(result):
+                    logger.debug("DETECTED COROUTINE - AWAITING")
+                    result = await result
+                    logger.debug(
+                        f"After awaiting coroutine: type={type(result).__name__}, "
+                        f"has_tokens={hasattr(result, 'tokens')}"
+                    )
+                
+                # Now check if we have an async generator (streaming mode)
+                if hasattr(result, "__anext__"):
+                    logger.debug("DETECTED ASYNC GENERATOR - CONSUMING")
+                    items = []
+                    count = 0
+                    async for item in result:
+                        count += 1
+                        items.append(item)
+                        # Safety: don't accumulate too many items
+                        if count > 10000:
+                            logger.warning("Excessive items in async generator - breaking")
+                            break
+                    
+                    logger.debug(f"Consumed {count} items from async generator")
+                    
+                    if not items:
+                        raise ValueError("Generator yielded no items!")
+                    
+                    return items[-1]
+                
+                # If result already has tokens, it's the final result
+                if hasattr(result, "tokens"):
+                    logger.debug("DETECTED DIRECT RESULT OBJECT")
+                    return result
+                
+                raise TypeError(
+                    f"Unknown result type: {type(result).__name__}, "
+                    f"has___anext__={hasattr(result, '__anext__')}, "
+                    f"has_tokens={hasattr(result, 'tokens')}"
+                )
+            
+            if timeout:
+                return await asyncio.wait_for(_consume(), timeout=timeout)
+            else:
+                return await _consume()
+                
+        except asyncio.TimeoutError:
+            logger.error(f"[TIMEOUT] Async generation exceeded {timeout}s limit")
+            raise TimeoutError(f"Generation timed out after {timeout} seconds")
+
+    def _run_async_in_thread(self, gen_result, timeout: Optional[float] = 60.0) -> Any:
+        """Run async generation in a separate thread with its own event loop.
+        
+        This is used when there's already an event loop running in the current thread
+        (e.g., when called from HybridLLMExecutor.run_in_executor()).
+        
+        CRITICAL FIX: This prevents the silent failure that occurred when trying to
+        create a new event loop while one is already running.
+        
+        Args:
+            gen_result: The async result to consume
+            timeout: Maximum time in seconds
+            
+        Returns:
+            The final result from async generation
+            
+        Raises:
+            TimeoutError: If operation exceeds timeout
+            RuntimeError: If thread execution fails
+        """
+        from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
+        
+        def run_in_new_loop():
+            """Execute async code in a new event loop in this thread."""
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                return loop.run_until_complete(
+                    self._consume_async_result(gen_result, timeout=timeout)
+                )
+            finally:
+                loop.close()
+                asyncio.set_event_loop(None)
+        
+        # Use a thread pool with a single worker
+        with ThreadPoolExecutor(max_workers=1, thread_name_prefix="vulcan_llm_") as executor:
+            future = executor.submit(run_in_new_loop)
+            try:
+                # Wait with an extra buffer for thread overhead
+                thread_timeout = (timeout + 5.0) if timeout else None
+                result = future.result(timeout=thread_timeout)
+                return result
+            except FuturesTimeoutError:
+                logger.error(f"[TIMEOUT] Threaded async generation exceeded {timeout}s limit")
+                raise TimeoutError(f"Generation timed out after {timeout} seconds")
+            except Exception as e:
+                logger.error(f"[ERROR] Threaded async generation failed: {type(e).__name__}: {e}")
+                raise RuntimeError(f"Generation failed: {e}") from e
+
     def _run_async(self, coro):
         """Run async coroutine or collect async generator"""
         # EMERGENCY FIX: Check if we're in an async context where run_until_complete would fail
@@ -1300,8 +1428,33 @@ class GraphixVulcanLLM:
         stop_strings: Optional[Sequence[str]] = None,
         stop_tokens: Optional[Sequence[int]] = None,
         use_cache: bool = True,
+        timeout: Optional[float] = 60.0,
     ) -> GenerationResult:
-        """High-level safe generation - FIXED nested async pattern"""
+        """High-level safe generation with proper async handling and timeout.
+        
+        CRITICAL FIX for silent failure issue:
+        - Adds timeout wrapper to prevent infinite hangs
+        - Runs async generation in a separate thread when event loop is already running
+        - Properly handles both sync and async CognitiveLoop implementations
+        
+        Args:
+            prompt: Input text or token sequence
+            max_tokens: Maximum tokens to generate (default from config)
+            explain: Whether to generate explanations
+            stream: Enable streaming mode
+            stream_callback: Callback for streaming tokens
+            stop_strings: Strings that stop generation
+            stop_tokens: Token IDs that stop generation
+            use_cache: Enable result caching
+            timeout: Maximum time in seconds for generation (default: 60.0)
+            
+        Returns:
+            GenerationResult with generated tokens, text, and metadata
+            
+        Raises:
+            TimeoutError: If generation exceeds timeout
+            RuntimeError: If critical errors occur during generation
+        """
         start = time.time()
         max_steps = max_tokens or self.config["generation"]["max_tokens"]
         
@@ -1359,90 +1512,27 @@ class GraphixVulcanLLM:
             loop_result = gen_result
         else:
             # Need async handling - check if we can safely create an event loop
-            if self._check_running_loop():
-                # FIX #1 CRITICAL: Instead of returning None, raise an informative error
-                # This allows HybridLLMExecutor to provide a proper error message
-                error_msg = (
-                    "Cannot process async result: event loop already running in current thread. "
-                    "This typically happens when generate() is called from within an async context. "
-                    "Consider using generate_async() instead, or ensure generate() is called "
-                    "from a synchronous context (e.g., via run_in_executor)."
-                )
-                logger.error(f"[DEBUG] {error_msg}")
-                raise RuntimeError(error_msg)
+            has_running_loop = self._check_running_loop()
+            
+            if has_running_loop:
+                # CRITICAL FIX: Event loop already running - run async code in a new thread
+                # This commonly happens when called from HybridLLMExecutor.run_in_executor()
+                logger.info("[DEBUG] Event loop running - using threaded async execution")
+                loop_result = self._run_async_in_thread(gen_result, timeout=timeout)
+            else:
+                # Create a new event loop for this synchronous context
+                # Note: We don't call set_event_loop() to avoid affecting the thread's default loop
+                loop = asyncio.new_event_loop()
 
-            # Create a new event loop for this synchronous context
-            # Note: We don't call set_event_loop() to avoid affecting the thread's default loop
-            loop = asyncio.new_event_loop()
-
-            try:
-                # Process based on type
-                if inspect.iscoroutine(gen_result):
-                    logger.debug("DETECTED COROUTINE - AWAITING")
-                    loop_result = loop.run_until_complete(gen_result)
-
-                    # Check if the coroutine returned an async generator!
-                    result_type_after_await = type(loop_result).__name__
-                    logger.debug(
-                        f"After awaiting coroutine: type={result_type_after_await}, has_tokens={hasattr(loop_result, 'tokens')}"
-                    )
-
-                    # If it returned an async generator, consume it
-                    if hasattr(loop_result, "__anext__"):
-                        logger.debug("COROUTINE RETURNED ASYNC GENERATOR - CONSUMING IT")
-
-                        async def consume_nested_generator():
-                            results = []
-                            count = 0
-
-                            async for item in loop_result:
-                                count += 1
-                                results.append(item)
-
-                            logger.debug(f"Consumed {count} items from nested generator")
-
-                            if not results:
-                                raise ValueError("Nested generator yielded no items!")
-
-                            return results[-1]
-
-                        loop_result = loop.run_until_complete(consume_nested_generator())
-                        logger.debug(
-                            f"After consuming nested generator: type={type(loop_result).__name__}, has_tokens={hasattr(loop_result, 'tokens')}"
-                        )
-
-                elif has_anext:
-                    logger.debug("DETECTED ASYNC GENERATOR - CONSUMING")
-
-                    async def consume_generator():
-                        results = []
-                        count = 0
-
-                        async for item in gen_result:
-                            count += 1
-                            results.append(item)
-
-                        logger.debug(f"Consumed {count} items")
-
-                        if not results:
-                            raise ValueError("Generator yielded no items!")
-
-                        return results[-1]
-
-                    loop_result = loop.run_until_complete(consume_generator())
-
-                elif has_tokens:
-                    logger.debug("DETECTED DIRECT RESULT OBJECT")
-                    loop_result = gen_result
-
-                else:
-                    raise TypeError(
-                        f"Unknown return type: type={result_type_name}, "
-                        f"has___anext__={has_anext}, has_tokens={has_tokens}"
-                    )
-            finally:
-                # Clean up the event loop we created
-                loop.close()
+                try:
+                    # FIX: Add timeout wrapper to prevent infinite hangs
+                    async def run_with_timeout():
+                        return await self._consume_async_result(gen_result, timeout)
+                    
+                    loop_result = loop.run_until_complete(run_with_timeout())
+                finally:
+                    # Clean up the event loop we created
+                    loop.close()
 
         # Final check
         final_type = type(loop_result).__name__

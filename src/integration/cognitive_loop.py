@@ -1355,7 +1355,21 @@ class CognitiveLoop:
             except Exception as e:
                 # Log logit extraction failure and fall through to alternative methods
                 logger.warning(f"Failed to get logits from transformer: {e}")
+        # Get vocab_size - handle both property/attribute and method cases
         vocab_size = getattr(self.transformer, "vocab_size", None)
+        if callable(vocab_size):
+            # It's a method, call it
+            try:
+                vocab_size = vocab_size()
+            except Exception as e:
+                logger.warning(f"Failed to call vocab_size method: {e}")
+                vocab_size = None
+        # Ensure vocab_size is an integer
+        if vocab_size is not None and not isinstance(vocab_size, int):
+            try:
+                vocab_size = int(vocab_size)
+            except (TypeError, ValueError):
+                vocab_size = None
         if vocab_size is None and self.vocab and hasattr(self.vocab, "size"):
             vocab_size = await self._async_safe(self.vocab.size, (), 200)
         if vocab_size is None:
