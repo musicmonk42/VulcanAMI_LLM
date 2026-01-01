@@ -1,38 +1,39 @@
 # ============================================================
 # VULCAN-AGI Hybrid LLM Executor Module
-# Enables simultaneous use of OpenAI and Vulcan's internal LLM
+# VULCAN does ALL reasoning - OpenAI is for language polish ONLY
 # ============================================================
 #
-# This module provides:
-#     - Multi-backend LLM execution
-#     - Fallback strategies
-#     - Parallel and ensemble execution modes
-#     - Response quality evaluation
-#     - OpenAI response caching (LRU with TTL)
+# ARCHITECTURE:
+#     - VULCAN internal LLM handles ALL reasoning
+#     - OpenAI is ONLY permitted for language interpretation/polish
+#     - NO external AI fallback for reasoning - if VULCAN fails, return error
 #
-# EXECUTION MODES:
-#     - local_first: Try Vulcan's local LLM first, fallback to OpenAI
-#     - openai_first: Try OpenAI first, fallback to local LLM
-#     - parallel: Run both simultaneously, use first successful response
-#     - ensemble: Run both, combine/select best response based on quality
+# PERMITTED OPENAI USAGE:
+#     - When VULCAN succeeds and OPENAI_LANGUAGE_POLISH=true:
+#       OpenAI can polish VULCAN's output into clearer language
+#     - OpenAI must NOT reason, analyze, or generate independent responses
 #
-# CACHING:
-#     - OpenAI responses are cached with configurable TTL (default: 1 hour)
-#     - Cache key includes prompt, max_tokens, temperature for uniqueness
-#     - LRU eviction when cache exceeds max size
-#     - Cache can be disabled per-request or globally
+# PROHIBITED OPENAI USAGE:
+#     - Reasoning fallback when VULCAN fails
+#     - Independent problem-solving
+#     - Code generation
+#     - Any form of independent analysis
+#
+# CONFIGURATION:
+#     - OPENAI_LANGUAGE_POLISH=false (default) - Return VULCAN output directly
+#     - OPENAI_LANGUAGE_POLISH=true - Polish VULCAN output with OpenAI
 #
 # USAGE:
 #     from vulcan.llm.hybrid_executor import HybridLLMExecutor
 #     
-#     executor = HybridLLMExecutor(local_llm=my_llm, mode="parallel")
+#     executor = HybridLLMExecutor(local_llm=my_llm)
 #     result = await executor.execute("What is 2+2?")
-#     print(result["text"])
+#     print(result["text"])  # VULCAN's reasoning result
 #
 # VERSION HISTORY:
 #     1.0.0 - Extracted from main.py for modular architecture
-#     1.0.1 - Added comprehensive documentation and type hints
 #     1.1.0 - Added OpenAI response caching with LRU and TTL
+#     1.2.0 - Removed OpenAI reasoning fallback - VULCAN only for reasoning
 # ============================================================
 
 import asyncio
@@ -57,26 +58,20 @@ logger = logging.getLogger(__name__)
 # Default path for GraphixVulcanLLM config, can be overridden via environment variable
 LLM_CONFIG_PATH = os.environ.get("VULCAN_LLM_CONFIG_PATH", "configs/llm_config.yaml")
 
-# ISSUE P1.2 FIX: OpenAI Fallback Confidence
-# When the internal VULCAN LLM fails and OpenAI provides full reasoning as fallback,
-# we assign this confidence value. Previously, fallback responses defaulted to 10%
-# which caused all responses to be filtered out by confidence thresholds.
-# 0.6 is reasonable because OpenAI is a capable LLM providing full reasoning.
+# NOTE: OPENAI_FALLBACK_CONFIDENCE is kept for backwards compatibility but
+# OpenAI reasoning fallback is now disabled. This constant is only used
+# if language polish mode is enabled.
 OPENAI_FALLBACK_CONFIDENCE = 0.6
 
-# ARCHITECTURE FIX: VULCAN should be primary brain, OpenAI is language fallback only
+# ARCHITECTURE: VULCAN does ALL reasoning. OpenAI is for language polish ONLY.
 # 
-# Previous behavior (WRONG): SKIP_LOCAL_LLM=true by default, bypassing VULCAN entirely
-# New behavior (CORRECT): SKIP_LOCAL_LLM=false by default, VULCAN runs first
-#
-# The correct architecture is:
+# The correct flow is:
 # 1. VULCAN reasoning engines analyze query (symbolic, probabilistic, causal, math)
-# 2. GraphixVulcanLLM tries to generate response using VULCAN's internal model
-# 3. If internal model succeeds with sufficient confidence -> return VULCAN response
-# 4. If internal model fails or low confidence -> OpenAI generates language ONLY
-#    (OpenAI should NOT reason, only express VULCAN's reasoning in fluent prose)
+# 2. GraphixVulcanLLM generates response using VULCAN's internal model
+# 3. If VULCAN succeeds -> return VULCAN response (optionally polish with OpenAI)
+# 4. If VULCAN fails -> return error (NO OpenAI reasoning fallback)
 #
-# Set SKIP_LOCAL_LLM=true ONLY if you want to bypass VULCAN entirely for testing
+# SKIP_LOCAL_LLM is deprecated - VULCAN must always run for reasoning.
 _skip_local_llm_env = os.environ.get("SKIP_LOCAL_LLM", "false").lower()
 SKIP_LOCAL_LLM = _skip_local_llm_env in ("true", "1", "yes")
 
