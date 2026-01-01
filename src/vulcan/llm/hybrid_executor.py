@@ -38,6 +38,7 @@
 
 import asyncio
 import hashlib
+import json
 import logging
 import os
 import threading
@@ -45,10 +46,11 @@ import time
 import traceback
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
+from dataclasses import asdict, dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 # Module metadata
-__version__ = "1.3.0"
+__version__ = "1.4.0"
 __author__ = "VULCAN-AGI Team"
 
 logger = logging.getLogger(__name__)
@@ -77,6 +79,14 @@ _skip_local_llm_env = os.environ.get("SKIP_LOCAL_LLM", "false").lower()
 SKIP_LOCAL_LLM = _skip_local_llm_env in ("true", "1", "yes")
 
 # ============================================================
+# TIMEOUT CONFIGURATION - INCREASED FOR CPU EXECUTION
+# ============================================================
+# FIX: Increased timeouts to prevent premature timeouts during CPU-intensive
+# symbolic reasoning. The internal LLM can take 3+ seconds per token on CPU.
+VULCAN_HARD_TIMEOUT = float(os.environ.get("VULCAN_HARD_TIMEOUT", "120.0"))  # 2 minutes (was 30s)
+PER_TOKEN_TIMEOUT = float(os.environ.get("VULCAN_PER_TOKEN_TIMEOUT", "30.0"))  # 30s per token (was 10s)
+
+# ============================================================
 # COMPONENT REGISTRY INTEGRATION
 # ============================================================
 # Import component registry getter for auto-fetching internal LLM
@@ -85,6 +95,63 @@ try:
     from vulcan.utils_main.components import get_component as _get_component_from_registry
 except ImportError:
     _get_component_from_registry = None
+
+
+# ============================================================
+# VULCAN REASONING OUTPUT - STRUCTURED OUTPUT FORMAT
+# ============================================================
+# This dataclass defines the structured format VULCAN's mind outputs
+# BEFORE any LLM is called for prose generation.
+
+
+@dataclass
+class VulcanReasoningOutput:
+    """
+    Output from VULCAN's reasoning systems (the mind).
+    
+    This represents the structured result from VULCAN's internal reasoning
+    systems (symbolic, probabilistic, causal, mathematical) BEFORE any
+    language model converts it to natural language prose.
+    
+    The key insight is that neither GraphixVulcanLLM nor OpenAI is "the mind."
+    They're output formatters. VULCAN's mind already did its reasoning work
+    before any LLM is invoked.
+    
+    Attributes:
+        query_id: Unique identifier for this query
+        success: Whether reasoning succeeded
+        result: The actual answer/computation (can be any type)
+        result_type: Category of result (mathematical, symbolic, factual, etc.)
+        method_used: Which reasoning system solved it
+        confidence: Confidence score 0.0 - 1.0
+        reasoning_trace: Steps taken during reasoning (for transparency)
+        error: Error message if reasoning failed
+        metadata: Additional context about the reasoning
+    """
+    query_id: str
+    success: bool
+    result: Any
+    result_type: str = "unknown"  # "mathematical", "symbolic", "factual", "causal", etc.
+    method_used: str = "unknown"  # "symbolic_integration", "probabilistic", "agent_pool", etc.
+    confidence: float = 0.0
+    reasoning_trace: List[str] = field(default_factory=list)
+    error: Optional[str] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return asdict(self)
+    
+    def is_valid(self) -> bool:
+        """Check if this is a valid, successful reasoning output."""
+        return self.success and self.result is not None
+    
+    def __repr__(self) -> str:
+        status = "✓" if self.success else "✗"
+        return (
+            f"VulcanReasoningOutput({status} query_id={self.query_id!r}, "
+            f"result_type={self.result_type!r}, confidence={self.confidence:.2f})"
+        )
 
 
 # ============================================================
@@ -518,15 +585,20 @@ class HybridLLMExecutor:
             thread_name_prefix="hybrid_timeout_"
         )
         # Parse VULCAN_LLM_TIMEOUT with error handling for invalid values
-        # FIX: Increased default from 15s to 30s per Claude diagnosis
-        # 15s was causing timeouts before internal LLM could complete complex reasoning
+        # FIX: Use VULCAN_HARD_TIMEOUT constant (default 120s) for CPU-intensive reasoning
+        # Previous 30s was causing timeouts before internal LLM could complete complex reasoning
         try:
-            self.vulcan_timeout = float(os.environ.get("VULCAN_LLM_TIMEOUT", "30.0"))
+            env_timeout = os.environ.get("VULCAN_LLM_TIMEOUT")
+            if env_timeout:
+                self.vulcan_timeout = float(env_timeout)
+            else:
+                # Use module-level constant as default
+                self.vulcan_timeout = VULCAN_HARD_TIMEOUT
         except (ValueError, TypeError):
             self.logger.warning(
-                f"[HybridExecutor] Invalid VULCAN_LLM_TIMEOUT value, using default 30.0s"
+                f"[HybridExecutor] Invalid VULCAN_LLM_TIMEOUT value, using default {VULCAN_HARD_TIMEOUT}s"
             )
-            self.vulcan_timeout = 30.0
+            self.vulcan_timeout = VULCAN_HARD_TIMEOUT
         self.logger.info(f"[HybridExecutor] VULCAN hard timeout set to {self.vulcan_timeout}s")
         
         # OpenAI response cache for reducing API costs and latency
@@ -621,6 +693,172 @@ class HybridLLMExecutor:
             self._capture_for_distillation(prompt, result)
 
         return result
+
+    async def execute_with_structured_output(
+        self,
+        prompt: str,
+        reasoning_output: Optional["VulcanReasoningOutput"] = None,
+        context: Optional[Dict[str, Any]] = None,
+        use_openai_formatting: Optional[bool] = None,
+        max_tokens: int = 1000,
+    ) -> Dict[str, Any]:
+        """
+        Execute with support for structured reasoning output.
+        
+        This implements the VULCAN Hybrid Output pattern where:
+        1. VULCAN's reasoning systems (the "mind") complete their work first
+        2. The result is captured in a VulcanReasoningOutput structure
+        3. OpenAI (or internal LLM) is used ONLY for prose formatting
+        
+        This approach solves the timeout problem because:
+        - VULCAN's reasoning is already complete (passed in reasoning_output)
+        - OpenAI is fast for simple prose generation (~2-5 seconds)
+        - The slow internal LLM is bypassed for the output formatting step
+        
+        Args:
+            prompt: The original user query
+            reasoning_output: Pre-computed structured output from VULCAN's reasoning systems.
+                            If None, falls back to legacy execute() behavior.
+            context: Optional context dict (may contain reasoning_output if not provided directly)
+            use_openai_formatting: Whether to use OpenAI for formatting.
+                                 None = auto-detect from OPENAI_LANGUAGE_POLISH env var.
+            max_tokens: Maximum tokens for response
+            
+        Returns:
+            Dict with 'text', 'source', 'systems_used', 'metadata', and optional 'reasoning_output'
+        """
+        loop = asyncio.get_running_loop()
+        
+        # Check if reasoning_output is in context
+        if reasoning_output is None and context:
+            reasoning_output = context.get("reasoning_output")
+        
+        # If no structured output, fall back to legacy execution
+        if reasoning_output is None:
+            self.logger.info("[HybridExecutor] No structured output provided, using legacy execution")
+            return await self.execute(prompt, max_tokens=max_tokens)
+        
+        # Validate reasoning output
+        if not isinstance(reasoning_output, VulcanReasoningOutput):
+            self.logger.warning(
+                f"[HybridExecutor] reasoning_output is not VulcanReasoningOutput (got {type(reasoning_output).__name__}), "
+                "using legacy execution"
+            )
+            return await self.execute(prompt, max_tokens=max_tokens)
+        
+        # Determine if we should use OpenAI for formatting
+        if use_openai_formatting is None:
+            use_openai_formatting = os.environ.get("OPENAI_LANGUAGE_POLISH", "false").lower() in ("true", "1", "yes")
+        
+        systems_used = ["vulcan_reasoning"]
+        
+        # Check if reasoning succeeded
+        if not reasoning_output.success:
+            # Return error in a user-friendly way
+            error_text = self._format_reasoning_error(reasoning_output)
+            return {
+                "text": error_text,
+                "source": "vulcan_reasoning_error",
+                "systems_used": systems_used,
+                "error": True,
+                "metadata": {
+                    "reasoning_output": reasoning_output.to_dict(),
+                    "query": prompt,
+                },
+            }
+        
+        # Format the successful reasoning output
+        if use_openai_formatting:
+            try:
+                formatted = await self._format_with_openai(reasoning_output, prompt, loop)
+                if formatted:
+                    systems_used.append("openai_formatting")
+                    self.logger.info("[HybridExecutor] ✓ Used OpenAI for output formatting (fast path)")
+                    
+                    # Capture for distillation if enabled
+                    if self._distillation_enabled:
+                        self._capture_polish_for_distillation(
+                            prompt=prompt,
+                            internal_output=self._format_structured_output_sync(reasoning_output),
+                            teacher_output=formatted,
+                        )
+                    
+                    return {
+                        "text": formatted,
+                        "source": "vulcan_with_openai_formatting",
+                        "systems_used": systems_used,
+                        "metadata": {
+                            "reasoning_output": reasoning_output.to_dict(),
+                            "query": prompt,
+                            "openai_role": "formatting_only",
+                        },
+                    }
+            except Exception as e:
+                self.logger.warning(f"[HybridExecutor] OpenAI formatting failed: {e}, using fallback")
+        
+        # Fallback to simple formatting (no external API)
+        formatted = self._format_structured_output_sync(reasoning_output)
+        systems_used.append("internal_formatting")
+        
+        return {
+            "text": formatted,
+            "source": "vulcan_internal_formatting",
+            "systems_used": systems_used,
+            "metadata": {
+                "reasoning_output": reasoning_output.to_dict(),
+                "query": prompt,
+            },
+        }
+
+    def _format_reasoning_error(self, reasoning_output: "VulcanReasoningOutput") -> str:
+        """Format a reasoning error for user display."""
+        import hashlib
+        import time as time_module
+        
+        # Generate error reference
+        error_ref = hashlib.sha256(
+            f"{time_module.time()}:{reasoning_output.query_id}".encode()
+        ).hexdigest()[:12].upper()
+        
+        error_text = (
+            "I encountered an issue while processing your request.\n\n"
+        )
+        
+        if reasoning_output.error:
+            # Provide specific error context without exposing internal details
+            if "timeout" in reasoning_output.error.lower():
+                error_text += (
+                    "**Issue:** The computation took longer than expected.\n\n"
+                    "**Suggestions:**\n"
+                    "• Try breaking your question into smaller parts\n"
+                    "• Simplify complex calculations\n"
+                    "• Try again in a moment\n"
+                )
+            elif "memory" in reasoning_output.error.lower():
+                error_text += (
+                    "**Issue:** The system ran into resource constraints.\n\n"
+                    "**Suggestions:**\n"
+                    "• Simplify your query\n"
+                    "• Try again shortly\n"
+                )
+            else:
+                error_text += (
+                    "**Issue:** An internal processing error occurred.\n\n"
+                    "**Suggestions:**\n"
+                    "• Rephrase your question\n"
+                    "• Try a different approach\n"
+                )
+        else:
+            error_text += (
+                "**Issue:** Could not complete the reasoning process.\n\n"
+                "**Suggestions:**\n"
+                "• Try rephrasing your question\n"
+                "• Break it into simpler parts\n"
+            )
+        
+        error_text += f"\nIf this persists, reference: **{error_ref}**"
+        
+        return error_text
 
     # ============================================================
     # EXECUTION MODE IMPLEMENTATIONS
@@ -1026,6 +1264,135 @@ class HybridLLMExecutor:
         except Exception as e:
             self.logger.debug(f"OpenAI call failed: {e}")
             return None
+
+    async def _format_with_openai(
+        self, 
+        reasoning_output: "VulcanReasoningOutput",
+        original_query: str,
+        loop,
+    ) -> Optional[str]:
+        """
+        Use OpenAI to format VULCAN's reasoning output as natural language.
+        
+        POLICY COMPLIANCE:
+        - OpenAI receives VULCAN's completed reasoning (not the original query)
+        - OpenAI does NOT reason independently
+        - OpenAI ONLY converts structured data to prose
+        
+        This method implements the "hybrid output" pattern where:
+        1. VULCAN's reasoning systems (the actual intelligence) complete their work
+        2. OpenAI is used ONLY as a language formatter for the final prose
+        
+        Args:
+            reasoning_output: The structured output from VULCAN's reasoning systems
+            original_query: The user's original question (for context)
+            loop: The asyncio event loop
+            
+        Returns:
+            Formatted natural language response, or None if formatting fails
+        """
+        system_prompt = """You are a language formatter for VULCAN AI.
+
+ROLE: Convert VULCAN's structured reasoning output into clear, natural language.
+
+RULES:
+- DO NOT perform independent reasoning or analysis
+- DO NOT add information beyond what VULCAN provided
+- DO NOT generate code unless VULCAN's result contains code
+- ONLY format VULCAN's results as readable prose
+- If VULCAN's result is mathematical, present it clearly with the answer
+- If VULCAN's output indicates an error, explain it helpfully
+
+FORMAT:
+- Start directly with the answer or explanation
+- Be concise but complete
+- Use markdown formatting where appropriate (e.g., for code blocks, math)
+"""
+
+        # Build the user prompt with VULCAN's structured output
+        try:
+            output_dict = reasoning_output.to_dict()
+            output_json = json.dumps(output_dict, indent=2, default=str)
+        except Exception as e:
+            self.logger.warning(f"Failed to serialize reasoning output: {e}")
+            output_json = str(reasoning_output)
+
+        user_prompt = f"""Format this VULCAN reasoning output for the user.
+
+Original question: {original_query}
+
+VULCAN's output:
+{output_json}
+
+Write a natural, helpful response based on VULCAN's results."""
+
+        try:
+            # Use gpt-4o-mini for fast and cheap formatting
+            response = await self._call_openai(
+                loop=loop,
+                prompt=user_prompt,
+                max_tokens=500,
+                temperature=0.3,  # Low temp for consistent formatting
+                system_prompt=system_prompt,
+                use_cache=True,
+            )
+            
+            if response and len(response.strip()) > self.MIN_MEANINGFUL_LENGTH:
+                self.logger.info("[HybridExecutor] ✓ OpenAI formatted VULCAN's structured output")
+                return response
+            else:
+                self.logger.warning("[HybridExecutor] OpenAI returned empty/short response for formatting")
+                return None
+                
+        except Exception as e:
+            self.logger.warning(f"[HybridExecutor] OpenAI formatting failed: {e}")
+            return None
+
+    def _format_structured_output_sync(
+        self,
+        reasoning_output: "VulcanReasoningOutput",
+    ) -> str:
+        """
+        Format VULCAN's structured output as plain text (fallback when OpenAI unavailable).
+        
+        This provides a simple, reliable fallback that doesn't require any external API.
+        
+        Args:
+            reasoning_output: The structured output from VULCAN's reasoning systems
+            
+        Returns:
+            Plain text formatted response
+        """
+        if not reasoning_output.success:
+            return f"I encountered an issue: {reasoning_output.error or 'Unknown error'}"
+        
+        result = reasoning_output.result
+        result_type = reasoning_output.result_type
+        
+        # Format based on result type
+        if result_type == "mathematical":
+            if reasoning_output.confidence >= 0.9:
+                return f"The answer is: **{result}**"
+            else:
+                return f"The calculated result is: **{result}** (confidence: {reasoning_output.confidence:.0%})"
+        
+        elif result_type == "symbolic":
+            return f"Based on symbolic reasoning: {result}"
+        
+        elif result_type == "factual":
+            return str(result)
+        
+        elif result_type == "causal":
+            return f"Based on causal analysis: {result}"
+        
+        else:
+            # Generic formatting
+            if isinstance(result, dict):
+                try:
+                    return json.dumps(result, indent=2)
+                except Exception:
+                    return str(result)
+            return str(result)
 
     # ============================================================
     # HELPER METHODS

@@ -48,6 +48,7 @@ except ImportError as e:
 try:
     from vulcan.llm.hybrid_executor import (
         HybridLLMExecutor,
+        VulcanReasoningOutput,
         get_or_create_hybrid_executor,
         get_hybrid_executor,
         set_hybrid_executor,
@@ -57,6 +58,7 @@ except ImportError as e:
     logger.warning(f"hybrid_executor module not available: {e}")
     _imports_successful = False
     HybridLLMExecutor = None
+    VulcanReasoningOutput = None
     get_or_create_hybrid_executor = None
     get_hybrid_executor = None
     set_hybrid_executor = None
@@ -92,6 +94,7 @@ __all__ = [
     "GRAPHIX_LLM_AVAILABLE",
     # Hybrid Executor
     "HybridLLMExecutor",
+    "VulcanReasoningOutput",
     "get_or_create_hybrid_executor",
     "get_hybrid_executor",
     "set_hybrid_executor",
@@ -127,6 +130,7 @@ def get_module_info() -> Dict[str, Any]:
         "components": {
             "mock_llm": MockGraphixVulcanLLM is not None,
             "hybrid_executor": HybridLLMExecutor is not None,
+            "vulcan_reasoning_output": VulcanReasoningOutput is not None,
             "openai_client": get_openai_client is not None,
         },
         "backends": {
