@@ -87,6 +87,10 @@ data:
   # Evidence: ISSUE-003 shows 66-80% of queries timeout at 10s threshold.
   # 30s allows embedding completion while still providing reasonable response times.
   QUERY_ROUTING_TIMEOUT: "30.0"
+  # VULCAN Internal LLM Timeout Configuration
+  # TIMEOUT FIX: Increased from 15s to 30s per Claude diagnosis
+  # 15s was causing timeouts before internal LLM could complete complex reasoning
+  VULCAN_LLM_TIMEOUT: "30.0"
   # OpenAI Response Caching Configuration (Performance Optimization)
   # Enables LRU+TTL caching for OpenAI API responses to reduce costs and latency
   OPENAI_CACHE_ENABLED: "true"
