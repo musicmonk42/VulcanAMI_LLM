@@ -1263,7 +1263,9 @@ class GraphixVulcanLLM:
     _THREAD_OVERHEAD_BUFFER = 5.0  # Extra seconds for thread overhead
 
     # Timeout for waiting for the first token from an async generator
-    _FIRST_TOKEN_TIMEOUT_SECONDS = 30.0
+    # CRITICAL FIX: Reduced from 30s to 15s - if no token arrives in 15 seconds,
+    # something is definitely wrong (likely async generator blocked on first await)
+    _FIRST_TOKEN_TIMEOUT_SECONDS = 15.0
 
     async def _consume_async_result(self, gen_result, timeout: Optional[float] = 60.0) -> Any:
         """Consume an async result (coroutine or async generator) with timeout protection.
@@ -1299,9 +1301,27 @@ class GraphixVulcanLLM:
                 logger.debug(f"[DIAG] _consume_async_result: type={type(result).__name__}")
                 
                 # If it's a coroutine, await it first
+                # CRITICAL FIX: Add timeout to coroutine await to prevent hang during
+                # CognitiveLoop.generate() setup phase (tokenization, initialization, etc.)
                 if inspect.iscoroutine(result):
                     logger.debug("[DIAG] DETECTED COROUTINE - AWAITING...")
-                    result = await result
+                    # Use a shorter timeout for the coroutine setup phase
+                    # This catches hangs during tokenization/initialization
+                    coroutine_setup_timeout = min(
+                        self._FIRST_TOKEN_TIMEOUT_SECONDS,
+                        timeout or 60.0
+                    )
+                    try:
+                        result = await asyncio.wait_for(result, timeout=coroutine_setup_timeout)
+                    except asyncio.TimeoutError:
+                        logger.error(
+                            f"[DIAG] ❌ COROUTINE AWAIT TIMED OUT after {coroutine_setup_timeout}s! "
+                            "CognitiveLoop.generate() setup phase is blocked (tokenization/initialization)."
+                        )
+                        raise FirstTokenTimeoutError(
+                            f"CognitiveLoop.generate() setup timed out after {coroutine_setup_timeout}s - "
+                            "likely blocked during tokenization or initialization"
+                        ) from None
                     logger.debug(
                         f"[DIAG] After awaiting coroutine: type={type(result).__name__}, "
                         f"has_tokens={hasattr(result, 'tokens')}"
