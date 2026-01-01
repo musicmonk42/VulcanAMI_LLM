@@ -12,6 +12,8 @@ logger = logging.getLogger(__name__)
 
 # ============================================================================
 # Core Types - Always available
+# CIRCULAR IMPORT FIX: ReasoningStrategy is now in reasoning_types.py to
+# prevent circular imports when agent_pool.py imports from src.vulcan.reasoning
 # ============================================================================
 try:
     from .reasoning_types import (
@@ -21,6 +23,7 @@ try:
         ReasoningResult,
         ReasoningStep,
         ReasoningType,
+        ReasoningStrategy,  # CIRCULAR IMPORT FIX: Now from reasoning_types
         SelectionMode,
         UtilityContext,
     )
@@ -39,20 +42,14 @@ except ImportError as e:
         ANALOGICAL = "analogical"
         MULTIMODAL = "multimodal"
 
-
-# ============================================================================
-# Strategy Enum - Import from unified_reasoning or provide fallback
-# ============================================================================
-try:
-    from .unified_reasoning import ReasoningStrategy
-except ImportError as e:
-    logger.warning(f"Could not import ReasoningStrategy from unified_reasoning: {e}")
-    from enum import Enum
-
     class ReasoningStrategy(Enum):
-        """Fallback ReasoningStrategy enum"""
+        """Fallback ReasoningStrategy enum.
+        
+        Note: This fallback is kept for defensive programming in case
+        reasoning_types.py fails to import (e.g., due to missing dependencies).
+        In normal operation, ReasoningStrategy is imported from reasoning_types.py.
+        """
 
-        SINGLE = "single"
         SEQUENTIAL = "sequential"
         PARALLEL = "parallel"
         ENSEMBLE = "ensemble"

@@ -1482,9 +1482,20 @@ result = simplify(integral)
         Initialize the mathematical computation tool.
 
         Args:
-            llm: Language model for code generation (must have .generate() method)
+            llm: Language model for code generation (must have .generate() method).
+                 WARNING: This should be an LLM client object, NOT a string model name.
             max_tokens: Maximum tokens for code generation
         """
+        # LLM INTERFACE FIX: Detect and warn when a string is passed instead of an object
+        if llm is not None and isinstance(llm, str):
+            llm_preview = llm[:50] + '...' if len(llm) > 50 else llm
+            logger.error(
+                f"LLM Interface Bug Detected: 'llm' parameter received a string ('{llm_preview}') "
+                f"instead of an LLM client object. This is likely a configuration error. "
+                f"Pass an actual LLM client instance or None to use templates only. Setting llm=None."
+            )
+            llm = None  # Set to None to use template fallback
+            
         self.llm = llm
         self.max_tokens = max_tokens
         self.name = "mathematical_computation"
@@ -1508,6 +1519,15 @@ result = simplify(integral)
             ComputationResult with code, result, and explanation
         """
         llm = kwargs.get("llm", self.llm)
+        
+        # LLM INTERFACE FIX: Detect if llm override is a string (common config error)
+        if llm is not None and isinstance(llm, str):
+            llm_preview = llm[:50] + '...' if len(llm) > 50 else llm
+            logger.warning(
+                f"LLM Interface Bug in execute(): 'llm' kwarg received a string ('{llm_preview}') "
+                f"instead of an LLM client object. Using templates as fallback."
+            )
+            llm = None
 
         with self._lock:
             try:
