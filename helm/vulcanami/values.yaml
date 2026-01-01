@@ -409,9 +409,13 @@ performanceTuning:
 # Implements the hybrid output pattern where VULCAN does all reasoning,
 # and OpenAI is used only for prose formatting (not reasoning)
 hybridOutput:
-  # Enable OpenAI for output formatting (not reasoning)
-  # When true, OpenAI converts VULCAN's structured output to natural language
+  # Enable OpenAI for ALL output formatting (not reasoning)
+  # When true, OpenAI (gpt-4o-mini) converts VULCAN's structured output to natural language
   # This bypasses the slow internal LLM for prose generation (2-5s vs 30s+)
+  # POLICY: OpenAI MUST NOT reason - only format VULCAN's completed reasoning
+  # Every response is captured for distillation so VULCAN LLM learns over time
+  openaiLanguageFormatting: false
+  # Legacy polish mode (polishes internal LLM output, not replacement)
   openaiLanguagePolish: false
   # Maximum tokens for formatting (shorter than reasoning)
   formattingMaxTokens: 500

@@ -53,6 +53,8 @@ try:
         get_hybrid_executor,
         set_hybrid_executor,
         verify_hybrid_executor_setup,
+        OPENAI_LANGUAGE_FORMATTING,
+        OPENAI_LANGUAGE_POLISH,
     )
 except ImportError as e:
     logger.warning(f"hybrid_executor module not available: {e}")
@@ -63,6 +65,8 @@ except ImportError as e:
     get_hybrid_executor = None
     set_hybrid_executor = None
     verify_hybrid_executor_setup = None
+    OPENAI_LANGUAGE_FORMATTING = False
+    OPENAI_LANGUAGE_POLISH = False
 
 try:
     from vulcan.llm.openai_client import (
@@ -99,6 +103,9 @@ __all__ = [
     "get_hybrid_executor",
     "set_hybrid_executor",
     "verify_hybrid_executor_setup",
+    # Configuration flags for OpenAI language formatting
+    "OPENAI_LANGUAGE_FORMATTING",
+    "OPENAI_LANGUAGE_POLISH",
     # OpenAI Client
     "get_openai_client",
     "get_openai_init_error",
