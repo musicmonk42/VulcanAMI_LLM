@@ -1,6 +1,6 @@
 # VulcanAMI Platform Troubleshooting Guide
 
-**Version:** 2.3.0  
+**Version:** 2.4.0  
 **Last Updated:** January 1, 2026
 
 This guide provides solutions for common issues encountered when developing, deploying, and operating the VulcanAMI/GraphixVulcan platform.
@@ -548,11 +548,55 @@ git pull origin main
 2. **Threaded async execution**: When called from an async context, generation runs in a separate thread with its own event loop
 3. **Improved error logging**: Silent failures now log detailed error messages
 
+**Diagnostic Logging (Added in v2.0.4):**
+
+When debugging generation hangs, look for checkpoint logs at INFO level:
+
+```
+13:43:56.143 - [INFO] [DIAG] About to call CognitiveLoop.generate()...
+13:43:56.144 - [INFO] [DIAG] _consume_async_result: type=<class 'coroutine'>
+13:43:56.144 - [INFO] [DIAG] DETECTED COROUTINE - AWAITING...
+13:43:56.145 - [INFO] [DIAG-STEP-0] Starting _step for FIRST token
+13:43:56.145 - [INFO] [DIAG-STEP-0] Calling bridge.before_execution...
+[LAST LOG BEFORE HANG IDENTIFIES BLOCKING OPERATION]
+```
+
+The LAST checkpoint log before the silence identifies the exact blocking operation. Common hang locations:
+- `bridge.before_execution` - Bridge initialization hang
+- `transformer.encode` - Transformer encoding hang
+- `obtain_logits` - Logits computation hang
+
+**Hard Timeout Fix (Added in v2.0.5):**
+
+`asyncio.wait_for()` only checks timeouts between await points. If code blocks synchronously, 
+the timeout never fires. v2.0.5 adds `ThreadPoolExecutor` hard timeouts that WILL fire even 
+if the underlying code blocks:
+
+```
+# Expected log pattern with hard timeout firing:
+[HybridExecutor] Calling generate(prompt_len=2146, max_tokens=500)...
+[HybridExecutor] Using HARD timeout: 15.0s
+[HybridExecutor] ❌ HARD TIMEOUT after 15.0s!
+```
+
+The `_Checkpoint` helper class in `cognitive_loop.py` provides elapsed-time tracking:
+```
+[CHECKPOINT 0.000s] generate() START: prompt_len=2146, max_tokens=500
+[CHECKPOINT 0.001s] Calling _tokenize()...
+[CHECKPOINT 0.050s] _tokenize() done: 523 tokens
+[CHECKPOINT 0.051s] _step(0) START (FIRST TOKEN)
+[CHECKPOINT 0.052s] Calling bridge.before_execution...
+[HANGS HERE - LAST CHECKPOINT IDENTIFIES BLOCKING OPERATION]
+```
+
 **Configuration (Optional):**
 ```bash
 # Set generation timeout (default: 60 seconds)
 # In your .env or environment:
 VULCAN_LLM_GENERATION_TIMEOUT=60.0
+
+# Set VULCAN hard timeout for HybridExecutor (default: 15 seconds)
+VULCAN_LLM_TIMEOUT=15.0
 ```
 
 **For Helm deployments:**
@@ -562,6 +606,7 @@ llm:
   # ... other llm settings ...
   graphixVulcan:
     generationTimeout: 60.0
+    vulcanTimeout: 15.0
     verboseLogging: false
 ```
 
@@ -879,5 +924,5 @@ For more detailed information, see:
 
 ---
 
-**Document Version:** 2.3.0  
+**Document Version:** 2.4.0  
 **Last Updated:** January 1, 2026

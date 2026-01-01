@@ -792,6 +792,103 @@ def _safe_compare(a: Optional[str], b: Optional[str]) -> bool:
         return False
 
 
+def validate_llm_components() -> Dict[str, Any]:
+    """
+    Validate that real LLM components loaded, not fallbacks.
+    
+    This function checks the CognitiveLoop, GraphixTransformer, and GraphixVulcanBridge
+    components to ensure they are the real implementations, not fallback stubs.
+    
+    Returns:
+        Dictionary with validation results:
+        - issues: List of issues found
+        - status: "PASS" or "FAIL"
+        - components: Dict of component status
+    """
+    issues = []
+    components = {}
+    
+    # Check CognitiveLoop
+    try:
+        from src.integration.cognitive_loop import CognitiveLoop
+        components["CognitiveLoop"] = {
+            "loaded": True,
+            "is_fallback": getattr(CognitiveLoop, '_is_fallback', False),
+            "type": type(CognitiveLoop).__name__
+        }
+        if components["CognitiveLoop"]["is_fallback"]:
+            issues.append("CognitiveLoop is using FALLBACK implementation")
+    except ImportError as e:
+        components["CognitiveLoop"] = {"loaded": False, "error": str(e)}
+        issues.append(f"CognitiveLoop import failed: {e}")
+    
+    # Check GraphixTransformer
+    try:
+        from src.llm_core.graphix_transformer import GraphixTransformer
+        components["GraphixTransformer"] = {
+            "loaded": True,
+            "is_fallback": getattr(GraphixTransformer, '_is_fallback', False),
+            "type": type(GraphixTransformer).__name__
+        }
+        if components["GraphixTransformer"]["is_fallback"]:
+            issues.append("GraphixTransformer is using FALLBACK implementation")
+    except ImportError as e:
+        components["GraphixTransformer"] = {"loaded": False, "error": str(e)}
+        issues.append(f"GraphixTransformer import failed: {e}")
+    
+    # Check GraphixVulcanBridge
+    try:
+        from src.integration.graphix_vulcan_bridge import GraphixVulcanBridge
+        components["GraphixVulcanBridge"] = {
+            "loaded": True,
+            "is_fallback": getattr(GraphixVulcanBridge, '_is_fallback', False),
+            "type": type(GraphixVulcanBridge).__name__
+        }
+        if components["GraphixVulcanBridge"]["is_fallback"]:
+            issues.append("GraphixVulcanBridge is using FALLBACK implementation")
+    except ImportError as e:
+        components["GraphixVulcanBridge"] = {"loaded": False, "error": str(e)}
+        issues.append(f"GraphixVulcanBridge import failed: {e}")
+    
+    # Check HybridLLMExecutor
+    try:
+        from src.vulcan.llm.hybrid_executor import get_hybrid_executor, verify_hybrid_executor_setup
+        executor = get_hybrid_executor()
+        if executor is not None:
+            verification = verify_hybrid_executor_setup()
+            components["HybridLLMExecutor"] = {
+                "loaded": True,
+                "has_internal_llm": verification.get("has_internal_llm", False),
+                "internal_llm_type": verification.get("internal_llm_type"),
+                "status": verification.get("status")
+            }
+            if not verification.get("has_internal_llm"):
+                issues.append("HybridLLMExecutor has no internal LLM - will fallback to OpenAI")
+        else:
+            components["HybridLLMExecutor"] = {"loaded": False, "error": "Not initialized"}
+    except ImportError as e:
+        components["HybridLLMExecutor"] = {"loaded": False, "error": str(e)}
+    
+    # Generate result
+    result = {
+        "issues": issues,
+        "status": "FAIL" if issues else "PASS",
+        "components": components
+    }
+    
+    # Log results
+    if issues:
+        logging.getLogger(__name__).error("=" * 60)
+        logging.getLogger(__name__).error("LLM COMPONENT ISSUES DETECTED:")
+        for issue in issues:
+            logging.getLogger(__name__).error(f"  - {issue}")
+        logging.getLogger(__name__).error("=" * 60)
+    else:
+        logging.getLogger(__name__).info("✓ All LLM components loaded successfully (no fallbacks)")
+    
+    return result
+
+
 class JWTAuth:
     """JWT authentication handler."""
 
@@ -1775,6 +1872,23 @@ async def lifespan(app: FastAPI):
                     from unittest.mock import MagicMock
 
                     vulcan_module.app.state.llm = MagicMock()
+
+                # ================================================================
+                # LLM COMPONENT VALIDATION
+                # Validate that real components loaded, not fallbacks
+                # This catches issues where import errors cause fallback classes to be used
+                # ================================================================
+                try:
+                    validation_result = validate_llm_components()
+                    vulcan_module.app.state.llm_validation = validation_result
+                    if validation_result["status"] == "PASS":
+                        logger.info("✓ LLM component validation passed")
+                    else:
+                        logger.warning(
+                            f"⚠️ LLM component validation found {len(validation_result['issues'])} issues"
+                        )
+                except Exception as val_err:
+                    logger.warning(f"LLM component validation failed: {val_err}")
 
                 logger.info("✓ VULCAN deployment initialized successfully")
 
