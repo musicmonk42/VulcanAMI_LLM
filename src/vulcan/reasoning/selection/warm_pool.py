@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 def _class_accepts_name_parameter(tool_class) -> bool:
     """
-    Check if a class's __init__ method accepts 'name' as a parameter.
+    Check if a class's __init__ method accepts 'name' as a constructor parameter.
     
     This is used to differentiate between classes that:
     1. Take 'name' as a constructor argument (e.g., MockTool(name, warm_time))
@@ -38,7 +38,9 @@ def _class_accepts_name_parameter(tool_class) -> bool:
         sig = inspect.signature(tool_class.__init__)
         return 'name' in sig.parameters
     except (ValueError, TypeError):
-        # If we can't get the signature, assume name is NOT a parameter
+        # Return False as the safe default to avoid passing unexpected 'name' arguments
+        # to classes that don't expect them. ValueError can occur if the callable has
+        # no signature, TypeError if the object is not callable.
         return False
 
 
