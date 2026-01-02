@@ -422,6 +422,14 @@ hybridOutput:
   # Temperature for formatting (low for consistent output)
   formattingTemperature: 0.3
 
+# Hybrid Executor Configuration (Parallel LLM Execution)
+# Controls how VULCAN's HybridLLMExecutor runs local and OpenAI backends
+hybridExecutor:
+  # Timeout for parallel execution in seconds
+  # Both local LLM and OpenAI run concurrently; first successful response wins
+  # Pending tasks are cancelled after timeout
+  timeout: 30.0
+
 # OpenAI Response Caching Configuration
 # Enables LRU+TTL caching for OpenAI API responses to reduce costs and latency
 openaiCache:

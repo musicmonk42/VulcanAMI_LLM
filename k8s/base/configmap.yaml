@@ -97,11 +97,21 @@ data:
   # Per-token timeout for CPU execution (30s per token)
   # Internal LLM can take 3+ seconds per token on CPU
   VULCAN_LLM_PER_TOKEN_TIMEOUT: "30.0"
-  # OpenAI Language Polish Configuration
-  # When enabled, OpenAI formats VULCAN's structured output as natural language
+  # OpenAI Language Formatting Configuration
+  # When true, routes ALL natural language output formatting to OpenAI (gpt-4o-mini).
+  # This provides fast responses (~2-5s) while VULCAN LLM learns via distillation.
+  # POLICY: OpenAI ONLY formats VULCAN's reasoning output - no independent reasoning.
+  # VULCAN handles ALL reasoning internally, OpenAI is purely for language generation.
+  OPENAI_LANGUAGE_FORMATTING: "true"
+  # OpenAI Language Polish (legacy mode - for backwards compatibility)
+  # When enabled, OpenAI polishes VULCAN's structured output as natural language
   # OpenAI is NOT used for reasoning - only for output formatting
   # This bypasses the slow internal LLM for prose generation (2-5s vs 30s+)
   OPENAI_LANGUAGE_POLISH: "false"
+  # Hybrid Executor Timeout Configuration
+  # Timeout for parallel LLM execution (both local and OpenAI running concurrently)
+  # First successful response wins; pending tasks are cancelled
+  HYBRID_EXECUTOR_TIMEOUT: "30.0"
   # OpenAI Response Caching Configuration (Performance Optimization)
   # Enables LRU+TTL caching for OpenAI API responses to reduce costs and latency
   OPENAI_CACHE_ENABLED: "true"

@@ -326,6 +326,9 @@ services:
       - OPENAI_LANGUAGE_FORMATTING=${OPENAI_LANGUAGE_FORMATTING:-true}
       # Legacy polish mode (for backwards compatibility)
       - OPENAI_LANGUAGE_POLISH=${OPENAI_LANGUAGE_POLISH:-false}
+      # Hybrid Executor Timeout for parallel LLM execution (seconds)
+      # Both local LLM and OpenAI run concurrently; first successful response wins
+      - HYBRID_EXECUTOR_TIMEOUT=${HYBRID_EXECUTOR_TIMEOUT:-30.0}
       # Vulcan Memory System (v46) Configuration
       - MILVUS_HOST=milvus
       - MILVUS_PORT=19530
