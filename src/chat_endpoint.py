@@ -611,7 +611,15 @@ class VulcanChatEngine:
         plan: Any,
         state: Any,
     ) -> str:
-        """Generate response using LLM with all gathered context."""
+        """Generate response using LLM with all gathered context.
+        
+        Uses HybridLLMExecutor which provides:
+        - Primary: Internal LLM (GraphixVulcanLLM)
+        - Fallback: OpenAI when internal LLM fails
+        - Automatic fallback to internal LLM when OpenAI is down
+        """
+        import asyncio
+        
         # Build context for the LLM
         context_parts = []
 
@@ -642,10 +650,16 @@ class VulcanChatEngine:
 
         # Add conversation history
         history_text = ""
+        conversation_history = []
         if request.history:
             history_entries = []
             for h in request.history[-MAX_HISTORY_MESSAGES:]:
                 history_entries.append(f"{h.role}: {h.content}")
+                # Build conversation history for HybridLLMExecutor
+                conversation_history.append({
+                    "role": h.role,
+                    "content": h.content
+                })
             history_text = "\n".join(history_entries)
             context_parts.append(f"History:\n{history_text}")
 
@@ -657,7 +671,50 @@ class VulcanChatEngine:
             else request.message
         )
 
-        # Try to generate with LLM
+        # Try to generate with HybridLLMExecutor for proper fallback handling
+        try:
+            from vulcan.llm.hybrid_executor import get_or_create_hybrid_executor
+            
+            # Get or create hybrid executor with proper fallback configuration
+            hybrid_executor = get_or_create_hybrid_executor()
+            
+            if hybrid_executor:
+                # Run async execute in sync context
+                async def _async_generate():
+                    return await hybrid_executor.execute(
+                        prompt=prompt,
+                        max_tokens=request.max_tokens,
+                        temperature=0.7,
+                        system_prompt=(
+                            "You are VULCAN, an advanced AI assistant. "
+                            "Respond based on the reasoning and context provided. "
+                            "If reasoning analysis is available, incorporate it into your response."
+                        ),
+                        conversation_history=conversation_history if conversation_history else None,
+                    )
+                
+                # Check if we're already in an event loop
+                try:
+                    loop = asyncio.get_running_loop()
+                    # We're in an async context, create a task
+                    import concurrent.futures
+                    with concurrent.futures.ThreadPoolExecutor() as pool:
+                        future = pool.submit(asyncio.run, _async_generate())
+                        result = future.result(timeout=60)
+                except RuntimeError:
+                    # No running loop, we can use asyncio.run directly
+                    result = asyncio.run(_async_generate())
+                
+                if result and result.get("text"):
+                    logger.info(f"[VulcanChat] Response generated via HybridLLMExecutor: source={result.get('source')}")
+                    return result["text"]
+                    
+        except ImportError as ie:
+            logger.warning(f"HybridLLMExecutor not available: {ie}")
+        except Exception as e:
+            logger.warning(f"HybridLLMExecutor generation failed: {e}")
+
+        # Fallback: Try direct LLM generation
         if self.llm:
             try:
                 if hasattr(self.llm, "generate"):
@@ -674,9 +731,9 @@ class VulcanChatEngine:
                         return result.get("text", result.get("response", str(result)))
                     return str(result)
             except Exception as e:
-                logger.warning(f"LLM generation failed: {e}")
+                logger.warning(f"Direct LLM generation failed: {e}")
 
-        # Fallback response
+        # Final fallback response
         return self._fallback_response(request, reasoning_result, plan, contexts)
 
     def _fallback_response(

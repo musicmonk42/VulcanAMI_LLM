@@ -1144,12 +1144,41 @@ class HybridLLMExecutor:
         # Internal LLM language generation failed
         # Note: This doesn't mean reasoning failed - reasoning is done by VULCAN's reasoning systems
         # The internal LLM is only for language output, same role as OpenAI
-        self.logger.error(
-            "[HybridExecutor] ❌ Internal LLM language generation failed. "
+        self.logger.warning(
+            "[HybridExecutor] ⚠ Internal LLM language generation failed. "
             "Note: The internal LLM is for language output, not reasoning. "
-            "Reasoning is done by VULCAN's reasoning systems (symbolic, causal, etc.)."
+            "Attempting OpenAI fallback for language generation..."
         )
         systems_used.append("vulcan_local_llm_failed")
+        
+        # FALLBACK TO OPENAI: When internal LLM fails, use OpenAI for language generation
+        # This implements the backup mechanism: OpenAI serves as fallback when internal LLM is down
+        try:
+            openai_result = await self._call_openai(
+                loop, prompt, max_tokens, temperature, system_prompt, conversation_history
+            )
+            if self._is_valid_response(openai_result):
+                systems_used.append("openai_fallback")
+                self.logger.info("[HybridExecutor] ✓ OpenAI fallback succeeded (internal LLM was unavailable)")
+                return {
+                    "text": openai_result,
+                    "source": "openai_fallback",
+                    "systems_used": systems_used,
+                    "metadata": {
+                        "fallback_reason": "internal_llm_failed",
+                        "openai_role": "language_generation_fallback",
+                    },
+                }
+            else:
+                self.logger.warning("[HybridExecutor] ⚠ OpenAI fallback returned invalid response")
+        except Exception as openai_err:
+            self.logger.warning(f"[HybridExecutor] ⚠ OpenAI fallback also failed: {openai_err}")
+        
+        # BOTH internal LLM AND OpenAI failed - return graceful error
+        self.logger.error(
+            "[HybridExecutor] ❌ Both internal LLM AND OpenAI fallback failed. "
+            "No language generation backend available."
+        )
         
         # GRACEFUL DEGRADATION FIX: Provide a user-friendly error message
         # Generate a unique error reference for tracking
@@ -1160,11 +1189,12 @@ class HybridLLMExecutor:
         ).hexdigest()[:12].upper()
         
         error_text = (
-            "I encountered an internal processing issue while reasoning about your request.\n\n"
+            "I encountered an internal processing issue while generating a response.\n\n"
+            "Both primary and backup language systems are temporarily unavailable.\n\n"
             "This could be due to:\n"
             "• High system load causing a timeout\n"
             "• A complex query requiring more processing time\n"
-            "• A temporary issue with the internal reasoning system\n\n"
+            "• Temporary network or service issues\n\n"
             "**Suggestions:**\n"
             "• Please try rephrasing your question\n"
             "• Try breaking down complex questions into simpler parts\n"
@@ -1178,8 +1208,9 @@ class HybridLLMExecutor:
             "systems_used": systems_used,
             "error": True,
             "metadata": {
-                "reason": "VULCAN internal LLM returned None or raised exception - graceful degradation active",
+                "reason": "Both VULCAN internal LLM and OpenAI fallback failed",
                 "vulcan_llm_failed": True,
+                "openai_fallback_failed": True,
                 "suggestion": "Rephrase question or try again later",
                 "timeout_seconds": self.vulcan_timeout,
                 "can_retry": True,
@@ -1192,19 +1223,91 @@ class HybridLLMExecutor:
         conversation_history: Optional[List[Dict[str, str]]] = None
     ) -> Dict[str, Any]:
         """
-        DISABLED MODE: OpenAI-first mode is no longer available.
-        This mode has been disabled because VULCAN should handle ALL reasoning internally.
-        External AI usage is prohibited.
+        OpenAI-first mode with internal LLM fallback.
+        
+        ARCHITECTURE:
+        1. Try OpenAI first for language generation
+        2. If OpenAI fails/unavailable, fall back to internal LLM
+        
+        This mode is useful when:
+        - OpenAI provides faster/higher-quality responses
+        - Internal LLM serves as backup when OpenAI is down
         """
+        systems_used = []
+        
+        # Step 1: Try OpenAI for language generation
+        try:
+            openai_result = await self._call_openai(
+                loop, prompt, max_tokens, temperature, system_prompt, conversation_history
+            )
+            if self._is_valid_response(openai_result):
+                systems_used.append("openai")
+                self.logger.info("[HybridExecutor] ✓ OpenAI language generation succeeded")
+                return {
+                    "text": openai_result,
+                    "source": "openai",
+                    "systems_used": systems_used,
+                }
+            else:
+                self.logger.warning("[HybridExecutor] ⚠ OpenAI returned invalid response, trying internal LLM fallback")
+        except Exception as openai_err:
+            self.logger.warning(f"[HybridExecutor] ⚠ OpenAI failed: {openai_err}, trying internal LLM fallback")
+        
+        systems_used.append("openai_failed")
+        
+        # Step 2: Fallback to internal LLM when OpenAI is unavailable
+        self.logger.info("[HybridExecutor] OpenAI unavailable, falling back to internal LLM...")
+        local_result = await self._call_local_llm(loop, prompt, max_tokens)
+        
+        if self._is_valid_response(local_result):
+            systems_used.append("vulcan_local_llm_fallback")
+            self.logger.info("[HybridExecutor] ✓ Internal LLM fallback succeeded (OpenAI was unavailable)")
+            return {
+                "text": local_result,
+                "source": "local_fallback",
+                "systems_used": systems_used,
+                "metadata": {
+                    "fallback_reason": "openai_unavailable",
+                    "internal_llm_role": "language_generation_fallback",
+                },
+            }
+        
+        # Both OpenAI AND internal LLM failed
         self.logger.error(
-            "[HybridExecutor] ❌ openai_first mode is DISABLED! "
-            "External AI usage is prohibited. VULCAN handles ALL reasoning internally. "
-            "Falling back to local_first mode."
+            "[HybridExecutor] ❌ Both OpenAI AND internal LLM fallback failed. "
+            "No language generation backend available."
         )
-        # Redirect to local_first mode instead
-        return await self._execute_local_first(
-            loop, prompt, max_tokens, temperature, system_prompt, conversation_history
+        systems_used.append("vulcan_local_llm_failed")
+        
+        # Generate error reference
+        import hashlib
+        import time as time_module
+        error_ref = hashlib.sha256(
+            f"{time_module.time()}:{prompt[:50]}".encode()
+        ).hexdigest()[:12].upper()
+        
+        error_text = (
+            "I encountered an issue generating a response.\n\n"
+            "Both primary and backup language systems are temporarily unavailable.\n\n"
+            "**Suggestions:**\n"
+            "• Please try again in a moment\n"
+            "• Try rephrasing your question\n\n"
+            f"If this issue persists, reference: **{error_ref}**"
         )
+        
+        return {
+            "text": error_text,
+            "source": "error_graceful_degradation",
+            "systems_used": systems_used,
+            "error": True,
+            "metadata": {
+                "reason": "Both OpenAI and internal LLM fallback failed",
+                "openai_failed": True,
+                "vulcan_llm_failed": True,
+                "can_retry": True,
+                "error_reference": error_ref,
+            },
+        }
 
     async def _execute_parallel(
         self, loop, prompt: str, max_tokens: int, temperature: float, system_prompt: str,
@@ -1247,25 +1350,28 @@ class HybridLLMExecutor:
         )
         
         try:
-            # Wait for first successful result with timeout
-            done, pending = await asyncio.wait(
-                [local_task, openai_task],
-                return_when=asyncio.FIRST_COMPLETED,
-                timeout=self.timeout
-            )
+            # Run tasks in parallel, returning when EITHER succeeds with valid output
+            # Use a loop to wait for tasks and check for valid results
+            tasks = {local_task, openai_task}
+            start_wait = time.perf_counter()
             
-            # Cancel pending tasks
-            for task in pending:
-                task.cancel()
-                try:
-                    await task
-                except asyncio.CancelledError:
-                    pass
-            
-            # Get result from completed task
-            # Note: FIRST_COMPLETED returns when first task completes (success or failure)
-            # We iterate through completed tasks looking for a valid response
-            if done:
+            while tasks and (time.perf_counter() - start_wait) < self.timeout:
+                # Wait for the first task to complete
+                remaining_timeout = self.timeout - (time.perf_counter() - start_wait)
+                if remaining_timeout <= 0:
+                    break
+                    
+                done, pending = await asyncio.wait(
+                    tasks,
+                    return_when=asyncio.FIRST_COMPLETED,
+                    timeout=remaining_timeout
+                )
+                
+                if not done:
+                    # Timeout - no tasks completed
+                    break
+                
+                # Check completed tasks for valid results
                 for task in done:
                     try:
                         result = task.result()
@@ -1277,9 +1383,35 @@ class HybridLLMExecutor:
                             result["source"] = f"parallel_{source}"
                             elapsed = time.perf_counter() - start_time
                             self.logger.info(f"[HybridExecutor] ✓ Parallel mode complete - winner: {source}, time: {elapsed:.2f}s")
+                            
+                            # Cancel any remaining tasks
+                            for pending_task in pending:
+                                pending_task.cancel()
+                                try:
+                                    await pending_task
+                                except asyncio.CancelledError:
+                                    pass
+                            
                             return result
+                        else:
+                            # Task completed but with invalid result, log it
+                            task_name = task.get_name() if hasattr(task, 'get_name') else "unknown"
+                            elapsed = time.perf_counter() - start_time
+                            self.logger.warning(f"[HybridExecutor] Task {task_name} completed but returned invalid result after {elapsed:.2f}s")
                     except Exception as e:
-                        self.logger.warning(f"[HybridExecutor] Task failed: {e}")
+                        task_name = task.get_name() if hasattr(task, 'get_name') else "unknown"
+                        self.logger.warning(f"[HybridExecutor] Task {task_name} failed with exception: {e}")
+                
+                # Remove completed tasks from set and continue waiting for others
+                tasks = pending
+            
+            # Cancel any remaining tasks after loop exits
+            for task in tasks:
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
             
             # If we get here, no task succeeded - fall back to local_first
             elapsed = time.perf_counter() - start_time
@@ -1320,13 +1452,21 @@ class HybridLLMExecutor:
         
         Returns a dict with 'text' and 'source' keys for parallel mode.
         """
+        import time as time_module
+        start = time_module.perf_counter()
+        self.logger.info("[HybridExecutor] Local LLM task started")
+        
         text = await self._call_local_llm(loop, prompt, max_tokens)
+        
+        elapsed = time_module.perf_counter() - start
         if text and self._is_valid_response(text):
+            self.logger.info(f"[HybridExecutor] ✓ Local LLM task completed successfully in {elapsed:.2f}s (len={len(text)})")
             return {
                 "text": text,
                 "source": "local",
                 "systems_used": ["vulcan_local_llm"],
             }
+        self.logger.warning(f"[HybridExecutor] ✗ Local LLM task failed in {elapsed:.2f}s")
         return {"text": None, "source": "local_failed", "systems_used": []}
     
     async def _run_openai(
@@ -1337,15 +1477,23 @@ class HybridLLMExecutor:
         
         Returns a dict with 'text' and 'source' keys for parallel mode.
         """
+        import time as time_module
+        start = time_module.perf_counter()
+        self.logger.info("[HybridExecutor] OpenAI task started")
+        
         text = await self._call_openai(
             loop, prompt, max_tokens, temperature, system_prompt, conversation_history
         )
+        
+        elapsed = time_module.perf_counter() - start
         if text and self._is_valid_response(text):
+            self.logger.info(f"[HybridExecutor] ✓ OpenAI task completed successfully in {elapsed:.2f}s (len={len(text)})")
             return {
                 "text": text,
                 "source": "openai",
                 "systems_used": ["openai"],
             }
+        self.logger.warning(f"[HybridExecutor] ✗ OpenAI task failed in {elapsed:.2f}s (text={text[:100] if text else None}...)")
         return {"text": None, "source": "openai_failed", "systems_used": []}
 
     async def _execute_ensemble(
@@ -1688,6 +1836,12 @@ class HybridLLMExecutor:
 
             result = await loop.run_in_executor(None, call_openai)
             
+            # Log successful OpenAI API call
+            if result:
+                self.logger.info(f"[HybridExecutor] OpenAI API call succeeded (len={len(result)})")
+            else:
+                self.logger.warning("[HybridExecutor] OpenAI API call returned empty result")
+            
             # Cache the result (only for single-turn requests without history)
             if (
                 result 
@@ -1712,7 +1866,7 @@ class HybridLLMExecutor:
             
             return result
         except Exception as e:
-            self.logger.debug(f"OpenAI call failed: {e}")
+            self.logger.warning(f"[HybridExecutor] OpenAI call failed: {type(e).__name__}: {e}")
             return None
 
     async def _format_with_openai(
