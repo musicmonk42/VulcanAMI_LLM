@@ -1,47 +1,55 @@
 """
-Philosophical Reasoning Module - SOTA Implementation for VULCAN-AGI
+Philosophical Reasoning Module for VULCAN-AGI
 
-This module implements state-of-the-art algorithms for philosophical,
-ethical, and deontic (normative) reasoning, following the highest
-industry standards for formal verification and moral decision theory.
+This module provides reasoning capabilities for philosophical, ethical,
+and deontic (normative) queries using a combination of formal logic
+structures and heuristic evaluation methods.
 
-SOTA Algorithms Implemented:
-============================
+Implementation Notes:
+=====================
 
-1. STANDARD DEONTIC LOGIC (SDL) with Paradox Handling
-   - Implements Kripke semantics for deontic modalities
-   - Handles Ross's paradox, Good Samaritan paradox, and contrary-to-duty
-   - Uses dyadic deontic logic for conditional obligations
+1. DEONTIC LOGIC ENGINE
+   - Implements Standard Deontic Logic (SDL) axiom schemas
+   - Uses inter-definability rules for operator conversion
+   - LIMITATION: Uses string-based formula matching, not full AST parsing
+   - LIMITATION: Does not implement tableaux/resolution provers
+   - Suitable for: Simple deontic inferences with well-formed inputs
 
-2. MORAL UNCERTAINTY HANDLING (MacAskill & Ord 2020)
-   - Maximizing Expected Choiceworthiness (MEC)
-   - Variance-voting for intertheoretic comparison
-   - My Favourite Theory (MFT) as fallback
+2. MORAL UNCERTAINTY HANDLER (Heuristic MEC-Inspired)
+   - Inspired by MacAskill & Ord's MEC framework
+   - LIMITATION: Uses keyword-based heuristics, not formal utility functions
+   - LIMITATION: Does not perform true intertheoretic value comparison
+   - Provides: Structured multi-theory evaluation with weighted aggregation
+   - Suitable for: Comparative ethical analysis, not formal moral calculus
 
-3. MULTI-CRITERIA DECISION ANALYSIS (MCDA)
-   - Pareto dominance detection
-   - Lexicographic ordering for value hierarchies
-   - Weighted sum model for commensurable values
+3. PARETO DOMINANCE CHECKER
+   - Implements standard Pareto optimality detection
+   - LIMITATION: Values derived from heuristic evaluation, not parsed inputs
+   - Suitable for: Identifying dominated options when values are provided
 
-4. TABLEAU-BASED THEOREM PROVING
-   - Analytic tableaux for deontic formulas
-   - Systematic proof search with branch closing
-   - Counter-model generation for invalid formulas
+4. FORMULA HANDLING
+   - Supports: P(x), O(x), F(x) operator patterns
+   - Supports: Natural language patterns ("X is permissible")
+   - LIMITATION: Does not handle nested formulas like O(P(x) → Q(x))
+   - LIMITATION: String splitting for implications breaks on A → (B → C)
 
-5. DEFEASIBLE DEONTIC REASONING
-   - Priority-based conflict resolution
-   - Specificity ordering for rule conflicts
-   - Non-monotonic inheritance for exceptions
+Design Philosophy:
+------------------
+This module prioritizes providing useful structured analysis over failing
+silently. When formal reasoning cannot complete, it provides heuristic
+analysis with clearly documented confidence levels.
+
+For queries requiring formal mathematical logic (e.g., ZFC set theory),
+this module correctly returns validate_input=False, routing to appropriate
+mathematical reasoners instead.
 
 References:
 -----------
 - Åqvist, L. (2002). Deontic Logic. Handbook of Philosophical Logic.
 - MacAskill, W., & Ord, T. (2020). Moral Uncertainty. Oxford University Press.
-- Horty, J. (2012). Reasons as Defaults. Oxford University Press.
-- Governatori, G. et al. (2013). Defeasible Logic. Handbook of Deontic Logic.
 
 Author: VULCAN-AGI Team
-Version: 2.0.0 (SOTA)
+Version: 2.1.0
 """
 
 from __future__ import annotations
@@ -481,18 +489,38 @@ class ActionEvaluation:
 
 class MoralUncertaintyHandler:
     """
-    SOTA Moral Uncertainty Handler implementing MacAskill & Ord (2020).
+    Heuristic Moral Uncertainty Handler inspired by MacAskill & Ord (2020).
     
-    Implements:
-    - Maximizing Expected Choiceworthiness (MEC)
-    - Variance-voting for intertheoretic comparison
-    - My Favourite Theory (MFT) as fallback
+    IMPORTANT LIMITATIONS:
+    ----------------------
+    This is NOT a formal implementation of Maximizing Expected Choiceworthiness.
+    True MEC requires:
+    - Utility functions over action outcomes
+    - Intertheoretic value comparisons with normalization
+    - Formal treatment of incommensurable theories
+    
+    What this implementation provides:
+    - Keyword-based heuristic evaluation per ethical framework
+    - Weighted aggregation across theories (MEC-inspired structure)
+    - Variance-voting for consensus detection
+    - Configurable theory credences
+    
+    Suitable for:
+    - Comparative ethical analysis of text-described actions
+    - Identifying which ethical frameworks favor which options
+    - Rough estimates of ethical consensus/disagreement
+    
+    NOT suitable for:
+    - Formal moral calculus
+    - Precise utility calculations
+    - Decisions with quantified outcomes
     
     Reference: MacAskill, W., & Ord, T. (2020). Moral Uncertainty.
     """
     
     def __init__(self):
         self.theories: List[MoralTheory] = []
+        self._lock = threading.RLock()  # Thread safety for credence updates
         self._init_default_theories()
     
     def _init_default_theories(self) -> None:
@@ -541,7 +569,7 @@ class MoralUncertaintyHandler:
     
     def set_theory_credence(self, theory_name: str, credence: float) -> None:
         """
-        Update credence for a specific moral theory.
+        Update credence for a specific moral theory (thread-safe).
         
         Args:
             theory_name: Name of the theory to update
@@ -550,30 +578,32 @@ class MoralUncertaintyHandler:
         Note: After updating, credences may not sum to 1.0. Call
         normalize_credences() if a valid probability distribution is needed.
         """
-        for theory in self.theories:
-            if theory.name == theory_name:
-                # MoralTheory is a dataclass, create new instance
-                idx = self.theories.index(theory)
-                self.theories[idx] = MoralTheory(
-                    name=theory.name,
-                    framework=theory.framework,
-                    credence=credence,
-                    evaluate=theory.evaluate,
-                )
-                return
-        logger.warning(f"Theory '{theory_name}' not found")
+        with self._lock:
+            for theory in self.theories:
+                if theory.name == theory_name:
+                    # MoralTheory is a dataclass, create new instance
+                    idx = self.theories.index(theory)
+                    self.theories[idx] = MoralTheory(
+                        name=theory.name,
+                        framework=theory.framework,
+                        credence=credence,
+                        evaluate=theory.evaluate,
+                    )
+                    return
+            logger.warning(f"Theory '{theory_name}' not found")
     
     def normalize_credences(self) -> None:
-        """Normalize credences to sum to 1.0."""
-        total = sum(t.credence for t in self.theories)
-        if total > 0:
-            for i, theory in enumerate(self.theories):
-                self.theories[i] = MoralTheory(
-                    name=theory.name,
-                    framework=theory.framework,
-                    credence=theory.credence / total,
-                    evaluate=theory.evaluate,
-                )
+        """Normalize credences to sum to 1.0 (thread-safe)."""
+        with self._lock:
+            total = sum(t.credence for t in self.theories)
+            if total > 0:
+                for i, theory in enumerate(self.theories):
+                    self.theories[i] = MoralTheory(
+                        name=theory.name,
+                        framework=theory.framework,
+                        credence=theory.credence / total,
+                        evaluate=theory.evaluate,
+                    )
     
     def _evaluate_kantian(self, action: str) -> float:
         """

@@ -132,6 +132,7 @@ class ReasoningStrategyType(Enum):
     PLANNING = "planning"
     DELIBERATIVE = "deliberative"
     META_REASONING = "meta_reasoning"
+    PHILOSOPHICAL_REASONING = "philosophical_reasoning"  # FIX: Strategy for ethical/deontic reasoning
     DEFAULT = "default"
 
 
@@ -143,6 +144,8 @@ QUERY_TYPE_STRATEGY_MAP: Dict[str, str] = {
     "planning": "deliberative",
     "learning": "meta_reasoning",
     "general": "direct",
+    "philosophical": "philosophical_reasoning",  # FIX: Map philosophical queries to philosophical reasoning
+    "ethical": "philosophical_reasoning",        # FIX: Map ethical queries to philosophical reasoning
 }
 
 # ==================================================================

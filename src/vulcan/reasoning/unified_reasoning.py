@@ -2178,6 +2178,29 @@ class UnifiedReasoner:
             ],
             ReasoningType.COUNTERFACTUAL: ["what if", "counterfactual", "had not"],
             ReasoningType.MULTIMODAL: ["image", "video", "audio", "multimodal"],
+            # FIX: Add PHILOSOPHICAL reasoning type detection for ethical/deontic queries
+            ReasoningType.PHILOSOPHICAL: [
+                "ethical",
+                "moral",
+                "permissible",
+                "obligatory",
+                "forbidden",
+                "duty",
+                "ought",
+                "should",
+                "right",
+                "wrong",
+                "virtue",
+                "justice",
+                "fairness",
+                "deontological",
+                "utilitarian",
+                "consequentialist",
+                "kantian",
+                "dilemma",
+                "normative",
+                "deontic",
+            ],
         }
         for r_type, keywords in keyword_map.items():
             for keyword in keywords:
