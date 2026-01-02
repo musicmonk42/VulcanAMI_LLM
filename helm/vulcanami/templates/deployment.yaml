@@ -297,6 +297,16 @@ spec:
         {{- /* CPU CLOUD FIX: Reduced from 5 to 2 to reduce context-switching overhead */}}
         - name: MIN_AGENTS
           value: {{ .Values.performanceTuning.minAgents | default 2 | quote }}
+        {{- /* ADAPTIVE TIMEOUT CONFIGURATION (Task 4 Fix) */}}
+        {{- /* Formula: timeout = baseTimeout + (max_tokens * timeoutPerToken) */}}
+        - name: VULCAN_BASE_TIMEOUT
+          value: {{ .Values.performanceTuning.adaptiveTimeoutBase | default 5.0 | quote }}
+        - name: VULCAN_TIMEOUT_PER_TOKEN
+          value: {{ .Values.performanceTuning.adaptiveTimeoutPerToken | default 2.0 | quote }}
+        {{- /* ZMQ BUFFER CONFIGURATION (Task 3 Fix) */}}
+        {{- /* Prevents Orchestrator Panic during CPU-bound inference */}}
+        - name: ZMQ_CONNECTION_TIMEOUT
+          value: {{ .Values.performanceTuning.zmqConnectionTimeout | default 30000 | quote }}
         {{- end }}
         {{- if .Values.hybridOutput }}
         {{- /* Hybrid Output Configuration (OpenAI for formatting only) */}}

@@ -64,10 +64,12 @@ except ImportError:
 # By including local_llm and graphix variants, we ensure that Vulcan's internal
 # LLM can be used for self-improvement without a 72-hour cooldown.
 # TASK 2 FIX: Added "trusted_internal_source" as requested for VULCAN Policy compliance
+# TASK 5 FIX: Added "local_graphix" to stop 72-hour self-improvement deadlock
 TRUSTED_PROVIDERS = frozenset({
     "local_llm",
+    "local_graphix",  # TASK 5 FIX: White-list local graphix provider
     "graphix",
-    "graphix_vulcan",
+    "graphix_vulcan",  # TASK 5 FIX: Confirmed present
     "graphix_vulcan_llm",
     "vulcan_local_llm",
     "internal",

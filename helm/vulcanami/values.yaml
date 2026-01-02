@@ -412,6 +412,17 @@ performanceTuning:
   # Minimum agents in the agent pool (reduced for CPU optimization)
   # CPU CLOUD FIX: Reduced from 5 to 2 to reduce context-switching overhead
   minAgents: 2
+  # ADAPTIVE TIMEOUT CONFIGURATION (Task 4 Fix)
+  # Base timeout for adaptive timeout calculation (seconds)
+  # Formula: timeout = baseTimeout + (max_tokens * timeoutPerToken)
+  adaptiveTimeoutBase: 5.0
+  # Per-token timeout for adaptive calculation (seconds)
+  adaptiveTimeoutPerToken: 2.0
+  # ZMQ BUFFER CONFIGURATION (Task 3 Fix)
+  # Connection timeout for ZMQ task queues (milliseconds)
+  # Increased from 15000ms to 30000ms to prevent Orchestrator Panic
+  # during CPU-bound inference (~2.5s/token)
+  zmqConnectionTimeout: 30000
 
 # Hybrid Output Configuration (VULCAN reasoning + OpenAI formatting)
 # Implements the hybrid output pattern where VULCAN does all reasoning,

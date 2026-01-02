@@ -792,7 +792,11 @@ class CustomTaskQueue(TaskQueueInterface):
     def __init__(
         self,
         coordinator_address: str = "tcp://localhost:5555",
-        connection_timeout: int = 15000,  # SIGNAL BUFFERING FIX: Increased from 5000ms to 15000ms
+        connection_timeout: int = 30000,  # ZMQ BUFFER FIX: Increased to 30000ms (30 seconds)
+                                          # to prevent Orchestrator Panic when the LLM is saturating
+                                          # the CPU during local inference (~2.5s/token).
+                                          # This gives the "Brain" enough time to send reasoning
+                                          # signals while the "Voice" (LLM) is generating tokens.
         config: Dict[str, Any] = None,
     ):
         """Initialize ZeroMQ task queue with Ray fallback."""
@@ -1088,11 +1092,11 @@ class CustomTaskQueue(TaskQueueInterface):
                     poller = zmq.Poller()
                     poller.register(self.socket, zmq.POLLIN)
 
-                    # SIGNAL BUFFERING FIX: Increased timeout from 10000ms to 15000ms (15 seconds)
+                    # ZMQ BUFFER FIX: Increased poll_timeout to 30000ms (30 seconds)
                     # to give slow CPU-bound LLM inference enough time to complete.
-                    # This prevents the Orchestrator from triggering "Direct Reasoning" fallback
-                    # prematurely during CPU inference cycles.
-                    if poller.poll(15000):
+                    # At ~2.5s/token, this allows reasoning results to be received
+                    # before the Orchestrator times out and falls back to "Direct Reasoning".
+                    if poller.poll(30000):
                         status = self.socket.recv_json(flags=zmq.NOBLOCK)
                         with self._coordinator_check_lock:
                             self._cached_coordinator_status = status

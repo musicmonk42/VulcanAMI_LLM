@@ -81,37 +81,86 @@ except ImportError:
 # ============================================================
 # REASONING INTEGRATION - Wire reasoning engines into task execution
 # ============================================================
-# Import UnifiedReasoner and reasoning integration for actual reasoning invocation
-try:
-    from src.vulcan.reasoning import (
-        UnifiedReasoner,
-        ReasoningType,
-        ReasoningResult,
-        UNIFIED_AVAILABLE,
-        create_unified_reasoner,
-    )
-    from src.vulcan.reasoning.reasoning_integration import (
-        apply_reasoning,
-        get_reasoning_integration,
-        ReasoningResult as IntegrationReasoningResult,
-    )
-    REASONING_AVAILABLE = UNIFIED_AVAILABLE
-    logging.getLogger(__name__).info(
-        "Reasoning integration loaded successfully - reasoning engines will be invoked"
-    )
-except ImportError as e:
-    UnifiedReasoner = None
-    ReasoningType = None
-    ReasoningResult = None
-    UNIFIED_AVAILABLE = False
-    create_unified_reasoner = None
-    apply_reasoning = None
-    get_reasoning_integration = None
-    IntegrationReasoningResult = None
-    REASONING_AVAILABLE = False
-    logging.getLogger(__name__).warning(
-        f"Reasoning integration not available: {e}. Tasks will use placeholder execution."
-    )
+# CIRCULAR IMPORT FIX: Do NOT import UnifiedReasoner at module level.
+# These imports are now done lazily inside methods that need them.
+# This prevents the "cannot import name 'UnifiedReasoner' from partially
+# initialized module" error that forces placeholder execution.
+#
+# The lazy import pattern is used in:
+# - _get_unified_reasoner() helper method
+# - _execute_agent_task() when reasoning is needed
+#
+# Module-level flags for availability check (these don't cause circular imports)
+UnifiedReasoner = None  # Lazy-loaded
+ReasoningType = None  # Lazy-loaded
+ReasoningResult = None  # Lazy-loaded
+UNIFIED_AVAILABLE = False  # Updated by lazy import
+create_unified_reasoner = None  # Lazy-loaded
+apply_reasoning = None  # Lazy-loaded
+get_reasoning_integration = None  # Lazy-loaded
+IntegrationReasoningResult = None  # Lazy-loaded
+REASONING_AVAILABLE = False  # Updated by lazy import
+_reasoning_import_attempted = False  # Track if we've tried to import
+
+
+def _lazy_import_reasoning():
+    """
+    Lazily import reasoning components to avoid circular import issues.
+    
+    CIRCULAR IMPORT FIX: This function is called when reasoning is actually
+    needed, not at module load time. This prevents the circular import
+    that occurs when agent_pool.py imports from src.vulcan.reasoning which
+    in turn imports from agent_pool.py.
+    
+    Returns:
+        bool: True if imports succeeded, False otherwise
+    """
+    global UnifiedReasoner, ReasoningType, ReasoningResult, UNIFIED_AVAILABLE
+    global create_unified_reasoner, apply_reasoning, get_reasoning_integration
+    global IntegrationReasoningResult, REASONING_AVAILABLE, _reasoning_import_attempted
+    
+    # Only attempt import once
+    if _reasoning_import_attempted:
+        return REASONING_AVAILABLE
+    
+    _reasoning_import_attempted = True
+    
+    try:
+        from src.vulcan.reasoning import (
+            UnifiedReasoner as _UnifiedReasoner,
+            ReasoningType as _ReasoningType,
+            ReasoningResult as _ReasoningResult,
+            UNIFIED_AVAILABLE as _UNIFIED_AVAILABLE,
+            create_unified_reasoner as _create_unified_reasoner,
+        )
+        from src.vulcan.reasoning.reasoning_integration import (
+            apply_reasoning as _apply_reasoning,
+            get_reasoning_integration as _get_reasoning_integration,
+            ReasoningResult as _IntegrationReasoningResult,
+        )
+        
+        # Update global references
+        UnifiedReasoner = _UnifiedReasoner
+        ReasoningType = _ReasoningType
+        ReasoningResult = _ReasoningResult
+        UNIFIED_AVAILABLE = _UNIFIED_AVAILABLE
+        create_unified_reasoner = _create_unified_reasoner
+        apply_reasoning = _apply_reasoning
+        get_reasoning_integration = _get_reasoning_integration
+        IntegrationReasoningResult = _IntegrationReasoningResult
+        REASONING_AVAILABLE = _UNIFIED_AVAILABLE
+        
+        logging.getLogger(__name__).info(
+            "Reasoning integration loaded successfully (lazy import) - reasoning engines will be invoked"
+        )
+        return True
+        
+    except ImportError as e:
+        logging.getLogger(__name__).warning(
+            f"Reasoning integration not available: {e}. Tasks will use placeholder execution."
+        )
+        REASONING_AVAILABLE = False
+        return False
 
 # ============================================================
 # CONSTANTS
@@ -2543,6 +2592,11 @@ class AgentPoolManager:
             reasoning_result = None
             node_results = {}
 
+            # CIRCULAR IMPORT FIX: Trigger lazy import of reasoning components
+            # This ensures UnifiedReasoner and other components are available
+            # before we check REASONING_AVAILABLE
+            _lazy_import_reasoning()
+            
             if is_reasoning_task and REASONING_AVAILABLE:
                 logger.info(
                     f"Agent {agent_id} invoking reasoning engine for task {task_id} "
