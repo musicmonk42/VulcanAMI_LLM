@@ -91,12 +91,23 @@ data:
   # TIMEOUT FIX: Increased from 15s to 30s per Claude diagnosis
   # 15s was causing timeouts before internal LLM could complete complex reasoning
   VULCAN_LLM_TIMEOUT: "30.0"
-  # Hard timeout for VULCAN LLM operations (2 minutes)
-  # This is the absolute maximum time VULCAN reasoning can take
-  VULCAN_LLM_HARD_TIMEOUT: "120.0"
+  # Hard timeout for VULCAN LLM operations (5 minutes)
+  # CPU CLOUD FIX: Increased from 120s to 300s to prevent timeout on CPU-only instances
+  # At ~2.5s/token, 300s allows ~120 tokens before timeout
+  VULCAN_LLM_HARD_TIMEOUT: "300.0"
   # Per-token timeout for CPU execution (30s per token)
   # Internal LLM can take 3+ seconds per token on CPU
   VULCAN_LLM_PER_TOKEN_TIMEOUT: "30.0"
+  # ADAPTIVE TIMEOUT CONFIGURATION (Task 4 Fix)
+  # Base timeout in seconds for adaptive timeout calculation
+  # Formula: timeout = base_timeout + (max_tokens * timeout_per_token)
+  VULCAN_BASE_TIMEOUT: "5.0"
+  # Per-token timeout for adaptive calculation (2s per token)
+  VULCAN_TIMEOUT_PER_TOKEN: "2.0"
+  # ZMQ Buffer Configuration (Task 3 Fix)
+  # Increased from 15000ms to 30000ms to prevent Orchestrator Panic
+  # during CPU-bound inference (~2.5s/token)
+  ZMQ_CONNECTION_TIMEOUT: "30000"
   # OpenAI Language Formatting Configuration
   # When true, routes ALL natural language output formatting to OpenAI (gpt-4o-mini).
   # This provides fast responses (~2-5s) while VULCAN LLM learns via distillation.
