@@ -1279,6 +1279,11 @@ class GraphixVulcanLLM:
     # something is definitely wrong (likely async generator blocked on first await)
     _FIRST_TOKEN_TIMEOUT_SECONDS = 15.0
     
+    # Default generation timeout - configurable via GRAPHIX_VULCAN_TIMEOUT env var
+    # PERFORMANCE FIX: Increased from 60s to 120s to handle slow CPU inference
+    # At ~500ms per token, 120s allows ~240 tokens vs only ~120 at 60s timeout
+    _DEFAULT_GENERATION_TIMEOUT = float(os.environ.get("GRAPHIX_VULCAN_TIMEOUT", "120.0"))
+    
     # Class-level ThreadPoolExecutor for hard timeouts
     # This ensures asyncio.wait_for() timeout WILL fire even if code blocks synchronously
     # because the entire async execution runs in a separate thread
@@ -1287,7 +1292,7 @@ class GraphixVulcanLLM:
         thread_name_prefix="vulcan_timeout_"
     )
 
-    async def _consume_async_result(self, gen_result, timeout: Optional[float] = 60.0) -> Any:
+    async def _consume_async_result(self, gen_result, timeout: Optional[float] = None) -> Any:
         """Consume an async result (coroutine or async generator) with timeout protection.
         
         This method handles:
@@ -1302,11 +1307,13 @@ class GraphixVulcanLLM:
         DIAGNOSTIC FIX: Critical checkpoint logs are now at INFO level to ensure
         they always appear in production logs, enabling root cause analysis of hangs.
         
+        PERFORMANCE FIX: Default timeout increased to 120s (configurable via
+        GRAPHIX_VULCAN_TIMEOUT env var) to handle slow CPU inference (~500ms/token).
+        
         Args:
             gen_result: The async result to consume
             timeout: Maximum time in seconds for the operation to complete.
-                    If None, no timeout is applied (operation can run indefinitely).
-                    Default is 60.0 seconds.
+                    If None, uses _DEFAULT_GENERATION_TIMEOUT (120s by default).
             
         Returns:
             The final result (typically a CognitiveLoopResult)
@@ -1315,6 +1322,9 @@ class GraphixVulcanLLM:
             TimeoutError: If operation exceeds the specified timeout
             ValueError: If generator yields no items
         """
+        # Use configurable default timeout
+        effective_timeout = timeout if timeout is not None else self._DEFAULT_GENERATION_TIMEOUT
+        
         try:
             # Wrap the consumption in a timeout
             async def _consume():
@@ -1332,7 +1342,7 @@ class GraphixVulcanLLM:
                     # This catches hangs during tokenization/initialization
                     coroutine_setup_timeout = min(
                         self._FIRST_TOKEN_TIMEOUT_SECONDS,
-                        timeout or 60.0
+                        effective_timeout
                     )
                     try:
                         result = await asyncio.wait_for(result, timeout=coroutine_setup_timeout)
@@ -1444,16 +1454,16 @@ class GraphixVulcanLLM:
                     f"has_tokens={hasattr(result, 'tokens')}"
                 )
             
-            if timeout:
+            if effective_timeout:
                 try:
-                    return await asyncio.wait_for(_consume(), timeout=timeout)
+                    return await asyncio.wait_for(_consume(), timeout=effective_timeout)
                 except FirstTokenTimeoutError:
                     # Re-raise our custom first-token timeout without wrapping
                     raise
                 except asyncio.TimeoutError:
                     # Generic timeout - convert to TimeoutError
-                    logger.error(f"[TIMEOUT] Async generation exceeded {timeout}s limit")
-                    raise TimeoutError(f"Generation timed out after {timeout} seconds") from None
+                    logger.error(f"[TIMEOUT] Async generation exceeded {effective_timeout}s limit")
+                    raise TimeoutError(f"Generation timed out after {effective_timeout} seconds") from None
             else:
                 return await _consume()
                 
@@ -1461,7 +1471,7 @@ class GraphixVulcanLLM:
             # Convert custom exception to standard TimeoutError for API compatibility
             raise TimeoutError(str(e)) from e
 
-    def _run_async_in_thread(self, gen_result, timeout: Optional[float] = 60.0) -> Any:
+    def _run_async_in_thread(self, gen_result, timeout: Optional[float] = None) -> Any:
         """Run async generation in a separate thread with its own event loop.
         
         This is used when there's already an event loop running in the current thread
@@ -1475,11 +1485,13 @@ class GraphixVulcanLLM:
         timeouts between await points - ThreadPoolExecutor.submit().result(timeout=X) 
         provides a true hard timeout.
         
+        PERFORMANCE FIX: Default timeout increased to 120s (configurable via
+        GRAPHIX_VULCAN_TIMEOUT env var) to handle slow CPU inference (~500ms/token).
+        
         Args:
             gen_result: The async result to consume
             timeout: Maximum time in seconds for generation to complete.
-                    If None, no timeout is applied (operation can run indefinitely).
-                    Default is 60.0 seconds.
+                    If None, uses _DEFAULT_GENERATION_TIMEOUT (120s by default).
             
         Returns:
             The final result from async generation
@@ -1488,7 +1500,9 @@ class GraphixVulcanLLM:
             TimeoutError: If operation exceeds timeout
             RuntimeError: If thread execution fails
         """
-        logger.info(f"[CONSUME] _run_async_in_thread: Starting with HARD timeout={timeout}s")
+        # Use configurable default timeout
+        effective_timeout = timeout if timeout is not None else self._DEFAULT_GENERATION_TIMEOUT
+        logger.info(f"[CONSUME] _run_async_in_thread: Starting with HARD timeout={effective_timeout}s")
         
         def run_in_new_loop():
             """Execute async code in a new event loop in this thread."""
@@ -1496,7 +1510,7 @@ class GraphixVulcanLLM:
             asyncio.set_event_loop(loop)
             try:
                 return loop.run_until_complete(
-                    self._consume_async_result(gen_result, timeout=timeout)
+                    self._consume_async_result(gen_result, timeout=effective_timeout)
                 )
             finally:
                 loop.close()
@@ -1508,14 +1522,14 @@ class GraphixVulcanLLM:
         try:
             # Wait with an extra buffer for thread overhead
             # HARD TIMEOUT: This WILL fire even if run_in_new_loop() blocks
-            thread_timeout = (timeout + self._THREAD_OVERHEAD_BUFFER) if timeout else None
+            thread_timeout = effective_timeout + self._THREAD_OVERHEAD_BUFFER
             result = future.result(timeout=thread_timeout)
             logger.info(f"[CONSUME] _run_async_in_thread: Completed successfully")
             return result
         except FuturesTimeoutError:
-            logger.error(f"[CONSUME] HARD TIMEOUT after {timeout}s - cancelling future")
+            logger.error(f"[CONSUME] HARD TIMEOUT after {effective_timeout}s - cancelling future")
             future.cancel()
-            raise TimeoutError(f"Generation timed out after {timeout} seconds (hard timeout)") from None
+            raise TimeoutError(f"Generation timed out after {effective_timeout} seconds (hard timeout)") from None
         except Exception as e:
             logger.error(f"[CONSUME] ERROR: {type(e).__name__}: {e}")
             raise RuntimeError(f"Generation failed: {e}") from e
@@ -1580,7 +1594,7 @@ class GraphixVulcanLLM:
         stop_strings: Optional[Sequence[str]] = None,
         stop_tokens: Optional[Sequence[int]] = None,
         use_cache: bool = True,
-        timeout: Optional[float] = 60.0,
+        timeout: Optional[float] = None,
     ) -> GenerationResult:
         """High-level safe generation with proper async handling and timeout.
         
@@ -1588,6 +1602,9 @@ class GraphixVulcanLLM:
         - Adds timeout wrapper to prevent infinite hangs
         - Runs async generation in a separate thread when event loop is already running
         - Properly handles both sync and async CognitiveLoop implementations
+        
+        PERFORMANCE FIX: Default timeout increased to 120s (configurable via
+        GRAPHIX_VULCAN_TIMEOUT env var) to handle slow CPU inference (~500ms/token).
         
         Args:
             prompt: Input text or token sequence
@@ -1598,7 +1615,8 @@ class GraphixVulcanLLM:
             stop_strings: Strings that stop generation
             stop_tokens: Token IDs that stop generation
             use_cache: Enable result caching
-            timeout: Maximum time in seconds for generation (default: 60.0)
+            timeout: Maximum time in seconds for generation.
+                    If None, uses _DEFAULT_GENERATION_TIMEOUT (120s by default).
             
         Returns:
             GenerationResult with generated tokens, text, and metadata
@@ -1607,6 +1625,9 @@ class GraphixVulcanLLM:
             TimeoutError: If generation exceeds timeout
             RuntimeError: If critical errors occur during generation
         """
+        # Use configurable default timeout
+        effective_timeout = timeout if timeout is not None else self._DEFAULT_GENERATION_TIMEOUT
+        
         start = time.time()
         max_steps = max_tokens or self.config["generation"]["max_tokens"]
         
@@ -1617,7 +1638,7 @@ class GraphixVulcanLLM:
             prompt_len = f"{len(prompt)} items"
         else:
             prompt_len = "unknown"
-        logger.info(f"[DEBUG] generate() called with prompt_len={prompt_len}, max_tokens={max_steps}")
+        logger.info(f"[DEBUG] generate() called with prompt_len={prompt_len}, max_tokens={max_steps}, timeout={effective_timeout}s")
 
         # Check cache
         if use_cache and self.cache and not stream:
@@ -1672,7 +1693,7 @@ class GraphixVulcanLLM:
                 # CRITICAL FIX: Event loop already running - run async code in a new thread
                 # This commonly happens when called from HybridLLMExecutor.run_in_executor()
                 logger.info("[DIAG] Event loop running - using threaded async execution")
-                loop_result = self._run_async_in_thread(gen_result, timeout=timeout)
+                loop_result = self._run_async_in_thread(gen_result, timeout=effective_timeout)
             else:
                 # Create a new event loop for this synchronous context
                 # Note: We don't call set_event_loop() to avoid affecting the thread's default loop
@@ -1682,7 +1703,7 @@ class GraphixVulcanLLM:
                 try:
                     # FIX: Add timeout wrapper to prevent infinite hangs
                     async def run_with_timeout():
-                        return await self._consume_async_result(gen_result, timeout)
+                        return await self._consume_async_result(gen_result, effective_timeout)
                     
                     logger.info("[DIAG] Starting run_until_complete...")
                     loop_result = loop.run_until_complete(run_with_timeout())
@@ -1940,7 +1961,7 @@ class GraphixVulcanLLM:
         self,
         prompt: Union[str, Sequence[int]],
         max_tokens: Optional[int] = None,
-        timeout: Optional[float] = 60.0,
+        timeout: Optional[float] = None,
     ) -> GenerationResult:
         """
         Fast generation mode for OUTPUT FORMATTING only (bypasses reasoning hooks).
@@ -1958,6 +1979,9 @@ class GraphixVulcanLLM:
         - generate_fast(): ~500ms first token (transformer only)
         - 30-token response: ~15s instead of TIMEOUT
         
+        PERFORMANCE FIX: Default timeout increased to 120s (configurable via
+        GRAPHIX_VULCAN_TIMEOUT env var) to handle slow CPU inference (~500ms/token).
+        
         POLICY COMPLIANCE:
         - This method does NOT perform independent reasoning
         - It only formats pre-computed results as readable prose
@@ -1966,7 +1990,8 @@ class GraphixVulcanLLM:
         Args:
             prompt: Input text or tokens to format as output
             max_tokens: Maximum tokens to generate (default from config)
-            timeout: Maximum time in seconds for generation (default: 60.0)
+            timeout: Maximum time in seconds for generation.
+                    If None, uses _DEFAULT_GENERATION_TIMEOUT (120s by default).
             
         Returns:
             GenerationResult with formatted text and metadata
@@ -1976,7 +2001,10 @@ class GraphixVulcanLLM:
             result = llm.generate_fast("Format this result: 42", max_tokens=100)
             print(result.text)  # Natural language formatted output
         """
-        logger.info("[GraphixVulcanLLM] generate_fast() - OUTPUT FORMATTING MODE")
+        # Use configurable default timeout
+        effective_timeout = timeout if timeout is not None else self._DEFAULT_GENERATION_TIMEOUT
+        
+        logger.info(f"[GraphixVulcanLLM] generate_fast() - OUTPUT FORMATTING MODE (timeout={effective_timeout}s)")
         
         max_steps = max_tokens or self.config["generation"]["max_tokens"]
         
@@ -1992,7 +2020,7 @@ class GraphixVulcanLLM:
                 max_tokens=max_steps,
                 explain=False,  # Skip explanation generation for speed
                 stream=False,
-                timeout=timeout,
+                timeout=effective_timeout,
             )
         finally:
             # Restore original mode
