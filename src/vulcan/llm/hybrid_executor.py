@@ -648,8 +648,8 @@ class HybridLLMExecutor:
             thread_name_prefix="hybrid_timeout_"
         )
         # Parse VULCAN_LLM_TIMEOUT with error handling for invalid values
-        # FIX: Use VULCAN_HARD_TIMEOUT constant (default 120s) for CPU-intensive reasoning
-        # Previous 30s was causing timeouts before internal LLM could complete complex reasoning
+        # FIX: Use VULCAN_HARD_TIMEOUT constant (default 300s) for CPU-intensive reasoning
+        # CPU CLOUD FIX: Increased from 120s to 300s to allow more tokens before timeout
         try:
             env_timeout = os.environ.get("VULCAN_LLM_TIMEOUT")
             if env_timeout:
