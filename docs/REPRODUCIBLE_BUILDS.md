@@ -304,7 +304,7 @@ deployment:
       version: 1.7.0
       state_serial: 42
     dependencies:
-      python: "3.11"
+      python: 3.11-slim
       postgres: "14-alpine"
       redis: "7-alpine"
       minio: "RELEASE.2025-01-10T00-00-00Z"
