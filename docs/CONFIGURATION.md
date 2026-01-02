@@ -69,11 +69,17 @@ query routing delays, cascade timeouts, and learning system issues.
 | VULCAN_GAP_GIVEUP_THRESHOLD | No | Attempts before marking gap as deferred | "10" |
 | VULCAN_LLM_HARD_TIMEOUT | No | Hard timeout for VULCAN LLM operations (seconds) | "120.0" |
 | VULCAN_LLM_PER_TOKEN_TIMEOUT | No | Per-token timeout for CPU execution (seconds) | "30.0" |
+| GRAPHIX_VULCAN_TIMEOUT | No | GraphixVulcanLLM generation timeout (seconds) | "120.0" |
 | OPENAI_LANGUAGE_ONLY | No | Restrict OpenAI to language-only operations | "true" |
 | OPENAI_LANGUAGE_FORMATTING | No | Route output formatting to OpenAI (fast ~2-5s) | "true" |
 | OPENAI_LANGUAGE_POLISH | No | Enable OpenAI for output polishing (legacy) | "false" |
 
 **Performance Tuning Notes:**
+
+- **GRAPHIX_VULCAN_TIMEOUT**: Controls the timeout for local transformer generation.
+  At ~500ms per token on CPU, a 120s timeout allows ~240 tokens. Increase this value
+  if you see "Generation timed out" errors. The previous default of 60s was insufficient
+  for CPU-intensive inference. Set higher (180s or 240s) for very slow environments.
 
 - **VULCAN_EMBEDDING_TIMEOUT**: Reduced from 30s to 5s to prevent cascade delays when
   decomposition calls multiple embeddings. Increase for slower CPU environments.
