@@ -95,7 +95,9 @@ OPENAI_FALLBACK_CONFIDENCE = 0.6
 #   - OpenAI MUST NOT generate code
 #   - All reasoning happens in VULCAN's mind BEFORE OpenAI is called
 #
-_openai_language_formatting_env = os.environ.get("OPENAI_LANGUAGE_FORMATTING", "false").lower()
+# FIX: Default to "true" to match .env.example documentation and prevent 60-second timeouts.
+# This enables fast OpenAI formatting (~2-5s) while VULCAN LLM learns via distillation.
+_openai_language_formatting_env = os.environ.get("OPENAI_LANGUAGE_FORMATTING", "true").lower()
 OPENAI_LANGUAGE_FORMATTING = _openai_language_formatting_env in ("true", "1", "yes")
 
 # Legacy polish mode - kept for backwards compatibility
@@ -582,7 +584,7 @@ class HybridLLMExecutor:
         local_llm: Optional[Any] = None,
         openai_client_getter: Optional[Callable] = None,
         mode: str = "parallel",
-        timeout: float = 30.0,
+        timeout: Optional[float] = None,  # Changed to allow env var override
         ensemble_min_confidence: float = 0.7,
         openai_max_tokens: int = 2000,  # Increased for diagnostic purposes
         enable_openai_cache: bool = True,
@@ -596,7 +598,8 @@ class HybridLLMExecutor:
             local_llm: Vulcan's local LLM instance
             openai_client_getter: Function to get OpenAI client (lazy loading)
             mode: Execution mode (local_first, openai_first, parallel, ensemble)
-            timeout: Timeout for parallel/ensemble execution in seconds
+            timeout: Timeout for parallel/ensemble execution in seconds.
+                     If None, uses HYBRID_EXECUTOR_TIMEOUT env var or default 30.0
             ensemble_min_confidence: Minimum confidence for ensemble selection
             openai_max_tokens: Maximum tokens for OpenAI API calls
             enable_openai_cache: Enable caching of OpenAI responses (default: True)
@@ -616,7 +619,13 @@ class HybridLLMExecutor:
             mode_lower = "parallel"
         self.mode = mode_lower
         
-        self.timeout = timeout
+        # Allow environment variable override for timeout (Issue #5 fix)
+        # Added error handling for invalid env var values
+        try:
+            default_timeout = float(os.environ.get("HYBRID_EXECUTOR_TIMEOUT", "30.0"))
+        except (ValueError, TypeError):
+            default_timeout = 30.0
+        self.timeout = timeout if timeout is not None else default_timeout
         self.ensemble_min_confidence = ensemble_min_confidence
         self.openai_max_tokens = openai_max_tokens
         self.logger = logging.getLogger("HybridLLMExecutor")
@@ -1191,16 +1200,143 @@ class HybridLLMExecutor:
         self, loop, prompt: str, max_tokens: int, temperature: float, system_prompt: str,
         conversation_history: Optional[List[Dict[str, str]]] = None
     ) -> Dict[str, Any]:
-        """Execute using VULCAN internal LLM only - NO EXTERNAL AI.
+        """Execute both local and OpenAI in parallel, use first successful response.
         
-        ARCHITECTURE: External AI has been removed. Only VULCAN internal LLM is used.
-        The 'parallel' mode now simply delegates to local_first since there's nothing
-        to run in parallel.
+        RESTORED: True parallel execution for faster response times.
+        This fixes the 60-second timeout issue by allowing OpenAI to respond quickly
+        (~2-5s) while the slow internal LLM (~500ms/token) is still processing.
+        
+        ARCHITECTURE:
+        - Both local LLM and OpenAI run simultaneously
+        - First successful response wins
+        - If OpenAI unavailable, falls back to local_first mode
+        - Pending tasks are cancelled after first success
         """
-        self.logger.info("[HybridExecutor] Parallel mode redirecting to local_first (external AI disabled)")
+        start_time = time.perf_counter()
+        
+        # Check if OpenAI is available (Issue #6: detailed logging)
+        openai_available = self._openai_available()
+        self.logger.info(f"[HybridExecutor] Parallel mode starting - OpenAI available: {openai_available}")
+        
+        if not openai_available:
+            self.logger.info("[HybridExecutor] OpenAI not available, falling back to local_first")
+            return await self._execute_local_first(
+                loop, prompt, max_tokens, temperature, system_prompt, conversation_history
+            )
+        
+        self.logger.info("[HybridExecutor] Executing in TRUE parallel mode")
+        
+        # Create tasks for both backends
+        local_task = asyncio.create_task(
+            self._run_local_llm(loop, prompt, max_tokens),
+            name="local_llm_task"
+        )
+        openai_task = asyncio.create_task(
+            self._run_openai(loop, prompt, max_tokens, temperature, system_prompt, conversation_history),
+            name="openai_task"
+        )
+        
+        try:
+            # Wait for first successful result with timeout
+            done, pending = await asyncio.wait(
+                [local_task, openai_task],
+                return_when=asyncio.FIRST_COMPLETED,
+                timeout=self.timeout
+            )
+            
+            # Cancel pending tasks
+            for task in pending:
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+            
+            # Get result from completed task
+            # Note: FIRST_COMPLETED returns when first task completes (success or failure)
+            # We iterate through completed tasks looking for a valid response
+            if done:
+                for task in done:
+                    try:
+                        result = task.result()
+                        # Check if result is a valid dict with text
+                        if isinstance(result, dict) and self._is_valid_response(result.get("text")):
+                            # Determine source from task name (with fallback for safety)
+                            task_name = task.get_name() if hasattr(task, 'get_name') else None
+                            source = "local" if task_name == "local_llm_task" else "openai"
+                            result["source"] = f"parallel_{source}"
+                            elapsed = time.perf_counter() - start_time
+                            self.logger.info(f"[HybridExecutor] ✓ Parallel mode complete - winner: {source}, time: {elapsed:.2f}s")
+                            return result
+                    except Exception as e:
+                        self.logger.warning(f"[HybridExecutor] Task failed: {e}")
+            
+            # If we get here, no task succeeded - fall back to local_first
+            elapsed = time.perf_counter() - start_time
+            self.logger.warning(f"[HybridExecutor] Parallel mode: no task succeeded after {elapsed:.2f}s, falling back to local_first")
+            
+        except asyncio.TimeoutError:
+            elapsed = time.perf_counter() - start_time
+            self.logger.warning(f"[HybridExecutor] Parallel mode timeout after {elapsed:.2f}s (limit: {self.timeout}s)")
+            # Cancel all tasks
+            local_task.cancel()
+            openai_task.cancel()
+        except Exception as e:
+            elapsed = time.perf_counter() - start_time
+            self.logger.warning(f"[HybridExecutor] Parallel mode error after {elapsed:.2f}s: {e}")
+        
+        # Fallback to local_first if parallel failed
+        self.logger.warning("[HybridExecutor] Parallel mode failed, falling back to local_first")
         return await self._execute_local_first(
             loop, prompt, max_tokens, temperature, system_prompt, conversation_history
         )
+    
+    def _openai_available(self) -> bool:
+        """Check if OpenAI client is available and configured.
+        
+        Returns:
+            True if OpenAI is available for use, False otherwise
+        """
+        try:
+            client = self.openai_client_getter()
+            return client is not None
+        except Exception:
+            return False
+    
+    async def _run_local_llm(
+        self, loop, prompt: str, max_tokens: int
+    ) -> Dict[str, Any]:
+        """Async wrapper for local LLM execution.
+        
+        Returns a dict with 'text' and 'source' keys for parallel mode.
+        """
+        text = await self._call_local_llm(loop, prompt, max_tokens)
+        if text and self._is_valid_response(text):
+            return {
+                "text": text,
+                "source": "local",
+                "systems_used": ["vulcan_local_llm"],
+            }
+        return {"text": None, "source": "local_failed", "systems_used": []}
+    
+    async def _run_openai(
+        self, loop, prompt: str, max_tokens: int, temperature: float, 
+        system_prompt: str, conversation_history: Optional[List[Dict[str, str]]] = None
+    ) -> Dict[str, Any]:
+        """Async wrapper for OpenAI execution.
+        
+        Returns a dict with 'text' and 'source' keys for parallel mode.
+        """
+        text = await self._call_openai(
+            loop, prompt, max_tokens, temperature, system_prompt, conversation_history
+        )
+        if text and self._is_valid_response(text):
+            return {
+                "text": text,
+                "source": "openai",
+                "systems_used": ["openai"],
+            }
+        return {"text": None, "source": "openai_failed", "systems_used": []}
 
     async def _execute_ensemble(
         self, loop, prompt: str, max_tokens: int, temperature: float, system_prompt: str,
