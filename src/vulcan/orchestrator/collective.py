@@ -33,6 +33,17 @@ logger = logging.getLogger(__name__)
 
 
 # ============================================================
+# TIMEOUT CONSTANTS (TASK 3 FIX: Signal Deafness Resolution)
+# ============================================================
+
+# Default SLO P95 latency for distributed execution (in milliseconds)
+# TASK 3 FIX: Increased from 30000ms to 120000ms (120 seconds) to account for
+# slow local LLM inference (~1s per token on CPU). This prevents premature
+# timeout and orphaning of completed tasks.
+DEFAULT_SLO_P95_LATENCY_MS = 120000
+
+
+# ============================================================
 # TYPE DEFINITIONS (No circular imports)
 # ============================================================
 
@@ -799,7 +810,8 @@ class VULCANAGICollective:
             )
 
             # Wait for result with timeout
-            timeout = getattr(self.config, "slo_p95_latency_ms", 30000) / 1000
+            # Use the named constant for default SLO P95 latency
+            timeout = getattr(self.config, "slo_p95_latency_ms", DEFAULT_SLO_P95_LATENCY_MS) / 1000
             start_wait = time.time()
             check_interval = 0.1
 

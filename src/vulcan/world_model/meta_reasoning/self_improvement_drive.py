@@ -82,7 +82,11 @@ try:
 except Exception:
     # Fallback: disable auto-apply if policy module isn't present
     # Define TRUSTED_PROVIDERS first since is_trusted_llm_provider references it
-    TRUSTED_PROVIDERS = frozenset({"local_llm", "graphix", "graphix_vulcan", "graphix_vulcan_llm", "vulcan_local_llm", "internal"})
+    # TASK 2 FIX: Added "trusted_internal_source" for VULCAN Policy compliance
+    TRUSTED_PROVIDERS = frozenset({
+        "local_llm", "graphix", "graphix_vulcan", "graphix_vulcan_llm", 
+        "vulcan_local_llm", "internal", "trusted_internal_source"
+    })
 
     def load_policy(_):
         from types import SimpleNamespace

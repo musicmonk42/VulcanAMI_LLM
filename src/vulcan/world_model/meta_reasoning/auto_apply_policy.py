@@ -63,6 +63,7 @@ except ImportError:
 # for code generation without triggering the EXTERNAL_LLM_DISABLED policy block.
 # By including local_llm and graphix variants, we ensure that Vulcan's internal
 # LLM can be used for self-improvement without a 72-hour cooldown.
+# TASK 2 FIX: Added "trusted_internal_source" as requested for VULCAN Policy compliance
 TRUSTED_PROVIDERS = frozenset({
     "local_llm",
     "graphix",
@@ -70,6 +71,7 @@ TRUSTED_PROVIDERS = frozenset({
     "graphix_vulcan_llm",
     "vulcan_local_llm",
     "internal",
+    "trusted_internal_source",  # VULCAN Policy requirement for code_modification tasks
 })
 
 

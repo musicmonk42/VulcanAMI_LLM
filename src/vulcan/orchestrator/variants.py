@@ -23,6 +23,18 @@ logger = logging.getLogger(__name__)
 
 
 # ============================================================
+# TIMEOUT CONSTANTS (TASK 3 FIX: Signal Deafness Resolution)
+# ============================================================
+
+# Default time budget for parallel orchestrator operations (in milliseconds)
+# TASK 3 FIX: Increased from 5000ms to 60000ms (60 seconds) to account for
+# slow local LLM inference (~1s per token on CPU). This prevents the
+# orchestrator from timing out and orphaning tasks that the Agent Pool
+# actually completed.
+DEFAULT_TIME_BUDGET_MS = 60000
+
+
+# ============================================================
 # PYTHON VERSION COMPATIBILITY
 # ============================================================
 
@@ -187,7 +199,8 @@ class ParallelOrchestrator(VULCANAGICollective):
             return self._create_fallback_result("System is shutting down")
 
         start_time = time.time()
-        timeout = context.get("time_budget_ms", 5000) / 1000
+        # Use the named constant for default time budget
+        timeout = context.get("time_budget_ms", DEFAULT_TIME_BUDGET_MS) / 1000
 
         try:
             # Phase 1: Parallel perception and memory operations
