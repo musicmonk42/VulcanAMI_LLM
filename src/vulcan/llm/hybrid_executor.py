@@ -1241,12 +1241,17 @@ class HybridLLMExecutor:
                     pass
             
             # Get result from completed task
+            # Note: FIRST_COMPLETED returns when first task completes (success or failure)
+            # We iterate through completed tasks looking for a valid response
             if done:
                 for task in done:
                     try:
                         result = task.result()
-                        if result and self._is_valid_response(result.get("text")):
-                            source = "local" if task.get_name() == "local_llm_task" else "openai"
+                        # Check if result is a valid dict with text
+                        if isinstance(result, dict) and self._is_valid_response(result.get("text")):
+                            # Determine source from task name (with fallback for safety)
+                            task_name = task.get_name() if hasattr(task, 'get_name') else None
+                            source = "local" if task_name == "local_llm_task" else "openai"
                             result["source"] = f"parallel_{source}"
                             self.logger.info(f"[HybridExecutor] ✓ Parallel mode: {source} won")
                             return result
