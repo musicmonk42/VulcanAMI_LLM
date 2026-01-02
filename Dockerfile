@@ -182,13 +182,14 @@ WORKDIR /app
 
 # OS hardening: minimal updates; remove apt caches immediately
 # Include compression libraries for Vulcan Memory System (zstd, lz4)
+# Note: libgl1-mesa-glx was replaced with libgl1 in Debian trixie
 # hadolint ignore=DL3008
 RUN apt-get update && \
     apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
         curl \
         ca-certificates \
-        libgl1-mesa-glx \
+        libgl1 \
         libglib2.0-0 \
         zstd \
         liblz4-1 \

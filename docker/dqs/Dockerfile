@@ -70,13 +70,14 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /app
 
 # Install runtime dependencies only
+# Note: libgl1-mesa-glx was replaced with libgl1 in Debian trixie
 RUN apt-get update && \
     apt-get dist-upgrade -y && \
     apt-get install -y --no-install-recommends \
         curl \
         ca-certificates \
         libpq5 \
-        libgl1-mesa-glx \
+        libgl1 \
         libglib2.0-0 && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*

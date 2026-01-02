@@ -2020,7 +2020,7 @@ class CognitiveLoop:
             if "cannot schedule new futures after shutdown" in str(e).lower():
                 logger.warning("Operation attempted after executor/event loop shutdown, suppressing further async work.")
                 return default
-            # Re-raise other RuntimeErrors to be caught by general exception handler
+            # Handle other RuntimeErrors gracefully as well
             logger.warning(f"Async safe operation failed with RuntimeError, returning default: {e}")
             return default
         except Exception as e:
