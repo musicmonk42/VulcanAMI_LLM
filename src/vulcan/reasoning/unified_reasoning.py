@@ -3051,10 +3051,11 @@ class UnifiedReasoner:
                         formatted_output = raw_result.get('formatted_output', '')
                         
                         # Build a user-friendly conclusion
-                        if computed_result:
+                        # Prefer formatted_output (includes full explanation) over simple result
+                        if formatted_output:
+                            user_conclusion = formatted_output
+                        elif computed_result:
                             user_conclusion = f"The answer is: {computed_result}"
-                            if formatted_output:
-                                user_conclusion = formatted_output
                         else:
                             user_conclusion = raw_result
                         
