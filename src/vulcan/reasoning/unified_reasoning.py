@@ -74,6 +74,16 @@ CONFIDENCE_FLOOR_NO_RESULT = 0.1  # Floor when reasoner returns empty/null resul
 # Problem type identifiers
 PROBLEM_TYPE_BAYESIAN = 'bayesian'
 
+# Fallback order for UNKNOWN reasoning type
+# When task type cannot be determined, fall back to these reasoning types in order.
+# SYMBOLIC (language reasoning) is first as it can handle most general queries.
+# PROBABILISTIC handles uncertainty well, CAUSAL handles cause-effect questions.
+UNKNOWN_TYPE_FALLBACK_ORDER = (
+    'SYMBOLIC',       # Best for general language/text queries
+    'PROBABILISTIC',  # Good for uncertainty handling
+    'CAUSAL',         # Good for cause-effect questions
+)
+
 # P0.2 FIX: Creative Task Detection
 # These keywords indicate creative tasks that should bypass confidence filtering.
 # Creative tasks like poems, sonnets, stories don't need high confidence scores
@@ -2780,6 +2790,49 @@ class UnifiedReasoner:
                         f"No reasoner for type {task.task_type} and no PROBABILISTIC fallback available"
                     )
                     return self._create_empty_result()
+            elif task.task_type == ReasoningType.UNKNOWN:
+                # FIX: Handle UNKNOWN reasoning type by falling back to available reasoners
+                # This prevents the "No reasoner for type UNKNOWN" error that causes 10% confidence
+                # UNKNOWN type indicates the classification couldn't determine a specific type,
+                # so we try multiple reasoners in priority order defined in UNKNOWN_TYPE_FALLBACK_ORDER
+                logger.info(
+                    f"[UnifiedReasoner] Task {task.task_id} has UNKNOWN type, "
+                    "attempting fallback to available reasoners"
+                )
+                
+                # Use configurable fallback order from constants
+                for fallback_name in UNKNOWN_TYPE_FALLBACK_ORDER:
+                    try:
+                        fallback_type = ReasoningType[fallback_name]
+                    except KeyError:
+                        logger.warning(f"[UnifiedReasoner] Invalid fallback type: {fallback_name}")
+                        continue
+                    
+                    if fallback_type in self.reasoners:
+                        logger.info(
+                            f"[UnifiedReasoner] Using {fallback_type.value} as fallback for UNKNOWN type"
+                        )
+                        fallback_task = ReasoningTask(
+                            task_id=task.task_id,
+                            task_type=fallback_type,
+                            input_data=task.input_data,
+                            query=task.query,
+                            constraints=task.constraints,
+                            utility_context=task.utility_context,
+                        )
+                        result = self._execute_reasoner(
+                            self.reasoners[fallback_type], fallback_task
+                        )
+                        # Keep the reasoning type as the actual type used, not UNKNOWN
+                        # This provides accurate metadata about what reasoning was performed
+                        return result
+                
+                # No fallback available
+                logger.warning(
+                    "[UnifiedReasoner] No fallback reasoner available for UNKNOWN type. "
+                    "Check that reasoning engines are properly initialized."
+                )
+                return self._create_empty_result()
             else:
                 logger.warning(f"No reasoner for type {task.task_type}")
                 return self._create_empty_result()

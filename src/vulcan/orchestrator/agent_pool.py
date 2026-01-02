@@ -3522,6 +3522,8 @@ class AgentPoolManager:
             return None
             
         # Mapping from task type strings to ReasoningType enum values
+        # FIX: Map "general" to SYMBOLIC instead of UNKNOWN to leverage the LanguageReasoner
+        # for general language/text queries. This prevents the 10% confidence issue.
         task_to_reasoning_map = {
             "causal": ReasoningType.CAUSAL,
             "symbolic": ReasoningType.SYMBOLIC,
@@ -3533,10 +3535,24 @@ class AgentPoolManager:
             "inductive": ReasoningType.INDUCTIVE,
             "abductive": ReasoningType.ABDUCTIVE,
             "reasoning": ReasoningType.HYBRID,  # Generic reasoning -> hybrid
-            "general": ReasoningType.UNKNOWN,
+            "general": ReasoningType.SYMBOLIC,  # FIX: General queries -> SYMBOLIC (language reasoning)
+            "language": ReasoningType.SYMBOLIC,  # Language tasks -> SYMBOLIC
+            "text": ReasoningType.SYMBOLIC,  # Text tasks -> SYMBOLIC
+            "mathematical": ReasoningType.MATHEMATICAL,  # Mathematical tasks
+            "math": ReasoningType.MATHEMATICAL,  # Math shorthand
         }
         
-        return task_to_reasoning_map.get(task_type.lower(), ReasoningType.UNKNOWN)
+        # FIX: Default to SYMBOLIC instead of UNKNOWN for unrecognized task types
+        # SYMBOLIC includes language reasoning which can handle most general queries
+        result = task_to_reasoning_map.get(task_type.lower())
+        if result is None:
+            # Log warning for unrecognized task types to help identify missing mappings
+            logger.warning(
+                f"[AgentPool] Unrecognized task type '{task_type}' - "
+                f"falling back to SYMBOLIC. Consider adding explicit mapping."
+            )
+            return ReasoningType.SYMBOLIC
+        return result
     
     def _calculate_task_complexity(
         self, 
