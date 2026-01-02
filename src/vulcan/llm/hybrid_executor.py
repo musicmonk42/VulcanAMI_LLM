@@ -1634,6 +1634,11 @@ class HybridLLMExecutor:
                 return self.local_llm.generate(prompt, effective_max_tokens)
             
             try:
+                # Check if event loop is closed before attempting async work
+                if loop.is_closed():
+                    self.logger.warning("[HybridExecutor] Event loop is closed, returning None")
+                    return None
+                
                 # ASYNC-FRIENDLY WAITING: Use run_in_executor to avoid blocking the event loop
                 # This allows other asyncio tasks (like OpenAI) to run concurrently
                 self.logger.info("[HybridExecutor] Starting async-friendly local LLM generation...")
@@ -1644,6 +1649,19 @@ class HybridLLMExecutor:
             except asyncio.TimeoutError:
                 self.logger.error(f"[HybridExecutor] ❌ ASYNC TIMEOUT after {adaptive_timeout:.1f}s!")
                 return None
+            except asyncio.CancelledError:
+                self.logger.debug("[HybridExecutor] Local LLM task was cancelled")
+                return None
+            except RuntimeError as e:
+                error_str = str(e).lower()
+                if "cannot schedule new futures after shutdown" in error_str:
+                    self.logger.debug("[HybridExecutor] Executor shutdown detected, returning None")
+                    return None
+                if "event loop is closed" in error_str:
+                    self.logger.debug("[HybridExecutor] Event loop closed, returning None")
+                    return None
+                # Re-raise other RuntimeErrors to be caught by outer handler
+                raise
             
             elapsed = time.perf_counter() - start_time
             self.logger.info(f"[HybridExecutor] generate() returned in {elapsed:.2f}s")
@@ -1738,6 +1756,11 @@ class HybridLLMExecutor:
             
             # PARALLEL MODE FIX: Use non-blocking async pattern
             try:
+                # Check if event loop is closed before attempting async work
+                if loop.is_closed():
+                    self.logger.warning("[HybridExecutor] Event loop is closed, returning None")
+                    return None
+                
                 self.logger.info("[HybridExecutor] Starting async-friendly fast generation...")
                 result = await asyncio.wait_for(
                     loop.run_in_executor(self._timeout_executor, generate_fast_sync),
@@ -1746,6 +1769,19 @@ class HybridLLMExecutor:
             except asyncio.TimeoutError:
                 self.logger.error(f"[HybridExecutor] ❌ FAST MODE ASYNC TIMEOUT after {fast_timeout}s!")
                 return None
+            except asyncio.CancelledError:
+                self.logger.debug("[HybridExecutor] Fast generation task was cancelled")
+                return None
+            except RuntimeError as e:
+                error_str = str(e).lower()
+                if "cannot schedule new futures after shutdown" in error_str:
+                    self.logger.debug("[HybridExecutor] Executor shutdown detected in fast mode, returning None")
+                    return None
+                if "event loop is closed" in error_str:
+                    self.logger.debug("[HybridExecutor] Event loop closed in fast mode, returning None")
+                    return None
+                # Re-raise other RuntimeErrors to be caught by outer handler
+                raise
             
             elapsed = time.perf_counter() - start_time
             self.logger.info(f"[HybridExecutor] generate_fast() completed in {elapsed:.2f}s")

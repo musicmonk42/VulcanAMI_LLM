@@ -1688,7 +1688,23 @@ class CognitiveLoop:
         # First try using the provided vocab object
         if self.vocab and hasattr(self.vocab, "id_to_token"):
             try:
+                # Check if event loop is closed before attempting async work
+                loop = asyncio.get_event_loop()
+                if loop.is_closed():
+                    logger.debug("Event loop closed, using sync fallback for id_to_token")
+                    return self.vocab.id_to_token(idx)
                 return await asyncio.to_thread(self.vocab.id_to_token, idx)
+            except RuntimeError as e:
+                # Handle executor/event loop shutdown gracefully
+                if "cannot schedule new futures after shutdown" in str(e).lower() or \
+                   "event loop is closed" in str(e).lower():
+                    logger.debug("Executor shutdown detected in id_to_token, using sync fallback")
+                    try:
+                        return self.vocab.id_to_token(idx)
+                    except Exception:
+                        pass
+                # Log vocab lookup failure, try tokenizer
+                logger.debug(f"Failed to convert index to token via vocab: {e}")
             except Exception as e:
                 # Log vocab lookup failure, try tokenizer
                 logger.debug(f"Failed to convert index to token via vocab: {e}")
@@ -1795,12 +1811,27 @@ class CognitiveLoop:
         if not candidates or not self.candidate_scorer:
             return [0.0] * len(candidates)
         loop = asyncio.get_event_loop()
+        
+        # Guard against closed event loop
+        if loop.is_closed():
+            logger.debug("Event loop closed, skipping parallel scoring")
+            return [0.0] * len(candidates)
+        
         executor = self._get_executor()
         scorer = self.candidate_scorer
-        futures = [
-            loop.run_in_executor(executor, scorer, hidden_state, cand, context)
-            for cand in candidates
-        ]
+        
+        # Guard against shutdown executor
+        try:
+            futures = [
+                loop.run_in_executor(executor, scorer, hidden_state, cand, context)
+                for cand in candidates
+            ]
+        except RuntimeError as e:
+            if "cannot schedule new futures after shutdown" in str(e).lower():
+                logger.debug("Executor shutdown detected, skipping parallel scoring")
+                return [0.0] * len(candidates)
+            raise
+        
         default_score = -0.5
         scores = []
         timeout = self.runtime.consensus_timeout_seconds
@@ -1812,6 +1843,15 @@ class CognitiveLoop:
             except asyncio.TimeoutError:
                 self._obs_sync("scoring.timeout", {"timeout_seconds": timeout})
                 scores.append(default_score)
+            except RuntimeError as e:
+                # Handle shutdown gracefully
+                if "cannot schedule new futures after shutdown" in str(e).lower() or \
+                   "event loop is closed" in str(e).lower():
+                    logger.debug("Executor shutdown detected during scoring")
+                    scores.append(default_score)
+                else:
+                    self._obs_sync("scoring.error", {"error": str(e)})
+                    scores.append(default_score)
             except Exception as e:
                 self._obs_sync("scoring.error", {"error": str(e)})
                 scores.append(default_score)
@@ -1939,7 +1979,23 @@ class CognitiveLoop:
     async def _tokenize(self, text: str) -> Tokens:
         if self.tokenizer and hasattr(self.tokenizer, "encode"):
             try:
+                # Check if event loop is closed before attempting async work
+                loop = asyncio.get_event_loop()
+                if loop.is_closed():
+                    logger.debug("Event loop closed, using sync fallback for tokenize")
+                    return self.tokenizer.encode(text)
                 return await asyncio.to_thread(self.tokenizer.encode, text)
+            except RuntimeError as e:
+                # Handle executor/event loop shutdown gracefully
+                if "cannot schedule new futures after shutdown" in str(e).lower() or \
+                   "event loop is closed" in str(e).lower():
+                    logger.debug("Executor shutdown detected in tokenize, using sync fallback")
+                    try:
+                        return self.tokenizer.encode(text)
+                    except Exception:
+                        pass
+                # Log tokenization failure, fallback to word splitting
+                logger.warning(f"Tokenization failed, using word split: {e}")
             except Exception as e:
                 # Log tokenization failure, fallback to word splitting
                 logger.warning(f"Tokenization failed, using word split: {e}")
@@ -1948,7 +2004,23 @@ class CognitiveLoop:
     async def _decode(self, tokens: Tokens) -> str:
         if self.tokenizer and hasattr(self.tokenizer, "decode"):
             try:
+                # Check if event loop is closed before attempting async work
+                loop = asyncio.get_event_loop()
+                if loop.is_closed():
+                    logger.debug("Event loop closed, using sync fallback for decode")
+                    return self.tokenizer.decode(tokens)
                 return await asyncio.to_thread(self.tokenizer.decode, tokens)
+            except RuntimeError as e:
+                # Handle executor/event loop shutdown gracefully
+                if "cannot schedule new futures after shutdown" in str(e).lower() or \
+                   "event loop is closed" in str(e).lower():
+                    logger.debug("Executor shutdown detected in decode, using sync fallback")
+                    try:
+                        return self.tokenizer.decode(tokens)
+                    except Exception:
+                        pass
+                # Log decoding failure, fallback to sync method
+                logger.warning(f"Async decoding failed, using fallback: {e}")
             except Exception as e:
                 # Log decoding failure, fallback to sync method
                 logger.warning(f"Async decoding failed, using fallback: {e}")
@@ -1992,6 +2064,10 @@ class CognitiveLoop:
             
         Returns:
             The function result, or default on failure/timeout
+            
+        Note:
+            This method includes guards against executor/event loop shutdown to prevent
+            "cannot schedule new futures after shutdown" errors.
         """
         if fn is None:
             return default
@@ -2005,7 +2081,12 @@ class CognitiveLoop:
                 else:
                     return await fn(*args_tuple)
             else:
+                # Check if event loop is closed before attempting to schedule work
                 loop = asyncio.get_event_loop()
+                if loop.is_closed():
+                    fn_name = getattr(fn, '__name__', str(fn))
+                    logger.debug(f"Event loop closed, skipping async call to '{fn_name}'")
+                    return default
                 coro = loop.run_in_executor(None, fn, *args_tuple)
                 if op_timeout is not None and op_timeout > 0:
                     return await asyncio.wait_for(coro, timeout=op_timeout)
@@ -2015,10 +2096,22 @@ class CognitiveLoop:
             fn_name = getattr(fn, '__name__', str(fn))
             logger.warning(f"Async operation '{fn_name}' timed out after {op_timeout}s, returning default")
             return default
+        except asyncio.CancelledError:
+            # Task was cancelled, likely during shutdown
+            fn_name = getattr(fn, '__name__', str(fn))
+            logger.debug(f"Async operation '{fn_name}' was cancelled, returning default")
+            return default
         except RuntimeError as e:
+            error_str = str(e).lower()
             # Handle executor/event loop shutdown gracefully
-            if "cannot schedule new futures after shutdown" in str(e).lower():
-                logger.warning("Operation attempted after executor/event loop shutdown, suppressing further async work.")
+            if "cannot schedule new futures after shutdown" in error_str:
+                logger.debug("Operation attempted after executor shutdown, returning default")
+                return default
+            if "event loop is closed" in error_str:
+                logger.debug("Event loop is closed, returning default")
+                return default
+            if "no running event loop" in error_str:
+                logger.debug("No running event loop, returning default")
                 return default
             # Handle other RuntimeErrors gracefully as well
             logger.warning(f"Async safe operation failed with RuntimeError, returning default: {e}")
