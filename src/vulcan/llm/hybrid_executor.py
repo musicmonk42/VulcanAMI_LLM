@@ -2214,6 +2214,88 @@ Write a natural, helpful response based on VULCAN's results."""
             return count
         return 0
 
+    def warm_up(self, test_prompt: str = "Hello", max_tokens: int = 5) -> Dict[str, Any]:
+        """
+        Warm up the local LLM to reduce cold start latency.
+        
+        BUG #4 FIX: CPU "Cold Start" and Cache Thrashing Prevention
+        
+        The first token generation on CPU can take 7+ seconds due to:
+        1. Model weights being swapped from disk/compressed memory into RAM
+        2. CPU cache not being primed with model data
+        3. Lazy initialization of model layers
+        
+        This method runs a minimal generation to prime the system:
+        - Loads model weights into active memory
+        - Primes CPU caches
+        - Initializes any lazy-loaded components
+        
+        Call this during application startup to reduce TTFT (Time To First Token)
+        for the first real user query.
+        
+        Args:
+            test_prompt: Simple prompt for warm-up (default: "Hello")
+            max_tokens: Number of tokens to generate (default: 5, kept small for speed)
+            
+        Returns:
+            Dict with warm-up results:
+            - success: bool - Whether warm-up succeeded
+            - warmup_time_ms: float - Time taken for warm-up in milliseconds
+            - first_token_time_ms: float - Time to first token (if available)
+            - error: str - Error message if warm-up failed
+        """
+        import time as time_module
+        
+        result = {
+            "success": False,
+            "warmup_time_ms": 0.0,
+            "first_token_time_ms": None,
+            "error": None,
+        }
+        
+        if not self.local_llm:
+            result["error"] = "No local LLM available for warm-up"
+            self.logger.warning("[HybridExecutor] Warm-up skipped: No local LLM")
+            return result
+        
+        self.logger.info("[HybridExecutor] Starting LLM warm-up to reduce cold start latency...")
+        start_time = time_module.perf_counter()
+        
+        try:
+            # Run a minimal generation to prime the system
+            if hasattr(self.local_llm, 'generate'):
+                warmup_result = self.local_llm.generate(test_prompt, max_tokens)
+                
+                # Check if result is valid
+                if warmup_result is not None:
+                    result["success"] = True
+                    # Try to get first token time if available from result
+                    if hasattr(warmup_result, 'first_token_time_ms'):
+                        result["first_token_time_ms"] = warmup_result.first_token_time_ms
+                else:
+                    result["error"] = "Warm-up generation returned None"
+            else:
+                result["error"] = "Local LLM does not have generate() method"
+                
+        except Exception as e:
+            result["error"] = f"Warm-up failed: {type(e).__name__}: {str(e)}"
+            self.logger.warning(f"[HybridExecutor] Warm-up error: {result['error']}")
+        
+        elapsed_ms = (time_module.perf_counter() - start_time) * 1000
+        result["warmup_time_ms"] = elapsed_ms
+        
+        if result["success"]:
+            self.logger.info(
+                f"[HybridExecutor] ✓ LLM warm-up complete in {elapsed_ms:.1f}ms - "
+                f"subsequent queries should have reduced TTFT"
+            )
+        else:
+            self.logger.warning(
+                f"[HybridExecutor] ⚠ LLM warm-up incomplete ({elapsed_ms:.1f}ms): {result['error']}"
+            )
+        
+        return result
+
     def set_mode(self, mode: str) -> bool:
         """
         Change the execution mode.

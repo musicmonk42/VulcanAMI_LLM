@@ -3207,42 +3207,69 @@ async def chat(request: ChatRequest):
     # CRITICAL FIX: Inject agent-based reasoning output into LLM context
     # This ensures reasoning engines invoked via agent_pool feed into response
     # FIX: Now uses TournamentManager for multi-agent selection when available
+    #
+    # BUG #3 FIX: "Parallel Execution" Orphanage Prevention
+    # Added retry loop with exponential backoff to properly wait for agent
+    # pool jobs to complete before proceeding. This prevents double work.
     # ================================================================
     agent_reasoning_output = None
     all_agent_results = []  # FIX: Collect ALL agent results for tournament selection
     
     if submitted_jobs and collective and hasattr(collective, "agent_pool") and collective.agent_pool:
         try:
-            # Give jobs a brief moment to complete (non-blocking check)
-            await asyncio.sleep(AGENT_REASONING_POLL_DELAY_SEC)
+            # BUG #3 FIX: Use retry loop with exponential backoff
+            # instead of single short poll that times out prematurely
+            MAX_POLL_ATTEMPTS = 5  # Max number of poll attempts
+            INITIAL_POLL_DELAY = 0.1  # Start with 100ms
+            MAX_POLL_DELAY = 1.0  # Cap at 1 second per attempt
+            BACKOFF_MULTIPLIER = 2.0  # Double delay each attempt
             
-            for job_id in submitted_jobs[:MAX_AGENT_REASONING_JOBS_TO_CHECK]:
-                try:
-                    provenance = collective.agent_pool.get_job_provenance(job_id)
-                    if provenance and provenance.get("status") == "success":
-                        result_data = provenance.get("result", {})
-                        # Check for reasoning_output from agent execution
-                        if isinstance(result_data, dict):
-                            reasoning_out = result_data.get("reasoning_output")
-                            reasoning_invoked = result_data.get("reasoning_invoked", False)
-                            
-                            # FIX: Collect all results for tournament selection
-                            if reasoning_out or reasoning_invoked:
-                                agent_result = {
-                                    "job_id": job_id,
-                                    "reasoning_output": reasoning_out,
-                                    "reasoning_invoked": reasoning_invoked,
-                                    "confidence": reasoning_out.get("confidence", 0.5) if reasoning_out else 0.5,
-                                    "reasoning_type": reasoning_out.get("reasoning_type", "unknown") if reasoning_out else "unknown",
-                                }
-                                all_agent_results.append(agent_result)
-                                logger.info(
-                                    f"[VULCAN] Collected reasoning result from job {job_id}: "
-                                    f"reasoning_invoked={reasoning_invoked}, "
-                                    f"confidence={agent_result['confidence']}"
-                                )
-                except Exception as job_err:
-                    logger.debug(f"[VULCAN] Could not get job {job_id} provenance: {job_err}")
+            poll_delay = INITIAL_POLL_DELAY
+            
+            for attempt in range(MAX_POLL_ATTEMPTS):
+                # Wait before checking (first attempt uses initial delay)
+                await asyncio.sleep(poll_delay)
+                
+                for job_id in submitted_jobs[:MAX_AGENT_REASONING_JOBS_TO_CHECK]:
+                    try:
+                        provenance = collective.agent_pool.get_job_provenance(job_id)
+                        if provenance and provenance.get("status") == "success":
+                            result_data = provenance.get("result", {})
+                            # Check for reasoning_output from agent execution
+                            if isinstance(result_data, dict):
+                                reasoning_out = result_data.get("reasoning_output")
+                                reasoning_invoked = result_data.get("reasoning_invoked", False)
+                                
+                                # FIX: Collect all results for tournament selection
+                                if reasoning_out or reasoning_invoked:
+                                    agent_result = {
+                                        "job_id": job_id,
+                                        "reasoning_output": reasoning_out,
+                                        "reasoning_invoked": reasoning_invoked,
+                                        "confidence": reasoning_out.get("confidence", 0.5) if reasoning_out else 0.5,
+                                        "reasoning_type": reasoning_out.get("reasoning_type", "unknown") if reasoning_out else "unknown",
+                                    }
+                                    all_agent_results.append(agent_result)
+                                    logger.info(
+                                        f"[VULCAN] Collected reasoning result from job {job_id} (attempt {attempt + 1}): "
+                                        f"reasoning_invoked={reasoning_invoked}, "
+                                        f"confidence={agent_result['confidence']}"
+                                    )
+                    except Exception as job_err:
+                        logger.debug(f"[VULCAN] Could not get job {job_id} provenance: {job_err}")
+                
+                # Exit early if we found results
+                if all_agent_results:
+                    break
+                    
+                # Exponential backoff for next attempt (capped)
+                poll_delay = min(poll_delay * BACKOFF_MULTIPLIER, MAX_POLL_DELAY)
+                
+                if attempt < MAX_POLL_ATTEMPTS - 1:
+                    logger.debug(
+                        f"[VULCAN] No agent results yet (attempt {attempt + 1}/{MAX_POLL_ATTEMPTS}), "
+                        f"retrying in {poll_delay:.2f}s..."
+                    )
             
             # FIX: Use TournamentManager for multi-agent selection when multiple results
             if len(all_agent_results) > 1:
@@ -5253,32 +5280,73 @@ async def unified_chat(request: UnifiedChatRequest):
         # STEP 6.5: Collect Reasoning Results from Agent Pool Jobs
         # CRITICAL FIX: Inject agent-based reasoning output into LLM context
         # This ensures reasoning engines invoked via agent_pool feed into response
+        # 
+        # BUG #3 FIX: "Parallel Execution" Orphanage Prevention
+        # The original implementation had a single 0.1s poll which was too short
+        # for jobs to complete, causing double work (agent pool + direct reasoning).
+        # 
+        # FIX: Added retry loop with exponential backoff to properly wait for
+        # agent pool jobs to complete before falling back to direct reasoning.
+        # This prevents the CPU load doubling from running the same work twice.
         # ================================================================
         agent_reasoning_output = None
         if submitted_jobs and pool:
             try:
-                # Give jobs a brief moment to complete (non-blocking check)
-                await asyncio.sleep(AGENT_REASONING_POLL_DELAY_SEC)
+                # BUG #3 FIX: Use retry loop with exponential backoff
+                # instead of single short poll that times out prematurely
+                MAX_POLL_ATTEMPTS = 5  # Max number of poll attempts
+                INITIAL_POLL_DELAY = 0.1  # Start with 100ms
+                MAX_POLL_DELAY = 1.0  # Cap at 1 second per attempt
+                BACKOFF_MULTIPLIER = 2.0  # Double delay each attempt
                 
-                for job_id in submitted_jobs[:MAX_AGENT_REASONING_JOBS_TO_CHECK]:
-                    try:
-                        provenance = pool.get_job_provenance(job_id)
-                        if provenance and provenance.get("status") == "success":
-                            result_data = provenance.get("result", {})
-                            # Check for reasoning_output from agent execution
-                            if isinstance(result_data, dict):
-                                reasoning_out = result_data.get("reasoning_output")
-                                if reasoning_out:
-                                    agent_reasoning_output = reasoning_out
-                                    logger.info(
-                                        f"[VULCAN/v1/chat] Collected reasoning output from agent job {job_id}: "
-                                        f"type={reasoning_out.get('reasoning_type', 'unknown')}, "
-                                        f"confidence={reasoning_out.get('confidence', 0)}"
-                                    )
-                                    systems_used.append("agent_reasoning_engine")
-                                    break  # Use first valid reasoning output
-                    except Exception as job_err:
-                        logger.debug(f"[VULCAN/v1/chat] Could not get job {job_id} provenance: {job_err}")
+                poll_delay = INITIAL_POLL_DELAY
+                found_result = False
+                
+                for attempt in range(MAX_POLL_ATTEMPTS):
+                    # Wait before checking (first attempt uses initial delay)
+                    await asyncio.sleep(poll_delay)
+                    
+                    # Check all submitted jobs for completion
+                    for job_id in submitted_jobs[:MAX_AGENT_REASONING_JOBS_TO_CHECK]:
+                        try:
+                            provenance = pool.get_job_provenance(job_id)
+                            if provenance and provenance.get("status") == "success":
+                                result_data = provenance.get("result", {})
+                                # Check for reasoning_output from agent execution
+                                if isinstance(result_data, dict):
+                                    reasoning_out = result_data.get("reasoning_output")
+                                    if reasoning_out:
+                                        agent_reasoning_output = reasoning_out
+                                        logger.info(
+                                            f"[VULCAN/v1/chat] Collected reasoning output from agent job {job_id} "
+                                            f"(attempt {attempt + 1}): "
+                                            f"type={reasoning_out.get('reasoning_type', 'unknown')}, "
+                                            f"confidence={reasoning_out.get('confidence', 0)}"
+                                        )
+                                        systems_used.append("agent_reasoning_engine")
+                                        found_result = True
+                                        break  # Use first valid reasoning output
+                        except Exception as job_err:
+                            logger.debug(f"[VULCAN/v1/chat] Could not get job {job_id} provenance: {job_err}")
+                    
+                    if found_result:
+                        break  # Exit retry loop if we found a result
+                    
+                    # Exponential backoff for next attempt (capped)
+                    poll_delay = min(poll_delay * BACKOFF_MULTIPLIER, MAX_POLL_DELAY)
+                    
+                    if attempt < MAX_POLL_ATTEMPTS - 1:
+                        logger.debug(
+                            f"[VULCAN/v1/chat] No agent results yet (attempt {attempt + 1}/{MAX_POLL_ATTEMPTS}), "
+                            f"retrying in {poll_delay:.2f}s..."
+                        )
+                
+                if not found_result and submitted_jobs:
+                    logger.debug(
+                        f"[VULCAN/v1/chat] Agent pool jobs ({len(submitted_jobs)}) did not complete "
+                        f"within polling window - will use direct reasoning fallback"
+                    )
+                    
             except Exception as e:
                 logger.debug(f"[VULCAN/v1/chat] Agent reasoning collection failed: {e}")
 
