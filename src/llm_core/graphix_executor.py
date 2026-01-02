@@ -61,6 +61,16 @@ logger = logging.getLogger(__name__)
 
 
 # ============================================================
+# CONFIGURATION CONSTANTS
+# ============================================================
+
+# Minimum number of layers to use during model warm-up
+# Using 2 layers provides sufficient coverage to pin tensors in RAM
+# while keeping warm-up time fast (~70-100ms instead of full model execution)
+WARMUP_MIN_LAYERS = 2
+
+
+# ============================================================
 # PERFORMANCE INSTRUMENTATION (Added for bottleneck diagnosis)
 # ============================================================
 
@@ -652,10 +662,10 @@ class GraphixExecutor:
         """
         warmup_start = time.time()
         try:
-            # Create minimal IR graph for warmup
+            # Create minimal IR graph for warmup using WARMUP_MIN_LAYERS constant
             warmup_ir = {
                 "embedding": {},
-                "layers": [{"layer_idx": i} for i in range(min(2, self.num_layers))]  # Use only 2 layers for faster warmup
+                "layers": [{"layer_idx": i} for i in range(min(WARMUP_MIN_LAYERS, self.num_layers))]
             }
             
             # Execute with a single dummy token (empty string triggers hash-based lookup)
@@ -1530,4 +1540,6 @@ __all__ = [
     "get_performance_stats",
     "reset_performance_stats",
     "log_performance_summary",
+    # Configuration constants
+    "WARMUP_MIN_LAYERS",
 ]

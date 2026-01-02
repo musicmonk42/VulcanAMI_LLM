@@ -93,12 +93,12 @@ except Exception:
         return False, ["policy module unavailable"]
 
     def is_trusted_llm_provider(provider_id):
-        """Fallback: trust local providers by default."""
+        """Fallback: trust local providers using the same trusted providers set."""
         if not provider_id:
             return False
-        return "local" in provider_id.lower() or "graphix" in provider_id.lower()
+        return provider_id.lower().strip() in TRUSTED_PROVIDERS
 
-    TRUSTED_PROVIDERS = frozenset({"local_llm", "graphix", "graphix_vulcan"})
+    TRUSTED_PROVIDERS = frozenset({"local_llm", "graphix", "graphix_vulcan", "graphix_vulcan_llm", "vulcan_local_llm", "internal"})
 
     class Policy:
         enabled = False
@@ -1115,6 +1115,36 @@ class SelfImprovementDrive:
         )
         if self._csiu_enabled:
             logger.info("CSIU (latent drive) enabled with granular controls")
+
+    # ---------- Helper Methods ----------
+
+    def _determine_llm_provider_id(self) -> Optional[str]:
+        """
+        Determine the LLM provider ID from the world_model's LLM object.
+        
+        This helper method extracts the provider ID used to check if the LLM
+        is in the TRUSTED_PROVIDERS list for self-improvement operations.
+        
+        Returns:
+            Provider ID string or None if it cannot be determined
+        """
+        if not self.world_model:
+            return None
+            
+        # First, check if the world_model has an explicit provider_id attribute
+        llm_provider_id = getattr(self.world_model, "llm_provider_id", None)
+        if llm_provider_id:
+            return llm_provider_id
+        
+        # Otherwise, try to determine from the LLM object type
+        llm_obj = getattr(self.world_model, "llm", None)
+        if llm_obj is not None:
+            llm_type = type(llm_obj).__name__.lower()
+            if "graphix" in llm_type or "vulcan" in llm_type or "local" in llm_type:
+                return "graphix_vulcan"
+            return llm_type
+        
+        return None
 
     # ---------- Config Loading ----------
 
@@ -3579,17 +3609,8 @@ FILE: <path/to/file.py>
             
             # Determine which LLM provider to use
             if self.world_model and hasattr(self.world_model, "ask_llm"):
-                # Check if the world_model's LLM is a trusted provider
-                llm_provider_id = getattr(self.world_model, "llm_provider_id", None)
-                if llm_provider_id is None:
-                    # Try to determine provider from the LLM object itself
-                    llm_obj = getattr(self.world_model, "llm", None)
-                    if llm_obj is not None:
-                        llm_type = type(llm_obj).__name__.lower()
-                        if "graphix" in llm_type or "vulcan" in llm_type or "local" in llm_type:
-                            llm_provider_id = "graphix_vulcan"
-                        else:
-                            llm_provider_id = llm_type
+                # Use helper method to determine provider ID
+                llm_provider_id = self._determine_llm_provider_id()
                 
                 # Only use the LLM if it's a trusted provider (to avoid policy deadlock)
                 if llm_provider_id and is_trusted_llm_provider(llm_provider_id):
@@ -4481,16 +4502,8 @@ Output the complete modified file content.
         # This ensures self-improvement operations use trusted internal LLM providers
         improvement = None
         if self.world_model and hasattr(self.world_model, "ask_llm"):
-            # Check if the LLM is a trusted provider
-            llm_provider_id = getattr(self.world_model, "llm_provider_id", None)
-            if llm_provider_id is None:
-                llm_obj = getattr(self.world_model, "llm", None)
-                if llm_obj is not None:
-                    llm_type = type(llm_obj).__name__.lower()
-                    if "graphix" in llm_type or "vulcan" in llm_type or "local" in llm_type:
-                        llm_provider_id = "graphix_vulcan"
-                    else:
-                        llm_provider_id = llm_type
+            # Use helper method to determine provider ID
+            llm_provider_id = self._determine_llm_provider_id()
             
             if llm_provider_id and not is_trusted_llm_provider(llm_provider_id):
                 logger.warning(
