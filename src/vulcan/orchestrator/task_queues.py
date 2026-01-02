@@ -1088,8 +1088,10 @@ class CustomTaskQueue(TaskQueueInterface):
                     poller = zmq.Poller()
                     poller.register(self.socket, zmq.POLLIN)
 
-                    # DEADLOCK FIX: Very short timeout - 200ms total
-                    if poller.poll(200):
+                    # DEADLOCK FIX: Increased timeout from 200ms to 10000ms (10 seconds)
+                    # to give slow CPUs enough "slack" to pick up results from the agent pool
+                    # after heavy inference cycles
+                    if poller.poll(10000):
                         status = self.socket.recv_json(flags=zmq.NOBLOCK)
                         with self._coordinator_check_lock:
                             self._cached_coordinator_status = status
