@@ -187,7 +187,11 @@ class ParallelOrchestrator(VULCANAGICollective):
             return self._create_fallback_result("System is shutting down")
 
         start_time = time.time()
-        timeout = context.get("time_budget_ms", 5000) / 1000
+        # TASK 3 FIX: Increased default time_budget_ms from 5000 to 60000 (60 seconds)
+        # to account for slow local LLM inference (~1s per token on CPU).
+        # This prevents the orchestrator from timing out and orphaning tasks
+        # that the Agent Pool actually completed.
+        timeout = context.get("time_budget_ms", 60000) / 1000
 
         try:
             # Phase 1: Parallel perception and memory operations

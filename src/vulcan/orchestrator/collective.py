@@ -799,7 +799,10 @@ class VULCANAGICollective:
             )
 
             # Wait for result with timeout
-            timeout = getattr(self.config, "slo_p95_latency_ms", 30000) / 1000
+            # TASK 3 FIX: Increased default slo_p95_latency_ms from 30000 to 120000 (120 seconds)
+            # to account for slow local LLM inference (~1s per token on CPU).
+            # This prevents premature timeout and orphaning of completed tasks.
+            timeout = getattr(self.config, "slo_p95_latency_ms", 120000) / 1000
             start_wait = time.time()
             check_interval = 0.1
 

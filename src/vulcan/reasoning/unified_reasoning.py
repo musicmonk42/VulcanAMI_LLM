@@ -730,14 +730,32 @@ class UnifiedReasoner:
             logger.warning(f"Error initializing specialized reasoners: {e}")
 
         # Initialize mathematical computation tool
+        # FIX: Pass the actual LLM client to MathematicalComputationTool instead of None
+        # This fixes the LLM Interface Bug where tools received strings instead of LLM objects
         try:
             from .mathematical_computation import MathematicalComputationTool
+            
+            # Try to get the LLM client from the hybrid executor singleton
+            llm_client = None
+            try:
+                from vulcan.llm import get_hybrid_executor
+                hybrid_executor = get_hybrid_executor()
+                if hybrid_executor is not None:
+                    # HybridLLMExecutor has a local_llm attribute that is the GraphixVulcanLLM instance
+                    llm_client = getattr(hybrid_executor, 'local_llm', None)
+                    if llm_client is not None:
+                        logger.info("Mathematical computation tool will use GraphixVulcanLLM from hybrid executor")
+            except ImportError:
+                logger.debug("Hybrid executor not available for mathematical computation tool")
+            except Exception as e:
+                logger.debug(f"Failed to get LLM from hybrid executor: {e}")
+            
             math_tool = MathematicalComputationTool(
-                llm=None,  # Will use templates without LLM
+                llm=llm_client,  # Pass the actual LLM client instead of None
                 enable_learning=enable_learning
             )
             self.reasoners[ReasoningType.MATHEMATICAL] = math_tool
-            logger.info("Mathematical computation tool registered")
+            logger.info(f"Mathematical computation tool registered (llm={'available' if llm_client else 'none'})")
         except ImportError as e:
             logger.warning(f"Mathematical computation tool not available: {e}")
         except Exception as e:
