@@ -58,6 +58,37 @@ except ImportError:
 # Exceptions and result types
 # ----------------------------
 
+# FIX: Trusted LLM providers list to prevent policy deadlock
+# These providers are allowed to be used by the self-improvement system
+# for code generation without triggering the EXTERNAL_LLM_DISABLED policy block.
+# By including local_llm and graphix variants, we ensure that Vulcan's internal
+# LLM can be used for self-improvement without a 72-hour cooldown.
+TRUSTED_PROVIDERS = frozenset({
+    "local_llm",
+    "graphix",
+    "graphix_vulcan",
+    "graphix_vulcan_llm",
+    "vulcan_local_llm",
+    "internal",
+})
+
+
+def is_trusted_llm_provider(provider_id: str) -> bool:
+    """
+    Check if an LLM provider is trusted for self-improvement operations.
+    
+    Args:
+        provider_id: The identifier of the LLM provider (e.g., "graphix_vulcan")
+        
+    Returns:
+        True if the provider is in the trusted list, False otherwise
+    """
+    if not provider_id:
+        return False
+    # Normalize the provider ID for comparison
+    normalized = provider_id.lower().strip()
+    return normalized in TRUSTED_PROVIDERS
+
 
 class PolicyError(Exception):
     pass
