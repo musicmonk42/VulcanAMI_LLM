@@ -396,7 +396,7 @@ services:
       # When true, routes ALL natural language output formatting to OpenAI (gpt-4o-mini)
       # This provides fast responses (~2-5s) while VULCAN LLM learns via distillation
       # POLICY: OpenAI ONLY formats VULCAN's reasoning output - no independent reasoning
-      - OPENAI_LANGUAGE_FORMATTING=${OPENAI_LANGUAGE_FORMATTING:-false}
+      - OPENAI_LANGUAGE_FORMATTING=${OPENAI_LANGUAGE_FORMATTING:-true}
       # Legacy polish mode (for backwards compatibility)
       - OPENAI_LANGUAGE_POLISH=${OPENAI_LANGUAGE_POLISH:-false}
     ports:

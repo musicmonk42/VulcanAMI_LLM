@@ -293,7 +293,7 @@ spec:
         {{- /* Hybrid Output Configuration (OpenAI for formatting only) */}}
         {{- /* OPENAI_LANGUAGE_FORMATTING: Route ALL output formatting to OpenAI (fast path) */}}
         - name: OPENAI_LANGUAGE_FORMATTING
-          value: {{ .Values.hybridOutput.openaiLanguageFormatting | default false | quote }}
+          value: {{ .Values.hybridOutput.openaiLanguageFormatting | default true | quote }}
         {{- /* OPENAI_LANGUAGE_POLISH: Legacy polish mode (polishes internal LLM output) */}}
         - name: OPENAI_LANGUAGE_POLISH
           value: {{ .Values.hybridOutput.openaiLanguagePolish | default false | quote }}

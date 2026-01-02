@@ -414,7 +414,7 @@ hybridOutput:
   # This bypasses the slow internal LLM for prose generation (2-5s vs 30s+)
   # POLICY: OpenAI MUST NOT reason - only format VULCAN's completed reasoning
   # Every response is captured for distillation so VULCAN LLM learns over time
-  openaiLanguageFormatting: false
+  openaiLanguageFormatting: true
   # Legacy polish mode (polishes internal LLM output, not replacement)
   openaiLanguagePolish: false
   # Maximum tokens for formatting (shorter than reasoning)
