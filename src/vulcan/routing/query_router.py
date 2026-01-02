@@ -2583,8 +2583,8 @@ class QueryAnalyzer:
             plan.agent_tasks = [
                 AgentTask(
                     task_id=f"task_{uuid.uuid4().hex[:8]}_philosophical",
-                    task_type="general_task",
-                    capability="general",  # Use general handler, NOT reasoning
+                    task_type="philosophical_task",  # FIX: Preserve philosophical type instead of general_task
+                    capability="philosophical",  # FIX: Use philosophical handler for proper routing
                     prompt=query,
                     priority=1,
                     timeout_seconds=PHILOSOPHICAL_TIMEOUT_SECONDS,
@@ -2595,7 +2595,8 @@ class QueryAnalyzer:
                         "prompt": query,  # FIX: Explicitly include prompt in parameters
                         "skip_heavy_analysis": True,
                         "skip_arena": True,
-                        "tools": ["symbolic", "causal"],  # FIX: Use proper tools instead of general
+                        # FIX: Add 'philosophical' tool for ethical/deontic reasoning
+                        "tools": ["philosophical", "symbolic", "causal"],
                         "response_type": "conversational",
                         "reasoning_context": {
                             "original_query": query,
@@ -2606,8 +2607,8 @@ class QueryAnalyzer:
                 )
             ]
 
-            plan.telemetry_data["selected_tools"] = ["symbolic", "causal"]  # FIX: Match actual tools
-            plan.telemetry_data["reasoning_strategy"] = "philosophical_lightweight"
+            plan.telemetry_data["selected_tools"] = ["philosophical", "symbolic", "causal"]  # FIX: Include philosophical tool
+            plan.telemetry_data["reasoning_strategy"] = "philosophical_reasoning"  # FIX: Use proper strategy name
 
             logger.info(
                 f"[QueryRouter] {query_id}: PHILOSOPHICAL-FAST-PATH source={source}, "

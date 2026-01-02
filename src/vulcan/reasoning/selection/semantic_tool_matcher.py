@@ -184,6 +184,32 @@ TOOL_DESCRIPTIONS = {
         hedonism, utilitarianism, virtue, consciousness, free will, experience machine,
         thought experiment, existential, meaning of life
     """,
+    "philosophical": """
+        Philosophical and ethical reasoning using deontic logic and moral frameworks.
+        
+        USE THIS TOOL FOR:
+        - Deontic logic: obligations, permissions, prohibitions
+        - Moral permissibility analysis (is action X morally permissible?)
+        - Ethical dilemmas and moral philosophy questions
+        - Moral uncertainty and decision theory under ethical ambiguity
+        - Pareto dominance and multi-criteria ethical comparisons
+        - Deontological reasoning (Kantian ethics, duty-based)
+        - Consequentialist reasoning (utilitarianism, outcome-based)
+        - Virtue ethics and character-based evaluation
+        - Contractualist reasoning (fairness, consent-based)
+        - Care ethics and relationship-based moral reasoning
+        - Trolley problems and ethical thought experiments
+        - Value conflicts and moral trade-offs
+        - Normative reasoning about what one ought to do
+        - Philosophical paradoxes requiring ethical analysis
+        
+        TRIGGER KEYWORDS: ethical, moral, permissible, obligatory, forbidden,
+        duty, right, wrong, virtue, value, harm, benefit, justice, fairness,
+        rights, autonomy, consent, welfare, utility, deontological, kantian,
+        consequentialist, utilitarian, categorical imperative, trolley problem,
+        dilemma, philosophical, deontic, normative, ought, should, must not,
+        permissibility, obligation, prohibition
+    """,
 }
 
 
@@ -589,6 +615,70 @@ TOOL_KEYWORDS = {
         "omelas",
         "utility monster",
         "repugnant conclusion",
+    ],
+    # PHILOSOPHICAL REASONING - Deontic logic and ethical analysis
+    # Routes queries to PhilosophicalReasoner for proper ethical/moral reasoning
+    "philosophical": [
+        # Deontic operators
+        "permissible",
+        "permissibility",
+        "obligatory",
+        "obligation",
+        "forbidden",
+        "prohibition",
+        "duty",
+        "ought",
+        "should",
+        "must not",
+        # Ethical concepts
+        "ethical",
+        "ethics",
+        "moral",
+        "morality",
+        "right",
+        "wrong",
+        "virtue",
+        "virtuous",
+        "vice",
+        "value",
+        "values",
+        # Ethical frameworks
+        "deontological",
+        "deontology",
+        "kantian",
+        "kant",
+        "categorical imperative",
+        "consequentialist",
+        "consequentialism",
+        "utilitarian",
+        "utilitarianism",
+        "virtue ethics",
+        "contractualist",
+        "contractualism",
+        "care ethics",
+        # Common ethical problems
+        "trolley problem",
+        "trolley",
+        "dilemma",
+        "moral dilemma",
+        "ethical dilemma",
+        # Value concepts
+        "harm",
+        "benefit",
+        "justice",
+        "fairness",
+        "rights",
+        "autonomy",
+        "consent",
+        "welfare",
+        "well-being",
+        "dignity",
+        "respect",
+        # Deontic logic terms
+        "deontic",
+        "normative",
+        "prescriptive",
+        "imperative",
     ],
 }
 

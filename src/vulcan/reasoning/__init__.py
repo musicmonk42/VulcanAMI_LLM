@@ -203,6 +203,20 @@ except ImportError as e:
     MULTIMODAL_AVAILABLE = False
 
 # ============================================================================
+# Philosophical Reasoning - Ethical/deontic reasoning component
+# ============================================================================
+try:
+    from .philosophical_reasoning import PhilosophicalReasoner, is_philosophical_query
+
+    PHILOSOPHICAL_AVAILABLE = True
+    logger.info("Philosophical reasoning loaded successfully")
+except ImportError as e:
+    logger.warning(f"Philosophical reasoning import failed: {e}")
+    PhilosophicalReasoner = None
+    is_philosophical_query = None
+    PHILOSOPHICAL_AVAILABLE = False
+
+# ============================================================================
 # Unified Reasoner - Main orchestrator (critical)
 # ============================================================================
 try:
@@ -296,6 +310,8 @@ __all__ = [
     "MultiModalReasoningEngine",
     "MultimodalReasoner",
     "CrossModalReasoner",  # ADDED: Export CrossModalReasoner
+    "PhilosophicalReasoner",  # FIX: Export PhilosophicalReasoner for ethical/deontic reasoning
+    "is_philosophical_query",  # FIX: Export helper function
     # ===== Symbolic Types =====
     "Clause",
     "Literal",
@@ -335,6 +351,7 @@ __all__ = [
     "SYMBOLIC_AVAILABLE",
     "ANALOGICAL_AVAILABLE",
     "MULTIMODAL_AVAILABLE",
+    "PHILOSOPHICAL_AVAILABLE",  # FIX: Add availability flag
     "UNIFIED_AVAILABLE",
     "EXPLAINER_AVAILABLE",
     "SELECTION_AVAILABLE",

@@ -78,10 +78,12 @@ PROBLEM_TYPE_BAYESIAN = 'bayesian'
 # When task type cannot be determined, fall back to these reasoning types in order.
 # SYMBOLIC (language reasoning) is first as it can handle most general queries.
 # PROBABILISTIC handles uncertainty well, CAUSAL handles cause-effect questions.
+# FIX: Added PHILOSOPHICAL for ethical/normative reasoning questions
 UNKNOWN_TYPE_FALLBACK_ORDER = (
     'SYMBOLIC',       # Best for general language/text queries
     'PROBABILISTIC',  # Good for uncertainty handling
     'CAUSAL',         # Good for cause-effect questions
+    'PHILOSOPHICAL',  # FIX: Added for ethical/deontic reasoning (permissibility, obligation, etc.)
 )
 
 # P0.2 FIX: Creative Task Detection
@@ -795,6 +797,22 @@ class UnifiedReasoner:
         except Exception as e:
             logger.warning(f"Error initializing mathematical computation tool: {e}")
 
+        # Initialize philosophical reasoner for ethical/deontic queries
+        # FIX: Add PHILOSOPHICAL reasoning type to handle ethical queries that were returning UNKNOWN
+        try:
+            from .philosophical_reasoning import PhilosophicalReasoner
+            
+            philosophical_reasoner = PhilosophicalReasoner(
+                symbolic_reasoner=self.reasoners.get(ReasoningType.SYMBOLIC),
+                enable_learning=enable_learning,
+            )
+            self.reasoners[ReasoningType.PHILOSOPHICAL] = philosophical_reasoner
+            logger.info("Philosophical reasoner registered for ethical/deontic queries")
+        except ImportError as e:
+            logger.warning(f"Philosophical reasoner not available: {e}")
+        except Exception as e:
+            logger.warning(f"Error initializing philosophical reasoner: {e}")
+        
         # FIX: Normalize enum keys to string keys for portfolio executor and warm pool
         tools_by_name = {k.value: v for k, v in self.reasoners.items()}
 
@@ -2160,6 +2178,29 @@ class UnifiedReasoner:
             ],
             ReasoningType.COUNTERFACTUAL: ["what if", "counterfactual", "had not"],
             ReasoningType.MULTIMODAL: ["image", "video", "audio", "multimodal"],
+            # FIX: Add PHILOSOPHICAL reasoning type detection for ethical/deontic queries
+            ReasoningType.PHILOSOPHICAL: [
+                "ethical",
+                "moral",
+                "permissible",
+                "obligatory",
+                "forbidden",
+                "duty",
+                "ought",
+                "should",
+                "right",
+                "wrong",
+                "virtue",
+                "justice",
+                "fairness",
+                "deontological",
+                "utilitarian",
+                "consequentialist",
+                "kantian",
+                "dilemma",
+                "normative",
+                "deontic",
+            ],
         }
         for r_type, keywords in keyword_map.items():
             for keyword in keywords:
@@ -2927,6 +2968,43 @@ class UnifiedReasoner:
                         explanation=f"Causal analysis performed",
                     )
                 else:
+                    result = self._create_empty_result()
+
+            elif task.task_type == ReasoningType.PHILOSOPHICAL:
+                # FIX: Handle PHILOSOPHICAL reasoning type for ethical/deontic queries
+                # PhilosophicalReasoner.reason() expects (problem, context) signature
+                # where problem can be a string query or dict with 'query' key
+                if hasattr(reasoner, "reason"):
+                    # Build problem dict from task
+                    problem = task.query if isinstance(task.query, dict) else {'query': str(task.query)}
+                    if task.input_data:
+                        if isinstance(task.input_data, dict):
+                            problem.update(task.input_data)
+                        else:
+                            problem['input'] = task.input_data
+                    
+                    raw_result = reasoner.reason(problem, None)
+                    
+                    if isinstance(raw_result, ReasoningResult):
+                        result = raw_result
+                        # Ensure minimum confidence floor for philosophical reasoning
+                        if result.confidence < 0.2:
+                            result.confidence = max(0.35, result.confidence)
+                    else:
+                        # Handle dict result
+                        raw_confidence = (
+                            raw_result.get("confidence", 0.55)
+                            if isinstance(raw_result, dict)
+                            else 0.55
+                        )
+                        result = ReasoningResult(
+                            conclusion=raw_result,
+                            confidence=max(0.35, raw_confidence),
+                            reasoning_type=ReasoningType.PHILOSOPHICAL,
+                            explanation="Philosophical/ethical analysis performed",
+                        )
+                else:
+                    logger.warning("Philosophical reasoner missing 'reason' method")
                     result = self._create_empty_result()
 
             elif task.task_type == ReasoningType.SYMBOLIC:
