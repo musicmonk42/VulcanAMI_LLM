@@ -3540,6 +3540,9 @@ class AgentPoolManager:
             "text": ReasoningType.SYMBOLIC,  # Text tasks -> SYMBOLIC
             "mathematical": ReasoningType.MATHEMATICAL,  # Mathematical tasks
             "math": ReasoningType.MATHEMATICAL,  # Math shorthand
+            "philosophical": ReasoningType.PHILOSOPHICAL,  # FIX: Philosophical/ethical tasks
+            "ethical": ReasoningType.PHILOSOPHICAL,  # FIX: Ethical queries
+            "deontic": ReasoningType.PHILOSOPHICAL,  # FIX: Deontic logic queries
         }
         
         # FIX: Default to SYMBOLIC instead of UNKNOWN for unrecognized task types

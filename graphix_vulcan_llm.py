@@ -171,11 +171,14 @@ except Exception as e:
 
     class GraphixVulcanBridge:
         def __init__(self):
+            # FIX: Lambda signatures must accept `self` as first argument when used as methods
+            # "update": lambda x: None was failing with "takes 1 positional argument but 2 were given"
+            # because Python passes `self` implicitly when calling methods on instances
             self.world_model = type(
-                "WorldModel", (), {"get_context": lambda: {}, "update": lambda x: None}
+                "WorldModel", (), {"get_context": lambda self: {}, "update": lambda self, x=None: None}
             )()
             self.reasoning = type(
-                "Reasoning", (), {"reason": lambda query: {"result": "fallback"}}
+                "Reasoning", (), {"reason": lambda self, query: {"result": "fallback"}}
             )()
             logger.info("Initialized fallback bridge")
 
