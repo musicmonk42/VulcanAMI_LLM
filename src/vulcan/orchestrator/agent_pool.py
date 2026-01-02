@@ -183,6 +183,17 @@ def _lazy_import_reasoning():
 DEFAULT_FALLBACK_MEMORY_GB = 4.0  # Conservative memory estimate
 DEFAULT_FALLBACK_STORAGE_GB = 100.0  # Conservative storage estimate
 
+# FIX: Import path prefixes for reasoning modules
+# Used by both lazy import and fallback reasoning invocation
+REASONING_IMPORT_PATHS = ['vulcan', 'src.vulcan']
+
+# FIX: Set of reasoning tool names for detecting reasoning tasks
+# Used to determine if fallback reasoning should be invoked
+REASONING_TOOL_NAMES = frozenset({
+    'causal', 'symbolic', 'analogical', 'probabilistic', 'counterfactual',
+    'deductive', 'inductive', 'abductive', 'multimodal', 'hybrid', 'ensemble'
+})
+
 # Redis keys for agent pool state persistence
 REDIS_KEY_AGENT_POOL_STATS = "vulcan:agent_pool:stats"
 REDIS_KEY_PROVENANCE_COUNT = "vulcan:agent_pool:provenance_records_count"
@@ -2701,7 +2712,7 @@ class AgentPoolManager:
                 selected_tools and 
                 not node_results and 
                 not reasoning_was_invoked and
-                (is_reasoning_task or any(tool.lower() in {'causal', 'symbolic', 'analogical', 'probabilistic', 'counterfactual', 'deductive', 'inductive', 'abductive', 'multimodal', 'hybrid', 'ensemble'} for tool in selected_tools))
+                (is_reasoning_task or any(tool.lower() in REASONING_TOOL_NAMES for tool in selected_tools))
             )
             
             if should_invoke_fallback_reasoning:
@@ -2711,7 +2722,7 @@ class AgentPoolManager:
                     ReasoningType_local = None
                     ReasoningStrategy_local = None
                     
-                    for path_prefix in ['vulcan', 'src.vulcan']:
+                    for path_prefix in REASONING_IMPORT_PATHS:
                         try:
                             rt_module = __import__(f'{path_prefix}.reasoning.reasoning_types', fromlist=['ReasoningType'])
                             ReasoningType_local = getattr(rt_module, 'ReasoningType', None)
@@ -2723,24 +2734,24 @@ class AgentPoolManager:
                             continue
                     
                     if ReasoningType_local is None:
-                        logger.warning("[REASONING] Could not import ReasoningType, using None")
+                        logger.warning(f"[REASONING] Could not import ReasoningType from any of: {REASONING_IMPORT_PATHS}")
                     
                     # Helper function to create fallback UnifiedReasoner instance
                     def _create_fallback_reasoner():
-                        for path_prefix in ['vulcan', 'src.vulcan']:
+                        for path_prefix in REASONING_IMPORT_PATHS:
                             try:
                                 ur_module = __import__(f'{path_prefix}.reasoning.unified_reasoning', fromlist=['UnifiedReasoner'])
                                 DirectUnifiedReasoner = getattr(ur_module, 'UnifiedReasoner')
                                 return DirectUnifiedReasoner()
                             except ImportError:
                                 continue
-                        raise ImportError("Could not import UnifiedReasoner from any path")
+                        raise ImportError(f"Could not import UnifiedReasoner from any of: {REASONING_IMPORT_PATHS}")
                     
                     # ISSUE #2 FIX: Use singleton UnifiedReasoner to prevent re-initialization per query
                     # Previously: reasoning = DirectUnifiedReasoner()
                     # This was causing UnifiedRuntime and other components to be re-initialized on every query
                     reasoning = None
-                    for path_prefix in ['vulcan', 'src.vulcan']:
+                    for path_prefix in REASONING_IMPORT_PATHS:
                         try:
                             singleton_module = __import__(f'{path_prefix}.reasoning.singletons', fromlist=['get_unified_reasoner'])
                             get_unified_reasoner_func = getattr(singleton_module, 'get_unified_reasoner')
