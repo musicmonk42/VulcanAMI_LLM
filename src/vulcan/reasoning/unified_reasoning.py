@@ -2780,6 +2780,49 @@ class UnifiedReasoner:
                         f"No reasoner for type {task.task_type} and no PROBABILISTIC fallback available"
                     )
                     return self._create_empty_result()
+            elif task.task_type == ReasoningType.UNKNOWN:
+                # FIX: Handle UNKNOWN reasoning type by falling back to available reasoners
+                # This prevents the "No reasoner for type UNKNOWN" error that causes 10% confidence
+                # UNKNOWN type indicates the classification couldn't determine a specific type,
+                # so we try multiple reasoners in priority order
+                logger.info(
+                    f"[UnifiedReasoner] Task {task.task_id} has UNKNOWN type, "
+                    "attempting fallback to available reasoners"
+                )
+                
+                # Priority order for fallback: SYMBOLIC (language), PROBABILISTIC, CAUSAL
+                fallback_types = [
+                    ReasoningType.SYMBOLIC,  # Best for general language/text queries
+                    ReasoningType.PROBABILISTIC,  # Good for uncertainty handling
+                    ReasoningType.CAUSAL,  # Good for cause-effect questions
+                ]
+                
+                for fallback_type in fallback_types:
+                    if fallback_type in self.reasoners:
+                        logger.info(
+                            f"[UnifiedReasoner] Using {fallback_type.value} as fallback for UNKNOWN type"
+                        )
+                        fallback_task = ReasoningTask(
+                            task_id=task.task_id,
+                            task_type=fallback_type,
+                            input_data=task.input_data,
+                            query=task.query,
+                            constraints=task.constraints,
+                            utility_context=task.utility_context,
+                        )
+                        result = self._execute_reasoner(
+                            self.reasoners[fallback_type], fallback_task
+                        )
+                        # Keep the reasoning type as the actual type used, not UNKNOWN
+                        # This provides accurate metadata about what reasoning was performed
+                        return result
+                
+                # No fallback available
+                logger.warning(
+                    "[UnifiedReasoner] No fallback reasoner available for UNKNOWN type. "
+                    "Check that reasoning engines are properly initialized."
+                )
+                return self._create_empty_result()
             else:
                 logger.warning(f"No reasoner for type {task.task_type}")
                 return self._create_empty_result()
