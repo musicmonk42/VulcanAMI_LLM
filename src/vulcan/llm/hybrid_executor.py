@@ -95,7 +95,9 @@ OPENAI_FALLBACK_CONFIDENCE = 0.6
 #   - OpenAI MUST NOT generate code
 #   - All reasoning happens in VULCAN's mind BEFORE OpenAI is called
 #
-_openai_language_formatting_env = os.environ.get("OPENAI_LANGUAGE_FORMATTING", "false").lower()
+# FIX: Default to "true" to match .env.example documentation and prevent 60-second timeouts.
+# This enables fast OpenAI formatting (~2-5s) while VULCAN LLM learns via distillation.
+_openai_language_formatting_env = os.environ.get("OPENAI_LANGUAGE_FORMATTING", "true").lower()
 OPENAI_LANGUAGE_FORMATTING = _openai_language_formatting_env in ("true", "1", "yes")
 
 # Legacy polish mode - kept for backwards compatibility
@@ -1191,16 +1193,129 @@ class HybridLLMExecutor:
         self, loop, prompt: str, max_tokens: int, temperature: float, system_prompt: str,
         conversation_history: Optional[List[Dict[str, str]]] = None
     ) -> Dict[str, Any]:
-        """Execute using VULCAN internal LLM only - NO EXTERNAL AI.
+        """Execute both local and OpenAI in parallel, use first successful response.
         
-        ARCHITECTURE: External AI has been removed. Only VULCAN internal LLM is used.
-        The 'parallel' mode now simply delegates to local_first since there's nothing
-        to run in parallel.
+        RESTORED: True parallel execution for faster response times.
+        This fixes the 60-second timeout issue by allowing OpenAI to respond quickly
+        (~2-5s) while the slow internal LLM (~500ms/token) is still processing.
+        
+        ARCHITECTURE:
+        - Both local LLM and OpenAI run simultaneously
+        - First successful response wins
+        - If OpenAI unavailable, falls back to local_first mode
+        - Pending tasks are cancelled after first success
         """
-        self.logger.info("[HybridExecutor] Parallel mode redirecting to local_first (external AI disabled)")
+        # Check if OpenAI is available
+        if not self._openai_available():
+            self.logger.info("[HybridExecutor] OpenAI not available, falling back to local_first")
+            return await self._execute_local_first(
+                loop, prompt, max_tokens, temperature, system_prompt, conversation_history
+            )
+        
+        self.logger.info("[HybridExecutor] Executing in TRUE parallel mode")
+        
+        # Create tasks for both backends
+        local_task = asyncio.create_task(
+            self._run_local_llm(loop, prompt, max_tokens),
+            name="local_llm_task"
+        )
+        openai_task = asyncio.create_task(
+            self._run_openai(loop, prompt, max_tokens, temperature, system_prompt, conversation_history),
+            name="openai_task"
+        )
+        
+        try:
+            # Wait for first successful result with timeout
+            done, pending = await asyncio.wait(
+                [local_task, openai_task],
+                return_when=asyncio.FIRST_COMPLETED,
+                timeout=self.timeout
+            )
+            
+            # Cancel pending tasks
+            for task in pending:
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+            
+            # Get result from completed task
+            if done:
+                for task in done:
+                    try:
+                        result = task.result()
+                        if result and self._is_valid_response(result.get("text")):
+                            source = "local" if task.get_name() == "local_llm_task" else "openai"
+                            result["source"] = f"parallel_{source}"
+                            self.logger.info(f"[HybridExecutor] ✓ Parallel mode: {source} won")
+                            return result
+                    except Exception as e:
+                        self.logger.warning(f"[HybridExecutor] Task failed: {e}")
+            
+            # If we get here, no task succeeded - fall back to local_first
+            self.logger.warning("[HybridExecutor] Parallel mode: no task succeeded, falling back to local_first")
+            
+        except asyncio.TimeoutError:
+            self.logger.warning(f"[HybridExecutor] Parallel mode timeout after {self.timeout}s")
+            # Cancel all tasks
+            local_task.cancel()
+            openai_task.cancel()
+        except Exception as e:
+            self.logger.warning(f"[HybridExecutor] Parallel mode error: {e}")
+        
+        # Fallback to local_first if parallel failed
+        self.logger.warning("[HybridExecutor] Parallel mode failed, falling back to local_first")
         return await self._execute_local_first(
             loop, prompt, max_tokens, temperature, system_prompt, conversation_history
         )
+    
+    def _openai_available(self) -> bool:
+        """Check if OpenAI client is available and configured.
+        
+        Returns:
+            True if OpenAI is available for use, False otherwise
+        """
+        try:
+            client = self.openai_client_getter()
+            return client is not None
+        except Exception:
+            return False
+    
+    async def _run_local_llm(
+        self, loop, prompt: str, max_tokens: int
+    ) -> Dict[str, Any]:
+        """Async wrapper for local LLM execution.
+        
+        Returns a dict with 'text' and 'source' keys for parallel mode.
+        """
+        text = await self._call_local_llm(loop, prompt, max_tokens)
+        if text and self._is_valid_response(text):
+            return {
+                "text": text,
+                "source": "local",
+                "systems_used": ["vulcan_local_llm"],
+            }
+        return {"text": None, "source": "local_failed", "systems_used": []}
+    
+    async def _run_openai(
+        self, loop, prompt: str, max_tokens: int, temperature: float, 
+        system_prompt: str, conversation_history: Optional[List[Dict[str, str]]] = None
+    ) -> Dict[str, Any]:
+        """Async wrapper for OpenAI execution.
+        
+        Returns a dict with 'text' and 'source' keys for parallel mode.
+        """
+        text = await self._call_openai(
+            loop, prompt, max_tokens, temperature, system_prompt, conversation_history
+        )
+        if text and self._is_valid_response(text):
+            return {
+                "text": text,
+                "source": "openai",
+                "systems_used": ["openai"],
+            }
+        return {"text": None, "source": "openai_failed", "systems_used": []}
 
     async def _execute_ensemble(
         self, loop, prompt: str, max_tokens: int, temperature: float, system_prompt: str,

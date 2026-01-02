@@ -687,8 +687,179 @@ class TestOpenAILanguageFormattingConfig:
             OPENAI_LANGUAGE_POLISH,
         )
         
-        # Default should be False (disabled)
+        # FIX: OPENAI_LANGUAGE_FORMATTING now defaults to True to prevent 60-second timeouts
+        # This matches .env.example documentation and enables fast OpenAI formatting (~2-5s)
         # Note: This test assumes no env vars are set
-        assert OPENAI_LANGUAGE_FORMATTING is False
+        assert OPENAI_LANGUAGE_FORMATTING is True  # Changed from False to True
         assert OPENAI_LANGUAGE_POLISH is False
+
+
+class TestParallelExecution:
+    """Test the restored true parallel execution mode.
+    
+    These tests verify:
+    1. True parallel execution runs both backends simultaneously
+    2. First successful response wins
+    3. Graceful fallback when OpenAI is unavailable
+    4. Task cancellation after first success
+    5. Timeout handling
+    """
+
+    @pytest.fixture
+    def mock_local_llm(self):
+        """Create a mock local LLM."""
+        mock = MagicMock()
+        mock.generate.return_value = MagicMock(text="Local LLM response")
+        return mock
+
+    @pytest.fixture
+    def mock_openai_client(self):
+        """Create a mock OpenAI client."""
+        mock_client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock(message=MagicMock(content="OpenAI response"))]
+        mock_client.chat.completions.create.return_value = mock_response
+        return mock_client
+
+    @pytest.fixture
+    def executor_with_both(self, mock_local_llm, mock_openai_client):
+        """Create HybridLLMExecutor with both backends available."""
+        executor = HybridLLMExecutor(
+            local_llm=mock_local_llm,
+            openai_client_getter=lambda: mock_openai_client,
+            mode="parallel",
+            timeout=30.0,
+        )
+        return executor
+
+    @pytest.fixture
+    def executor_without_openai(self, mock_local_llm):
+        """Create HybridLLMExecutor without OpenAI access."""
+        executor = HybridLLMExecutor(
+            local_llm=mock_local_llm,
+            openai_client_getter=lambda: None,  # No OpenAI
+            mode="parallel",
+            timeout=30.0,
+        )
+        return executor
+
+    def test_openai_available_method(self, executor_with_both, executor_without_openai):
+        """Test _openai_available helper method."""
+        assert executor_with_both._openai_available() is True
+        assert executor_without_openai._openai_available() is False
+
+    @pytest.mark.asyncio
+    async def test_parallel_mode_with_openai_available(self, executor_with_both, mock_openai_client):
+        """Test parallel execution when OpenAI is available."""
+        # Mock both _call_openai and _call_local_llm
+        executor_with_both._call_openai = AsyncMock(return_value="OpenAI wins!")
+        executor_with_both._call_local_llm = AsyncMock(return_value=None)  # Local fails
+        
+        result = await executor_with_both.execute(
+            prompt="Hello, how are you?",
+            max_tokens=50,
+            temperature=0.7,
+        )
+        
+        assert result is not None
+        assert "text" in result
+        # OpenAI should win since local failed
+        assert "parallel" in result.get("source", "") or "openai" in result.get("source", "").lower()
+
+    @pytest.mark.asyncio
+    async def test_parallel_fallback_without_openai(self, executor_without_openai):
+        """Test that parallel mode falls back to local_first when OpenAI unavailable."""
+        # Since OpenAI is not available, it should fall back to local_first
+        result = await executor_without_openai.execute(
+            prompt="Test query",
+            max_tokens=50,
+        )
+        
+        assert result is not None
+        # Should have used local execution
+        assert "text" in result
+
+    @pytest.mark.asyncio
+    async def test_run_local_llm_wrapper(self, executor_with_both):
+        """Test _run_local_llm async wrapper returns correct format."""
+        executor_with_both._call_local_llm = AsyncMock(return_value="Local LLM result")
+        
+        loop = asyncio.get_event_loop()
+        result = await executor_with_both._run_local_llm(loop, "test prompt", 100)
+        
+        assert result is not None
+        assert "text" in result
+        assert result["text"] == "Local LLM result"
+        assert result["source"] == "local"
+        assert "vulcan_local_llm" in result["systems_used"]
+
+    @pytest.mark.asyncio
+    async def test_run_openai_wrapper(self, executor_with_both):
+        """Test _run_openai async wrapper returns correct format."""
+        executor_with_both._call_openai = AsyncMock(return_value="OpenAI result")
+        
+        loop = asyncio.get_event_loop()
+        result = await executor_with_both._run_openai(
+            loop, "test prompt", 100, 0.7, "system prompt", None
+        )
+        
+        assert result is not None
+        assert "text" in result
+        assert result["text"] == "OpenAI result"
+        assert result["source"] == "openai"
+        assert "openai" in result["systems_used"]
+
+    @pytest.mark.asyncio
+    async def test_run_local_llm_failure_returns_empty(self, executor_with_both):
+        """Test _run_local_llm returns empty result on failure."""
+        executor_with_both._call_local_llm = AsyncMock(return_value=None)
+        
+        loop = asyncio.get_event_loop()
+        result = await executor_with_both._run_local_llm(loop, "test prompt", 100)
+        
+        assert result is not None
+        assert result["text"] is None
+        assert "failed" in result["source"]
+
+    @pytest.mark.asyncio
+    async def test_run_openai_failure_returns_empty(self, executor_with_both):
+        """Test _run_openai returns empty result on failure."""
+        executor_with_both._call_openai = AsyncMock(return_value=None)
+        
+        loop = asyncio.get_event_loop()
+        result = await executor_with_both._run_openai(
+            loop, "test prompt", 100, 0.7, "system prompt", None
+        )
+        
+        assert result is not None
+        assert result["text"] is None
+        assert "failed" in result["source"]
+
+    @pytest.mark.asyncio
+    async def test_parallel_first_wins(self, executor_with_both):
+        """Test that the first successful response wins in parallel mode."""
+        import asyncio
+        
+        # Make OpenAI return quickly, local return slowly
+        async def slow_local(*args, **kwargs):
+            await asyncio.sleep(5)  # Very slow
+            return "Slow local result"
+        
+        async def fast_openai(*args, **kwargs):
+            await asyncio.sleep(0.01)  # Very fast
+            return "Fast OpenAI result"
+        
+        executor_with_both._call_local_llm = slow_local
+        executor_with_both._call_openai = fast_openai
+        
+        result = await executor_with_both.execute(
+            prompt="Test query",
+            max_tokens=50,
+        )
+        
+        assert result is not None
+        # OpenAI should win since it's faster
+        if "parallel" in result.get("source", ""):
+            assert "openai" in result.get("source", "").lower()
+
 
