@@ -1190,3 +1190,84 @@ def get_unified_learning_system() -> Optional[Any]:
         except Exception as e:
             logger.error(f"[Singletons] Failed to create UnifiedLearningSystem: {e}")
             return None
+
+
+# ============================================
+# LLM CLIENT SINGLETON (Task 4 Fix)
+# ============================================
+
+_llm_client: Optional[Any] = None
+_llm_client_lock = threading.Lock()
+
+
+def get_llm_client() -> Optional[Any]:
+    """
+    Get the global LLM client singleton.
+    
+    FIX TASK 4: Tools were being initialized with llm=None because the LLM
+    client wasn't available during component initialization. This singleton
+    provides a centralized way to access the LLM client from anywhere.
+    
+    Tries multiple sources:
+    1. Cached singleton
+    2. HybridLLMExecutor's local_llm
+    3. Global GraphixVulcanLLM instance
+    
+    Returns:
+        LLM client instance, or None if unavailable.
+    """
+    global _llm_client
+    
+    if _llm_client is not None:
+        return _llm_client
+    
+    with _llm_client_lock:
+        if _llm_client is not None:
+            return _llm_client
+        
+        # Try HybridLLMExecutor first
+        try:
+            from vulcan.llm import get_hybrid_executor
+            hybrid_executor = get_hybrid_executor()
+            if hybrid_executor is not None:
+                client = getattr(hybrid_executor, 'local_llm', None)
+                if client is not None:
+                    _llm_client = client
+                    logger.info("[Singletons] ✓ LLM client obtained from HybridLLMExecutor")
+                    return _llm_client
+        except ImportError:
+            pass
+        except Exception as e:
+            logger.debug(f"[Singletons] Failed to get LLM from hybrid executor: {e}")
+        
+        # Try global GraphixVulcanLLM
+        try:
+            from vulcan.llm import GraphixVulcanLLM
+            # Check if there's a global instance
+            if hasattr(GraphixVulcanLLM, '_instance') and GraphixVulcanLLM._instance is not None:
+                _llm_client = GraphixVulcanLLM._instance
+                logger.info("[Singletons] ✓ LLM client obtained from GraphixVulcanLLM singleton")
+                return _llm_client
+        except ImportError:
+            pass
+        except Exception as e:
+            logger.debug(f"[Singletons] Failed to get GraphixVulcanLLM: {e}")
+        
+        logger.debug("[Singletons] LLM client not available yet")
+        return None
+
+
+def set_llm_client(client: Any) -> None:
+    """
+    Set the global LLM client singleton.
+    
+    This should be called during app initialization to make the LLM client
+    available to all reasoning components.
+    
+    Args:
+        client: The LLM client instance to set as the global singleton.
+    """
+    global _llm_client
+    with _llm_client_lock:
+        _llm_client = client
+        logger.info("[Singletons] ✓ LLM client registered")

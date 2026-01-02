@@ -2576,9 +2576,13 @@ class AgentPoolManager:
                     break
 
             # Determine if this is a reasoning task
+            # FIX TASK 2: Include philosophical and general with selected tools
+            # Production logs showed philosophical queries completing in 0.000s with
+            # reasoning_invoked=False because "philosophical" wasn't in reasoning_task_types
             reasoning_task_types = {
                 "reasoning", "causal", "symbolic", "analogical", "probabilistic",
-                "counterfactual", "multimodal", "deductive", "inductive", "abductive"
+                "counterfactual", "multimodal", "deductive", "inductive", "abductive",
+                "philosophical", "mathematical", "hybrid",  # FIX: Added missing types
             }
             is_reasoning_task = normalized_task_type in reasoning_task_types
             
@@ -2597,10 +2601,38 @@ class AgentPoolManager:
             if metadata.capability == AgentCapability.REASONING:
                 is_reasoning_task = True
 
-            # Extract query/input from graph or parameters
-            query = parameters.get("query", "")
+            # ==================================================================
+            # FIX TASK 2: Invoke reasoning for complex queries even when tools=["general"]
+            # PHILOSOPHICAL-FAST-PATH sets tools=["general"] but complex philosophical
+            # queries should still invoke reasoning. Check query content keywords.
+            # ==================================================================
+            if not is_reasoning_task and parameters.get("is_philosophical"):
+                is_reasoning_task = True
+                selected_tools = ["symbolic", "causal"]  # Override general with proper tools
+                logger.info(
+                    f"[AgentPool] task {task_id}: philosophical query detected, "
+                    f"forcing reasoning with tools={selected_tools}"
+                )
+
+            # ==================================================================
+            # FIX TASK 1: Extract FULL query context, not truncated version
+            # Production logs showed queries being truncated to 25 chars because
+            # only parameters.get("query") was checked, missing "prompt" parameter
+            # ==================================================================
+            # Priority order: prompt > query > original_prompt > user_query
+            query = (
+                parameters.get("prompt", "") or 
+                parameters.get("query", "") or
+                parameters.get("original_prompt", "") or
+                parameters.get("user_query", "")
+            )
             input_data = parameters.get("input_data") or parameters.get("input", "")
             context = parameters.get("context", {})
+            
+            # Also preserve full reasoning context from parameters
+            reasoning_context = parameters.get("reasoning_context", {})
+            if reasoning_context:
+                context = {**context, **reasoning_context}
             
             # Try to extract query from nodes if not in parameters
             if not query and nodes:
@@ -2609,6 +2641,26 @@ class AgentPoolManager:
                         query = node.get("data", {}).get("value", "") or node.get("params", {}).get("query", "")
                         input_data = input_data or node.get("data", {}).get("input", "")
                         break
+            
+            # FIX TASK 2: Also trigger reasoning for long complex queries
+            # Short queries (<100 chars) are likely simple, but long queries need reasoning
+            query_len = len(query) if query else 0
+            if not is_reasoning_task and query_len > 500:
+                is_reasoning_task = True
+                if not selected_tools or selected_tools == ["general"]:
+                    selected_tools = ["hybrid"]  # Use hybrid for long complex queries
+                logger.info(
+                    f"[AgentPool] task {task_id}: long query ({query_len} chars) detected, "
+                    f"forcing reasoning with tools={selected_tools}"
+                )
+            
+            # FIX TASK 1: Log query length for debugging truncation issues
+            if query_len < 50 and is_reasoning_task:
+                logger.warning(
+                    f"[AgentPool] SHORT QUERY detected for reasoning task: "
+                    f"query_len={query_len} chars - this may indicate truncation! "
+                    f"Check parameters keys: {list(parameters.keys())}"
+                )
 
             # ============================================================
             # REASONING TASK EXECUTION - Invoke actual reasoning engines
@@ -2616,6 +2668,17 @@ class AgentPoolManager:
             reasoning_result = None
             node_results = {}
             reasoning_was_invoked = False  # FIX: Track actual reasoning invocation
+
+            # ==================================================================
+            # FIX TASK 6: Add validation and logging for diagnostic purposes
+            # This helps catch issues like truncated queries early
+            # ==================================================================
+            if is_reasoning_task:
+                logger.info(
+                    f"[AgentPool] Task {task_id} starting reasoning invocation: "
+                    f"query_len={query_len}, tools={selected_tools}, "
+                    f"task_type={task_type}, agent={agent_id}"
+                )
 
             # CIRCULAR IMPORT FIX: Trigger lazy import of reasoning components
             # This ensures UnifiedReasoner and other components are available
@@ -2628,12 +2691,25 @@ class AgentPoolManager:
                     f"(type={task_type}, capability={metadata.capability.value})"
                 )
                 
+                # FIX TASK 6: Validate query before reasoning
+                if query_len < 50:
+                    logger.warning(
+                        f"[AgentPool] Task {task_id}: Query too short ({query_len} chars) - "
+                        f"reasoning may produce poor results. Consider passing full context."
+                    )
+                
                 try:
                     # Map task type to reasoning type
                     reasoning_type = self._map_task_to_reasoning_type(task_type)
                     
                     # Calculate complexity from graph structure
                     complexity = self._calculate_task_complexity(graph, parameters)
+                    
+                    # FIX TASK 6: Log what we're passing to reasoning
+                    logger.info(
+                        f"[AgentPool] Calling apply_reasoning: query_len={query_len}, "
+                        f"query_type={task_type}, complexity={complexity:.2f}"
+                    )
                     
                     # Apply reasoning via the integration layer
                     integration_result = apply_reasoning(
@@ -2643,12 +2719,20 @@ class AgentPoolManager:
                         context=context,
                     )
                     
+                    # FIX TASK 6: Log and validate result
                     logger.info(
                         f"Agent {agent_id} reasoning selection complete: "
                         f"tools={integration_result.selected_tools}, "
                         f"strategy={integration_result.reasoning_strategy}, "
                         f"confidence={integration_result.confidence:.2f}"
                     )
+                    
+                    # FIX TASK 6: Warn if confidence is too low
+                    if integration_result.confidence < 0.3:
+                        logger.warning(
+                            f"[AgentPool] Task {task_id}: LOW CONFIDENCE result ({integration_result.confidence:.2f}). "
+                            f"This may indicate a configuration issue."
+                        )
                     
                     # If UnifiedReasoner is available, invoke actual reasoning
                     if UnifiedReasoner is not None and create_unified_reasoner is not None:
@@ -2667,11 +2751,22 @@ class AgentPoolManager:
                                     reasoning_type=reasoning_type,
                                 )
                                 
+                                # FIX TASK 6: Validate reasoning result
+                                result_type = getattr(reasoning_result, 'reasoning_type', 'unknown')
+                                result_confidence = getattr(reasoning_result, 'confidence', 0.0)
+                                
                                 logger.info(
                                     f"Agent {agent_id} reasoning execution complete: "
-                                    f"type={reasoning_result.reasoning_type if hasattr(reasoning_result, 'reasoning_type') else 'unknown'}, "
-                                    f"confidence={reasoning_result.confidence if hasattr(reasoning_result, 'confidence') else 'N/A'}"
+                                    f"type={result_type}, confidence={result_confidence}"
                                 )
+                                
+                                # FIX TASK 6: Warn if result type is UNKNOWN
+                                if str(result_type).upper() == 'UNKNOWN' or str(result_type) == 'ReasoningType.UNKNOWN':
+                                    logger.warning(
+                                        f"[AgentPool] Task {task_id}: Reasoning returned UNKNOWN type! "
+                                        f"Task type was: {task_type}. This indicates a configuration issue."
+                                    )
+                                
                         except Exception as reasoning_error:
                             logger.warning(
                                 f"Agent {agent_id} UnifiedReasoner invocation failed: {reasoning_error}. "
