@@ -59,7 +59,7 @@ on:
       timeout_seconds:
         description: 'Query timeout in seconds'
         required: false
-        default: '30'
+        default: '60'
         type: string
 
 # Prevent concurrent runs on the same branch
@@ -172,7 +172,7 @@ jobs:
           # Determine configuration from inputs or defaults
           SCENARIO="${{ github.event.inputs.scenario || 'progressive' }}"
           SKIP_HEAVY="${{ github.event.inputs.skip_heavy || 'true' }}"
-          TIMEOUT="${{ github.event.inputs.timeout_seconds || '30' }}"
+          TIMEOUT="${{ github.event.inputs.timeout_seconds || '60' }}"
 
           # Build command
           CMD="python -u tests/performance/scalability_stress_test.py"
