@@ -144,7 +144,7 @@ class LoopRuntimeConfig:
     aggressive_cache_threshold: int = 10  # Step after which to use aggressive caching
     aggressive_context_cache_interval: int = 20  # Context cache interval after warmup
     world_model_update_interval: int = 5  # Update world model every N steps
-    async_operation_timeout_seconds: float = 10.0  # Timeout for individual async operations in _async_safe()
+    async_operation_timeout_seconds: float = 30.0  # Timeout for individual async operations in _async_safe()
     # OUTPUT FORMATTING MODE: When True, skip reasoning hooks for faster output generation
     # This is used when VULCAN's reasoning is already complete and we just need prose output.
     # Key architecture insight: The LLM shouldn't reason - VULCAN's mind (orchestrator, 
@@ -2014,6 +2014,14 @@ class CognitiveLoop:
         except asyncio.TimeoutError:
             fn_name = getattr(fn, '__name__', str(fn))
             logger.warning(f"Async operation '{fn_name}' timed out after {op_timeout}s, returning default")
+            return default
+        except RuntimeError as e:
+            # Handle executor/event loop shutdown gracefully
+            if "cannot schedule new futures after shutdown" in str(e).lower():
+                logger.warning("Operation attempted after executor/event loop shutdown, suppressing further async work.")
+                return default
+            # Re-raise other RuntimeErrors to be caught by general exception handler
+            logger.warning(f"Async safe operation failed with RuntimeError, returning default: {e}")
             return default
         except Exception as e:
             # Log async operation failures
