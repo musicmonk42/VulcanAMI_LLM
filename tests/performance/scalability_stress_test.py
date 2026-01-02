@@ -339,7 +339,7 @@ class QueryStatus(Enum):
         )
 
 
-@dataclass(frozen=False)
+@dataclass
 class QueryResult:
     """
     Result of a single query execution.
@@ -1041,26 +1041,49 @@ class VulcanSystemInterface:
 
         Raises:
             TimeoutError: If execution exceeds timeout.
+
+        Note:
+            We create a new event loop per call because ThreadPoolExecutor
+            runs tasks in separate threads, and asyncio event loops are
+            not thread-safe. This is the recommended pattern for running
+            async code from sync threads.
         """
         import asyncio
 
         if self.hybrid_executor:
             try:
-                # Create a new event loop for this thread
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                try:
-                    result = loop.run_until_complete(
-                        asyncio.wait_for(
-                            self.hybrid_executor.execute(query, max_tokens=100),
-                            timeout=timeout,
-                        )
+                # asyncio.run() handles loop lifecycle automatically and is the
+                # recommended way to run async code from synchronous context.
+                # Each thread in ThreadPoolExecutor needs its own event loop.
+                async def _execute_async():
+                    return await asyncio.wait_for(
+                        self.hybrid_executor.execute(query, max_tokens=100),
+                        timeout=timeout,
                     )
-                    return result
-                finally:
-                    loop.close()
+
+                result = asyncio.run(_execute_async())
+                return result
             except asyncio.TimeoutError:
                 raise TimeoutError(f"Query timed out after {timeout:.1f}s")
+            except RuntimeError as e:
+                # Handle case where event loop is already running
+                if "cannot be called from a running event loop" in str(e):
+                    # Fallback to new_event_loop for nested cases
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    try:
+                        result = loop.run_until_complete(
+                            asyncio.wait_for(
+                                self.hybrid_executor.execute(query, max_tokens=100),
+                                timeout=timeout,
+                            )
+                        )
+                        return result
+                    finally:
+                        loop.close()
+                else:
+                    logger.debug(f"Hybrid executor error: {e}")
+                    # Fall through to mock response
             except Exception as e:
                 logger.debug(f"Hybrid executor error: {e}")
                 # Fall through to mock response

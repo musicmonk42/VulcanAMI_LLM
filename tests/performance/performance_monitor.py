@@ -94,7 +94,7 @@ MEMORY_GROWTH_THRESHOLD: Final[float] = 1.5  # 50% growth triggers anomaly
 # ============================================================
 
 
-@dataclass(frozen=False)
+@dataclass
 class SystemSnapshot:
     """
     A snapshot of system metrics at a point in time.
@@ -834,9 +834,9 @@ def quick_system_check() -> Dict[str, Any]:
     """
     collector = SystemMetricsCollector()
     snapshot = collector.collect_snapshot()
-    
+
     return {
-        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "cpu_percent": snapshot.cpu_percent_total,
         "memory_rss_mb": snapshot.memory_rss_mb,
         "memory_percent": snapshot.memory_percent,

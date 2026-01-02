@@ -67,11 +67,19 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Limit GITHUB_TOKEN permissions to minimum required
+permissions:
+  contents: read
+  actions: read
+
 jobs:
   stress-test:
     name: Run Stress Tests
     runs-on: ubuntu-latest
     timeout-minutes: 30
+
+    permissions:
+      contents: read
 
     env:
       PYTHONPATH: ${{ github.workspace }}/src
@@ -80,7 +88,8 @@ jobs:
       VULCAN_SIMPLE_MODE: 'true'
       SKIP_OPENAI: 'true'
       OPENAI_LANGUAGE_FORMATTING: 'false'
-      # Prevent atexit handlers from blocking
+      # Signal to VULCAN conftest.py that we're in test mode.
+      # This enables test-specific behaviors like non-blocking atexit handlers.
       PYTEST_RUNNING: '1'
 
     steps:
@@ -294,6 +303,10 @@ jobs:
       needs.stress-test.result == 'success' &&
       github.event_name == 'push' &&
       (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+
+    permissions:
+      contents: read
+      actions: read
 
     steps:
       - name: Checkout repository
