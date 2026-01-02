@@ -173,7 +173,7 @@ kubectl create secret generic vulcanami-secrets \
 
 ### Continuous Integration (ci.yml)
 - Triggered on: push, pull_request
-- Jobs: lint, test (Python 3.10.11), integration-test, build-validation
+- Jobs: lint, test (Python 3.11), integration-test, build-validation
 - Services: PostgreSQL, Redis
 
 ### Docker Build (docker.yml)
@@ -263,7 +263,7 @@ kubectl describe pod <pod-name> -n vulcanami
 - Docker Compose 2.0+
 - kubectl 1.24+ (for K8s)
 - Helm 3.10+ (for Helm)
-- Python 3.10.11
+- Python 3.11+
 - Make
 - Git
 

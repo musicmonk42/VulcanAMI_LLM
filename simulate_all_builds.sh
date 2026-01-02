@@ -337,9 +337,9 @@ if [ -f "Dockerfile" ]; then
     fi
     
     # Check for pinned base image
-    if grep -q "FROM python:3.10.11" Dockerfile; then
+    if grep -q "FROM python:3.11" Dockerfile; then
         ((checks_passed++))
-        log_info "✓ Pinned Python version (3.10.11)"
+        log_info "✓ Pinned Python version (3.11)"
     fi
     
     # Check for multi-stage build

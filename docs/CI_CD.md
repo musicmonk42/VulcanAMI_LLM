@@ -44,7 +44,7 @@ For detailed testing instructions, see **[TESTING_GUIDE.md](TESTING_GUIDE.md)**.
 
 **Jobs:**
 - **Lint**: Code quality checks (Black, isort, Flake8, Pylint, Bandit)
-- **Test**: Run tests on Python 3.10.11 with PostgreSQL and Redis
+- **Test**: Run tests on Python 3.11 with PostgreSQL and Redis
 - **Integration Test**: Run integration tests with Docker Compose services
 - **Build Validation**: Validate Docker image builds
 - **Check Dependencies**: Scan for vulnerable dependencies
