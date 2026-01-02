@@ -135,6 +135,41 @@ PER_TOKEN_TIMEOUT = float(os.environ.get("VULCAN_LLM_PER_TOKEN_TIMEOUT", "30.0")
 FAST_MODE_MAX_TIMEOUT_SECONDS = float(os.environ.get("VULCAN_LLM_FAST_TIMEOUT", "60.0"))  # 60 seconds
 
 # ============================================================
+# ADAPTIVE TIMEOUT CALCULATION
+# ============================================================
+# FIX: Implement adaptive timeout to prevent timeouts during CPU inference.
+# Formula: timeout = BASE_TIMEOUT_SECONDS + (max_tokens * TIMEOUT_PER_TOKEN_SECONDS)
+# This dynamically scales the timeout based on the expected generation length.
+BASE_TIMEOUT_SECONDS = float(os.environ.get("VULCAN_BASE_TIMEOUT", "5.0"))  # 5 seconds base
+TIMEOUT_PER_TOKEN_SECONDS = float(os.environ.get("VULCAN_TIMEOUT_PER_TOKEN", "2.0"))  # 2 seconds per token
+
+
+def calculate_adaptive_timeout(max_tokens: int) -> float:
+    """
+    Calculate adaptive timeout based on token count.
+    
+    ADAPTIVE TIMEOUT FIX: This function implements Claude's adaptive timeout formula
+    to prevent premature timeouts during CPU-bound inference.
+    
+    Formula: timeout = base_timeout (5s) + (max_tokens * 2.0s)
+    
+    Examples:
+        - 10 tokens: 5 + (10 * 2.0) = 25 seconds
+        - 50 tokens: 5 + (50 * 2.0) = 105 seconds
+        - 100 tokens: 5 + (100 * 2.0) = 205 seconds
+    
+    Args:
+        max_tokens: Maximum number of tokens to generate
+        
+    Returns:
+        Calculated timeout in seconds, capped at VULCAN_HARD_TIMEOUT
+    """
+    adaptive_timeout = BASE_TIMEOUT_SECONDS + (max_tokens * TIMEOUT_PER_TOKEN_SECONDS)
+    # Cap at hard timeout to prevent excessive waits
+    return min(adaptive_timeout, VULCAN_HARD_TIMEOUT)
+
+
+# ============================================================
 # CPU CLOUD EXECUTION - MAX TOKENS LIMIT
 # ============================================================
 # FIX: Limit max tokens for CPU execution to prevent timeout issues.
@@ -1578,7 +1613,11 @@ class HybridLLMExecutor:
                 )
             
             self.logger.info(f"[HybridExecutor] Calling generate(prompt_len={len(prompt)}, max_tokens={effective_max_tokens})...")
-            self.logger.info(f"[HybridExecutor] Using HARD timeout: {self.vulcan_timeout}s")
+            
+            # ADAPTIVE TIMEOUT FIX: Calculate timeout based on token count
+            # Formula: timeout = base_timeout (5s) + (max_tokens * 2.0s)
+            adaptive_timeout = calculate_adaptive_timeout(effective_max_tokens)
+            self.logger.info(f"[HybridExecutor] Using ADAPTIVE timeout: {adaptive_timeout:.1f}s (base={BASE_TIMEOUT_SECONDS}s + {effective_max_tokens}*{TIMEOUT_PER_TOKEN_SECONDS}s)")
             start_time = time.perf_counter()
             
             # PARALLEL MODE FIX: Use non-blocking async pattern for concurrent execution
@@ -1600,10 +1639,10 @@ class HybridLLMExecutor:
                 self.logger.info("[HybridExecutor] Starting async-friendly local LLM generation...")
                 result = await asyncio.wait_for(
                     loop.run_in_executor(self._timeout_executor, generate_sync),
-                    timeout=self.vulcan_timeout
+                    timeout=adaptive_timeout
                 )
             except asyncio.TimeoutError:
-                self.logger.error(f"[HybridExecutor] ❌ ASYNC TIMEOUT after {self.vulcan_timeout}s!")
+                self.logger.error(f"[HybridExecutor] ❌ ASYNC TIMEOUT after {adaptive_timeout:.1f}s!")
                 return None
             
             elapsed = time.perf_counter() - start_time
@@ -2740,6 +2779,10 @@ __all__ = [
     # CPU Cloud execution constants
     "VULCAN_HARD_TIMEOUT",
     "CPU_MAX_TOKENS_DEFAULT",
+    # Adaptive timeout (Task 4 fix)
+    "BASE_TIMEOUT_SECONDS",
+    "TIMEOUT_PER_TOKEN_SECONDS",
+    "calculate_adaptive_timeout",
 ]
 
 

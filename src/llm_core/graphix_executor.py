@@ -48,6 +48,7 @@ import functools
 import json
 import logging
 import math
+import os
 import random
 import time
 from collections import OrderedDict, defaultdict
@@ -56,6 +57,15 @@ from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar
 
 import numpy as np
+
+# CPU Priority Management (Task 4 Fix)
+# Import psutil for setting process priority to improve inference performance
+try:
+    import psutil
+    PSUTIL_AVAILABLE = True
+except ImportError:
+    psutil = None
+    PSUTIL_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -646,10 +656,62 @@ class GraphixExecutor:
             f"GraphixExecutor initialized: {hidden_size}d, {num_layers}L, {num_heads}H"
         )
 
+        # CPU PRIORITY FIX (Task 4): Set process priority to nice(-5) for faster inference
+        # This gives the LLM inference higher CPU scheduling priority, reducing latency
+        # when the system is under load from other processes.
+        self._set_cpu_priority()
+
         # FIX: Model warm-up to prevent 7-second cold start delay
         # Perform a dummy inference pass during initialization to pin tensors in RAM
         # This prevents lazy loading delays on the first real inference request
         self._warmup_model()
+
+    def _set_cpu_priority(self) -> None:
+        """
+        Set process priority to nice(-5) for improved inference performance.
+        
+        CPU PRIORITY FIX: By setting a higher priority (lower nice value),
+        the LLM inference process gets more CPU time, reducing latency during
+        token generation when other processes are competing for CPU resources.
+        
+        This is especially important in cloud environments where the CPU may
+        be shared with other workloads.
+        
+        Note: nice(-5) requires appropriate permissions. On failure, we log
+        a warning but continue execution since this is a performance optimization,
+        not a functional requirement.
+        """
+        if not PSUTIL_AVAILABLE:
+            logger.debug("psutil not available - CPU priority optimization skipped")
+            return
+        
+        try:
+            process = psutil.Process(os.getpid())
+            current_nice = process.nice()
+            
+            # Set nice value to -5 (higher priority)
+            # On Linux: -20 (highest) to 19 (lowest), default is 0
+            # On Windows: psutil maps nice values to priority classes
+            target_nice = -5
+            
+            if current_nice > target_nice:
+                process.nice(target_nice)
+                new_nice = process.nice()
+                logger.info(
+                    f"CPU priority optimized: nice value changed from {current_nice} to {new_nice} "
+                    f"(higher priority for LLM inference)"
+                )
+            else:
+                logger.debug(f"CPU priority already at or above target (nice={current_nice})")
+                
+        except psutil.AccessDenied:
+            logger.warning(
+                "Could not set CPU priority (permission denied). "
+                "Run with elevated privileges for priority optimization."
+            )
+        except Exception as e:
+            logger.warning(f"CPU priority optimization failed: {e}")
+            # Non-fatal: inference will work, just potentially slower under load
 
     def _warmup_model(self) -> None:
         """
@@ -1542,4 +1604,6 @@ __all__ = [
     "log_performance_summary",
     # Configuration constants
     "WARMUP_MIN_LAYERS",
+    # CPU priority (Task 4 fix)
+    "PSUTIL_AVAILABLE",
 ]
