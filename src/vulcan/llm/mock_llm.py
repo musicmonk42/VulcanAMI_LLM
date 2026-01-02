@@ -242,7 +242,7 @@ class MockGraphixVulcanLLM:
         Returns:
             A structured reasoning result as text
         """
-        topic = self._extract_topic(query) if hasattr(self, '_extract_topic') else query[:50]
+        topic = self._extract_topic(query)
         return (
             f"Reasoning analysis for: {topic}\n\n"
             f"Based on systematic analysis, the key considerations are:\n"
