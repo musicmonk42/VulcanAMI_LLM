@@ -7,6 +7,7 @@ and ensure fast tool execution when needed.
 Fixed version with proper error handling, thread safety, and interruptible threads.
 """
 
+import inspect
 import logging
 import queue
 import threading
@@ -20,6 +21,27 @@ import numpy as np
 import psutil
 
 logger = logging.getLogger(__name__)
+
+
+def _class_accepts_name_parameter(tool_class) -> bool:
+    """
+    Check if a class's __init__ method accepts 'name' as a constructor parameter.
+    
+    This is used to differentiate between classes that:
+    1. Take 'name' as a constructor argument (e.g., MockTool(name, warm_time))
+    2. Set 'name' internally (e.g., MathematicalComputationTool sets self.name internally)
+    
+    Returns:
+        True if 'name' is a parameter in __init__, False otherwise
+    """
+    try:
+        sig = inspect.signature(tool_class.__init__)
+        return 'name' in sig.parameters
+    except (ValueError, TypeError):
+        # Return False as the safe default to avoid passing unexpected 'name' arguments
+        # to classes that don't expect them. ValueError can occur if the callable has
+        # no signature, TypeError if the object is not callable.
+        return False
 
 
 class PoolState(Enum):
@@ -605,10 +627,15 @@ class WarmStartPool:
                 else:
                     # It's an instance - create a factory that produces new instances
                     tool_class = tool_instance.__class__
+                    
+                    # FIX: Check if the class actually accepts 'name' as a constructor parameter
+                    # Some classes (like MathematicalComputationTool) have self.name but don't
+                    # accept it as a constructor argument - they set it internally
+                    class_accepts_name = _class_accepts_name_parameter(tool_class)
 
                     # CRITICAL FIX: Introspect the instance to determine how to clone it
-                    if hasattr(tool_instance, "name"):
-                        # Has a name attribute - likely MockTool-style or similar
+                    if hasattr(tool_instance, "name") and class_accepts_name:
+                        # Has a name attribute AND the class accepts it as a constructor param
                         tool_name_arg = getattr(tool_instance, "name", tool_name)
 
                         if hasattr(tool_instance, "warm_time"):
@@ -639,6 +666,8 @@ class WarmStartPool:
 
                     else:
                         # Default: try no-arg constructor or use instance as singleton
+                        # This handles classes like MathematicalComputationTool that have
+                        # self.name but don't take name as a constructor argument
                         try:
                             # Try creating with no args to test
                             tool_class()
