@@ -261,25 +261,35 @@ class DeonticInference:
 
 class DeonticLogicEngine:
     """
-    SOTA Standard Deontic Logic (SDL) engine with paradox handling.
+    Standard Deontic Logic (SDL) engine for basic deontic inference.
     
     Implements:
-    - Kripke semantics for deontic modalities
-    - SDL axioms (K, D, N rules)
-    - Inter-definability of operators
-    - Paradox detection and resolution
+    - SDL axiom schemas (K, D, N) as reference
+    - Inter-definability of operators (P↔¬O¬, F↔O¬)
+    - Basic consistency checking
+    
+    LIMITATIONS:
+    - Uses string-based formula matching, not full Kripke semantics
+    - No tableaux or resolution provers
+    - No paradox detection (Ross, Good Samaritan, CTD)
+    - Axiom N (necessitation) not implemented
+    - Nested formulas not handled
+    
+    Suitable for:
+    - Simple deontic inferences with well-formed P/O/F formulas
+    - Checking basic obligation-permission relationships
     
     Based on: Åqvist (2002), Chellas (1980)
     """
     
-    # SDL Axiom schemas
+    # SDL Axiom schemas (reference only - not fully implemented)
     SDL_AXIOMS = {
         'K': 'O(φ→ψ) → (O(φ)→O(ψ))',  # Distribution axiom
-        'D': 'O(φ) → P(φ)',              # Ought implies can
-        'N': 'If ⊢φ then ⊢O(φ)',         # Necessitation
+        'D': 'O(φ) → P(φ)',              # Ought implies can (implemented)
+        'N': 'If ⊢φ then ⊢O(φ)',         # Necessitation (not implemented)
     }
     
-    # Inter-definability rules
+    # Inter-definability rules (implemented)
     INTERDEFINABILITY = {
         'P_def': 'P(φ) ↔ ¬O(¬φ)',
         'F_def': 'F(φ) ↔ O(¬φ)',
@@ -396,15 +406,24 @@ class DeonticLogicEngine:
     def _apply_sdl_axioms(
         self, goal: DeonticFormula
     ) -> Tuple[bool, List[DeonticInference]]:
-        """Apply SDL axiom schemas."""
+        """
+        Apply SDL axiom schemas for inference.
+        
+        Currently implements: Axiom K application for simple implications.
+        
+        LIMITATION: Uses string splitting on "→" which breaks on nested
+        implications like "A → (B → C)". Only handles simple "X → Y" patterns.
+        For complex formulas, a proper parser would be needed.
+        """
         # Axiom K: O(φ→ψ) → (O(φ)→O(ψ))
         # If we have O(φ) and O(φ→ψ), we can derive O(ψ)
         if goal.operator == DeonticOperator.OBLIGATION and not goal.negated:
             for formula in self.knowledge_base:
                 if formula.operator == DeonticOperator.OBLIGATION:
                     # Check if this is an implication O(X→goal.content)
+                    # NOTE: This simple split breaks on nested implications
                     if "→" in formula.content:
-                        parts = formula.content.split("→")
+                        parts = formula.content.split("→", 1)  # Split only on first arrow
                         if len(parts) == 2 and parts[1].strip() == goal.content:
                             antecedent = parts[0].strip()
                             # Check if we have O(antecedent)
@@ -914,13 +933,26 @@ class ParetoDominanceChecker:
 
 class PhilosophicalReasoner(AbstractReasoner):
     """
-    SOTA Philosophical Reasoner integrating all algorithms.
+    Philosophical Reasoner for ethical and deontic queries.
     
     This class serves as the main entry point for philosophical reasoning,
     coordinating the deontic logic engine, moral uncertainty handler,
     and Pareto dominance checker.
     
+    CAPABILITIES:
+    - Query classification (permissibility, obligation, dominance, etc.)
+    - Deontic formula extraction from natural language
+    - Basic SDL inference (Axiom D, inter-definability)
+    - Heuristic multi-theory moral evaluation
+    - Pareto dominance detection
+    
+    LIMITATIONS (see module docstring for details):
+    - Heuristic keyword-based evaluation, not formal utility calculation
+    - String-based deontic formula matching, not full AST parsing
+    - No paradox detection or resolution
+    
     Designed for integration with VULCAN's unified reasoning system.
+    Returns structured analysis even when formal reasoning cannot complete.
     """
     
     # Patterns for detecting philosophical content
