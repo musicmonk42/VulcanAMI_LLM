@@ -2898,12 +2898,32 @@ class UnifiedReasoner:
 
                 if isinstance(raw_result, ReasoningResult):
                     result = raw_result
+                    # FIX: Improve probabilistic conclusion to be more user-friendly
+                    # The raw conclusion contains ML metrics like "is_above_threshold"
+                    # Convert to a more meaningful response for end users
+                    if isinstance(result.conclusion, dict):
+                        conclusion_dict = result.conclusion
+                        # Extract meaningful information from ML metrics
+                        if 'details' in conclusion_dict:
+                            # Use the details which has a more readable format
+                            result.conclusion = f"Analysis result: {conclusion_dict['details']}"
+                        elif 'is_above_threshold' in conclusion_dict:
+                            # Fallback to threshold check result
+                            threshold_met = conclusion_dict.get('is_above_threshold', False)
+                            result.conclusion = f"Probabilistic analysis indicates: {'positive' if threshold_met else 'negative'} outcome (confidence: {result.confidence:.2f})"
                 else:
+                    # FIX: Better formatting for dict results
+                    raw_conclusion = raw_result.get("conclusion")
+                    if isinstance(raw_conclusion, dict) and 'details' in raw_conclusion:
+                        formatted_conclusion = f"Analysis result: {raw_conclusion['details']}"
+                    else:
+                        formatted_conclusion = raw_conclusion
+                    
                     result = ReasoningResult(
-                        conclusion=raw_result.get("conclusion"),
+                        conclusion=formatted_conclusion,
                         confidence=raw_result.get("confidence", 0.5),
                         reasoning_type=task.task_type,
-                        explanation=str(raw_result),
+                        explanation=raw_result.get("explanation", str(raw_result)),
                     )
 
             elif task.task_type == ReasoningType.SYMBOLIC:
@@ -3005,6 +3025,57 @@ class UnifiedReasoner:
                         )
                 else:
                     logger.warning("Philosophical reasoner missing 'reason' method")
+                    result = self._create_empty_result()
+
+            elif task.task_type == ReasoningType.MATHEMATICAL:
+                # FIX: Handle MATHEMATICAL reasoning type for math computations
+                # MathematicalComputationTool.reason() returns a dict with 'conclusion', 'confidence', etc.
+                # The conclusion contains the actual computed result in 'result' field
+                if hasattr(reasoner, "reason"):
+                    # Extract math query from task
+                    if isinstance(task.input_data, str):
+                        math_query = task.input_data
+                    elif isinstance(task.input_data, dict):
+                        math_query = task.input_data.get('query') or task.input_data.get('problem') or str(task.input_data)
+                    else:
+                        math_query = str(task.query.get('query', '')) if isinstance(task.query, dict) else str(task.query)
+                    
+                    raw_result = reasoner.reason(math_query, task.query)
+                    
+                    if isinstance(raw_result, ReasoningResult):
+                        result = raw_result
+                    elif isinstance(raw_result, dict):
+                        # Extract the actual computed result for user-friendly conclusion
+                        conclusion = raw_result.get('conclusion', {})
+                        computed_result = conclusion.get('result') if isinstance(conclusion, dict) else conclusion
+                        formatted_output = raw_result.get('formatted_output', '')
+                        
+                        # Build a user-friendly conclusion
+                        # Prefer formatted_output (includes full explanation) over simple result
+                        if formatted_output:
+                            user_conclusion = formatted_output
+                        elif computed_result:
+                            user_conclusion = f"The answer is: {computed_result}"
+                        else:
+                            user_conclusion = raw_result
+                        
+                        raw_confidence = raw_result.get('confidence', 0.9)
+                        result = ReasoningResult(
+                            conclusion=user_conclusion,
+                            confidence=raw_confidence,
+                            reasoning_type=ReasoningType.MATHEMATICAL,
+                            explanation=raw_result.get('explanation', 'Mathematical computation performed'),
+                            metadata=raw_result.get('metadata', {}),
+                        )
+                    else:
+                        result = ReasoningResult(
+                            conclusion=raw_result,
+                            confidence=0.9,
+                            reasoning_type=ReasoningType.MATHEMATICAL,
+                            explanation="Mathematical computation performed",
+                        )
+                else:
+                    logger.warning("Mathematical reasoner missing 'reason' method")
                     result = self._create_empty_result()
 
             elif task.task_type == ReasoningType.SYMBOLIC:
