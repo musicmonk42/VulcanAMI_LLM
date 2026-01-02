@@ -112,6 +112,10 @@ def _lazy_import_reasoning():
     that occurs when agent_pool.py imports from src.vulcan.reasoning which
     in turn imports from agent_pool.py.
     
+    FIX: Tries multiple import paths to handle different execution contexts:
+    - 'vulcan.reasoning' - when running from src/ directory
+    - 'src.vulcan.reasoning' - when running from project root
+    
     Returns:
         bool: True if imports succeeded, False otherwise
     """
@@ -125,42 +129,51 @@ def _lazy_import_reasoning():
     
     _reasoning_import_attempted = True
     
-    try:
-        from src.vulcan.reasoning import (
-            UnifiedReasoner as _UnifiedReasoner,
-            ReasoningType as _ReasoningType,
-            ReasoningResult as _ReasoningResult,
-            UNIFIED_AVAILABLE as _UNIFIED_AVAILABLE,
-            create_unified_reasoner as _create_unified_reasoner,
-        )
-        from src.vulcan.reasoning.reasoning_integration import (
-            apply_reasoning as _apply_reasoning,
-            get_reasoning_integration as _get_reasoning_integration,
-            ReasoningResult as _IntegrationReasoningResult,
-        )
-        
-        # Update global references
-        UnifiedReasoner = _UnifiedReasoner
-        ReasoningType = _ReasoningType
-        ReasoningResult = _ReasoningResult
-        UNIFIED_AVAILABLE = _UNIFIED_AVAILABLE
-        create_unified_reasoner = _create_unified_reasoner
-        apply_reasoning = _apply_reasoning
-        get_reasoning_integration = _get_reasoning_integration
-        IntegrationReasoningResult = _IntegrationReasoningResult
-        REASONING_AVAILABLE = _UNIFIED_AVAILABLE
-        
-        logging.getLogger(__name__).info(
-            "Reasoning integration loaded successfully (lazy import) - reasoning engines will be invoked"
-        )
-        return True
-        
-    except ImportError as e:
-        logging.getLogger(__name__).warning(
-            f"Reasoning integration not available: {e}. Tasks will use placeholder execution."
-        )
-        REASONING_AVAILABLE = False
-        return False
+    # Try multiple import paths for robustness
+    import_paths = [
+        ('vulcan.reasoning', 'vulcan.reasoning.reasoning_integration'),
+        ('src.vulcan.reasoning', 'src.vulcan.reasoning.reasoning_integration'),
+    ]
+    
+    for reasoning_path, integration_path in import_paths:
+        try:
+            # Dynamic import using __import__
+            reasoning_module = __import__(reasoning_path, fromlist=[
+                'UnifiedReasoner', 'ReasoningType', 'ReasoningResult',
+                'UNIFIED_AVAILABLE', 'create_unified_reasoner'
+            ])
+            integration_module = __import__(integration_path, fromlist=[
+                'apply_reasoning', 'get_reasoning_integration', 'ReasoningResult'
+            ])
+            
+            # Update global references
+            UnifiedReasoner = getattr(reasoning_module, 'UnifiedReasoner', None)
+            ReasoningType = getattr(reasoning_module, 'ReasoningType', None)
+            ReasoningResult = getattr(reasoning_module, 'ReasoningResult', None)
+            UNIFIED_AVAILABLE = getattr(reasoning_module, 'UNIFIED_AVAILABLE', False)
+            create_unified_reasoner = getattr(reasoning_module, 'create_unified_reasoner', None)
+            apply_reasoning = getattr(integration_module, 'apply_reasoning', None)
+            get_reasoning_integration = getattr(integration_module, 'get_reasoning_integration', None)
+            IntegrationReasoningResult = getattr(integration_module, 'ReasoningResult', None)
+            REASONING_AVAILABLE = UNIFIED_AVAILABLE
+            
+            logging.getLogger(__name__).info(
+                f"Reasoning integration loaded successfully via {reasoning_path} (lazy import) - reasoning engines will be invoked"
+            )
+            return True
+            
+        except ImportError as e:
+            logging.getLogger(__name__).debug(
+                f"Import path {reasoning_path} failed: {e}. Trying next path..."
+            )
+            continue
+    
+    # All paths failed
+    logging.getLogger(__name__).warning(
+        f"Reasoning integration not available (all import paths failed). Tasks will use placeholder execution."
+    )
+    REASONING_AVAILABLE = False
+    return False
 
 # ============================================================
 # CONSTANTS
@@ -169,6 +182,17 @@ def _lazy_import_reasoning():
 # Fallback hardware specification values when psutil is not available
 DEFAULT_FALLBACK_MEMORY_GB = 4.0  # Conservative memory estimate
 DEFAULT_FALLBACK_STORAGE_GB = 100.0  # Conservative storage estimate
+
+# FIX: Import path prefixes for reasoning modules
+# Used by both lazy import and fallback reasoning invocation
+REASONING_IMPORT_PATHS = ['vulcan', 'src.vulcan']
+
+# FIX: Set of reasoning tool names for detecting reasoning tasks
+# Used to determine if fallback reasoning should be invoked
+REASONING_TOOL_NAMES = frozenset({
+    'causal', 'symbolic', 'analogical', 'probabilistic', 'counterfactual',
+    'deductive', 'inductive', 'abductive', 'multimodal', 'hybrid', 'ensemble'
+})
 
 # Redis keys for agent pool state persistence
 REDIS_KEY_AGENT_POOL_STATS = "vulcan:agent_pool:stats"
@@ -2591,6 +2615,7 @@ class AgentPoolManager:
             # ============================================================
             reasoning_result = None
             node_results = {}
+            reasoning_was_invoked = False  # FIX: Track actual reasoning invocation
 
             # CIRCULAR IMPORT FIX: Trigger lazy import of reasoning components
             # This ensures UnifiedReasoner and other components are available
@@ -2664,6 +2689,9 @@ class AgentPoolManager:
                             "selected_tools": integration_result.selected_tools,
                             "reasoning_strategy": integration_result.reasoning_strategy,
                         }
+                    
+                    # FIX: Mark that reasoning was actually invoked
+                    reasoning_was_invoked = True
                         
                 except Exception as reasoning_error:
                     logger.warning(
@@ -2675,56 +2703,92 @@ class AgentPoolManager:
 
             # ============================================================
             # FIX: EXPLICIT REASONING INVOCATION when selected_tools present
-            # This handles cases where REASONING_AVAILABLE=False but we still
-            # have reasoning tools selected from QueryRouter
+            # This handles cases where:
+            # 1. REASONING_AVAILABLE=False but we still have reasoning tools selected
+            # 2. REASONING_AVAILABLE=True but first path didn't execute (e.g., is_reasoning_task was initially False)
+            # 3. selected_tools are present and reasoning hasn't been invoked yet
             # ============================================================
-            if is_reasoning_task and selected_tools and not node_results and not REASONING_AVAILABLE:
+            should_invoke_fallback_reasoning = (
+                selected_tools and 
+                not node_results and 
+                not reasoning_was_invoked and
+                (is_reasoning_task or any(tool.lower() in REASONING_TOOL_NAMES for tool in selected_tools))
+            )
+            
+            if should_invoke_fallback_reasoning:
                 logger.info(f"[REASONING] INVOKING engines for task {task_id}, tools={selected_tools}")
                 try:
-                    from vulcan.reasoning.reasoning_types import ReasoningType
-                    from vulcan.reasoning.unified_reasoning import ReasoningStrategy
+                    # FIX: Try multiple import paths for ReasoningType and ReasoningStrategy
+                    ReasoningType_local = None
+                    ReasoningStrategy_local = None
+                    
+                    for path_prefix in REASONING_IMPORT_PATHS:
+                        try:
+                            rt_module = __import__(f'{path_prefix}.reasoning.reasoning_types', fromlist=['ReasoningType'])
+                            ReasoningType_local = getattr(rt_module, 'ReasoningType', None)
+                            ur_module = __import__(f'{path_prefix}.reasoning.unified_reasoning', fromlist=['ReasoningStrategy'])
+                            ReasoningStrategy_local = getattr(ur_module, 'ReasoningStrategy', None)
+                            if ReasoningType_local and ReasoningStrategy_local:
+                                break
+                        except ImportError:
+                            continue
+                    
+                    if ReasoningType_local is None:
+                        logger.warning(f"[REASONING] Could not import ReasoningType from any of: {REASONING_IMPORT_PATHS}")
                     
                     # Helper function to create fallback UnifiedReasoner instance
                     def _create_fallback_reasoner():
-                        from vulcan.reasoning.unified_reasoning import UnifiedReasoner as DirectUnifiedReasoner
-                        return DirectUnifiedReasoner()
+                        for path_prefix in REASONING_IMPORT_PATHS:
+                            try:
+                                ur_module = __import__(f'{path_prefix}.reasoning.unified_reasoning', fromlist=['UnifiedReasoner'])
+                                DirectUnifiedReasoner = getattr(ur_module, 'UnifiedReasoner')
+                                return DirectUnifiedReasoner()
+                            except ImportError:
+                                continue
+                        raise ImportError(f"Could not import UnifiedReasoner from any of: {REASONING_IMPORT_PATHS}")
                     
                     # ISSUE #2 FIX: Use singleton UnifiedReasoner to prevent re-initialization per query
                     # Previously: reasoning = DirectUnifiedReasoner()
                     # This was causing UnifiedRuntime and other components to be re-initialized on every query
-                    try:
-                        from vulcan.reasoning.singletons import get_unified_reasoner
-                        reasoning = get_unified_reasoner()
-                        if reasoning is None:
-                            # Fallback to direct instantiation if singleton fails
-                            reasoning = _create_fallback_reasoner()
-                            logger.warning("[REASONING] Using direct UnifiedReasoner instantiation (singleton unavailable)")
-                        else:
-                            logger.debug("[REASONING] Using singleton UnifiedReasoner")
-                    except ImportError:
+                    reasoning = None
+                    for path_prefix in REASONING_IMPORT_PATHS:
+                        try:
+                            singleton_module = __import__(f'{path_prefix}.reasoning.singletons', fromlist=['get_unified_reasoner'])
+                            get_unified_reasoner_func = getattr(singleton_module, 'get_unified_reasoner')
+                            reasoning = get_unified_reasoner_func()
+                            if reasoning is not None:
+                                logger.debug("[REASONING] Using singleton UnifiedReasoner")
+                                break
+                        except ImportError:
+                            continue
+                    
+                    if reasoning is None:
+                        # Fallback to direct instantiation if singleton fails
                         reasoning = _create_fallback_reasoner()
-                        logger.warning("[REASONING] Using direct UnifiedReasoner instantiation (singletons module unavailable)")
+                        logger.warning("[REASONING] Using direct UnifiedReasoner instantiation (singleton unavailable)")
                     
                     # Extract query from parameters
                     query_text = parameters.get("prompt", "") or parameters.get("query", "")
                     
                     # Convert first tool name to ReasoningType enum if possible
                     reasoning_type = None
-                    if selected_tools and len(selected_tools) > 0:
+                    if selected_tools and len(selected_tools) > 0 and ReasoningType_local is not None:
                         tool_name = selected_tools[0].upper()
                         try:
-                            reasoning_type = ReasoningType[tool_name]
+                            reasoning_type = ReasoningType_local[tool_name]
                         except KeyError:
                             # Try matching by value
-                            for rt in ReasoningType:
+                            for rt in ReasoningType_local:
                                 if rt.value == selected_tools[0].lower():
                                     reasoning_type = rt
                                     break
                     
                     # Use ADAPTIVE strategy by default, ENSEMBLE when multiple tools selected
-                    strategy = ReasoningStrategy.ADAPTIVE
-                    if selected_tools and len(selected_tools) > 1:
-                        strategy = ReasoningStrategy.ENSEMBLE
+                    strategy = None
+                    if ReasoningStrategy_local is not None:
+                        strategy = ReasoningStrategy_local.ADAPTIVE
+                        if selected_tools and len(selected_tools) > 1:
+                            strategy = ReasoningStrategy_local.ENSEMBLE
                     
                     # Invoke actual reasoning with correct signature:
                     # reason(input_data, query=None, reasoning_type=None, strategy=ADAPTIVE, ...)
@@ -2832,7 +2896,8 @@ class AgentPoolManager:
                 "node_results": node_results,
                 "parameters_used": list(parameters.keys()) if parameters else [],
                 "capability": metadata.capability.value,
-                "reasoning_invoked": is_reasoning_task and REASONING_AVAILABLE,
+                "reasoning_invoked": reasoning_was_invoked,  # FIX: Use actual tracking variable
+                "selected_tools": selected_tools if selected_tools else [],  # FIX: Include selected tools in result
             }
             
             # Add reasoning-specific results if available
