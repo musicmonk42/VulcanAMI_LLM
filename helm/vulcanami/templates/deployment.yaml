@@ -283,11 +283,20 @@ spec:
         - name: VULCAN_LLM_TIMEOUT
           value: {{ .Values.performanceTuning.vulcanLlmTimeout | default 30.0 | quote }}
         {{- /* VULCAN Hard Timeout for CPU-intensive reasoning */}}
+        {{- /* CPU CLOUD FIX: Increased default from 120s to 300s */}}
         - name: VULCAN_LLM_HARD_TIMEOUT
-          value: {{ .Values.performanceTuning.vulcanLlmHardTimeout | default 120.0 | quote }}
+          value: {{ .Values.performanceTuning.vulcanLlmHardTimeout | default 300.0 | quote }}
         {{- /* VULCAN Per-Token Timeout for CPU execution */}}
         - name: VULCAN_LLM_PER_TOKEN_TIMEOUT
           value: {{ .Values.performanceTuning.vulcanLlmPerTokenTimeout | default 30.0 | quote }}
+        {{- /* VULCAN CPU Max Tokens limit for CPU-only instances */}}
+        {{- /* CPU CLOUD FIX: Limits max_tokens to prevent timeout */}}
+        - name: VULCAN_CPU_MAX_TOKENS
+          value: {{ .Values.performanceTuning.vulcanCpuMaxTokens | default 50 | quote }}
+        {{- /* Minimum agents in agent pool (CPU optimization) */}}
+        {{- /* CPU CLOUD FIX: Reduced from 5 to 2 to reduce context-switching overhead */}}
+        - name: MIN_AGENTS
+          value: {{ .Values.performanceTuning.minAgents | default 2 | quote }}
         {{- end }}
         {{- if .Values.hybridOutput }}
         {{- /* Hybrid Output Configuration (OpenAI for formatting only) */}}

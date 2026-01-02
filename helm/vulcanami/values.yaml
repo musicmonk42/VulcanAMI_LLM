@@ -399,11 +399,19 @@ performanceTuning:
   # Increased from 15s to 30s to allow complex reasoning to complete
   vulcanLlmTimeout: 30.0
   # VULCAN Hard Timeout for LLM operations (seconds)
-  # Absolute maximum time VULCAN reasoning can take (increased for CPU execution)
-  vulcanLlmHardTimeout: 120.0
+  # CPU CLOUD FIX: Increased from 120s to 300s (5 minutes) to prevent timeout
+  # At ~500ms per token, 300s allows ~600 tokens before timeout
+  vulcanLlmHardTimeout: 300.0
   # VULCAN Per-Token Timeout for CPU execution (seconds)
-  # Internal LLM can take 3+ seconds per token on CPU
+  # Internal LLM can take 500ms+ per token on CPU
   vulcanLlmPerTokenTimeout: 30.0
+  # VULCAN CPU Max Tokens limit (prevents timeout on CPU-only instances)
+  # CPU CLOUD FIX: Limits max_tokens to 50 to ensure completion within timeout
+  # At ~500ms per token, 50 tokens takes ~25 seconds
+  vulcanCpuMaxTokens: 50
+  # Minimum agents in the agent pool (reduced for CPU optimization)
+  # CPU CLOUD FIX: Reduced from 5 to 2 to reduce context-switching overhead
+  minAgents: 2
 
 # Hybrid Output Configuration (VULCAN reasoning + OpenAI formatting)
 # Implements the hybrid output pattern where VULCAN does all reasoning,
