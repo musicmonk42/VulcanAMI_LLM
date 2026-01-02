@@ -69,7 +69,9 @@ query routing delays, cascade timeouts, and learning system issues.
 | VULCAN_GAP_GIVEUP_THRESHOLD | No | Attempts before marking gap as deferred | "10" |
 | VULCAN_LLM_HARD_TIMEOUT | No | Hard timeout for VULCAN LLM operations (seconds) | "120.0" |
 | VULCAN_LLM_PER_TOKEN_TIMEOUT | No | Per-token timeout for CPU execution (seconds) | "30.0" |
-| OPENAI_LANGUAGE_POLISH | No | Enable OpenAI for output formatting (not reasoning) | "false" |
+| OPENAI_LANGUAGE_ONLY | No | Restrict OpenAI to language-only operations | "true" |
+| OPENAI_LANGUAGE_FORMATTING | No | Route output formatting to OpenAI (fast ~2-5s) | "true" |
+| OPENAI_LANGUAGE_POLISH | No | Enable OpenAI for output polishing (legacy) | "false" |
 
 **Performance Tuning Notes:**
 
@@ -96,11 +98,27 @@ query routing delays, cascade timeouts, and learning system issues.
 - **VULCAN_LLM_PER_TOKEN_TIMEOUT**: Per-token timeout (30s) for CPU execution.
   Allows for slower token generation on CPU-bound systems.
 
-- **OPENAI_LANGUAGE_POLISH**: When set to "true", enables OpenAI to polish the
-  internal LLM's language output. Both the internal LLM and OpenAI serve the same
-  conceptual role - language generation from VULCAN's reasoning results. OpenAI
-  can provide additional polish but neither LLM does the actual reasoning - that's
-  done by VULCAN's reasoning systems (symbolic, causal, probabilistic, mathematical).
+**OpenAI Language-Only Architecture:**
+
+VULCAN handles ALL reasoning internally using its specialized reasoning systems
+(symbolic, causal, probabilistic, mathematical). OpenAI is ONLY used for language
+generation - converting VULCAN's reasoning results into natural language prose.
+
+- **OPENAI_LANGUAGE_ONLY**: When "true" (default), restricts OpenAI to language-only
+  operations. Operations like embeddings, image generation (DALL-E), and audio
+  transcription (Whisper) are blocked and must use local models or alternatives.
+  OpenAI is NEVER permitted to perform reasoning - only language generation.
+
+- **OPENAI_LANGUAGE_FORMATTING**: When "true" (default), routes ALL natural language
+  output formatting to OpenAI (gpt-4o-mini). This provides fast response times
+  (~2-5 seconds vs 60+ seconds with internal LLM on CPU). VULCAN's reasoning
+  systems still do ALL thinking - OpenAI only formats the output as prose.
+  Every (input, output) pair is captured for distillation training.
+
+- **OPENAI_LANGUAGE_POLISH**: Legacy option. When "true", enables OpenAI to polish
+  the internal LLM's language output. Both serve the same conceptual role -
+  language generation from VULCAN's reasoning results. OPENAI_LANGUAGE_FORMATTING
+  is the preferred option (replaces this).
 
 ## 3. Profiles
 development:
