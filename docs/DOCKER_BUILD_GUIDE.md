@@ -96,7 +96,7 @@ docker compose -f docker-compose.prod.yml up -d
 ## Docker Images
 
 ### Main Application (`Dockerfile`)
-- **Base**: python:3.10.11-slim
+- **Base**: python:3.11-slim
 - **User**: graphix (UID 1001)
 - **Ports**: 8000
 - **Features**:
@@ -169,7 +169,7 @@ pip-compile --generate-hashes requirements.txt -o requirements-hashed.txt
 
 ### Pinned Versions
 All base images and dependencies use exact versions:
-- Python: `3.10.11-slim`
+- Python: `3.11-slim`
 - PostgreSQL: `14-alpine`
 - Redis: `7-alpine`
 - MinIO: `RELEASE.2025-01-10T00-00-00Z`

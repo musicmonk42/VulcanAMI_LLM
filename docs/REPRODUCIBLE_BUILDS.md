@@ -197,7 +197,7 @@ Before building for production:
 - [x] No `>=` or `~=` version specifiers in production (✅ All exact versions)
 
 ### Docker:
-- [x] Base image uses specific version tag (not `latest`) (✅ Uses python:3.10.11-slim)
+- [x] Base image uses specific version tag (not `latest`) (✅ Uses python:3.11-slim)
 - [x] Build args for reproducibility documented (✅ REJECT_INSECURE_JWT required)
 - [x] Multi-stage build minimizes final image size (✅ Implemented)
 - [x] Non-root user specified (✅ Uses graphix/apiuser/dqs/pii users)
@@ -304,7 +304,7 @@ deployment:
       version: 1.7.0
       state_serial: 42
     dependencies:
-      python: 3.10.11
+      python: 3.11-slim
       postgres: "14-alpine"
       redis: "7-alpine"
       minio: "RELEASE.2025-01-10T00-00-00Z"

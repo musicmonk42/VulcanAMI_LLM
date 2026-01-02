@@ -602,7 +602,7 @@ class TestReproducibility:
 
         assert re.search(
             r"python:3\.\d+", content.lower()
-        ), "Dockerfile should specify exact Python version (e.g., python:3.10.11)"
+        ), "Dockerfile should specify exact Python version (e.g., python:3.11)"
 
     def test_makefile_exists(self):
         """Verify Makefile exists for consistent build commands"""

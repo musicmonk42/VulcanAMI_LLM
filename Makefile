@@ -10,7 +10,7 @@ REGISTRY ?= ghcr.io
 REGISTRY_USERNAME ?= musicmonk42
 TAG ?= latest
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
-PYTHON_VERSION ?= 3.10.11
+PYTHON_VERSION ?= 3.11
 DOCKER_COMPOSE_DEV ?= docker-compose.dev.yml
 DOCKER_COMPOSE_PROD ?= docker-compose.prod.yml
 
