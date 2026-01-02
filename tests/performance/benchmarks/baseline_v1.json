@@ -73,7 +73,7 @@
   "metadata": {
     "created_by": "VULCAN Performance Engineering",
     "created_date": "2025-01-02",
-    "last_updated": "2026-01-02",
+    "last_updated": "2025-01-02",
     "test_framework": "scalability_stress_test.py",
     "framework_version": "1.0.0",
     "review_cadence": "quarterly",

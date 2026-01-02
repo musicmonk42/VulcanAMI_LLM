@@ -1080,7 +1080,7 @@ class VulcanSystemInterface:
                     raise TimeoutError(f"Query timed out after {timeout:.1f}s")
                 except asyncio.CancelledError:
                     # Task was cancelled during shutdown
-                    logger.debug(f"Query execution cancelled for {query_type}")
+                    logger.debug(f"Query execution cancelled")
                     return None
                     
             except RuntimeError as e:
@@ -1105,20 +1105,30 @@ class VulcanSystemInterface:
                 # to prevent resource leaks and shutdown issues
                 if loop is not None:
                     try:
-                        # Cancel any pending tasks
-                        pending = asyncio.all_tasks(loop)
-                        for task in pending:
-                            task.cancel()
-                        # Allow cancelled tasks to complete
-                        if pending:
-                            loop.run_until_complete(
-                                asyncio.gather(*pending, return_exceptions=True)
-                            )
+                        # Check if loop is still running before cleanup
+                        if not loop.is_closed():
+                            # Cancel any pending tasks
+                            try:
+                                pending = asyncio.all_tasks(loop)
+                            except RuntimeError:
+                                # Loop may be closed by now
+                                pending = set()
+                            for task in pending:
+                                task.cancel()
+                            # Allow cancelled tasks to complete only if loop is open
+                            if pending and not loop.is_closed():
+                                try:
+                                    loop.run_until_complete(
+                                        asyncio.gather(*pending, return_exceptions=True)
+                                    )
+                                except RuntimeError:
+                                    pass  # Loop already closed
                     except Exception:
                         pass  # Ignore cleanup errors
                     finally:
                         try:
-                            loop.close()
+                            if not loop.is_closed():
+                                loop.close()
                         except Exception:
                             pass  # Ignore close errors
 
