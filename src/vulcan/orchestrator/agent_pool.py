@@ -3544,7 +3544,15 @@ class AgentPoolManager:
         
         # FIX: Default to SYMBOLIC instead of UNKNOWN for unrecognized task types
         # SYMBOLIC includes language reasoning which can handle most general queries
-        return task_to_reasoning_map.get(task_type.lower(), ReasoningType.SYMBOLIC)
+        result = task_to_reasoning_map.get(task_type.lower())
+        if result is None:
+            # Log warning for unrecognized task types to help identify missing mappings
+            logger.warning(
+                f"[AgentPool] Unrecognized task type '{task_type}' - "
+                f"falling back to SYMBOLIC. Consider adding explicit mapping."
+            )
+            return ReasoningType.SYMBOLIC
+        return result
     
     def _calculate_task_complexity(
         self, 
