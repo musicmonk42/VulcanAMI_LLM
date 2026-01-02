@@ -55,7 +55,7 @@ import threading
 import time
 import traceback
 from collections import OrderedDict
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
@@ -208,6 +208,15 @@ class VulcanReasoningOutput:
             f"VulcanReasoningOutput({status} query_id={self.query_id!r}, "
             f"result_type={self.result_type!r}, confidence={self.confidence:.2f})"
         )
+
+
+# ============================================================
+# UTILITY FUNCTIONS
+# ============================================================
+
+def _get_task_name(task: asyncio.Task) -> str:
+    """Get the name of an asyncio Task safely."""
+    return task.get_name() if hasattr(task, 'get_name') else "unknown"
 
 
 # ============================================================
@@ -1181,11 +1190,9 @@ class HybridLLMExecutor:
         )
         
         # GRACEFUL DEGRADATION FIX: Provide a user-friendly error message
-        # Generate a unique error reference for tracking
-        import hashlib
-        import time as time_module
+        # Generate a unique error reference for tracking (use time_ns for better uniqueness)
         error_ref = hashlib.sha256(
-            f"{time_module.time()}:{prompt[:50]}".encode()
+            f"{time.time_ns()}:{prompt[:50]}".encode()
         ).hexdigest()[:12].upper()
         
         error_text = (
@@ -1279,11 +1286,9 @@ class HybridLLMExecutor:
         )
         systems_used.append("vulcan_local_llm_failed")
         
-        # Generate error reference
-        import hashlib
-        import time as time_module
+        # Generate error reference (use time_ns for better uniqueness)
         error_ref = hashlib.sha256(
-            f"{time_module.time()}:{prompt[:50]}".encode()
+            f"{time.time_ns()}:{prompt[:50]}".encode()
         ).hexdigest()[:12].upper()
         
         error_text = (
@@ -1378,7 +1383,7 @@ class HybridLLMExecutor:
                         # Check if result is a valid dict with text
                         if isinstance(result, dict) and self._is_valid_response(result.get("text")):
                             # Determine source from task name (with fallback for safety)
-                            task_name = task.get_name() if hasattr(task, 'get_name') else None
+                            task_name = _get_task_name(task)
                             source = "local" if task_name == "local_llm_task" else "openai"
                             result["source"] = f"parallel_{source}"
                             elapsed = time.perf_counter() - start_time
@@ -1395,11 +1400,11 @@ class HybridLLMExecutor:
                             return result
                         else:
                             # Task completed but with invalid result, log it
-                            task_name = task.get_name() if hasattr(task, 'get_name') else "unknown"
+                            task_name = _get_task_name(task)
                             elapsed = time.perf_counter() - start_time
                             self.logger.warning(f"[HybridExecutor] Task {task_name} completed but returned invalid result after {elapsed:.2f}s")
                     except Exception as e:
-                        task_name = task.get_name() if hasattr(task, 'get_name') else "unknown"
+                        task_name = _get_task_name(task)
                         self.logger.warning(f"[HybridExecutor] Task {task_name} failed with exception: {e}")
                 
                 # Remove completed tasks from set and continue waiting for others
@@ -1452,13 +1457,12 @@ class HybridLLMExecutor:
         
         Returns a dict with 'text' and 'source' keys for parallel mode.
         """
-        import time as time_module
-        start = time_module.perf_counter()
+        start = time.perf_counter()
         self.logger.info("[HybridExecutor] Local LLM task started")
         
         text = await self._call_local_llm(loop, prompt, max_tokens)
         
-        elapsed = time_module.perf_counter() - start
+        elapsed = time.perf_counter() - start
         if text and self._is_valid_response(text):
             self.logger.info(f"[HybridExecutor] ✓ Local LLM task completed successfully in {elapsed:.2f}s (len={len(text)})")
             return {
@@ -1477,15 +1481,14 @@ class HybridLLMExecutor:
         
         Returns a dict with 'text' and 'source' keys for parallel mode.
         """
-        import time as time_module
-        start = time_module.perf_counter()
+        start = time.perf_counter()
         self.logger.info("[HybridExecutor] OpenAI task started")
         
         text = await self._call_openai(
             loop, prompt, max_tokens, temperature, system_prompt, conversation_history
         )
         
-        elapsed = time_module.perf_counter() - start
+        elapsed = time.perf_counter() - start
         if text and self._is_valid_response(text):
             self.logger.info(f"[HybridExecutor] ✓ OpenAI task completed successfully in {elapsed:.2f}s (len={len(text)})")
             return {
@@ -1532,7 +1535,6 @@ class HybridLLMExecutor:
         within the timeout period.
         """
         import traceback
-        import time as time_module
         
         # Check if local LLM should be skipped (default: False, VULCAN runs first)
         if _should_skip_local_llm():
@@ -1577,23 +1579,34 @@ class HybridLLMExecutor:
             
             self.logger.info(f"[HybridExecutor] Calling generate(prompt_len={len(prompt)}, max_tokens={effective_max_tokens})...")
             self.logger.info(f"[HybridExecutor] Using HARD timeout: {self.vulcan_timeout}s")
-            start_time = time_module.perf_counter()
+            start_time = time.perf_counter()
             
-            # HARD TIMEOUT FIX: Use ThreadPoolExecutor for TRUE hard timeout
-            # asyncio.wait_for() only checks between await points
-            # ThreadPoolExecutor.submit().result(timeout=X) fires even on sync blocks
+            # PARALLEL MODE FIX: Use non-blocking async pattern for concurrent execution
+            # Previous implementation used blocking future.result() which prevented the
+            # asyncio event loop from running other tasks (like OpenAI task in parallel mode).
+            # 
+            # New approach:
+            # 1. Submit the work to ThreadPoolExecutor (this is async-friendly)
+            # 2. Use loop.run_in_executor to wait without blocking the event loop
+            # 3. Wrap in asyncio.wait_for() for timeout handling
+            #
+            # This ensures OpenAI task can run concurrently with local LLM task.
             def generate_sync():
                 return self.local_llm.generate(prompt, effective_max_tokens)
             
-            future = self._timeout_executor.submit(generate_sync)
             try:
-                result = future.result(timeout=self.vulcan_timeout)
-            except FuturesTimeoutError:
-                self.logger.error(f"[HybridExecutor] ❌ HARD TIMEOUT after {self.vulcan_timeout}s!")
-                future.cancel()
+                # ASYNC-FRIENDLY WAITING: Use run_in_executor to avoid blocking the event loop
+                # This allows other asyncio tasks (like OpenAI) to run concurrently
+                self.logger.info("[HybridExecutor] Starting async-friendly local LLM generation...")
+                result = await asyncio.wait_for(
+                    loop.run_in_executor(self._timeout_executor, generate_sync),
+                    timeout=self.vulcan_timeout
+                )
+            except asyncio.TimeoutError:
+                self.logger.error(f"[HybridExecutor] ❌ ASYNC TIMEOUT after {self.vulcan_timeout}s!")
                 return None
             
-            elapsed = time_module.perf_counter() - start_time
+            elapsed = time.perf_counter() - start_time
             self.logger.info(f"[HybridExecutor] generate() returned in {elapsed:.2f}s")
 
             # Handle None result (returned when event loop conflict is detected)
@@ -1650,7 +1663,6 @@ class HybridLLMExecutor:
         - 30-token response: ~15s instead of TIMEOUT
         """
         import traceback
-        import time as time_module
         
         if _should_skip_local_llm():
             self.logger.warning(
@@ -1675,7 +1687,7 @@ class HybridLLMExecutor:
         
         try:
             self.logger.info(f"[HybridExecutor] Calling generate_fast(prompt_len={len(prompt)}, max_tokens={max_tokens})...")
-            start_time = time_module.perf_counter()
+            start_time = time.perf_counter()
             
             # Use generate_fast which skips reasoning hooks
             def generate_fast_sync():
@@ -1684,16 +1696,19 @@ class HybridLLMExecutor:
             # Use hard timeout (should be faster than standard generate)
             # Fast mode uses FAST_MODE_MAX_TIMEOUT_SECONDS since no reasoning hooks run
             fast_timeout = min(self.vulcan_timeout, FAST_MODE_MAX_TIMEOUT_SECONDS)
-            future = self._timeout_executor.submit(generate_fast_sync)
             
+            # PARALLEL MODE FIX: Use non-blocking async pattern
             try:
-                result = future.result(timeout=fast_timeout)
-            except FuturesTimeoutError:
-                self.logger.error(f"[HybridExecutor] ❌ FAST MODE TIMEOUT after {fast_timeout}s!")
-                future.cancel()
+                self.logger.info("[HybridExecutor] Starting async-friendly fast generation...")
+                result = await asyncio.wait_for(
+                    loop.run_in_executor(self._timeout_executor, generate_fast_sync),
+                    timeout=fast_timeout
+                )
+            except asyncio.TimeoutError:
+                self.logger.error(f"[HybridExecutor] ❌ FAST MODE ASYNC TIMEOUT after {fast_timeout}s!")
                 return None
             
-            elapsed = time_module.perf_counter() - start_time
+            elapsed = time.perf_counter() - start_time
             self.logger.info(f"[HybridExecutor] generate_fast() completed in {elapsed:.2f}s")
             
             if result is None:
@@ -2398,8 +2413,6 @@ Write a natural, helpful response based on VULCAN's results."""
             - first_token_time_ms: float - Time to first token (if available)
             - error: str - Error message if warm-up failed
         """
-        import time as time_module
-        
         result = {
             "success": False,
             "warmup_time_ms": 0.0,
@@ -2413,7 +2426,7 @@ Write a natural, helpful response based on VULCAN's results."""
             return result
         
         self.logger.info("[HybridExecutor] Starting LLM warm-up to reduce cold start latency...")
-        start_time = time_module.perf_counter()
+        start_time = time.perf_counter()
         
         try:
             # Run a minimal generation to prime the system
@@ -2435,7 +2448,7 @@ Write a natural, helpful response based on VULCAN's results."""
             result["error"] = f"Warm-up failed: {type(e).__name__}: {str(e)}"
             self.logger.warning(f"[HybridExecutor] Warm-up error: {result['error']}")
         
-        elapsed_ms = (time_module.perf_counter() - start_time) * 1000
+        elapsed_ms = (time.perf_counter() - start_time) * 1000
         result["warmup_time_ms"] = elapsed_ms
         
         if result["success"]:

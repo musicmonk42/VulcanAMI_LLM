@@ -11,6 +11,7 @@ Provides a chat interface that integrates all VULCAN platform components:
 - LLM Core
 """
 
+import asyncio
 import logging
 import time
 from typing import Any, Dict, List, Optional
@@ -618,8 +619,6 @@ class VulcanChatEngine:
         - Fallback: OpenAI when internal LLM fails
         - Automatic fallback to internal LLM when OpenAI is down
         """
-        import asyncio
-        
         # Build context for the LLM
         context_parts = []
 
@@ -693,16 +692,17 @@ class VulcanChatEngine:
                         conversation_history=conversation_history if conversation_history else None,
                     )
                 
-                # Check if we're already in an event loop
+                # Safely run async code from sync context
+                # Handle both cases: running within existing event loop and standalone
                 try:
+                    # Try to get existing event loop
                     loop = asyncio.get_running_loop()
-                    # We're in an async context, create a task
-                    import concurrent.futures
-                    with concurrent.futures.ThreadPoolExecutor() as pool:
-                        future = pool.submit(asyncio.run, _async_generate())
-                        result = future.result(timeout=60)
+                    # We're already in an async context - use run_coroutine_threadsafe
+                    # This schedules the coroutine on the existing loop safely
+                    future = asyncio.run_coroutine_threadsafe(_async_generate(), loop)
+                    result = future.result(timeout=120)  # 2 minute timeout
                 except RuntimeError:
-                    # No running loop, we can use asyncio.run directly
+                    # No running event loop - safe to use asyncio.run()
                     result = asyncio.run(_async_generate())
                 
                 if result and result.get("text"):
