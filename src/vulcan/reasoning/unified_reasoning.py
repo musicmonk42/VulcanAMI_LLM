@@ -735,8 +735,11 @@ class UnifiedReasoner:
         try:
             from .mathematical_computation import MathematicalComputationTool
             
-            # Try to get the LLM client from the hybrid executor singleton
+            # Try to get the LLM client from multiple sources
+            # FIX TASK 4: Try multiple sources for LLM client
             llm_client = None
+            
+            # Source 1: Hybrid executor singleton
             try:
                 from vulcan.llm import get_hybrid_executor
                 hybrid_executor = get_hybrid_executor()
@@ -749,6 +752,27 @@ class UnifiedReasoner:
                 logger.debug("Hybrid executor not available for mathematical computation tool")
             except Exception as e:
                 logger.debug(f"Failed to get LLM from hybrid executor: {e}")
+            
+            # Source 2: Try to get from singletons if hybrid executor didn't have it
+            if llm_client is None:
+                try:
+                    from vulcan.reasoning.singletons import get_llm_client
+                    llm_client = get_llm_client()
+                    if llm_client is not None:
+                        logger.info("Mathematical computation tool will use LLM from singletons")
+                except (ImportError, AttributeError):
+                    pass
+            
+            # Source 3: Try to get from main's global
+            if llm_client is None:
+                try:
+                    from vulcan import main
+                    if hasattr(main, 'global_llm_client'):
+                        llm_client = main.global_llm_client
+                        if llm_client is not None:
+                            logger.info("Mathematical computation tool will use LLM from main.global_llm_client")
+                except (ImportError, AttributeError):
+                    pass
             
             math_tool = MathematicalComputationTool(
                 llm=llm_client,  # Pass the actual LLM client instead of None

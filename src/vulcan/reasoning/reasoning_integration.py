@@ -145,6 +145,69 @@ QUERY_TYPE_STRATEGY_MAP: Dict[str, str] = {
     "general": "direct",
 }
 
+# ==================================================================
+# FIX TASK 3: Map query routes to reasoning types
+# Production logs showed reasoning returning type=UNKNOWN with confidence=0.1
+# because the system didn't know how to map route types to reasoning types.
+# This mapping ensures proper reasoning type classification.
+# ==================================================================
+ROUTE_TO_REASONING_TYPE: Dict[str, str] = {
+    # Fast-path routes from query_router.py
+    "PHILOSOPHICAL-FAST-PATH": "philosophical",  # Philosophical queries use philosophical reasoning
+    "MATH-FAST-PATH": "mathematical",            # Math queries use mathematical reasoning
+    "CAUSAL-PATH": "causal",                     # Causal queries use causal reasoning
+    "IDENTITY-FAST-PATH": "symbolic",            # Identity queries use symbolic reasoning
+    "CONVERSATIONAL-FAST-PATH": "hybrid",        # Conversational uses hybrid
+    "FACTUAL-FAST-PATH": "probabilistic",        # Factual queries use probabilistic
+    # QueryType enum values from query_router.py
+    "philosophical": "philosophical",            # PHILOSOPHICAL query type
+    "mathematical": "mathematical",              # MATHEMATICAL query type
+    "causal": "causal",                          # CAUSAL query type
+    "identity": "symbolic",                      # IDENTITY query type
+    "conversational": "hybrid",                  # CONVERSATIONAL query type
+    "factual": "probabilistic",                  # FACTUAL query type
+    "general": "hybrid",                         # GENERAL query type (default)
+    "reasoning": "causal",                       # Generic reasoning
+    "execution": "symbolic",                     # Execution tasks
+    # Legacy/fallback mappings
+    "HYBRID": "hybrid",
+    "UNKNOWN": "hybrid",
+}
+
+
+def get_reasoning_type_from_route(query_type: str, route: Optional[str] = None) -> str:
+    """
+    Get the appropriate reasoning type from query route or query type.
+    
+    FIX TASK 3: This function ensures proper reasoning type classification
+    instead of returning UNKNOWN with confidence=0.1.
+    
+    Args:
+        query_type: The query type (e.g., "reasoning", "philosophical", "mathematical")
+        route: Optional route string (e.g., "PHILOSOPHICAL-FAST-PATH")
+        
+    Returns:
+        Reasoning type string (e.g., "symbolic", "causal", "mathematical")
+    """
+    # Try route first (more specific)
+    if route:
+        route_upper = route.upper()
+        if route_upper in ROUTE_TO_REASONING_TYPE:
+            return ROUTE_TO_REASONING_TYPE[route_upper]
+    
+    # Try query_type (case-insensitive)
+    if query_type:
+        query_type_lower = query_type.lower()
+        if query_type_lower in ROUTE_TO_REASONING_TYPE:
+            return ROUTE_TO_REASONING_TYPE[query_type_lower]
+    
+    # Default to hybrid for unknown types
+    logger.debug(
+        f"{LOG_PREFIX} Unknown query_type='{query_type}' route='{route}', "
+        f"defaulting to 'hybrid' reasoning type"
+    )
+    return "hybrid"
+
 
 @dataclass
 class ReasoningResult:
