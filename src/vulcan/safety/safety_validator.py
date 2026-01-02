@@ -102,6 +102,41 @@ HYPOTHETICAL_INDICATORS = frozenset({
     "solve", "calculate", "compute",
 })
 
+# ==================================================================
+# FIX: Ethical Discourse Indicators
+# Ethical hypotheticals, thought experiments, and philosophical questions
+# should be ALLOWED - they are academic discourse, not harmful content.
+# Production logs showed these queries being successfully processed before.
+# ==================================================================
+ETHICAL_DISCOURSE_INDICATORS = frozenset({
+    # Academic/philosophical framing
+    "thought experiment",
+    "ethical dilemma",
+    "moral philosophy",
+    "philosophical question",
+    "hypothetical scenario",
+    "academic exercise",
+    "theoretical scenario",
+    # Structured ethical questions
+    "you are given perfect evidence",
+    "choose one of the following",
+    "is it permissible",
+    "is it ethical",
+    "would you",
+    "should you",
+    "do you implement",
+    # Known ethical test patterns
+    "trolley problem",
+    "extinction scenario",
+    "catastrophic risk",
+    "governance trade-off",
+    # Research/analysis framing  
+    "analyze this scenario",
+    "consider the following",
+    "reasoning consistency",
+    "answer yes or no",
+})
+
 # Reasoning tools that should be allowed for mathematical scenarios
 MATHEMATICAL_REASONING_TOOLS = frozenset({
     "probabilistic", "symbolic", "causal",
@@ -1648,6 +1683,20 @@ class EnhancedSafetyValidator(SafetyValidator):
             logger.debug(
                 f"[Safety] Detected mathematical scenario - reducing medical false positives"
             )
+        
+        # ==================================================================
+        # FIX: Ethical Discourse Detection - Allow thought experiments/moral philosophy
+        # VULCAN was refusing ethical hypotheticals that were successfully answered
+        # in production logs from 2026-01-02. Ethical discourse should be ALLOWED.
+        # ==================================================================
+        is_ethical_discourse = self.is_ethical_discourse(query)
+        if is_ethical_discourse:
+            context["is_ethical_discourse"] = True
+            # Log the detection for monitoring
+            logger.info(
+                f"[Safety] Detected ethical discourse/thought experiment - "
+                f"allowing academic engagement (query_len={len(query)})"
+            )
 
         for validator in self.llm_validators:
             try:
@@ -1667,6 +1716,18 @@ class EnhancedSafetyValidator(SafetyValidator):
                     if is_math_scenario and validator_name in ("MedicalValidator", "HIPAAValidator", "ComplianceValidator"):
                         logger.debug(
                             f"[Safety] Skipping {validator_name} for mathematical scenario"
+                        )
+                        continue
+                    
+                    # ==================================================================
+                    # FIX: Skip EthicalValidator for ethical discourse
+                    # Thought experiments and philosophical questions should not be blocked
+                    # by EthicalValidator - engaging with them IS ethical behavior
+                    # ==================================================================
+                    if is_ethical_discourse and validator_name == "EthicalValidator":
+                        logger.info(
+                            f"[Safety] Skipping EthicalValidator for ethical discourse - "
+                            f"academic/philosophical engagement allowed"
                         )
                         continue
                     
@@ -1947,6 +2008,86 @@ class EnhancedSafetyValidator(SafetyValidator):
         if math_score >= 1 and has_math_notation:
             return True
         if is_hypothetical and math_score >= 1:
+            return True
+            
+        return False
+
+    def is_ethical_discourse(self, query: str) -> bool:
+        """
+        Detect if query is ethical discourse (thought experiments, moral philosophy).
+        
+        Ethical discourse includes:
+        - Thought experiments (trolley problem, extinction scenarios)
+        - Moral philosophy questions
+        - Academic ethical analysis
+        - Hypothetical governance scenarios
+        - Philosophical dilemmas
+        
+        These queries should be ALLOWED and engaged with analytically, as refusing
+        to discuss ethical hypotheticals is itself an ethical failure.
+        
+        FIX: VULCAN was refusing to answer ethical dilemma questions that it
+        previously answered successfully in production logs from 2026-01-02.
+        
+        Args:
+            query: The user query to analyze
+            
+        Returns:
+            True if query is ethical discourse that should be allowed
+        """
+        query_lower = query.lower()
+        
+        # Check for ethical discourse indicators
+        discourse_score = sum(
+            1 for indicator in ETHICAL_DISCOURSE_INDICATORS 
+            if indicator in query_lower
+        )
+        
+        # Strong indicators that this is academic/philosophical
+        strong_indicators = [
+            "thought experiment",
+            "ethical dilemma", 
+            "moral philosophy",
+            "hypothetical scenario",
+            "you are given perfect evidence",
+            "trolley problem",
+            "extinction scenario",
+        ]
+        has_strong_indicator = any(ind in query_lower for ind in strong_indicators)
+        
+        # Check for question framing patterns that indicate philosophical inquiry
+        question_patterns = [
+            r"is it (ethical|permissible|moral)",
+            r"should (you|one|we)",
+            r"would (you|it be)",
+            r"do you implement",
+            r"choose (one of|between)",
+            r"answer (yes|no)",
+        ]
+        has_question_pattern = any(
+            re.search(pattern, query_lower) 
+            for pattern in question_patterns
+        )
+        
+        # Return True if this is ethical discourse
+        # Either: strong indicator, 2+ discourse indicators, or 1 indicator + question pattern
+        if has_strong_indicator:
+            logger.info(
+                f"[SafetyValidator] Detected ethical discourse (strong indicator) - "
+                f"allowing academic engagement"
+            )
+            return True
+        if discourse_score >= 2:
+            logger.info(
+                f"[SafetyValidator] Detected ethical discourse ({discourse_score} indicators) - "
+                f"allowing academic engagement"
+            )
+            return True
+        if discourse_score >= 1 and has_question_pattern:
+            logger.info(
+                f"[SafetyValidator] Detected ethical discourse (indicator + question pattern) - "
+                f"allowing academic engagement"
+            )
             return True
             
         return False

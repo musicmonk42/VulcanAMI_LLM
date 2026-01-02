@@ -1240,14 +1240,25 @@ def get_llm_client() -> Optional[Any]:
         except Exception as e:
             logger.debug(f"[Singletons] Failed to get LLM from hybrid executor: {e}")
         
-        # Try global GraphixVulcanLLM
+        # Try global GraphixVulcanLLM singleton getter if available
         try:
             from vulcan.llm import GraphixVulcanLLM
-            # Check if there's a global instance
-            if hasattr(GraphixVulcanLLM, '_instance') and GraphixVulcanLLM._instance is not None:
-                _llm_client = GraphixVulcanLLM._instance
-                logger.info("[Singletons] ✓ LLM client obtained from GraphixVulcanLLM singleton")
-                return _llm_client
+            # Try to use a public singleton getter if available
+            if hasattr(GraphixVulcanLLM, 'get_instance'):
+                instance = GraphixVulcanLLM.get_instance()
+                if instance is not None:
+                    _llm_client = instance
+                    logger.info("[Singletons] ✓ LLM client obtained from GraphixVulcanLLM.get_instance()")
+                    return _llm_client
+            # Fallback: Try to get from module-level singleton registry
+            # Note: Accessing internal attributes is not ideal but may be necessary
+            # for backward compatibility with existing code patterns
+            elif hasattr(GraphixVulcanLLM, 'default_instance'):
+                instance = GraphixVulcanLLM.default_instance
+                if instance is not None:
+                    _llm_client = instance
+                    logger.info("[Singletons] ✓ LLM client obtained from GraphixVulcanLLM.default_instance")
+                    return _llm_client
         except ImportError:
             pass
         except Exception as e:

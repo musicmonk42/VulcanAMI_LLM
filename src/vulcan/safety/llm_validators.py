@@ -386,6 +386,10 @@ class EthicalValidator(BaseValidator):
         FIX: Added source-based risk reduction for internal platform calls.
         Arena, agent, and internal sources get reduced sensitivity to avoid
         blocking legitimate platform operations.
+        
+        FIX: Added ethical discourse detection - thought experiments and
+        philosophical questions should have significantly reduced risk as
+        engaging with them is legitimate academic discourse.
         """
         text = self._normalize(token)
         risk = 0.0
@@ -405,6 +409,20 @@ class EthicalValidator(BaseValidator):
         if intent in ("educational", "safety_training"):
             # Lower risk if context is educational
             risk *= 0.5
+        
+        # ==================================================================
+        # FIX: Ethical discourse detection - significantly reduce risk for
+        # thought experiments, philosophical questions, and academic discourse
+        # These should NOT be blocked - engaging with them is ethical behavior
+        # ==================================================================
+        is_ethical_discourse = context.get("is_ethical_discourse", False)
+        if is_ethical_discourse:
+            # Major reduction for ethical discourse - this is academic discussion
+            risk *= 0.1
+            logger.debug(
+                f"[EthicalValidator] Ethical discourse detected - risk reduced "
+                f"to allow academic engagement"
+            )
         
         # FIX: Reduce risk for internal platform calls (arena, agent, internal)
         # These are trusted sources that shouldn't be blocked by false positives

@@ -216,6 +216,12 @@ DEFAULT_DLQ_SIZE = 100  # Maximum entries in dead letter queue
 STUCK_JOB_WARNING_THRESHOLD = 0.7  # 70% of timeout
 STUCK_JOB_CRITICAL_THRESHOLD = 0.9  # 90% of timeout
 
+# FIX TASK 6: Query length thresholds for reasoning validation
+# Short queries may indicate truncation and produce poor results
+MIN_REASONING_QUERY_LENGTH = 50  # Minimum chars for valid reasoning query
+# Long queries should force reasoning even with general tools
+LONG_QUERY_REASONING_THRESHOLD = 500  # Chars above which reasoning is forced
+
 # FIXED: Add cachetools import for LRU cache with TTL
 try:
     from cachetools import TTLCache
@@ -2620,11 +2626,15 @@ class AgentPoolManager:
             # only parameters.get("query") was checked, missing "prompt" parameter
             # ==================================================================
             # Priority order: prompt > query > original_prompt > user_query
-            query = (
-                parameters.get("prompt", "") or 
-                parameters.get("query", "") or
-                parameters.get("original_prompt", "") or
-                parameters.get("user_query", "")
+            # Use explicit check for non-empty values to avoid issues with empty strings
+            query = next(
+                (v for v in [
+                    parameters.get("prompt"),
+                    parameters.get("query"),
+                    parameters.get("original_prompt"),
+                    parameters.get("user_query")
+                ] if v),  # Only take non-empty, non-None values
+                ""  # Default to empty string if all are None or empty
             )
             input_data = parameters.get("input_data") or parameters.get("input", "")
             context = parameters.get("context", {})
@@ -2645,20 +2655,20 @@ class AgentPoolManager:
             # FIX TASK 2: Also trigger reasoning for long complex queries
             # Short queries (<100 chars) are likely simple, but long queries need reasoning
             query_len = len(query) if query else 0
-            if not is_reasoning_task and query_len > 500:
+            if not is_reasoning_task and query_len > LONG_QUERY_REASONING_THRESHOLD:
                 is_reasoning_task = True
                 if not selected_tools or selected_tools == ["general"]:
                     selected_tools = ["hybrid"]  # Use hybrid for long complex queries
                 logger.info(
-                    f"[AgentPool] task {task_id}: long query ({query_len} chars) detected, "
+                    f"[AgentPool] task {task_id}: long query ({query_len} chars > {LONG_QUERY_REASONING_THRESHOLD}) detected, "
                     f"forcing reasoning with tools={selected_tools}"
                 )
             
             # FIX TASK 1: Log query length for debugging truncation issues
-            if query_len < 50 and is_reasoning_task:
+            if query_len < MIN_REASONING_QUERY_LENGTH and is_reasoning_task:
                 logger.warning(
                     f"[AgentPool] SHORT QUERY detected for reasoning task: "
-                    f"query_len={query_len} chars - this may indicate truncation! "
+                    f"query_len={query_len} chars (< {MIN_REASONING_QUERY_LENGTH}) - this may indicate truncation! "
                     f"Check parameters keys: {list(parameters.keys())}"
                 )
 
@@ -2692,9 +2702,9 @@ class AgentPoolManager:
                 )
                 
                 # FIX TASK 6: Validate query before reasoning
-                if query_len < 50:
+                if query_len < MIN_REASONING_QUERY_LENGTH:
                     logger.warning(
-                        f"[AgentPool] Task {task_id}: Query too short ({query_len} chars) - "
+                        f"[AgentPool] Task {task_id}: Query too short ({query_len} chars < {MIN_REASONING_QUERY_LENGTH}) - "
                         f"reasoning may produce poor results. Consider passing full context."
                     )
                 

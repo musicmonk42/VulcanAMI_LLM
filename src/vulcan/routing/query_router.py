@@ -2504,6 +2504,8 @@ class QueryAnalyzer:
                     timeout_seconds=MATH_QUERY_TIMEOUT_SECONDS,  # Short timeout (5s)
                     parameters={
                         "is_mathematical": True,
+                        # FIX TASK 7: Pass full query context in parameters
+                        "prompt": query,  # FIX: Explicitly include prompt in parameters
                         "skip_heavy_analysis": True,
                         "skip_arena": True,
                         # PRIORITY 4 FIX: Route to specialized mathematical tools
@@ -2511,6 +2513,11 @@ class QueryAnalyzer:
                         "preferred_tool": "probabilistic",  # Hint to use probabilistic tool
                         "mathematical_scenario_override": True,  # Safety override
                         "require_verification": True,  # Trigger mathematical verification
+                        "reasoning_context": {
+                            "original_query": query,
+                            "query_type": "mathematical",
+                            "source": source,
+                        },
                     },
                 )
             ]
@@ -2583,15 +2590,23 @@ class QueryAnalyzer:
                     timeout_seconds=PHILOSOPHICAL_TIMEOUT_SECONDS,
                     parameters={
                         "is_philosophical": True,
+                        # FIX TASK 7: Pass full query context in parameters
+                        # Agent pool extracts query from parameters["prompt"] or parameters["query"]
+                        "prompt": query,  # FIX: Explicitly include prompt in parameters
                         "skip_heavy_analysis": True,
                         "skip_arena": True,
-                        "tools": ["general"],
+                        "tools": ["symbolic", "causal"],  # FIX: Use proper tools instead of general
                         "response_type": "conversational",
+                        "reasoning_context": {
+                            "original_query": query,
+                            "query_type": "philosophical",
+                            "source": source,
+                        },
                     },
                 )
             ]
 
-            plan.telemetry_data["selected_tools"] = ["general"]
+            plan.telemetry_data["selected_tools"] = ["symbolic", "causal"]  # FIX: Match actual tools
             plan.telemetry_data["reasoning_strategy"] = "philosophical_lightweight"
 
             logger.info(
