@@ -1,5 +1,8 @@
 # VULCAN Generation Configuration
 # This file contains tunable parameters for token generation and performance optimization
+# CPU CLOUD FIX: Default max_tokens reduced from 2000 to 50 to prevent timeout on CPU instances.
+# At ~500ms per token, 50 tokens takes ~25 seconds, ensuring completion within the 300s timeout.
+# Set VULCAN_CPU_MAX_TOKENS environment variable to override for GPU environments.
 
 generation:
   # Sampling parameters
@@ -13,7 +16,11 @@ generation:
   allow_repetition: false   # Whether to allow repeated tokens
   
   # Generation limits
-  max_tokens: 2000          # Maximum tokens to generate (increased for diagnostic purposes)
+  # CPU CLOUD FIX: Reduced from 2000 to 50 to prevent timeout on CPU-only instances
+  # At ~500ms per token on CPU, max_tokens of 2000 would take ~1000s (16+ minutes)
+  # Reduced to 50 tokens (~25 seconds) to ensure completion within timeout
+  # Override via VULCAN_CPU_MAX_TOKENS environment variable for GPU environments
+  max_tokens: 50            # Maximum tokens to generate (reduced for CPU cloud)
   min_tokens: 1             # Minimum tokens to generate
   
   # Stopping conditions

@@ -67,9 +67,11 @@ query routing delays, cascade timeouts, and learning system issues.
 | ARENA_COMPLEXITY_THRESHOLD | No | Complexity threshold for Arena fast-path skip | "0.1" |
 | VULCAN_SELF_IMPROVEMENT_AUTO_COMMIT | No | Auto-commit self-improvements to Git | "false" |
 | VULCAN_GAP_GIVEUP_THRESHOLD | No | Attempts before marking gap as deferred | "10" |
-| VULCAN_LLM_HARD_TIMEOUT | No | Hard timeout for VULCAN LLM operations (seconds) | "120.0" |
+| VULCAN_LLM_HARD_TIMEOUT | No | Hard timeout for VULCAN LLM operations (seconds) | "300.0" |
 | VULCAN_LLM_PER_TOKEN_TIMEOUT | No | Per-token timeout for CPU execution (seconds) | "30.0" |
+| VULCAN_CPU_MAX_TOKENS | No | Max tokens limit for CPU execution | "50" |
 | GRAPHIX_VULCAN_TIMEOUT | No | GraphixVulcanLLM generation timeout (seconds) | "120.0" |
+| MIN_AGENTS | No | Minimum number of agents in pool | "2" |
 | OPENAI_LANGUAGE_ONLY | No | Restrict OpenAI to language-only operations | "true" |
 | OPENAI_LANGUAGE_FORMATTING | No | Route output formatting to OpenAI (fast ~2-5s) | "true" |
 | OPENAI_LANGUAGE_POLISH | No | Enable OpenAI for output polishing (legacy) | "false" |
@@ -96,13 +98,21 @@ query routing delays, cascade timeouts, and learning system issues.
 - **VULCAN_GAP_GIVEUP_THRESHOLD**: Increased from 3 to 10 to prevent premature give-up
   on complex learning gaps.
 
-- **VULCAN_LLM_HARD_TIMEOUT**: Hard timeout (120s) for VULCAN LLM operations.
+- **VULCAN_LLM_HARD_TIMEOUT**: Hard timeout (300s) for VULCAN LLM operations.
   This prevents indefinite hangs during CPU-intensive language generation. The internal LLM
-  can take 3+ seconds per token on CPU. Note: The internal LLM is for language
+  can take 500ms+ per token on CPU. Increased from 120s to 300s to allow ~600 tokens on
+  CPU-only cloud instances. Note: The internal LLM is for language
   generation, not reasoning. Reasoning is done by VULCAN's reasoning systems.
 
 - **VULCAN_LLM_PER_TOKEN_TIMEOUT**: Per-token timeout (30s) for CPU execution.
   Allows for slower token generation on CPU-bound systems.
+
+- **VULCAN_CPU_MAX_TOKENS**: Maximum tokens (50) for local LLM generation on CPU.
+  At ~500ms per token, 50 tokens takes ~25 seconds, ensuring completion within timeout.
+  Override via environment variable for GPU environments (e.g., VULCAN_CPU_MAX_TOKENS=500).
+
+- **MIN_AGENTS**: Minimum agents (2) in the agent pool. Reduced from 5 to reduce
+  context-switching overhead on CPU-only cloud instances.
 
 **OpenAI Language-Only Architecture:**
 

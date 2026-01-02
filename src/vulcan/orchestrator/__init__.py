@@ -630,18 +630,22 @@ def create_orchestrator(config, sys, deps, variant="basic", redis_client=None):
         return VULCANAGICollective(config, sys, deps, redis_client=redis_client)
 
 
-def create_agent_pool(max_agents=10, min_agents=5, task_queue_type="custom", redis_client=None):
+def create_agent_pool(max_agents=10, min_agents=2, task_queue_type="custom", redis_client=None):
     """
     Convenience function to create an agent pool
 
     Args:
         max_agents: Maximum number of agents (default: 10, reduced from 100 for CPU optimization)
-        min_agents: Minimum number of agents (default: 5, reduced from 10 for CPU optimization)
+        min_agents: Minimum number of agents (default: 2, reduced from 5 for CPU cloud optimization)
         task_queue_type: Type of task queue ('ray', 'celery', 'custom')
         redis_client: Optional Redis client for state persistence across workers/restarts
 
     Returns:
         AgentPoolManager instance
+    
+    Note:
+        CPU CLOUD FIX: min_agents reduced from 5 to 2 to reduce context-switching
+        overhead on CPU-only cloud instances.
     """
     return AgentPoolManager(max_agents, min_agents, task_queue_type, redis_client=redis_client)
 

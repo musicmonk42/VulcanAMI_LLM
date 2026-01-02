@@ -27,8 +27,9 @@ class TestSimpleModeConfiguration:
         
         assert sm.SIMPLE_MODE is False
         assert sm.SKIP_BERT_EMBEDDINGS is False
-        assert sm.DEFAULT_MIN_AGENTS == 10
-        assert sm.DEFAULT_MAX_AGENTS == 100
+        # CPU CLOUD FIX: DEFAULT_MIN_AGENTS reduced from 10 to 2 for CPU optimization
+        assert sm.DEFAULT_MIN_AGENTS == 2
+        assert sm.DEFAULT_MAX_AGENTS == 10
         assert sm.MAX_PROVENANCE_RECORDS == 1000
         assert sm.AGENT_CHECK_INTERVAL == 30
 
