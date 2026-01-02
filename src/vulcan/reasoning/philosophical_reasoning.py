@@ -365,7 +365,8 @@ class FormulaParser:
     Example:
         >>> parser = FormulaParser("O(P(x) → Q(x))")
         >>> ast = parser.parse()
-        # Returns: DeonticOp(O, BinaryOp(→, DeonticOp(P, Atom(x)), Atom(Q(x))))
+        # Returns: DeonticOp(O, BinaryOp(→, DeonticOp(P, Atom('x')), Atom('Q(x)')))
+        # Note: Q(x) is parsed as an atom since Q is not a deontic operator (O/P/F)
     """
     
     def __init__(self, text: str):
@@ -1529,10 +1530,11 @@ class DeonticParadoxDetector:
                     f2.operator == DeonticOperator.OBLIGATION and
                     f2.condition is not None):
                     
-                    # Check if condition matches the prohibited action
-                    if str(f2.condition) == str(prohibited):
-                        # Check if the violation is asserted
-                        if prohibited in formulas or Atom(str(prohibited)) in formulas:
+                    # Check if condition matches the prohibited action (use string comparison for consistency)
+                    prohibited_str = str(prohibited)
+                    if str(f2.condition) == prohibited_str:
+                        # Check if the violation is asserted (use string comparison for consistency)
+                        if any(str(f) == prohibited_str for f in formulas):
                             return ParadoxResult(
                                 name="Contrary-to-Duty Paradox",
                                 detected=True,
@@ -2090,11 +2092,11 @@ Dominance relations found:
         chain_id: str,
         steps: List[ReasoningStep],
     ) -> ReasoningResult:
-        """Attempt formal proof."""
+        """Attempt formal proof using both deontic engine and tableau prover."""
         if not formulas:
             return self._reason_general(query, chain_id, steps)
         
-        # Try to derive each formula
+        # Try to derive each formula using deontic engine
         proof_results = []
         overall_success = False
         
@@ -2112,6 +2114,30 @@ Dominance relations found:
                 overall_success = True
                 with self._lock:
                     self._stats['formal_proofs'] += 1
+        
+        # Also try tableau prover for AST-based formulas
+        tableau_results = []
+        try:
+            # Parse formulas into AST if possible and attempt tableau proof
+            for formula in formulas:
+                try:
+                    ast_formula = parse_formula(str(formula))
+                    proven, trace = self.tableau_prover.prove(ast_formula)
+                    tableau_results.append({
+                        'formula': str(formula),
+                        'tableau_proven': proven,
+                        'trace_length': len(trace),
+                    })
+                    if proven:
+                        with self._lock:
+                            self._stats['tableau_proofs'] += 1
+                        if not overall_success:
+                            overall_success = True
+                except ValueError:
+                    # Formula couldn't be parsed for tableau, skip
+                    pass
+        except Exception as e:
+            logger.debug(f"Tableau proof attempt failed: {e}")
         
         confidence = CONFIDENCE_FORMAL_PROOF if overall_success else CONFIDENCE_PARTIAL_ANALYSIS
         
@@ -2131,6 +2157,7 @@ Dominance relations found:
                 'type': 'formal_proof',
                 'success': overall_success,
                 'proof_results': proof_results,
+                'tableau_results': tableau_results,
             },
             confidence=confidence,
             reasoning_type=ReasoningType.PHILOSOPHICAL,
