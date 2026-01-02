@@ -114,11 +114,12 @@ class VULCANAGICollective:
         self._shutdown_event = threading.Event()
 
         # Initialize agent pool
-        # CPU OPTIMIZATION: Default reduced from min=10/max=100 to min=5/max=10
+        # CPU OPTIMIZATION: Default reduced from min=10/max=100 to min=2/max=10
+        # CPU CLOUD FIX: Reduced min_agents from 5 to 2 to reduce context-switching overhead
         # BUG FIX: Pass redis_client for state persistence across workers/restarts
         self.agent_pool = AgentPoolManager(
             max_agents=getattr(config, "max_agents", 10),
-            min_agents=getattr(config, "min_agents", 5),
+            min_agents=getattr(config, "min_agents", 2),
             task_queue_type=getattr(config, "task_queue_type", "custom"),
             redis_client=redis_client,
         )

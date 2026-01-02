@@ -125,12 +125,22 @@ SKIP_LOCAL_LLM = _skip_local_llm_env in ("true", "1", "yes")
 # ============================================================
 # FIX: Increased timeouts to prevent premature timeouts during CPU-intensive
 # language generation. The internal LLM can take 3+ seconds per token on CPU.
-VULCAN_HARD_TIMEOUT = float(os.environ.get("VULCAN_LLM_HARD_TIMEOUT", "120.0"))  # 2 minutes (was 30s)
+# CPU Cloud Fix: At ~500ms per token, generating 120 tokens takes 60s which was
+# causing TimeoutError. Increased to 300s (5 minutes) to allow ~600 tokens on CPU.
+VULCAN_HARD_TIMEOUT = float(os.environ.get("VULCAN_LLM_HARD_TIMEOUT", "300.0"))  # 5 minutes (was 120s)
 PER_TOKEN_TIMEOUT = float(os.environ.get("VULCAN_LLM_PER_TOKEN_TIMEOUT", "30.0"))  # 30s per token (was 10s)
 
 # Fast mode timeout for output formatting (when reasoning is already done)
 # This can be shorter since no reasoning hooks run per-token
 FAST_MODE_MAX_TIMEOUT_SECONDS = float(os.environ.get("VULCAN_LLM_FAST_TIMEOUT", "60.0"))  # 60 seconds
+
+# ============================================================
+# CPU CLOUD EXECUTION - MAX TOKENS LIMIT
+# ============================================================
+# FIX: Limit max tokens for CPU execution to prevent timeout issues.
+# At 500ms per token, max_tokens=50 takes ~25s, ensuring completion before timeout.
+# This can be overridden via environment variable for GPU environments.
+CPU_MAX_TOKENS_DEFAULT = int(os.environ.get("VULCAN_CPU_MAX_TOKENS", "50"))
 
 # ============================================================
 # COMPONENT REGISTRY INTEGRATION
@@ -1368,6 +1378,10 @@ class HybridLLMExecutor:
         BUG #1 FIX: Added detailed error logging to expose why local model
         generation fails silently. Previously, exceptions were caught and
         logged at debug level, hiding the real cause of 100% OpenAI fallback.
+        
+        CPU CLOUD FIX: Limits max_tokens to prevent timeout on CPU-only instances.
+        At ~500ms per token, max_tokens must be limited to ensure completion
+        within the timeout period.
         """
         import traceback
         import time as time_module
@@ -1403,7 +1417,17 @@ class HybridLLMExecutor:
             self.logger.info(f"[HybridExecutor] device: {self.local_llm.device}")
 
         try:
-            self.logger.info(f"[HybridExecutor] Calling generate(prompt_len={len(prompt)}, max_tokens={max_tokens})...")
+            # CPU CLOUD FIX: Limit max_tokens to prevent timeout on CPU-only instances
+            # At ~500ms per token, generating more than CPU_MAX_TOKENS_DEFAULT tokens
+            # would exceed the timeout. This ensures completion before timeout.
+            effective_max_tokens = min(max_tokens, CPU_MAX_TOKENS_DEFAULT)
+            if effective_max_tokens < max_tokens:
+                self.logger.info(
+                    f"[HybridExecutor] CPU optimization: Limiting max_tokens from {max_tokens} "
+                    f"to {effective_max_tokens} (VULCAN_CPU_MAX_TOKENS={CPU_MAX_TOKENS_DEFAULT})"
+                )
+            
+            self.logger.info(f"[HybridExecutor] Calling generate(prompt_len={len(prompt)}, max_tokens={effective_max_tokens})...")
             self.logger.info(f"[HybridExecutor] Using HARD timeout: {self.vulcan_timeout}s")
             start_time = time_module.perf_counter()
             
@@ -1411,7 +1435,7 @@ class HybridLLMExecutor:
             # asyncio.wait_for() only checks between await points
             # ThreadPoolExecutor.submit().result(timeout=X) fires even on sync blocks
             def generate_sync():
-                return self.local_llm.generate(prompt, max_tokens)
+                return self.local_llm.generate(prompt, effective_max_tokens)
             
             future = self._timeout_executor.submit(generate_sync)
             try:
@@ -2464,6 +2488,9 @@ __all__ = [
     # Configuration constants
     "OPENAI_LANGUAGE_FORMATTING",
     "OPENAI_LANGUAGE_POLISH",
+    # CPU Cloud execution constants
+    "VULCAN_HARD_TIMEOUT",
+    "CPU_MAX_TOKENS_DEFAULT",
 ]
 
 

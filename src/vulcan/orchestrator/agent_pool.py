@@ -827,9 +827,11 @@ class AgentPoolManager:
         self.redis_client = redis_client
         
         # EMERGENCY STABILIZATION: Hardcode agent limits to reduce thread thrashing
-        # Original behavior used SIMPLE_MODE defaults, now forced to min=5, max=10
+        # CPU CLOUD FIX: Reduced min_agents from 5 to 2 to reduce context-switching
+        # overhead on CPU-only instances. The 5 agents were competing for the same
+        # CPU resources, causing forward() pass times to fluctuate significantly.
         self.max_agents = 10
-        self.min_agents = 5
+        self.min_agents = 2
         self.task_timeout_seconds = task_timeout_seconds
 
         # Agent tracking
