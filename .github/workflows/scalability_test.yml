@@ -1,0 +1,381 @@
+# ==============================================================================
+# VULCAN Scalability Stress Test Workflow
+# ==============================================================================
+#
+# This workflow runs comprehensive stress tests on the VULCAN cognitive
+# architecture to validate system behavior under various load conditions.
+#
+# Key Features:
+#   - Progressive load testing (baseline → light → medium)
+#   - Performance regression detection against baselines
+#   - Artifact collection for debugging
+#   - Automated status reporting
+#
+# Triggers:
+#   - Push to main/develop branches
+#   - Pull requests to main
+#   - Weekly scheduled runs (Sunday 2am UTC)
+#   - Manual workflow dispatch
+#
+# Author: VULCAN-AGI Team
+# Version: 1.0.0
+# ==============================================================================
+
+name: Scalability Stress Test
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'src/**'
+      - 'tests/performance/**'
+      - '.github/workflows/scalability_test.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'tests/performance/**'
+      - '.github/workflows/scalability_test.yml'
+  schedule:
+    - cron: '0 2 * * 0'  # Weekly on Sunday 2am UTC
+  workflow_dispatch:
+    inputs:
+      scenario:
+        description: 'Test scenario to run'
+        required: false
+        default: 'progressive'
+        type: choice
+        options:
+          - progressive
+          - baseline
+          - light_load
+          - medium_load
+          - heavy_load
+      skip_heavy:
+        description: 'Skip heavy_load scenario'
+        required: false
+        default: true
+        type: boolean
+      timeout_seconds:
+        description: 'Query timeout in seconds'
+        required: false
+        default: '30'
+        type: string
+
+# Prevent concurrent runs on the same branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  stress-test:
+    name: Run Stress Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      PYTHONPATH: ${{ github.workspace }}/src
+      PYTHONUNBUFFERED: '1'
+      # VULCAN configuration for testing
+      VULCAN_SIMPLE_MODE: 'true'
+      SKIP_OPENAI: 'true'
+      OPENAI_LANGUAGE_FORMATTING: 'false'
+      # Prevent atexit handlers from blocking
+      PYTEST_RUNNING: '1'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip wheel setuptools
+          pip install -r requirements.txt
+          # Install additional test dependencies
+          pip install pytest psutil
+
+      - name: Create test directories
+        run: |
+          mkdir -p test_results
+          mkdir -p artifacts
+
+      - name: Run Scalability Stress Test
+        id: stress_test
+        continue-on-error: true
+        run: |
+          set -o pipefail
+
+          # Determine configuration from inputs or defaults
+          SCENARIO="${{ github.event.inputs.scenario || 'progressive' }}"
+          SKIP_HEAVY="${{ github.event.inputs.skip_heavy || 'true' }}"
+          TIMEOUT="${{ github.event.inputs.timeout_seconds || '30' }}"
+
+          # Build command
+          CMD="python -u tests/performance/scalability_stress_test.py"
+          CMD="$CMD --scenario $SCENARIO"
+          CMD="$CMD --output test_results/stress_test_results.json"
+          CMD="$CMD --baseline tests/performance/benchmarks/baseline_v1.json"
+          CMD="$CMD --timeout $TIMEOUT"
+
+          if [ "$SKIP_HEAVY" = "true" ] && [ "$SCENARIO" = "progressive" ]; then
+            CMD="$CMD --skip-heavy"
+          fi
+
+          echo "Running: $CMD"
+          echo "scenario=$SCENARIO" >> $GITHUB_OUTPUT
+          echo "skip_heavy=$SKIP_HEAVY" >> $GITHUB_OUTPUT
+
+          # Run the stress test with output capture
+          $CMD 2>&1 | tee test_results/stress_test_output.log
+
+          # Capture exit code
+          TEST_EXIT_CODE=${PIPESTATUS[0]}
+          echo "test_exit_code=$TEST_EXIT_CODE" >> $GITHUB_OUTPUT
+
+          exit $TEST_EXIT_CODE
+
+      - name: Generate test summary
+        if: always()
+        run: |
+          echo "### 🔬 Scalability Stress Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Scenario:** ${{ steps.stress_test.outputs.scenario || 'progressive' }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Skip Heavy:** ${{ steps.stress_test.outputs.skip_heavy || 'true' }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ -f test_results/stress_test_results.json ]; then
+            python3 << 'EOF' >> $GITHUB_STEP_SUMMARY
+          import json
+          import sys
+
+          try:
+              with open('test_results/stress_test_results.json') as f:
+                  data = json.load(f)
+
+              summary = data.get('summary', {})
+              scenarios = data.get('scenarios', [])
+
+              print("| Scenario | Success Rate | Throughput | Latency P95 | Status |")
+              print("|----------|--------------|------------|-------------|--------|")
+
+              for s in scenarios:
+                  name = s.get('scenario_name', 'unknown')
+                  success_rate = s.get('success_rate', 0) * 100
+                  throughput = s.get('throughput_qps', 0)
+                  latency_p95 = s.get('latency_p95', 0)
+                  meets_sla = s.get('meets_sla', False)
+                  status = '✅ Pass' if meets_sla else '❌ Fail'
+                  print(f"| {name} | {success_rate:.1f}% | {throughput:.2f} qps | {latency_p95:.2f}s | {status} |")
+
+              print()
+              print(f"**Total Scenarios:** {summary.get('total_scenarios', 0)}")
+              print(f"**Passed Scenarios:** {summary.get('passed_scenarios', 0)}")
+              print(f"**Overall Success Rate:** {summary.get('overall_success_rate', 0) * 100:.1f}%")
+
+          except Exception as e:
+              print(f"⚠️ Error parsing results: {e}")
+              sys.exit(0)
+          EOF
+          else
+            echo "⚠️ Results file not found" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Collect system information
+        if: always()
+        run: |
+          {
+            echo "=== System Information ==="
+            echo "Date: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "Hostname: $(hostname)"
+            echo ""
+            echo "=== OS Information ==="
+            uname -a
+            echo ""
+            echo "=== Python Version ==="
+            python --version
+            echo ""
+            echo "=== CPU Information ==="
+            nproc
+            echo ""
+            echo "=== Memory Information ==="
+            free -h
+            echo ""
+            echo "=== Disk Information ==="
+            df -h .
+            echo ""
+            echo "=== Installed Packages ==="
+            pip freeze
+          } > test_results/system_info.txt
+
+          # Copy any SQLite databases for debugging
+          if [ -d "provenance_archive" ]; then
+            cp -r provenance_archive test_results/ 2>/dev/null || true
+          fi
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stress-test-results-${{ github.run_number }}
+          path: |
+            test_results/stress_test_results.json
+            test_results/stress_test_output.log
+            test_results/system_info.txt
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Upload provenance archive
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stress-test-provenance-${{ github.run_number }}
+          path: test_results/provenance_archive/
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Check test results
+        if: always()
+        run: |
+          EXIT_CODE="${{ steps.stress_test.outputs.test_exit_code }}"
+
+          if [ "$EXIT_CODE" = "0" ]; then
+            echo "✅ Stress test passed - success rate >= 95%"
+            exit 0
+          else
+            echo "❌ Stress test failed - success rate < 95%"
+
+            # Show failure summary
+            if [ -f test_results/stress_test_results.json ]; then
+              echo ""
+              echo "Failure details:"
+              python3 << 'EOF'
+          import json
+
+          try:
+              with open('test_results/stress_test_results.json') as f:
+                  data = json.load(f)
+
+              for s in data.get('scenarios', []):
+                  name = s.get('scenario_name')
+                  rate = s.get('success_rate', 0) * 100
+                  if rate < 95:
+                      print(f"  ❌ {name}: {rate:.1f}% success rate")
+                      failures = s.get('failures', [])[:3]
+                      for f in failures:
+                          error = f.get('error', 'Unknown')
+                          if len(error) > 80:
+                              error = error[:77] + '...'
+                          print(f"      - {error}")
+          except Exception as e:
+              print(f"Error reading results: {e}")
+          EOF
+            fi
+            exit 1
+          fi
+
+  # ============================================================================
+  # Regression Check Job
+  # ============================================================================
+  regression-check:
+    name: Check for Regressions
+    runs-on: ubuntu-latest
+    needs: stress-test
+    if: |
+      always() &&
+      needs.stress-test.result == 'success' &&
+      github.event_name == 'push' &&
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download test results
+        uses: actions/download-artifact@v4
+        with:
+          name: stress-test-results-${{ github.run_number }}
+          path: test_results/
+
+      - name: Check for performance regression
+        run: |
+          python3 << 'EOF'
+          import json
+          import sys
+
+          # Load baseline
+          try:
+              with open('tests/performance/benchmarks/baseline_v1.json') as f:
+                  baseline = json.load(f)
+          except FileNotFoundError:
+              print('ℹ️ No baseline found, skipping regression check')
+              sys.exit(0)
+
+          # Load results
+          try:
+              with open('test_results/stress_test_results.json') as f:
+                  results = json.load(f)
+          except FileNotFoundError:
+              print('❌ No results found')
+              sys.exit(1)
+
+          regressions = []
+          thresholds = baseline.get('regression_thresholds', {})
+
+          for scenario in results.get('scenarios', []):
+              name = scenario['scenario_name']
+              baseline_scenario = baseline.get('scenarios', {}).get(name, {})
+
+              if not baseline_scenario:
+                  continue
+
+              # Check throughput regression
+              expected_min = baseline_scenario.get('expected_throughput_min', 0)
+              tolerance = thresholds.get('throughput_degradation_tolerance', 0.1)
+              threshold = expected_min * (1 - tolerance)
+              actual = scenario.get('throughput_qps', 0)
+
+              if actual < threshold:
+                  regressions.append(
+                      f'{name}: throughput {actual:.2f} < {threshold:.2f} qps'
+                  )
+
+              # Check latency regression
+              expected_max = baseline_scenario.get('expected_latency_p95_max', float('inf'))
+              latency_tolerance = thresholds.get('latency_increase_tolerance', 0.15)
+              threshold = expected_max * (1 + latency_tolerance)
+              actual_p95 = scenario.get('latency_p95', 0)
+
+              if actual_p95 > threshold:
+                  regressions.append(
+                      f'{name}: latency p95 {actual_p95:.2f}s > {threshold:.2f}s'
+                  )
+
+              # Check success rate regression
+              expected_min = baseline_scenario.get('expected_success_rate_min', 0.9)
+              success_tolerance = thresholds.get('success_rate_degradation_tolerance', 0.05)
+              threshold = expected_min - success_tolerance
+              actual_rate = scenario.get('success_rate', 0)
+
+              if actual_rate < threshold:
+                  regressions.append(
+                      f'{name}: success rate {actual_rate*100:.1f}% < {threshold*100:.1f}%'
+                  )
+
+          if regressions:
+              print('⚠️ Performance regressions detected:')
+              for r in regressions:
+                  print(f'  - {r}')
+              sys.exit(1)
+          else:
+              print('✅ No performance regressions detected')
+              sys.exit(0)
+          EOF
