@@ -197,13 +197,42 @@ jobs:
         run: |
           set -x
           python -m pip install --no-cache-dir --upgrade pip setuptools wheel
+          
+          # ==================================================================
+          # CRITICAL: Install VULCAN as a package to enable 'import src'
+          # This fixes the "No module named 'src'" error in GitHub Actions
+          # ==================================================================
+          echo "=================================================="
+          echo "Installing VULCAN as editable package..."
+          echo "=================================================="
+          pip install -e .
+          
           for i in 1 2 3; do
-            pip install --no-cache-dir pytest pytest-cov pytest-asyncio pytest-timeout mock hypothesis faker numpy python-dotenv && \
+            pip install --no-cache-dir pytest pytest-cov pytest-asyncio pytest-timeout mock hypothesis faker numpy python-dotenv scipy lz4 && \
             break || (echo "Retry $i/3: test dependencies install failed"; sleep $((i*10)))
           done
           for i in 1 2 3; do
             pip install --no-cache-dir -r requirements.txt && break || (echo "Retry $i/3: requirements.txt install failed, continuing..."; sleep $((i*10)))
           done || echo "Some dependencies may have failed, continuing..."
+
+      - name: Verify VULCAN installation
+        run: |
+          echo "=================================================="
+          echo "Verifying VULCAN package installation..."
+          echo "=================================================="
+          
+          # Run the verification script
+          python scripts/verify_installation.py --critical-only || {
+            echo "❌ VULCAN installation verification failed!"
+            echo "Attempting to diagnose..."
+            pip show vulcan-agi || echo "Package not installed"
+            python -c "import sys; print('Python path:', sys.path)"
+            exit 1
+          }
+          
+          echo "=================================================="
+          echo "✓ VULCAN installation verified successfully!"
+          echo "=================================================="
 
       - name: Set environment variables
         run: |
