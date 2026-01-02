@@ -620,7 +620,11 @@ class HybridLLMExecutor:
         self.mode = mode_lower
         
         # Allow environment variable override for timeout (Issue #5 fix)
-        default_timeout = float(os.environ.get("HYBRID_EXECUTOR_TIMEOUT", "30.0"))
+        # Added error handling for invalid env var values
+        try:
+            default_timeout = float(os.environ.get("HYBRID_EXECUTOR_TIMEOUT", "30.0"))
+        except (ValueError, TypeError):
+            default_timeout = 30.0
         self.timeout = timeout if timeout is not None else default_timeout
         self.ensemble_min_confidence = ensemble_min_confidence
         self.openai_max_tokens = openai_max_tokens
@@ -1208,8 +1212,7 @@ class HybridLLMExecutor:
         - If OpenAI unavailable, falls back to local_first mode
         - Pending tasks are cancelled after first success
         """
-        import time as time_module
-        start_time = time_module.perf_counter()
+        start_time = time.perf_counter()
         
         # Check if OpenAI is available (Issue #6: detailed logging)
         openai_available = self._openai_available()
@@ -1262,24 +1265,24 @@ class HybridLLMExecutor:
                             task_name = task.get_name() if hasattr(task, 'get_name') else None
                             source = "local" if task_name == "local_llm_task" else "openai"
                             result["source"] = f"parallel_{source}"
-                            elapsed = time_module.perf_counter() - start_time
+                            elapsed = time.perf_counter() - start_time
                             self.logger.info(f"[HybridExecutor] ✓ Parallel mode complete - winner: {source}, time: {elapsed:.2f}s")
                             return result
                     except Exception as e:
                         self.logger.warning(f"[HybridExecutor] Task failed: {e}")
             
             # If we get here, no task succeeded - fall back to local_first
-            elapsed = time_module.perf_counter() - start_time
+            elapsed = time.perf_counter() - start_time
             self.logger.warning(f"[HybridExecutor] Parallel mode: no task succeeded after {elapsed:.2f}s, falling back to local_first")
             
         except asyncio.TimeoutError:
-            elapsed = time_module.perf_counter() - start_time
+            elapsed = time.perf_counter() - start_time
             self.logger.warning(f"[HybridExecutor] Parallel mode timeout after {elapsed:.2f}s (limit: {self.timeout}s)")
             # Cancel all tasks
             local_task.cancel()
             openai_task.cancel()
         except Exception as e:
-            elapsed = time_module.perf_counter() - start_time
+            elapsed = time.perf_counter() - start_time
             self.logger.warning(f"[HybridExecutor] Parallel mode error after {elapsed:.2f}s: {e}")
         
         # Fallback to local_first if parallel failed
