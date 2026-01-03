@@ -161,8 +161,14 @@ spec:
               name: {{ include "vulcanami.fullname" . }}-secrets
               key: graphixApiKey
         {{- end }}
-        {{- /* VULCAN_LLM_API_KEY defaults to OPENAI_API_KEY if not set */}}
-        {{- if .Values.secrets.openaiApiKey }}
+        {{- /* VULCAN_LLM_API_KEY: Use dedicated key if set, otherwise fallback to OPENAI_API_KEY */}}
+        {{- if .Values.secrets.vulcanLlmApiKey }}
+        - name: VULCAN_LLM_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "vulcanami.fullname" . }}-secrets
+              key: vulcanLlmApiKey
+        {{- else if .Values.secrets.openaiApiKey }}
         - name: VULCAN_LLM_API_KEY
           valueFrom:
             secretKeyRef:
