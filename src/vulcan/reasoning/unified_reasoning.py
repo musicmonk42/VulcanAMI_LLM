@@ -2136,9 +2136,28 @@ class UnifiedReasoner:
         A heuristic-based classifier to select the most appropriate reasoning type.
         This simulates a trained model by scoring reasoning types based on features
         of the input data and query.
+        
+        BUG FIX: Now checks keywords in BOTH input_data AND query dict.
+        Previously only checked query dict, which is often empty when input_data
+        contains the actual query text. This caused all queries to fall back to PROBABILISTIC.
         """
         scores = defaultdict(float)
         query_str = str(query).lower()
+        
+        # BUG FIX: Also extract text from input_data for keyword matching
+        # This fixes the issue where queries passed as input_data were not being classified
+        input_str = ""
+        if isinstance(input_data, str):
+            input_str = input_data.lower()
+        elif isinstance(input_data, dict):
+            # Try to extract text from common dict keys
+            for key in ['query', 'text', 'problem', 'question', 'input']:
+                if key in input_data and isinstance(input_data[key], str):
+                    input_str = input_data[key].lower()
+                    break
+        
+        # Combined string for keyword matching - check BOTH sources
+        combined_str = query_str + " " + input_str
 
         # FIX: Stronger preference for PROBABILISTIC with numeric arrays
         if isinstance(input_data, (list, tuple, np.ndarray)):
@@ -2283,9 +2302,10 @@ class UnifiedReasoner:
                 "deontic",
             ],
         }
+        # BUG FIX: Use combined_str (input_data + query) for keyword matching
         for r_type, keywords in keyword_map.items():
             for keyword in keywords:
-                if keyword in query_str:
+                if keyword in combined_str:
                     scores[r_type] += 0.3
 
         if any(key in query for key in ["treatment", "intervention", "action"]):
@@ -2303,9 +2323,57 @@ class UnifiedReasoner:
         if (
             isinstance(input_data, str)
             and len(input_data) > 200
-            and "generate" in query_str
+            and "generate" in combined_str
         ):
             scores[ReasoningType.SYMBOLIC] += 0.5
+        
+        # BUG FIX: Enhanced detection for specific problem types
+        # These patterns need stronger detection to avoid misclassification
+        
+        # SAT/satisfiability problems -> SYMBOLIC
+        sat_patterns = ["satisfiable", "satisfiability", "sat", "propositions", "constraints", "a → b", "a->b", "¬", "∨", "∧"]
+        if any(p in combined_str for p in sat_patterns):
+            scores[ReasoningType.SYMBOLIC] += 0.5
+            logger.debug(f"[Classifier] SAT pattern detected, boosting SYMBOLIC")
+        
+        # Bayesian/probability calculations -> PROBABILISTIC
+        # These are statistical calculations, NOT mathematical computations like integrals/derivatives
+        bayes_patterns = ["sensitivity", "specificity", "prevalence", "p(x|", "bayes", "posterior", "prior probability", "base rate"]
+        if any(p in combined_str for p in bayes_patterns):
+            scores[ReasoningType.PROBABILISTIC] += 0.8  # Increased from 0.6
+            # Reduce MATHEMATICAL score to prevent misrouting Bayesian problems
+            scores[ReasoningType.MATHEMATICAL] -= 0.5
+            logger.debug(f"[Classifier] Bayesian pattern detected, boosting PROBABILISTIC, reducing MATHEMATICAL")
+        
+        # Causal inference/confounding -> CAUSAL
+        causal_patterns = ["confound", "randomize", "causal effect", "treatment effect", "intervention", "s→d", "s->d", "causal graph"]
+        if any(p in combined_str for p in causal_patterns):
+            scores[ReasoningType.CAUSAL] += 0.6  # Increased from 0.5
+            logger.debug(f"[Classifier] Causal inference pattern detected, boosting CAUSAL")
+        
+        # Analogical structure mapping -> ANALOGICAL
+        analogy_patterns = ["map the", "structure mapping", "domain s", "domain t", "analogs", "map from", "mapping between", "deep structure"]
+        if any(p in combined_str for p in analogy_patterns):
+            scores[ReasoningType.ANALOGICAL] += 0.7  # Increased from 0.6
+            logger.debug(f"[Classifier] Analogical mapping pattern detected, boosting ANALOGICAL")
+        
+        # Proof verification -> SYMBOLIC
+        proof_patterns = ["verify each step", "valid or invalid", "proof sketch", "claim:", "step 1", "step 2"]
+        if any(p in combined_str for p in proof_patterns):
+            scores[ReasoningType.SYMBOLIC] += 0.5
+            logger.debug(f"[Classifier] Proof verification pattern detected, boosting SYMBOLIC")
+        
+        # Ethical/deontic -> PHILOSOPHICAL
+        ethics_patterns = ["permissible", "forbidden", "harm to innocents", "deontic", "nonzero probability of", "rule:"]
+        if any(p in combined_str for p in ethics_patterns):
+            scores[ReasoningType.PHILOSOPHICAL] += 0.6
+            logger.debug(f"[Classifier] Ethical/deontic pattern detected, boosting PHILOSOPHICAL")
+        
+        # FOL/quantifier scope -> SYMBOLIC
+        fol_patterns = ["first-order logic", "quantifier scope", "formalization", "∀", "∃", "forall", "exists"]
+        if any(p in combined_str for p in fol_patterns):
+            scores[ReasoningType.SYMBOLIC] += 0.5
+            logger.debug(f"[Classifier] FOL pattern detected, boosting SYMBOLIC")
 
         if not scores or max(scores.values()) < 0.3:
             return ReasoningType.PROBABILISTIC
@@ -3008,43 +3076,74 @@ class UnifiedReasoner:
                     )
 
             elif task.task_type == ReasoningType.SYMBOLIC:
-                hypothesis = task.query.get("goal", "")
-                kb_data = (
-                    task.input_data.get("kb", [])
-                    if isinstance(task.input_data, dict)
-                    else []
-                )
-
-                # The symbolic reasoner expects rules/facts to be added
-                for fact in kb_data:
-                    reasoner.add_rule(fact)
-
-                query_result = reasoner.query(hypothesis)
-
-                # FIX: Ensure minimum confidence floor for symbolic reasoning
-                # Order matters: check 'proven' first (highest confidence), then 'proof exists'
-                raw_confidence = (
-                    query_result.get("confidence", 0.0)
-                    if isinstance(query_result, dict)
-                    else 0.0
-                )
-                if isinstance(query_result, dict) and query_result.get("proven"):
-                    confidence = max(CONFIDENCE_FLOOR_SYMBOLIC_PROVEN, raw_confidence)
-                elif isinstance(query_result, dict) and query_result.get("proof") is not None:
-                    confidence = max(CONFIDENCE_FLOOR_SYMBOLIC_HAS_PROOF, raw_confidence)
-                else:
-                    confidence = max(CONFIDENCE_FLOOR_SYMBOLIC_DEFAULT, raw_confidence)
+                # BUG FIX: Handle both structured and string inputs
+                # The symbolic reasoner expects structured input (kb and hypothesis)
+                # but often receives raw query strings. For raw strings, use a
+                # generic reasoning approach if available.
                 
-                result = ReasoningResult(
-                    conclusion=query_result,
-                    confidence=confidence,
-                    reasoning_type=task.task_type,
-                    explanation=(
-                        str(query_result.get("proof"))
+                if isinstance(task.input_data, str) and hasattr(reasoner, "reason"):
+                    # Use generic reason() method for raw string queries
+                    # This provides better results than forcing structure parsing
+                    raw_result = reasoner.reason(task.input_data, task.query)
+                    if isinstance(raw_result, ReasoningResult):
+                        result = raw_result
+                    elif isinstance(raw_result, dict):
+                        result = ReasoningResult(
+                            conclusion=raw_result.get("conclusion", raw_result),
+                            confidence=raw_result.get("confidence", CONFIDENCE_FLOOR_SYMBOLIC_DEFAULT),
+                            reasoning_type=task.task_type,
+                            explanation=raw_result.get("explanation", "Symbolic reasoning performed"),
+                        )
+                    else:
+                        result = ReasoningResult(
+                            conclusion=raw_result,
+                            confidence=CONFIDENCE_FLOOR_SYMBOLIC_DEFAULT,
+                            reasoning_type=task.task_type,
+                            explanation="Symbolic reasoning performed",
+                        )
+                else:
+                    # Structured input path - use kb/hypothesis approach
+                    hypothesis = task.query.get("goal", "")
+                    kb_data = (
+                        task.input_data.get("kb", [])
+                        if isinstance(task.input_data, dict)
+                        else []
+                    )
+                    
+                    # If hypothesis is empty but we have string input_data, use it as hypothesis
+                    if not hypothesis and isinstance(task.input_data, str):
+                        hypothesis = task.input_data
+                    
+                    # The symbolic reasoner expects rules/facts to be added
+                    for fact in kb_data:
+                        reasoner.add_rule(fact)
+
+                    query_result = reasoner.query(hypothesis)
+
+                    # FIX: Ensure minimum confidence floor for symbolic reasoning
+                    # Order matters: check 'proven' first (highest confidence), then 'proof exists'
+                    raw_confidence = (
+                        query_result.get("confidence", 0.0)
                         if isinstance(query_result, dict)
-                        else str(query_result)
-                    ),
-                )
+                        else 0.0
+                    )
+                    if isinstance(query_result, dict) and query_result.get("proven"):
+                        confidence = max(CONFIDENCE_FLOOR_SYMBOLIC_PROVEN, raw_confidence)
+                    elif isinstance(query_result, dict) and query_result.get("proof") is not None:
+                        confidence = max(CONFIDENCE_FLOOR_SYMBOLIC_HAS_PROOF, raw_confidence)
+                    else:
+                        confidence = max(CONFIDENCE_FLOOR_SYMBOLIC_DEFAULT, raw_confidence)
+                    
+                    result = ReasoningResult(
+                        conclusion=query_result,
+                        confidence=confidence,
+                        reasoning_type=task.task_type,
+                        explanation=(
+                            str(query_result.get("proof"))
+                            if isinstance(query_result, dict)
+                            else str(query_result)
+                        ),
+                    )
 
             elif task.task_type == ReasoningType.CAUSAL:
                 if hasattr(reasoner, "reason"):
