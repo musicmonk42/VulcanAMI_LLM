@@ -369,6 +369,29 @@ class SymbolicReasoner:
         else:
             return Constant(term_str)
 
+    def clear_state(self):
+        """
+        BUG #4 FIX: Clear knowledge base and prover state to prevent cross-query contamination.
+        
+        This should be called before each new reasoning query when working with
+        independent queries that shouldn't share state.
+        
+        The cross-contamination issue manifests as:
+        - Previous query results appearing in new query responses
+        - "x^2 + 2x + 1" appearing in unrelated queries
+        - SymPy expressions from failed parses leaking into next queries
+        """
+        logger.debug("[SymbolicReasoner] Clearing state to prevent cross-query contamination")
+        
+        # Clear knowledge base
+        self.kb = KnowledgeBase()
+        
+        # Recreate prover to clear any cached state
+        self.prover = self._create_prover()
+        
+        # Re-create converter to clear any internal state
+        self.converter = ASTConverter()
+
     def explain_proof(self, proof: Optional[ProofNode]) -> str:
         """
         Generate human-readable explanation of proof.
@@ -442,6 +465,20 @@ class ProbabilisticReasoner:
         self.variables: Set[str] = set()
         self._network_built = False
         self._causal_structure: Optional[Dict[str, List[str]]] = None
+
+    def clear_state(self):
+        """
+        BUG #4 FIX: Clear all state to prevent cross-query contamination.
+        
+        This resets the Bayesian network, rules, and variables to their
+        initial state, allowing independent queries to not interfere.
+        """
+        logger.debug("[ProbabilisticReasoner] Clearing state to prevent cross-query contamination")
+        self.bn = BayesianNetworkReasoner()
+        self.rules.clear()
+        self.variables.clear()
+        self._network_built = False
+        self._causal_structure = None
 
     def add_rule(self, rule_str: str, confidence: float = 0.9):
         """
