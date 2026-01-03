@@ -993,9 +993,11 @@ class TestSelectedToolsInTaskParameters(unittest.TestCase):
             mock_plan.governance_sensitivity = MockGovSensitivity()
             
             # Use a query that triggers perception support task ("analyze" keyword)
+            # Note: Using REASONING type because perception support is only added when
+            # query_type != PERCEPTION (see _decompose_to_tasks implementation)
             tasks = analyzer._decompose_to_tasks(
                 query="Analyze the data and explain the pattern",
-                query_type=QueryType.REASONING,  # Not PERCEPTION to trigger perception support
+                query_type=QueryType.REASONING,
                 source="user",
                 plan=mock_plan,
             )

@@ -4161,7 +4161,8 @@ class QueryAnalyzer:
         selected_tools = []
         reasoning_strategy = None
         if plan and hasattr(plan, 'telemetry_data') and plan.telemetry_data:
-            selected_tools = plan.telemetry_data.get("selected_tools", []) or []
+            # Use 'or []' to handle both None and missing keys
+            selected_tools = plan.telemetry_data.get("selected_tools") or []
             reasoning_strategy = plan.telemetry_data.get("reasoning_strategy")
             if selected_tools:
                 logger.info(
