@@ -587,9 +587,10 @@ class UnifiedLearningSystem:
                 # FIX #4: Selected tool doesn't match router's suggestion - PENALIZE
                 # The router knows the appropriate tools for the query; if ToolSelector
                 # chose something else, that selection was likely incorrect.
+                # Penalty: WEIGHT_ADJUSTMENT_FAILURE * 1.5 = -0.005 * 1.5 = -0.0075
                 logger.warning(
                     f"[Learning] FIX #4 ROUTER MISMATCH: {router_mismatch_reason}. "
-                    f"Applying -0.015 PENALTY (1.5x failure penalty) for ignoring router."
+                    f"Applying -0.0075 PENALTY (1.5x failure penalty) for ignoring router."
                 )
                 weight_delta = WEIGHT_ADJUSTMENT_FAILURE * 1.5  # -0.0075 penalty for router mismatch
             elif is_tool_mismatch:

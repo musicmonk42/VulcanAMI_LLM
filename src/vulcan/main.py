@@ -5393,7 +5393,17 @@ async def unified_chat(request: UnifiedChatRequest):
             # FIX #1: Get complexity and query type from router (not hardcoded 0.5)
             router_complexity = getattr(routing_plan, 'complexity_score', None)
             router_type = getattr(routing_plan, 'query_type', None)
-            router_type_str = router_type.value if hasattr(router_type, 'value') else str(router_type) if router_type else None
+            
+            # Extract router type string, handling enum and string types
+            if hasattr(router_type, 'value'):
+                router_type_str = router_type.value
+            elif router_type is not None:
+                router_type_str = str(router_type)
+            else:
+                router_type_str = None
+            
+            # Normalize to lowercase for consistent comparison
+            router_type_lower = router_type_str.lower() if router_type_str else None
             
             # If router says this is simple, skip reasoning entirely
             if router_complexity is not None and router_complexity < 0.1:
@@ -5401,7 +5411,7 @@ async def unified_chat(request: UnifiedChatRequest):
                     f"[VULCAN/v1/chat] Simple query (complexity={router_complexity:.2f}) - "
                     f"skipping direct reasoning fallback"
                 )
-            elif router_type_str in ('general', 'conversational', 'CONVERSATIONAL'):
+            elif router_type_lower in ('general', 'conversational'):
                 logger.info(
                     f"[VULCAN/v1/chat] Simple query (type={router_type_str}) - "
                     f"skipping direct reasoning fallback"
