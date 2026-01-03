@@ -142,6 +142,13 @@ MAX_TOOL_COUNT = 10000
 WEIGHT_RESET_THRESHOLD = -0.9
 WEIGHT_DEFAULT_VALUE = 0.0  # Default adjustment is 0.0 (absolute weight = 1.0)
 
+# BUG #4 FIX: Weight corruption detection constants
+# These thresholds are used in reset_tool_weights_if_corrupted() to detect
+# runaway feedback loops and death spirals.
+DEATH_SPIRAL_NEGATIVE_THRESHOLD = -0.05  # Weight below this is considered negative
+DEATH_SPIRAL_PERCENTAGE_THRESHOLD = 0.5  # If this fraction of tools are negative, reset
+MONOPOLY_PERCENTAGE_THRESHOLD = 0.9  # If one tool has this fraction of positive weight, reset
+
 
 # =============================================================================
 # JSON Serialization Helper
@@ -829,8 +836,8 @@ class LearningStatePersistence:
                 reset_reason = f"Tool '{max_tool}' dominates with weight {max_weight:.3f} > {dominance_threshold}"
             
             # Check 2: Death spiral - most tools have negative weights
-            negative_count = sum(1 for w in weights.values() if w < -0.05)
-            if negative_count >= len(weights) * 0.5:  # More than half are negative
+            negative_count = sum(1 for w in weights.values() if w < DEATH_SPIRAL_NEGATIVE_THRESHOLD)
+            if negative_count >= len(weights) * DEATH_SPIRAL_PERCENTAGE_THRESHOLD:
                 reset_needed = True
                 reset_reason = f"{negative_count}/{len(weights)} tools have negative weights (death spiral)"
             
@@ -838,7 +845,7 @@ class LearningStatePersistence:
             if len(weights) > 1:
                 weight_values = list(weights.values())
                 total_positive = sum(w for w in weight_values if w > 0)
-                if total_positive > 0 and max_weight / total_positive > 0.9:
+                if total_positive > 0 and max_weight / total_positive > MONOPOLY_PERCENTAGE_THRESHOLD:
                     # One tool has >90% of all positive weight
                     reset_needed = True
                     reset_reason = f"Tool '{max_tool}' monopolizes {max_weight/total_positive:.1%} of positive weight"
