@@ -758,14 +758,15 @@ class TelemetryRecorder:
             if len(self._memory_update_buffer) >= self._memory_update_buffer_size:
                 self._schedule_memory_flush_locked()
 
-    def _schedule_flush_locked(self) -> None:
+    def _submit_flush_to_executor(self) -> None:
         """
-        Schedule a non-blocking flush (must hold self._lock).
+        Submit a flush task to the background executor.
         
-        PERFORMANCE FIX: This submits the flush to a background thread pool
-        instead of blocking the current thread.
+        This is the core implementation that handles executor shutdown gracefully.
+        Does nothing if the executor has been shut down or a flush is already in progress.
         
-        Does nothing if the executor has been shut down.
+        Returns:
+            None
         """
         if self._executor_shutdown:
             return
@@ -778,22 +779,24 @@ class TelemetryRecorder:
                 # Executor is shutting down - ignore
                 self._flush_in_progress.clear()
 
+    def _schedule_flush_locked(self) -> None:
+        """
+        Schedule a non-blocking flush (must hold self._lock).
+        
+        PERFORMANCE FIX: This submits the flush to a background thread pool
+        instead of blocking the current thread.
+        
+        Does nothing if the executor has been shut down.
+        """
+        self._submit_flush_to_executor()
+
     def _schedule_memory_flush_locked(self) -> None:
         """
         Schedule a non-blocking memory flush (must hold self._memory_update_lock).
         
         Does nothing if the executor has been shut down.
         """
-        if self._executor_shutdown:
-            return
-        if not self._flush_in_progress.is_set():
-            self._flush_in_progress.set()
-            self._stats["async_flushes_started"] += 1
-            try:
-                self._io_executor.submit(self._do_flush_in_background)
-            except RuntimeError:
-                # Executor is shutting down - ignore
-                self._flush_in_progress.clear()
+        self._submit_flush_to_executor()
 
     def flush_async(self) -> None:
         """
@@ -804,18 +807,7 @@ class TelemetryRecorder:
         
         Does nothing if the executor has been shut down.
         """
-        # Skip if executor is shut down (e.g., during interpreter shutdown)
-        if self._executor_shutdown:
-            return
-            
-        if not self._flush_in_progress.is_set():
-            self._flush_in_progress.set()
-            self._stats["async_flushes_started"] += 1
-            try:
-                self._io_executor.submit(self._do_flush_in_background)
-            except RuntimeError:
-                # Executor is shutting down - ignore
-                self._flush_in_progress.clear()
+        self._submit_flush_to_executor()
 
     def _do_flush_in_background(self) -> None:
         """
