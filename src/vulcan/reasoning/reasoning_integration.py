@@ -1002,22 +1002,42 @@ class ReasoningIntegration:
                 f"confidence={decomposition_plan.confidence:.2f}"
             )
 
-            # Step 3: Apply tool selection to each subproblem step
-            all_tools: set = set()
+            # Step 3: Select tools ONCE based on ORIGINAL query
+            # BUG FIX: Previously, step descriptions (~28 chars like "Step 1: Parse constraints")
+            # were passed to ToolSelector instead of the original query (e.g., 507 chars).
+            # This caused semantic matching to fail because it was matching against
+            # short step descriptions instead of the actual user query.
+            # 
+            # The fix: Select tools once based on the original query, then apply those
+            # tools to each decomposed step.
+            logger.info(
+                f"{LOG_PREFIX} Selecting tools based on original query "
+                f"(length={len(query)} chars)"
+            )
+            
+            primary_result = self._select_with_tool_selector(
+                query=query,  # Use ORIGINAL query, not step descriptions
+                query_type=query_type,
+                complexity=complexity,
+                context=context,
+            )
+            
+            # The tools selected for the original query apply to all steps
+            all_tools: set = set(primary_result.selected_tools)
             step_results: List[Dict[str, Any]] = []
-            total_step_confidence = 0.0
 
+            # Record step metadata (without re-running tool selection per step)
             for step in decomposition_plan.steps:
-                # Extract step description
+                # Extract step description for metadata only
                 if hasattr(step, 'description'):
-                    step_query = step.description
+                    step_description = step.description
                 elif hasattr(step, 'to_dict'):
                     step_dict = step.to_dict()
-                    step_query = step_dict.get('description', str(step))
+                    step_description = step_dict.get('description', str(step))
                 else:
-                    step_query = str(step)
+                    step_description = str(step)
 
-                # Extract step complexity
+                # Extract step complexity for metadata
                 if hasattr(step, 'estimated_complexity'):
                     step_complexity = step.estimated_complexity
                 elif hasattr(step, 'complexity'):
@@ -1028,24 +1048,14 @@ class ReasoningIntegration:
                 # Ensure step_complexity is within bounds
                 step_complexity = max(0.1, min(1.0, step_complexity))
 
-                # Apply tool selection to this step
-                step_result = self._select_with_tool_selector(
-                    query=step_query,
-                    query_type=query_type,
-                    complexity=step_complexity,
-                    context=context,
-                )
-
-                # Collect tools from this step
-                all_tools.update(step_result.selected_tools)
-                total_step_confidence += step_result.confidence
-
+                # Record step metadata - tools are inherited from primary selection
                 step_results.append({
                     'step_id': getattr(step, 'step_id', f'step_{len(step_results)}'),
-                    'description': step_query[:100],  # Truncate for metadata
-                    'tools': step_result.selected_tools,
-                    'strategy': step_result.reasoning_strategy,
-                    'confidence': step_result.confidence,
+                    'description': step_description[:100],  # Truncate for metadata
+                    'tools': primary_result.selected_tools,  # Inherited from primary
+                    'strategy': primary_result.reasoning_strategy,
+                    'confidence': primary_result.confidence,
+                    'step_complexity': step_complexity,
                 })
 
             # Step 4: Determine overall strategy based on decomposition
@@ -1055,9 +1065,9 @@ class ReasoningIntegration:
                 strategy_name = 'hierarchical_decomposition'
 
             # Calculate overall confidence
+            # Use the primary tool selection confidence combined with decomposition confidence
             num_steps = len(step_results)
-            avg_step_confidence = total_step_confidence / num_steps if num_steps > 0 else 0.5
-            overall_confidence = (decomposition_plan.confidence * 0.4) + (avg_step_confidence * 0.6)
+            overall_confidence = (decomposition_plan.confidence * 0.4) + (primary_result.confidence * 0.6)
 
             decomposition_time_ms = (time.perf_counter() - decomposition_start) * 1000
 
