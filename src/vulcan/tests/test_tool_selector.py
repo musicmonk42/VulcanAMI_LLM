@@ -1102,7 +1102,13 @@ class TestGreetingDetectionFix:
         result = matcher.match_query("What is the probability of rain?", ["general", "probabilistic"])
         
         # Should NOT get the greeting fast-path boost
-        assert result["general"].keyword_boost < 0.8 or 'greeting_fast_path' not in result["general"].keyword_matches
+        # Either the boost is less than 0.8, OR the greeting_fast_path marker is not present
+        has_greeting_boost = result["general"].keyword_boost >= 0.8
+        has_greeting_marker = 'greeting_fast_path' in result["general"].keyword_matches
+        
+        # Non-greeting queries should NOT have BOTH the boost AND the marker
+        assert not (has_greeting_boost and has_greeting_marker), \
+            "Non-greeting query should not receive greeting boost"
 
     def test_general_wins_over_probabilistic_for_greeting(self):
         """Test that 'general' tool wins over 'probabilistic' for greetings"""

@@ -447,11 +447,16 @@ class UnifiedLearningSystem:
             # couldn't understand the input (e.g., "Hello" query). This should be treated
             # as a FAILURE, not a success, to prevent probabilistic from accumulating weight
             # for inappropriate queries.
+            # Use tolerance check (0.01) to handle floating point precision issues.
+            mean_val = metadata.get('mean')
+            uncertainty_val = metadata.get('uncertainty', metadata.get('std'))
             is_uninformative_probabilistic = (
                 'probabilistic' in tools and
                 status == 'success' and
-                metadata.get('mean') == 0.5 and
-                metadata.get('uncertainty', metadata.get('std')) == 0.5
+                mean_val is not None and
+                uncertainty_val is not None and
+                abs(float(mean_val) - 0.5) < 0.01 and
+                abs(float(uncertainty_val) - 0.5) < 0.01
             )
             
             if is_uninformative_probabilistic:

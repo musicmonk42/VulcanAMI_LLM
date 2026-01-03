@@ -1050,10 +1050,19 @@ class SemanticToolMatcher:
             "what's up", 'sup', 'how are you', "how's it going",
         }
         
-        # Check if query is a simple greeting (exact match or starts with greeting)
+        # Check if query is a simple greeting:
+        # 1. Exact match with known patterns
+        # 2. Starts with a greeting and total length is short (greeting + up to 15 extra chars)
+        #    e.g., "hello there" (11 chars) = "hello" (5) + 6 extra chars < 15
         is_simple_greeting = (
             query_lower in SIMPLE_GREETING_PATTERNS or
-            any(query_lower.startswith(p) and len(query_lower) < len(p) + 15 
+            any(query_lower.startswith(p + ' ') and len(query_lower) <= len(p) + 15 
+                for p in SIMPLE_GREETING_PATTERNS) or
+            any(query_lower.startswith(p + '!') and len(query_lower) <= len(p) + 5
+                for p in SIMPLE_GREETING_PATTERNS) or
+            any(query_lower.startswith(p + '.') and len(query_lower) <= len(p) + 5
+                for p in SIMPLE_GREETING_PATTERNS) or
+            any(query_lower.startswith(p + ',') and len(query_lower) <= len(p) + 15
                 for p in SIMPLE_GREETING_PATTERNS)
         )
 
