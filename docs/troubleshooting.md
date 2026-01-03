@@ -517,6 +517,84 @@ Requirements for JWT secret:
 
 ---
 
+### Issue: Reasoning Engine Returns Internal Metrics Instead of Answers
+
+**Symptoms:**
+- Query "What is 2+2?" returns `"mean prediction 0.500 with uncertainty 0.500"` instead of `"4"`
+- Mathematical questions get routed to probabilistic reasoning
+- Bayesian queries return GP metrics instead of computed probabilities
+- Log shows: `"Unrecognized task type 'mathematical_task' - falling back to SYMBOLIC"`
+
+**Root Cause:**
+1. Task type mappings missing `_task` suffix variants (e.g., `mathematical_task` not in mapping)
+2. LLM client not registered with singletons module during initialization
+3. Missing arithmetic fallback when SymPy unavailable
+
+**Solution:**
+
+These issues were fixed in the reasoning engine update. Verify you have the latest code:
+
+```bash
+git pull origin main
+```
+
+**Configuration Check:**
+
+Ensure the LLM client is properly registered by checking startup logs for:
+```
+✓ LLM client registered with singletons module
+```
+
+For Helm deployments, verify `values.yaml` has:
+```yaml
+llm:
+  openai:
+    enabled: true
+```
+
+For test environments, set `SKIP_OPENAI=false` to enable OpenAI fallback:
+```yaml
+# In scalability_test.yml or your CI workflow
+env:
+  SKIP_OPENAI: 'false'
+  OPENAI_LANGUAGE_FORMATTING: 'true'
+```
+
+---
+
+### Issue: No Language Generation Backend Available
+
+**Symptoms:**
+- Error: `"[HybridExecutor] ❌ Both internal LLM AND OpenAI fallback failed. No language generation backend available."`
+- Scalability tests failing with timeout errors
+- Log shows: `"[TIMEOUT] Async generation exceeded 120.0s limit"`
+
+**Root Cause:**
+1. Internal LLM (GraphixVulcanLLM) not properly initialized or models not loaded
+2. OpenAI fallback disabled (`SKIP_OPENAI=true`)
+3. Both backends failing simultaneously
+
+**Solution:**
+
+1. Enable OpenAI fallback in your CI/CD workflow:
+```yaml
+env:
+  SKIP_OPENAI: 'false'
+  OPENAI_LANGUAGE_FORMATTING: 'true'
+```
+
+2. Ensure OpenAI API key is set:
+```bash
+export OPENAI_API_KEY="your-api-key"
+```
+
+3. For local development, check internal LLM status:
+```bash
+python -c "from graphix_vulcan_llm import GraphixVulcanLLM; llm = GraphixVulcanLLM(); print('LLM ready')"
+```
+
+---
+
 ## 5. Performance Issues
 
 ### Issue: GraphixVulcanLLM Silent Failure / Generation Hangs
