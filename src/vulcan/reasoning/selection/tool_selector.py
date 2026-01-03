@@ -1268,6 +1268,384 @@ class SelectionResult:
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 
+
+# ==============================================================================
+# TOOL WRAPPER CLASSES
+# ==============================================================================
+# These wrappers adapt the different reasoning engine interfaces to a common
+# reason(problem) interface expected by PortfolioExecutor._run_tool()
+
+class SymbolicToolWrapper:
+    """
+    Wrapper for SymbolicReasoner that exposes reason() method.
+    
+    The SymbolicReasoner uses query() method for theorem proving.
+    This wrapper:
+    1. Extracts query from problem (string or dict)
+    2. Calls the SAT/theorem prover
+    3. Returns result in expected format
+    """
+    
+    def __init__(self, engine):
+        self.engine = engine
+        self.name = "symbolic"
+    
+    def reason(self, problem: Any) -> Dict[str, Any]:
+        """
+        Execute symbolic reasoning on the problem.
+        
+        Args:
+            problem: Query string or dict with 'query' key
+            
+        Returns:
+            Dict with tool, result, confidence, and proof details
+        """
+        start_time = time.time()
+        
+        try:
+            # Extract query string from problem
+            query_str = self._extract_query(problem)
+            
+            if not query_str:
+                return self._error_result("No query provided")
+            
+            logger.info(f"[SymbolicEngine] Processing query: {query_str[:100]}...")
+            
+            # Check if problem contains rules/facts to add to knowledge base
+            if isinstance(problem, dict):
+                rules = problem.get("rules", [])
+                facts = problem.get("facts", [])
+                for rule in rules:
+                    self.engine.add_rule(rule)
+                for fact in facts:
+                    self.engine.add_fact(fact)
+            
+            # Execute the symbolic reasoning query
+            result = self.engine.query(query_str)
+            
+            execution_time = (time.time() - start_time) * 1000
+            
+            logger.info(
+                f"[SymbolicEngine] Query complete: proven={result.get('proven')}, "
+                f"confidence={result.get('confidence', 0):.3f}, time={execution_time:.0f}ms"
+            )
+            
+            return {
+                "tool": self.name,
+                "result": result,
+                "proven": result.get("proven", False),
+                "confidence": result.get("confidence", 0.5),
+                "proof": result.get("proof"),
+                "method": result.get("method", "symbolic"),
+                "execution_time_ms": execution_time,
+                "engine": "SymbolicReasoner",
+            }
+            
+        except Exception as e:
+            logger.error(f"[SymbolicEngine] Reasoning failed: {e}", exc_info=True)
+            return self._error_result(str(e))
+    
+    def _extract_query(self, problem: Any) -> str:
+        """Extract query string from problem."""
+        if isinstance(problem, str):
+            return problem
+        elif isinstance(problem, dict):
+            return problem.get("query") or problem.get("text") or problem.get("formula") or ""
+        else:
+            return str(problem)
+    
+    def _error_result(self, error: str) -> Dict[str, Any]:
+        return {
+            "tool": self.name,
+            "result": None,
+            "confidence": 0.1,
+            "error": error,
+            "engine": "SymbolicReasoner",
+        }
+
+
+class ProbabilisticToolWrapper:
+    """
+    Wrapper for ProbabilisticReasoner that exposes reason() method.
+    
+    The ProbabilisticReasoner uses query() method for Bayesian inference.
+    This wrapper:
+    1. Extracts query variable and evidence from problem
+    2. Executes Bayesian inference
+    3. Returns probability distribution
+    """
+    
+    def __init__(self, engine):
+        self.engine = engine
+        self.name = "probabilistic"
+    
+    def reason(self, problem: Any) -> Dict[str, Any]:
+        """
+        Execute probabilistic reasoning on the problem.
+        
+        Args:
+            problem: Dict with query_var, evidence, and optional rules
+            
+        Returns:
+            Dict with probability distribution and confidence
+        """
+        start_time = time.time()
+        
+        try:
+            # Parse the problem
+            query_var, evidence, rules = self._parse_problem(problem)
+            
+            if not query_var:
+                return self._error_result("No query variable provided")
+            
+            logger.info(
+                f"[ProbabilisticEngine] Computing P({query_var} | evidence={evidence})"
+            )
+            
+            # Add any rules to the engine
+            for rule in rules:
+                confidence = rule.get("confidence", 0.9) if isinstance(rule, dict) else 0.9
+                rule_str = rule.get("rule", rule) if isinstance(rule, dict) else rule
+                self.engine.add_rule(rule_str, confidence)
+            
+            # Execute the Bayesian inference
+            result = self.engine.query(query_var, evidence)
+            
+            execution_time = (time.time() - start_time) * 1000
+            
+            # Extract probability
+            if isinstance(result, dict):
+                prob_true = result.get(True, 0.5)
+                prob_false = result.get(False, 0.5)
+            else:
+                prob_true = float(result) if result else 0.5
+                prob_false = 1.0 - prob_true
+            
+            logger.info(
+                f"[ProbabilisticEngine] Result: P({query_var}=True)={prob_true:.4f}, "
+                f"time={execution_time:.0f}ms"
+            )
+            
+            return {
+                "tool": self.name,
+                "result": result,
+                "probability": prob_true,
+                "posterior": prob_true,
+                "distribution": {True: prob_true, False: prob_false},
+                "confidence": max(prob_true, prob_false),  # Confidence is max prob
+                "query_var": query_var,
+                "evidence": evidence,
+                "execution_time_ms": execution_time,
+                "engine": "ProbabilisticReasoner",
+            }
+            
+        except Exception as e:
+            logger.error(f"[ProbabilisticEngine] Reasoning failed: {e}", exc_info=True)
+            return self._error_result(str(e))
+    
+    def _parse_problem(self, problem: Any) -> tuple:
+        """Parse problem into query_var, evidence, and rules."""
+        if isinstance(problem, str):
+            # Simple string query - assume it's the query variable
+            return problem, {}, []
+        elif isinstance(problem, dict):
+            query_var = problem.get("query_var") or problem.get("query") or problem.get("variable")
+            evidence = problem.get("evidence", {})
+            rules = problem.get("rules", [])
+            return query_var, evidence, rules
+        else:
+            return str(problem), {}, []
+    
+    def _error_result(self, error: str) -> Dict[str, Any]:
+        return {
+            "tool": self.name,
+            "result": None,
+            "confidence": 0.1,
+            "error": error,
+            "engine": "ProbabilisticReasoner",
+        }
+
+
+class CausalToolWrapper:
+    """
+    Wrapper for CausalReasoner that exposes reason() method.
+    
+    The CausalReasoner performs causal DAG analysis and counterfactual reasoning.
+    """
+    
+    def __init__(self, engine):
+        self.engine = engine
+        self.name = "causal"
+    
+    def reason(self, problem: Any) -> Dict[str, Any]:
+        """
+        Execute causal reasoning on the problem.
+        """
+        start_time = time.time()
+        
+        try:
+            # Parse problem
+            if isinstance(problem, str):
+                query = problem
+                data = None
+                intervention = None
+            elif isinstance(problem, dict):
+                query = problem.get("query") or problem.get("text", "")
+                data = problem.get("data")
+                intervention = problem.get("intervention")
+            else:
+                query = str(problem)
+                data = None
+                intervention = None
+            
+            logger.info(f"[CausalEngine] Analyzing causal query: {query[:100]}...")
+            
+            # Execute causal reasoning
+            if hasattr(self.engine, "analyze_causality"):
+                result = self.engine.analyze_causality(query, data=data)
+            elif hasattr(self.engine, "reason"):
+                result = self.engine.reason(problem)
+            elif hasattr(self.engine, "query"):
+                result = self.engine.query(query)
+            else:
+                result = {"analysis": "Causal analysis requested", "query": query}
+            
+            execution_time = (time.time() - start_time) * 1000
+            
+            confidence = 0.7
+            if isinstance(result, dict):
+                confidence = result.get("confidence", 0.7)
+            
+            logger.info(f"[CausalEngine] Analysis complete: confidence={confidence:.3f}, time={execution_time:.0f}ms")
+            
+            return {
+                "tool": self.name,
+                "result": result,
+                "confidence": confidence,
+                "execution_time_ms": execution_time,
+                "engine": "CausalReasoner",
+            }
+            
+        except Exception as e:
+            logger.error(f"[CausalEngine] Reasoning failed: {e}", exc_info=True)
+            return {
+                "tool": self.name,
+                "result": None,
+                "confidence": 0.1,
+                "error": str(e),
+                "engine": "CausalReasoner",
+            }
+
+
+class AnalogicalToolWrapper:
+    """
+    Wrapper for AnalogicalReasoner that exposes reason() method.
+    """
+    
+    def __init__(self, engine):
+        self.engine = engine
+        self.name = "analogical"
+    
+    def reason(self, problem: Any) -> Dict[str, Any]:
+        """Execute analogical reasoning on the problem."""
+        start_time = time.time()
+        
+        try:
+            # Parse problem
+            if isinstance(problem, str):
+                query = problem
+            elif isinstance(problem, dict):
+                query = problem.get("query") or problem.get("text", "")
+            else:
+                query = str(problem)
+            
+            logger.info(f"[AnalogicalEngine] Finding analogies for: {query[:100]}...")
+            
+            # Execute analogical reasoning
+            if hasattr(self.engine, "find_analogies"):
+                result = self.engine.find_analogies(query)
+            elif hasattr(self.engine, "reason"):
+                result = self.engine.reason(problem)
+            else:
+                result = {"analogies": [], "query": query}
+            
+            execution_time = (time.time() - start_time) * 1000
+            
+            confidence = 0.6
+            if isinstance(result, dict):
+                confidence = result.get("confidence", 0.6)
+            
+            logger.info(f"[AnalogicalEngine] Complete: confidence={confidence:.3f}, time={execution_time:.0f}ms")
+            
+            return {
+                "tool": self.name,
+                "result": result,
+                "confidence": confidence,
+                "execution_time_ms": execution_time,
+                "engine": "AnalogicalReasoner",
+            }
+            
+        except Exception as e:
+            logger.error(f"[AnalogicalEngine] Reasoning failed: {e}", exc_info=True)
+            return {
+                "tool": self.name,
+                "result": None,
+                "confidence": 0.1,
+                "error": str(e),
+                "engine": "AnalogicalReasoner",
+            }
+
+
+class MultimodalToolWrapper:
+    """
+    Wrapper for MultimodalReasoner that exposes reason() method.
+    """
+    
+    def __init__(self, engine):
+        self.engine = engine
+        self.name = "multimodal"
+    
+    def reason(self, problem: Any) -> Dict[str, Any]:
+        """Execute multimodal reasoning on the problem."""
+        start_time = time.time()
+        
+        try:
+            logger.info(f"[MultimodalEngine] Processing multimodal input...")
+            
+            # Execute multimodal reasoning
+            if hasattr(self.engine, "process"):
+                result = self.engine.process(problem)
+            elif hasattr(self.engine, "reason"):
+                result = self.engine.reason(problem)
+            else:
+                result = {"processed": True, "input_type": type(problem).__name__}
+            
+            execution_time = (time.time() - start_time) * 1000
+            
+            confidence = 0.65
+            if isinstance(result, dict):
+                confidence = result.get("confidence", 0.65)
+            
+            logger.info(f"[MultimodalEngine] Complete: confidence={confidence:.3f}, time={execution_time:.0f}ms")
+            
+            return {
+                "tool": self.name,
+                "result": result,
+                "confidence": confidence,
+                "execution_time_ms": execution_time,
+                "engine": "MultimodalReasoner",
+            }
+            
+        except Exception as e:
+            logger.error(f"[MultimodalEngine] Reasoning failed: {e}", exc_info=True)
+            return {
+                "tool": self.name,
+                "result": None,
+                "confidence": 0.1,
+                "error": str(e),
+                "engine": "MultimodalReasoner",
+            }
+
 class ToolSelector:
     """
     Main tool selector orchestrating all components
@@ -1460,11 +1838,22 @@ class ToolSelector:
             return None
 
     def _initialize_tools(self):
-        """Initialize reasoning tools"""
-
-        # These would be actual tool instances in production
-        # For now, using placeholders
-
+        """
+        Initialize reasoning tools with ACTUAL reasoning engines.
+        
+        BUG FIX: Previously this method created MockTool placeholders that just
+        returned canned responses. This caused the selected tools to never
+        actually execute any reasoning logic - OpenAI answered everything.
+        
+        Now this method:
+        1. Tries to import the real reasoning engines (SymbolicReasoner, etc.)
+        2. Creates wrapper classes that adapt engine interfaces to reason() method
+        3. Falls back to mock tools ONLY if imports fail
+        
+        The wrapper classes ensure that when tool.reason(problem) is called,
+        the actual engine's query/inference logic is executed (SAT solving,
+        Bayesian inference, causal analysis, etc.)
+        """
         tool_configs = {
             "symbolic": {"speed": "medium", "accuracy": "high", "energy": "medium"},
             "probabilistic": {"speed": "fast", "accuracy": "medium", "energy": "low"},
@@ -1473,13 +1862,108 @@ class ToolSelector:
             "multimodal": {"speed": "slow", "accuracy": "high", "energy": "very_high"},
         }
 
+        # Try to initialize real reasoning engines
+        engines_initialized = self._initialize_real_engines()
+        
         for tool_name, config in tool_configs.items():
-            # Create mock tool (would be actual tool instance)
-            self.tools[tool_name] = self._create_mock_tool(tool_name, config)
+            if tool_name in engines_initialized and engines_initialized[tool_name] is not None:
+                # Use the real engine wrapper
+                self.tools[tool_name] = engines_initialized[tool_name]
+                logger.info(f"[ToolSelector] Initialized REAL {tool_name} engine")
+            else:
+                # Fall back to mock tool
+                self.tools[tool_name] = self._create_mock_tool(tool_name, config)
+                logger.warning(f"[ToolSelector] Using MOCK {tool_name} tool (real engine unavailable)")
             self.tool_names.append(tool_name)
 
+    def _initialize_real_engines(self) -> Dict[str, Any]:
+        """
+        Initialize real reasoning engines with proper adapters.
+        
+        Returns:
+            Dictionary mapping tool names to engine wrapper instances
+        """
+        engines = {}
+        
+        # ============================================================
+        # SYMBOLIC ENGINE (SAT solver, FOL theorem proving)
+        # ============================================================
+        try:
+            from ..symbolic.reasoner import SymbolicReasoner
+            engines["symbolic"] = SymbolicToolWrapper(SymbolicReasoner())
+            logger.info("[ToolSelector] SymbolicReasoner loaded successfully")
+        except ImportError as e:
+            logger.warning(f"[ToolSelector] SymbolicReasoner not available: {e}")
+            engines["symbolic"] = None
+        except Exception as e:
+            logger.error(f"[ToolSelector] SymbolicReasoner initialization failed: {e}")
+            engines["symbolic"] = None
+        
+        # ============================================================
+        # PROBABILISTIC ENGINE (Bayesian inference)
+        # ============================================================
+        try:
+            from ..symbolic.reasoner import ProbabilisticReasoner
+            engines["probabilistic"] = ProbabilisticToolWrapper(ProbabilisticReasoner())
+            logger.info("[ToolSelector] ProbabilisticReasoner loaded successfully")
+        except ImportError as e:
+            logger.warning(f"[ToolSelector] ProbabilisticReasoner not available: {e}")
+            engines["probabilistic"] = None
+        except Exception as e:
+            logger.error(f"[ToolSelector] ProbabilisticReasoner initialization failed: {e}")
+            engines["probabilistic"] = None
+        
+        # ============================================================
+        # CAUSAL ENGINE (Causal DAG analysis, counterfactuals)
+        # ============================================================
+        try:
+            from ..causal_reasoning import CausalReasoner
+            engines["causal"] = CausalToolWrapper(CausalReasoner())
+            logger.info("[ToolSelector] CausalReasoner loaded successfully")
+        except ImportError as e:
+            logger.warning(f"[ToolSelector] CausalReasoner not available: {e}")
+            engines["causal"] = None
+        except Exception as e:
+            logger.error(f"[ToolSelector] CausalReasoner initialization failed: {e}")
+            engines["causal"] = None
+        
+        # ============================================================
+        # ANALOGICAL ENGINE (Pattern matching, analogy reasoning)
+        # ============================================================
+        try:
+            from ..analogical_reasoning import AnalogicalReasoner
+            engines["analogical"] = AnalogicalToolWrapper(AnalogicalReasoner())
+            logger.info("[ToolSelector] AnalogicalReasoner loaded successfully")
+        except ImportError as e:
+            logger.warning(f"[ToolSelector] AnalogicalReasoner not available: {e}")
+            engines["analogical"] = None
+        except Exception as e:
+            logger.error(f"[ToolSelector] AnalogicalReasoner initialization failed: {e}")
+            engines["analogical"] = None
+        
+        # ============================================================
+        # MULTIMODAL ENGINE (Multi-modal reasoning - images, etc.)
+        # ============================================================
+        try:
+            from ..multimodal_reasoning import MultimodalReasoner
+            engines["multimodal"] = MultimodalToolWrapper(MultimodalReasoner())
+            logger.info("[ToolSelector] MultimodalReasoner loaded successfully")
+        except ImportError as e:
+            logger.warning(f"[ToolSelector] MultimodalReasoner not available: {e}")
+            engines["multimodal"] = None
+        except Exception as e:
+            logger.error(f"[ToolSelector] MultimodalReasoner initialization failed: {e}")
+            engines["multimodal"] = None
+        
+        return engines
+
     def _create_mock_tool(self, name: str, config: Dict[str, Any]) -> Any:
-        """Create mock tool for testing"""
+        """
+        Create mock tool as fallback when real engines are unavailable.
+        
+        NOTE: This is a FALLBACK only. In production, real engines should be used.
+        Mock tools do NOT perform actual reasoning - they just return placeholder results.
+        """
 
         class MockTool:
             def __init__(self, tool_name, tool_config):
@@ -1487,6 +1971,9 @@ class ToolSelector:
                 self.config = tool_config
 
             def reason(self, problem):
+                # Log that we're using a mock (helps debugging)
+                logger.warning(f"[MockTool:{self.name}] Using MOCK reasoning (real engine unavailable)")
+                
                 # Simulate execution
                 time.sleep(0.1)  # Simulate work
 
@@ -1500,11 +1987,13 @@ class ToolSelector:
 
                 return {
                     "tool": self.name,
-                    "result": f"Result from {self.name}",
+                    "result": f"[MOCK] Result from {self.name} - real engine not available",
                     "confidence": confidence,
+                    "is_mock": True,  # Flag to indicate this is a mock result
                 }
 
         return MockTool(name, config)
+
 
     def _start_background_processes(self):
         """Start background processes"""
