@@ -14,6 +14,7 @@ PRODUCTION FIX: Skips heavy UnifiedRuntime initialization during tests to preven
 import logging
 import os
 import pickle
+import re
 import threading
 import time
 import uuid
@@ -84,6 +85,21 @@ UNKNOWN_TYPE_FALLBACK_ORDER = (
     'PROBABILISTIC',  # Good for uncertainty handling
     'CAUSAL',         # Good for cause-effect questions
     'PHILOSOPHICAL',  # FIX: Added for ethical/deontic reasoning (permissibility, obligation, etc.)
+)
+
+# ==============================================================================
+# MATHEMATICAL EXPRESSION DETECTION PATTERNS
+# ==============================================================================
+# Pre-compiled regex patterns for detecting mathematical expressions in queries.
+# Defined at module level to avoid recompilation on each method call.
+
+# Pattern to match simple arithmetic expressions like "2+2", "3*4", "10/2"
+MATH_EXPRESSION_PATTERN = re.compile(r'[\d]+\s*[\+\-\*\/\^\%]\s*[\d]+')
+
+# Pattern to match "what is X+Y" or "calculate X+Y" patterns
+MATH_QUERY_PATTERN = re.compile(
+    r'(what\s+is|calculate|compute|solve|evaluate)\s+[\d]+\s*[\+\-\*\/\^\%]',
+    re.IGNORECASE
 )
 
 # P0.2 FIX: Creative Task Detection
@@ -2133,14 +2149,11 @@ class UnifiedReasoner:
             if any(op in input_data for op in [" AND ", " OR ", " NOT ", "=>"]):
                 scores[ReasoningType.SYMBOLIC] += 0.4
             # FIX: Detect mathematical expressions in string input (e.g., "2+2", "3*4")
-            # This pattern matches simple arithmetic expressions
-            import re
-            math_pattern = re.compile(r'[\d]+\s*[\+\-\*\/\^\%]\s*[\d]+')
-            if math_pattern.search(input_data):
+            # Uses pre-compiled module-level patterns for performance
+            if MATH_EXPRESSION_PATTERN.search(input_data):
                 scores[ReasoningType.MATHEMATICAL] += 0.8  # Strong preference for math expressions
             # Also detect "what is X+Y" or "calculate X+Y" patterns
-            what_is_math = re.compile(r'(what\s+is|calculate|compute|solve|evaluate)\s+[\d]+\s*[\+\-\*\/\^\%]', re.IGNORECASE)
-            if what_is_math.search(input_data):
+            if MATH_QUERY_PATTERN.search(input_data):
                 scores[ReasoningType.MATHEMATICAL] += 0.9
         elif isinstance(input_data, dict):
             if any(
