@@ -589,5 +589,132 @@ class TestTaskTypeToReasoningTypeMapping(unittest.TestCase):
             self.skipTest("ReasoningType not available in test environment")
 
 
+class TestSimpleArithmeticFallback(unittest.TestCase):
+    """
+    Tests for Bug #3 fix: Simple arithmetic fallback in MathematicalComputationTool.
+    
+    When SymPy/RestrictedPython is not available, the mathematical computation tool
+    should use a simple arithmetic fallback for basic calculations instead of returning
+    error messages or internal metrics like "mean prediction 0.500".
+    """
+    
+    def test_simple_arithmetic_2_plus_2(self):
+        """Test that 2+2 returns 4, not 'mean prediction 0.500'."""
+        try:
+            from vulcan.reasoning.mathematical_computation import MathematicalComputationTool
+            
+            tool = MathematicalComputationTool(llm=None)
+            result = tool.execute("What is 2+2?")
+            
+            self.assertTrue(result.success, "Simple arithmetic should succeed")
+            self.assertEqual(result.result, "4", "2+2 should equal 4")
+            self.assertNotIn(
+                "mean prediction",
+                result.explanation.lower(),
+                "Should not contain 'mean prediction' internal metrics"
+            )
+        except ImportError:
+            self.skipTest("MathematicalComputationTool not available")
+    
+    def test_simple_arithmetic_multiplication(self):
+        """Test that multiplication works: 3*4 = 12."""
+        try:
+            from vulcan.reasoning.mathematical_computation import MathematicalComputationTool
+            
+            tool = MathematicalComputationTool(llm=None)
+            result = tool.execute("3*4")
+            
+            self.assertTrue(result.success)
+            self.assertEqual(result.result, "12")
+        except ImportError:
+            self.skipTest("MathematicalComputationTool not available")
+    
+    def test_simple_arithmetic_division(self):
+        """Test that division works: 10/2 = 5."""
+        try:
+            from vulcan.reasoning.mathematical_computation import MathematicalComputationTool
+            
+            tool = MathematicalComputationTool(llm=None)
+            result = tool.execute("10/2")
+            
+            self.assertTrue(result.success)
+            self.assertEqual(result.result, "5")
+        except ImportError:
+            self.skipTest("MathematicalComputationTool not available")
+    
+    def test_simple_arithmetic_parentheses(self):
+        """Test that parentheses work: (2+3)*4 = 20."""
+        try:
+            from vulcan.reasoning.mathematical_computation import MathematicalComputationTool
+            
+            tool = MathematicalComputationTool(llm=None)
+            result = tool.execute("(2+3)*4")
+            
+            self.assertTrue(result.success)
+            self.assertEqual(result.result, "20")
+        except ImportError:
+            self.skipTest("MathematicalComputationTool not available")
+    
+    def test_simple_arithmetic_exponentiation(self):
+        """Test that exponentiation works: 2**3 = 8."""
+        try:
+            from vulcan.reasoning.mathematical_computation import MathematicalComputationTool
+            
+            tool = MathematicalComputationTool(llm=None)
+            result = tool.execute("2**3")
+            
+            self.assertTrue(result.success)
+            self.assertEqual(result.result, "8")
+        except ImportError:
+            self.skipTest("MathematicalComputationTool not available")
+    
+    def test_reason_interface_returns_correct_result(self):
+        """Test that reason() interface returns computed result, not internal metrics."""
+        try:
+            from vulcan.reasoning.mathematical_computation import MathematicalComputationTool
+            
+            tool = MathematicalComputationTool(llm=None)
+            result = tool.reason("What is 2+2?")
+            
+            self.assertIsInstance(result, dict)
+            self.assertIn("conclusion", result)
+            
+            conclusion = result["conclusion"]
+            self.assertIsInstance(conclusion, dict)
+            self.assertTrue(conclusion.get("success"))
+            self.assertEqual(conclusion.get("result"), "4")
+            
+            # Verify no internal metrics leak into output
+            formatted_output = result.get("formatted_output", "")
+            self.assertNotIn("mean prediction", formatted_output.lower())
+            self.assertNotIn("uncertainty", formatted_output.lower())
+            self.assertIn("4", formatted_output)
+        except ImportError:
+            self.skipTest("MathematicalComputationTool not available")
+    
+    def test_rejects_unsafe_expressions(self):
+        """Test that unsafe expressions are rejected."""
+        try:
+            from vulcan.reasoning.mathematical_computation import MathematicalComputationTool
+            
+            tool = MathematicalComputationTool(llm=None)
+            
+            # These should be rejected by the security check
+            unsafe_queries = [
+                "__import__('os')",
+                "open('file.txt')",
+                "exec('print(1)')",
+            ]
+            
+            for query in unsafe_queries:
+                result = tool._try_simple_arithmetic(query)
+                self.assertIsNone(
+                    result,
+                    f"Unsafe expression should be rejected: {query}"
+                )
+        except ImportError:
+            self.skipTest("MathematicalComputationTool not available")
+
+
 if __name__ == "__main__":
     unittest.main()
