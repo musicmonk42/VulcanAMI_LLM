@@ -3524,6 +3524,10 @@ class AgentPoolManager:
         # Mapping from task type strings to ReasoningType enum values
         # FIX: Map "general" to SYMBOLIC instead of UNKNOWN to leverage the LanguageReasoner
         # for general language/text queries. This prevents the 10% confidence issue.
+        #
+        # BUG #1 FIX: Added "_task" suffix variants for task types coming from query_router.py
+        # The router creates tasks with types like "mathematical_task", "philosophical_task", etc.
+        # Without these mappings, the system falls back to SYMBOLIC for all math/philosophical queries.
         task_to_reasoning_map = {
             "causal": ReasoningType.CAUSAL,
             "symbolic": ReasoningType.SYMBOLIC,
@@ -3543,6 +3547,21 @@ class AgentPoolManager:
             "philosophical": ReasoningType.PHILOSOPHICAL,  # FIX: Philosophical/ethical tasks
             "ethical": ReasoningType.PHILOSOPHICAL,  # FIX: Ethical queries
             "deontic": ReasoningType.PHILOSOPHICAL,  # FIX: Deontic logic queries
+            # BUG #1 FIX: Add "_task" suffix variants from query_router.py
+            # Query router creates task types like "mathematical_task", "philosophical_task", etc.
+            # These were causing "Unrecognized task type" warnings and fallback to SYMBOLIC
+            "mathematical_task": ReasoningType.MATHEMATICAL,
+            "philosophical_task": ReasoningType.PHILOSOPHICAL,
+            "probabilistic_task": ReasoningType.PROBABILISTIC,
+            "causal_task": ReasoningType.CAUSAL,
+            "analogical_task": ReasoningType.ANALOGICAL,
+            "symbolic_task": ReasoningType.SYMBOLIC,
+            "reasoning_task": ReasoningType.HYBRID,
+            "general_task": ReasoningType.SYMBOLIC,
+            "execution_task": ReasoningType.SYMBOLIC,  # Execution tasks use symbolic
+            "perception_task": ReasoningType.ANALOGICAL,  # Perception uses pattern matching
+            "planning_task": ReasoningType.HYBRID,  # Planning uses hybrid reasoning
+            "learning_task": ReasoningType.HYBRID,  # Learning uses hybrid
         }
         
         # FIX: Default to SYMBOLIC instead of UNKNOWN for unrecognized task types
