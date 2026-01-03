@@ -1795,9 +1795,30 @@ class QueryAnalyzer:
         # Learning system integration (set externally for adaptive routing)
         self.learning_system: Optional["UnifiedLearningSystem"] = None
 
+        # CuriosityEngine integration for knowledge gap detection
+        # FIX: Wire curiosity engine to query pipeline for gap identification
+        self._curiosity_engine: Optional[Any] = None
+        self._init_curiosity_engine()
+
         logger.debug(
             "QueryAnalyzer initialized with compiled patterns and bounded caches"
         )
+
+    def _init_curiosity_engine(self) -> None:
+        """Initialize CuriosityEngine for knowledge gap detection.
+        
+        FIX: This connects the query pipeline to the curiosity-driven learning system,
+        enabling gap detection from actual query outcomes instead of empty data.
+        """
+        try:
+            from vulcan.reasoning.singletons import get_curiosity_engine
+            self._curiosity_engine = get_curiosity_engine()
+            if self._curiosity_engine:
+                logger.info("[QueryRouter] CuriosityEngine wired for gap detection")
+        except ImportError as e:
+            logger.debug(f"[QueryRouter] CuriosityEngine not available: {e}")
+        except Exception as e:
+            logger.warning(f"[QueryRouter] Failed to init CuriosityEngine: {e}")
 
     def clear_caches(self) -> Dict[str, Any]:
         """
@@ -2213,6 +2234,55 @@ class QueryAnalyzer:
         """
         self.learning_system = learning_system
         logger.info("[QueryRouter] Learning system connected for adaptive routing")
+
+    def set_curiosity_engine(self, curiosity_engine: Any) -> None:
+        """Connect CuriosityEngine for knowledge gap detection.
+        
+        FIX: Allows external configuration of the curiosity engine for testing
+        or when lazy initialization isn't desired.
+        
+        Args:
+            curiosity_engine: CuriosityEngine instance to use
+        """
+        self._curiosity_engine = curiosity_engine
+        if curiosity_engine:
+            logger.info("[QueryRouter] CuriosityEngine connected externally")
+
+    def report_query_outcome(
+        self,
+        query: str,
+        result: Dict[str, Any],
+        success: bool,
+        domain: str = "unknown",
+        query_type: str = "general"
+    ) -> None:
+        """
+        Report query outcome to CuriosityEngine for gap detection.
+        
+        FIX: This method bridges the query pipeline to the curiosity-driven learning
+        system. Call this after query processing completes to enable gap detection.
+        
+        Args:
+            query: The original query text
+            result: The result dictionary from query processing
+            success: Whether the query was successful
+            domain: The domain/topic of the query (default: "unknown")
+            query_type: The type of query (default: "general")
+        """
+        if self._curiosity_engine is None:
+            return
+        
+        try:
+            self._curiosity_engine.ingest_query_result(
+                query=query,
+                result=result,
+                success=success,
+                domain=domain,
+                query_type=query_type
+            )
+        except Exception as e:
+            # Don't let curiosity engine failures affect query processing
+            logger.debug(f"[QueryRouter] Failed to report to CuriosityEngine: {e}")
 
     def analyze(self, query: str, session_id: Optional[str] = None) -> QueryPlan:
         """

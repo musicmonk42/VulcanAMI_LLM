@@ -96,18 +96,19 @@ DEFAULT_MIN_CONFIDENCE = 0.5  # Minimum confidence threshold for results
 FAST_PATH_COMPLEXITY_THRESHOLD = 0.3  # Below this, use fast path
 LOW_COMPLEXITY_THRESHOLD = 0.4  # Below this, use FAST mode
 HIGH_COMPLEXITY_THRESHOLD = 0.7  # Above this, use ACCURATE mode
-# ISSUE #7 FIX: Raised from 0.70 to 0.90 to reduce unnecessary decomposition
-# Decomposition was causing cascade delays (48+ second query routing times)
-# Only truly complex queries should trigger hierarchical decomposition
-# Previous value of 0.7 was triggering decomposition for simple queries
+# FIX: Lowered from 0.90 to 0.70 to enable problem decomposition
+# The 0.90 threshold was preventing decomposition from ever being triggered,
+# causing "ProblemDecomposer boots up then silence" behavior.
+# Decomposition is essential for complex problem solving.
 #
 # CONFIGURABLE: Set VULCAN_DECOMPOSITION_THRESHOLD environment variable to override
-# Example: VULCAN_DECOMPOSITION_THRESHOLD=0.80 for more frequent decomposition
+# Example: VULCAN_DECOMPOSITION_THRESHOLD=0.80 for less frequent decomposition
 try:
-    DECOMPOSITION_COMPLEXITY_THRESHOLD = float(os.environ.get("VULCAN_DECOMPOSITION_THRESHOLD", "0.90"))
+    DECOMPOSITION_COMPLEXITY_THRESHOLD = float(os.environ.get("VULCAN_DECOMPOSITION_THRESHOLD", "0.70"))
 except (ValueError, TypeError):
-    logger.warning("Invalid VULCAN_DECOMPOSITION_THRESHOLD, using default 0.90")
-    DECOMPOSITION_COMPLEXITY_THRESHOLD = 0.90
+    logger.warning("Invalid VULCAN_DECOMPOSITION_THRESHOLD, using default 0.70")
+    DECOMPOSITION_COMPLEXITY_THRESHOLD = 0.70
+
 
 # Strategy selection thresholds
 CAUSAL_REASONING_THRESHOLD = 0.6  # Complexity threshold for causal reasoning

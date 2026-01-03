@@ -40,7 +40,7 @@ query routing degradation (469ms → 152,048ms) by caching ML model instances.
 | MEMORY_GUARD_CHECK_INTERVAL | No | Seconds between memory checks | "5.0" |
 | GC_REQUEST_INTERVAL | No | GC every N requests (rate limiting) | "10" |
 | PROBLEM_DECOMPOSER_ENABLED | No | Enable hierarchical problem decomposition | "true" |
-| DECOMPOSITION_COMPLEXITY_THRESHOLD | No | Complexity threshold for decomposition | "0.40" |
+| VULCAN_DECOMPOSITION_THRESHOLD | No | Complexity threshold for decomposition | "0.70" |
 | SEMANTIC_BRIDGE_ENABLED | No | Enable cross-domain knowledge transfer | "true" |
 | CROSS_DOMAIN_TRANSFER_ENABLED | No | Enable concept transfer between domains | "true" |
 | PATTERN_LEARNING_ENABLED | No | Learn patterns from successful outcomes | "true" |
