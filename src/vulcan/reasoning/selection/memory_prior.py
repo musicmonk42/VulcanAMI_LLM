@@ -559,23 +559,33 @@ class BayesianMemoryPrior:
                     logger.warning(f"Semantic boost failed: {e}")
 
         # Additional boost for multimodal when multimodal content is detected
+        # BUG #2 FIX: Only apply boost when actual multimodal data is present
+        # (detected via stricter checks in tool_selector.py), NOT just keyword matches
         if context and context.get('is_multimodal') and 'multimodal' in available_tools:
-            try:
-                original_multimodal_prob = prior.tool_probs.get('multimodal', 0)
-                prior.tool_probs['multimodal'] = original_multimodal_prob + MULTIMODAL_CONTENT_BOOST
-                
-                # Renormalize
-                total = sum(prior.tool_probs.values())
-                if total > 0:
-                    prior.tool_probs = {k: v / total for k, v in prior.tool_probs.items()}
-                
-                # Update most likely tool
-                prior.most_likely_tool = max(prior.tool_probs.items(), key=lambda x: x[1])[0]
-                prior.metadata['multimodal_content_boost_applied'] = True
-                
-                logger.info(f"[MultimodalBoost] multimodal: {original_multimodal_prob:.3f} -> {prior.tool_probs['multimodal']:.3f}")
-            except Exception as e:
-                logger.warning(f"Multimodal boost failed: {e}")
+            # Double-check: Only boost if we have evidence of actual multimodal data
+            # This prevents false positives from text queries about images
+            has_actual_multimodal_data = (
+                context.get('has_binary_data') or
+                context.get('has_image_url') or
+                context.get('is_multimodal')  # Set by stricter check in tool_selector
+            )
+            if has_actual_multimodal_data:
+                try:
+                    original_multimodal_prob = prior.tool_probs.get('multimodal', 0)
+                    prior.tool_probs['multimodal'] = original_multimodal_prob + MULTIMODAL_CONTENT_BOOST
+                    
+                    # Renormalize
+                    total = sum(prior.tool_probs.values())
+                    if total > 0:
+                        prior.tool_probs = {k: v / total for k, v in prior.tool_probs.items()}
+                    
+                    # Update most likely tool
+                    prior.most_likely_tool = max(prior.tool_probs.items(), key=lambda x: x[1])[0]
+                    prior.metadata['multimodal_content_boost_applied'] = True
+                    
+                    logger.info(f"[MultimodalBoost] multimodal: {original_multimodal_prob:.3f} -> {prior.tool_probs['multimodal']:.3f}")
+                except Exception as e:
+                    logger.warning(f"Multimodal boost failed: {e}")
 
         # CRITICAL FIX: Evict old cache entries before adding new one
         if len(self.prior_cache) >= self.max_cache_size:
