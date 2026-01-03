@@ -160,8 +160,12 @@ try:
         )
 except ImportError as e:
     logger.warning(f"Could not import OpenAI verification: {e}")
-except Exception as e:
-    logger.warning(f"OpenAI verification failed: {e}")
+except (KeyError, TypeError, AttributeError) as e:
+    # These exceptions indicate issues with the verification function's return value
+    logger.warning(f"OpenAI verification returned unexpected result: {type(e).__name__}: {e}")
+except RuntimeError as e:
+    # RuntimeError could occur during module initialization
+    logger.warning(f"OpenAI verification runtime error: {e}")
 
 
 # ============================================================
