@@ -532,7 +532,7 @@ pytest tests/test_cicd_reproducibility.py -v
 ### Core Technologies
 
 **Language & Runtime:**
-- Python 3.10.11 (strict version requirement)
+- Python 3.11+ (strict version requirement)
 - Async/await with asyncio
 - Type hints throughout
 
@@ -807,7 +807,7 @@ helm upgrade graphix-vulcan ./helm/
 
 **System Requirements:**
 - **OS:** Linux x86_64 (recommended), macOS (development)
-- **Python:** 3.10.11 (exact version)
+- **Python:** 3.11+ (minimum version)
 - **CPU:** 4+ cores recommended
 - **RAM:** 8GB+ (16GB+ for large graphs)
 - **Disk:** 10GB+ for installation, varies by workload
@@ -1030,7 +1030,7 @@ DEBUG=false                              # Never true in production
 - ✅ **Enterprise Focus:** Governance, compliance, explainability
 - ✅ **Strong Documentation:** 96 files, investor-ready
 - ✅ **Exceptional Testing:** 48% test coverage for VULCAN
-- ✅ **Modern Stack:** Python 3.10, Docker, K8s, modern AI libs
+- ✅ **Modern Stack:** Python 3.11+, Docker, K8s, modern AI libs
 
 **Risks & Mitigation:**
 - ⚠️ **Legal Clarity Needed:** Add formal LICENSE file
@@ -1146,7 +1146,7 @@ VulcanAMI combines the explainability and safety of symbolic AI with the adaptab
 ### Quick Start
 
 **1. Prerequisites**
-- Python 3.10.11 (exact version)
+- Python 3.11+ (minimum version)
 - Docker & Docker Compose v2 (optional)
 - 8GB+ RAM, 10GB+ disk
 
@@ -1157,7 +1157,7 @@ git clone <repo-url> vulcanami
 cd vulcanami
 
 # Virtual environment
-python3.10 -m venv .venv
+python3.11 -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 
 # Install dependencies
@@ -1380,7 +1380,7 @@ For exhaustive documentation of every service, function, and class:
 
 | Category | Technologies |
 |----------|--------------|
-| **Language** | Python 3.10.11 |
+| **Language** | Python 3.11+ |
 | **Web** | Flask, FastAPI, CORS, uvicorn, gunicorn |
 | **AI/ML** | PyTorch, Transformers, spaCy, Captum, causal-learn |
 | **Data** | SQLAlchemy, SQLite, PostgreSQL, Redis, ChromaDB |

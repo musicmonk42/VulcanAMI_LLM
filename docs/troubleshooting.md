@@ -436,13 +436,13 @@ pip-compile --generate-hashes requirements.txt -o requirements-hashed.txt
 
 ```bash
 # Create venv with specific Python version
-python3.10 -m venv .venv
+python3.11 -m venv .venv
 
 # Verify activation
 which python  # Should point to .venv/bin/python
 
 # Verify Python version
-python --version  # Should be 3.10.11
+python --version  # Should be 3.11+
 ```
 
 ---
@@ -925,7 +925,7 @@ python src/full_platform.py
 ./scripts/validate-all.sh
 
 # Step 2: Check prerequisites
-python --version  # Should be 3.10.11
+python --version  # Should be 3.11+
 docker --version  # Should be 20.10+
 docker compose version  # Should be v2+
 

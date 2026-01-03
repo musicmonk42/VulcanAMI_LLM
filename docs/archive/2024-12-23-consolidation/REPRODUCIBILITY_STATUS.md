@@ -109,8 +109,8 @@ This repository has been comprehensively validated for 100% reproducibility with
 - ✅ All scripts executable and working
 
 ### 8. Reproducibility Features ✅
-- ✅ Python 3.10.11 pinned in Dockerfile
-- ✅ Base images use specific tags (python:3.10.11-slim)
+- ✅ Python 3.11+ pinned in Dockerfile
+- ✅ Base images use specific tags (python:3.11-slim)
 - ✅ All dependencies pinned with exact versions
 - ✅ Hash verification enabled for all packages
 - ✅ Git commit hash tracked

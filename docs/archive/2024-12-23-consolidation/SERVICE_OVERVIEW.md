@@ -582,7 +582,7 @@ EXAMINE → SELECT → APPLY → REMEMBER
 ## Service Dependencies
 
 ### Core Dependencies
-- Python 3.10.11
+- Python 3.11+
 - PyTorch (deep learning)
 - Flask (Registry API)
 - FastAPI (Arena API)

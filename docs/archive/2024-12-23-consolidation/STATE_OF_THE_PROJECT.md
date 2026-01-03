@@ -163,7 +163,7 @@ The project includes a comprehensive threat matrix covering:
 | Total Dependencies | 197 pinned | All with exact versions |
 | Hashed Requirements | Yes | requirements-hashed.txt (357KB) |
 | Version Pinning | 100% | All packages use `==` syntax |
-| Python Version | 3.10.11 required | Consistent across configs |
+| Python Version | 3.11+ required | Consistent across configs |
 | Update Strategy | Documented | Via pip-compile with hashes |
 
 #### Key Dependencies
@@ -269,9 +269,9 @@ docs/
 
 #### Documentation Inaccuracies Found
 1. **Python Version Consistency**: 
-   - README.md says "Python: 3.10.11"
-   - pyproject.toml says ">=3.10.11" ✅ Correct
-   - CI tests Python 3.10.11 ✅ Good practice
+   - README.md says "Python: 3.11+"
+   - pyproject.toml says ">=3.11" ✅ Correct
+   - CI tests Python 3.11 ✅ Good practice
 
 2. **Transparency Report**:
    - Last generated: 2025-11-11 (future date - should be 2024-11-11)
@@ -289,7 +289,7 @@ docs/
 #### GitHub Actions Workflows
 1. **ci.yml** - Test and Lint
    - Runs on: push to main/develop, PRs, manual dispatch
-   - Jobs: lint, test (matrix: Python 3.10.11)
+   - Jobs: lint, test (matrix: Python 3.11)
    - Timeout: 30 minutes (lint), 60 minutes (test)
    - Disk cleanup to prevent space issues
 
@@ -326,7 +326,7 @@ docs/
 - Timeout limits on all jobs
 - Artifact retention
 - Security scanning integration
-- Matrix testing (Python 3.10.11)
+- Matrix testing (Python 3.11)
 - Automated dependency updates (Dependabot)
 
 ⚠️ **Improvement Opportunities:**
