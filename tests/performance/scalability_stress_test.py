@@ -122,6 +122,19 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 
 # ============================================================
+# CRITICAL: ENABLE OPENAI FALLBACK FOR STRESS TESTS
+# ============================================================
+# FIX: Always force SKIP_OPENAI='false' during stress tests to ensure OpenAI
+# fallback is available when the internal LLM times out.
+# This addresses the issue where both internal LLM AND OpenAI fallback failed
+# because SKIP_OPENAI may have been overridden elsewhere.
+# 
+# See: scalability_test.yml workflow which also sets SKIP_OPENAI='false'
+os.environ['SKIP_OPENAI'] = 'false'
+logger.info("Stress test: SKIP_OPENAI set to 'false' to enable OpenAI fallback")
+
+
+# ============================================================
 # CONSTANTS AND CONFIGURATION
 # ============================================================
 

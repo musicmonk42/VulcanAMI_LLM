@@ -298,6 +298,12 @@ services:
       # Set to "false" (default) to enable VULCAN as primary brain
       # Set to "true" only if you want to bypass VULCAN entirely (testing/cost control)
       - SKIP_LOCAL_LLM=${SKIP_LOCAL_LLM:-false}
+      # OpenAI Fallback Configuration (SCALABILITY FIX)
+      # Controls whether OpenAI fallback is disabled when the internal LLM times out
+      # When "false" (default), OpenAI fallback is enabled for when internal LLM fails
+      # When "true", OpenAI is disabled even if OPENAI_API_KEY is set
+      # For stress tests and production, keep this "false" to ensure fallback availability
+      - SKIP_OPENAI=${SKIP_OPENAI:-false}
       # Arena enabled/disabled
       # PERFORMANCE FIX: Set to "false" by default because Arena operations timeout
       # at 30-53 seconds with 66% timeout rate (ISSUE-005), causing cascade failures.

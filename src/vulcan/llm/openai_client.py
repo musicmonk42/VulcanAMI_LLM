@@ -50,6 +50,24 @@ except ImportError:
 
 
 # ============================================================
+# SKIP_OPENAI CONFIGURATION
+# ============================================================
+# The SKIP_OPENAI environment variable controls whether OpenAI fallback is enabled.
+# When SKIP_OPENAI='true', OpenAI will be disabled even if OPENAI_API_KEY is set.
+# When SKIP_OPENAI='false' (default), OpenAI fallback is enabled.
+# This is used in CI workflows like scalability_test.yml to ensure OpenAI fallback
+# is available when the internal LLM times out during stress tests.
+
+_skip_openai_env = os.environ.get("SKIP_OPENAI", "false").lower()
+SKIP_OPENAI = _skip_openai_env in ("true", "1", "yes")
+
+if SKIP_OPENAI:
+    logger.info("SKIP_OPENAI=true - OpenAI fallback is DISABLED")
+else:
+    logger.debug("SKIP_OPENAI=false - OpenAI fallback is ENABLED (if API key is set)")
+
+
+# ============================================================
 # GLOBAL CLIENT STATE
 # ============================================================
 
@@ -74,6 +92,13 @@ def get_openai_client():
     Returns:
         OpenAI client instance if available and initialized, None otherwise
         
+    Note:
+        The client will return None in the following cases:
+        - OpenAI package is not installed
+        - SKIP_OPENAI environment variable is set to 'true'
+        - OPENAI_API_KEY environment variable is not set
+        - OpenAI client initialization fails
+        
     Example:
         >>> client = get_openai_client()
         >>> if client:
@@ -85,6 +110,15 @@ def get_openai_client():
     global _openai_client, _openai_init_error, _openai_initialized
     
     if not OPENAI_AVAILABLE:
+        return None
+    
+    # Check SKIP_OPENAI environment variable
+    # FIX: Support SKIP_OPENAI env var from workflow to control OpenAI fallback
+    if SKIP_OPENAI:
+        if not _openai_initialized:
+            _openai_init_error = "OpenAI skipped due to SKIP_OPENAI=true environment variable"
+            _openai_initialized = True
+            logger.info("OpenAI client disabled by SKIP_OPENAI=true")
         return None
     
     if _openai_initialized:
@@ -204,8 +238,9 @@ __all__ = [
     "is_openai_initialized",
     "is_openai_ready",
     "OPENAI_AVAILABLE",
+    "SKIP_OPENAI",
 ]
 
 
 # Log module status
-logger.debug(f"OpenAI client module v{__version__} loaded (available: {OPENAI_AVAILABLE})")
+logger.debug(f"OpenAI client module v{__version__} loaded (available: {OPENAI_AVAILABLE}, skip: {SKIP_OPENAI})")
