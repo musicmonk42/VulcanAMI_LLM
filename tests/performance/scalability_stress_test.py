@@ -130,7 +130,6 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 # because SKIP_OPENAI may have been overridden elsewhere.
 # 
 # See: scalability_test.yml workflow which also sets SKIP_OPENAI='false'
-# Reference: https://github.com/musicmonk42/VulcanAMI_LLM/issues/xxx
 os.environ['SKIP_OPENAI'] = 'false'
 logger.info("Stress test: SKIP_OPENAI set to 'false' to enable OpenAI fallback")
 
