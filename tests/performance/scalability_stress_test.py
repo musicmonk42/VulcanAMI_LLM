@@ -135,6 +135,40 @@ logger.info("Stress test: SKIP_OPENAI set to 'false' to enable OpenAI fallback")
 
 
 # ============================================================
+# OPENAI FALLBACK VERIFICATION
+# ============================================================
+# Log OpenAI configuration status at startup for CI diagnostics
+try:
+    from vulcan.llm.openai_client import log_openai_status, verify_openai_configuration
+    
+    # Log status for visibility in CI logs
+    log_openai_status()
+    
+    # Get detailed status for programmatic checking
+    openai_status = verify_openai_configuration()
+    if openai_status["status"] != "READY":
+        logger.warning(
+            "=" * 70 + "\n"
+            "⚠️  OPENAI FALLBACK NOT AVAILABLE\n"
+            "=" * 70 + "\n"
+            f"Status: {openai_status['status']}\n"
+            f"Reason: {openai_status['message']}\n"
+            "\n"
+            "This means if the internal LLM times out, there is NO fallback.\n"
+            "To fix: Set OPENAI_API_KEY in repository secrets.\n"
+            "=" * 70
+        )
+except ImportError as e:
+    logger.warning(f"Could not import OpenAI verification: {e}")
+except (KeyError, TypeError, AttributeError) as e:
+    # These exceptions indicate issues with the verification function's return value
+    logger.warning(f"OpenAI verification returned unexpected result: {type(e).__name__}: {e}")
+except RuntimeError as e:
+    # RuntimeError could occur during module initialization
+    logger.warning(f"OpenAI verification runtime error: {e}")
+
+
+# ============================================================
 # CONSTANTS AND CONFIGURATION
 # ============================================================
 

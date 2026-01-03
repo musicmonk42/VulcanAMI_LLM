@@ -130,16 +130,26 @@ def get_openai_client():
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         _openai_init_error = "OPENAI_API_KEY environment variable not set"
-        logger.warning("OPENAI_API_KEY not set - OpenAI integration disabled")
+        logger.warning(
+            "OPENAI_API_KEY not set - OpenAI integration disabled. "
+            "Set OPENAI_API_KEY in environment or repository secrets to enable OpenAI fallback."
+        )
         return None
+    
+    # Log that we found an API key (without exposing any part of it for security)
+    logger.info("OPENAI_API_KEY found, attempting initialization...")
     
     try:
         _openai_client = OpenAI(api_key=api_key)
-        logger.info("OpenAI client initialized successfully")
+        logger.info("OpenAI client initialized successfully - fallback is AVAILABLE")
         return _openai_client
     except Exception as e:
         _openai_init_error = str(e)
-        logger.error(f"Failed to initialize OpenAI client: {e}")
+        logger.error(
+            f"Failed to initialize OpenAI client: {e}. "
+            "This may indicate an invalid API key. "
+            "Verify OPENAI_API_KEY is correct in repository secrets."
+        )
         return None
 
 
@@ -226,6 +236,89 @@ def is_openai_ready() -> bool:
     return _openai_initialized and _openai_client is not None
 
 
+def verify_openai_configuration() -> dict:
+    """
+    Verify OpenAI configuration and return detailed diagnostics.
+    
+    This function provides comprehensive information about the OpenAI
+    configuration status, useful for debugging CI failures.
+    
+    Returns:
+        Dictionary with diagnostic information:
+        - available: Whether OpenAI package is installed
+        - skip_openai: Whether SKIP_OPENAI env var is set to true
+        - api_key_set: Whether OPENAI_API_KEY env var is set (non-empty)
+        - client_ready: Whether OpenAI client is initialized and ready
+        - initialization_error: Any error that occurred during initialization
+        - status: Overall status ("READY", "DISABLED", "ERROR", "NOT_CONFIGURED")
+        - message: Human-readable status message
+        
+    Example:
+        >>> status = verify_openai_configuration()
+        >>> if status["status"] != "READY":
+        ...     print(f"OpenAI not available: {status['message']}")
+    """
+    api_key = os.getenv("OPENAI_API_KEY", "")
+    api_key_set = bool(api_key and api_key.strip())
+    
+    result = {
+        "available": OPENAI_AVAILABLE,
+        "skip_openai": SKIP_OPENAI,
+        "api_key_set": api_key_set,
+        "client_ready": is_openai_ready(),
+        "initialization_error": get_openai_init_error(),
+        "status": "UNKNOWN",
+        "message": "",
+    }
+    
+    # Determine status
+    if not OPENAI_AVAILABLE:
+        result["status"] = "ERROR"
+        result["message"] = "OpenAI package not installed - run: pip install openai"
+    elif SKIP_OPENAI:
+        result["status"] = "DISABLED"
+        result["message"] = "OpenAI is disabled (SKIP_OPENAI=true). Set SKIP_OPENAI=false to enable."
+    elif not api_key_set:
+        result["status"] = "NOT_CONFIGURED"
+        result["message"] = (
+            "OPENAI_API_KEY not set. Set the OPENAI_API_KEY repository secret "
+            "or provide via workflow input to enable OpenAI fallback."
+        )
+    elif is_openai_ready():
+        result["status"] = "READY"
+        result["message"] = "OpenAI client ready and available"
+    else:
+        # API key is set but client failed to initialize
+        result["status"] = "ERROR"
+        error = get_openai_init_error() or "Unknown initialization error"
+        result["message"] = (
+            f"OpenAI initialization failed: {error}. "
+            "The API key may be invalid or expired."
+        )
+    
+    return result
+
+
+def log_openai_status() -> None:
+    """
+    Log the current OpenAI configuration status.
+    
+    This is a convenience function that logs the output of verify_openai_configuration()
+    at appropriate log levels. Call this during application startup to provide
+    visibility into OpenAI availability.
+    """
+    status = verify_openai_configuration()
+    
+    if status["status"] == "READY":
+        logger.info(f"✓ OpenAI fallback READY: {status['message']}")
+    elif status["status"] == "DISABLED":
+        logger.warning(f"⚠ OpenAI fallback DISABLED: {status['message']}")
+    elif status["status"] == "NOT_CONFIGURED":
+        logger.warning(f"⚠ OpenAI fallback NOT CONFIGURED: {status['message']}")
+    else:  # ERROR
+        logger.error(f"❌ OpenAI fallback ERROR: {status['message']}")
+
+
 # ============================================================
 # MODULE EXPORTS
 # ============================================================
@@ -237,6 +330,8 @@ __all__ = [
     "reset_openai_client",
     "is_openai_initialized",
     "is_openai_ready",
+    "verify_openai_configuration",
+    "log_openai_status",
     "OPENAI_AVAILABLE",
     "SKIP_OPENAI",
 ]

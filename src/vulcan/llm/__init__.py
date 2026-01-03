@@ -74,6 +74,8 @@ try:
         get_openai_init_error,
         OPENAI_AVAILABLE,
         initialize_openai_client,
+        verify_openai_configuration,
+        log_openai_status,
     )
 except ImportError as e:
     logger.warning(f"openai_client module not available: {e}")
@@ -82,6 +84,8 @@ except ImportError as e:
     get_openai_init_error = None
     OPENAI_AVAILABLE = False
     initialize_openai_client = None
+    verify_openai_configuration = None
+    log_openai_status = None
 
 
 # ============================================================
@@ -111,6 +115,8 @@ __all__ = [
     "get_openai_init_error",
     "OPENAI_AVAILABLE",
     "initialize_openai_client",
+    "verify_openai_configuration",
+    "log_openai_status",
     # Module utilities
     "get_module_info",
     "validate_llm_module",
