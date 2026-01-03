@@ -1236,5 +1236,93 @@ class TestKeywordBoostingFix:
         assert result["analogical"].combined_score >= result["causal"].combined_score
 
 
+# BUG FIX Tests: Query Classifier for Understanding-Based Complexity
+class TestQueryClassifier:
+    """
+    Test the QueryClassifier that fixes the fundamental issue where
+    "hello" and complex SAT problems both got complexity=0.50 because
+    the old heuristic-based system didn't understand query meaning.
+    """
+    
+    def test_hello_classified_as_greeting(self):
+        """Test that 'hello' is classified as GREETING with low complexity"""
+        from vulcan.routing.query_classifier import classify_query
+        
+        result = classify_query("hello")
+        
+        assert result.category == "GREETING"
+        assert result.complexity == 0.0
+        assert result.skip_reasoning == True
+    
+    def test_hi_classified_as_greeting(self):
+        """Test that 'hi' is classified as GREETING"""
+        from vulcan.routing.query_classifier import classify_query
+        
+        result = classify_query("hi")
+        
+        assert result.category == "GREETING"
+        assert result.skip_reasoning == True
+    
+    def test_thanks_classified_as_greeting(self):
+        """Test that 'thanks' is classified as GREETING"""
+        from vulcan.routing.query_classifier import classify_query
+        
+        result = classify_query("thanks")
+        
+        assert result.category == "GREETING"
+        assert result.skip_reasoning == True
+    
+    def test_sat_problem_classified_as_logical(self):
+        """Test that SAT problem is classified as LOGICAL with high complexity"""
+        from vulcan.routing.query_classifier import classify_query
+        
+        query = "Is A→B, B→C, ¬C, A∨B satisfiable?"
+        result = classify_query(query)
+        
+        assert result.category == "LOGICAL"
+        assert result.complexity >= 0.6  # Should be high complexity
+        assert result.skip_reasoning == False
+        assert "symbolic" in result.suggested_tools
+    
+    def test_bayes_problem_classified_as_probabilistic(self):
+        """Test that Bayes problem is classified as PROBABILISTIC"""
+        from vulcan.routing.query_classifier import classify_query
+        
+        query = "Sensitivity=0.99, Specificity=0.95, Prevalence=0.01. Compute P(X|+)"
+        result = classify_query(query)
+        
+        assert result.category == "PROBABILISTIC"
+        assert result.complexity >= 0.4
+        assert result.skip_reasoning == False
+        assert "probabilistic" in result.suggested_tools
+    
+    def test_causal_problem_classified_correctly(self):
+        """Test that causal inference problem is classified as CAUSAL"""
+        from vulcan.routing.query_classifier import classify_query
+        
+        query = "Does correlation imply causation? How do we control for confounding?"
+        result = classify_query(query)
+        
+        assert result.category == "CAUSAL"
+        assert "causal" in result.suggested_tools
+    
+    def test_complexity_differs_by_query_type(self):
+        """Test that 'hello' and SAT problem get DIFFERENT complexity scores"""
+        from vulcan.routing.query_classifier import classify_query
+        
+        hello_result = classify_query("hello")
+        sat_result = classify_query("Is A→B, ¬B, A satisfiable?")
+        
+        # The whole point of the fix: these should NOT be equal
+        assert hello_result.complexity != sat_result.complexity, \
+            f"CRITICAL: 'hello' ({hello_result.complexity}) and SAT ({sat_result.complexity}) " \
+            f"should have DIFFERENT complexity scores!"
+        
+        # Hello should be much lower
+        assert hello_result.complexity < sat_result.complexity
+        assert hello_result.complexity < 0.2
+        assert sat_result.complexity >= 0.5
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "--tb=short"])

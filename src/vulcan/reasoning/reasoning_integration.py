@@ -760,6 +760,47 @@ class ReasoningIntegration:
             self._stats.invocations += 1
 
         try:
+            # =================================================================
+            # BUG FIX: Short-circuit for simple queries regardless of complexity
+            # The problem: "hello" (5 chars) was getting complexity=0.50 from
+            # upstream, causing it to hit decomposition path instead of fast path.
+            # This fix checks query CONTENT, not just the complexity score.
+            # =================================================================
+            SIMPLE_QUERY_PATTERNS = frozenset([
+                'hello', 'hi', 'hey', 'howdy', 'greetings',
+                'thanks', 'thank you', 'bye', 'goodbye', 'see you',
+                'good morning', 'good afternoon', 'good evening',
+                'ok', 'okay', 'sure', 'yes', 'no', 'maybe',
+            ])
+            
+            query_lower = query.lower().strip()
+            is_simple_greeting = (
+                query_lower in SIMPLE_QUERY_PATTERNS or
+                len(query_lower) < 10 and not any(c in query_lower for c in '?∧∨→¬=')
+            )
+            
+            if is_simple_greeting:
+                logger.info(
+                    f"{LOG_PREFIX} SIMPLE QUERY BYPASS: '{query[:20]}' (len={len(query)}) - "
+                    f"skipping reasoning entirely"
+                )
+                with self._stats_lock:
+                    self._stats.fast_path_count += 1
+                
+                return ReasoningResult(
+                    selected_tools=["general"],
+                    reasoning_strategy=ReasoningStrategyType.DIRECT.value,
+                    confidence=0.95,
+                    rationale="Simple greeting/conversational - bypassing reasoning",
+                    metadata={
+                        "fast_path": True,
+                        "simple_query_bypass": True,
+                        "complexity": 0.0,  # Override upstream complexity
+                        "query_type": "conversational",
+                        "selection_time_ms": 0.0,
+                    },
+                )
+            
             # Fast path for simple queries - skip heavy tool selection
             if complexity < FAST_PATH_COMPLEXITY_THRESHOLD:
                 with self._stats_lock:

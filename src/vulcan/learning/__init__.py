@@ -479,10 +479,28 @@ class UnifiedLearningSystem:
             # 3. Low confidence with "success" status (tool guessed but didn't understand)
             is_explicitly_uninformative = metadata.get('uninformative', False)
             is_reasoning_unknown = metadata.get('reasoning_type') == 'UNKNOWN'
+            
+            # BUG #3 FIX: Check confidence from multiple sources
+            # The confidence value might be in outcome['confidence'] or outcome['metadata']['confidence']
+            # or outcome['result']['confidence'] depending on the caller
+            confidence_value = outcome.get('confidence')
+            if confidence_value is None:
+                confidence_value = metadata.get('confidence')
+            if confidence_value is None:
+                confidence_value = 1.0  # Default to 1.0 if not found
+            
             is_low_confidence_success = (
                 status == 'success' and
-                outcome.get('confidence', 1.0) < 0.3  # Very low confidence
+                float(confidence_value) < 0.3  # Very low confidence (e.g., 0.10)
             )
+            
+            # Log for debugging
+            if is_reasoning_unknown or is_low_confidence_success:
+                logger.warning(
+                    f"[Learning] FAILURE SIGNAL DETECTED: reasoning_type={metadata.get('reasoning_type')}, "
+                    f"confidence={confidence_value}, status={status}"
+                )
+            
             is_uninformative_general = (
                 is_explicitly_uninformative or 
                 is_reasoning_unknown or
