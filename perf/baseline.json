@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "version": "1.0.0",
+  "description": "Performance baseline for VULCAN perf tests. Used for regression detection in CI.",
+  "created_date": "2025-01-03",
+  "last_updated": "2025-01-03",
+  "environment": {
+    "python_version": "3.11",
+    "os": "ubuntu-latest",
+    "runner": "github-actions",
+    "notes": "Baseline established using mock reasoners for CI stability"
+  },
+  "thresholds": {
+    "max_p95_regression_pct": 25,
+    "max_rps_regression_pct": 25,
+    "max_rss_growth_mb": 50,
+    "max_slowdown_pct": 20,
+    "description": "Configurable via PERF_MAX_* environment variables"
+  },
+  "benchmarks": {
+    "micro_benchmarks": {
+      "reasoner_warmup": {
+        "init_time_max_seconds": 5.0,
+        "warmup_avg_max_seconds": 1.0,
+        "description": "Maximum acceptable warmup times"
+      },
+      "single_query": {
+        "latency_max_seconds": 1.0,
+        "description": "Maximum latency for single mock query"
+      },
+      "batch_throughput": {
+        "min_qps": 1.0,
+        "description": "Minimum queries per second for sequential batch"
+      }
+    },
+    "concurrency": {
+      "threadpool": {
+        "concurrency_10": {
+          "min_throughput_qps": 5.0,
+          "max_latency_p95_seconds": 2.0,
+          "min_success_rate": 0.95
+        },
+        "concurrency_25": {
+          "min_throughput_qps": 10.0,
+          "max_latency_p95_seconds": 3.0,
+          "min_success_rate": 0.90
+        },
+        "concurrency_50": {
+          "min_throughput_qps": 15.0,
+          "max_latency_p95_seconds": 5.0,
+          "min_success_rate": 0.85
+        }
+      },
+      "asyncio": {
+        "concurrency_10": {
+          "min_throughput_qps": 5.0,
+          "max_latency_p95_seconds": 2.0
+        },
+        "concurrency_25": {
+          "min_throughput_qps": 10.0,
+          "max_latency_p95_seconds": 3.0
+        },
+        "concurrency_50": {
+          "min_throughput_qps": 15.0,
+          "max_latency_p95_seconds": 5.0
+        }
+      }
+    },
+    "end_to_end": {
+      "pipeline": {
+        "avg_latency_max_seconds": 0.5,
+        "p95_latency_max_seconds": 1.0,
+        "min_throughput_qps": 2.0
+      }
+    },
+    "boundedness": {
+      "rss_growth": {
+        "max_growth_mb": 50,
+        "iterations": 500
+      },
+      "performance_stability": {
+        "max_slowdown_pct": 20,
+        "iterations": 500
+      },
+      "history_bounds": {
+        "max_provenance_records": 1000,
+        "max_cache_entries": 500
+      }
+    }
+  },
+  "metadata": {
+    "framework_version": "1.0.0",
+    "test_modules": [
+      "tests/perf/test_perf_smoke.py",
+      "tests/perf/test_boundedness.py",
+      "tests/perf/test_deps.py"
+    ],
+    "update_command": "python scripts/update_perf_baseline.py",
+    "compare_script": "python scripts/compare_perf.py"
+  }
+}

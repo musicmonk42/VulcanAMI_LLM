@@ -537,3 +537,200 @@ jobs:
       - name: Check for outdated packages
         run: |
           pip list --outdated || true
+
+  # ============================================================================
+  # Performance Smoke Tests Job
+  # ============================================================================
+  perf-smoke:
+    name: Performance Smoke Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [lint]
+    # Run on push to main/develop and PRs, but allow workflow_dispatch
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'push' ||
+      github.event_name == 'pull_request'
+
+    permissions:
+      contents: read
+
+    env:
+      PYTHONPATH: ${{ github.workspace }}/src
+      PYTHONUNBUFFERED: '1'
+      # Performance test configuration (can be overridden)
+      PERF_ITERATIONS: '100'
+      PERF_CONCURRENCY_LEVELS: '10,25'
+      PERF_MAX_RSS_GROWTH_MB: '50'
+      PERF_MAX_SLOWDOWN_PCT: '20'
+      PERF_MAX_P95_REGRESSION_PCT: '25'
+      PERF_MAX_RPS_REGRESSION_PCT: '25'
+      PERF_OUTPUT_DIR: 'perf'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          lfs: false
+          persist-credentials: false
+
+      - name: Free up runner disk space
+        run: |
+          set -euo pipefail
+          echo "Disk usage before cleanup:" && df -h || true
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/boost || true
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY" || true
+          sudo apt-get clean || true
+          sudo rm -rf /var/lib/apt/lists/* || true
+          python -m pip cache purge || true
+          sudo rm -rf /home/runner/.cache/* /home/runner/.local/share/virtualenvs/* || true
+          sudo docker system prune -af --volumes || true
+          echo "Disk usage after cleanup:" && df -h || true
+
+      - name: Ensure cert directory readable
+        if: always()
+        run: |
+          REPO_CERT_DIR="${{ github.workspace }}/configs/minio/certs"
+          mkdir -p "$REPO_CERT_DIR/CAs"
+          chmod -R a+rX "$REPO_CERT_DIR" || true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install perf-lite dependencies
+        run: |
+          set -x
+          python -m pip install --no-cache-dir --upgrade pip setuptools wheel
+
+          echo "=================================================="
+          echo "Installing VULCAN as editable package with perf-lite deps..."
+          echo "=================================================="
+          pip install -e ".[perf-lite]"
+
+          # Verify psutil is available (critical for memory tracking)
+          python -c "import psutil; print(f'psutil {psutil.__version__} installed')"
+
+          echo "=================================================="
+          echo "Perf-lite dependencies installed successfully"
+          echo "=================================================="
+
+      - name: Verify VULCAN installation
+        run: |
+          echo "Verifying VULCAN package installation..."
+          python scripts/verify_installation.py --critical-only || {
+            echo "⚠ VULCAN installation verification had issues"
+            echo "Performance tests will use mock components"
+          }
+
+      - name: Create output directories
+        run: |
+          mkdir -p perf
+          mkdir -p logs
+
+      - name: Run performance smoke tests
+        id: perf_tests
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          echo "=================================================="
+          echo "Running Performance Smoke Tests"
+          echo "=================================================="
+          echo "Configuration:"
+          echo "  PERF_ITERATIONS: $PERF_ITERATIONS"
+          echo "  PERF_CONCURRENCY_LEVELS: $PERF_CONCURRENCY_LEVELS"
+          echo "  PERF_MAX_RSS_GROWTH_MB: $PERF_MAX_RSS_GROWTH_MB"
+          echo "  PERF_MAX_SLOWDOWN_PCT: $PERF_MAX_SLOWDOWN_PCT"
+          echo ""
+
+          # Run perf tests with pytest
+          pytest tests/perf/ \
+            -m "perf or boundedness" \
+            -v \
+            --timeout=300 \
+            --tb=short \
+            --junitxml=perf/perf-junit.xml \
+            2>&1 | tee logs/perf-test-output.log
+
+          PERF_EXIT=${PIPESTATUS[0]}
+          echo "perf_exit_code=$PERF_EXIT" >> $GITHUB_OUTPUT
+          exit $PERF_EXIT
+
+      - name: Run regression comparison
+        if: always()
+        continue-on-error: true
+        run: |
+          echo "=================================================="
+          echo "Running Performance Regression Check"
+          echo "=================================================="
+
+          # Run comparison script (won't fail CI if no results yet)
+          python scripts/compare_perf.py \
+            --results perf/results.json \
+            --baseline perf/baseline.json \
+            --output perf/comparison.md \
+            --no-fail \
+            2>&1 | tee logs/perf-comparison.log || true
+
+      - name: Generate performance summary
+        if: always()
+        run: |
+          echo "### 🚀 Performance Smoke Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Add test result status
+          if [ "${{ steps.perf_tests.outputs.perf_exit_code }}" = "0" ]; then
+            echo "**Status:** ✅ All performance tests passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**Status:** ⚠️ Some performance tests failed (exit code: ${{ steps.perf_tests.outputs.perf_exit_code }})" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Add configuration
+          echo "**Configuration:**" >> $GITHUB_STEP_SUMMARY
+          echo "- Iterations: $PERF_ITERATIONS" >> $GITHUB_STEP_SUMMARY
+          echo "- Concurrency levels: $PERF_CONCURRENCY_LEVELS" >> $GITHUB_STEP_SUMMARY
+          echo "- Max RSS growth: ${PERF_MAX_RSS_GROWTH_MB}MB" >> $GITHUB_STEP_SUMMARY
+          echo "- Max slowdown: ${PERF_MAX_SLOWDOWN_PCT}%" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Include comparison report if available
+          if [ -f perf/comparison.md ]; then
+            echo "---" >> $GITHUB_STEP_SUMMARY
+            cat perf/comparison.md >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload performance artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: perf-smoke-results-${{ github.run_number }}
+          path: |
+            perf/*.json
+            perf/*.md
+            perf/*.xml
+            logs/perf-*.log
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Check test results
+        if: always()
+        run: |
+          # Check if tests passed
+          EXIT_CODE="${{ steps.perf_tests.outputs.perf_exit_code }}"
+          if [ -z "$EXIT_CODE" ]; then
+            EXIT_CODE="unknown"
+          fi
+
+          echo "Performance test exit code: $EXIT_CODE"
+
+          # For now, we don't fail the workflow on perf test failures
+          # to avoid blocking PRs during initial rollout
+          if [ "$EXIT_CODE" != "0" ] && [ "$EXIT_CODE" != "unknown" ]; then
+            echo "⚠️ Performance tests had failures - see artifacts for details"
+            # Uncomment to fail CI on perf test failures:
+            # exit 1
+          fi
