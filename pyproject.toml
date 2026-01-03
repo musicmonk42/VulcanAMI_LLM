@@ -57,6 +57,45 @@ test = [
     "psutil>=5.9.0",
     "httpx>=0.24.0",
 ]
+# Lite-full: Dependencies for CI performance tests (fast install, no heavy deps)
+# Use: pip install -e ".[perf-lite]"
+perf-lite = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-timeout>=2.3.0",
+    "pytest-benchmark>=4.0.0",
+    "psutil>=5.9.0",
+    "requests>=2.28.0",
+    "aiohttp>=3.8.0",
+    "scikit-learn>=1.3.0",
+    "networkx>=3.0",
+    "statsmodels>=0.14.0",
+    "sympy>=1.12",
+    "pandas>=2.0.0",
+    "PyYAML>=6.0",
+    "Whoosh>=2.7.4",
+]
+# Full perf: All reasoning/ML dependencies (heavy, use for nightly/extended tests)
+# Use: pip install -e ".[perf-full]"
+perf-full = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-timeout>=2.3.0",
+    "pytest-benchmark>=4.0.0",
+    "psutil>=5.9.0",
+    "requests>=2.28.0",
+    "aiohttp>=3.8.0",
+    "scikit-learn>=1.3.0",
+    "networkx>=3.0",
+    "statsmodels>=0.14.0",
+    "sympy>=1.12",
+    "pandas>=2.0.0",
+    "PyYAML>=6.0",
+    "Whoosh>=2.7.4",
+    "torch>=2.0.0",
+    "sentence-transformers>=2.2.0",
+    "faiss-cpu>=1.7.4",
+]
 
 [project.urls]
 Homepage = "https://github.com/musicmonk42/VulcanAMI_LLM"
