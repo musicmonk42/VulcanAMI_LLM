@@ -3559,9 +3559,9 @@ class AgentPoolManager:
             "symbolic_task": ReasoningType.SYMBOLIC,
             "reasoning_task": ReasoningType.HYBRID,
             "general_task": ReasoningType.SYMBOLIC,
-            # Note: execution_task uses HYBRID (not SYMBOLIC) because execution often involves
-            # multi-step planning and may include mathematical operations. HYBRID provides
-            # fallback to PROBABILISTIC reasoner which has uncertainty quantification.
+            # Note: execution_task uses HYBRID because execution often involves multi-step
+            # planning and may include mathematical operations. HYBRID reasoning combines
+            # multiple reasoning types adaptively (see _execute_task in unified_reasoning.py).
             "execution_task": ReasoningType.HYBRID,
             "perception_task": ReasoningType.ANALOGICAL,  # Perception uses pattern matching
             "planning_task": ReasoningType.HYBRID,  # Planning uses hybrid reasoning
