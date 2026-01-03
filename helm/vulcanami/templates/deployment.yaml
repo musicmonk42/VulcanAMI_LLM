@@ -325,6 +325,15 @@ spec:
         - name: OPENAI_LANGUAGE_POLISH
           value: {{ .Values.hybridOutput.openaiLanguagePolish | default false | quote }}
         {{- end }}
+        {{- /* SKIP_OPENAI: Controls whether OpenAI fallback is disabled */}}
+        {{- /* When false (default), OpenAI fallback is enabled */}}
+        {{- /* When true, OpenAI is disabled even if API key is set */}}
+        {{- if .Values.llm }}
+        {{- if .Values.llm.openai }}
+        - name: SKIP_OPENAI
+          value: {{ .Values.llm.openai.skipOpenai | default false | quote }}
+        {{- end }}
+        {{- end }}
         {{- if .Values.memorySystem.enabled }}
         # Vulcan Memory System v46 AWS credentials
         {{- if .Values.secrets.awsAccessKeyId }}
