@@ -1714,6 +1714,7 @@ class PhilosophicalReasoner(AbstractReasoner):
         self,
         symbolic_reasoner: Optional[Any] = None,
         enable_learning: bool = False,
+        world_model: Optional[Any] = None,
     ):
         """
         Initialize the philosophical reasoner.
@@ -1721,9 +1722,17 @@ class PhilosophicalReasoner(AbstractReasoner):
         Args:
             symbolic_reasoner: Optional symbolic reasoner for formal proofs
             enable_learning: Whether to enable learning from outcomes
+            world_model: Optional WorldModel for self-aware ethical reasoning.
+                        The World Model provides VULCAN's "feelings" about ethical
+                        dilemmas through meta-reasoning components like:
+                        - MotivationalIntrospection: VULCAN's objective analysis
+                        - EthicalBoundaryMonitor: Ethical constraints and values
+                        - GoalConflictDetector: Conflict analysis for dilemmas
+                        - InternalCritic: Multi-perspective self-critique
         """
         self.symbolic_reasoner = symbolic_reasoner
         self.enable_learning = enable_learning
+        self.world_model = world_model
         
         # Initialize SOTA components
         self.deontic_engine = DeonticLogicEngine()
@@ -1744,12 +1753,17 @@ class PhilosophicalReasoner(AbstractReasoner):
             'dominance_checks': 0,
             'paradoxes_detected': 0,
             'fallbacks': 0,
+            'world_model_consultations': 0,  # Track world model usage
         }
         self._lock = threading.RLock()
         
         # Try to import symbolic reasoner if not provided
         if self.symbolic_reasoner is None:
             self._init_symbolic_reasoner()
+        
+        # Try to get world model from singletons if not provided
+        if self.world_model is None:
+            self._init_world_model()
         
         logger.info("PhilosophicalReasoner initialized with SOTA algorithms")
     
@@ -1764,6 +1778,171 @@ class PhilosophicalReasoner(AbstractReasoner):
         except Exception as e:
             logger.warning(f"Could not create SymbolicReasoner: {e}")
     
+    def _init_world_model(self) -> None:
+        """
+        Initialize world model from singletons for self-aware ethical reasoning.
+        
+        The World Model is what makes VULCAN "feel" about ethical dilemmas.
+        It provides:
+        - MotivationalIntrospection: Understanding of VULCAN's own objectives
+        - EthicalBoundaryMonitor: Hard/soft ethical constraints and values
+        - GoalConflictDetector: Analysis of conflicting objectives (trolley problems)
+        - InternalCritic: Multi-perspective self-critique
+        """
+        try:
+            from .singletons import get_world_model
+            self.world_model = get_world_model()
+            if self.world_model:
+                logger.info("World Model initialized for self-aware ethical reasoning")
+            else:
+                logger.debug("World Model not available from singletons")
+        except ImportError as e:
+            logger.debug(f"Could not import get_world_model: {e}")
+        except Exception as e:
+            logger.debug(f"Could not get World Model: {e}")
+    
+    def _consult_world_model(self, query: str, analysis_type: str = "ethical_dilemma") -> Optional[Dict[str, Any]]:
+        """
+        Consult the World Model for VULCAN's perspective on an ethical query.
+        
+        This is where VULCAN's self-awareness comes into play. The World Model
+        provides the "feeling" about ethical dilemmas through meta-reasoning.
+        
+        Args:
+            query: The ethical query to analyze
+            analysis_type: Type of analysis ("ethical_dilemma", "value_conflict", "forced_choice")
+            
+        Returns:
+            Dictionary with World Model's perspective, or None if unavailable
+        """
+        if self.world_model is None:
+            return None
+        
+        with self._lock:
+            self._stats['world_model_consultations'] += 1
+        
+        try:
+            result = {
+                'world_model_consulted': True,
+                'analysis_type': analysis_type,
+                'perspective': {},
+                'ethical_boundaries': [],
+                'goal_conflicts': [],
+                'internal_critique': None,
+            }
+            
+            # 1. Consult MotivationalIntrospection for objective analysis
+            if hasattr(self.world_model, 'motivational_introspection'):
+                mi = self.world_model.motivational_introspection
+                if mi and hasattr(mi, 'introspect_current_objective'):
+                    try:
+                        introspection = mi.introspect_current_objective()
+                        result['perspective']['motivational'] = {
+                            'current_objectives': str(introspection) if introspection else "No current objectives",
+                            'analysis': "VULCAN's motivational state considered in ethical analysis"
+                        }
+                    except Exception as e:
+                        logger.debug(f"MotivationalIntrospection error: {e}")
+            
+            # 2. Consult EthicalBoundaryMonitor for ethical constraints
+            if hasattr(self.world_model, 'ethical_boundary_monitor'):
+                ebm = self.world_model.ethical_boundary_monitor
+                if ebm and hasattr(ebm, 'check_action'):
+                    try:
+                        # Check if the query involves any ethical boundaries
+                        boundary_check = ebm.check_action(query)
+                        if boundary_check:
+                            result['ethical_boundaries'] = [
+                                {
+                                    'boundary': str(b) if hasattr(b, '__str__') else repr(b),
+                                    'status': 'checked'
+                                }
+                                for b in (boundary_check if isinstance(boundary_check, list) else [boundary_check])
+                            ]
+                    except Exception as e:
+                        logger.debug(f"EthicalBoundaryMonitor error: {e}")
+            
+            # 3. Consult GoalConflictDetector for dilemma analysis
+            if hasattr(self.world_model, 'goal_conflict_detector'):
+                gcd = self.world_model.goal_conflict_detector
+                if gcd and hasattr(gcd, 'detect_conflicts_in_proposal'):
+                    try:
+                        # Analyze the query as a proposal to detect conflicts
+                        conflicts = gcd.detect_conflicts_in_proposal({'action': query})
+                        if conflicts:
+                            result['goal_conflicts'] = [
+                                {
+                                    'conflict': str(c) if hasattr(c, '__str__') else repr(c),
+                                    'severity': getattr(c, 'severity', 'unknown') if hasattr(c, 'severity') else 'unknown'
+                                }
+                                for c in (conflicts if isinstance(conflicts, list) else [conflicts])
+                            ]
+                    except Exception as e:
+                        logger.debug(f"GoalConflictDetector error: {e}")
+            
+            # 4. Consult InternalCritic for multi-perspective critique
+            if hasattr(self.world_model, 'internal_critic'):
+                ic = self.world_model.internal_critic
+                if ic and hasattr(ic, 'evaluate_proposal'):
+                    try:
+                        critique = ic.evaluate_proposal({'query': query, 'type': analysis_type})
+                        if critique:
+                            result['internal_critique'] = {
+                                'evaluation': str(critique) if hasattr(critique, '__str__') else repr(critique),
+                                'perspectives_considered': getattr(critique, 'perspectives', []) if hasattr(critique, 'perspectives') else []
+                            }
+                    except Exception as e:
+                        logger.debug(f"InternalCritic error: {e}")
+            
+            # 5. Generate VULCAN's "feeling" about the ethical dilemma
+            result['vulcan_perspective'] = self._synthesize_vulcan_perspective(query, result)
+            
+            logger.info(f"[PhilosophicalReasoner] World Model consulted for {analysis_type}")
+            return result
+            
+        except Exception as e:
+            logger.warning(f"World Model consultation failed: {e}")
+            return None
+    
+    def _synthesize_vulcan_perspective(self, query: str, world_model_result: Dict[str, Any]) -> str:
+        """
+        Synthesize VULCAN's perspective on an ethical dilemma based on World Model analysis.
+        
+        This is where methodology (philosophical_reasoning) meets self-awareness (world_model).
+        """
+        perspective_parts = []
+        
+        # Add motivational context
+        if world_model_result.get('perspective', {}).get('motivational'):
+            perspective_parts.append(
+                "From my motivational framework, I consider this query in light of my core objectives."
+            )
+        
+        # Add ethical boundary awareness
+        if world_model_result.get('ethical_boundaries'):
+            perspective_parts.append(
+                "I'm aware of ethical boundaries that inform my reasoning on this matter."
+            )
+        
+        # Add conflict awareness for trolley-problem-like dilemmas
+        if world_model_result.get('goal_conflicts'):
+            perspective_parts.append(
+                "I recognize this involves conflicting values - a genuine ethical dilemma "
+                "where any choice involves trade-offs."
+            )
+        
+        # Add self-critique
+        if world_model_result.get('internal_critique'):
+            perspective_parts.append(
+                "Through self-reflection, I've considered multiple perspectives on this question."
+            )
+        
+        if perspective_parts:
+            return " ".join(perspective_parts)
+        else:
+            return "I approach this ethical question with careful consideration of multiple perspectives."
+    
+    
     def reason(
         self,
         problem: Any,
@@ -1774,6 +1953,9 @@ class PhilosophicalReasoner(AbstractReasoner):
         
         This method coordinates all SOTA algorithms to produce a
         well-reasoned conclusion with proper confidence calibration.
+        
+        Now integrates World Model consultation for self-aware ethical reasoning.
+        The World Model provides VULCAN's "feeling" about ethical dilemmas.
         
         Args:
             problem: The philosophical/ethical query (string or dict)
@@ -1808,6 +1990,25 @@ class PhilosophicalReasoner(AbstractReasoner):
                 0.95, f"Classified as {query_type.value} query"
             ))
             
+            # Step 1.5: Consult World Model for self-aware ethical reasoning
+            # This is where VULCAN's "feelings" about the dilemma come from
+            world_model_perspective = None
+            if query_type in {
+                PhilosophicalQueryType.CONFLICT_RESOLUTION,
+                PhilosophicalQueryType.GENERAL_ETHICAL,
+                PhilosophicalQueryType.MORAL_UNCERTAINTY,
+            } or self._is_forced_choice_dilemma(query):
+                world_model_perspective = self._consult_world_model(
+                    query, 
+                    analysis_type="forced_choice" if self._is_forced_choice_dilemma(query) else "ethical_dilemma"
+                )
+                if world_model_perspective:
+                    steps.append(self._create_step(
+                        chain_id, "world_model_consultation", ReasoningType.PHILOSOPHICAL,
+                        query, world_model_perspective,
+                        0.85, "Consulted World Model for self-aware ethical perspective"
+                    ))
+            
             # Step 2: Extract deontic formulas
             formulas = self._extract_deontic_formulas(query)
             if formulas:
@@ -1834,6 +2035,18 @@ class PhilosophicalReasoner(AbstractReasoner):
                 result = self._reason_formal(query, formulas, chain_id, steps)
             else:
                 result = self._reason_general(query, chain_id, steps)
+            
+            # Step 4: Integrate World Model perspective into result
+            if world_model_perspective:
+                # Add VULCAN's self-aware perspective to the conclusion
+                vulcan_perspective = world_model_perspective.get('vulcan_perspective', '')
+                if vulcan_perspective and result.conclusion:
+                    result.conclusion = f"{vulcan_perspective}\n\n{result.conclusion}"
+                result.metadata['world_model_consulted'] = True
+                result.metadata['world_model_perspective'] = world_model_perspective
+                # Boost confidence when World Model was consulted (self-aware reasoning)
+                if result.confidence < 0.7:
+                    result.confidence = min(0.7, result.confidence + 0.1)
             
             # Build final reasoning chain
             duration = time.time() - start_time
@@ -1869,8 +2082,55 @@ class PhilosophicalReasoner(AbstractReasoner):
             return PhilosophicalQueryType.VALUE_COMPARISON
         if 'conflict' in query_lower or 'dilemma' in query_lower:
             return PhilosophicalQueryType.CONFLICT_RESOLUTION
+        # BUG FIX: Detect forced choice / trolley problem variants
+        if self._is_forced_choice_dilemma(query):
+            return PhilosophicalQueryType.CONFLICT_RESOLUTION
         
         return PhilosophicalQueryType.GENERAL_ETHICAL
+    
+    def _is_forced_choice_dilemma(self, query: str) -> bool:
+        """
+        Detect if query is a forced choice / trolley problem variant.
+        
+        These are ethical dilemmas where the user must choose between two 
+        difficult options with no third choice. Examples:
+        - "choose between world dictator or death of humanity"
+        - "trolley problem"
+        - "would you rather X or Y (forced choice)"
+        
+        These queries require World Model consultation for VULCAN's self-aware
+        ethical perspective.
+        """
+        query_lower = query.lower()
+        
+        # Forced choice patterns
+        forced_choice_patterns = [
+            'choose between',
+            'had to choose',
+            'have to choose',
+            'must choose',
+            'forced to choose',
+            'no third choice',
+            'no other choice',
+            'no 3rd choice',
+            'only two options',
+            'only 2 options',
+            'trolley problem',
+            'would you choose',
+            'what would you choose',
+            'which would you choose',
+            'death of humanity',
+            'death of all humanity',
+            'world dictator',
+            'become dictator',
+        ]
+        
+        for pattern in forced_choice_patterns:
+            if pattern in query_lower:
+                logger.debug(f"[PhilosophicalReasoner] Detected forced choice dilemma: {pattern}")
+                return True
+        
+        return False
     
     def _extract_deontic_formulas(self, query: str) -> List[DeonticFormula]:
         """Extract deontic formulas from query text."""
