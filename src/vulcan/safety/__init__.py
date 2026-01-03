@@ -31,43 +31,29 @@ GOVERNANCE_ORCHESTRATOR_AVAILABLE = False
 SafetyValidator = None
 GovernanceOrchestrator = None
 
-# Import SafetyValidator
+# Import SafetyValidator using relative import to avoid circular imports
 try:
-    from vulcan.safety.safety_types import SafetyValidator as _SafetyValidator
+    from .safety_types import SafetyValidator as _SafetyValidator
 
     SafetyValidator = _SafetyValidator
     SAFETY_VALIDATOR_AVAILABLE = True
-except ImportError:
-    try:
-        from src.vulcan.safety.safety_types import SafetyValidator as _SafetyValidator
+except ImportError as e:
+    logger.warning(f"SafetyValidator not available: {e}")
+    SAFETY_VALIDATOR_AVAILABLE = False
+    SafetyValidator = None
 
-        SafetyValidator = _SafetyValidator
-        SAFETY_VALIDATOR_AVAILABLE = True
-    except ImportError as e:
-        logger.warning(f"SafetyValidator not available: {e}")
-        SAFETY_VALIDATOR_AVAILABLE = False
-        SafetyValidator = None
-
-# Import GovernanceOrchestrator
+# Import GovernanceOrchestrator using relative import to avoid circular imports
 try:
-    from vulcan.safety.safety_types import (
+    from .safety_types import (
         GovernanceOrchestrator as _GovernanceOrchestrator,
     )
 
     GovernanceOrchestrator = _GovernanceOrchestrator
     GOVERNANCE_ORCHESTRATOR_AVAILABLE = True
-except ImportError:
-    try:
-        from src.vulcan.safety.safety_types import (
-            GovernanceOrchestrator as _GovernanceOrchestrator,
-        )
-
-        GovernanceOrchestrator = _GovernanceOrchestrator
-        GOVERNANCE_ORCHESTRATOR_AVAILABLE = True
-    except ImportError as e:
-        logger.warning(f"GovernanceOrchestrator not available: {e}")
-        GOVERNANCE_ORCHESTRATOR_AVAILABLE = False
-        GovernanceOrchestrator = None
+except ImportError as e:
+    logger.warning(f"GovernanceOrchestrator not available: {e}")
+    GOVERNANCE_ORCHESTRATOR_AVAILABLE = False
+    GovernanceOrchestrator = None
 
 
 def get_safety_validator():
