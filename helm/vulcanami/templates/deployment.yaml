@@ -139,6 +139,36 @@ spec:
         - name: PYTHON_UNBUFFERED
           value: {{ .pythonUnbuffered | quote }}
         {{- end }}
+        {{- /* LLM API Keys (CRITICAL for chat features) */}}
+        {{- if .Values.secrets.openaiApiKey }}
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "vulcanami.fullname" . }}-secrets
+              key: openaiApiKey
+        {{- end }}
+        {{- if .Values.secrets.anthropicApiKey }}
+        - name: ANTHROPIC_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "vulcanami.fullname" . }}-secrets
+              key: anthropicApiKey
+        {{- end }}
+        {{- if .Values.secrets.graphixApiKey }}
+        - name: GRAPHIX_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "vulcanami.fullname" . }}-secrets
+              key: graphixApiKey
+        {{- end }}
+        {{- /* VULCAN_LLM_API_KEY defaults to OPENAI_API_KEY if not set */}}
+        {{- if .Values.secrets.openaiApiKey }}
+        - name: VULCAN_LLM_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "vulcanami.fullname" . }}-secrets
+              key: openaiApiKey
+        {{- end }}
         {{- if .Values.security }}
         {{- if .Values.security.modelRevisions }}
         {{- if .Values.security.modelRevisions.textModel }}
