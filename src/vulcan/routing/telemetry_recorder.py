@@ -1290,16 +1290,19 @@ class TelemetryRecorder:
         if self._flush_thread and self._flush_thread.is_alive():
             self._flush_thread.join(timeout=5.0)
 
-        # Final synchronous flush
+        # Mark executor as shut down BEFORE final flush
+        # This prevents flush_async() from trying to submit new work
+        self._executor_shutdown = True
+
+        # Final synchronous flush - do it directly without using flush_async()
         try:
-            self.flush()
+            # Manually trigger a background flush one last time
+            if not self._flush_in_progress.is_set():
+                self._flush_in_progress.set()
+                self._do_flush_in_background()
         except Exception as e:
             logger.error(f"[TelemetryRecorder] Error during shutdown flush: {e}")
 
-        # Mark executor as shut down BEFORE shutting it down
-        # This prevents flush_async() from trying to submit new work
-        self._executor_shutdown = True
-        
         # Shutdown thread pool
         self._io_executor.shutdown(wait=True, cancel_futures=False)
 
