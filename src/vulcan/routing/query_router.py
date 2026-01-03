@@ -2358,6 +2358,114 @@ class QueryAnalyzer:
         query_id = f"q_{uuid.uuid4().hex[:12]}"
         query_lower = query.lower()
 
+        # =================================================================
+        # LLM-BASED QUERY CLASSIFICATION (BUG FIX)
+        # =================================================================
+        # This fixes the fundamental issue where "hello" got complexity=0.50
+        # (same as complex SAT problems) because the old heuristic-based
+        # complexity calculation didn't understand query meaning.
+        #
+        # The QueryClassifier uses:
+        # 1. Fast keyword matching for obvious cases (greetings, factual, etc.)
+        # 2. LLM-based classification for ambiguous queries
+        # 3. Caching to avoid repeated classifications
+        # =================================================================
+        try:
+            from .query_classifier import classify_query, QueryCategory
+            
+            classification = classify_query(query)
+            
+            # Log the classification result
+            logger.info(
+                f"[QueryRouter] {query_id}: LLM Classification: "
+                f"category={classification.category}, complexity={classification.complexity:.2f}, "
+                f"skip_reasoning={classification.skip_reasoning}, tools={classification.suggested_tools}"
+            )
+            
+            # If classifier says skip reasoning (greetings, chitchat, simple factual)
+            # return a fast-path plan immediately
+            if classification.skip_reasoning and classification.complexity < 0.3:
+                # Determine learning mode
+                if source == "user":
+                    learning_mode = LearningMode.USER_INTERACTION
+                    with self._lock:
+                        self._user_interaction_count += 1
+                    telemetry_category = "user_query"
+                else:
+                    learning_mode = LearningMode.AI_INTERACTION
+                    with self._lock:
+                        self._ai_interaction_count += 1
+                    telemetry_category = f"{source}_interaction"
+                
+                # Map category to query type
+                category_to_type = {
+                    "GREETING": QueryType.CONVERSATIONAL,
+                    "CHITCHAT": QueryType.CONVERSATIONAL,
+                    "FACTUAL": QueryType.GENERAL,
+                }
+                query_type = category_to_type.get(
+                    classification.category, QueryType.GENERAL
+                )
+                
+                plan = ProcessingPlan(
+                    query_id=query_id,
+                    original_query=query,
+                    source=source,
+                    learning_mode=learning_mode,
+                    query_type=query_type,
+                    complexity_score=classification.complexity,
+                    uncertainty_score=0.0,
+                    collaboration_needed=False,
+                    arena_participation=False,
+                    telemetry_category=telemetry_category,
+                    telemetry_data={
+                        "session_id": session_id,
+                        "query_length": len(query),
+                        "word_count": len(query.split()),
+                        "query_number": query_number,
+                        "source": source,
+                        "learning_mode": learning_mode.value,
+                        "fast_path": True,
+                        "classifier_category": classification.category,
+                        "classifier_source": classification.source,
+                    },
+                )
+                
+                plan.safety_passed = True
+                plan.detected_patterns.append(f"classifier_{classification.category.lower()}")
+                
+                plan.agent_tasks = [
+                    AgentTask(
+                        task_id=f"task_{uuid.uuid4().hex[:8]}_{classification.category.lower()}",
+                        task_type="general_task",
+                        capability="general",
+                        prompt=query,
+                        priority=1,
+                        timeout_seconds=10.0,
+                        parameters={
+                            "is_simple": True,
+                            "skip_heavy_analysis": True,
+                            "skip_arena": True,
+                            "tools": classification.suggested_tools or ["general"],
+                            "response_type": "conversational",
+                        },
+                    )
+                ]
+                
+                plan.telemetry_data["selected_tools"] = classification.suggested_tools or ["general"]
+                plan.telemetry_data["reasoning_strategy"] = f"classifier_{classification.category.lower()}"
+                
+                logger.info(
+                    f"[QueryRouter] {query_id}: CLASSIFIER-FAST-PATH ({classification.category}) "
+                    f"source={source}, complexity={classification.complexity:.2f}"
+                )
+                return plan
+                
+        except ImportError:
+            logger.debug("[QueryRouter] QueryClassifier not available, using heuristic fallback")
+        except Exception as e:
+            logger.warning(f"[QueryRouter] QueryClassifier failed: {e}, using heuristic fallback")
+
         # BUG #2 FIX: Fast-path for trivial queries to avoid 100-200s latency
         if query and self._is_trivial_query(query):
             logger.debug(f"[QueryRouter] {query_id}: Fast-path for trivial query")

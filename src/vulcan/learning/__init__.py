@@ -37,6 +37,12 @@ WEIGHT_DECAY_INTERVAL_SECONDS = 3600  # Apply decay every hour
 WEIGHT_DECAY_EPSILON = 0.001  # Weights below this threshold are considered zero
 MAX_DECAY_INTERVALS = 168  # Cap decay at 1 week (168 hours) to prevent precision issues
 
+# BUG #4 FIX: Corruption Detection Margin
+# This margin is added to MAX_TOOL_WEIGHT when checking for dominance at startup.
+# It allows some leeway before triggering a reset, since weights slightly above
+# MAX_TOOL_WEIGHT aren't necessarily corruption - they might just need clamping.
+CORRUPTION_THRESHOLD_MARGIN = 0.15  # Results in dominance threshold of 0.35 (MAX_TOOL_WEIGHT + 0.15)
+
 # ISSUE P0.3 FIX: Corrupted Weight Detection Constants
 # These constants control when tool weights are considered "corrupted" and need reset.
 # Corruption typically occurs from the "death spiral" bug (P0.1) where LLM failures
@@ -221,6 +227,16 @@ class UnifiedLearningSystem:
         if LEARNING_PERSISTENCE_AVAILABLE:
             try:
                 self._learning_persistence = LearningStatePersistence()
+                
+                # BUG #4 FIX: Check for dominated/corrupted weights at startup
+                # This resets weights if one tool has runaway positive feedback (>35%)
+                if hasattr(self._learning_persistence, 'reset_tool_weights_if_corrupted'):
+                    was_reset = self._learning_persistence.reset_tool_weights_if_corrupted(
+                        dominance_threshold=MAX_TOOL_WEIGHT + CORRUPTION_THRESHOLD_MARGIN
+                    )
+                    if was_reset:
+                        logger.warning("[Learning] Tool weights were reset due to corruption detected at startup")
+                
                 # Load previous tool weights from disk
                 persisted_state = self._learning_persistence.load_state()
                 persisted_weights = persisted_state.get("tool_weights", {})
@@ -459,6 +475,89 @@ class UnifiedLearningSystem:
                 abs(float(uncertainty_val) - 0.5) < 0.01
             )
             
+            # BUG #3 FIX: Detect general uninformative results (wrong tool selection)
+            # This prevents tools from accumulating positive weights when they were
+            # selected incorrectly (e.g., "analogical" for SAT problems).
+            # 
+            # Indicators of uninformative/wrong tool selection:
+            # 1. Explicit 'uninformative' flag in metadata
+            # 2. 'reasoning_type' == 'UNKNOWN' (tool couldn't classify the query)
+            # 3. Low confidence with "success" status (tool guessed but didn't understand)
+            is_explicitly_uninformative = metadata.get('uninformative', False)
+            is_reasoning_unknown = metadata.get('reasoning_type') == 'UNKNOWN'
+            
+            # BUG #3 FIX: Check confidence from multiple sources
+            # The confidence value might be in outcome['confidence'] or outcome['metadata']['confidence']
+            # or outcome['result']['confidence'] depending on the caller
+            confidence_value = outcome.get('confidence')
+            if confidence_value is None:
+                confidence_value = metadata.get('confidence')
+            if confidence_value is None:
+                confidence_value = 1.0  # Default to 1.0 if not found
+            
+            is_low_confidence_success = (
+                status == 'success' and
+                float(confidence_value) < 0.3  # Very low confidence (e.g., 0.10)
+            )
+            
+            # Log for debugging
+            if is_reasoning_unknown or is_low_confidence_success:
+                logger.warning(
+                    f"[Learning] FAILURE SIGNAL DETECTED: reasoning_type={metadata.get('reasoning_type')}, "
+                    f"confidence={confidence_value}, status={status}"
+                )
+            
+            is_uninformative_general = (
+                is_explicitly_uninformative or 
+                is_reasoning_unknown or
+                is_low_confidence_success
+            )
+            
+            # BUG #3 FIX (CRITICAL): Detect tool-query type MISMATCH
+            # This is the core fix for the runaway positive feedback loop.
+            # 
+            # The bug: 'analogical' gets +0.010 reward every time because it always
+            # "succeeds" (returns something), even when it's the WRONG tool.
+            # Meanwhile, correct tools (symbolic, probabilistic, causal) are never
+            # selected so they never get rewards.
+            #
+            # The fix: If query_type indicates a specific reasoning type but a
+            # DIFFERENT tool was used, that tool should be PENALIZED, not rewarded.
+            #
+            # Tool-to-query-type mapping:
+            TOOL_QUERY_TYPE_MAP = {
+                'symbolic': ['symbolic', 'logic', 'sat', 'proof', 'theorem', 'formal'],
+                'probabilistic': ['probabilistic', 'bayesian', 'bayes', 'probability', 'statistical'],
+                'causal': ['causal', 'causation', 'intervention', 'counterfactual'],
+                'mathematical': ['mathematical', 'math', 'computation', 'calculation', 'numeric'],
+                'analogical': ['analogical', 'analogy', 'mapping', 'structure'],
+            }
+            
+            # Check for tool-query type mismatch
+            is_tool_mismatch = False
+            mismatch_reason = ""
+            query_type_lower = query_type.lower() if query_type else ''
+            
+            for tool in tools:
+                tool_lower = tool.lower()
+                expected_types = TOOL_QUERY_TYPE_MAP.get(tool_lower, [])
+                
+                # If this tool has expected query types and query_type doesn't match any
+                if expected_types and query_type_lower:
+                    # Check if query_type matches what this tool expects
+                    tool_matches_query = any(qt in query_type_lower for qt in expected_types)
+                    
+                    # Check if query_type suggests a DIFFERENT tool should have been used
+                    for other_tool, other_types in TOOL_QUERY_TYPE_MAP.items():
+                        if other_tool != tool_lower:
+                            query_matches_other = any(qt in query_type_lower for qt in other_types)
+                            if query_matches_other and not tool_matches_query:
+                                is_tool_mismatch = True
+                                mismatch_reason = f"Tool '{tool}' used for '{query_type}' query (should use '{other_tool}')"
+                                break
+                    if is_tool_mismatch:
+                        break
+            
             if is_uninformative_probabilistic:
                 logger.warning(
                     f"[Learning] DETECTED uninformative probabilistic result (0.5/0.5): "
@@ -466,6 +565,25 @@ class UnifiedLearningSystem:
                 )
                 # Treat as failure - this query should not have gone to probabilistic
                 weight_delta = WEIGHT_ADJUSTMENT_FAILURE * 2  # Double penalty for bad routing
+            elif is_tool_mismatch:
+                # BUG #3 FIX (CRITICAL): Tool-query type mismatch detected
+                # This is the KEY fix for the analogical runaway feedback loop.
+                # When analogical is used for SAT/Bayes/Causal queries, PENALIZE it!
+                logger.warning(
+                    f"[Learning] TOOL-QUERY MISMATCH: {mismatch_reason}. "
+                    f"Applying PENALTY instead of reward to prevent runaway feedback."
+                )
+                weight_delta = WEIGHT_ADJUSTMENT_FAILURE * 2  # Double penalty for wrong tool
+            elif is_uninformative_general:
+                # BUG #3 FIX: Apply negative feedback for uninformative/UNKNOWN results
+                # This prevents the runaway positive feedback loop where tools like 'analogical'
+                # accumulate weight just because they're always selected (not because they're correct)
+                logger.warning(
+                    f"[Learning] DETECTED uninformative result: uninformative={is_explicitly_uninformative}, "
+                    f"reasoning_unknown={is_reasoning_unknown}, low_confidence_success={is_low_confidence_success}. "
+                    f"Applying PENALTY to tools: {tools}"
+                )
+                weight_delta = WEIGHT_ADJUSTMENT_FAILURE * 2  # Double penalty for wrong tool selection
             elif is_system_error and status != 'success':
                 logger.info(
                     f"[Learning] SKIPPING weight adjustment for system error: "
