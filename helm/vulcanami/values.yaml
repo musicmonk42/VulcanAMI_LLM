@@ -353,7 +353,8 @@ reasoning:
   problemDecomposer:
     enabled: true
     # Complexity threshold for using decomposition vs direct tool selection
-    complexityThreshold: 0.40
+    # FIX: Updated from 0.40 to 0.70 to match code default (prevents "boots up then silence" issue)
+    complexityThreshold: 0.70
   # Semantic bridge for cross-domain knowledge transfer
   semanticBridge:
     enabled: true

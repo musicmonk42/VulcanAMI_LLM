@@ -505,7 +505,7 @@ enable-reasoning-features: ## Enable all reasoning features (Problem Decomposer,
 	@echo ""
 	@echo "# Problem Decomposer (hierarchical query decomposition)"
 	@echo "PROBLEM_DECOMPOSER_ENABLED=true"
-	@echo "DECOMPOSITION_COMPLEXITY_THRESHOLD=0.40"
+	@echo "VULCAN_DECOMPOSITION_THRESHOLD=0.70"
 	@echo ""
 	@echo "# Semantic Bridge (cross-domain knowledge transfer)"
 	@echo "SEMANTIC_BRIDGE_ENABLED=true"
