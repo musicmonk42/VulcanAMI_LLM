@@ -1205,30 +1205,52 @@ class HybridLLMExecutor:
         # FALLBACK TO OPENAI: When internal LLM fails, use OpenAI for language generation
         # This implements the backup mechanism: OpenAI serves as fallback when internal LLM is down
         try:
-            openai_result = await self._call_openai(
-                loop, prompt, max_tokens, temperature, system_prompt, conversation_history
-            )
-            if self._is_valid_response(openai_result):
-                systems_used.append("openai_fallback")
-                self.logger.info("[HybridExecutor] ✓ OpenAI fallback succeeded (internal LLM was unavailable)")
-                return {
-                    "text": openai_result,
-                    "source": "openai_fallback",
-                    "systems_used": systems_used,
-                    "metadata": {
-                        "fallback_reason": "internal_llm_failed",
-                        "openai_role": "language_generation_fallback",
-                    },
-                }
+            # Check if OpenAI client is available before attempting fallback
+            openai_client = self.openai_client_getter()
+            if openai_client is None:
+                self.logger.error(
+                    "[HybridExecutor] ❌ OpenAI client is NOT available for fallback. "
+                    "Possible causes:\n"
+                    "  - OPENAI_API_KEY environment variable not set\n"
+                    "  - OPENAI_API_KEY secret not configured in repository\n"
+                    "  - SKIP_OPENAI environment variable is 'true'\n"
+                    "  - OpenAI client initialization failed\n"
+                    "To fix: Set OPENAI_API_KEY in repository secrets."
+                )
+                systems_used.append("openai_client_unavailable")
             else:
-                self.logger.warning("[HybridExecutor] ⚠ OpenAI fallback returned invalid response")
+                openai_result = await self._call_openai(
+                    loop, prompt, max_tokens, temperature, system_prompt, conversation_history
+                )
+                if self._is_valid_response(openai_result):
+                    systems_used.append("openai_fallback")
+                    self.logger.info("[HybridExecutor] ✓ OpenAI fallback succeeded (internal LLM was unavailable)")
+                    return {
+                        "text": openai_result,
+                        "source": "openai_fallback",
+                        "systems_used": systems_used,
+                        "metadata": {
+                            "fallback_reason": "internal_llm_failed",
+                            "openai_role": "language_generation_fallback",
+                        },
+                    }
+                else:
+                    self.logger.warning(
+                        "[HybridExecutor] ⚠ OpenAI fallback returned invalid response. "
+                        "Response may be empty or too short."
+                    )
+                    systems_used.append("openai_invalid_response")
         except Exception as openai_err:
-            self.logger.warning(f"[HybridExecutor] ⚠ OpenAI fallback also failed: {openai_err}")
+            self.logger.warning(
+                f"[HybridExecutor] ⚠ OpenAI fallback exception: {type(openai_err).__name__}: {openai_err}"
+            )
+            systems_used.append("openai_exception")
         
         # BOTH internal LLM AND OpenAI failed - return graceful error
         self.logger.error(
             "[HybridExecutor] ❌ Both internal LLM AND OpenAI fallback failed. "
-            "No language generation backend available."
+            "No language generation backend available. "
+            "Check CI logs for OPENAI_API_KEY configuration."
         )
         
         # GRACEFUL DEGRADATION FIX: Provide a user-friendly error message
@@ -1944,6 +1966,10 @@ class HybridLLMExecutor:
         
         openai_client = self.openai_client_getter()
         if not openai_client:
+            self.logger.debug(
+                "[HybridExecutor] OpenAI client not available - "
+                "check OPENAI_API_KEY env var or repository secrets"
+            )
             return None
 
         try:
