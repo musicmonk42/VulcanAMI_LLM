@@ -86,8 +86,11 @@ jobs:
       PYTHONUNBUFFERED: '1'
       # VULCAN configuration for testing
       VULCAN_SIMPLE_MODE: 'true'
-      SKIP_OPENAI: 'true'
-      OPENAI_LANGUAGE_FORMATTING: 'false'
+      # FIX: Enable OpenAI fallback to prevent "No language generation backend available" errors
+      # When internal LLM fails or times out, OpenAI provides a working fallback for language generation.
+      # Previously SKIP_OPENAI='true' caused both backends to fail, breaking scalability tests.
+      SKIP_OPENAI: 'false'
+      OPENAI_LANGUAGE_FORMATTING: 'true'
       # Signal to VULCAN conftest.py that we're in test mode.
       # This enables test-specific behaviors like non-blocking atexit handlers.
       PYTEST_RUNNING: '1'

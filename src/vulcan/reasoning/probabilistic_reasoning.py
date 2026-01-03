@@ -14,6 +14,7 @@ from .reasoning_explainer import ReasoningExplainer, SafetyAwareReasoning
 import hashlib
 import logging
 import pickle
+import re
 import time
 from collections import defaultdict, deque
 from pathlib import Path
@@ -1685,6 +1686,146 @@ class ProbabilisticReasoner(EnhancedProbabilisticReasoner):
 
     def __init__(self, enable_learning: bool = True):
         super().__init__(enable_learning=enable_learning)
+        # Compile regex patterns for Bayesian calculation detection
+        # Uses module-level `re` import for efficiency
+        self._bayes_pattern = re.compile(
+            r'(?:bayes|bayesian|posterior|P\s*\([^)]*\|[^)]*\))',
+            re.IGNORECASE
+        )
+        # Improved patterns: match all valid decimal formats including '.99', '0.99', '99'
+        # Pattern (\d+(?:\.\d*)?|\.\d+) matches: "99", "0.99", ".99", "99."
+        self._sensitivity_pattern = re.compile(
+            r'sensitivity\s*[=:]\s*(\d+(?:\.\d*)?|\.\d+)',
+            re.IGNORECASE
+        )
+        self._specificity_pattern = re.compile(
+            r'specificity\s*[=:]\s*(\d+(?:\.\d*)?|\.\d+)',
+            re.IGNORECASE
+        )
+        self._prevalence_pattern = re.compile(
+            r'(?:prevalence|prior|base\s*rate)\s*[=:]\s*(\d+(?:\.\d*)?|\.\d+)',
+            re.IGNORECASE
+        )
+
+    def _try_bayesian_calculation(self, input_data: Any) -> Optional[ReasoningResult]:
+        """
+        BUG FIX: Detect and compute explicit Bayesian probability queries.
+        
+        Handles queries like:
+        - "Bayes: Sensitivity=0.99, Specificity=0.95, Prevalence=0.01. Compute P(X|+)"
+        - "Calculate posterior probability with sens=0.99, spec=0.95, prev=0.01"
+        
+        Uses Bayes' theorem:
+        P(Disease|Positive) = P(Positive|Disease) * P(Disease) / P(Positive)
+        
+        where:
+        - P(Positive|Disease) = Sensitivity (true positive rate)
+        - P(Negative|No Disease) = Specificity (true negative rate)
+        - P(Disease) = Prevalence (base rate)
+        - P(Positive) = P(Positive|Disease)*P(Disease) + P(Positive|No Disease)*P(No Disease)
+        
+        Returns:
+            ReasoningResult if this is a Bayesian calculation query, None otherwise
+        """
+        if not isinstance(input_data, str):
+            return None
+            
+        # Check if this looks like a Bayesian calculation query
+        if not self._bayes_pattern.search(input_data):
+            return None
+            
+        # Try to extract parameters
+        sens_match = self._sensitivity_pattern.search(input_data)
+        spec_match = self._specificity_pattern.search(input_data)
+        prev_match = self._prevalence_pattern.search(input_data)
+        
+        if not (sens_match and spec_match and prev_match):
+            # Not enough parameters for Bayes calculation
+            return None
+            
+        try:
+            sensitivity = float(sens_match.group(1))
+            specificity = float(spec_match.group(1))
+            prevalence = float(prev_match.group(1))
+            
+            # Validate parameters
+            if not (0 <= sensitivity <= 1 and 0 <= specificity <= 1 and 0 <= prevalence <= 1):
+                logger.warning(f"Invalid Bayes parameters: sens={sensitivity}, spec={specificity}, prev={prevalence}")
+                return None
+            
+            # Compute Bayes' theorem: P(Disease|Positive)
+            # P(Positive|Disease) = sensitivity
+            # P(Positive|No Disease) = 1 - specificity (false positive rate)
+            # P(Disease) = prevalence
+            # P(No Disease) = 1 - prevalence
+            
+            p_positive_given_disease = sensitivity
+            p_positive_given_no_disease = 1 - specificity
+            p_disease = prevalence
+            p_no_disease = 1 - prevalence
+            
+            # P(Positive) = P(Positive|Disease)*P(Disease) + P(Positive|No Disease)*P(No Disease)
+            p_positive = (p_positive_given_disease * p_disease) + (p_positive_given_no_disease * p_no_disease)
+            
+            # Avoid division by zero
+            if p_positive == 0:
+                posterior = 0.0
+            else:
+                # P(Disease|Positive) = P(Positive|Disease) * P(Disease) / P(Positive)
+                posterior = (p_positive_given_disease * p_disease) / p_positive
+            
+            # Build detailed explanation
+            explanation = (
+                f"Bayes' Theorem Calculation:\n"
+                f"Given:\n"
+                f"  - Sensitivity (P(+|Disease)) = {sensitivity}\n"
+                f"  - Specificity (P(-|No Disease)) = {specificity}\n"
+                f"  - Prevalence (P(Disease)) = {prevalence}\n"
+                f"\n"
+                f"Calculation:\n"
+                f"  P(+) = P(+|D)*P(D) + P(+|¬D)*P(¬D)\n"
+                f"       = {sensitivity} × {prevalence} + {1-specificity} × {1-prevalence}\n"
+                f"       = {p_positive_given_disease * p_disease:.6f} + {p_positive_given_no_disease * p_no_disease:.6f}\n"
+                f"       = {p_positive:.6f}\n"
+                f"\n"
+                f"  P(Disease|+) = P(+|D) × P(D) / P(+)\n"
+                f"               = {sensitivity} × {prevalence} / {p_positive:.6f}\n"
+                f"               = {posterior:.6f}\n"
+                f"\n"
+                f"Result: P(Disease|Positive) ≈ {posterior:.3f} ({posterior*100:.1f}%)"
+            )
+            
+            conclusion = {
+                "posterior_probability": posterior,
+                "result": f"{posterior:.6f}",
+                "formatted_result": f"P(Disease|Positive) ≈ {posterior:.3f} ({posterior*100:.1f}%)",
+                "parameters": {
+                    "sensitivity": sensitivity,
+                    "specificity": specificity,
+                    "prevalence": prevalence,
+                },
+                "intermediate_values": {
+                    "p_positive": p_positive,
+                    "false_positive_rate": 1 - specificity,
+                }
+            }
+            
+            logger.info(f"Bayesian calculation: P(D|+) = {posterior:.6f}")
+            
+            return ReasoningResult(
+                conclusion=conclusion,
+                confidence=0.95,  # High confidence for exact calculation
+                reasoning_type=ReasoningType.PROBABILISTIC,
+                explanation=explanation,
+                metadata={
+                    "calculation_type": "bayes_theorem",
+                    "formula": "P(D|+) = P(+|D) * P(D) / P(+)",
+                }
+            )
+            
+        except (ValueError, ZeroDivisionError) as e:
+            logger.warning(f"Bayesian calculation failed: {e}")
+            return None
 
     def reason(self, input_data: Any, **kwargs) -> ReasoningResult:
         """
@@ -1697,7 +1838,15 @@ class ProbabilisticReasoner(EnhancedProbabilisticReasoner):
     ) -> ReasoningResult:
         """
         FULL IMPLEMENTATION: Intelligent feature extraction and reasoning
+        
+        BUG FIX: Now first checks for explicit Bayesian calculation queries
+        before falling back to GP-based probabilistic inference.
         """
+        # BUG FIX: Try explicit Bayesian calculation first
+        bayes_result = self._try_bayesian_calculation(input_data)
+        if bayes_result is not None:
+            return bayes_result
+        
         try:
             # Use intelligent feature extraction
             features = self.feature_extractor.extract_features(

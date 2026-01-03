@@ -419,11 +419,12 @@ performanceTuning:
   adaptiveTimeoutBase: 5.0
   # Per-token timeout for adaptive calculation (seconds)
   adaptiveTimeoutPerToken: 2.0
-  # ZMQ BUFFER CONFIGURATION (Task 3 Fix)
+  # ZMQ BUFFER CONFIGURATION (Resource Starvation Fix)
   # Connection timeout for ZMQ task queues (milliseconds)
-  # Increased from 15000ms to 30000ms to prevent Orchestrator Panic
-  # during CPU-bound inference (~2.5s/token)
-  zmqConnectionTimeout: 30000
+  # Increased from 30000ms to 120000ms to prevent Resource Starvation
+  # when transformer inference causes 1.1-3.9s/token latency
+  # At 30-100 tokens per response, this allows reasoning to complete
+  zmqConnectionTimeout: 120000
 
 # Hybrid Output Configuration (VULCAN reasoning + OpenAI formatting)
 # Implements the hybrid output pattern where VULCAN does all reasoning,

@@ -792,11 +792,11 @@ class CustomTaskQueue(TaskQueueInterface):
     def __init__(
         self,
         coordinator_address: str = "tcp://localhost:5555",
-        connection_timeout: int = 30000,  # ZMQ BUFFER FIX: Increased to 30000ms (30 seconds)
-                                          # to prevent Orchestrator Panic when the LLM is saturating
-                                          # the CPU during local inference (~2.5s/token).
-                                          # This gives the "Brain" enough time to send reasoning
-                                          # signals while the "Voice" (LLM) is generating tokens.
+        connection_timeout: int = 120000,  # ZMQ BUFFER FIX: Increased to 120000ms (120 seconds)
+                                           # to prevent Resource Starvation when transformer inference
+                                           # causes 1.1-3.9s/token latency. At 30-100 tokens per
+                                           # response, this gives the reasoning engines enough time
+                                           # to complete before the Orchestrator times out.
         config: Dict[str, Any] = None,
     ):
         """Initialize ZeroMQ task queue with Ray fallback."""
@@ -1092,11 +1092,12 @@ class CustomTaskQueue(TaskQueueInterface):
                     poller = zmq.Poller()
                     poller.register(self.socket, zmq.POLLIN)
 
-                    # ZMQ BUFFER FIX: Increased poll_timeout to 30000ms (30 seconds)
-                    # to give slow CPU-bound LLM inference enough time to complete.
-                    # At ~2.5s/token, this allows reasoning results to be received
-                    # before the Orchestrator times out and falls back to "Direct Reasoning".
-                    if poller.poll(30000):
+                    # ZMQ BUFFER FIX: Increased poll_timeout to 120000ms (120 seconds)
+                    # to prevent Resource Starvation when transformer inference is slow.
+                    # At 1.1-3.9s/token with responses of 30-100 tokens, this allows
+                    # reasoning results to be received before timeout.
+                    # Previous value: 30000ms was too short for slow CPU inference.
+                    if poller.poll(120000):
                         status = self.socket.recv_json(flags=zmq.NOBLOCK)
                         with self._coordinator_check_lock:
                             self._cached_coordinator_status = status

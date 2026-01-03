@@ -584,8 +584,23 @@ result = simplify(integral)
 
                 # Step 4: Execute the code
                 if not SAFE_EXECUTION_AVAILABLE or execute_math_code is None:
+                    # BUG #3 FIX: Try simple arithmetic fallback before giving up
+                    # This allows basic calculations like "2+2" to work without SymPy
+                    simple_result = self._try_simple_arithmetic(query)
+                    if simple_result is not None:
+                        return ComputationResult(
+                            success=True,
+                            code=f"# Simple arithmetic: {query}\nresult = {simple_result}",
+                            result=str(simple_result),
+                            explanation=f"Computed using simple arithmetic: {query} = {simple_result}",
+                            tool=self.name,
+                            problem_type=classification.problem_type,
+                            strategy=SolutionStrategy.NUMERIC,
+                            execution_time=time.time() - start_time,
+                            metadata={"fallback": "simple_arithmetic"},
+                        )
                     return self._create_error_result(
-                        query, code, "Safe execution not available",
+                        query, code, "Safe execution not available and query is not simple arithmetic",
                         classification, strategy, time.time() - start_time
                     )
 
@@ -923,6 +938,105 @@ Brief explanation:"""
         except Exception as e:
             logger.warning(f"Explanation generation failed: {e}")
             return f"The computation was performed using SymPy. The result is: {result}"
+
+    def _try_simple_arithmetic(self, query: str) -> Optional[Union[int, float]]:
+        """
+        BUG #3 FIX: Try to evaluate simple arithmetic expressions.
+        
+        This is a fallback for when SymPy/RestrictedPython is not available.
+        Only allows safe mathematical operations - no arbitrary code execution.
+        
+        Supported:
+        - Basic operations: +, -, *, /, **, %
+        - Parentheses: (2+3)*4
+        - Decimal numbers: 3.14 * 2
+        - "What is X" style questions
+        
+        Returns:
+            The computed result, or None if query is not simple arithmetic
+        """
+        import re
+        
+        # Extract mathematical expression from common question patterns
+        # "What is 2+2?" -> "2+2"
+        # "Calculate 3*4" -> "3*4"
+        # "Compute 10/2" -> "10/2"
+        patterns = [
+            r'(?:what\s+is|calculate|compute|evaluate|solve)\s+(.+?)(?:\?|$)',
+            r'^([\d\.\s\+\-\*\/\%\^\(\)]+)$',  # Pure expression
+        ]
+        
+        expression = None
+        for pattern in patterns:
+            match = re.search(pattern, query.strip(), re.IGNORECASE)
+            if match:
+                expression = match.group(1).strip()
+                break
+        
+        if not expression:
+            # Try the whole query as an expression
+            expression = query.strip().rstrip('?')
+        
+        # Clean up the expression
+        expression = expression.strip()
+        
+        # Replace common mathematical notation
+        expression = expression.replace('^', '**')  # Caret for exponent
+        expression = re.sub(r'(\d)\s*x\s*(\d)', r'\1*\2', expression)  # 2x3 -> 2*3
+        
+        # Security check: Only allow safe characters
+        # Allowed: digits (0-9), decimal point (.), operators (+, -, *, /, %)
+        #          parentheses ((, )), whitespace
+        # NOT allowed: letters, quotes, brackets, attribute access, function calls
+        # Note: ** (exponentiation) is allowed because * is in the character class
+        allowed_pattern = r'^[\d\.\+\-\*\/\%\(\)\s]+$'
+        if not re.match(allowed_pattern, expression):
+            logger.debug(f"Expression contains disallowed characters: {expression}")
+            return None
+        
+        # Validate balanced parentheses
+        if expression.count('(') != expression.count(')'):
+            logger.debug(f"Unbalanced parentheses in expression: {expression}")
+            return None
+        
+        # Prevent empty or trivial expressions
+        if not expression or not any(c.isdigit() for c in expression):
+            return None
+        
+        try:
+            # SECURITY TRADE-OFF: We use compile+eval instead of ast.literal_eval.
+            # ast.literal_eval only allows literals (strings, numbers, tuples, etc.)
+            # and cannot evaluate operators like 2+2. Our approach is safe because:
+            # 1. We validate the input against a strict character whitelist (line 989)
+            # 2. We execute with {"__builtins__": {}} preventing function calls
+            # 3. The character whitelist prevents attribute access (no dots for .x)
+            # 4. The only executable operations are basic arithmetic
+            code = compile(expression, '<string>', 'eval')
+            
+            # Execute in a restricted namespace with no builtins
+            # This prevents function calls, attribute access, etc.
+            result = eval(code, {"__builtins__": {}}, {})
+            
+            # Validate the result is a number
+            if isinstance(result, (int, float)) and not isinstance(result, bool):
+                # Round floats to avoid floating point display issues
+                if isinstance(result, float):
+                    # If it's close to an integer, return as int
+                    if abs(result - round(result)) < 1e-9:
+                        return int(round(result))
+                    # Otherwise round to reasonable precision
+                    return round(result, 10)
+                return result
+            
+            logger.debug(f"Expression result is not a number: {type(result)}")
+            return None
+            
+        except (SyntaxError, NameError, TypeError, ZeroDivisionError) as e:
+            logger.debug(f"Simple arithmetic evaluation failed for '{expression}': {e}")
+            return None
+        except Exception as e:
+            logger.warning(f"Unexpected error in simple arithmetic: {e}")
+            return None
 
     def _try_fallback(
         self, 

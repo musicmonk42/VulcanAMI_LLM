@@ -689,6 +689,20 @@ async def lifespan(app: FastAPI):
             "llm", lambda: GraphixVulcanLLM(config_path="configs/llm_config.yaml")
         )
         app.state.llm = llm_instance
+        
+        # BUG #2 FIX: Register LLM client with singletons module
+        # This ensures MathematicalComputationTool and other reasoning components
+        # receive the actual LLM client object instead of None or a string.
+        # Without this, tools fall back to template-only mode.
+        try:
+            from vulcan.reasoning.singletons import set_llm_client
+            if llm_instance is not None:
+                set_llm_client(llm_instance)
+                logger.info("✓ LLM client registered with singletons module")
+        except ImportError:
+            logger.debug("Singletons module not available for LLM client registration")
+        except Exception as e:
+            logger.warning(f"Failed to register LLM client with singletons: {e}")
 
         # PERFORMANCE FIX (Issue #1): Initialize HybridLLMExecutor ONCE at startup
         # Previously this was instantiated per-request, adding ~0.5s overhead each time
