@@ -1666,9 +1666,14 @@ class ToolSelector:
                     routing_tools = routing_plan.get('tools')
                     logger.debug(f"[ToolSelector] Found tools in routing_plan dict: {routing_tools}")
                 
-                # Source 2: Direct routing_plan_tools or selected_tools keys
+                # Source 2: Direct routing_plan_tools, router_tools, or selected_tools keys
+                # FIX #2: Added 'router_tools' which is set by reasoning_integration.py
                 if not routing_tools:
-                    routing_tools = request.context.get('routing_plan_tools') or request.context.get('selected_tools')
+                    routing_tools = (
+                        request.context.get('routing_plan_tools') or 
+                        request.context.get('router_tools') or  # FIX #2: Check for router_tools key
+                        request.context.get('selected_tools')
+                    )
                 
                 # Source 3: routing_plan object with telemetry_data attribute
                 if not routing_tools and hasattr(routing_plan, 'telemetry_data'):

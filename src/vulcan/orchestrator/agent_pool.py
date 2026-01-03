@@ -2644,6 +2644,12 @@ class AgentPoolManager:
             if reasoning_context:
                 context = {**context, **reasoning_context}
             
+            # FIX #6: Ensure router_tools are in the context for ToolSelector
+            # This allows ToolSelector to see what tools the router decided on
+            if selected_tools and 'router_tools' not in context:
+                context['router_tools'] = selected_tools
+                logger.debug(f"[AgentPool] Added router_tools to context: {selected_tools}")
+            
             # Try to extract query from nodes if not in parameters
             if not query and nodes:
                 for node in nodes:

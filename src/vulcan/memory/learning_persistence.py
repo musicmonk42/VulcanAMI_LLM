@@ -795,7 +795,7 @@ class LearningStatePersistence:
             logger.info("[LearningStatePersistence] Clearing state")
             return self.save_state(default_state)
     
-    def reset_tool_weights_if_corrupted(self, dominance_threshold: float = 0.35) -> bool:
+    def reset_tool_weights_if_corrupted(self, dominance_threshold: float = 0.15) -> bool:
         """
         BUG #4 FIX: Reset tool weights if they show signs of corruption.
         
@@ -809,7 +809,8 @@ class LearningStatePersistence:
         
         Args:
             dominance_threshold: Maximum allowed weight for any single tool.
-                                 Default is 0.35 (35%) per problem statement.
+                                 Default is 0.15 (15%) per problem statement FIX #5.
+                                 Lowered from 0.35 to break runaway feedback loops.
         
         Returns:
             True if weights were reset (corruption detected), False otherwise.
