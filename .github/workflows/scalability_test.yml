@@ -61,6 +61,10 @@ on:
         required: false
         default: '60'
         type: string
+      openai_api_key:
+        description: 'OpenAI API key for fallback (optional - can also use OPENAI_API_KEY secret)'
+        required: false
+        type: string
 
 # Prevent concurrent runs on the same branch
 concurrency:
@@ -94,6 +98,8 @@ jobs:
       # Signal to VULCAN conftest.py that we're in test mode.
       # This enables test-specific behaviors like non-blocking atexit handlers.
       PYTEST_RUNNING: '1'
+      # OpenAI API key for fallback - uses workflow input if provided, otherwise falls back to repository secret
+      OPENAI_API_KEY: ${{ github.event.inputs.openai_api_key || secrets.OPENAI_API_KEY }}
 
     steps:
       - name: Checkout repository
