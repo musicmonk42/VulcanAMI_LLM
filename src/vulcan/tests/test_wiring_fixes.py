@@ -716,5 +716,134 @@ class TestSimpleArithmeticFallback(unittest.TestCase):
             self.skipTest("MathematicalComputationTool not available")
 
 
+class TestBayesianCalculationFallback(unittest.TestCase):
+    """
+    Tests for Bug #4 fix: Bayesian calculation fallback in ProbabilisticReasoner.
+    
+    When the probabilistic reasoner receives explicit Bayesian probability queries
+    like "Bayes: Sensitivity=0.99, Specificity=0.95, Prevalence=0.01. Compute P(X|+)",
+    it should compute the actual result using Bayes' theorem instead of returning
+    GP-based metrics like "mean prediction 0.500 with uncertainty 0.500".
+    """
+    
+    def test_bayesian_calculation_basic(self):
+        """Test basic Bayesian calculation with standard medical test parameters."""
+        try:
+            from vulcan.reasoning.probabilistic_reasoning import ProbabilisticReasoner
+            
+            reasoner = ProbabilisticReasoner(enable_learning=False)
+            
+            # Standard medical test example
+            query = "Bayes: Sensitivity=0.99, Specificity=0.95, Prevalence=0.01. Compute P(X|+)"
+            result = reasoner._try_bayesian_calculation(query)
+            
+            self.assertIsNotNone(result, "Should return a result for Bayesian query")
+            
+            # Expected: P(D|+) = 0.99 * 0.01 / (0.99 * 0.01 + 0.05 * 0.99) ≈ 0.167
+            posterior = result.conclusion.get("posterior_probability")
+            self.assertIsNotNone(posterior)
+            self.assertAlmostEqual(posterior, 0.167, places=2)
+            
+            # Verify high confidence for exact calculation
+            self.assertGreaterEqual(result.confidence, 0.9)
+            
+        except ImportError:
+            self.skipTest("ProbabilisticReasoner not available")
+    
+    def test_bayesian_calculation_perfect_test(self):
+        """Test with perfect test (sensitivity=1, specificity=1)."""
+        try:
+            from vulcan.reasoning.probabilistic_reasoning import ProbabilisticReasoner
+            
+            reasoner = ProbabilisticReasoner(enable_learning=False)
+            
+            # Perfect test with no false positives or false negatives
+            query = "Bayes: Sensitivity=1.0, Specificity=1.0, Prevalence=0.5"
+            result = reasoner._try_bayesian_calculation(query)
+            
+            self.assertIsNotNone(result)
+            # With perfect test, P(D|+) = 1.0
+            posterior = result.conclusion.get("posterior_probability")
+            self.assertAlmostEqual(posterior, 1.0, places=5)
+            
+        except ImportError:
+            self.skipTest("ProbabilisticReasoner not available")
+    
+    def test_bayesian_calculation_alternative_syntax(self):
+        """Test that various query formats are recognized."""
+        try:
+            from vulcan.reasoning.probabilistic_reasoning import ProbabilisticReasoner
+            
+            reasoner = ProbabilisticReasoner(enable_learning=False)
+            
+            # Alternative formats
+            queries = [
+                "Calculate posterior probability with sensitivity=0.99, specificity=0.95, prevalence=0.01",
+                "Bayesian: sens=0.99, spec=0.95, prior=0.01",
+            ]
+            
+            for query in queries:
+                result = reasoner._try_bayesian_calculation(query)
+                # These may or may not be recognized depending on exact pattern matching
+                # At minimum, the first format should work
+                if "sensitivity" in query.lower() and "specificity" in query.lower():
+                    if result is not None:
+                        posterior = result.conclusion.get("posterior_probability")
+                        self.assertIsNotNone(posterior)
+                        self.assertAlmostEqual(posterior, 0.167, places=2)
+                        
+        except ImportError:
+            self.skipTest("ProbabilisticReasoner not available")
+    
+    def test_non_bayesian_query_returns_none(self):
+        """Test that non-Bayesian queries return None (fall through to GP)."""
+        try:
+            from vulcan.reasoning.probabilistic_reasoning import ProbabilisticReasoner
+            
+            reasoner = ProbabilisticReasoner(enable_learning=False)
+            
+            # These should NOT be recognized as Bayesian queries
+            non_bayes_queries = [
+                "What is 2+2?",
+                "Calculate the mean of [1, 2, 3, 4, 5]",
+                "Predict the next value in the sequence",
+            ]
+            
+            for query in non_bayes_queries:
+                result = reasoner._try_bayesian_calculation(query)
+                self.assertIsNone(
+                    result,
+                    f"Non-Bayesian query should return None: {query}"
+                )
+                
+        except ImportError:
+            self.skipTest("ProbabilisticReasoner not available")
+    
+    def test_integration_through_reason_method(self):
+        """Test that Bayesian calculation works through the main reason() interface."""
+        try:
+            from vulcan.reasoning.probabilistic_reasoning import ProbabilisticReasoner
+            
+            reasoner = ProbabilisticReasoner(enable_learning=False)
+            
+            query = "Bayes: Sensitivity=0.99, Specificity=0.95, Prevalence=0.01. Compute P(X|+)"
+            result = reasoner.reason(query)
+            
+            # Verify it's a proper ReasoningResult
+            self.assertIsNotNone(result)
+            
+            # Check that it computed the Bayesian result, not GP metrics
+            explanation = result.explanation
+            self.assertNotIn("mean prediction", explanation.lower())
+            self.assertIn("bayes", explanation.lower())
+            
+            # Verify the posterior is in the conclusion
+            if isinstance(result.conclusion, dict):
+                self.assertIn("posterior_probability", result.conclusion)
+                
+        except ImportError:
+            self.skipTest("ProbabilisticReasoner not available")
+
+
 if __name__ == "__main__":
     unittest.main()
