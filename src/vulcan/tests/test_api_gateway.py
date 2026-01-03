@@ -185,7 +185,6 @@ class ProductionRedis:
                     keys.append(k)
                 else:
                     pattern = match.replace("*", ".*")
-                    import re
 
                     if re.match(pattern, k):
                         keys.append(k)
