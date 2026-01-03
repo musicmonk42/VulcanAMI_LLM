@@ -202,6 +202,12 @@ CONFIDENCE_PARTIAL_ANALYSIS = 0.55  # Partial analysis with identified gaps
 CONFIDENCE_HEURISTIC_ONLY = 0.35  # Heuristic pattern matching only
 CONFIDENCE_FALLBACK = 0.20  # Minimum meaningful confidence (above noise threshold)
 
+# World Model integration confidence thresholds
+# When the World Model is consulted for ethical reasoning, we boost confidence
+# because VULCAN is providing self-aware ethical analysis
+WORLD_MODEL_MIN_CONFIDENCE = 0.7  # Minimum confidence when World Model is consulted
+WORLD_MODEL_CONFIDENCE_BOOST = 0.1  # Amount to boost confidence by
+
 # Deontic operators per Standard Deontic Logic (SDL)
 class DeonticOperator(enum.Enum):
     """Standard deontic modal operators."""
@@ -1842,7 +1848,7 @@ class PhilosophicalReasoner(AbstractReasoner):
                             'analysis': "VULCAN's motivational state considered in ethical analysis"
                         }
                     except Exception as e:
-                        logger.debug(f"MotivationalIntrospection error: {e}")
+                        logger.debug(f"MotivationalIntrospection.introspect_current_objective() error: {e}")
             
             # 2. Consult EthicalBoundaryMonitor for ethical constraints
             if hasattr(self.world_model, 'ethical_boundary_monitor'):
@@ -1860,7 +1866,7 @@ class PhilosophicalReasoner(AbstractReasoner):
                                 for b in (boundary_check if isinstance(boundary_check, list) else [boundary_check])
                             ]
                     except Exception as e:
-                        logger.debug(f"EthicalBoundaryMonitor error: {e}")
+                        logger.debug(f"EthicalBoundaryMonitor.check_action() error: {e}")
             
             # 3. Consult GoalConflictDetector for dilemma analysis
             if hasattr(self.world_model, 'goal_conflict_detector'):
@@ -1868,6 +1874,7 @@ class PhilosophicalReasoner(AbstractReasoner):
                 if gcd and hasattr(gcd, 'detect_conflicts_in_proposal'):
                     try:
                         # Analyze the query as a proposal to detect conflicts
+                        # The API expects a dict with 'action' key for proposal analysis
                         conflicts = gcd.detect_conflicts_in_proposal({'action': query})
                         if conflicts:
                             result['goal_conflicts'] = [
@@ -1878,13 +1885,14 @@ class PhilosophicalReasoner(AbstractReasoner):
                                 for c in (conflicts if isinstance(conflicts, list) else [conflicts])
                             ]
                     except Exception as e:
-                        logger.debug(f"GoalConflictDetector error: {e}")
+                        logger.debug(f"GoalConflictDetector.detect_conflicts_in_proposal() error: {e}")
             
             # 4. Consult InternalCritic for multi-perspective critique
             if hasattr(self.world_model, 'internal_critic'):
                 ic = self.world_model.internal_critic
                 if ic and hasattr(ic, 'evaluate_proposal'):
                     try:
+                        # The API expects a dict with 'query' and 'type' keys for evaluation
                         critique = ic.evaluate_proposal({'query': query, 'type': analysis_type})
                         if critique:
                             result['internal_critique'] = {
@@ -1892,7 +1900,7 @@ class PhilosophicalReasoner(AbstractReasoner):
                                 'perspectives_considered': getattr(critique, 'perspectives', []) if hasattr(critique, 'perspectives') else []
                             }
                     except Exception as e:
-                        logger.debug(f"InternalCritic error: {e}")
+                        logger.debug(f"InternalCritic.evaluate_proposal() error: {e}")
             
             # 5. Generate VULCAN's "feeling" about the ethical dilemma
             result['vulcan_perspective'] = self._synthesize_vulcan_perspective(query, result)
@@ -2045,8 +2053,9 @@ class PhilosophicalReasoner(AbstractReasoner):
                 result.metadata['world_model_consulted'] = True
                 result.metadata['world_model_perspective'] = world_model_perspective
                 # Boost confidence when World Model was consulted (self-aware reasoning)
-                if result.confidence < 0.7:
-                    result.confidence = min(0.7, result.confidence + 0.1)
+                if result.confidence < WORLD_MODEL_MIN_CONFIDENCE:
+                    result.confidence = min(WORLD_MODEL_MIN_CONFIDENCE, 
+                                          result.confidence + WORLD_MODEL_CONFIDENCE_BOOST)
             
             # Build final reasoning chain
             duration = time.time() - start_time
