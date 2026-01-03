@@ -18,7 +18,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import numpy as np
 import torch
@@ -1495,9 +1495,46 @@ class ToolSelectionBandit(AdaptiveBanditOrchestrator):
         time_ms: float,
         energy_mj: float,
         constraints: Dict[str, float],
+        router_selected_tools: Optional[List[str]] = None,
+        source: Optional[str] = None,
     ):
-        """Update from execution"""
+        """Update from execution.
+        
+        BUG #8 FIX: Added router_selected_tools and source parameters to check
+        if the tool was CORRECT for the query type. Don't reward a tool just
+        because OpenAI fallback succeeded - reward only when the tool was
+        actually the right choice based on query router's analysis.
+        
+        Args:
+            features: Context features
+            tool_name: Tool that was used
+            quality: Quality score of result
+            time_ms: Execution time in milliseconds
+            energy_mj: Energy used in millijoules
+            constraints: Budget constraints
+            router_selected_tools: Tools that the QueryRouter recommended (for correctness check)
+            source: Source of result (e.g., 'openai_fallback', 'local')
+        """
         try:
+            # BUG #8 FIX: Check if result came from OpenAI fallback
+            # If so, don't reward the selected tool - it didn't actually produce the result
+            if source and 'openai' in source.lower() and 'fallback' in source.lower():
+                logger.info(
+                    f"[ToolSelectionBandit] SKIPPING reward for '{tool_name}' - "
+                    f"result came from OpenAI fallback, not tool execution"
+                )
+                return
+            
+            # BUG #8 FIX: Check router agreement
+            # Only reward tool if it was in the router's recommended list
+            if router_selected_tools and tool_name not in router_selected_tools:
+                logger.info(
+                    f"[ToolSelectionBandit] REDUCED reward for '{tool_name}' - "
+                    f"not in router's selection: {router_selected_tools}"
+                )
+                # Apply penalty: tool wasn't the router's choice
+                quality = quality * 0.5  # Halve the quality to reduce reward
+            
             reward = self._compute_reward(quality, time_ms, energy_mj, constraints)
 
             context = BanditContext(
