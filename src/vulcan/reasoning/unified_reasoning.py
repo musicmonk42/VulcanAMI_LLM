@@ -2132,6 +2132,16 @@ class UnifiedReasoner:
             scores[ReasoningType.SYMBOLIC] += 0.2  # Reduced from 0.3
             if any(op in input_data for op in [" AND ", " OR ", " NOT ", "=>"]):
                 scores[ReasoningType.SYMBOLIC] += 0.4
+            # FIX: Detect mathematical expressions in string input (e.g., "2+2", "3*4")
+            # This pattern matches simple arithmetic expressions
+            import re
+            math_pattern = re.compile(r'[\d]+\s*[\+\-\*\/\^\%]\s*[\d]+')
+            if math_pattern.search(input_data):
+                scores[ReasoningType.MATHEMATICAL] += 0.8  # Strong preference for math expressions
+            # Also detect "what is X+Y" or "calculate X+Y" patterns
+            what_is_math = re.compile(r'(what\s+is|calculate|compute|solve|evaluate)\s+[\d]+\s*[\+\-\*\/\^\%]', re.IGNORECASE)
+            if what_is_math.search(input_data):
+                scores[ReasoningType.MATHEMATICAL] += 0.9
         elif isinstance(input_data, dict):
             if any(
                 key in input_data for key in ["graph", "nodes", "edges", "evidence"]
@@ -2178,6 +2188,58 @@ class UnifiedReasoner:
             ],
             ReasoningType.COUNTERFACTUAL: ["what if", "counterfactual", "had not"],
             ReasoningType.MULTIMODAL: ["image", "video", "audio", "multimodal"],
+            # FIX: Add MATHEMATICAL reasoning type detection for math computation queries
+            ReasoningType.MATHEMATICAL: [
+                "calculate",
+                "compute",
+                "solve",
+                "evaluate",
+                "simplify",
+                "factor",
+                "integrate",
+                "differentiate",
+                "derivative",
+                "integral",
+                "equation",
+                "expression",
+                "formula",
+                "arithmetic",
+                "algebra",
+                "calculus",
+                "math",
+                "sum",
+                "product",
+                "divide",
+                "multiply",
+                "add",
+                "subtract",
+                "plus",
+                "minus",
+                "times",
+                "equals",
+                "+",
+                "-",
+                "*",
+                "/",
+                "^",
+                "**",
+                "sqrt",
+                "square root",
+                "power",
+                "exponent",
+                "logarithm",
+                "log",
+                "sin",
+                "cos",
+                "tan",
+                "matrix",
+                "determinant",
+                "eigenvalue",
+                "polynomial",
+                "quadratic",
+                "linear",
+                "numerical",
+            ],
             # FIX: Add PHILOSOPHICAL reasoning type detection for ethical/deontic queries
             ReasoningType.PHILOSOPHICAL: [
                 "ethical",
