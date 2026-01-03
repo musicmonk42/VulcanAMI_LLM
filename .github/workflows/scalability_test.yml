@@ -62,7 +62,7 @@ on:
         default: '60'
         type: string
       openai_api_key:
-        description: 'OpenAI API key for fallback (optional - can also use OPENAI_API_KEY secret)'
+        description: 'OpenAI API key for fallback. SECURITY NOTE: Prefer using OPENAI_API_KEY repository secret instead. Input values may appear in workflow logs.'
         required: false
         type: string
 
