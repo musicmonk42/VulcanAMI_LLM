@@ -57,6 +57,7 @@ import logging
 import os
 import pathlib
 import threading
+import sys
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -757,7 +758,7 @@ class PerfResultCollector:
             "test_name": self.test_name,
             "start_timestamp": datetime.now(timezone.utc).isoformat(),
             "psutil_available": PSUTIL_AVAILABLE,
-            "python_version": f"{os.sys.version_info.major}.{os.sys.version_info.minor}.{os.sys.version_info.micro}",
+            "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
         }
 
         logger.debug(f"PerfResultCollector initialized for test: {test_name}")
@@ -1017,7 +1018,9 @@ def check_dependency(module_name: str) -> bool:
         return False
 
 
-# Expected dependencies for perf-lite (fast CI install)
+# Expected dependencies for perf-lite
+# Note: "lite" refers to ML dependencies (no torch/transformers/faiss)
+# not overall install size - pandas, scikit-learn, statsmodels are included
 PERF_LITE_DEPS: Final[List[str]] = [
     "psutil",
     "sklearn",  # scikit-learn imports as sklearn
@@ -1029,7 +1032,7 @@ PERF_LITE_DEPS: Final[List[str]] = [
     "whoosh",
 ]
 
-# Additional dependencies for perf-full (includes heavy ML deps)
+# Additional dependencies for perf-full (includes heavy ML deps: torch, transformers, faiss)
 PERF_FULL_DEPS: Final[List[str]] = PERF_LITE_DEPS + [
     "torch",
     "sentence_transformers",

@@ -109,9 +109,16 @@ class MockReasoner:
             "general": 1.0,
         }.get(query_type, 1.0)
         
-        # Add some variability
+        # Add deterministic variability based on query hash (no randomness)
         jitter = (hash(query) % 100) / 1000.0
-        time.sleep(self.base_latency * latency_multiplier + jitter)
+        
+        # Use computation-based delay to avoid CI timing inconsistencies
+        # This is more stable than time.sleep() in CI environments
+        target_delay = self.base_latency * latency_multiplier + jitter
+        start = time.perf_counter()
+        # Spin-wait for deterministic delay (avoids scheduler inconsistency)
+        while (time.perf_counter() - start) < target_delay:
+            pass
         
         return {
             "success": True,
@@ -133,7 +140,11 @@ class MockReasoner:
         }.get(query_type, 1.0)
         
         jitter = (hash(query) % 100) / 1000.0
-        await asyncio.sleep(self.base_latency * latency_multiplier + jitter)
+        target_delay = self.base_latency * latency_multiplier + jitter
+        
+        # For async, use asyncio.sleep as it yields to event loop
+        # This is appropriate for async tests and doesn't block other tasks
+        await asyncio.sleep(target_delay)
         
         return {
             "success": True,

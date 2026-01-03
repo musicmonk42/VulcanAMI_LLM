@@ -457,6 +457,9 @@ def run_comparison(
     baseline: Dict[str, Any],
     p95_threshold: float,
     rps_threshold: float,
+    *,
+    results_path: str = DEFAULT_RESULTS_PATH,
+    baseline_path: str = DEFAULT_BASELINE_PATH,
 ) -> ComparisonReport:
     """
     Run comprehensive comparison of results against baseline.
@@ -470,6 +473,8 @@ def run_comparison(
         baseline: Loaded baseline data.
         p95_threshold: Threshold for p95 latency regression %.
         rps_threshold: Threshold for throughput regression %.
+        results_path: Path to results file (for reporting).
+        baseline_path: Path to baseline file (for reporting).
 
     Returns:
         ComparisonReport with all comparisons and summary.
@@ -480,8 +485,8 @@ def run_comparison(
     """
     report = ComparisonReport(
         timestamp=datetime.now(timezone.utc).isoformat(),
-        baseline_path=DEFAULT_BASELINE_PATH,
-        results_path=DEFAULT_RESULTS_PATH,
+        baseline_path=baseline_path,
+        results_path=results_path,
         baseline_version=baseline.get("version", "unknown"),
         metadata={
             "p95_threshold_pct": p95_threshold,
@@ -888,6 +893,8 @@ def main() -> int:
             baseline=baseline,
             p95_threshold=args.p95_threshold,
             rps_threshold=args.rps_threshold,
+            results_path=args.results,
+            baseline_path=args.baseline,
         )
     except (InvalidBaselineError, InvalidResultsError) as e:
         print(f"✗ Comparison error: {e}")

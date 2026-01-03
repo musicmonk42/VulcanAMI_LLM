@@ -431,10 +431,16 @@ class TestLeakDetection:
         print(f"  Total growth: {growth_mb:.2f} MB")
         
         if PSUTIL_AVAILABLE:
-            # Allow some growth but should be minimal
-            max_growth_per_cycle = perf_config.max_rss_growth_mb / 10
+            # For cycle-based leak detection, use a per-cycle threshold
+            # Total growth should be minimal since each cycle cleans up
+            max_growth_per_cycle = perf_config.max_rss_growth_mb / num_cycles
+            print(f"  Max allowed per-cycle growth: {max_growth_per_cycle:.2f} MB")
+            print(f"  Average per-cycle growth: {growth_mb / num_cycles:.2f} MB")
+            
+            # Assert total growth is bounded
             assert growth_mb <= perf_config.max_rss_growth_mb, (
-                f"Memory growth ({growth_mb:.2f} MB) suggests leak"
+                f"Memory growth ({growth_mb:.2f} MB) exceeds threshold "
+                f"({perf_config.max_rss_growth_mb:.2f} MB) - suggests leak"
             )
     
     def test_concurrent_operation_cleanup(
