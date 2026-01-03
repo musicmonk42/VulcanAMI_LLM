@@ -845,5 +845,182 @@ class TestBayesianCalculationFallback(unittest.TestCase):
             self.skipTest("ProbabilisticReasoner not available")
 
 
+class TestSelectedToolsInTaskParameters(unittest.TestCase):
+    """
+    Tests for WIRING FIX: selected_tools included in _decompose_to_tasks.
+    
+    The critical fix ensures that when _decompose_to_tasks() creates AgentTask objects,
+    the selected_tools from plan.telemetry_data are included directly in task.parameters.
+    This enables the agent pool to properly invoke reasoning engines.
+    
+    Without this fix, selected_tools were only stored in telemetry_data and had to be
+    extracted separately by main.py - a fragile approach that could fail silently.
+    """
+    
+    def test_selected_tools_in_primary_task_parameters(self):
+        """Test that selected_tools is included in primary task parameters."""
+        try:
+            from vulcan.routing.query_router import QueryAnalyzer, QueryType
+            
+            analyzer = QueryAnalyzer()
+            
+            # Create a mock ProcessingPlan with selected_tools in telemetry_data
+            class MockPlan:
+                def __init__(self):
+                    self.telemetry_data = {
+                        "selected_tools": ["symbolic", "causal"],
+                        "reasoning_strategy": "causal_reasoning",
+                    }
+                    self.governance_sensitivity = None
+                    self.safety_risk_level = "SAFE"
+                    self.complexity_score = 0.6
+            
+            # Call _decompose_to_tasks directly
+            mock_plan = MockPlan()
+            
+            # Use a minimal mock governance sensitivity
+            class MockGovSensitivity:
+                value = "low"
+            mock_plan.governance_sensitivity = MockGovSensitivity()
+            
+            tasks = analyzer._decompose_to_tasks(
+                query="Why does A cause B?",
+                query_type=QueryType.REASONING,
+                source="user",
+                plan=mock_plan,
+            )
+            
+            # Verify we got at least one task
+            self.assertGreater(len(tasks), 0, "Should have at least one task")
+            
+            # Find the primary task
+            primary_tasks = [t for t in tasks if t.parameters.get("is_primary")]
+            self.assertEqual(len(primary_tasks), 1, "Should have exactly one primary task")
+            
+            primary_task = primary_tasks[0]
+            
+            # CRITICAL ASSERTION: selected_tools must be in task parameters
+            self.assertIn(
+                "selected_tools",
+                primary_task.parameters,
+                "selected_tools MUST be in primary task parameters for reasoning invocation"
+            )
+            
+            # Verify the correct tools are passed
+            self.assertEqual(
+                primary_task.parameters["selected_tools"],
+                ["symbolic", "causal"],
+                "selected_tools should match telemetry_data"
+            )
+            
+            # Verify reasoning_strategy is also passed
+            self.assertIn(
+                "reasoning_strategy",
+                primary_task.parameters,
+                "reasoning_strategy should be in primary task parameters"
+            )
+            self.assertEqual(
+                primary_task.parameters["reasoning_strategy"],
+                "causal_reasoning"
+            )
+            
+        except ImportError:
+            self.skipTest("QueryAnalyzer not available")
+    
+    def test_empty_selected_tools_handled_gracefully(self):
+        """Test that empty selected_tools doesn't break task creation."""
+        try:
+            from vulcan.routing.query_router import QueryAnalyzer, QueryType
+            
+            analyzer = QueryAnalyzer()
+            
+            # Create a mock ProcessingPlan with no selected_tools
+            class MockPlan:
+                def __init__(self):
+                    self.telemetry_data = {}  # No selected_tools
+                    self.governance_sensitivity = None
+                    self.safety_risk_level = "SAFE"
+                    self.complexity_score = 0.3
+            
+            mock_plan = MockPlan()
+            
+            class MockGovSensitivity:
+                value = "low"
+            mock_plan.governance_sensitivity = MockGovSensitivity()
+            
+            tasks = analyzer._decompose_to_tasks(
+                query="Hello, how are you?",
+                query_type=QueryType.GENERAL,
+                source="user",
+                plan=mock_plan,
+            )
+            
+            # Should still create tasks without error
+            self.assertGreater(len(tasks), 0)
+            
+            # Primary task should have empty selected_tools (not fail)
+            primary_tasks = [t for t in tasks if t.parameters.get("is_primary")]
+            primary_task = primary_tasks[0]
+            
+            # selected_tools should be present but empty
+            self.assertIn("selected_tools", primary_task.parameters)
+            self.assertEqual(primary_task.parameters["selected_tools"], [])
+            
+        except ImportError:
+            self.skipTest("QueryAnalyzer not available")
+    
+    def test_supporting_tasks_include_selected_tools(self):
+        """Test that supporting tasks (perception, planning) also include selected_tools."""
+        try:
+            from vulcan.routing.query_router import QueryAnalyzer, QueryType
+            
+            analyzer = QueryAnalyzer()
+            
+            class MockPlan:
+                def __init__(self):
+                    self.telemetry_data = {
+                        "selected_tools": ["analogical"],
+                        "reasoning_strategy": "analogical_reasoning",
+                    }
+                    self.governance_sensitivity = None
+                    self.safety_risk_level = "SAFE"
+                    self.complexity_score = 0.5
+            
+            mock_plan = MockPlan()
+            
+            class MockGovSensitivity:
+                value = "low"
+            mock_plan.governance_sensitivity = MockGovSensitivity()
+            
+            # Use a query that triggers perception support task ("analyze" keyword)
+            # Note: Using REASONING type because perception support is only added when
+            # query_type != PERCEPTION (see _decompose_to_tasks implementation)
+            tasks = analyzer._decompose_to_tasks(
+                query="Analyze the data and explain the pattern",
+                query_type=QueryType.REASONING,
+                source="user",
+                plan=mock_plan,
+            )
+            
+            # Find supporting tasks
+            support_tasks = [t for t in tasks if not t.parameters.get("is_primary")]
+            
+            # If there are support tasks, verify they also have selected_tools
+            for task in support_tasks:
+                self.assertIn(
+                    "selected_tools",
+                    task.parameters,
+                    f"Support task {task.task_type} should include selected_tools"
+                )
+                self.assertEqual(
+                    task.parameters["selected_tools"],
+                    ["analogical"],
+                    f"Support task {task.task_type} should have correct selected_tools"
+                )
+                
+        except ImportError:
+            self.skipTest("QueryAnalyzer not available")
+
+
 if __name__ == "__main__":
     unittest.main()
