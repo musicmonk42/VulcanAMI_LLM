@@ -1841,6 +1841,10 @@ class ProbabilisticReasoner(EnhancedProbabilisticReasoner):
         
         BUG FIX: Now first checks for explicit Bayesian calculation queries
         before falling back to GP-based probabilistic inference.
+        
+        BUG #3 FIX (0.500 Bug): Detects when the model returns uninformative 
+        default values (0.5/0.5) and returns a "not applicable" result instead
+        of the confusing probabilistic metrics.
         """
         # BUG FIX: Try explicit Bayesian calculation first
         bayes_result = self._try_bayesian_calculation(input_data)
@@ -1863,6 +1867,41 @@ class ProbabilisticReasoner(EnhancedProbabilisticReasoner):
 
             mean_val = result["mean"]
             std_val = result["std"]
+            
+            # BUG #3 FIX (0.500 Bug): Detect uninformative results
+            # When mean == 0.5 and std == 0.5 (or very close), this indicates the model
+            # returned default values because it couldn't process the input.
+            # This happens for queries like "Hello" that are not probabilistic questions.
+            is_uninformative = (
+                result.get("untrained", False) or
+                (abs(mean_val - 0.5) < 0.01 and abs(std_val - 0.5) < 0.01)
+            )
+            
+            if is_uninformative:
+                logger.warning(
+                    f"[ProbabilisticReasoner] Uninformative result detected (mean={mean_val:.3f}, std={std_val:.3f}). "
+                    f"Query may not be suitable for probabilistic reasoning."
+                )
+                # Return a clear "not applicable" response instead of confusing metrics
+                return ReasoningResult(
+                    conclusion={
+                        "not_applicable": True,
+                        "details": "This query does not appear to be a probabilistic reasoning question.",
+                    },
+                    confidence=0.1,  # Very low confidence - indicates uncertainty
+                    reasoning_type=ReasoningType.PROBABILISTIC,
+                    explanation=(
+                        "This query does not appear to require probabilistic reasoning. "
+                        "Consider rephrasing as a probability question, or this may be better "
+                        "handled by a different reasoning approach."
+                    ),
+                    metadata={
+                        "mean": float(mean_val),
+                        "uncertainty": float(std_val),
+                        "uninformative_result": True,
+                        "model_untrained": result.get("untrained", False),
+                    },
+                )
 
             confidence = max(0.0, min(1.0, 1.0 - std_val))
 

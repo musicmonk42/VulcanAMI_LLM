@@ -1047,5 +1047,79 @@ class TestBackgroundProcesses:
         assert selector.is_shutdown is True
 
 
+# Bug #1 Fix Tests: Greeting Detection in Semantic Tool Matcher
+class TestGreetingDetectionFix:
+    """
+    Test the fix for Bug #1 (0.500 Bug): Simple greetings like "Hello"
+    should be routed to 'general' tool instead of 'probabilistic',
+    which would return confusing "mean prediction 0.500" responses.
+    """
+
+    def test_hello_boosts_general_tool(self):
+        """Test that 'Hello' query gives strong boost to 'general' tool"""
+        from vulcan.reasoning.selection.semantic_tool_matcher import SemanticToolMatcher
+        
+        matcher = SemanticToolMatcher()
+        result = matcher.match_query("Hello", ["general", "probabilistic", "mathematical"])
+        
+        # 'general' should have strong boost (0.8 from greeting detection)
+        assert result["general"].keyword_boost == 0.8
+        # 'probabilistic' should have no boost or penalty
+        assert result["probabilistic"].keyword_boost <= 0.0
+
+    def test_hi_boosts_general_tool(self):
+        """Test that 'Hi' query gives strong boost to 'general' tool"""
+        from vulcan.reasoning.selection.semantic_tool_matcher import SemanticToolMatcher
+        
+        matcher = SemanticToolMatcher()
+        result = matcher.match_query("hi", ["general", "probabilistic"])
+        
+        assert result["general"].keyword_boost == 0.8
+
+    def test_good_morning_boosts_general(self):
+        """Test that 'Good morning' query gives strong boost to 'general' tool"""
+        from vulcan.reasoning.selection.semantic_tool_matcher import SemanticToolMatcher
+        
+        matcher = SemanticToolMatcher()
+        result = matcher.match_query("Good morning", ["general", "probabilistic"])
+        
+        assert result["general"].keyword_boost == 0.8
+
+    def test_thanks_boosts_general(self):
+        """Test that 'Thanks' query gives strong boost to 'general' tool"""
+        from vulcan.reasoning.selection.semantic_tool_matcher import SemanticToolMatcher
+        
+        matcher = SemanticToolMatcher()
+        result = matcher.match_query("thanks", ["general", "probabilistic"])
+        
+        assert result["general"].keyword_boost == 0.8
+
+    def test_non_greeting_no_boost(self):
+        """Test that non-greeting queries don't get the greeting boost"""
+        from vulcan.reasoning.selection.semantic_tool_matcher import SemanticToolMatcher
+        
+        matcher = SemanticToolMatcher()
+        result = matcher.match_query("What is the probability of rain?", ["general", "probabilistic"])
+        
+        # Should NOT get the greeting fast-path boost
+        # Either the boost is less than 0.8, OR the greeting_fast_path marker is not present
+        has_greeting_boost = result["general"].keyword_boost >= 0.8
+        has_greeting_marker = 'greeting_fast_path' in result["general"].keyword_matches
+        
+        # Non-greeting queries should NOT have BOTH the boost AND the marker
+        assert not (has_greeting_boost and has_greeting_marker), \
+            "Non-greeting query should not receive greeting boost"
+
+    def test_general_wins_over_probabilistic_for_greeting(self):
+        """Test that 'general' tool wins over 'probabilistic' for greetings"""
+        from vulcan.reasoning.selection.semantic_tool_matcher import SemanticToolMatcher
+        
+        matcher = SemanticToolMatcher()
+        result = matcher.match_query("Hello there!", ["general", "probabilistic", "mathematical"])
+        
+        # general's combined score should be higher than probabilistic's
+        assert result["general"].combined_score > result["probabilistic"].combined_score
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "--tb=short"])

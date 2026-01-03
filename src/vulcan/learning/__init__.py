@@ -442,7 +442,31 @@ class UnifiedLearningSystem:
                 (outcome.get('confidence', 1.0) <= LLM_FALLBACK_LOW_CONFIDENCE_THRESHOLD and source != 'local')
             )
             
-            if is_system_error and status != 'success':
+            # BUG #2 FIX (0.500 Bug): Detect uninformative probabilistic results
+            # When probabilistic tool returns default 0.5 mean/std, it means the model
+            # couldn't understand the input (e.g., "Hello" query). This should be treated
+            # as a FAILURE, not a success, to prevent probabilistic from accumulating weight
+            # for inappropriate queries.
+            # Use tolerance check (0.01) to handle floating point precision issues.
+            mean_val = metadata.get('mean')
+            uncertainty_val = metadata.get('uncertainty', metadata.get('std'))
+            is_uninformative_probabilistic = (
+                'probabilistic' in tools and
+                status == 'success' and
+                mean_val is not None and
+                uncertainty_val is not None and
+                abs(float(mean_val) - 0.5) < 0.01 and
+                abs(float(uncertainty_val) - 0.5) < 0.01
+            )
+            
+            if is_uninformative_probabilistic:
+                logger.warning(
+                    f"[Learning] DETECTED uninformative probabilistic result (0.5/0.5): "
+                    f"query_type={query_type}, treating as FAILURE to prevent weight accumulation"
+                )
+                # Treat as failure - this query should not have gone to probabilistic
+                weight_delta = WEIGHT_ADJUSTMENT_FAILURE * 2  # Double penalty for bad routing
+            elif is_system_error and status != 'success':
                 logger.info(
                     f"[Learning] SKIPPING weight adjustment for system error: "
                     f"type={error_type}, message={error_message[:100] if error_message else 'N/A'}. "

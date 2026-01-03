@@ -1023,6 +1023,10 @@ class SemanticToolMatcher:
         ISSUE #2 FIX: Query embedding is now computed ONCE using the cache,
         instead of being recomputed for every tool in the loop.
 
+        BUG #1 FIX (0.500 Bug): Added explicit greeting detection to ensure
+        simple greetings like "Hello" route to 'general' tool instead of 
+        probabilistic, which would return confusing "mean prediction 0.500".
+
         Args:
             query: The input query/problem text
             available_tools: Optional list of available tools (defaults to all)
@@ -1034,7 +1038,33 @@ class SemanticToolMatcher:
             available_tools = list(TOOL_DESCRIPTIONS.keys())
 
         results = {}
-        query_lower = query.lower()
+        query_lower = query.lower().strip()
+        
+        # BUG #1 FIX: Fast-path for simple greetings
+        # These patterns MUST route to 'general' tool - NOT probabilistic
+        # Otherwise users get absurd responses like "mean prediction 0.500"
+        SIMPLE_GREETING_PATTERNS = {
+            'hello', 'hi', 'hey', 'howdy', 'greetings', 'yo',
+            'good morning', 'good afternoon', 'good evening', 'good night',
+            'thanks', 'thank you', 'thx', 'bye', 'goodbye', 'see you',
+            "what's up", 'sup', 'how are you', "how's it going",
+        }
+        
+        # Check if query is a simple greeting:
+        # 1. Exact match with known patterns
+        # 2. Starts with a greeting and total length is short (greeting + up to 15 extra chars)
+        #    e.g., "hello there" (11 chars) = "hello" (5) + 6 extra chars < 15
+        is_simple_greeting = (
+            query_lower in SIMPLE_GREETING_PATTERNS or
+            any(query_lower.startswith(p + ' ') and len(query_lower) <= len(p) + 15 
+                for p in SIMPLE_GREETING_PATTERNS) or
+            any(query_lower.startswith(p + '!') and len(query_lower) <= len(p) + 5
+                for p in SIMPLE_GREETING_PATTERNS) or
+            any(query_lower.startswith(p + '.') and len(query_lower) <= len(p) + 5
+                for p in SIMPLE_GREETING_PATTERNS) or
+            any(query_lower.startswith(p + ',') and len(query_lower) <= len(p) + 15
+                for p in SIMPLE_GREETING_PATTERNS)
+        )
 
         # ISSUE #2 FIX: Pre-compute query embedding ONCE before the tool loop
         # Previously this was done inside the loop, causing N embedding computations
@@ -1057,6 +1087,18 @@ class SemanticToolMatcher:
 
                 # Cap keyword boost at 0.5
                 keyword_boost = min(0.5, keyword_boost)
+            
+            # BUG #1 FIX: Apply dominant boost for 'general' tool on greetings
+            # This prevents greetings from being sent to probabilistic (which returns 0.5)
+            if is_simple_greeting and tool_name == 'general':
+                keyword_boost = 0.8  # Very strong boost - must win over probabilistic
+                keyword_matches.append('greeting_fast_path')
+                logger.debug(f"[SemanticToolMatcher] Applied greeting boost to 'general' for query: {query_lower[:30]}...")
+            
+            # BUG #1 FIX: Penalize probabilistic for simple greetings
+            # Probabilistic tool should NOT handle greetings - it returns "mean prediction 0.500"
+            if is_simple_greeting and tool_name == 'probabilistic':
+                keyword_boost = max(0.0, keyword_boost - 0.3)  # Significant penalty
 
             # 2. Embedding similarity (now uses pre-computed query embedding)
             similarity_score = 0.0
