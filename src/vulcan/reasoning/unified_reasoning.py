@@ -4067,8 +4067,6 @@ class UnifiedReasoner:
                     logger.debug(f"Failed to convert match {match.group()}: {e}")
         
         return result
-        
-        return result
     
     def _check_sat_satisfiability(self, reasoner: Any, extracted: Dict[str, Any]) -> ReasoningResult:
         """
