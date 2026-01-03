@@ -296,6 +296,7 @@ secrets:
   openaiApiKey: ""  # REQUIRED for OpenAI chat functionality
   anthropicApiKey: ""  # Optional: For Claude model support
   graphixApiKey: ""  # Optional: For Graphix services
+  vulcanLlmApiKey: ""  # Optional: For self-improvement features (defaults to openaiApiKey if not set)
   # AWS Credentials for Memory System (required if using S3)
   awsAccessKeyId: ""  # Optional: For S3 storage
   awsSecretAccessKey: ""  # Optional: For S3 storage

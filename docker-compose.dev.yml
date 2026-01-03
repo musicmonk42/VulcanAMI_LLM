@@ -427,7 +427,9 @@ services:
     networks:
       - vulcanami-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      # Uses /health/live for fast liveness checks (doesn't wait for all services)
+      # For comprehensive health, use /health endpoint after startup
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/live"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -623,7 +625,9 @@ services:
     networks:
       - vulcanami-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      # Uses /health/live for fast liveness checks (doesn't wait for all services)
+      # For comprehensive health, use /health endpoint after startup
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/live"]
       interval: 30s
       timeout: 10s
       retries: 3

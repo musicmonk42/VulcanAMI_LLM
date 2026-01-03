@@ -113,8 +113,9 @@ EXPOSE 8000 9148
 
 USER apiuser
 
+# Uses /health/live for fast liveness checks (doesn't wait for all services)
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-    CMD curl -fsS http://localhost:8000/health || exit 1
+    CMD curl -fsS http://localhost:8000/health/live || exit 1
 
 ENTRYPOINT ["/app/entrypoint.sh"]
 # PRODUCTION MODE: --workers 1 ensures singleton process (no split-brain/ghost processes)

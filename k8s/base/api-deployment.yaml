@@ -144,6 +144,29 @@ spec:
             secretKeyRef:
               name: vulcanami-secrets
               key: AWS_SECRET_ACCESS_KEY
+        # LLM API Keys (CRITICAL for chat features)
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: vulcanami-secrets
+              key: OPENAI_API_KEY
+        - name: ANTHROPIC_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: vulcanami-secrets
+              key: ANTHROPIC_API_KEY
+              optional: true
+        - name: GRAPHIX_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: vulcanami-secrets
+              key: GRAPHIX_API_KEY
+              optional: true
+        - name: VULCAN_LLM_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: vulcanami-secrets
+              key: VULCAN_LLM_API_KEY
         envFrom:
         - configMapRef:
             name: vulcanami-config
