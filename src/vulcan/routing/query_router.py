@@ -4130,6 +4130,7 @@ class QueryAnalyzer:
         tasks based on query content analysis.
 
         SECURITY FIX: Bureaucratic Gap #3 - Injects safety context for high-risk tasks
+        WIRING FIX: Includes selected_tools in task parameters to enable reasoning invocation
 
         Args:
             query: The original query
@@ -4154,6 +4155,19 @@ class QueryAnalyzer:
         }
 
         primary_capability = capability_map.get(query_type, "reasoning")
+        
+        # WIRING FIX: Extract selected_tools from plan telemetry to include in task parameters
+        # This ensures reasoning engines are invoked based on QueryRouter's tool selection
+        selected_tools = []
+        reasoning_strategy = None
+        if plan and hasattr(plan, 'telemetry_data') and plan.telemetry_data:
+            selected_tools = plan.telemetry_data.get("selected_tools", []) or []
+            reasoning_strategy = plan.telemetry_data.get("reasoning_strategy")
+            if selected_tools:
+                logger.info(
+                    f"[QueryRouter._decompose_to_tasks] Including selected_tools={selected_tools} "
+                    f"in task parameters for reasoning invocation"
+                )
 
         # SECURITY FIX: Bureaucratic Gap #3 - Inject safety context for high-risk queries
         modified_prompt = query
@@ -4209,6 +4223,9 @@ class QueryAnalyzer:
                 ),
                 "safety_risk_level": plan.safety_risk_level if plan else "SAFE",
                 "requires_validation": requires_validation,  # Flag for agent to check
+                # WIRING FIX: Include selected_tools and reasoning_strategy for reasoning invocation
+                "selected_tools": selected_tools,
+                "reasoning_strategy": reasoning_strategy,
             },
         )
         tasks.append(primary_task)
@@ -4232,6 +4249,8 @@ class QueryAnalyzer:
                         "is_primary": False,
                         "support_type": "perception",
                         "source": source,
+                        # WIRING FIX: Include selected_tools for reasoning context
+                        "selected_tools": selected_tools,
                     },
                 )
             )
@@ -4252,6 +4271,8 @@ class QueryAnalyzer:
                         "is_primary": False,
                         "support_type": "planning",
                         "source": source,
+                        # WIRING FIX: Include selected_tools for reasoning context
+                        "selected_tools": selected_tools,
                     },
                 )
             )
@@ -4290,6 +4311,8 @@ class QueryAnalyzer:
                         "source": source,
                         "introspection_fields": ["all"],
                         "node_type": "INTROSPECT",  # Hint to use INTROSPECT node
+                        # WIRING FIX: Include selected_tools for reasoning context
+                        "selected_tools": selected_tools,
                     },
                 ),
             )
@@ -4314,6 +4337,8 @@ class QueryAnalyzer:
                         "source": source,
                         "memory_limit": 5,
                         "node_type": "QUERY_MEMORIES",  # Hint to use QUERY_MEMORIES node
+                        # WIRING FIX: Include selected_tools for reasoning context
+                        "selected_tools": selected_tools,
                     },
                 ),
             )
