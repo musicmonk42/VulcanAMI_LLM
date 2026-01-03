@@ -3547,9 +3547,10 @@ class AgentPoolManager:
             "philosophical": ReasoningType.PHILOSOPHICAL,  # FIX: Philosophical/ethical tasks
             "ethical": ReasoningType.PHILOSOPHICAL,  # FIX: Ethical queries
             "deontic": ReasoningType.PHILOSOPHICAL,  # FIX: Deontic logic queries
-            # BUG #1 FIX: Add "_task" suffix variants from query_router.py
-            # Query router creates task types like "mathematical_task", "philosophical_task", etc.
-            # These were causing "Unrecognized task type" warnings and fallback to SYMBOLIC
+            # BUG #1 FIX: Add "_task" suffix variants for task types from query_router.py
+            # The router systematically generates task types using `f'{query_type.value}_task'` pattern.
+            # Explicit task types (mathematical_task, philosophical_task) are created in fast-path handlers.
+            # These mappings prevent "Unrecognized task type" warnings and incorrect SYMBOLIC fallback.
             "mathematical_task": ReasoningType.MATHEMATICAL,
             "philosophical_task": ReasoningType.PHILOSOPHICAL,
             "probabilistic_task": ReasoningType.PROBABILISTIC,
@@ -3558,7 +3559,10 @@ class AgentPoolManager:
             "symbolic_task": ReasoningType.SYMBOLIC,
             "reasoning_task": ReasoningType.HYBRID,
             "general_task": ReasoningType.SYMBOLIC,
-            "execution_task": ReasoningType.SYMBOLIC,  # Execution tasks use symbolic
+            # Note: execution_task uses HYBRID (not SYMBOLIC) because execution often involves
+            # multi-step planning and may include mathematical operations. HYBRID provides
+            # fallback to PROBABILISTIC reasoner which has uncertainty quantification.
+            "execution_task": ReasoningType.HYBRID,
             "perception_task": ReasoningType.ANALOGICAL,  # Perception uses pattern matching
             "planning_task": ReasoningType.HYBRID,  # Planning uses hybrid reasoning
             "learning_task": ReasoningType.HYBRID,  # Learning uses hybrid
