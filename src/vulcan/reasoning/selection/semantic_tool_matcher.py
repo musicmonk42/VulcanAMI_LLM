@@ -267,6 +267,25 @@ TOOL_KEYWORDS = {
         "formal",
         "first-order",
         "fol",
+        # BUG #2 FIX: SAT/satisfiability problem detection keywords
+        # These keywords strongly indicate symbolic logic problems that
+        # MUST NOT be routed to analogical (which was happening due to
+        # uniform semantic similarity scores of ~0.35)
+        "satisfiable",
+        "sat",
+        "unsatisfiable",
+        "cnf",
+        "dnf",
+        "→",
+        "∧",
+        "∨",
+        "¬",
+        "⊢",
+        "⊨",
+        "contradiction",
+        "tautology",
+        "propositional",
+        "quantifier",
         # ENHANCED: Mathematical proof keywords
         "q.e.d.",
         "qed",
@@ -371,6 +390,27 @@ TOOL_KEYWORDS = {
         "factor",
         "impact",
         "influence",
+        # BUG #2 FIX: Causal inference and experiment design keywords
+        # These keywords strongly indicate causal reasoning problems that
+        # were incorrectly routing to analogical (scoring 0.350).
+        "confound",
+        "confounder",
+        "confounding",
+        "do(",
+        "pearl",
+        "dag",
+        "backdoor",
+        "frontdoor",
+        "randomize",
+        "randomized",
+        "experiment",
+        "treatment",
+        "control group",
+        "observational",
+        "rct",
+        "correlation",
+        "correlates",
+        "causation",
     ],
     "probabilistic": [
         "probability",
@@ -397,6 +437,22 @@ TOOL_KEYWORDS = {
         "confident",
         "percent",
         "percentage",
+        # BUG #2 FIX: Bayes theorem and medical test keywords
+        # These keywords strongly indicate Bayesian calculations that
+        # MUST NOT be routed to analogical. The problem statement shows
+        # Bayes problems incorrectly scoring analogical (0.339) highest.
+        "p(",
+        "sensitivity",
+        "specificity",
+        "prevalence",
+        "conditional",
+        "given",
+        "positive predictive",
+        "negative predictive",
+        "false positive",
+        "false negative",
+        "true positive",
+        "true negative",
         # ENHANCED: Quantum physics and statistical mechanics
         "quantum",
         "wave function",
@@ -679,6 +735,51 @@ TOOL_KEYWORDS = {
         "normative",
         "prescriptive",
         "imperative",
+    ],
+    # BUG #2 FIX: Mathematical tool keywords for numeric computation
+    # These queries need numerical/computational tools, not analogical reasoning
+    "mathematical": [
+        # Basic computation
+        "proof",
+        "theorem",
+        "lemma",
+        "differentiate",
+        "integrate",
+        "derivative",
+        "integral",
+        "limit",
+        "continuous",
+        "differentiable",
+        "converge",
+        "series",
+        "equation",
+        "solve",
+        "calculate",
+        "compute",
+        "=",
+        "+",
+        "-",
+        "*",
+        "/",
+        "sum",
+        "product",
+        "factorial",
+        "exponent",
+        "logarithm",
+        "log",
+        "sqrt",
+        "root",
+        # Advanced math
+        "matrix",
+        "vector",
+        "linear algebra",
+        "eigenvalue",
+        "eigenvector",
+        "determinant",
+        "optimization",
+        "minimize",
+        "maximize",
+        "constraint",
     ],
 }
 

@@ -788,6 +788,81 @@ class LearningStatePersistence:
             logger.info("[LearningStatePersistence] Clearing state")
             return self.save_state(default_state)
     
+    def reset_tool_weights_if_corrupted(self, dominance_threshold: float = 0.35) -> bool:
+        """
+        BUG #4 FIX: Reset tool weights if they show signs of corruption.
+        
+        Corruption indicators:
+        1. One tool has weight > dominance_threshold (runaway positive feedback)
+        2. Most tools have severely negative weights (death spiral)
+        3. Tool weights are all near-zero except one (monopoly)
+        
+        This should be called at startup to fix corrupted state from
+        previous runs affected by the feedback loop bug.
+        
+        Args:
+            dominance_threshold: Maximum allowed weight for any single tool.
+                                 Default is 0.35 (35%) per problem statement.
+        
+        Returns:
+            True if weights were reset (corruption detected), False otherwise.
+        
+        Example:
+            >>> persistence.reset_tool_weights_if_corrupted()
+            True  # Weights were corrupted and reset
+        """
+        with self._lock:
+            weights = self.get_tool_weights()
+            
+            if not weights:
+                logger.debug("[LearningStatePersistence] No tool weights to check")
+                return False
+            
+            reset_needed = False
+            reset_reason = ""
+            
+            # Check 1: Dominance - one tool has too much weight
+            max_weight = max(weights.values())
+            max_tool = max(weights.items(), key=lambda x: x[1])[0]
+            if max_weight > dominance_threshold:
+                reset_needed = True
+                reset_reason = f"Tool '{max_tool}' dominates with weight {max_weight:.3f} > {dominance_threshold}"
+            
+            # Check 2: Death spiral - most tools have negative weights
+            negative_count = sum(1 for w in weights.values() if w < -0.05)
+            if negative_count >= len(weights) * 0.5:  # More than half are negative
+                reset_needed = True
+                reset_reason = f"{negative_count}/{len(weights)} tools have negative weights (death spiral)"
+            
+            # Check 3: Monopoly - all weights concentrated in one tool
+            if len(weights) > 1:
+                weight_values = list(weights.values())
+                total_positive = sum(w for w in weight_values if w > 0)
+                if total_positive > 0 and max_weight / total_positive > 0.9:
+                    # One tool has >90% of all positive weight
+                    reset_needed = True
+                    reset_reason = f"Tool '{max_tool}' monopolizes {max_weight/total_positive:.1%} of positive weight"
+            
+            if reset_needed:
+                logger.warning(
+                    f"[LearningStatePersistence] CORRUPTED WEIGHTS DETECTED: {reset_reason}. "
+                    f"Resetting all tool weights to 0.0"
+                )
+                logger.warning(f"[LearningStatePersistence] Old weights: {weights}")
+                
+                # Reset all weights to 0.0
+                state = self.load_state()
+                state["tool_weights"] = {}
+                state["metadata"]["weight_reset_at"] = time.time()
+                state["metadata"]["weight_reset_reason"] = reset_reason
+                self.save_state(state)
+                
+                logger.info("[LearningStatePersistence] Tool weights reset to neutral (0.0)")
+                return True
+            
+            logger.debug(f"[LearningStatePersistence] Tool weights look healthy: {weights}")
+            return False
+    
     # =========================================================================
     # Public API - Statistics and Information
     # =========================================================================

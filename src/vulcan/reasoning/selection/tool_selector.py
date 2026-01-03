@@ -1608,12 +1608,37 @@ class ToolSelector:
             # This prevents ToolSelector from overriding the router's intelligent selection.
             # ================================================================
             if hasattr(request, 'context') and isinstance(request.context, dict):
-                routing_tools = request.context.get('routing_plan_tools') or request.context.get('selected_tools')
+                # Try multiple sources for router-selected tools:
+                # 1. routing_plan.tools (from QueryRouter's RoutingPlan)
+                # 2. routing_plan_tools (directly set)
+                # 3. selected_tools (alternative key)
+                # 4. routing_plan dict with 'tools' key
+                routing_plan = request.context.get('routing_plan', {})
+                routing_tools = None
+                task_type = request.context.get('task_type') or request.context.get('query_type')
+                
+                # Source 1: routing_plan dict with 'tools' key
+                if isinstance(routing_plan, dict) and routing_plan.get('tools'):
+                    routing_tools = routing_plan.get('tools')
+                    logger.debug(f"[ToolSelector] Found tools in routing_plan dict: {routing_tools}")
+                
+                # Source 2: Direct routing_plan_tools or selected_tools keys
+                if not routing_tools:
+                    routing_tools = request.context.get('routing_plan_tools') or request.context.get('selected_tools')
+                
+                # Source 3: routing_plan object with telemetry_data attribute
+                if not routing_tools and hasattr(routing_plan, 'telemetry_data'):
+                    routing_tools = routing_plan.telemetry_data.get('selected_tools', [])
+                
+                # Source 4: routing_plan object with selected_tools attribute
+                if not routing_tools and hasattr(routing_plan, 'selected_tools'):
+                    routing_tools = routing_plan.selected_tools
+                
                 if routing_tools and isinstance(routing_tools, (list, tuple)) and len(routing_tools) > 0:
                     # Router has already made a selection - use it directly
                     logger.info(
                         f"[ToolSelector] BUG#1 FIX: Using QueryRouter's pre-selected tools: {routing_tools} "
-                        f"(bypassing SemanticBoost/bandit selection)"
+                        f"for task_type={task_type} (bypassing SemanticBoost/bandit selection)"
                     )
                     # Filter to only include available tools (using constant)
                     available_tools = getattr(self, 'available_tools', None) or DEFAULT_AVAILABLE_TOOLS

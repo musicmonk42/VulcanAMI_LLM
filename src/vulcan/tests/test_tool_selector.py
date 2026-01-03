@@ -1121,5 +1121,120 @@ class TestGreetingDetectionFix:
         assert result["general"].combined_score > result["probabilistic"].combined_score
 
 
+# BUG #2 FIX Tests: Keyword Boosting for SAT, Bayes, Causal queries
+class TestKeywordBoostingFix:
+    """
+    Test BUG #2 fix: Keyword-based boosting to prevent ALL queries
+    from routing to 'analogical' due to miscalibrated semantic embeddings.
+    
+    The problem was that semantic similarity scores were nearly uniform
+    (0.329-0.451) regardless of query type, causing analogical to win.
+    
+    Evidence from problem statement:
+    - SAT problem (260 chars) → analogical (0.349) ← WRONG
+    - Bayes calculation (191 chars) → analogical (0.339) ← WRONG
+    - Causal inference (507 chars) → analogical (0.350) ← WRONG
+    """
+    
+    def test_sat_problem_boosts_symbolic(self):
+        """Test that SAT problem keywords boost 'symbolic' tool"""
+        from vulcan.reasoning.selection.semantic_tool_matcher import SemanticToolMatcher
+        
+        matcher = SemanticToolMatcher()
+        # SAT problem example from problem statement
+        query = "Is A→B, B→C, ¬C, A∨B satisfiable?"
+        result = matcher.match_query(query, ["symbolic", "analogical", "probabilistic"])
+        
+        # 'symbolic' should have keyword boost due to SAT keywords
+        assert result["symbolic"].keyword_boost > 0, f"symbolic boost={result['symbolic'].keyword_boost}"
+        # 'symbolic' should win over 'analogical'
+        assert result["symbolic"].combined_score > result["analogical"].combined_score, \
+            f"symbolic ({result['symbolic'].combined_score:.3f}) should beat analogical ({result['analogical'].combined_score:.3f})"
+    
+    def test_cnf_dnf_keywords_boost_symbolic(self):
+        """Test that CNF/DNF keywords boost 'symbolic' tool"""
+        from vulcan.reasoning.selection.semantic_tool_matcher import SemanticToolMatcher
+        
+        matcher = SemanticToolMatcher()
+        query = "Convert this CNF formula to DNF form"
+        result = matcher.match_query(query, ["symbolic", "analogical", "probabilistic"])
+        
+        # Keywords like 'cnf', 'dnf' should boost symbolic
+        assert result["symbolic"].keyword_boost > 0
+    
+    def test_satisfiable_keyword_boosts_symbolic(self):
+        """Test that 'satisfiable' keyword boosts symbolic"""
+        from vulcan.reasoning.selection.semantic_tool_matcher import SemanticToolMatcher
+        
+        matcher = SemanticToolMatcher()
+        query = "Is this formula satisfiable? p ∧ ¬p"
+        result = matcher.match_query(query, ["symbolic", "analogical", "probabilistic"])
+        
+        assert result["symbolic"].keyword_boost > 0
+        
+    def test_bayes_problem_boosts_probabilistic(self):
+        """Test that Bayes calculation keywords boost 'probabilistic' tool"""
+        from vulcan.reasoning.selection.semantic_tool_matcher import SemanticToolMatcher
+        
+        matcher = SemanticToolMatcher()
+        # Bayes problem example from problem statement
+        query = "Sensitivity=0.99, Specificity=0.95, Prevalence=0.01. Compute P(X|+)"
+        result = matcher.match_query(query, ["symbolic", "analogical", "probabilistic"])
+        
+        # 'probabilistic' should have keyword boost due to Bayes keywords
+        assert result["probabilistic"].keyword_boost > 0, f"probabilistic boost={result['probabilistic'].keyword_boost}"
+        # 'probabilistic' should win over 'analogical'
+        assert result["probabilistic"].combined_score > result["analogical"].combined_score, \
+            f"probabilistic ({result['probabilistic'].combined_score:.3f}) should beat analogical ({result['analogical'].combined_score:.3f})"
+    
+    def test_sensitivity_specificity_boost_probabilistic(self):
+        """Test that sensitivity/specificity keywords boost probabilistic"""
+        from vulcan.reasoning.selection.semantic_tool_matcher import SemanticToolMatcher
+        
+        matcher = SemanticToolMatcher()
+        query = "Given sensitivity of 0.9 and specificity of 0.95, calculate PPV"
+        result = matcher.match_query(query, ["symbolic", "analogical", "probabilistic"])
+        
+        assert result["probabilistic"].keyword_boost > 0
+    
+    def test_causal_inference_boosts_causal(self):
+        """Test that causal inference keywords boost 'causal' tool"""
+        from vulcan.reasoning.selection.semantic_tool_matcher import SemanticToolMatcher
+        
+        matcher = SemanticToolMatcher()
+        # Causal inference example from problem statement
+        query = "S correlates with lower D, S users exercise more. Which experiment identifies S→D?"
+        result = matcher.match_query(query, ["causal", "analogical", "probabilistic"])
+        
+        # 'causal' should have keyword boost due to causal keywords
+        assert result["causal"].keyword_boost > 0, f"causal boost={result['causal'].keyword_boost}"
+        # 'causal' should win over 'analogical'
+        assert result["causal"].combined_score > result["analogical"].combined_score, \
+            f"causal ({result['causal'].combined_score:.3f}) should beat analogical ({result['analogical'].combined_score:.3f})"
+    
+    def test_confounding_randomize_boost_causal(self):
+        """Test that confounding/randomize keywords boost causal"""
+        from vulcan.reasoning.selection.semantic_tool_matcher import SemanticToolMatcher
+        
+        matcher = SemanticToolMatcher()
+        query = "How do we account for confounding variables? Should we randomize treatment?"
+        result = matcher.match_query(query, ["causal", "analogical", "probabilistic"])
+        
+        assert result["causal"].keyword_boost > 0
+    
+    def test_analogy_keywords_still_boost_analogical(self):
+        """Test that genuine analogy queries still route to 'analogical' correctly"""
+        from vulcan.reasoning.selection.semantic_tool_matcher import SemanticToolMatcher
+        
+        matcher = SemanticToolMatcher()
+        query = "What is the analogy between atoms and solar systems? Is this mapping correct?"
+        result = matcher.match_query(query, ["causal", "analogical", "symbolic"])
+        
+        # 'analogical' should have keyword boost for genuine analogy queries
+        assert result["analogical"].keyword_boost > 0
+        # 'analogical' should win for genuine analogy queries
+        assert result["analogical"].combined_score >= result["causal"].combined_score
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "--tb=short"])
