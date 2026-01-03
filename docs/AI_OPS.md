@@ -24,7 +24,7 @@ Graphix is an AI-native execution & evolution fabric for JSON-based directed gra
 | Ethical Governance | Multi-model audit (LLM consensus), risky pattern removal | NSOAligner flags: eval/exec, path traversal, bias taxonomy |
 | Observability | Prometheus/Grafana integration, structured audit chain | Enable metrics export only behind internal gateway |
 | Testing & QA | Pytest suites (validation, hardware emulation, stress, E2E) | Parallelize with `pytest -n auto`; tag slow vs fast tests |
-| Dependency Surface | Core: Python 3.10.11, numpy, networkx; Optional: torch, optuna, ray, vllm | Pin high-risk libs; generate SBOM for release artifacts |
+| Dependency Surface | Core: Python 3.11+, numpy, networkx; Optional: torch, optuna, ray, vllm | Pin high-risk libs; generate SBOM for release artifacts |
 
 ---
 
@@ -46,7 +46,7 @@ Graphix is an AI-native execution & evolution fabric for JSON-based directed gra
 git clone https://github.com/musicmonk42/VulcanAMI_LLM.git
 cd VulcanAMI_LLM
 
-py -3.10 -m venv .venv
+py -3.11 -m venv .venv
 source .venv/Scripts/activate
 python -m pip install --upgrade pip
 pip install -r requirements.txt

@@ -357,7 +357,7 @@ The repository includes multiple CI/CD workflows:
 1. **CI Workflow** (`.github/workflows/ci.yml`)
    - Runs on: push to main/develop, pull requests
    - Tests: lint, unit tests, integration tests
-   - Matrix: Python 3.10.11
+   - Matrix: Python 3.11
 
 2. **Docker Workflow** (`.github/workflows/docker.yml`)
    - Runs on: push to main/develop, version tags
