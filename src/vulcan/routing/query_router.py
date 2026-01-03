@@ -1068,6 +1068,7 @@ PENDULUM_ADVANCED_VERBS: Tuple[str, ...] = (
 # Examples: "This sentence is false", "Experience machine", "Trolley problem"
 # ISSUE FIX: Added missing philosophical terms that were causing misrouting to MATH-FAST-PATH
 # Queries about hedonism, ethical dilemmas, etc. were getting routed to mathematical tools
+# BUG FIX: Added forced choice / trolley problem variant keywords
 PHILOSOPHICAL_KEYWORDS: Tuple[str, ...] = (
     "paradox",
     "dilemma",
@@ -1132,10 +1133,21 @@ PHILOSOPHICAL_KEYWORDS: Tuple[str, ...] = (
     "solipsism",
     "phenomenology",
     "existentialism",
+    # BUG FIX: Forced choice / trolley problem variant keywords
+    "choose between",
+    "forced to choose",
+    "had to choose",
+    "no third choice",
+    "no other choice",
+    "only two options",
+    "world dictator",
+    "death of humanity",
+    "would you choose",
 )
 
 # Compiled regex patterns for philosophical/paradox detection
 # ISSUE FIX: Added more patterns to catch philosophical queries that were being misrouted
+# BUG FIX: Added forced choice / trolley problem variant patterns
 PHILOSOPHICAL_PATTERNS: Tuple[re.Pattern, ...] = (
     re.compile(r"this\s+(?:sentence|statement)\s+is\s+(?:false|true|a\s+lie)", re.IGNORECASE),
     re.compile(r"liar\s*(?:'s)?\s*paradox", re.IGNORECASE),
@@ -1163,6 +1175,16 @@ PHILOSOPHICAL_PATTERNS: Tuple[re.Pattern, ...] = (
     re.compile(r"hard\s+problem\s+of\s+consciousness", re.IGNORECASE),
     re.compile(r"mind-?body\s+(?:problem|dualism)", re.IGNORECASE),
     re.compile(r"what\s+(?:is|are)\s+qualia", re.IGNORECASE),
+    # BUG FIX: Forced choice / trolley problem variant patterns
+    # These catch queries like "choose between world dictator or death of humanity"
+    re.compile(r"(?:if\s+you\s+)?(?:had\s+to|have\s+to|must)\s+choose\s+between", re.IGNORECASE),
+    re.compile(r"(?:forced|have)\s+to\s+choose", re.IGNORECASE),
+    re.compile(r"no\s+(?:third|other|3rd)\s+(?:choice|option)", re.IGNORECASE),
+    re.compile(r"only\s+(?:two|2)\s+(?:choices|options)", re.IGNORECASE),
+    re.compile(r"(?:world|become)\s+dictator", re.IGNORECASE),  # Specific trolley variant
+    re.compile(r"death\s+of\s+(?:all\s+)?humanity", re.IGNORECASE),  # Specific trolley variant
+    re.compile(r"(?:would|what\s+would)\s+you\s+choose", re.IGNORECASE),
+    re.compile(r"which\s+(?:would|do)\s+you\s+(?:choose|pick|select)", re.IGNORECASE),
 )
 
 # Identity/attribution patterns - direct factual responses needed

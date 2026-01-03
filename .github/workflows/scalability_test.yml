@@ -309,42 +309,62 @@ jobs:
       - name: Check test results
         if: always()
         run: |
-          EXIT_CODE="${{ steps.stress_test.outputs.test_exit_code }}"
-
-          if [ "$EXIT_CODE" = "0" ]; then
-            echo "✅ Stress test passed - success rate >= 95%"
-            exit 0
-          else
-            echo "❌ Stress test failed - success rate < 95%"
-
-            # Show failure summary
-            if [ -f test_results/stress_test_results.json ]; then
+          # Check for results file existence instead of relying on exit code output
+          # This is more robust because GitHub Actions may not capture outputs when
+          # steps fail (even with continue-on-error: true)
+          if [ ! -f test_results/stress_test_results.json ]; then
+            echo "❌ Stress test failed - no results file generated"
+            
+            # Show any available output for debugging
+            if [ -f test_results/stress_test_output.log ]; then
               echo ""
-              echo "Failure details:"
-              python3 << 'EOF'
+              echo "Last 50 lines of test output:"
+              tail -50 test_results/stress_test_output.log
+            fi
+            exit 1
+          fi
+          
+          # Parse results and check success rate
+          python3 << 'EOF'
           import json
+          import sys
 
           try:
               with open('test_results/stress_test_results.json') as f:
                   data = json.load(f)
-
-              for s in data.get('scenarios', []):
-                  name = s.get('scenario_name')
-                  rate = s.get('success_rate', 0) * 100
-                  if rate < 95:
-                      print(f"  ❌ {name}: {rate:.1f}% success rate")
-                      failures = s.get('failures', [])[:3]
-                      for f in failures:
-                          error = f.get('error', 'Unknown')
-                          if len(error) > 80:
-                              error = error[:77] + '...'
-                          print(f"      - {error}")
+              
+              summary = data.get('summary', {})
+              overall_success_rate = summary.get('overall_success_rate', 0)
+              
+              if overall_success_rate >= 0.95:
+                  print(f"✅ Stress test passed - success rate {overall_success_rate*100:.1f}% >= 95%")
+                  sys.exit(0)
+              else:
+                  print(f"❌ Stress test failed - success rate {overall_success_rate*100:.1f}% < 95%")
+                  print()
+                  
+                  # Show failure details
+                  print("Failure details:")
+                  for s in data.get('scenarios', []):
+                      name = s.get('scenario_name')
+                      rate = s.get('success_rate', 0) * 100
+                      if rate < 95:
+                          print(f"  ❌ {name}: {rate:.1f}% success rate")
+                          failures = s.get('failures', [])[:3]
+                          for f in failures:
+                              error = f.get('error', 'Unknown')
+                              if len(error) > 80:
+                                  error = error[:77] + '...'
+                              print(f"      - {error}")
+                  sys.exit(1)
+                  
+          except json.JSONDecodeError as e:
+              print(f"❌ Error parsing results JSON: {e}")
+              sys.exit(1)
           except Exception as e:
-              print(f"Error reading results: {e}")
+              print(f"❌ Error reading results: {e}")
+              sys.exit(1)
           EOF
-            fi
-            exit 1
-          fi
 
   # ============================================================================
   # Regression Check Job

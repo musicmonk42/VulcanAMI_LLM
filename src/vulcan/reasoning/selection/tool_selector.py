@@ -1303,6 +1303,11 @@ class SymbolicToolWrapper:
         start_time = time.time()
         
         try:
+            # BUG #4 FIX: Clear state before each query to prevent cross-contamination
+            # This prevents previous query results from leaking into new queries
+            if hasattr(self.engine, 'clear_state'):
+                self.engine.clear_state()
+            
             # Extract query string from problem
             query_str = self._extract_query(problem)
             
@@ -1373,7 +1378,29 @@ class ProbabilisticToolWrapper:
     1. Extracts query variable and evidence from problem
     2. Executes Bayesian inference
     3. Returns probability distribution
+    
+    BUG #2 FIX: Now properly extracts probability parameters from natural
+    language queries instead of passing the query title as the variable.
     """
+    
+    # Regex patterns for extracting Bayesian parameters
+    # BUG #2 FIX: Extract actual numbers, not query titles
+    _SENSITIVITY_PATTERN = re.compile(
+        r'sensitivity\s*[=:]\s*(\d+(?:\.\d*)?|\.\d+)',
+        re.IGNORECASE
+    )
+    _SPECIFICITY_PATTERN = re.compile(
+        r'specificity\s*[=:]\s*(\d+(?:\.\d*)?|\.\d+)',
+        re.IGNORECASE
+    )
+    _PREVALENCE_PATTERN = re.compile(
+        r'(?:prevalence|prior|base\s*rate)\s*[=:]\s*(\d+(?:\.\d*)?|\.\d+)',
+        re.IGNORECASE
+    )
+    _BAYES_PATTERN = re.compile(
+        r'(?:bayes|bayesian|posterior|P\s*\([^)]*\|[^)]*\))',
+        re.IGNORECASE
+    )
     
     def __init__(self, engine):
         self.engine = engine
@@ -1392,6 +1419,15 @@ class ProbabilisticToolWrapper:
         start_time = time.time()
         
         try:
+            # BUG #4 FIX: Clear state before each query
+            if hasattr(self.engine, 'clear_state'):
+                self.engine.clear_state()
+            
+            # BUG #2 FIX: Try Bayesian calculation first for explicit probability queries
+            bayes_result = self._try_bayesian_calculation(problem)
+            if bayes_result is not None:
+                return bayes_result
+            
             # Parse the problem
             query_var, evidence, rules = self._parse_problem(problem)
             
@@ -1443,11 +1479,112 @@ class ProbabilisticToolWrapper:
             logger.error(f"[ProbabilisticEngine] Reasoning failed: {e}", exc_info=True)
             return self._error_result(str(e))
     
+    def _try_bayesian_calculation(self, problem: Any) -> Optional[Dict[str, Any]]:
+        """
+        BUG #2 FIX: Detect and compute explicit Bayesian probability queries.
+        
+        This handles queries like:
+        - "P1 — Bayes: Sensitivity=0.99, Specificity=0.95, Prevalence=0.01"
+        - "Probabilistic Reasoning - compute posterior with sens=0.99..."
+        
+        Returns:
+            Dict with result if this is a Bayesian calculation, None otherwise
+        """
+        if not isinstance(problem, str):
+            if isinstance(problem, dict):
+                problem_text = problem.get("text") or problem.get("query") or str(problem)
+            else:
+                problem_text = str(problem)
+        else:
+            problem_text = problem
+        
+        # Check if this looks like a Bayesian calculation query
+        if not self._BAYES_PATTERN.search(problem_text):
+            return None
+        
+        # Try to extract parameters
+        sens_match = self._SENSITIVITY_PATTERN.search(problem_text)
+        spec_match = self._SPECIFICITY_PATTERN.search(problem_text)
+        prev_match = self._PREVALENCE_PATTERN.search(problem_text)
+        
+        if not (sens_match and spec_match and prev_match):
+            # Not enough parameters for Bayes calculation
+            logger.debug(
+                f"[ProbabilisticEngine] Found Bayes keywords but missing parameters: "
+                f"sens={sens_match is not None}, spec={spec_match is not None}, prev={prev_match is not None}"
+            )
+            return None
+        
+        try:
+            sensitivity = float(sens_match.group(1))
+            specificity = float(spec_match.group(1))
+            prevalence = float(prev_match.group(1))
+            
+            # Validate parameters
+            if not (0 <= sensitivity <= 1 and 0 <= specificity <= 1 and 0 <= prevalence <= 1):
+                logger.warning(
+                    f"[ProbabilisticEngine] Invalid Bayes parameters: "
+                    f"sens={sensitivity}, spec={specificity}, prev={prevalence}"
+                )
+                return None
+            
+            # Compute Bayes' theorem: P(Disease|Positive)
+            p_positive_given_disease = sensitivity
+            p_positive_given_no_disease = 1 - specificity
+            p_disease = prevalence
+            p_no_disease = 1 - prevalence
+            
+            # P(Positive) = P(+|D)*P(D) + P(+|¬D)*P(¬D)
+            p_positive = (p_positive_given_disease * p_disease) + \
+                        (p_positive_given_no_disease * p_no_disease)
+            
+            # Avoid division by zero
+            if p_positive == 0:
+                posterior = 0.0
+            else:
+                # P(Disease|Positive) = P(+|D) * P(D) / P(+)
+                posterior = (p_positive_given_disease * p_disease) / p_positive
+            
+            logger.info(
+                f"[ProbabilisticEngine] Bayesian calculation: "
+                f"sens={sensitivity}, spec={specificity}, prev={prevalence} -> "
+                f"P(D|+) = {posterior:.6f}"
+            )
+            
+            return {
+                "tool": self.name,
+                "result": {
+                    "posterior": posterior,
+                    "parameters": {
+                        "sensitivity": sensitivity,
+                        "specificity": specificity,
+                        "prevalence": prevalence,
+                    }
+                },
+                "probability": posterior,
+                "posterior": posterior,
+                "distribution": {True: posterior, False: 1 - posterior},
+                "confidence": 0.95,  # High confidence for exact calculation
+                "calculation_type": "bayes_theorem",
+                "execution_time_ms": 0.0,
+                "engine": "BayesianCalculator",
+            }
+            
+        except (ValueError, ZeroDivisionError) as e:
+            logger.warning(f"[ProbabilisticEngine] Bayesian calculation failed: {e}")
+            return None
+    
     def _parse_problem(self, problem: Any) -> tuple:
-        """Parse problem into query_var, evidence, and rules."""
+        """Parse problem into query_var, evidence, and rules.
+        
+        BUG #2 FIX: Now handles natural language queries better by extracting
+        the actual query variable instead of using the entire text.
+        """
         if isinstance(problem, str):
-            # Simple string query - assume it's the query variable
-            return problem, {}, []
+            # BUG #2 FIX: For string queries, try to extract a meaningful variable name
+            # instead of passing the whole query title
+            var_name = self._extract_variable_from_text(problem)
+            return var_name, {}, []
         elif isinstance(problem, dict):
             query_var = problem.get("query_var") or problem.get("query") or problem.get("variable")
             evidence = problem.get("evidence", {})
@@ -1455,6 +1592,51 @@ class ProbabilisticToolWrapper:
             return query_var, evidence, rules
         else:
             return str(problem), {}, []
+    
+    def _extract_variable_from_text(self, text: str) -> str:
+        """
+        BUG #2 FIX: Extract a meaningful variable name from natural language text.
+        
+        Instead of:
+            Computing P(Multimodal Reasoning (cross-constraints))  # WRONG
+        
+        We want:
+            Computing P(X)  # Where X is a properly extracted variable
+        """
+        import re
+        
+        # Try to find an explicit variable reference like P(X) or P(var_name)
+        prob_match = re.search(r'P\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*(?:\||\))', text)
+        if prob_match:
+            return prob_match.group(1)
+        
+        # Try to find "query:" or "variable:" prefix
+        var_match = re.search(r'(?:query|variable|compute)\s*[=:]\s*([A-Za-z_][A-Za-z0-9_]*)', text, re.IGNORECASE)
+        if var_match:
+            return var_match.group(1)
+        
+        # Look for common probability query patterns
+        patterns = [
+            r'probability\s+(?:of\s+)?([A-Za-z_][A-Za-z0-9_]*)',
+            r'P\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)',
+            r'prob\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)',
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                return match.group(1)
+        
+        # If nothing found, extract first word that looks like a variable name
+        # This is a fallback - better than using the whole query title
+        words = text.split()
+        for word in words[:5]:  # Check first 5 words
+            clean_word = re.sub(r'[^A-Za-z0-9_]', '', word)
+            if clean_word and not clean_word.isdigit() and len(clean_word) > 1:
+                return clean_word
+        
+        # Ultimate fallback - return a generic variable name
+        return "X"
     
     def _error_result(self, error: str) -> Dict[str, Any]:
         return {
@@ -2768,11 +2950,26 @@ class ToolSelector:
             primary_result = execution_result.primary_result
 
             # Calibrate confidence if enabled
+            # BUG #3 FIX: Properly extract confidence from engine result
+            # The primary_result is often a Dict, not an object with attributes
             confidence = 0.5
             calibrated_confidence = 0.5
 
-            if primary_result and hasattr(primary_result, "confidence"):
-                confidence = primary_result.confidence
+            if primary_result:
+                # Try to extract confidence from the result
+                # BUG #3 FIX: Handle both dict and object forms
+                if isinstance(primary_result, dict):
+                    confidence = primary_result.get("confidence", 0.5)
+                elif hasattr(primary_result, "confidence"):
+                    confidence = primary_result.confidence
+                
+                # BUG #3 FIX: If confidence is 0.0 or very low, don't override to 0.5
+                # This respects the engine's assessment that it couldn't answer
+                if confidence <= 0.1:
+                    logger.warning(
+                        f"[ToolSelector] Engine returned very low confidence ({confidence:.3f}) - "
+                        f"respecting engine's assessment that it may not be applicable"
+                    )
 
                 if self.config.get("enable_calibration"):
                     calibrated_confidence = self.calibrator.calibrate_confidence(

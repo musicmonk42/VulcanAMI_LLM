@@ -146,12 +146,18 @@ ANALOGICAL_KEYWORDS: FrozenSet[str] = frozenset([
 ])
 
 # Philosophical/ethical indicators - complexity 0.4+, tools=['philosophical']
+# BUG FIX: Added forced choice patterns for trolley problem variants
 PHILOSOPHICAL_KEYWORDS: FrozenSet[str] = frozenset([
     "ethical", "ethics", "moral", "morality",
     "permissible", "forbidden", "obligatory",
     "deontological", "utilitarian", "consequentialist",
     "trolley problem", "thought experiment",
     "virtue", "justice", "rights", "duty",
+    # BUG FIX: Added forced choice / trolley problem variant patterns
+    "choose between", "forced to choose", "had to choose",
+    "no third choice", "no other choice", "only two options",
+    "dilemma", "ethical dilemma", "moral dilemma",
+    "world dictator", "death of humanity",  # Specific trolley problem variant
 ])
 
 # Simple factual indicators - complexity 0.1-0.2

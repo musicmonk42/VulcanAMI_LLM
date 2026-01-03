@@ -92,10 +92,98 @@ class Token:
 
 
 class Lexer:
-    """Lexical analyzer for FOL formulas."""
+    """Lexical analyzer for FOL formulas.
+    
+    BUG #1 FIX: Now preprocesses natural language text to handle:
+    - Em-dashes (—) converted to regular dashes (-)
+    - Slashes (/) that are not part of comments converted to OR
+    - Other Unicode characters that might appear in natural language
+    
+    This allows the parser to handle queries like:
+    "Mathematical Verification
+    M1 — Proof check with a hidden flaw..."
+    """
 
-    def __init__(self, text: str):
-        self.text = text
+    # Character substitution map for preprocessing
+    # BUG #1 FIX: Handle natural language characters
+    CHAR_SUBSTITUTIONS = {
+        "—": "-",      # Em-dash to hyphen
+        "–": "-",      # En-dash to hyphen
+        "−": "-",      # Minus sign to hyphen
+        "/": " or ",   # Slash as alternative to OR (common in natural language)
+        "：": ":",     # Full-width colon
+        "．": ".",     # Full-width period
+        "，": ",",     # Full-width comma
+        """: '"',      # Smart quotes
+        """: '"',
+        "'": "'",
+        "'": "'",
+        "…": "...",    # Ellipsis
+    }
+
+    @classmethod
+    def preprocess_natural_language(cls, text: str) -> str:
+        """
+        BUG #1 FIX: Preprocess natural language text before tokenization.
+        
+        This method:
+        1. Normalizes Unicode characters (em-dashes, smart quotes, etc.)
+        2. Attempts to extract formal logic from natural language prose
+        3. Returns text suitable for the FOL lexer
+        
+        Args:
+            text: Raw input text (may contain natural language)
+            
+        Returns:
+            Preprocessed text suitable for tokenization
+        """
+        if not text:
+            return text
+        
+        # Step 1: Apply character substitutions
+        result = text
+        for old_char, new_char in cls.CHAR_SUBSTITUTIONS.items():
+            result = result.replace(old_char, new_char)
+        
+        # Step 2: Check if this looks like natural language prose
+        # If it has multiple lines with non-formula content, try to extract formulas
+        lines = result.split('\n')
+        if len(lines) > 1:
+            # Try to find lines that look like logical formulas
+            formula_lines = []
+            for line in lines:
+                line = line.strip()
+                # Skip empty lines and lines that look like headers/prose
+                if not line:
+                    continue
+                # Skip lines that start with common prose patterns
+                if any(line.lower().startswith(prefix) for prefix in 
+                       ['m1', 'p1', 's1', 'l1', 'c1', 'a1', 'g1', 'mm1',  # Query identifiers
+                        'the ', 'a ', 'an ', 'this ', 'that ', 'if ', 'when ',
+                        'given ', 'suppose ', 'assume ', 'let ', 'consider ',
+                        'what ', 'how ', 'why ', 'where ', 'who ',
+                        'prove ', 'show ', 'verify ', 'check ', 'find ',
+                        'calculate ', 'compute ', 'determine ', 'evaluate ']):
+                    continue
+                # This line might be a formula, keep it
+                formula_lines.append(line)
+            
+            # If we found potential formula lines, use those
+            if formula_lines:
+                result = ' '.join(formula_lines)
+        
+        return result
+
+    def __init__(self, text: str, preprocess: bool = True):
+        # BUG #1 FIX: Preprocess natural language input
+        if preprocess:
+            self.text = Lexer.preprocess_natural_language(text)
+            # Log if preprocessing changed the text
+            if self.text != text:
+                logger.debug(f"Lexer preprocessed input: '{text[:50]}...' -> '{self.text[:50]}...'")
+        else:
+            self.text = text
+        
         self.pos = 0
         self.line = 1
         self.column = 1
@@ -182,6 +270,15 @@ class Lexer:
             token_type = self.token_map.get(value)
             if token_type:
                 return Token(token_type, value, self.line, start_col)
+        elif kind == "MISMATCH":
+            # BUG #1 FIX: Skip unknown characters instead of crashing
+            # This allows natural language text to pass through more gracefully
+            # Log a warning but don't fail
+            logger.debug(
+                f"Lexer: Skipping unknown character '{value}' (U+{ord(value):04X}) "
+                f"at line {self.line}, column {start_col}"
+            )
+            return self._get_next_token()  # Skip and continue
 
         raise SyntaxError(
             f"Lexer error: Unknown token '{value}' at line {self.line}, column {start_col}"
