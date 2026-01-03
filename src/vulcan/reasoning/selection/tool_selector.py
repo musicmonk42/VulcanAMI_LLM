@@ -13,6 +13,7 @@ Fixed with interruptible background threads.
 import json
 import logging
 import pickle  # SECURITY: Internal data only, never deserialize untrusted data
+import re
 import threading
 import time
 import uuid

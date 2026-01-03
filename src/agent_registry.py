@@ -10,6 +10,7 @@ signatures, key management, certificate support, and enterprise security feature
 import json
 import logging
 import os
+import re
 import sqlite3
 import threading
 import time

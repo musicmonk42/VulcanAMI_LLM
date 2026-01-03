@@ -4,6 +4,7 @@ import asyncio
 import hashlib
 import logging
 import pickle  # SECURITY WARNING: pickle is used for internal data structures only
+import re
 import time
 import zlib
 from collections import defaultdict

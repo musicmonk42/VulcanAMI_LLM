@@ -76,6 +76,7 @@ import hmac
 import importlib
 import json  # For Arena API endpoints
 import logging
+import re
 import subprocess  # For background process management
 import sys
 from collections import deque

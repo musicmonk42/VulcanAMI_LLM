@@ -17,6 +17,7 @@ FIXES APPLIED:
 
 import argparse
 import logging
+import re
 import sys
 from typing import List
 
