@@ -37,7 +37,9 @@
 #
 # DEBUGGING:
 # - Check /vulcan/v1/llm/status endpoint to verify LLM configuration
-# - Check /health endpoint for overall platform health
+# - Check /health/live for liveness (fast, used by Railway healthcheck)
+# - Check /health/ready for readiness (checks service mounts)
+# - Check /health for comprehensive platform health (all services)
 # - Check Railway logs for startup messages about environment variables
 # =============================================================================
 [build]
@@ -48,8 +50,14 @@ buildArgs = ["REJECT_INSECURE_JWT=ack"]
 
 [deploy]
 # Health check configuration
-healthcheckPath = "/health"
-healthcheckTimeout = 300  # Increased to 5 minutes for ML model loading
+# Using /health/live (liveness probe) instead of /health (comprehensive check)
+# /health/live is a fast, lightweight endpoint that returns immediately once the
+# FastAPI server is accepting HTTP requests, without waiting for all services
+# to be fully initialized. This prevents healthcheck failures during the slow
+# startup phase when ML models (spaCy, BERT, embeddings) are being loaded.
+# For comprehensive health status, use the /health endpoint after startup.
+healthcheckPath = "/health/live"
+healthcheckTimeout = 300  # 5 minutes for initial startup (ML model loading)
 # Restart policy
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
