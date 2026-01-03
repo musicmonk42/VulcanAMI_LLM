@@ -10,6 +10,7 @@ signatures, key management, certificate support, and enterprise security feature
 import json
 import logging
 import os
+import re
 import sqlite3
 import threading
 import time
@@ -1030,8 +1031,6 @@ class AgentRegistry:
             return False
 
         # Only allow alphanumeric, underscore, hyphen
-        import re
-
         if not re.match(r"^[a-zA-Z0-9_-]+$", agent_id):
             return False
 
@@ -1041,8 +1040,6 @@ class AgentRegistry:
         """Validate permission name."""
         if not permission or len(permission) > PERMISSION_NAME_MAX_LENGTH:
             return False
-
-        import re
 
         if not re.match(r"^[a-z_]+$", permission):
             return False

@@ -4,6 +4,7 @@ import asyncio
 import hashlib
 import hmac
 import logging
+import re
 import time
 import zlib
 from concurrent.futures import ThreadPoolExecutor

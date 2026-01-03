@@ -19,6 +19,7 @@ Fully functional context management with:
 import hashlib
 import logging
 import math
+import re
 import time
 from collections import deque
 from dataclasses import dataclass, field

@@ -4,6 +4,7 @@ import asyncio
 import hashlib
 import logging
 import pickle  # SECURITY WARNING: pickle is used for internal data structures only
+import re
 import time
 import zlib
 from collections import defaultdict
@@ -482,8 +483,6 @@ class MerkleLSM:
         Returns:
             List of matching keys
         """
-        import re
-
         # Convert wildcard pattern to regex
         regex_pattern = pattern.replace("*", ".*")
         regex = re.compile(regex_pattern)
@@ -524,8 +523,6 @@ class MerkleLSM:
         Returns:
             List of (key, value) tuples matching the pattern
         """
-        import re
-
         regex = re.compile(pattern)
         results = []
         seen_keys = set()

@@ -2,6 +2,8 @@
 # Production-grade test suite for VULCAN-AGI API Gateway
 # Run: pytest src/vulcan/tests/test_api_gateway.py -v --tb=short --cov=src.vulcan.api_gateway --cov-report=html
 
+import re
+
 from src.vulcan.config import AgentConfig
 from src.vulcan.api_gateway import (
     APIGateway,
@@ -183,7 +185,6 @@ class ProductionRedis:
                     keys.append(k)
                 else:
                     pattern = match.replace("*", ".*")
-                    import re
 
                     if re.match(pattern, k):
                         keys.append(k)

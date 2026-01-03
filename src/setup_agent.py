@@ -17,6 +17,7 @@ FIXES APPLIED:
 
 import argparse
 import logging
+import re
 import sys
 from typing import List
 
@@ -85,8 +86,6 @@ def validate_agent_id(agent_id: str) -> None:
         )
 
     # Check valid characters (alphanumeric, underscore, hyphen)
-    import re
-
     if not re.match(r"^[a-zA-Z0-9_-]+$", agent_id):
         raise ValidationError(
             f"Agent ID '{agent_id}' contains invalid characters. "
@@ -137,8 +136,6 @@ def validate_roles(roles: List[str]) -> List[str]:
             raise ValidationError("Role name cannot be whitespace only")
 
         # Check for valid characters
-        import re
-
         if not re.match(r"^[a-zA-Z0-9_-]+$", role_lower):
             raise ValidationError(
                 f"Role '{role}' contains invalid characters. "
