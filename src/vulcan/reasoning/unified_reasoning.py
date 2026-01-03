@@ -122,6 +122,14 @@ CREATIVE_TASK_KEYWORDS = (
 # Maximum text length to check for creative keywords (performance optimization)
 MAX_CREATIVE_CHECK_LENGTH = 2000
 
+# BUG #18 FIX: Pre-compile regex patterns at module level
+# Previously patterns were recompiled on every call to _is_creative_task
+import re
+_CREATIVE_KEYWORD_PATTERNS = {}
+for _kw in CREATIVE_TASK_KEYWORDS:
+    if ' ' not in _kw:
+        _CREATIVE_KEYWORD_PATTERNS[_kw] = re.compile(r'\b' + re.escape(_kw) + r'\b')
+
 
 def _is_creative_task(task: 'ReasoningTask') -> bool:
     """
@@ -160,14 +168,12 @@ def _is_creative_task(task: 'ReasoningTask') -> bool:
         query_str = str(task.query)[:MAX_CREATIVE_CHECK_LENGTH]
         text_to_check += " " + query_str.lower()
     
-    # Check for creative keywords using word boundary matching
-    # This prevents false positives like 'rewrite' matching 'write'
-    import re
+    # Check for creative keywords using pre-compiled patterns (BUG #18 FIX)
     for keyword in CREATIVE_TASK_KEYWORDS:
-        # Use word boundary regex for single-word keywords
         if ' ' not in keyword:
-            pattern = r'\b' + re.escape(keyword) + r'\b'
-            if re.search(pattern, text_to_check):
+            # Use pre-compiled regex pattern
+            pattern = _CREATIVE_KEYWORD_PATTERNS.get(keyword)
+            if pattern and pattern.search(text_to_check):
                 return True
         else:
             # Multi-word keywords: direct substring match is fine
@@ -3153,13 +3159,30 @@ class UnifiedReasoner:
                     logger.warning("Mathematical reasoner missing 'reason' method")
                     result = self._create_empty_result()
 
-            elif task.task_type == ReasoningType.SYMBOLIC:
-                # Direct call to the reasoner's main method, handles chain creation internally
-                result = reasoner.reason(task.input_data, task.query)
-                if not isinstance(result, ReasoningResult):
-                    result = self._create_error_result(
-                        "Language reasoner returned invalid type"
-                    )
+            elif task.task_type == ReasoningType.ANALOGICAL:
+                # BUG #20 FIX: Handle ANALOGICAL reasoning type 
+                # Previously this was incorrectly handled as SYMBOLIC (duplicate branch)
+                if hasattr(reasoner, "reason"):
+                    raw_result = reasoner.reason(task.input_data, task.query)
+                    if isinstance(raw_result, ReasoningResult):
+                        result = raw_result
+                    elif isinstance(raw_result, dict):
+                        result = ReasoningResult(
+                            conclusion=raw_result.get("conclusion") or raw_result,
+                            confidence=max(CONFIDENCE_FLOOR_ANALOGICAL_DEFAULT, raw_result.get("confidence", 0.5)),
+                            reasoning_type=ReasoningType.ANALOGICAL,
+                            explanation=raw_result.get("explanation", "Analogical reasoning performed"),
+                        )
+                    else:
+                        result = ReasoningResult(
+                            conclusion=raw_result,
+                            confidence=0.5,
+                            reasoning_type=ReasoningType.ANALOGICAL,
+                            explanation="Analogical reasoning performed",
+                        )
+                else:
+                    logger.warning("Analogical reasoner missing 'reason' method")
+                    result = self._create_empty_result()
 
             else:
                 # Default fallback for other reasoners with a standard interface
@@ -3236,6 +3259,12 @@ class UnifiedReasoner:
                         logger.warning(
                             f"Failed to create reasoning chain for task {task.task_id}: {e}"
                         )
+
+        # BUG #20 FIX: Ensure result is never None
+        # If an elif branch didn't set result, create an empty result
+        if result is None:
+            logger.warning(f"[UnifiedReasoner] No result from _execute_reasoner for task_type={task.task_type}")
+            result = self._create_empty_result()
 
         return result
 

@@ -49,7 +49,8 @@ data:
   # Problem Decomposer Configuration
   # Complex queries (complexity >= threshold) use hierarchical decomposition
   PROBLEM_DECOMPOSER_ENABLED: "true"
-  DECOMPOSITION_COMPLEXITY_THRESHOLD: "0.40"
+  # FIX: Updated to 0.50 to match code default and enable decomposition
+  DECOMPOSITION_COMPLEXITY_THRESHOLD: "0.50"
   # Semantic Bridge Configuration
   # Enables cross-domain knowledge transfer for multi-tool queries
   SEMANTIC_BRIDGE_ENABLED: "true"
@@ -58,8 +59,9 @@ data:
   # Performance Tuning Configuration (PR Fixes)
   # Embedding timeout reduced from 30s to 5s to prevent cascade delays
   VULCAN_EMBEDDING_TIMEOUT: "5.0"
-  # Decomposition threshold raised to reduce unnecessary decomposition
-  VULCAN_DECOMPOSITION_THRESHOLD: "0.70"
+  # Decomposition threshold updated to 0.50 to match code default
+  # This enables decomposition for complex queries (complexity >= 0.50)
+  VULCAN_DECOMPOSITION_THRESHOLD: "0.50"
   # Arena threshold lowered so more queries go through Arena
   ARENA_COMPLEXITY_THRESHOLD: "0.1"
   # Self-improvement auto-commit disabled by default
@@ -123,6 +125,10 @@ data:
   # Timeout for parallel LLM execution (both local and OpenAI running concurrently)
   # First successful response wins; pending tasks are cancelled
   HYBRID_EXECUTOR_TIMEOUT: "30.0"
+  # BUG #5 FIX: Grace period before cancelling local VULCAN task when OpenAI finishes first
+  # This allows VULCAN's local reasoning to complete even if slower than OpenAI
+  # Ensures VULCAN reasoning is preferred over OpenAI fallback
+  VULCAN_LOCAL_GRACE_PERIOD: "2.0"
   # OpenAI Response Caching Configuration (Performance Optimization)
   # Enables LRU+TTL caching for OpenAI API responses to reduce costs and latency
   OPENAI_CACHE_ENABLED: "true"

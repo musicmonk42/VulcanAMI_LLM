@@ -135,6 +135,13 @@ PER_TOKEN_TIMEOUT = float(os.environ.get("VULCAN_LLM_PER_TOKEN_TIMEOUT", "30.0")
 FAST_MODE_MAX_TIMEOUT_SECONDS = float(os.environ.get("VULCAN_LLM_FAST_TIMEOUT", "60.0"))  # 60 seconds
 
 # ============================================================
+# BUG #5 FIX: PARALLEL MODE GRACE PERIOD
+# ============================================================
+# When OpenAI finishes first in parallel mode, wait this long for local to complete
+# This prevents cancelling local when it's almost done
+LOCAL_GRACE_PERIOD_SECONDS = float(os.environ.get("VULCAN_LOCAL_GRACE_PERIOD", "2.0"))  # 2 seconds
+
+# ============================================================
 # ADAPTIVE TIMEOUT CALCULATION
 # ============================================================
 # FIX: Implement adaptive timeout to prevent timeouts during CPU inference.
@@ -1395,6 +1402,12 @@ class HybridLLMExecutor:
             tasks = {local_task, openai_task}
             start_wait = time.perf_counter()
             
+            # BUG #5 FIX: Track results from each task
+            # This allows us to prefer local results over OpenAI even if OpenAI finishes first,
+            # IF local has already produced a usable result
+            local_result = None
+            openai_result = None
+            
             while tasks and (time.perf_counter() - start_wait) < self.timeout:
                 # Wait for the first task to complete
                 remaining_timeout = self.timeout - (time.perf_counter() - start_wait)
@@ -1415,29 +1428,81 @@ class HybridLLMExecutor:
                 for task in done:
                     try:
                         result = task.result()
+                        task_name = _get_task_name(task)
+                        is_local = task_name == "local_llm_task"
+                        
                         # Check if result is a valid dict with text
                         if isinstance(result, dict) and self._is_valid_response(result.get("text")):
-                            # Determine source from task name (with fallback for safety)
-                            task_name = _get_task_name(task)
-                            source = "local" if task_name == "local_llm_task" else "openai"
-                            result["source"] = f"parallel_{source}"
-                            elapsed = time.perf_counter() - start_time
-                            self.logger.info(f"[HybridExecutor] ✓ Parallel mode complete - winner: {source}, time: {elapsed:.2f}s")
+                            if is_local:
+                                local_result = result
+                                self.logger.info(f"[HybridExecutor] Local LLM produced valid result")
+                            else:
+                                openai_result = result
+                                self.logger.info(f"[HybridExecutor] OpenAI produced valid result")
                             
-                            # Cancel any remaining tasks
-                            for pending_task in pending:
-                                pending_task.cancel()
+                            # BUG #5 FIX: Prefer local results over OpenAI
+                            # If we have a local result, use it immediately (VULCAN should do reasoning)
+                            # This prevents OpenAI from "winning" just because it's faster
+                            if local_result:
+                                local_result["source"] = "parallel_local"
+                                elapsed = time.perf_counter() - start_time
+                                self.logger.info(f"[HybridExecutor] ✓ Parallel mode complete - winner: local (VULCAN), time: {elapsed:.2f}s")
+                                
+                                # Cancel any remaining tasks
+                                for pending_task in pending:
+                                    pending_task.cancel()
+                                    try:
+                                        await pending_task
+                                    except asyncio.CancelledError:
+                                        pass
+                                
+                                return local_result
+                            
+                            # If only OpenAI has a result, check if local is still running
+                            # Give local a short grace period to complete
+                            if openai_result and not local_result and local_task in pending:
+                                # BUG #5 FIX: Wait a bit longer for local to finish
+                                # This prevents cancelling local when it's almost done
+                                grace_period = min(LOCAL_GRACE_PERIOD_SECONDS, remaining_timeout)
+                                self.logger.info(f"[HybridExecutor] OpenAI won first, waiting {grace_period}s for local to finish...")
+                                
                                 try:
-                                    await pending_task
+                                    local_done, _ = await asyncio.wait(
+                                        {local_task},
+                                        timeout=grace_period
+                                    )
+                                    if local_done:
+                                        try:
+                                            local_check = local_task.result()
+                                            if isinstance(local_check, dict) and self._is_valid_response(local_check.get("text")):
+                                                local_result = local_check
+                                                local_result["source"] = "parallel_local"
+                                                elapsed = time.perf_counter() - start_time
+                                                self.logger.info(f"[HybridExecutor] ✓ Local completed during grace period - using local (VULCAN), time: {elapsed:.2f}s")
+                                                return local_result
+                                        except Exception:
+                                            pass
+                                except asyncio.TimeoutError:
+                                    pass
+                                
+                                # Local didn't complete in grace period, use OpenAI
+                                openai_result["source"] = "parallel_openai"
+                                elapsed = time.perf_counter() - start_time
+                                self.logger.info(f"[HybridExecutor] ✓ Parallel mode complete - winner: openai, time: {elapsed:.2f}s")
+                                
+                                # Cancel local task
+                                local_task.cancel()
+                                try:
+                                    await local_task
                                 except asyncio.CancelledError:
                                     pass
-                            
-                            return result
+                                
+                                return openai_result
                         else:
                             # Task completed but with invalid result, log it
-                            task_name = _get_task_name(task)
                             elapsed = time.perf_counter() - start_time
-                            self.logger.warning(f"[HybridExecutor] Task {task_name} completed but returned invalid result after {elapsed:.2f}s")
+                            source_name = "local" if is_local else "openai"
+                            self.logger.warning(f"[HybridExecutor] Task {source_name} completed but returned invalid result after {elapsed:.2f}s")
                     except Exception as e:
                         task_name = _get_task_name(task)
                         self.logger.warning(f"[HybridExecutor] Task {task_name} failed with exception: {e}")

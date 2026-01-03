@@ -197,6 +197,24 @@ SUCCESS_CONFIDENCE_THRESHOLD = 0.5  # Minimum confidence for success
 MAX_SUCCESS_TIME_MS = 10000  # Maximum execution time (ms) for success
 
 # ==============================================================================
+# Constants for BUG #1 FIX - QueryRouter Tool Selection
+# ==============================================================================
+# Default available tools when not specified in class instance
+# These represent all reasoning tools that can be selected by the QueryRouter
+DEFAULT_AVAILABLE_TOOLS = (
+    'symbolic', 'probabilistic', 'causal', 'analogical', 'multimodal',
+    'mathematical', 'philosophical'
+)
+
+# ==============================================================================
+# Constants for BUG #2 FIX - Multimodal Detection
+# ==============================================================================
+# Minimum string length to be considered as potential URL or file path
+MULTIMODAL_MIN_URL_LENGTH = 50
+# Minimum string length to be considered as potential base64 data
+MULTIMODAL_MIN_BASE64_LENGTH = 100
+
+# ==============================================================================
 # Embedding Timeout Configuration
 # ==============================================================================
 # PERFORMANCE FIX: Reduced from 30s to 5s to prevent query routing cascade delays
@@ -1583,6 +1601,53 @@ class ToolSelector:
         try:
             start_time = time.time()
 
+            # ================================================================
+            # BUG #1 FIX: Check if QueryRouter already selected tools
+            # If routing_plan.tools is provided for a typed fast-path (e.g., MATH-FAST-PATH),
+            # use those tools directly instead of running SemanticBoost/bandit selection.
+            # This prevents ToolSelector from overriding the router's intelligent selection.
+            # ================================================================
+            if hasattr(request, 'context') and isinstance(request.context, dict):
+                routing_tools = request.context.get('routing_plan_tools') or request.context.get('selected_tools')
+                if routing_tools and isinstance(routing_tools, (list, tuple)) and len(routing_tools) > 0:
+                    # Router has already made a selection - use it directly
+                    logger.info(
+                        f"[ToolSelector] BUG#1 FIX: Using QueryRouter's pre-selected tools: {routing_tools} "
+                        f"(bypassing SemanticBoost/bandit selection)"
+                    )
+                    # Filter to only include available tools (using constant)
+                    available_tools = getattr(self, 'available_tools', None) or DEFAULT_AVAILABLE_TOOLS
+                    valid_routing_tools = [t for t in routing_tools if t in available_tools]
+                    
+                    if valid_routing_tools:
+                        # Execute with router's selected tools directly
+                        # Create candidates from router's selection
+                        candidates = [
+                            {'tool': tool, 'utility': 1.0 - (i * 0.1), 'source': 'query_router'}
+                            for i, tool in enumerate(valid_routing_tools)
+                        ]
+                        
+                        # Skip to execution with these candidates
+                        features = self._extract_features(request)
+                        request.features = features
+                        
+                        strategy = self._select_strategy(request, candidates)
+                        execution_result = self._execute_portfolio(request, candidates, strategy)
+                        final_result = self._postprocess_result(request, execution_result, start_time)
+                        
+                        # Update learning with router attribution
+                        if self.config.get("learning_enabled"):
+                            self._update_learning(request, final_result)
+                        
+                        # Cache result
+                        if self.config.get("cache_enabled"):
+                            self._cache_result(request, final_result)
+                        
+                        self._update_statistics(final_result)
+                        
+                        logger.info(f"[ToolSelector] Executed with router's tools: {valid_routing_tools}")
+                        return final_result
+
             # Step 1: Admission control
             admitted, admission_info = self._check_admission(request)
             if not admitted:
@@ -1813,20 +1878,45 @@ class ToolSelector:
                     time_budget * 0.02,  # Use 2% of budget for extraction
                 )
 
-            # Check if problem contains multimodal indicators
+            # ================================================================
+            # BUG #2 FIX: Stricter multimodal detection
+            # Only trigger multimodal when ACTUAL multimodal data is present,
+            # not just keyword mentions like "image" or "picture" in text queries.
+            # This prevents false positives like "2+2" triggering multimodal boost
+            # because the context flag was set incorrectly.
+            # ================================================================
             is_multimodal = False
             if isinstance(request.problem, dict):
-                multimodal_keys = ['image', 'images', 'audio', 'video', 'file', 'document', 'attachment']
-                is_multimodal = any(key in request.problem for key in multimodal_keys)
-            elif isinstance(request.problem, str):
-                multimodal_indicators = ['image', 'picture', 'photo', 'uploaded', 'attached', 'file', 'document', 'diagram', 'chart', 'screenshot']
-                problem_lower = request.problem.lower()
-                is_multimodal = any(indicator in problem_lower for indicator in multimodal_indicators)
+                # Check for actual multimodal data (binary content, URLs, base64)
+                multimodal_data_keys = ['image', 'images', 'audio', 'video', 'file', 'attachment']
+                for key in multimodal_data_keys:
+                    if key in request.problem:
+                        value = request.problem[key]
+                        # Only count as multimodal if there's actual data, not just a key
+                        if value is not None and value != '' and value != []:
+                            # Check if it looks like actual data (bytes, URL, base64, or non-empty list)
+                            if isinstance(value, (bytes, bytearray)):
+                                is_multimodal = True
+                                break
+                            elif isinstance(value, str) and len(value) > MULTIMODAL_MIN_URL_LENGTH:
+                                # Likely a URL, file path, or base64 data (not just a filename mention)
+                                if value.startswith(('http://', 'https://', 'data:', '/', 'file:')) or \
+                                   len(value) > MULTIMODAL_MIN_BASE64_LENGTH:  # Base64 data is typically long
+                                    is_multimodal = True
+                                    break
+                            elif isinstance(value, list) and len(value) > 0:
+                                # List of images/files
+                                is_multimodal = True
+                                break
+            # NOTE: We intentionally do NOT set is_multimodal based on text keywords
+            # like "image", "picture", "photo" in string queries. A query about images
+            # (e.g., "How do I process an image?") is NOT the same as a query WITH images.
+            # Text-only queries should use text reasoning tools, not multimodal tools.
             
             if is_multimodal:
                 request.context = request.context or {}
                 request.context['is_multimodal'] = True
-                logger.info("[ToolSelector] Multimodal content detected in request")
+                logger.info("[ToolSelector] Multimodal content detected: actual binary/URL data present in request")
 
             # Cache features
             self.cache.cache_features(request.problem, features)
