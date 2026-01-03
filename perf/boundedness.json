@@ -1,10 +1,10 @@
 {
   "test_suite": "boundedness",
-  "timestamp": "2026-01-03T22:53:45.780780+00:00",
+  "timestamp": "2026-01-03T23:03:43.966820+00:00",
   "configuration": {
     "max_rss_growth_mb": 50.0,
     "max_slowdown_pct": 20.0,
-    "iterations": 50
+    "iterations": 10
   },
   "psutil_available": true
 }

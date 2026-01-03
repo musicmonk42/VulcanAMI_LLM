@@ -1,12 +1,12 @@
 # Boundedness Test Results
 
-**Generated:** 2026-01-03T22:53:45.780780+00:00
+**Generated:** 2026-01-03T23:03:43.966820+00:00
 
 ## Configuration
 
 - **Max RSS Growth:** 50.0 MB
 - **Max Slowdown:** 20.0%
-- **Iterations:** 50
+- **Iterations:** 10
 - **psutil Available:** True
 
 ## Test Categories
