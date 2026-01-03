@@ -177,7 +177,7 @@ class ToolDomainBridge:
         # BUG #15 FIX: For unknown types, assume FAILURE not success
         # This is more conservative - we require explicit success indication
         # to prevent false positives from counting as successes
-        logger.debug(f"_is_successful_transfer_result: Unknown result type {type(result)}, assuming failure")
+        logger.debug(f"_is_successful_transfer_result: Unknown result type {type(result).__name__}, assuming failure")
         return False
     
     def _init_semantic_bridge(self):

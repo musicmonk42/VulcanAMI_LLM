@@ -41,6 +41,16 @@ except ImportError:
     logger.warning("scikit-learn not available, using simplified models")
 
 
+# ============================================================
+# BUG #8 FIX: Router Disagreement Penalty
+# ============================================================
+# When the selected tool wasn't in the router's recommended list,
+# we apply this penalty to reduce the reward signal.
+# This prevents tools from being rewarded when the router suggested
+# different tools (and OpenAI fallback produced the actual result).
+ROUTER_DISAGREEMENT_PENALTY = 0.5  # Halve the quality when router disagreed
+
+
 class ExplorationStrategy(Enum):
     """Exploration strategies for bandit algorithms"""
 
@@ -1533,7 +1543,7 @@ class ToolSelectionBandit(AdaptiveBanditOrchestrator):
                     f"not in router's selection: {router_selected_tools}"
                 )
                 # Apply penalty: tool wasn't the router's choice
-                quality = quality * 0.5  # Halve the quality to reduce reward
+                quality = quality * ROUTER_DISAGREEMENT_PENALTY
             
             reward = self._compute_reward(quality, time_ms, energy_mj, constraints)
 

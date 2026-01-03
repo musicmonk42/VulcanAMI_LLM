@@ -1647,11 +1647,8 @@ class ReasoningIntegration:
         except Exception as e:
             logger.warning(f"{LOG_PREFIX} Cross-domain transfer failed: {e}")
             # BUG #5 FIX: Properly check if domains variable exists
-            # 'domains' in dir() checks globals/builtins, not local variables
-            try:
-                domains_list = list(domains) if domains else []
-            except NameError:
-                domains_list = []
+            # Use 'domains' in locals() to check if local variable is defined
+            domains_list = list(locals().get('domains', set()) or [])
             return {
                 'success': False,
                 'error': str(e),

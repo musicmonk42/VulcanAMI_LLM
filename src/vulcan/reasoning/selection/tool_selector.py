@@ -197,6 +197,24 @@ SUCCESS_CONFIDENCE_THRESHOLD = 0.5  # Minimum confidence for success
 MAX_SUCCESS_TIME_MS = 10000  # Maximum execution time (ms) for success
 
 # ==============================================================================
+# Constants for BUG #1 FIX - QueryRouter Tool Selection
+# ==============================================================================
+# Default available tools when not specified in class instance
+# These represent all reasoning tools that can be selected by the QueryRouter
+DEFAULT_AVAILABLE_TOOLS = (
+    'symbolic', 'probabilistic', 'causal', 'analogical', 'multimodal',
+    'mathematical', 'philosophical'
+)
+
+# ==============================================================================
+# Constants for BUG #2 FIX - Multimodal Detection
+# ==============================================================================
+# Minimum string length to be considered as potential URL or file path
+MULTIMODAL_MIN_URL_LENGTH = 50
+# Minimum string length to be considered as potential base64 data
+MULTIMODAL_MIN_BASE64_LENGTH = 100
+
+# ==============================================================================
 # Embedding Timeout Configuration
 # ==============================================================================
 # PERFORMANCE FIX: Reduced from 30s to 5s to prevent query routing cascade delays
@@ -1597,11 +1615,8 @@ class ToolSelector:
                         f"[ToolSelector] BUG#1 FIX: Using QueryRouter's pre-selected tools: {routing_tools} "
                         f"(bypassing SemanticBoost/bandit selection)"
                     )
-                    # Filter to only include available tools
-                    available_tools = getattr(self, 'available_tools', None) or [
-                        'symbolic', 'probabilistic', 'causal', 'analogical', 'multimodal',
-                        'mathematical', 'philosophical'
-                    ]
+                    # Filter to only include available tools (using constant)
+                    available_tools = getattr(self, 'available_tools', None) or DEFAULT_AVAILABLE_TOOLS
                     valid_routing_tools = [t for t in routing_tools if t in available_tools]
                     
                     if valid_routing_tools:
@@ -1883,10 +1898,10 @@ class ToolSelector:
                             if isinstance(value, (bytes, bytearray)):
                                 is_multimodal = True
                                 break
-                            elif isinstance(value, str) and len(value) > 50:
+                            elif isinstance(value, str) and len(value) > MULTIMODAL_MIN_URL_LENGTH:
                                 # Likely a URL, file path, or base64 data (not just a filename mention)
                                 if value.startswith(('http://', 'https://', 'data:', '/', 'file:')) or \
-                                   len(value) > 100:  # Base64 data is typically long
+                                   len(value) > MULTIMODAL_MIN_BASE64_LENGTH:  # Base64 data is typically long
                                     is_multimodal = True
                                     break
                             elif isinstance(value, list) and len(value) > 0:

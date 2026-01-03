@@ -135,6 +135,13 @@ PER_TOKEN_TIMEOUT = float(os.environ.get("VULCAN_LLM_PER_TOKEN_TIMEOUT", "30.0")
 FAST_MODE_MAX_TIMEOUT_SECONDS = float(os.environ.get("VULCAN_LLM_FAST_TIMEOUT", "60.0"))  # 60 seconds
 
 # ============================================================
+# BUG #5 FIX: PARALLEL MODE GRACE PERIOD
+# ============================================================
+# When OpenAI finishes first in parallel mode, wait this long for local to complete
+# This prevents cancelling local when it's almost done
+LOCAL_GRACE_PERIOD_SECONDS = float(os.environ.get("VULCAN_LOCAL_GRACE_PERIOD", "2.0"))  # 2 seconds
+
+# ============================================================
 # ADAPTIVE TIMEOUT CALCULATION
 # ============================================================
 # FIX: Implement adaptive timeout to prevent timeouts during CPU inference.
@@ -1456,7 +1463,7 @@ class HybridLLMExecutor:
                             if openai_result and not local_result and local_task in pending:
                                 # BUG #5 FIX: Wait a bit longer for local to finish
                                 # This prevents cancelling local when it's almost done
-                                grace_period = min(2.0, remaining_timeout)  # 2 second grace period
+                                grace_period = min(LOCAL_GRACE_PERIOD_SECONDS, remaining_timeout)
                                 self.logger.info(f"[HybridExecutor] OpenAI won first, waiting {grace_period}s for local to finish...")
                                 
                                 try:
