@@ -200,3 +200,5 @@ data/backups/
 # Runtime state files (test-generated)
 data/agent_state.json
 data/agent_state.json.tmp
+data/llm_meta_state.json
+data/llm_meta_state.json.tmp
