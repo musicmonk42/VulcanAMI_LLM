@@ -308,6 +308,14 @@ spec:
         - name: ZMQ_CONNECTION_TIMEOUT
           value: {{ .Values.performanceTuning.zmqConnectionTimeout | default 30000 | quote }}
         {{- end }}
+        {{- if .Values.hybridExecutor }}
+        {{- /* Hybrid Executor Configuration (BUG #5 FIX: Parallel LLM Execution) */}}
+        - name: HYBRID_EXECUTOR_TIMEOUT
+          value: {{ .Values.hybridExecutor.timeout | default 30.0 | quote }}
+        {{- /* BUG #5 FIX: Grace period before cancelling local VULCAN task when OpenAI finishes first */}}
+        - name: VULCAN_LOCAL_GRACE_PERIOD
+          value: {{ .Values.hybridExecutor.localGracePeriodSeconds | default 2.0 | quote }}
+        {{- end }}
         {{- if .Values.hybridOutput }}
         {{- /* Hybrid Output Configuration (OpenAI for formatting only) */}}
         {{- /* OPENAI_LANGUAGE_FORMATTING: Route ALL output formatting to OpenAI (fast path) */}}

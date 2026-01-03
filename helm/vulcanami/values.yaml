@@ -353,8 +353,8 @@ reasoning:
   problemDecomposer:
     enabled: true
     # Complexity threshold for using decomposition vs direct tool selection
-    # FIX: Updated from 0.40 to 0.70 to match code default (prevents "boots up then silence" issue)
-    complexityThreshold: 0.70
+    # Updated to 0.50 to enable decomposition for complex queries (complexity >= 0.50)
+    complexityThreshold: 0.50
   # Semantic bridge for cross-domain knowledge transfer
   semanticBridge:
     enabled: true
@@ -369,8 +369,9 @@ performanceTuning:
   # Embedding timeout for tool selector (seconds)
   # Reduced from 30s to 5s to prevent cascade delays
   embeddingTimeout: 5.0
-  # Decomposition threshold raised to reduce unnecessary decomposition
-  decompositionThreshold: 0.70
+  # Decomposition threshold set to 0.50 to match code default
+  # This enables decomposition for complex queries
+  decompositionThreshold: 0.50
   # Arena threshold lowered so more queries go through Arena
   arenaComplexityThreshold: 0.1
   # Self-improvement auto-commit disabled by default
@@ -450,6 +451,10 @@ hybridExecutor:
   # Both local LLM and OpenAI run concurrently; first successful response wins
   # Pending tasks are cancelled after timeout
   timeout: 30.0
+  # BUG #5 FIX: Grace period before cancelling local task when OpenAI finishes first
+  # This allows VULCAN's local reasoning to complete even if slower than OpenAI
+  # Ensures VULCAN reasoning is preferred over OpenAI fallback
+  localGracePeriodSeconds: 2.0
 
 # OpenAI Response Caching Configuration
 # Enables LRU+TTL caching for OpenAI API responses to reduce costs and latency
