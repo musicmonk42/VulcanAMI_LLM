@@ -101,13 +101,17 @@ HIGH_COMPLEXITY_THRESHOLD = 0.7  # Above this, use ACCURATE mode
 # causing "ProblemDecomposer boots up then silence" behavior.
 # Decomposition is essential for complex problem solving.
 #
+# BUG #1 FIX: Further lowered default from 0.70 to 0.50 
+# 0.70 is still too high - most queries won't trigger decomposition
+# Complex queries (0.4-0.7 complexity) should use decomposition
+#
 # CONFIGURABLE: Set VULCAN_DECOMPOSITION_THRESHOLD environment variable to override
-# Example: VULCAN_DECOMPOSITION_THRESHOLD=0.80 for less frequent decomposition
+# Example: VULCAN_DECOMPOSITION_THRESHOLD=0.60 for less frequent decomposition
 try:
-    DECOMPOSITION_COMPLEXITY_THRESHOLD = float(os.environ.get("VULCAN_DECOMPOSITION_THRESHOLD", "0.70"))
+    DECOMPOSITION_COMPLEXITY_THRESHOLD = float(os.environ.get("VULCAN_DECOMPOSITION_THRESHOLD", "0.50"))
 except (ValueError, TypeError):
-    logger.warning("Invalid VULCAN_DECOMPOSITION_THRESHOLD, using default 0.70")
-    DECOMPOSITION_COMPLEXITY_THRESHOLD = 0.70
+    logger.warning("Invalid VULCAN_DECOMPOSITION_THRESHOLD, using default 0.50")
+    DECOMPOSITION_COMPLEXITY_THRESHOLD = 0.50
 
 
 # Strategy selection thresholds
@@ -163,6 +167,7 @@ ROUTE_TO_REASONING_TYPE: Dict[str, str] = {
     "IDENTITY-FAST-PATH": "symbolic",            # Identity queries use symbolic reasoning
     "CONVERSATIONAL-FAST-PATH": "hybrid",        # Conversational uses hybrid
     "FACTUAL-FAST-PATH": "probabilistic",        # Factual queries use probabilistic
+    "ANALOGICAL-PATH": "analogical",             # BUG #2 FIX: Added analogical fast-path
     # QueryType enum values from query_router.py
     "philosophical": "philosophical",            # PHILOSOPHICAL query type
     "mathematical": "mathematical",              # MATHEMATICAL query type
@@ -173,6 +178,8 @@ ROUTE_TO_REASONING_TYPE: Dict[str, str] = {
     "general": "hybrid",                         # GENERAL query type (default)
     "reasoning": "causal",                       # Generic reasoning
     "execution": "symbolic",                     # Execution tasks
+    "analogical": "analogical",                  # BUG #2 FIX: Added analogical mapping
+    "perception": "analogical",                  # BUG #2 FIX: Perception often uses analogical reasoning
     # Legacy/fallback mappings
     "HYBRID": "hybrid",
     "UNKNOWN": "hybrid",
@@ -1188,10 +1195,20 @@ class ReasoningIntegration:
         """
         strategy = self._determine_strategy_from_query(query_type, complexity)
 
+        # BUG #3 FIX: Adjust confidence based on complexity
+        # High-complexity queries that fall back should have lower confidence
+        # because we couldn't handle them properly
+        if complexity >= 0.7:
+            fallback_confidence = 0.3  # Low confidence for high-complexity fallbacks
+        elif complexity >= 0.5:
+            fallback_confidence = 0.4  # Medium-low confidence
+        else:
+            fallback_confidence = 0.5  # Default confidence for low-complexity
+
         return ReasoningResult(
             selected_tools=["general"],
             reasoning_strategy=strategy,
-            confidence=0.5,
+            confidence=fallback_confidence,
             rationale="Fallback to default strategy",
             metadata={
                 "query_type": query_type,
@@ -1598,8 +1615,13 @@ class ReasoningIntegration:
             
             # Record transfer in domain bridge
             if transferred:
+                # BUG #6 FIX: Safe set subtraction - handle edge cases
+                # If domains has exactly one element equal to primary_domain,
+                # (domains - {primary_domain}) is empty and [0] would raise IndexError
+                other_domains = list(domains - {primary_domain})
+                source_domain = other_domains[0] if other_domains else 'unknown'
                 self._domain_bridge.record_transfer(
-                    source_domain=list(domains - {primary_domain})[0] if len(domains) > 1 else 'unknown',
+                    source_domain=source_domain,
                     target_domain=primary_domain,
                     success=True,
                     concepts_transferred=len(transferred),
@@ -1624,10 +1646,16 @@ class ReasoningIntegration:
             
         except Exception as e:
             logger.warning(f"{LOG_PREFIX} Cross-domain transfer failed: {e}")
+            # BUG #5 FIX: Properly check if domains variable exists
+            # 'domains' in dir() checks globals/builtins, not local variables
+            try:
+                domains_list = list(domains) if domains else []
+            except NameError:
+                domains_list = []
             return {
                 'success': False,
                 'error': str(e),
-                'domains': list(domains) if 'domains' in dir() else [],
+                'domains': domains_list,
             }
 
     def learn_from_outcome(

@@ -58,6 +58,7 @@ class ToolDomainBridge:
     """
     
     # Map tools to their primary semantic domains
+    # BUG #14 FIX: Added missing tool mappings
     TOOL_TO_DOMAIN: Dict[str, str] = {
         # Probabilistic/Statistical reasoning
         'probabilistic': 'statistical',
@@ -81,6 +82,24 @@ class ToolDomainBridge:
         'analogical': 'analogical',
         'analogy': 'analogical',
         
+        # BUG #14 FIX: Added mathematical domain
+        'mathematical': 'mathematical',
+        'math': 'mathematical',
+        'arithmetic': 'mathematical',
+        'algebra': 'mathematical',
+        'calculus': 'mathematical',
+        
+        # BUG #14 FIX: Added philosophical/ethical domain
+        'philosophical': 'philosophical',
+        'ethical': 'philosophical',
+        'deontic': 'philosophical',
+        'moral': 'philosophical',
+        
+        # BUG #14 FIX: Added language/hybrid domains
+        'language': 'linguistic',
+        'linguistic': 'linguistic',
+        'hybrid': 'general',
+        
         # General/Fallback
         'general': 'general',
         'default': 'general',
@@ -89,12 +108,16 @@ class ToolDomainBridge:
     # Define domain relationships (which domains can transfer knowledge to which)
     # Each domain maps to a list of domains it can transfer TO
     DOMAIN_RELATIONSHIPS: Dict[str, List[str]] = {
-        'statistical': ['causal_reasoning', 'general', 'analogical'],
-        'causal_reasoning': ['statistical', 'logical', 'general'],
-        'logical': ['causal_reasoning', 'general', 'analogical'],
-        'perceptual': ['analogical', 'general'],
-        'analogical': ['perceptual', 'logical', 'general', 'statistical'],
-        'general': ['statistical', 'causal_reasoning', 'logical', 'perceptual', 'analogical'],
+        'statistical': ['causal_reasoning', 'general', 'analogical', 'mathematical'],
+        'causal_reasoning': ['statistical', 'logical', 'general', 'philosophical'],
+        'logical': ['causal_reasoning', 'general', 'analogical', 'mathematical', 'philosophical'],
+        'perceptual': ['analogical', 'general', 'linguistic'],
+        'analogical': ['perceptual', 'logical', 'general', 'statistical', 'linguistic'],
+        'general': ['statistical', 'causal_reasoning', 'logical', 'perceptual', 'analogical', 'mathematical', 'philosophical', 'linguistic'],
+        # BUG #14 FIX: Added relationships for new domains
+        'mathematical': ['logical', 'statistical', 'general'],
+        'philosophical': ['logical', 'causal_reasoning', 'general'],
+        'linguistic': ['analogical', 'general', 'philosophical'],
     }
     
     # Domain priority for execution ordering (lower = higher priority)
@@ -130,6 +153,10 @@ class ToolDomainBridge:
         
         Handles various result types from different transfer engine implementations.
         
+        BUG #15 FIX: More conservative success detection
+        Previously, any non-None result without explicit failure was assumed successful.
+        Now we require explicit success indication.
+        
         Args:
             result: Transfer result object (TransferDecision, dict, or other)
             
@@ -143,9 +170,15 @@ class ToolDomainBridge:
             return bool(result.success)
         # Check for dict with success key
         if isinstance(result, dict):
+            # BUG #15 FIX: Check for explicit failure indicators too
+            if result.get('error') or result.get('failed'):
+                return False
             return result.get('success', False) or result.get('transferred', False)
-        # Non-None result without explicit failure assumed successful
-        return True
+        # BUG #15 FIX: For unknown types, assume FAILURE not success
+        # This is more conservative - we require explicit success indication
+        # to prevent false positives from counting as successes
+        logger.debug(f"_is_successful_transfer_result: Unknown result type {type(result)}, assuming failure")
+        return False
     
     def _init_semantic_bridge(self):
         """Initialize SemanticBridge integration.
