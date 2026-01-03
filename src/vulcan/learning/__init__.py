@@ -538,6 +538,24 @@ class UnifiedLearningSystem:
             mismatch_reason = ""
             query_type_lower = query_type.lower() if query_type else ''
             
+            # FIX #4: Check if selected tools match what the router suggested
+            # If router_tools are provided and the selected tools differ, that's a mismatch
+            router_tools = outcome.get('router_tools') or metadata.get('router_tools', [])
+            is_router_mismatch = False
+            router_mismatch_reason = ""
+            
+            if router_tools and tools:
+                # Check if any selected tool is NOT in the router's suggestion
+                for tool in tools:
+                    tool_lower = tool.lower()
+                    if tool_lower not in [rt.lower() for rt in router_tools]:
+                        is_router_mismatch = True
+                        router_mismatch_reason = f"Selected tool '{tool}' not in router's suggestions: {router_tools}"
+                        logger.info(
+                            f"[Learning] FIX #4: Tool '{tool}' selected but router suggested {router_tools}"
+                        )
+                        break
+            
             for tool in tools:
                 tool_lower = tool.lower()
                 expected_types = TOOL_QUERY_TYPE_MAP.get(tool_lower, [])
@@ -565,6 +583,16 @@ class UnifiedLearningSystem:
                 )
                 # Treat as failure - this query should not have gone to probabilistic
                 weight_delta = WEIGHT_ADJUSTMENT_FAILURE * 2  # Double penalty for bad routing
+            elif is_router_mismatch:
+                # FIX #4: Selected tool doesn't match router's suggestion - PENALIZE
+                # The router knows the appropriate tools for the query; if ToolSelector
+                # chose something else, that selection was likely incorrect.
+                # Penalty: WEIGHT_ADJUSTMENT_FAILURE * 1.5 = -0.005 * 1.5 = -0.0075
+                logger.warning(
+                    f"[Learning] FIX #4 ROUTER MISMATCH: {router_mismatch_reason}. "
+                    f"Applying -0.0075 PENALTY (1.5x failure penalty) for ignoring router."
+                )
+                weight_delta = WEIGHT_ADJUSTMENT_FAILURE * 1.5  # -0.0075 penalty for router mismatch
             elif is_tool_mismatch:
                 # BUG #3 FIX (CRITICAL): Tool-query type mismatch detected
                 # This is the KEY fix for the analogical runaway feedback loop.

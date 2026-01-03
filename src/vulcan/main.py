@@ -5384,94 +5384,138 @@ async def unified_chat(request: UnifiedChatRequest):
         # BUG #2 FIX: When agent pool jobs don't complete in time, invoke reasoning
         # directly using the proven GraphixArena pattern. This ensures reasoning
         # results are available for the LLM context even if agent pool is slow.
+        #
+        # FIX #1: Check router's complexity before invoking direct reasoning fallback.
+        # Simple queries (complexity < 0.1 or type=general) should be handled
+        # directly by the LLM without reasoning engines.
         # ================================================================
         if not reasoning_results and not agent_reasoning_output:
-            logger.warning(
-                "[VULCAN/v1/chat] No reasoning results from parallel tasks or agent pool. "
-                "Invoking direct reasoning (GraphixArena pattern)..."
-            )
-            try:
-                # NOTE: Imports are inside try-except intentionally because these modules
-                # may not be available in all deployments. If they're not available,
-                # we gracefully fall back to agent pool results (or no reasoning).
-                from vulcan.reasoning.reasoning_integration import apply_reasoning
-                from vulcan.reasoning import create_unified_reasoner, ReasoningType
-                
-                # Determine query type and complexity for reasoning selection
-                query_type = metadata.get("query_type", "general")
-                complexity = metadata.get("complexity", 0.5)
-                
-                # Apply reasoning selection (determines which tools to use)
-                integration_result = apply_reasoning(
-                    query=user_message[:4096],  # Limit query length
-                    query_type=query_type,
-                    complexity=complexity,
-                    context=context,
-                )
-                
+            # FIX #1: Get complexity and query type from router (not hardcoded 0.5)
+            router_complexity = getattr(routing_plan, 'complexity_score', None)
+            router_type = getattr(routing_plan, 'query_type', None)
+            
+            # Extract router type string, handling enum and string types
+            if hasattr(router_type, 'value'):
+                router_type_str = router_type.value
+            elif router_type is not None:
+                router_type_str = str(router_type)
+            else:
+                router_type_str = None
+            
+            # Normalize to lowercase for consistent comparison
+            router_type_lower = router_type_str.lower() if router_type_str else None
+            
+            # If router says this is simple, skip reasoning entirely
+            if router_complexity is not None and router_complexity < 0.1:
                 logger.info(
-                    f"[VULCAN/v1/chat] Direct reasoning selection: "
-                    f"tools={integration_result.selected_tools}, "
-                    f"strategy={integration_result.reasoning_strategy}, "
-                    f"confidence={integration_result.confidence:.2f}"
+                    f"[VULCAN/v1/chat] Simple query (complexity={router_complexity:.2f}) - "
+                    f"skipping direct reasoning fallback"
                 )
-                
-                # Invoke actual reasoning engine
-                reasoner = create_unified_reasoner(
-                    enable_learning=True,
-                    enable_safety=True,
+            elif router_type_lower in ('general', 'conversational'):
+                logger.info(
+                    f"[VULCAN/v1/chat] Simple query (type={router_type_str}) - "
+                    f"skipping direct reasoning fallback"
                 )
-                
-                if reasoner is not None:
-                    # Map query_type to ReasoningType
-                    type_map = {
-                        "causal": ReasoningType.CAUSAL,
-                        "symbolic": ReasoningType.SYMBOLIC,
-                        "analogical": ReasoningType.ANALOGICAL,
-                        "probabilistic": ReasoningType.PROBABILISTIC,
-                        "counterfactual": ReasoningType.COUNTERFACTUAL,
-                        "reasoning": ReasoningType.HYBRID,
-                        "general": ReasoningType.HYBRID,
-                    }
-                    reasoning_type_enum = type_map.get(query_type, ReasoningType.HYBRID)
+            else:
+                logger.warning(
+                    "[VULCAN/v1/chat] No reasoning results from parallel tasks or agent pool. "
+                    "Invoking direct reasoning (GraphixArena pattern)..."
+                )
+                try:
+                    # NOTE: Imports are inside try-except intentionally because these modules
+                    # may not be available in all deployments. If they're not available,
+                    # we gracefully fall back to agent pool results (or no reasoning).
+                    from vulcan.reasoning.reasoning_integration import apply_reasoning
+                    from vulcan.reasoning import create_unified_reasoner, ReasoningType
                     
-                    # Execute reasoning synchronously
-                    reasoning_result = await loop.run_in_executor(
-                        None,
-                        lambda: reasoner.reason(
-                            input_data=user_message,
-                            query={"query": user_message, "context": context},
-                            reasoning_type=reasoning_type_enum,
-                        )
+                    # FIX #1: Use router's complexity and type, not hardcoded defaults
+                    query_type = router_type_str or metadata.get("query_type", "general")
+                    complexity = router_complexity if router_complexity is not None else metadata.get("complexity", 0.5)
+                    
+                    # FIX #3: Get router's suggested tools to pass through
+                    router_tools = []
+                    if routing_plan and hasattr(routing_plan, 'telemetry_data'):
+                        router_tools = routing_plan.telemetry_data.get('selected_tools', []) or []
+                    
+                    # FIX #3: Build context with router's information
+                    reasoning_context = {
+                        **context,
+                        'complexity': complexity,
+                        'router_tools': router_tools,
+                        'task_type': query_type,
+                    }
+                    
+                    # Apply reasoning selection (determines which tools to use)
+                    integration_result = apply_reasoning(
+                        query=user_message[:4096],  # Limit query length
+                        query_type=query_type,
+                        complexity=complexity,
+                        context=reasoning_context,  # FIX #3: Pass router context through
                     )
                     
-                    if reasoning_result:
-                        # Extract reasoning output (same format as GraphixArena)
-                        direct_reasoning_output = {
-                            "conclusion": getattr(reasoning_result, "conclusion", None),
-                            "confidence": getattr(reasoning_result, "confidence", 0.5),
-                            "reasoning_type": str(getattr(reasoning_result, "reasoning_type", "hybrid")),
-                            "explanation": getattr(reasoning_result, "explanation", None),
-                        }
-                        
-                        # Add to reasoning_results
-                        reasoning_results["direct_reasoning"] = direct_reasoning_output
-                        systems_used.append("direct_reasoning_engine")
-                        
-                        logger.info(
-                            f"[VULCAN/v1/chat] Direct reasoning complete: "
-                            f"type={direct_reasoning_output.get('reasoning_type')}, "
-                            f"confidence={direct_reasoning_output.get('confidence'):.2f}"
-                        )
-                    else:
-                        logger.warning("[VULCAN/v1/chat] Direct reasoning returned None")
-                else:
-                    logger.warning("[VULCAN/v1/chat] Could not create unified reasoner")
+                    logger.info(
+                        f"[VULCAN/v1/chat] Direct reasoning selection: "
+                        f"tools={integration_result.selected_tools}, "
+                        f"strategy={integration_result.reasoning_strategy}, "
+                        f"confidence={integration_result.confidence:.2f}"
+                    )
                     
-            except ImportError as ie:
-                logger.warning(f"[VULCAN/v1/chat] Reasoning integration not available: {ie}")
-            except Exception as e:
-                logger.warning(f"[VULCAN/v1/chat] Direct reasoning invocation failed: {e}")
+                    # Invoke actual reasoning engine
+                    reasoner = create_unified_reasoner(
+                        enable_learning=True,
+                        enable_safety=True,
+                    )
+                    
+                    if reasoner is not None:
+                        # Map query_type to ReasoningType
+                        type_map = {
+                            "causal": ReasoningType.CAUSAL,
+                            "symbolic": ReasoningType.SYMBOLIC,
+                            "analogical": ReasoningType.ANALOGICAL,
+                            "probabilistic": ReasoningType.PROBABILISTIC,
+                            "counterfactual": ReasoningType.COUNTERFACTUAL,
+                            "reasoning": ReasoningType.HYBRID,
+                            "general": ReasoningType.HYBRID,
+                        }
+                        reasoning_type_enum = type_map.get(query_type, ReasoningType.HYBRID)
+                        
+                        # Execute reasoning synchronously
+                        reasoning_result = await loop.run_in_executor(
+                            None,
+                            lambda: reasoner.reason(
+                                input_data=user_message,
+                                query={"query": user_message, "context": context},
+                                reasoning_type=reasoning_type_enum,
+                            )
+                        )
+                        
+                        if reasoning_result:
+                            # Extract reasoning output (same format as GraphixArena)
+                            direct_reasoning_output = {
+                                "conclusion": getattr(reasoning_result, "conclusion", None),
+                                "confidence": getattr(reasoning_result, "confidence", 0.5),
+                                "reasoning_type": str(getattr(reasoning_result, "reasoning_type", "hybrid")),
+                                "explanation": getattr(reasoning_result, "explanation", None),
+                            }
+                            
+                            # Add to reasoning_results
+                            reasoning_results["direct_reasoning"] = direct_reasoning_output
+                            systems_used.append("direct_reasoning_engine")
+                            
+                            logger.info(
+                                f"[VULCAN/v1/chat] Direct reasoning complete: "
+                                f"type={direct_reasoning_output.get('reasoning_type')}, "
+                                f"confidence={direct_reasoning_output.get('confidence'):.2f}"
+                            )
+                        else:
+                            logger.warning("[VULCAN/v1/chat] Direct reasoning returned None")
+                    else:
+                        logger.warning("[VULCAN/v1/chat] Could not create unified reasoner")
+                        
+                except ImportError as ie:
+                    logger.warning(f"[VULCAN/v1/chat] Reasoning integration not available: {ie}")
+                except Exception as e:
+                    logger.warning(f"[VULCAN/v1/chat] Direct reasoning invocation failed: {e}")
 
         # ================================================================
         # STEP 7: Generate Response using LLM with full context
