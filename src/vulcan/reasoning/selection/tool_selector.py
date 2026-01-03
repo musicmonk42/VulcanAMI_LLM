@@ -1602,6 +1602,50 @@ class ToolSelector:
             start_time = time.time()
 
             # ================================================================
+            # BUG #0 FIX: Check if QueryClassifier already suggested tools
+            # The classifier uses LLM-based language understanding to identify
+            # the correct tool based on query intent (not heuristics).
+            # This is the PRIMARY tool selection path.
+            # ================================================================
+            if hasattr(request, 'context') and isinstance(request.context, dict):
+                classifier_tools = request.context.get('classifier_suggested_tools')
+                classifier_category = request.context.get('classifier_category')
+                
+                if classifier_tools and isinstance(classifier_tools, (list, tuple)) and len(classifier_tools) > 0:
+                    logger.info(
+                        f"[ToolSelector] BUG#0 FIX: Using LLM classifier's suggested tools: {classifier_tools} "
+                        f"for category={classifier_category} (LLM understands query intent)"
+                    )
+                    # Filter to only include available tools
+                    available_tools = getattr(self, 'available_tools', None) or DEFAULT_AVAILABLE_TOOLS
+                    valid_classifier_tools = [t for t in classifier_tools if t in available_tools]
+                    
+                    if valid_classifier_tools:
+                        # Execute with classifier's selected tools directly
+                        candidates = [
+                            {'tool': tool, 'utility': 1.0 - (i * 0.1), 'source': 'llm_classifier'}
+                            for i, tool in enumerate(valid_classifier_tools)
+                        ]
+                        
+                        features = self._extract_features(request)
+                        request.features = features
+                        
+                        strategy = self._select_strategy(request, candidates)
+                        execution_result = self._execute_portfolio(request, candidates, strategy)
+                        final_result = self._postprocess_result(request, execution_result, start_time)
+                        
+                        if self.config.get("learning_enabled"):
+                            self._update_learning(request, final_result)
+                        
+                        if self.config.get("cache_enabled"):
+                            self._cache_result(request, final_result)
+                        
+                        self._update_statistics(final_result)
+                        
+                        logger.info(f"[ToolSelector] Executed with classifier's tools: {valid_classifier_tools}")
+                        return final_result
+
+            # ================================================================
             # BUG #1 FIX: Check if QueryRouter already selected tools
             # If routing_plan.tools is provided for a typed fast-path (e.g., MATH-FAST-PATH),
             # use those tools directly instead of running SemanticBoost/bandit selection.

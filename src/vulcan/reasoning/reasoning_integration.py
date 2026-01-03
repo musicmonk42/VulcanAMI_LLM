@@ -761,10 +761,83 @@ class ReasoningIntegration:
 
         try:
             # =================================================================
-            # BUG FIX: Short-circuit for simple queries regardless of complexity
+            # BUG #0 FIX: LLM-BASED QUERY CLASSIFICATION (ROOT CAUSE FIX)
+            # =================================================================
             # The problem: "hello" (5 chars) was getting complexity=0.50 from
-            # upstream, causing it to hit decomposition path instead of fast path.
-            # This fix checks query CONTENT, not just the complexity score.
+            # heuristic-based calculation, causing it to hit full reasoning.
+            # 
+            # The fix: Use LLM layer for LANGUAGE UNDERSTANDING to:
+            # 1. Determine if query needs reasoning at all
+            # 2. Suggest appropriate tools based on query intent
+            # 3. Set correct complexity based on actual query meaning
+            #
+            # Architecture note: LLMs (cloud or internal) are interchangeable
+            # for classification. The reasoning engines provide correctness.
+            # =================================================================
+            try:
+                from vulcan.routing.query_classifier import classify_query, QueryCategory
+                
+                classification = classify_query(query)
+                
+                logger.info(
+                    f"{LOG_PREFIX} LLM Classification: category={classification.category}, "
+                    f"complexity={classification.complexity:.2f}, skip={classification.skip_reasoning}, "
+                    f"tools={classification.suggested_tools}"
+                )
+                
+                # If classifier says skip reasoning (greetings, chitchat, simple factual)
+                # return immediately without invoking any reasoning engine
+                if classification.skip_reasoning:
+                    logger.info(
+                        f"{LOG_PREFIX} CLASSIFIER SKIP: '{query[:30]}' classified as "
+                        f"{classification.category} - skipping reasoning entirely"
+                    )
+                    with self._stats_lock:
+                        self._stats.fast_path_count += 1
+                    
+                    return ReasoningResult(
+                        selected_tools=classification.suggested_tools or ["general"],
+                        reasoning_strategy=ReasoningStrategyType.DIRECT.value,
+                        confidence=classification.confidence,
+                        rationale=f"Query classified as {classification.category} - no reasoning needed",
+                        metadata={
+                            "fast_path": True,
+                            "classifier_category": classification.category,
+                            "classifier_source": classification.source,
+                            "complexity": classification.complexity,
+                            "query_type": classification.category.lower(),
+                            "selection_time_ms": (time.perf_counter() - selection_start) * 1000,
+                            "needs_reasoning": False,
+                        },
+                    )
+                
+                # Classifier identified this needs reasoning - use its suggestions
+                # Override the heuristic complexity with LLM-derived complexity
+                if classification.complexity != complexity:
+                    logger.info(
+                        f"{LOG_PREFIX} Overriding heuristic complexity {complexity:.2f} with "
+                        f"classifier complexity {classification.complexity:.2f}"
+                    )
+                    complexity = classification.complexity
+                
+                # If classifier suggested specific tools, pass them to context
+                if classification.suggested_tools:
+                    if context is None:
+                        context = {}
+                    context['classifier_suggested_tools'] = classification.suggested_tools
+                    context['classifier_category'] = classification.category
+                    logger.info(
+                        f"{LOG_PREFIX} Using classifier suggested tools: {classification.suggested_tools}"
+                    )
+                    
+            except ImportError:
+                logger.debug(f"{LOG_PREFIX} QueryClassifier not available, using heuristic fallback")
+            except Exception as e:
+                logger.warning(f"{LOG_PREFIX} QueryClassifier failed: {e}, using heuristic fallback")
+            
+            # =================================================================
+            # FALLBACK: Simple pattern matching for obvious cases
+            # This is a safety net if QueryClassifier fails, NOT the primary path
             # =================================================================
             SIMPLE_QUERY_PATTERNS = frozenset([
                 'hello', 'hi', 'hey', 'howdy', 'greetings',
@@ -781,7 +854,7 @@ class ReasoningIntegration:
             
             if is_simple_greeting:
                 logger.info(
-                    f"{LOG_PREFIX} SIMPLE QUERY BYPASS: '{query[:20]}' (len={len(query)}) - "
+                    f"{LOG_PREFIX} PATTERN FALLBACK: '{query[:20]}' (len={len(query)}) - "
                     f"skipping reasoning entirely"
                 )
                 with self._stats_lock:
