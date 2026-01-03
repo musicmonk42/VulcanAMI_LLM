@@ -37,6 +37,12 @@ WEIGHT_DECAY_INTERVAL_SECONDS = 3600  # Apply decay every hour
 WEIGHT_DECAY_EPSILON = 0.001  # Weights below this threshold are considered zero
 MAX_DECAY_INTERVALS = 168  # Cap decay at 1 week (168 hours) to prevent precision issues
 
+# BUG #4 FIX: Corruption Detection Margin
+# This margin is added to MAX_TOOL_WEIGHT when checking for dominance at startup.
+# It allows some leeway before triggering a reset, since weights slightly above
+# MAX_TOOL_WEIGHT aren't necessarily corruption - they might just need clamping.
+CORRUPTION_THRESHOLD_MARGIN = 0.15  # Results in dominance threshold of 0.35 (MAX_TOOL_WEIGHT + 0.15)
+
 # ISSUE P0.3 FIX: Corrupted Weight Detection Constants
 # These constants control when tool weights are considered "corrupted" and need reset.
 # Corruption typically occurs from the "death spiral" bug (P0.1) where LLM failures
@@ -226,7 +232,7 @@ class UnifiedLearningSystem:
                 # This resets weights if one tool has runaway positive feedback (>35%)
                 if hasattr(self._learning_persistence, 'reset_tool_weights_if_corrupted'):
                     was_reset = self._learning_persistence.reset_tool_weights_if_corrupted(
-                        dominance_threshold=MAX_TOOL_WEIGHT + 0.15  # Allow some margin above max
+                        dominance_threshold=MAX_TOOL_WEIGHT + CORRUPTION_THRESHOLD_MARGIN
                     )
                     if was_reset:
                         logger.warning("[Learning] Tool weights were reset due to corruption detected at startup")

@@ -465,6 +465,13 @@ class QueryClassifier:
         if self.llm_client is None:
             return None
         
+        # Sanitize query to prevent prompt injection
+        # Remove characters that could be used for injection attacks
+        sanitized_query = query.replace('"', "'").replace("\\", "")
+        # Truncate very long queries to prevent token overflow
+        if len(sanitized_query) > 500:
+            sanitized_query = sanitized_query[:500] + "..."
+        
         prompt = f'''Classify this query into ONE category and estimate complexity.
 
 Categories:
@@ -479,7 +486,7 @@ Categories:
 - PHILOSOPHICAL: Ethics, morality, paradoxes (complexity: 0.4-0.6)
 - COMPLEX_RESEARCH: Multi-step research (complexity: 0.8-1.0)
 
-Query: "{query}"
+Query: "{sanitized_query}"
 
 Respond ONLY with JSON (no explanation):
 {{"category": "...", "complexity": 0.0-1.0, "tools": ["..."], "skip_reasoning": true/false}}'''
@@ -501,18 +508,22 @@ Respond ONLY with JSON (no explanation):
             # Parse JSON response
             response_text = response if isinstance(response, str) else str(response)
             
-            # Extract JSON from response
-            json_match = re.search(r'\{[^}]+\}', response_text)
+            # Extract JSON from response - use a more robust pattern that handles arrays
+            # Pattern matches from first { to last } allowing nested content
+            json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', response_text)
             if json_match:
-                data = json.loads(json_match.group())
-                return QueryClassification(
-                    category=data.get("category", "UNKNOWN"),
-                    complexity=float(data.get("complexity", 0.5)),
-                    suggested_tools=data.get("tools", ["general"]),
-                    skip_reasoning=data.get("skip_reasoning", False),
-                    confidence=0.85,
-                    source="llm",
-                )
+                try:
+                    data = json.loads(json_match.group())
+                    return QueryClassification(
+                        category=data.get("category", "UNKNOWN"),
+                        complexity=float(data.get("complexity", 0.5)),
+                        suggested_tools=data.get("tools", ["general"]),
+                        skip_reasoning=data.get("skip_reasoning", False),
+                        confidence=0.85,
+                        source="llm",
+                    )
+                except json.JSONDecodeError:
+                    logger.warning(f"[QueryClassifier] Failed to parse JSON: {json_match.group()}")
             
         except Exception as e:
             logger.warning(f"[QueryClassifier] LLM classification failed: {e}")
