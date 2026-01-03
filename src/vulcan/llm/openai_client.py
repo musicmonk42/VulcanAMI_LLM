@@ -136,9 +136,8 @@ def get_openai_client():
         )
         return None
     
-    # Log that we found an API key (without exposing it)
-    key_preview = f"{api_key[:4]}...{api_key[-4:]}" if len(api_key) > 8 else "***"
-    logger.info(f"OPENAI_API_KEY found (preview: {key_preview}), attempting initialization...")
+    # Log that we found an API key (without exposing any part of it for security)
+    logger.info("OPENAI_API_KEY found, attempting initialization...")
     
     try:
         _openai_client = OpenAI(api_key=api_key)
@@ -249,7 +248,6 @@ def verify_openai_configuration() -> dict:
         - available: Whether OpenAI package is installed
         - skip_openai: Whether SKIP_OPENAI env var is set to true
         - api_key_set: Whether OPENAI_API_KEY env var is set (non-empty)
-        - api_key_preview: Preview of API key (first 4 + last 4 chars) for verification
         - client_ready: Whether OpenAI client is initialized and ready
         - initialization_error: Any error that occurred during initialization
         - status: Overall status ("READY", "DISABLED", "ERROR", "NOT_CONFIGURED")
@@ -262,17 +260,11 @@ def verify_openai_configuration() -> dict:
     """
     api_key = os.getenv("OPENAI_API_KEY", "")
     api_key_set = bool(api_key and api_key.strip())
-    api_key_preview = None
-    if api_key_set and len(api_key) > 8:
-        api_key_preview = f"{api_key[:4]}...{api_key[-4:]}"
-    elif api_key_set:
-        api_key_preview = "***"
     
     result = {
         "available": OPENAI_AVAILABLE,
         "skip_openai": SKIP_OPENAI,
         "api_key_set": api_key_set,
-        "api_key_preview": api_key_preview,
         "client_ready": is_openai_ready(),
         "initialization_error": get_openai_init_error(),
         "status": "UNKNOWN",
@@ -294,7 +286,7 @@ def verify_openai_configuration() -> dict:
         )
     elif is_openai_ready():
         result["status"] = "READY"
-        result["message"] = f"OpenAI client ready (key: {api_key_preview})"
+        result["message"] = "OpenAI client ready and available"
     else:
         # API key is set but client failed to initialize
         result["status"] = "ERROR"
