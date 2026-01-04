@@ -4126,6 +4126,11 @@ MAX_ANALOGIES_TO_SHOW = 5  # Maximum analogies to include in formatted output
 MAX_LIST_ITEMS_TO_SHOW = 10  # Maximum list items to show before truncation
 MAX_REASONING_STEPS = 5  # Maximum reasoning chain steps to include in context
 
+# WORLD MODEL INSIGHT FORMATTING: Truncation limits for world model insights
+# Used when adding world model insights to LLM context
+WORLD_MODEL_INSIGHT_TRUNCATION = 200  # Maximum characters per insight field
+WORLD_MODEL_LOG_TRUNCATION = 100  # Maximum characters for logging world model insights
+
 # _format_dict_result keys that have explicit formatting (avoid duplicate output)
 _HANDLED_DICT_RESULT_KEYS = frozenset({
     'conclusion', 'explanation', 'reasoning_type', 'reasoning_steps',
@@ -5331,7 +5336,6 @@ async def unified_chat(request: UnifiedChatRequest):
             _task_start = time.perf_counter()
             _insights = {}
             _systems = []
-            _meta_reasoning_result = None
             
             world_model = getattr(deps, "world_model", None)
             if not world_model:
@@ -5784,14 +5788,14 @@ async def unified_chat(request: UnifiedChatRequest):
                     try:
                         insight_parts = []
                         if world_model_insight.get("prediction"):
-                            insight_parts.append(f"Prediction: {str(world_model_insight['prediction'])[:200]}")
+                            insight_parts.append(f"Prediction: {str(world_model_insight['prediction'])[:WORLD_MODEL_INSIGHT_TRUNCATION]}")
                         if world_model_insight.get("meta_reasoning"):
-                            insight_parts.append(f"Meta-reasoning: {str(world_model_insight['meta_reasoning'])[:200]}")
+                            insight_parts.append(f"Meta-reasoning: {str(world_model_insight['meta_reasoning'])[:WORLD_MODEL_INSIGHT_TRUNCATION]}")
                         if world_model_insight.get("motivational_analysis"):
-                            insight_parts.append(f"Motivational Analysis: {str(world_model_insight['motivational_analysis'])[:200]}")
+                            insight_parts.append(f"Motivational Analysis: {str(world_model_insight['motivational_analysis'])[:WORLD_MODEL_INSIGHT_TRUNCATION]}")
                         if insight_parts:
                             world_model_str = "\nWorld Model Insights: " + "; ".join(insight_parts)
-                            logger.debug(f"[VULCAN] World model insights added to context: {world_model_str[:100]}...")
+                            logger.debug(f"[VULCAN] World model insights added to context: {world_model_str[:WORLD_MODEL_LOG_TRUNCATION]}...")
                     except Exception as e:
                         logger.debug(f"[VULCAN] Failed to format world model insights: {e}")
 
