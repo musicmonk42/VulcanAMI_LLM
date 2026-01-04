@@ -316,13 +316,19 @@ SPECULATION_PATTERNS: Tuple[re.Pattern, ...] = (
     # "hypothetically" patterns
     re.compile(r"\bhypothetically\b", re.IGNORECASE),
     re.compile(r"\bhypothetical\s+(?:scenario|situation|case)\b", re.IGNORECASE),
-    # "if you could/had" patterns - made more specific to require experience/feeling context
-    # Matches: "if you could experience/feel/have emotions/consciousness"
-    re.compile(r"\bif\s+you\s+(?:could|had|were\s+able\s+to)\s+(?:experience|feel|have\s+(?:emotions?|feelings?|consciousness))\b", re.IGNORECASE),
+    # "if you could/had" patterns - requires experience/feeling/cognitive context
+    # Matches: "if you could experience/feel/have emotions/dream/think/remember"
+    re.compile(
+        r"\bif\s+you\s+(?:could|had|were\s+able\s+to)\s+"
+        r"(?:experience|feel|have\s+(?:emotions?|feelings?|consciousness)|"
+        r"dream|think|remember|sense|perceive|understand|love|hate|fear)\b",
+        re.IGNORECASE
+    ),
     # "suppose" patterns - specific to AI self-reflection
     re.compile(r"\bsuppose\s+you\s+(?:could|had|felt|were)\b", re.IGNORECASE),
     re.compile(r"\bsuppose\s+that\s+you\b", re.IGNORECASE),
-    # "what if" + experience/feeling patterns
+    # "what if" + counterfactual about AI capabilities
+    # Matches: "what if you could/had/felt/experienced" followed by any word
     re.compile(r"\bwhat\s+if\s+you\s+(?:could|had|felt|experienced)\b", re.IGNORECASE),
 )
 
