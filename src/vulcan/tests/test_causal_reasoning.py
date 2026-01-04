@@ -359,7 +359,8 @@ class TestInterventions:
         result = engine.perform_intervention("X", 5.0)
 
         assert isinstance(result, InterventionResult)
-        assert result.confidence == 0.0
+        # When no DAG is available, minimum confidence floor (0.1) is returned
+        assert result.confidence == 0.1
 
 
 # ============================================================================
