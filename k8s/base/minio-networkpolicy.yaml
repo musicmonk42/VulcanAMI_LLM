@@ -1,0 +1,40 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: minio-netpol
+  namespace: vulcanami
+  labels:
+    app: minio
+spec:
+  podSelector:
+    matchLabels:
+      app: minio
+  policyTypes:
+  - Ingress
+  - Egress
+
+  ingress:
+  # Allow ingress only from vulcanami-api pods
+  - from:
+    - podSelector:
+        matchLabels:
+          app: vulcanami-api
+    ports:
+    - protocol: TCP
+      port: 9000
+    - protocol: TCP
+      port: 9001
+
+  egress:
+  # Allow DNS resolution
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+    ports:
+    - protocol: UDP
+      port: 53
+
+  # Allow egress to pods in the same namespace (if needed for clustering)
+  - to:
+    - podSelector: {}

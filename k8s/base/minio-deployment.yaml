@@ -1,0 +1,259 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: minio
+  namespace: vulcanami
+  labels:
+    app: minio
+    component: object-storage
+spec:
+  serviceName: minio-service
+  replicas: 1
+  selector:
+    matchLabels:
+      app: minio
+  template:
+    metadata:
+      labels:
+        app: minio
+        component: object-storage
+    spec:
+      # Disable automount service account token
+      automountServiceAccountToken: false
+
+      # Pod-level security context
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+        seccompProfile:
+          type: RuntimeDefault
+
+      containers:
+      - name: minio
+        # Using stable MinIO release from 2024
+        image: minio/minio:RELEASE.2024-01-01T16-36-33Z
+        imagePullPolicy: IfNotPresent
+        command:
+          - /bin/sh
+          - -c
+          - |
+            minio server /data --console-address :9001
+        ports:
+        - containerPort: 9000
+          name: api
+          protocol: TCP
+        - containerPort: 9001
+          name: console
+          protocol: TCP
+
+        # Container-level security context
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 1001
+          seccompProfile:
+            type: RuntimeDefault
+          capabilities:
+            drop:
+              - ALL
+
+        env:
+        - name: MINIO_ROOT_USER
+          valueFrom:
+            secretKeyRef:
+              name: vulcanami-secrets
+              key: MINIO_ROOT_USER
+        - name: MINIO_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: vulcanami-secrets
+              key: MINIO_ROOT_PASSWORD
+        # Prometheus metrics
+        - name: MINIO_PROMETHEUS_AUTH_TYPE
+          value: "public"
+
+        volumeMounts:
+        - name: minio-storage
+          mountPath: /data
+        - name: tmp
+          mountPath: /tmp
+
+        resources:
+          requests:
+            cpu: 250m
+            memory: 512Mi
+          limits:
+            cpu: 1000m
+            memory: 2Gi
+
+        # Liveness probe checks if MinIO is responding
+        livenessProbe:
+          httpGet:
+            path: /minio/health/live
+            port: 9000
+          initialDelaySeconds: 30
+          periodSeconds: 20
+          timeoutSeconds: 10
+          failureThreshold: 3
+
+        # Readiness probe checks if MinIO is ready to accept connections
+        readinessProbe:
+          httpGet:
+            path: /minio/health/ready
+            port: 9000
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+
+      volumes:
+      - name: tmp
+        emptyDir: {}
+
+  volumeClaimTemplates:
+  - metadata:
+      name: minio-storage
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 100Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio-service
+  namespace: vulcanami
+  labels:
+    app: minio
+spec:
+  type: ClusterIP
+  ports:
+  - port: 9000
+    targetPort: 9000
+    protocol: TCP
+    name: api
+  - port: 9001
+    targetPort: 9001
+    protocol: TCP
+    name: console
+  selector:
+    app: minio
+---
+# Job to create the required S3 bucket after MinIO is ready
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: minio-bucket-setup
+  namespace: vulcanami
+  labels:
+    app: minio
+    component: setup
+spec:
+  # Keep job history for debugging
+  ttlSecondsAfterFinished: 86400  # 24 hours
+  backoffLimit: 5
+  template:
+    metadata:
+      labels:
+        app: minio-setup
+    spec:
+      restartPolicy: OnFailure
+      automountServiceAccountToken: false
+
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+        seccompProfile:
+          type: RuntimeDefault
+
+      containers:
+      - name: create-bucket
+        image: minio/mc:RELEASE.2024-01-01T16-36-33Z
+        imagePullPolicy: IfNotPresent
+        command:
+          - sh
+          - -c
+          - |
+            set -e
+            echo "Waiting for MinIO service to be ready..."
+            
+            # Wait for MinIO to be accessible with retries
+            MAX_RETRIES=30
+            RETRY_INTERVAL=5
+            for i in $(seq 1 $MAX_RETRIES); do
+              if mc alias set myminio http://minio-service:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD}; then
+                echo "Successfully connected to MinIO"
+                break
+              fi
+              if [ $i -eq $MAX_RETRIES ]; then
+                echo "ERROR: Failed to connect to MinIO after $MAX_RETRIES attempts"
+                exit 1
+              fi
+              echo "Retry $i/$MAX_RETRIES: MinIO not ready yet, waiting ${RETRY_INTERVAL}s..."
+              sleep $RETRY_INTERVAL
+            done
+            
+            # Create bucket if it doesn't exist
+            echo "Creating bucket vulcanami-memory..."
+            if mc mb myminio/vulcanami-memory; then
+              echo "Bucket created successfully"
+            elif mc ls myminio/vulcanami-memory > /dev/null 2>&1; then
+              echo "Bucket already exists"
+            else
+              echo "ERROR: Failed to create bucket"
+              exit 1
+            fi
+            
+            # Verify bucket is accessible
+            echo "Verifying bucket access..."
+            if mc ls myminio/vulcanami-memory > /dev/null 2>&1; then
+              echo "Bucket is accessible and ready"
+              exit 0
+            else
+              echo "ERROR: Bucket exists but is not accessible"
+              exit 1
+            fi
+        env:
+        - name: MINIO_ROOT_USER
+          valueFrom:
+            secretKeyRef:
+              name: vulcanami-secrets
+              key: MINIO_ROOT_USER
+        - name: MINIO_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: vulcanami-secrets
+              key: MINIO_ROOT_PASSWORD
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 1001
+          readOnlyRootFilesystem: true
+          seccompProfile:
+            type: RuntimeDefault
+          capabilities:
+            drop:
+              - ALL
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: mc-config
+          mountPath: /.mc
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      - name: mc-config
+        emptyDir: {}

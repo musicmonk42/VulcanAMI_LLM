@@ -15,6 +15,10 @@ resources:
   - postgres-networkpolicy.yaml
   - redis-deployment.yaml
   - redis-networkpolicy.yaml
+  - milvus-deployment.yaml
+  - milvus-networkpolicy.yaml
+  - minio-deployment.yaml
+  - minio-networkpolicy.yaml
 
 labels:
   - pairs:
