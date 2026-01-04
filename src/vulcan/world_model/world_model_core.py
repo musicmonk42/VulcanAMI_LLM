@@ -3088,11 +3088,12 @@ class WorldModel:
                             logger.debug(f"[WorldModel] Confidence calibration failed: {e}")
                     
                     # Generate counterfactual explanation
-                    all_actions = [i.get('action', 'unknown') for i in interventions]
+                    # Note: intervention_actions refers to actions in this intervention batch
+                    intervention_actions = [i.get('action', 'unknown') for i in interventions]
                     counterfactual = self._generate_counterfactual(
                         action=action,
                         outcome=outcome,
-                        all_actions=all_actions
+                        all_actions=intervention_actions
                     )
                     logger.info(f"[WorldModel] Counterfactual: {counterfactual[:80]}...")
                     

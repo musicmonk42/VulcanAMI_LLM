@@ -1059,7 +1059,7 @@ class ToolSelectionBandit:
         # CRITICAL FIX: Added 'philosophical' and 'mathematical' tools
         # These were missing from the tool_names list causing "Unknown tool name" errors
         # when the QueryRouter selected 'philosophical' for ethical queries.
-        # See: Line 886: ERROR - Unknown tool name 'philosophical' in bandit update
+        # Error: "Unknown tool name 'philosophical' in bandit update"
         self.tool_names = [
             "symbolic",
             "probabilistic",
