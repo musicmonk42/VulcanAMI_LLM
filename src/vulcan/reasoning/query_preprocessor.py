@@ -312,6 +312,11 @@ class QueryPreprocessor:
     MEDIUM_LOW_CONFIDENCE: float = 0.75
     LOW_CONFIDENCE: float = 0.7
 
+    # Validation constants (addressing code review feedback)
+    HEADER_CHECK_LENGTH: int = 20  # Characters to check for section headers
+    MAX_EQUATION_LENGTH: int = 100  # Maximum length for extracted equations
+    TEXT_EQUATION_PREFIXES: Tuple[str, ...] = ('is ', 'the ', 'a ', 'an ')
+
     def __init__(self) -> None:
         """
         Initialize preprocessor with compiled pattern matchers.
@@ -605,7 +610,9 @@ class QueryPreprocessor:
                 continue
 
             # Skip lines that are section headers (contain colon early but no operators)
-            if ':' in line[:20] and not self._contains_logical_operators(line[:20]):
+            # Use HEADER_CHECK_LENGTH constant for maintainability
+            header_prefix = line[:self.HEADER_CHECK_LENGTH]
+            if ':' in header_prefix and not self._contains_logical_operators(header_prefix):
                 continue
 
             # Check if line contains logical operators
@@ -678,8 +685,9 @@ class QueryPreprocessor:
 
             # Validate it's a real equation, not descriptive text
             # Reject if it starts with common text patterns or is too long
-            if (len(equation) < 100 and
-                    not equation.lower().startswith(('is ', 'the ', 'a ', 'an '))):
+            # Using class constants for maintainability
+            if (len(equation) < self.MAX_EQUATION_LENGTH and
+                    not equation.lower().startswith(self.TEXT_EQUATION_PREFIXES)):
                 logger.info(f"{LOG_PREFIX} Extracted equation: {equation}")
 
                 with self._metrics_lock:

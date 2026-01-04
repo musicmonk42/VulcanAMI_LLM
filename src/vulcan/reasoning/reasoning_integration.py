@@ -69,6 +69,7 @@ Error Handling:
 """
 
 import atexit
+import hashlib
 import logging
 import os
 import threading
@@ -840,6 +841,42 @@ class ReasoningIntegration:
                     context['classifier_category'] = classification.category
                     logger.info(
                         f"{LOG_PREFIX} Using classifier suggested tools: {classification.suggested_tools}"
+                    )
+                
+                # =============================================================
+                # FIX #4: Prevent tool override for simple/factual queries
+                # =============================================================
+                # The LLM classifier correctly identifies simple factual queries
+                # (e.g., "What is the capital of France?") but QueryRouter may
+                # incorrectly override with specialized tools like ['probabilistic'].
+                # Respect the LLM classifier's judgment for these categories.
+                SIMPLE_QUERY_CATEGORIES = frozenset([
+                    'FACTUAL', 'CONVERSATIONAL', 'UNKNOWN', 'GREETING',
+                    'factual', 'conversational', 'unknown', 'greeting',
+                ])
+                
+                if classification.category in SIMPLE_QUERY_CATEGORIES:
+                    # For simple queries, ensure we use general tools
+                    if classification.suggested_tools != ['general']:
+                        logger.warning(
+                            f"{LOG_PREFIX} FIX#4: LLM classifier suggested "
+                            f"{classification.suggested_tools} for category "
+                            f"{classification.category}, overriding to ['general'] "
+                            f"for simple factual query"
+                        )
+                        classification.suggested_tools = ['general']
+                        if context is None:
+                            context = {}
+                        context['classifier_suggested_tools'] = ['general']
+                    
+                    # Set flag to prevent router override downstream
+                    if context is None:
+                        context = {}
+                    context['prevent_router_tool_override'] = True
+                    context['classifier_is_authoritative'] = True
+                    logger.info(
+                        f"{LOG_PREFIX} FIX#4: Preventing router tool override - "
+                        f"LLM classifier identified this as {classification.category}"
                     )
                     
             except ImportError:
@@ -1980,7 +2017,6 @@ class ReasoningIntegration:
             
             # Create pattern outcome for learning
             from vulcan.semantic_bridge import PatternOutcome
-            import hashlib
             
             # Use deterministic SHA-256 hash for pattern ID (hash() is not deterministic across runs)
             pattern_hash = hashlib.sha256(query.encode()).hexdigest()[:8]
@@ -2074,7 +2110,6 @@ class ReasoningIntegration:
                 return
 
             # Create execution trace for crystallization
-            import hashlib
             trace_id = hashlib.sha256(
                 f"{query}:{time.time()}".encode()
             ).hexdigest()[:12]

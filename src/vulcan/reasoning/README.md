@@ -54,6 +54,10 @@ Core Reasoning Components
 
 unified\_reasoning.py: Implements UnifiedReasoner to orchestrate reasoning paradigms, integrating tool selection (ToolSelector), portfolio execution, and safety governance. Features thread-safe shutdowns and monkey-patched cache cleanup.
 
+reasoning\_integration.py: Provides ReasoningIntegration for wiring ProblemDecomposer, Query Preprocessing, and KnowledgeCrystallizer together. Includes FIX #1 (Query Preprocessing), FIX #3 (Learning Hook), and FIX #4 (Prevent Tool Override).
+
+query\_preprocessor.py: **NEW** - Extracts formal syntax from natural language queries to prevent parse errors. Converts SAT problems ("Propositions: A,B,C" + "Constraints: 1. A→B") into formal conjunctions "(A→B) ∧ (B→C)". Handles mathematical formulas, probabilistic notation (P(...), E[...]), and operator normalization (-> to →, AND to ∧).
+
 probabilistic\_reasoning.py: Provides ProbabilisticReasoner with Gaussian process ensembles, intelligent feature extraction (numerical, textual, structural), and hyperparameter optimization.
 
 causal\_reasoning.py: Implements CausalReasoner for DAG-based causal discovery, effect estimation, interventions, and counterfactuals, with fallbacks for missing libraries (e.g., DoWhy, causal-learn).
