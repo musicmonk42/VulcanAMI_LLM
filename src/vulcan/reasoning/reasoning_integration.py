@@ -874,6 +874,7 @@ class ReasoningIntegration:
                 # incorrectly override with specialized tools like ['probabilistic'].
                 # Respect the LLM classifier's judgment for these categories.
                 # BUG A FIX: Added CREATIVE and CHITCHAT to skip reasoning
+                # BUG S FIX: Added SELF_INTROSPECTION - these must use world_model tool
                 SIMPLE_QUERY_CATEGORIES = frozenset([
                     'FACTUAL', 'CONVERSATIONAL', 'UNKNOWN', 'GREETING',
                     'CREATIVE', 'CHITCHAT',  # BUG A FIX: Creative/chitchat skip reasoning
@@ -881,7 +882,29 @@ class ReasoningIntegration:
                     'creative', 'chitchat',  # lowercase variants
                 ])
                 
-                if classification.category in SIMPLE_QUERY_CATEGORIES:
+                # BUG S FIX: Self-introspection queries MUST use world_model tool
+                # These query Vulcan's sense of self (CSIU, motivations, ethics, etc.)
+                SELF_INTROSPECTION_CATEGORIES = frozenset([
+                    'SELF_INTROSPECTION', 'self_introspection',
+                ])
+                
+                if classification.category in SELF_INTROSPECTION_CATEGORIES:
+                    # For self-introspection queries, ensure we use world_model tool
+                    logger.info(
+                        f"{LOG_PREFIX} SELF_INTROSPECTION detected - using world_model tool "
+                        f"(classifier suggested: {classification.suggested_tools})"
+                    )
+                    # Ensure world_model is in the suggested tools
+                    if 'world_model' not in (classification.suggested_tools or []):
+                        classification.suggested_tools = ['world_model']
+                    if context is None:
+                        context = {}
+                    context['classifier_suggested_tools'] = classification.suggested_tools
+                    context['prevent_router_tool_override'] = True
+                    context['classifier_is_authoritative'] = True
+                    context['is_self_introspection'] = True
+                
+                elif classification.category in SIMPLE_QUERY_CATEGORIES:
                     # For simple queries, ensure we use general tools
                     if classification.suggested_tools != ['general']:
                         logger.warning(
