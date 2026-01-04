@@ -246,8 +246,9 @@ SELF_INTROSPECTION_PATTERNS: Tuple[re.Pattern, ...] = (
     
     # Ethical boundary questions
     re.compile(r"\b(what|why)\b.*\b(you|your)\b.*\b(won'?t|cannot|refuse|constraint|limit)", re.IGNORECASE),
-    re.compile(r"\bwhat\s+are\s+your\s+(values|ethics|principles)\b", re.IGNORECASE),
+    re.compile(r"\bwhat\s+are\s+your\s+(values|ethics|principles|boundaries)\b", re.IGNORECASE),
     re.compile(r"\bwhat\s+won'?t\s+you\s+do\b", re.IGNORECASE),
+    re.compile(r"\bwhat\s+are\s+your\s+ethical\s+", re.IGNORECASE),
     
     # Self-assessment questions
     re.compile(r"\b(how|are\s+you)\b.*\b(good|confident|sure|certain)\b.*\b(at|about)\b", re.IGNORECASE),
@@ -256,6 +257,12 @@ SELF_INTROSPECTION_PATTERNS: Tuple[re.Pattern, ...] = (
     # Identity questions
     re.compile(r"\b(who|what)\s+are\s+you\b", re.IGNORECASE),
     re.compile(r"\btell\s+me\s+about\s+(yourself|you)\b", re.IGNORECASE),
+    
+    # Learning/improvement questions (user-facing - NOT exposing CSIU internals)
+    re.compile(r"\bhow\s+(do|does)\s+(you|vulcan)\s+(learn|improve)\b", re.IGNORECASE),
+    
+    # Meta-reasoning questions
+    re.compile(r"\b(how|what)\s+(do|does)\s+your\s+(reasoning|thinking|decision)\b", re.IGNORECASE),
 )
 
 SELF_INTROSPECTION_KEYWORDS: FrozenSet[str] = frozenset([

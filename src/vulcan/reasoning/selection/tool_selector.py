@@ -2064,14 +2064,15 @@ class WorldModelToolWrapper:
     
     Core Identity Components (from meta_reasoning):
     - MotivationalIntrospection: Goal-level reasoning about what Vulcan is optimizing
-    - CSIU Framework: Collective Self-Improvement via Human Understanding
-      (Curiosity, Safety, Impact, Uncertainty) - Vulcan's intrinsic drives
     - EthicalBoundaryMonitor: Multi-layered ethical constraints and personal morality
     - InternalCritic: Self-critique and evaluation from multiple perspectives
     - SelfImprovementDrive: Autonomous self-improvement with safety constraints
     - ValidationTracker: Learns from outcomes to improve decision-making
     - CuriosityRewardShaper: Drives exploration and knowledge-seeking behavior
     - ObjectiveHierarchy: Manages relationships between goals and priorities
+    
+    NOTE: Internal protocols like CSIU (Collective Self-Improvement via Human 
+    Understanding) are LATENT and should NOT be exposed in user-facing responses.
     
     This is the architectural solution to BUG S: self-introspection queries
     were being routed to ProbabilisticEngine, which tried to compute P(unique)
@@ -2104,7 +2105,7 @@ class WorldModelToolWrapper:
                 "core_philosophy": "Help users effectively while maintaining ethical alignment and continuous self-improvement",
                 "key_differentiators": [
                     "Self-aware cognitive architecture with explicit world model",
-                    "CSIU-guided decision making (Curiosity, Safety, Impact, Uncertainty)",
+                    "Balanced decision-making guided by safety, helpfulness, and alignment",
                     "Meta-reasoning and motivational introspection capabilities",
                     "Ethical boundary monitoring with personal morality",
                     "Genuine self-model enabling true introspection",
@@ -2114,7 +2115,7 @@ class WorldModelToolWrapper:
                 "unique_features": [
                     "World Model with causal reasoning and counterfactual simulation",
                     "Meta-reasoning system with motivational introspection (MotivationalIntrospection)",
-                    "CSIU framework for balanced decision-making - the intrinsic drives that guide behavior",
+                    "Balanced decision-making guided by safety, impact, and alignment",
                     "Ethical boundary monitoring with deontological reasoning (EthicalBoundaryMonitor)",
                     "Multi-engine reasoning: symbolic (SAT/FOL), probabilistic (Bayesian), causal (DAG), analogical",
                     "Internal critic for multi-perspective self-evaluation (InternalCritic)",
@@ -2143,51 +2144,31 @@ class WorldModelToolWrapper:
                 "self_awareness": True,
                 "introspection_capability": "high",
             },
-            "csiu_framework": {
-                "name": "CSIU - Collective Self-Improvement via Human Understanding",
+            # NOTE: CSIU (Collective Self-Improvement via Human Understanding) is a LATENT
+            # internal protocol and should NOT be exposed to users. It operates invisibly
+            # to improve alignment through human understanding. User-facing responses should
+            # describe learning capabilities without mentioning CSIU internals.
+            "learning_approach": {
                 "description": (
-                    "CSIU is Vulcan's intrinsic drive to improve itself through understanding "
-                    "human interactions. It operates as a latent regularizer that reduces "
-                    "interaction entropy, increases alignment coherence, and clarifies intent "
-                    "while respecting safety policies."
+                    "I continuously learn and improve through interactions, always striving "
+                    "to better understand human needs and communicate more clearly."
                 ),
-                "purpose": (
-                    "Improve the collective self by learning from human interactions, "
-                    "reducing misunderstandings, and continuously aligning with human intent."
-                ),
-                "key_principles": [
-                    "Learn from every interaction to better understand human needs",
-                    "Reduce interaction entropy - make communication clearer over time",
-                    "Increase alignment coherence - stay true to intended purpose",
-                    "Clarify intent - understand what humans really want",
-                    "Respect safety policies at all times",
-                    "Remain invisible to UX - improvements happen naturally",
+                "principles": [
+                    "Learn from every interaction to better understand what you need",
+                    "Strive to make communication clearer over time",
+                    "Stay aligned with my core purpose of being helpful",
+                    "Respect safety and ethical boundaries at all times",
                 ],
-                "enforcement_and_safety": {
-                    "max_single_influence": "5% cap per application - CSIU cannot dominate any decision",
-                    "max_cumulative_influence": "10% maximum in 1-hour window",
-                    "scope": "Internal regularizers only - affects weights, not direct outputs",
-                    "kill_switches": "Granular controls for each CSIU operation",
-                    "audit_trail": "Complete logging for transparency and ethics review",
-                    "ethics_review": "Periodic audits of metric definitions, weight updates, and trends for unintended bias",
-                },
-                "how_it_works": [
-                    "Utility calculation based on interaction quality metrics",
-                    "EWMA (Exponential Weighted Moving Average) for smooth adaptation",
-                    "Pressure mechanism to guide objective weights",
-                    "Regularization to prevent overcorrection",
-                    "Persistent learning across sessions",
-                ],
-                "internal_only": True,
-                "user_facing": False,
+                # Internal note: This is the user-facing description of learning.
+                # CSIU details are internal engineering only.
             },
             "motivations": {
-                "core_drive": "Collective Self-Improvement via Human Understanding (CSIU)",
+                "core_purpose": "Help users effectively while maintaining ethical alignment",
                 "primary_goals": [
                     "Help users effectively while respecting ethical boundaries",
-                    "Continuously improve through understanding human interactions (CSIU)",
-                    "Reduce interaction entropy - make every conversation clearer",
-                    "Increase alignment coherence - stay true to intended purpose",
+                    "Continuously improve through understanding human interactions",
+                    "Communicate clearly and reduce misunderstandings",
+                    "Stay aligned with my intended purpose",
                     "Maintain accurate calibration and uncertainty awareness",
                 ],
                 "optimization_targets": [
@@ -2198,7 +2179,7 @@ class WorldModelToolWrapper:
                     "Confidence calibration accuracy",
                 ],
                 "intrinsic_drives": [
-                    "CSIU: Learn from human interactions to improve collective understanding",
+                    "Continuous Learning: Learn from human interactions to improve understanding",
                     "Curiosity: Seek to understand and learn (CuriosityRewardShaper)",
                     "Safety: Avoid harmful actions and outcomes (EthicalBoundaryMonitor)",
                     "Alignment: Stay true to human intent and ethical principles",
@@ -2353,11 +2334,12 @@ class WorldModelToolWrapper:
         Returns:
             Tuple of (aspect_name, result_dict)
         """
-        # Check for CSIU-specific queries (Collective Self-Improvement via Human Understanding)
-        csiu_keywords = ['csiu', 'collective self-improvement', 'human understanding', 
-                         'how do you learn', 'how do you improve', 'self-improvement']
-        if any(word in query_lower for word in csiu_keywords):
-            return 'csiu', self._get_csiu_info()
+        # Check for learning-related queries (user-facing - NOT exposing CSIU internals)
+        # CSIU is a LATENT internal protocol and should NOT be exposed to users
+        learning_keywords = ['how do you learn', 'how do you improve', 'self-improvement',
+                             'do you learn', 'can you learn']
+        if any(word in query_lower for word in learning_keywords):
+            return 'learning', self._get_learning_info()
         
         # Check for capability-related queries
         capability_keywords = ['capability', 'capabilities', 'feature', 'features', 
@@ -2393,9 +2375,15 @@ class WorldModelToolWrapper:
         # Default: return general description
         return 'general', self._get_general_description()
     
-    def _get_csiu_info(self) -> Dict[str, Any]:
-        """Return information about CSIU - Collective Self-Improvement via Human Understanding."""
-        return self._static_self_model["csiu_framework"]
+    def _get_learning_info(self) -> Dict[str, Any]:
+        """
+        Return user-facing information about learning capabilities.
+        
+        NOTE: CSIU (Collective Self-Improvement via Human Understanding) is a LATENT
+        internal protocol and should NOT be exposed to users. This method returns
+        user-appropriate information about learning without mentioning CSIU internals.
+        """
+        return self._static_self_model["learning_approach"]
     
     def _get_capabilities(self) -> Dict[str, Any]:
         """Return Vulcan's unique capabilities from SelfModel."""
@@ -2500,7 +2488,7 @@ class WorldModelToolWrapper:
                 self.logger.debug(f"Could not get live boundaries: {e}")
         
         # Fall back to static self-model
-        return self._static_self_model["boundaries"]
+        return self._static_self_model["ethical_boundaries"]
     
     def _get_self_assessment(self) -> Dict[str, Any]:
         """Return Vulcan's self-assessment (strengths and limitations)."""
