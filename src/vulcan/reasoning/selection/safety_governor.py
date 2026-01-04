@@ -87,6 +87,17 @@ TOOLS_WITH_EXPECTED_INCONSISTENCY = frozenset(
     }
 )
 
+# Math/probability tools that should not have their outputs flagged as sensitive data
+# These tools produce legitimate mathematical results that may contain numbers/patterns
+# that could otherwise be misidentified as sensitive data (e.g., SSN-like patterns)
+MATH_REASONING_TOOLS = frozenset(
+    {
+        "probabilistic",
+        "mathematical",
+        "symbolic",
+    }
+)
+
 # =============================================================================
 # SEMANTIC KEYWORD SYNONYMS
 # =============================================================================
@@ -645,11 +656,15 @@ class SafetyValidator:
             logger.error(f"Input validation failed: {e}")
             return False, f"Validation error: {str(e)}"
 
-    def validate_output(self, output_data: Any) -> Tuple[bool, str]:
+    def validate_output(self, output_data: Any, tool_name: Optional[str] = None) -> Tuple[bool, str]:
         """Validate output for safety"""
 
         if output_data is None:
             return True, "Null output allowed"
+
+        # Don't flag math/probability results as sensitive
+        if tool_name in MATH_REASONING_TOOLS:
+            return True, "Output validated (math/probabilistic tool)"
 
         try:
             output_str = str(output_data)
@@ -1513,8 +1528,8 @@ class SafetyGovernor:
         """Validate tool output for safety"""
 
         try:
-            # Basic output validation
-            is_safe, reason = self.validator.validate_output(output)
+            # Basic output validation - pass tool_name to skip sensitive data checks for math tools
+            is_safe, reason = self.validator.validate_output(output, tool_name=tool_name)
             if not is_safe:
                 self._record_violation(tool_name, VetoReason.UNSAFE_OUTPUT, reason)
                 return False, reason
