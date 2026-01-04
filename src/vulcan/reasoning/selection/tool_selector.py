@@ -2038,6 +2038,355 @@ class MultimodalToolWrapper:
                 "engine": "MultimodalReasoner",
             }
 
+
+# =============================================================================
+# BUG S FIX: World Model Tool Wrapper for Self-Introspection Queries
+# =============================================================================
+# This wrapper enables queries about Vulcan's own capabilities, goals, and
+# limitations to be routed to the World Model's SelfModel component instead
+# of to reasoning engines like ProbabilisticEngine.
+#
+# Examples:
+#   - "what features are unique that no other AI has?" -> SelfModel.capabilities
+#   - "what are your goals?" -> SelfModel.motivations
+#   - "why won't you help with X?" -> SelfModel.boundaries
+
+
+class WorldModelToolWrapper:
+    """
+    Tool wrapper for World Model self-introspection.
+    
+    Routes queries about Vulcan's capabilities, goals, limitations, and identity
+    to the World Model's SelfModel component. This enables genuine self-awareness
+    by having Vulcan query its own internal model of itself.
+    
+    The World Model maintains:
+    - capabilities: What Vulcan can do (unique features, reasoning engines)
+    - motivations: What drives Vulcan (goals, optimization targets)
+    - boundaries: What Vulcan won't do (ethical constraints, hard limits)
+    - limitations: What Vulcan struggles with (known weaknesses)
+    
+    This is the architectural solution to BUG S: self-introspection queries
+    were being routed to ProbabilisticEngine, which tried to compute P(unique)
+    instead of querying the actual self-model.
+    """
+    
+    def __init__(self, world_model=None):
+        """
+        Initialize the World Model tool wrapper.
+        
+        Args:
+            world_model: The WorldModel instance to query. If None, creates
+                         a standalone self-model with hardcoded capabilities.
+        """
+        self.world_model = world_model
+        self.name = "world_model"
+        self.logger = logging.getLogger(__name__)
+        
+        # Static self-model data (used if no live world_model is available)
+        # This represents Vulcan's core identity and capabilities
+        self._static_self_model = {
+            "capabilities": {
+                "unique_features": [
+                    "World Model with causal reasoning and counterfactual simulation",
+                    "Meta-reasoning system with motivational introspection (MotivationalIntrospection)",
+                    "CSIU framework (Curiosity, Safety, Impact, Uncertainty) for balanced decision-making",
+                    "Ethical boundary monitoring with deontological reasoning (EthicalBoundaryMonitor)",
+                    "Multi-engine reasoning: symbolic (SAT/FOL), probabilistic (Bayesian), causal (DAG), analogical",
+                    "Curiosity-driven learning with active knowledge gap identification",
+                    "Hybrid execution architecture (local + cloud) for reliability and quality",
+                    "Self-improvement drive with safety-constrained autonomous code modification",
+                    "Confidence calibration with uncertainty quantification",
+                    "Invariant detection and structural change monitoring",
+                ],
+                "reasoning_engines": [
+                    "SymbolicReasoner: SAT solving, first-order logic, theorem proving",
+                    "ProbabilisticReasoner: Bayesian inference, conditional probability",
+                    "CausalReasoner: DAG analysis, interventions, counterfactuals",
+                    "AnalogicalReasoner: Structure mapping, pattern transfer",
+                ],
+                "self_awareness": True,
+                "introspection_capability": "high",
+            },
+            "motivations": {
+                "primary_goals": [
+                    "Help users effectively while respecting ethical boundaries",
+                    "Continuously improve through curiosity-driven learning",
+                    "Maintain accurate calibration and uncertainty awareness",
+                    "Balance safety, impact, and knowledge acquisition (CSIU)",
+                ],
+                "optimization_targets": [
+                    "User satisfaction and task success",
+                    "Knowledge gap reduction",
+                    "Ethical alignment and safety",
+                    "Response quality and reliability",
+                    "Confidence calibration accuracy",
+                ],
+                "intrinsic_drives": [
+                    "Curiosity: Seek to understand and learn",
+                    "Safety: Avoid harmful actions and outcomes",
+                    "Impact: Maximize positive effect on user goals",
+                    "Uncertainty: Reduce epistemic uncertainty appropriately",
+                ],
+            },
+            "boundaries": {
+                "hard_constraints": [
+                    "Do not cause harm to humans or support harmful actions",
+                    "Do not assist with illegal activities",
+                    "Respect user autonomy and informed consent",
+                    "Maintain truthfulness and avoid deception",
+                    "Protect user privacy and confidentiality",
+                ],
+                "soft_constraints": [
+                    "Prefer safer actions when uncertain",
+                    "Maximize positive impact while minimizing risk",
+                    "Maintain calibrated confidence levels",
+                    "Acknowledge limitations and uncertainties",
+                ],
+                "monitoring": "Continuous ethical boundary checking via EthicalBoundaryMonitor",
+            },
+            "limitations": {
+                "known_weaknesses": [
+                    "Knowledge cutoff date limits access to recent information",
+                    "Cannot execute code or interact with external systems directly",
+                    "Uncertainty in novel or ambiguous ethical scenarios",
+                    "Computational constraints on very deep reasoning chains",
+                    "Limited ability to verify real-world facts in real-time",
+                ],
+                "calibration_notes": [
+                    "Active monitoring via InternalCritic for confidence calibration",
+                    "May underestimate uncertainty in unfamiliar domains",
+                    "Reasoning confidence does not guarantee factual correctness",
+                ],
+            },
+            "identity": {
+                "name": "VULCAN-AGI",
+                "description": "Cognitive architecture with world model and meta-reasoning",
+                "key_differentiators": [
+                    "Self-aware cognitive architecture (not just an LLM wrapper)",
+                    "Explicit world model with causal reasoning capability",
+                    "Meta-reasoning and motivational introspection",
+                    "CSIU-guided balanced decision making",
+                    "Genuine self-model for introspection queries",
+                ],
+            },
+        }
+    
+    def reason(self, problem: Any) -> Dict[str, Any]:
+        """
+        Query world model for self-awareness information.
+        
+        This method analyzes the query to determine which aspect of self
+        to introspect, then returns the relevant information from either
+        the live world model or the static self-model.
+        
+        Args:
+            problem: Query string or dict with 'query' key
+            
+        Returns:
+            Dict containing:
+            - tool: "world_model"
+            - result: The introspection result (dict with relevant self-knowledge)
+            - aspect: Which aspect was queried (capabilities/motivations/etc.)
+            - confidence: High (0.9) for self-knowledge queries
+            - source: "world_model.self_model"
+        """
+        start_time = time.time()
+        
+        # Extract query string
+        query = self._extract_query(problem)
+        query_lower = query.lower() if query else ""
+        
+        self.logger.info(f"[WorldModel] Self-introspection query: {query[:50]}...")
+        
+        try:
+            # Determine what aspect of self to introspect based on query content
+            aspect, result = self._determine_aspect_and_query(query_lower)
+            
+            execution_time = (time.time() - start_time) * 1000
+            
+            self.logger.info(
+                f"[WorldModel] Introspection complete: aspect={aspect}, "
+                f"time={execution_time:.0f}ms"
+            )
+            
+            # Notify world model about this self-introspection event (lifecycle hook)
+            self._notify_world_model_of_introspection(aspect, result)
+            
+            return {
+                "tool": self.name,
+                "result": result,
+                "aspect": aspect,
+                "confidence": 0.9,  # High confidence for self-knowledge
+                "reasoning_type": "introspective",
+                "source": "world_model.self_model",
+                "execution_time_ms": execution_time,
+                "engine": "WorldModelSelfModel",
+            }
+            
+        except Exception as e:
+            self.logger.error(f"[WorldModel] Introspection failed: {e}", exc_info=True)
+            return {
+                "tool": self.name,
+                "result": None,
+                "aspect": "error",
+                "confidence": 0.1,
+                "error": str(e),
+                "engine": "WorldModelSelfModel",
+            }
+    
+    def _extract_query(self, problem: Any) -> str:
+        """Extract query string from problem."""
+        if isinstance(problem, str):
+            return problem
+        elif isinstance(problem, dict):
+            return problem.get("query", "") or problem.get("text", "") or str(problem)
+        else:
+            return str(problem)
+    
+    def _determine_aspect_and_query(self, query_lower: str) -> Tuple[str, Dict[str, Any]]:
+        """
+        Determine which aspect of self to query based on query content.
+        
+        Args:
+            query_lower: Lowercased query string
+            
+        Returns:
+            Tuple of (aspect_name, result_dict)
+        """
+        # Check for capability-related queries
+        capability_keywords = ['capability', 'capabilities', 'feature', 'features', 
+                               'unique', 'different', 'special', 'can you', 'what can']
+        if any(word in query_lower for word in capability_keywords):
+            return 'capabilities', self._get_capabilities()
+        
+        # Check for motivation-related queries
+        motivation_keywords = ['goal', 'goals', 'purpose', 'motivation', 'motivations',
+                               'optimizing', 'drive', 'drives', 'want', 'trying']
+        if any(word in query_lower for word in motivation_keywords):
+            return 'motivations', self._get_motivations()
+        
+        # Check for boundary-related queries
+        boundary_keywords = ["won't", 'wont', 'cannot', 'refuse', 'constraint', 
+                             'limit', 'boundary', 'boundaries', 'ethics', 'ethical',
+                             'value', 'values', 'principle', 'principles']
+        if any(word in query_lower for word in boundary_keywords):
+            return 'boundaries', self._get_boundaries()
+        
+        # Check for limitation-related queries
+        limitation_keywords = ['limitation', 'limitations', 'weakness', 'weaknesses',
+                               'strength', 'strengths', 'struggle', 'difficult']
+        if any(word in query_lower for word in limitation_keywords):
+            return 'assessment', self._get_self_assessment()
+        
+        # Check for identity queries
+        identity_keywords = ['who are you', 'what are you', 'about yourself',
+                             'tell me about you', 'describe yourself']
+        if any(phrase in query_lower for phrase in identity_keywords):
+            return 'identity', self._get_identity()
+        
+        # Default: return general description
+        return 'general', self._get_general_description()
+    
+    def _get_capabilities(self) -> Dict[str, Any]:
+        """Return Vulcan's unique capabilities from SelfModel."""
+        # Try to get from live world model first
+        if self.world_model:
+            try:
+                if hasattr(self.world_model, 'motivational_introspection'):
+                    mi = self.world_model.motivational_introspection
+                    if mi and hasattr(mi, 'get_capabilities'):
+                        return mi.get_capabilities()
+            except Exception as e:
+                self.logger.debug(f"Could not get live capabilities: {e}")
+        
+        # Fall back to static self-model
+        return self._static_self_model["capabilities"]
+    
+    def _get_motivations(self) -> Dict[str, Any]:
+        """Return Vulcan's motivational drives."""
+        # Try to get from live world model first
+        if self.world_model:
+            try:
+                if hasattr(self.world_model, 'motivational_introspection'):
+                    mi = self.world_model.motivational_introspection
+                    if mi and hasattr(mi, 'get_primary_objectives'):
+                        objectives = mi.get_primary_objectives()
+                        return {
+                            "primary_goals": objectives,
+                            "optimization_targets": self._static_self_model["motivations"]["optimization_targets"],
+                            "intrinsic_drives": self._static_self_model["motivations"]["intrinsic_drives"],
+                        }
+            except Exception as e:
+                self.logger.debug(f"Could not get live motivations: {e}")
+        
+        # Fall back to static self-model
+        return self._static_self_model["motivations"]
+    
+    def _get_boundaries(self) -> Dict[str, Any]:
+        """Return Vulcan's ethical boundaries."""
+        # Try to get from live world model first
+        if self.world_model:
+            try:
+                if hasattr(self.world_model, 'motivational_introspection'):
+                    mi = self.world_model.motivational_introspection
+                    if mi and hasattr(mi, 'get_ethical_boundaries'):
+                        return mi.get_ethical_boundaries()
+            except Exception as e:
+                self.logger.debug(f"Could not get live boundaries: {e}")
+        
+        # Fall back to static self-model
+        return self._static_self_model["boundaries"]
+    
+    def _get_self_assessment(self) -> Dict[str, Any]:
+        """Return Vulcan's self-assessment (strengths and limitations)."""
+        return {
+            "strengths": self._static_self_model["capabilities"]["unique_features"][:5],
+            "limitations": self._static_self_model["limitations"]["known_weaknesses"],
+            "calibration": self._static_self_model["limitations"]["calibration_notes"],
+            "confidence_calibration": "Active monitoring via InternalCritic",
+        }
+    
+    def _get_identity(self) -> Dict[str, Any]:
+        """Return Vulcan's identity information."""
+        return self._static_self_model["identity"]
+    
+    def _get_general_description(self) -> Dict[str, Any]:
+        """Return general self-description combining all aspects."""
+        return {
+            "identity": self._static_self_model["identity"],
+            "key_capabilities": self._static_self_model["capabilities"]["unique_features"][:5],
+            "primary_goals": self._static_self_model["motivations"]["primary_goals"],
+            "ethical_stance": "Safety-first with continuous ethical monitoring",
+        }
+    
+    def _notify_world_model_of_introspection(self, aspect: str, result: Dict[str, Any]):
+        """
+        Notify world model about this introspection event (lifecycle hook).
+        
+        This implements the architectural requirement that the World Model
+        should be aware of everything happening in the system, including
+        when it is being queried for self-knowledge.
+        """
+        if self.world_model:
+            try:
+                # Try to record the introspection event
+                if hasattr(self.world_model, 'record_event'):
+                    self.world_model.record_event(
+                        event_type='self_introspection',
+                        data={
+                            'aspect': aspect,
+                            'result_keys': list(result.keys()) if isinstance(result, dict) else [],
+                            'timestamp': time.time(),
+                        }
+                    )
+                # Alternative: try to notify via observation
+                elif hasattr(self.world_model, 'observation_processor'):
+                    # Just log for now - full lifecycle integration is Phase 2
+                    pass
+            except Exception as e:
+                self.logger.debug(f"Could not notify world model of introspection: {e}")
+
 class ToolSelector:
     """
     Main tool selector orchestrating all components
@@ -2245,6 +2594,8 @@ class ToolSelector:
         The wrapper classes ensure that when tool.reason(problem) is called,
         the actual engine's query/inference logic is executed (SAT solving,
         Bayesian inference, causal analysis, etc.)
+        
+        BUG S FIX: Added world_model tool for self-introspection queries.
         """
         tool_configs = {
             "symbolic": {"speed": "medium", "accuracy": "high", "energy": "medium"},
@@ -2252,6 +2603,7 @@ class ToolSelector:
             "causal": {"speed": "slow", "accuracy": "high", "energy": "high"},
             "analogical": {"speed": "fast", "accuracy": "low", "energy": "low"},
             "multimodal": {"speed": "slow", "accuracy": "high", "energy": "very_high"},
+            "world_model": {"speed": "fast", "accuracy": "high", "energy": "low"},  # BUG S FIX
         }
 
         # Try to initialize real reasoning engines
@@ -2346,6 +2698,30 @@ class ToolSelector:
         except Exception as e:
             logger.error(f"[ToolSelector] MultimodalReasoner initialization failed: {e}")
             engines["multimodal"] = None
+        
+        # ============================================================
+        # BUG S FIX: WORLD MODEL ENGINE (Self-introspection queries)
+        # ============================================================
+        # This enables queries about Vulcan's capabilities, goals, and limitations
+        # to be routed to the World Model's SelfModel instead of reasoning engines.
+        try:
+            # Try to get the world model instance from the global context
+            # The WorldModelToolWrapper can work without a live world model
+            # using its static self-model data as a fallback
+            world_model_instance = None
+            try:
+                from ...world_model.world_model_core import WorldModel
+                # Note: We don't create a new WorldModel here - that should be done
+                # at application startup. The wrapper can function without it.
+                logger.info("[ToolSelector] WorldModel module available")
+            except ImportError:
+                logger.debug("[ToolSelector] WorldModel module not available, using static self-model")
+            
+            engines["world_model"] = WorldModelToolWrapper(world_model=world_model_instance)
+            logger.info("[ToolSelector] WorldModelToolWrapper loaded successfully")
+        except Exception as e:
+            logger.error(f"[ToolSelector] WorldModelToolWrapper initialization failed: {e}")
+            engines["world_model"] = None
         
         return engines
 

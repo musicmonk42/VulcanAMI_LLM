@@ -571,3 +571,153 @@ class TestExtractionType:
         assert ExtractionType.PROBABILISTIC.value == "probabilistic"
         assert ExtractionType.CAUSAL.value == "causal"
         assert ExtractionType.NONE.value == "none"
+
+
+# =============================================================================
+# BUG D FIX: Tests for standalone operator filtering
+# =============================================================================
+class TestBugDStandaloneOperatorFiltering:
+    """
+    Tests for BUG D fix: Filtering standalone operators in formula extraction.
+    
+    The bug caused queries like "A→B, B→C" to extract "(→) ∧ (A→B)" instead of
+    just "(A→B) ∧ (B→C)". The fix ensures that standalone operators without
+    propositions (like "→", "∧", "∨", "¬") are filtered out.
+    """
+
+    @pytest.fixture
+    def preprocessor(self):
+        """Create a fresh preprocessor instance."""
+        return QueryPreprocessor()
+
+    def test_filter_standalone_implication(self, preprocessor):
+        """Test that standalone → operator is filtered out."""
+        # This should NOT extract (→) as a formula
+        cleaned = preprocessor._clean_formula_line("→")
+        assert cleaned == "", f"Standalone → should be filtered, got: '{cleaned}'"
+
+    def test_filter_standalone_conjunction(self, preprocessor):
+        """Test that standalone ∧ operator is filtered out."""
+        cleaned = preprocessor._clean_formula_line("∧")
+        assert cleaned == "", f"Standalone ∧ should be filtered, got: '{cleaned}'"
+
+    def test_filter_standalone_disjunction(self, preprocessor):
+        """Test that standalone ∨ operator is filtered out."""
+        cleaned = preprocessor._clean_formula_line("∨")
+        assert cleaned == "", f"Standalone ∨ should be filtered, got: '{cleaned}'"
+
+    def test_filter_standalone_negation(self, preprocessor):
+        """Test that standalone ¬ operator is filtered out."""
+        cleaned = preprocessor._clean_formula_line("¬")
+        assert cleaned == "", f"Standalone ¬ should be filtered, got: '{cleaned}'"
+
+    def test_keep_valid_implication_formula(self, preprocessor):
+        """Test that valid A→B formula is kept."""
+        cleaned = preprocessor._clean_formula_line("A→B")
+        assert cleaned == "A→B", f"Valid formula A→B should be kept, got: '{cleaned}'"
+
+    def test_keep_valid_negation_formula(self, preprocessor):
+        """Test that valid ¬C formula is kept."""
+        cleaned = preprocessor._clean_formula_line("¬C")
+        assert cleaned == "¬C", f"Valid formula ¬C should be kept, got: '{cleaned}'"
+
+    def test_keep_valid_disjunction_formula(self, preprocessor):
+        """Test that valid A∨B formula is kept."""
+        cleaned = preprocessor._clean_formula_line("A∨B")
+        assert cleaned == "A∨B", f"Valid formula A∨B should be kept, got: '{cleaned}'"
+
+    def test_sat_problem_no_standalone_operators(self, preprocessor):
+        """
+        Test that SAT problem extraction doesn't include standalone operators.
+        
+        This is the main BUG D scenario: a well-formed SAT problem should
+        produce formulas like "(A→B) ∧ (B→C) ∧ (¬C)", NOT "(→) ∧ (A→B)".
+        """
+        query = """
+        Propositions: A, B, C
+
+        Constraints:
+        1. A→B
+        2. B→C
+        3. ¬C
+        4. A∨B
+
+        Task: Is the set satisfiable?
+        """
+
+        result = preprocessor.preprocess(
+            query=query,
+            query_type="symbolic",
+            reasoning_tools=["symbolic"],
+        )
+
+        assert result.preprocessing_applied is True
+        
+        # The formal input should NOT contain standalone operators
+        formal_input = result.formal_input
+        assert formal_input is not None
+        
+        # Check that we don't have "(→)" or "(∧)" etc. as standalone formulas
+        # These would appear as "(→) ∧" patterns if the bug is present
+        assert "(→) ∧" not in formal_input, f"BUG D present: standalone (→) found in: {formal_input}"
+        assert "(∧) ∧" not in formal_input, f"BUG D present: standalone (∧) found in: {formal_input}"
+        assert "(∨) ∧" not in formal_input, f"BUG D present: standalone (∨) found in: {formal_input}"
+        assert "(¬) ∧" not in formal_input, f"BUG D present: standalone (¬) found in: {formal_input}"
+        
+        # Check that valid formulas ARE present
+        assert "(A→B)" in formal_input, f"Valid formula (A→B) missing from: {formal_input}"
+        assert "(B→C)" in formal_input, f"Valid formula (B→C) missing from: {formal_input}"
+        assert "(¬C)" in formal_input, f"Valid formula (¬C) missing from: {formal_input}"
+        assert "(A∨B)" in formal_input, f"Valid formula (A∨B) missing from: {formal_input}"
+
+    def test_direct_formulas_no_standalone_operators(self, preprocessor):
+        """Test direct formula extraction doesn't include standalone operators."""
+        query = """
+        Given:
+        A → B
+        B → C
+        ¬C
+        
+        What can we conclude?
+        """
+
+        result = preprocessor.preprocess(
+            query=query,
+            query_type="symbolic",
+            reasoning_tools=["symbolic"],
+        )
+
+        if result.preprocessing_applied and result.formal_input:
+            formal_input = result.formal_input
+            # Should not have standalone operators
+            assert "(→) ∧" not in formal_input
+            # Should have valid formulas
+            assert "A → B" in formal_input or "A→B" in formal_input
+
+    def test_numbered_list_constraint_extraction(self, preprocessor):
+        """Test that numbered list constraints are properly extracted without standalone operators."""
+        query = """
+        Propositions: S, D, E
+
+        Constraints:
+        1. S→D
+        2. S→E
+
+        Task: Does S cause D?
+        """
+
+        result = preprocessor.preprocess(
+            query=query,
+            query_type="symbolic",
+            reasoning_tools=["symbolic"],
+        )
+
+        assert result.preprocessing_applied is True
+        formal_input = result.formal_input
+        
+        # Should contain valid formulas
+        assert "(S→D)" in formal_input, f"Missing (S→D) in: {formal_input}"
+        assert "(S→E)" in formal_input, f"Missing (S→E) in: {formal_input}"
+        
+        # Should NOT have standalone operators
+        assert "(→)" not in formal_input or "(→) ∧" not in formal_input

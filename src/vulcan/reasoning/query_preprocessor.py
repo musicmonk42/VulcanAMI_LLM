@@ -557,12 +557,18 @@ class QueryPreprocessor:
                 extraction_type=ExtractionType.SYMBOLIC,
             )
 
-        # Normalize each constraint
+        # Normalize each constraint and filter out invalid ones
         formal_constraints = []
         for constraint in constraint_matches:
             normalized = self._normalize_operators(constraint.strip())
             if normalized:
-                formal_constraints.append(normalized)
+                # BUG D FIX: Validate constraint contains at least one proposition
+                if re.search(r'[A-Za-z]', normalized):
+                    formal_constraints.append(normalized)
+                else:
+                    logger.warning(
+                        f"{LOG_PREFIX} Filtered invalid constraint (no proposition): '{normalized}'"
+                    )
 
         if not formal_constraints:
             return PreprocessingResult(
@@ -813,13 +819,26 @@ class QueryPreprocessor:
         Clean a line containing a formula.
 
         Removes common prefixes (numbers, bullets) and trailing punctuation,
-        then normalizes operators.
+        then normalizes operators. Also validates that the result is a complete
+        formula containing at least one proposition (letter).
+
+        CRITICAL FIX (BUG D): Standalone operators like '→', '∧', '∨', '¬'
+        are NOT valid formulas and must be filtered out. A valid formula must
+        contain at least one proposition letter (A-Z or a-z).
 
         Args:
             line: Line to clean
 
         Returns:
-            Cleaned formula string
+            Cleaned formula string, or empty string if invalid
+
+        Examples:
+            >>> preprocessor._clean_formula_line("1. A→B")
+            "A→B"
+            >>> preprocessor._clean_formula_line("→")  # Invalid standalone operator
+            ""
+            >>> preprocessor._clean_formula_line("¬C")
+            "¬C"
         """
         # Remove common prefixes (numbered lists, bullets)
         cleaned = re.sub(r'^(?:\d+\.|\*|•|[-])\s*', '', line)
@@ -830,7 +849,37 @@ class QueryPreprocessor:
         # Normalize operators
         cleaned = self._normalize_operators(cleaned)
 
-        return cleaned.strip()
+        cleaned = cleaned.strip()
+
+        # ====================================================================
+        # BUG D FIX: Filter out standalone operators and invalid formulas
+        # ====================================================================
+        # A valid formula MUST contain at least one proposition letter (A-Z or a-z)
+        # Standalone operators like '→', '∧', '∨', '¬', '(→)', '(∧)', etc. are INVALID
+        
+        # Check if formula contains at least one letter (proposition)
+        if not re.search(r'[A-Za-z]', cleaned):
+            logger.warning(
+                f"{LOG_PREFIX} Filtered invalid formula (no proposition): '{cleaned}'"
+            )
+            return ""
+        
+        # Define standalone operators that should be rejected
+        standalone_operators = frozenset([
+            '→', '∨', '∧', '¬', '↔',
+            '(→)', '(∨)', '(∧)', '(¬)', '(↔)',
+            '->', '<->', '&&', '||', '~', '!',
+            '(->', '(<->)', '(&&)', '(||)', '(~)', '(!)',
+        ])
+        
+        # Reject if the entire formula is just an operator
+        if cleaned in standalone_operators:
+            logger.warning(
+                f"{LOG_PREFIX} Filtered standalone operator: '{cleaned}'"
+            )
+            return ""
+
+        return cleaned
 
     def get_metrics(self) -> Dict[str, int]:
         """

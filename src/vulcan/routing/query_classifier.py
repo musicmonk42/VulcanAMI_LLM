@@ -45,6 +45,7 @@ class QueryCategory(Enum):
     FACTUAL = "FACTUAL"
     CREATIVE = "CREATIVE"  # BUG A FIX: Creative writing, stories, poems
     CONVERSATIONAL = "CONVERSATIONAL"  # BUG A FIX: General conversation
+    SELF_INTROSPECTION = "SELF_INTROSPECTION"  # BUG S FIX: Questions about Vulcan's capabilities/identity
     MATHEMATICAL = "MATHEMATICAL"
     LOGICAL = "LOGICAL"
     PROBABILISTIC = "PROBABILISTIC"
@@ -214,6 +215,52 @@ CONVERSATIONAL_PATTERNS: Tuple[re.Pattern, ...] = (
     re.compile(r"^describe\s+", re.IGNORECASE),
     re.compile(r"^what\s+do\s+you\s+(think|know)\s+about\s+", re.IGNORECASE),
 )
+
+# =============================================================================
+# BUG S FIX: Self-Introspection patterns - Route to World Model
+# =============================================================================
+# These queries ask about Vulcan's own capabilities, goals, limitations, etc.
+# They should be routed to the World Model's SelfModel component, NOT to
+# reasoning engines like ProbabilisticEngine.
+#
+# Examples:
+#   - "what features are unique that no other AI has?" -> SelfModel.capabilities
+#   - "what are your goals?" -> SelfModel.motivations
+#   - "why won't you help with X?" -> SelfModel.boundaries
+
+SELF_INTROSPECTION_PATTERNS: Tuple[re.Pattern, ...] = (
+    # Capability questions
+    re.compile(r"\b(what|which)\b.*\b(you|your)\b.*\b(can|able|feature|capability|unique)", re.IGNORECASE),
+    re.compile(r"\b(what|how)\b.*\b(makes?\s+you|are\s+you)\b.*\b(different|special|unique)", re.IGNORECASE),
+    re.compile(r"\bwhat\s+(features?|capabilities?)\s+(do\s+you|are\s+unique)", re.IGNORECASE),
+    re.compile(r"\bwhat\s+can\s+you\s+do\b", re.IGNORECASE),
+    re.compile(r"\bwhat\s+are\s+you\s+capable\s+of\b", re.IGNORECASE),
+    
+    # Motivational questions
+    re.compile(r"\b(why|what)\b.*\b(you|your)\b.*\b(goal|purpose|motivation|trying|want)", re.IGNORECASE),
+    re.compile(r"\bwhat\s+are\s+you\s+optimizing\b", re.IGNORECASE),
+    re.compile(r"\bwhat\s+(drives?|motivates?)\s+you\b", re.IGNORECASE),
+    
+    # Ethical boundary questions
+    re.compile(r"\b(what|why)\b.*\b(you|your)\b.*\b(won'?t|cannot|refuse|constraint|limit)", re.IGNORECASE),
+    re.compile(r"\bwhat\s+are\s+your\s+(values|ethics|principles)\b", re.IGNORECASE),
+    re.compile(r"\bwhat\s+won'?t\s+you\s+do\b", re.IGNORECASE),
+    
+    # Self-assessment questions
+    re.compile(r"\b(how|are\s+you)\b.*\b(good|confident|sure|certain)\b.*\b(at|about)\b", re.IGNORECASE),
+    re.compile(r"\bwhat\s+are\s+your\s+(limitations?|weaknesses?|strengths?)\b", re.IGNORECASE),
+    
+    # Identity questions
+    re.compile(r"\b(who|what)\s+are\s+you\b", re.IGNORECASE),
+    re.compile(r"\btell\s+me\s+about\s+(yourself|you)\b", re.IGNORECASE),
+)
+
+SELF_INTROSPECTION_KEYWORDS: FrozenSet[str] = frozenset([
+    "unique", "special", "different", "capability", "capabilities",
+    "feature", "features", "goal", "goals", "purpose", "motivation",
+    "limitation", "limitations", "weakness", "strength",
+    "value", "values", "ethics", "principle", "principles",
+])
 
 
 class QueryClassifier:
@@ -434,6 +481,35 @@ class QueryClassifier:
                     suggested_tools=["general"],
                     skip_reasoning=True,
                     confidence=0.85,
+                    source="keyword",
+                )
+        
+        # =============================================================================
+        # BUG S FIX: Check self-introspection patterns BEFORE reasoning patterns
+        # =============================================================================
+        # Questions about Vulcan's capabilities, goals, limitations should route to
+        # World Model's SelfModel, NOT to ProbabilisticEngine or other reasoning tools.
+        for pattern in SELF_INTROSPECTION_PATTERNS:
+            if pattern.search(query_original):
+                return QueryClassification(
+                    category=QueryCategory.SELF_INTROSPECTION.value,
+                    complexity=0.3,  # Medium-low complexity - World Model can handle
+                    suggested_tools=["world_model"],  # Route to World Model SelfModel
+                    skip_reasoning=False,  # Use reasoning path but with world_model tool
+                    confidence=0.9,
+                    source="keyword",
+                )
+        
+        # Check self-introspection keywords (questions about "you" with certain keywords)
+        if any(word in query_lower for word in ['you', 'your', 'yourself']):
+            introspection_count = sum(1 for kw in SELF_INTROSPECTION_KEYWORDS if kw in query_lower)
+            if introspection_count >= 1:
+                return QueryClassification(
+                    category=QueryCategory.SELF_INTROSPECTION.value,
+                    complexity=0.3,
+                    suggested_tools=["world_model"],
+                    skip_reasoning=False,
+                    confidence=0.8,
                     source="keyword",
                 )
         
