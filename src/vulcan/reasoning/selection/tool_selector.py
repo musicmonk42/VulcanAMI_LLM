@@ -256,6 +256,8 @@ class StochasticCostModel:
             "causal": {"time": 3000, "energy": 300},
             "analogical": {"time": 600, "energy": 60},
             "multimodal": {"time": 8000, "energy": 800},  # Increased from 5000 to allow more processing time
+            "philosophical": {"time": 1500, "energy": 150},  # FIX #2: Add philosophical tool costs
+            "mathematical": {"time": 1200, "energy": 120},   # FIX #2: Add mathematical tool costs
         }
 
     def predict_cost(self, tool_name: str, features: np.ndarray) -> Dict[str, Any]:
@@ -1054,12 +1056,18 @@ class ToolSelectionBandit:
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         self.is_enabled = BANDIT_AVAILABLE
         config = config or {}
+        # CRITICAL FIX: Added 'philosophical' and 'mathematical' tools
+        # These were missing from the tool_names list causing "Unknown tool name" errors
+        # when the QueryRouter selected 'philosophical' for ethical queries.
+        # See: Line 886: ERROR - Unknown tool name 'philosophical' in bandit update
         self.tool_names = [
             "symbolic",
             "probabilistic",
             "causal",
             "analogical",
             "multimodal",
+            "philosophical",  # FIX #2: Register philosophical reasoning tool
+            "mathematical",   # FIX #2: Register mathematical reasoning tool
         ]
 
         # **************************************************************************
@@ -1317,6 +1325,10 @@ class SymbolicToolWrapper:
             
             logger.info(f"[SymbolicEngine] Processing query: {query_str[:100]}...")
             
+            # FIX #1: Preprocess natural language into formal logic
+            # This transforms queries like "Is A→B, B→C, ¬C satisfiable?" into "A→B, B→C, ¬C"
+            preprocessed_query = self._preprocess_query(query_str)
+            
             # Check if problem contains rules/facts to add to knowledge base
             if isinstance(problem, dict):
                 rules = problem.get("rules", [])
@@ -1326,8 +1338,8 @@ class SymbolicToolWrapper:
                 for fact in facts:
                     self.engine.add_fact(fact)
             
-            # Execute the symbolic reasoning query
-            result = self.engine.query(query_str)
+            # Execute the symbolic reasoning query with preprocessed input
+            result = self.engine.query(preprocessed_query)
             
             execution_time = (time.time() - start_time) * 1000
             
@@ -1345,6 +1357,7 @@ class SymbolicToolWrapper:
                 "method": result.get("method", "symbolic"),
                 "execution_time_ms": execution_time,
                 "engine": "SymbolicReasoner",
+                "preprocessed": preprocessed_query != query_str,  # Flag if preprocessing occurred
             }
             
         except Exception as e:
@@ -1359,6 +1372,142 @@ class SymbolicToolWrapper:
             return problem.get("query") or problem.get("text") or problem.get("formula") or ""
         else:
             return str(problem)
+    
+    def _preprocess_query(self, query: str) -> str:
+        """
+        FIX #1: Preprocess natural language queries into formal logic notation.
+        
+        This addresses the core issue where engines expect formal logic but receive
+        natural language, resulting in confidence=0.0.
+        
+        Transformations:
+        1. Extract formal logic statements from mixed natural language/formal queries
+        2. Normalize logical operators (→, ∧, ∨, ¬, etc.)
+        3. Handle SAT-style queries ("Is A→B, B→C satisfiable?")
+        4. Handle FOL queries with quantifiers
+        
+        Args:
+            query: Natural language or mixed query string
+            
+        Returns:
+            Extracted/normalized formal logic string, or original if no formal content found
+            
+        Examples:
+            "Is A→B, B→C, ¬C, A∨B satisfiable?" → "A→B, B→C, ¬C, A∨B"
+            "Symbolic Reasoning\nS1 — Satisfiability...\n\nPropositions: A,B,C..."
+            → "A→B, B→C, ¬C, A∨B" (extracts the formal part)
+        """
+        if not query:
+            return query
+            
+        original_query = query
+        
+        # Step 1: Check if query already contains formal logic operators
+        formal_operators = ['→', '∧', '∨', '¬', '∀', '∃', '->', '/\\', '\\/', '~', '⇒', '⇔', '|-']
+        has_formal_content = any(op in query for op in formal_operators)
+        
+        if has_formal_content:
+            # Try to extract just the formal logic portion
+            extracted = self._extract_formal_logic_portion(query)
+            if extracted:
+                logger.info(f"[SymbolicEngine] Preprocessed query: '{query[:50]}...' → '{extracted[:50]}...'")
+                return extracted
+        
+        # Step 2: Check for natural language patterns that indicate logic queries
+        # and try to convert them
+        converted = self._convert_natural_language_to_formal(query)
+        if converted != query:
+            logger.info(f"[SymbolicEngine] Converted NL to formal: '{query[:50]}...' → '{converted[:50]}...'")
+            return converted
+        
+        # Step 3: Return original if no transformation needed/possible
+        return original_query
+    
+    def _extract_formal_logic_portion(self, query: str) -> Optional[str]:
+        """
+        Extract formal logic statements from a query that contains both
+        natural language and formal notation.
+        
+        Example:
+            Input: "Is A→B, B→C, ¬C, A∨B satisfiable?"
+            Output: "A→B, B→C, ¬C, A∨B"
+        """
+        # Pattern 1: Look for comma-separated formulas with operators
+        # Match sequences like: A→B, B→C, ¬C, A∨B
+        formula_pattern = r'([A-Z∀∃¬→∧∨⇒⇔()a-z_\s,~]+(?:→|∧|∨|¬|⇒|⇔|->)[A-Z∀∃¬→∧∨⇒⇔()a-z_\s,~]+)'
+        
+        matches = re.findall(formula_pattern, query)
+        if matches:
+            # Return the longest match (most complete formula)
+            longest = max(matches, key=len)
+            # Clean up whitespace
+            cleaned = ' '.join(longest.split())
+            if len(cleaned) > 3:  # Ensure it's not just operators
+                return cleaned
+        
+        # Pattern 2: Look for explicit formula sections
+        # "Propositions: A,B,C" + formulas
+        if "Proposition" in query or "Formula" in query:
+            lines = query.split('\n')
+            formula_lines = []
+            for line in lines:
+                line = line.strip()
+                # Skip natural language lines
+                if any(skip in line.lower() for skip in ['symbolic', 'reasoning', 'satisfiability', 'step', 'analyze']):
+                    continue
+                # Keep lines with logical operators
+                if any(op in line for op in ['→', '∧', '∨', '¬', '->', '|', '&']):
+                    formula_lines.append(line)
+            if formula_lines:
+                return ', '.join(formula_lines)
+        
+        # Pattern 3: Extract from parenthesized expressions
+        paren_pattern = r'\(([^()]+(?:→|∧|∨|¬|->)[^()]+)\)'
+        paren_matches = re.findall(paren_pattern, query)
+        if paren_matches:
+            return ', '.join(paren_matches)
+        
+        return None
+    
+    def _convert_natural_language_to_formal(self, query: str) -> str:
+        """
+        Convert natural language logic queries to formal notation.
+        
+        Handles patterns like:
+        - "if A then B" → "A → B"
+        - "A and B" → "A ∧ B"
+        - "A or B" → "A ∨ B"
+        - "not A" → "¬A"
+        - "for all X" → "∀X"
+        - "there exists X" → "∃X"
+        """
+        result = query
+        
+        # Natural language to formal operator mappings
+        # Order matters - do multi-word patterns first
+        replacements = [
+            # Implications
+            (r'\bif\s+(\w+)\s+then\s+(\w+)\b', r'\1 → \2'),
+            (r'\b(\w+)\s+implies\s+(\w+)\b', r'\1 → \2'),
+            # Biconditional
+            (r'\b(\w+)\s+if\s+and\s+only\s+if\s+(\w+)\b', r'\1 ⇔ \2'),
+            (r'\b(\w+)\s+iff\s+(\w+)\b', r'\1 ⇔ \2'),
+            # Conjunction
+            (r'\b(\w+)\s+and\s+(\w+)\b', r'\1 ∧ \2'),
+            # Disjunction
+            (r'\b(\w+)\s+or\s+(\w+)\b', r'\1 ∨ \2'),
+            # Negation (must be careful not to match natural language "not")
+            (r'\bnot\s+([A-Z])\b', r'¬\1'),
+            # Quantifiers
+            (r'\bfor\s+all\s+(\w+)\b', r'∀\1'),
+            (r'\bthere\s+exists\s+(\w+)\b', r'∃\1'),
+            (r'\bexists\s+(\w+)\b', r'∃\1'),
+        ]
+        
+        for pattern, replacement in replacements:
+            result = re.sub(pattern, replacement, result, flags=re.IGNORECASE)
+        
+        return result
     
     def _error_result(self, error: str) -> Dict[str, Any]:
         return {
