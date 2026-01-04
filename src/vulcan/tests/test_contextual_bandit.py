@@ -703,7 +703,7 @@ class TestToolSelectionBandit:
 
     def test_initialization(self):
         tsb = ToolSelectionBandit()
-        # BUG FIX: Updated from 5 to 8 to include mathematical, philosophical, and world_model tools
+        # 8 tools: symbolic, probabilistic, causal, analogical, multimodal, mathematical, philosophical, world_model
         assert tsb.n_actions == 8
         assert len(tsb.tool_names) == 8
         assert len(tsb.tool_costs) == 8

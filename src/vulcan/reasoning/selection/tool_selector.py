@@ -1060,10 +1060,10 @@ class ToolSelectionBandit:
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         self.is_enabled = BANDIT_AVAILABLE
         config = config or {}
-        # CRITICAL FIX: Added 'philosophical', 'mathematical', and 'world_model' tools
-        # These were missing from the tool_names list causing "Unknown tool name" errors
-        # when the QueryRouter selected these tools for queries.
-        # Error: "Unknown tool name 'world_model' in bandit update"
+        # Tool names registered with the bandit learning system
+        # FIX #2: Added 'philosophical' and 'mathematical' tools (previous change)
+        # FIX #3: Added 'world_model' for meta-cognitive self-introspection (this change)
+        # Without registration, bandit updates fail with "Unknown tool name 'X' in bandit update"
         self.tool_names = [
             "symbolic",
             "probabilistic",
