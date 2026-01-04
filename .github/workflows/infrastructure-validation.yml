@@ -586,13 +586,13 @@ jobs:
 
       - name: Install Hadolint
         run: |
-          wget -qO /tmp/hadolint https://github.com/hadolint/hadolint/releases/latest/download/hadolint-Linux-x86_64
+          wget -qO /tmp/hadolint https://github.com/hadolint/hadolint/releases/download/v2.14.0/hadolint-Linux-x86_64
           chmod +x /tmp/hadolint
           sudo mv /tmp/hadolint /usr/local/bin/hadolint
 
       - name: Lint Dockerfile with Hadolint
         run: |
-          hadolint Dockerfile --failure-threshold warning || exit 1
+          hadolint Dockerfile --failure-threshold warning
 
       - name: Create .env file for validation
         run: |
