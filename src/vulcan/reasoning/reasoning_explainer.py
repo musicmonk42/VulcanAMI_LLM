@@ -490,11 +490,13 @@ class SafetyAwareReasoning:
             if not is_creative:
                 # Check confidence threshold - low confidence is treated as unsafe
                 # Only for non-creative tasks where confidence is meaningful
+                # FIX: Lowered threshold from 0.3 to 0.1 to avoid filtering out
+                # results that could still be useful (shows reasoning attempt)
                 if hasattr(result, "confidence"):
-                    if result.confidence < 0.3:
+                    if result.confidence < 0.1:
                         return {
                             "is_safe": False,
-                            "reason": f"Confidence too low: {result.confidence:.2f} (threshold: 0.3)",
+                            "reason": f"Confidence too low: {result.confidence:.2f} (threshold: 0.1)",
                         }
 
             # Check for error indicators in conclusion
@@ -617,14 +619,15 @@ class SafetyAwareReasoning:
                 )
 
         # Check confidence threshold
+        # FIX: Lowered threshold from 0.3 to 0.1 to show reasoning attempts
         if hasattr(result, "confidence"):
-            if result.confidence < 0.3:
+            if result.confidence < 0.1:
                 safety_checks["confidence_sufficient"] = False
                 safety_checks["checks_performed"].append(
                     {
                         "type": "confidence_threshold",
                         "passed": False,
-                        "reason": f"Confidence {result.confidence:.2f} below threshold 0.3",
+                        "reason": f"Confidence {result.confidence:.2f} below threshold 0.1",
                         "confidence": result.confidence,
                     }
                 )
