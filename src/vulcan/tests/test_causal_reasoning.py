@@ -1077,6 +1077,86 @@ class TestCompatibility:
         assert "reasoning_type" in result or "causal_graph" in result
         assert result.get("confidence", 0) > 0
 
+    def test_bug_l_fix_pattern1_edge_direction(self):
+        """
+        Test BUG L FIX: Pattern 1 edge direction correction.
+        
+        Input: "S users are also more likely to exercise E"
+        
+        Correct interpretation:
+        - People who exercise (E) are more likely to take supplements (S)
+        - Therefore E -> S (exercise causes supplement-taking behavior)
+        
+        Bug was: S -> E (wrong direction)
+        Fix: E -> S (correct direction)
+        """
+        reasoner = CausalReasoner()
+        
+        # Test query with the problematic pattern
+        query = """
+        You observe in a dataset:
+        People who take supplement S have lower disease D.
+        S users are also more likely to exercise E.
+        """
+        
+        result = reasoner.reason({"query": query})
+        
+        # Verify that the DAG was constructed
+        assert "causal_graph" in result
+        
+        # Verify the causal graph string representation contains E→S
+        # This is the expected edge direction after the BUG L FIX
+        causal_graph_str = result.get("causal_graph", "")
+        assert "E→S" in causal_graph_str or "E->S" in causal_graph_str or (
+            reasoner._query_dag is not None and 
+            NETWORKX_AVAILABLE and 
+            reasoner._query_dag.has_edge('E', 'S')
+        ), f"Expected E→S in causal graph, got: {causal_graph_str}"
+        
+        # The incorrect edge S→E should NOT be in the graph
+        # (unless added by some other pattern, which it shouldn't be)
+        if reasoner._query_dag is not None and NETWORKX_AVAILABLE:
+            assert not reasoner._query_dag.has_edge('S', 'E'), "Incorrect edge S→E should not exist"
+        
+        # E should be identified as a confounder between S and D
+        assert 'E' in result.get('confounders', []), "E should be identified as a confounder"
+        
+        # Verify the reasoning type
+        assert result.get("reasoning_type") == "causal"
+
+    def test_bug_l_fix_correct_confounder_detection(self):
+        """
+        Test that with BUG L FIX, confounders are correctly detected.
+        
+        With the fix, E (exercise) should be identified as a confounder
+        in the S -> D relationship because:
+        - E -> S (exercise causes supplement use)
+        - E -> D (exercise affects disease)
+        - These create a backdoor path from S to D through E
+        """
+        reasoner = CausalReasoner()
+        
+        query = """
+        You observe in a dataset:
+        People who take supplement S have lower disease D.
+        S users are also more likely to exercise E.
+        Which experiment identifies the causal effect S→D?
+        1. Randomize S
+        2. Randomize E
+        3. Observe more data
+        """
+        
+        result = reasoner.reason({"query": query})
+        
+        # E should be identified as a confounder
+        confounders = result.get("confounders", [])
+        assert 'E' in confounders, f"E should be a confounder, got: {confounders}"
+        
+        # The best experiment should be option 1 (randomize S)
+        # because randomizing the treatment breaks backdoor paths
+        best_exp = result.get("best_experiment")
+        assert best_exp == 1, f"Best experiment should be 1 (randomize S), got: {best_exp}"
+
 
 # ============================================================================
 # Edge Cases Tests
