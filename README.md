@@ -410,8 +410,11 @@ This repository supports multiple deployment options:
 ### Production Deployment Options
 
 **Kubernetes (Recommended)**
-- Kustomize overlays for different environments
+- Kustomize overlays for different environments (development, staging, production)
 - Helm charts for templated deployments
+- Automated deployment scripts for validation and deployment
+  - `./scripts/validate-deployment.sh <environment>` - Pre-deployment validation
+  - `./scripts/deploy.sh <environment> --image-tag <version>` - Automated deployment
 - See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for detailed instructions
 
 **Azure Kubernetes Service (AKS)**
