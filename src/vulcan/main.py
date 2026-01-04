@@ -2878,7 +2878,7 @@ async def chat(request: ChatRequest):
             # Map query types to relevant engines
             if query_type in ('logical', 'symbolic', 'mathematical'):
                 relevant_engines.add('symbolic')
-            elif query_type in ('probabilistic', 'factual'):
+            elif query_type in ('probabilistic',):
                 relevant_engines.add('probabilistic')
             elif query_type in ('causal',):
                 relevant_engines.add('causal')
@@ -2890,6 +2890,7 @@ async def chat(request: ChatRequest):
             elif query_type in ('greeting', 'chitchat', 'conversational', 'creative', 'factual'):
                 # These don't need reasoning engines at all
                 # BUG N FIX: Skip reasoning entirely for these categories
+                # Note: 'factual' queries are simple factual lookups, not probabilistic inference
                 logger.info(
                     f"[VULCAN] BUG N FIX: Skipping reasoning for query_type={query_type}"
                 )
