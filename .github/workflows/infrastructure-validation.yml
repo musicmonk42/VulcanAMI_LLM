@@ -584,11 +584,15 @@ jobs:
 
           echo "Dockerfile validation passed!"
 
+      - name: Install Hadolint
+        run: |
+          wget -qO /tmp/hadolint https://github.com/hadolint/hadolint/releases/latest/download/hadolint-Linux-x86_64
+          chmod +x /tmp/hadolint
+          sudo mv /tmp/hadolint /usr/local/bin/hadolint
+
       - name: Lint Dockerfile with Hadolint
-        uses: hadolint/hadolint-action@v3.1.0
-        with:
-          dockerfile: Dockerfile
-          failure-threshold: warning
+        run: |
+          hadolint Dockerfile --failure-threshold warning || exit 1
 
       - name: Create .env file for validation
         run: |
