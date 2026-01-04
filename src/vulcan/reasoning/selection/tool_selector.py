@@ -1446,10 +1446,11 @@ class SymbolicToolWrapper:
         natural language, resulting in confidence=0.0.
         
         Transformations:
-        1. Extract formal logic statements from mixed natural language/formal queries
-        2. Normalize logical operators (→, ∧, ∨, ¬, etc.)
-        3. Handle SAT-style queries ("Is A→B, B→C satisfiable?")
-        4. Handle FOL queries with quantifiers
+        1. Skip header/metadata lines that don't contain formal content
+        2. Extract formal logic statements from mixed natural language/formal queries
+        3. Normalize logical operators (→, ∧, ∨, ¬, etc.)
+        4. Handle SAT-style queries ("Is A→B, B→C satisfiable?")
+        5. Handle FOL queries with quantifiers
         
         Args:
             query: Natural language or mixed query string
@@ -1466,6 +1467,19 @@ class SymbolicToolWrapper:
             return query
             
         original_query = query
+        
+        # ====================================================================
+        # BUG #1 FIX: Skip header/metadata lines FIRST before other processing
+        # This prevents the bug where "Language Reasoning" header is parsed
+        # instead of the actual SAT content below it.
+        # ====================================================================
+        cleaned_query = self._skip_header_lines(query)
+        if cleaned_query != query:
+            logger.info(
+                f"[SymbolicEngine] Skipped header lines: "
+                f"'{query[:30]}...' → '{cleaned_query[:30]}...'"
+            )
+            query = cleaned_query
         
         # Step 1: Check if query already contains formal logic operators
         formal_operators = ['→', '∧', '∨', '¬', '∀', '∃', '->', '/\\', '\\/', '~', '⇒', '⇔', '|-']
@@ -1487,6 +1501,105 @@ class SymbolicToolWrapper:
         
         # Step 3: Return original if no transformation needed/possible
         return original_query
+    
+    def _skip_header_lines(self, query: str) -> str:
+        """
+        BUG #1 FIX: Skip header/metadata lines from the query.
+        
+        The issue is that queries like:
+            "Symbolic Reasoning
+             S1 — Satisfiability (SAT-style)
+             
+             Propositions: A, B, C
+             Constraints:
+             1. A→B
+             ..."
+        
+        Were being parsed as just the header "Symbolic Reasoning" or "Language Reasoning",
+        causing parse errors like "Unexpected token 'Reasoning'".
+        
+        This method skips:
+        - Lines containing 'Reasoning' (headers like "Symbolic Reasoning", "Language Reasoning")
+        - Lines with section markers like '—' or '–'
+        - Lines starting with 'Task:', 'Claim:', 'S1', 'S2', etc.
+        - Empty lines at the start
+        
+        Returns content starting from 'Propositions:', 'Constraints:', 'Formula:', etc.
+        or the first line with actual formal content (logical operators).
+        
+        Args:
+            query: Raw query string
+            
+        Returns:
+            Query with header lines stripped, or original if no headers detected
+        """
+        if not query or '\n' not in query:
+            return query
+        
+        lines = query.split('\n')
+        content_lines = []
+        found_content_start = False
+        
+        # Headers/metadata patterns to skip
+        header_patterns = [
+            'reasoning',  # "Symbolic Reasoning", "Language Reasoning"
+            '—',         # Section markers like "S1 — Satisfiability"
+            '–',         # Alternative dash
+            'task:',     # "Task:" section header
+            'claim:',    # "Claim:" section header  
+        ]
+        
+        # Content start markers (keep these lines)
+        content_markers = [
+            'proposition',  # "Propositions: A, B, C"
+            'constraint',   # "Constraints:"
+            'formula',      # "Formula:"
+            'given',        # "Given:"
+            'prove',        # "Prove:"
+            'variables:',   # "Variables:"
+        ]
+        
+        for line in lines:
+            line_stripped = line.strip()
+            line_lower = line_stripped.lower()
+            
+            # Skip empty lines before content starts
+            if not line_stripped and not found_content_start:
+                continue
+            
+            # Check if this is a header line to skip
+            is_header = False
+            for pattern in header_patterns:
+                if pattern in line_lower:
+                    is_header = True
+                    break
+            
+            # Check for S1, S2, M1, M2 style section markers at start of line
+            if not is_header and line_stripped:
+                # Match patterns like "S1", "S1 —", "M2", etc. at line start
+                if re.match(r'^[A-Z]\d+\s*[—–-]?\s*', line_stripped):
+                    is_header = True
+            
+            # Check if this line starts content
+            for marker in content_markers:
+                if marker in line_lower:
+                    found_content_start = True
+                    break
+            
+            # Check if line contains formal logic operators (content line)
+            formal_operators = ['→', '∧', '∨', '¬', '∀', '∃', '->', '|-']
+            if any(op in line_stripped for op in formal_operators):
+                found_content_start = True
+            
+            # Keep the line if it's content or we've found content
+            if found_content_start or not is_header:
+                content_lines.append(line)
+                if line_stripped:  # Mark that we found content
+                    found_content_start = True
+        
+        # Return cleaned content, or original if no content found
+        cleaned = '\n'.join(content_lines).strip()
+        return cleaned if cleaned else query
     
     def _extract_formal_logic_portion(self, query: str) -> Optional[str]:
         """

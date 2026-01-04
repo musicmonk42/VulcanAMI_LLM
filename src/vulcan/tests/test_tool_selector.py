@@ -1362,5 +1362,177 @@ class TestQueryClassifier:
                 f"Conversational query '{query}' should have low complexity"
 
 
+# =============================================================================
+# BUG #1 FIX Tests: Header Skipping in SymbolicToolWrapper._preprocess_query
+# =============================================================================
+class TestSymbolicEngineHeaderSkipping:
+    """
+    Test the BUG #1 fix: The symbolic engine was parsing "Language Reasoning"
+    (the header) instead of the actual SAT content, causing parse errors.
+    
+    The fix adds header-skipping logic via `_skip_header_lines()` that:
+    1. Skips lines containing 'Reasoning' (headers like "Symbolic Reasoning")
+    2. Skips lines with section markers like '—' or '–'
+    3. Skips lines starting with 'Task:', 'Claim:', 'S1', etc.
+    4. Returns content starting from 'Propositions:', 'Constraints:', etc.
+    """
+    
+    def test_skip_symbolic_reasoning_header(self):
+        """Test that 'Symbolic Reasoning' header is skipped"""
+        from vulcan.reasoning.selection.tool_selector import SymbolicToolWrapper
+        
+        # Create wrapper with mock engine
+        from unittest.mock import MagicMock
+        mock_engine = MagicMock()
+        wrapper = SymbolicToolWrapper(mock_engine)
+        
+        # Query with header
+        query = """Symbolic Reasoning
+S1 — Satisfiability (SAT-style)
+
+Propositions: A, B, C
+
+Constraints:
+1. A→B
+2. B→C
+"""
+        
+        result = wrapper._skip_header_lines(query)
+        
+        # Should NOT contain 'Symbolic Reasoning' or 'S1 —'
+        assert 'Symbolic Reasoning' not in result
+        assert 'S1 —' not in result
+        # Should still contain actual content
+        assert 'Propositions' in result
+        assert 'A→B' in result
+    
+    def test_skip_language_reasoning_header(self):
+        """Test that 'Language Reasoning' header is skipped (from bug report)"""
+        from vulcan.reasoning.selection.tool_selector import SymbolicToolWrapper
+        from unittest.mock import MagicMock
+        
+        mock_engine = MagicMock()
+        wrapper = SymbolicToolWrapper(mock_engine)
+        
+        # Query with "Language Reasoning" header (from the bug report)
+        query = """Language Reasoning
+M2 — Logic Test
+
+Given: A→B, B→C
+Prove: A→C
+"""
+        
+        result = wrapper._skip_header_lines(query)
+        
+        # Should NOT contain 'Language Reasoning'
+        assert 'Language Reasoning' not in result
+        assert 'M2 —' not in result
+        # Should contain actual content
+        assert 'Given' in result
+        assert 'A→B' in result
+    
+    def test_skip_section_markers(self):
+        """Test that section markers like S1, M2, etc. are skipped"""
+        from vulcan.reasoning.selection.tool_selector import SymbolicToolWrapper
+        from unittest.mock import MagicMock
+        
+        mock_engine = MagicMock()
+        wrapper = SymbolicToolWrapper(mock_engine)
+        
+        query = """S1 — First Section
+S2 — Second Section
+Propositions: X, Y
+"""
+        
+        result = wrapper._skip_header_lines(query)
+        
+        assert 'S1 —' not in result
+        assert 'S2 —' not in result
+        assert 'Propositions' in result
+    
+    def test_keep_content_lines(self):
+        """Test that actual content lines are preserved"""
+        from vulcan.reasoning.selection.tool_selector import SymbolicToolWrapper
+        from unittest.mock import MagicMock
+        
+        mock_engine = MagicMock()
+        wrapper = SymbolicToolWrapper(mock_engine)
+        
+        query = """Symbolic Reasoning
+
+Propositions: A, B
+Constraints:
+1. A→B
+2. ¬B
+
+Task: Is it satisfiable?
+"""
+        
+        result = wrapper._skip_header_lines(query)
+        
+        # All content should be preserved
+        assert 'Propositions: A, B' in result
+        assert 'Constraints:' in result
+        assert 'A→B' in result
+        assert '¬B' in result
+    
+    def test_no_header_passthrough(self):
+        """Test that queries without headers pass through unchanged"""
+        from vulcan.reasoning.selection.tool_selector import SymbolicToolWrapper
+        from unittest.mock import MagicMock
+        
+        mock_engine = MagicMock()
+        wrapper = SymbolicToolWrapper(mock_engine)
+        
+        # Query without headers
+        query = """Propositions: A, B
+Constraints:
+1. A→B
+"""
+        
+        result = wrapper._skip_header_lines(query)
+        
+        # Should be essentially unchanged
+        assert 'Propositions: A, B' in result
+        assert 'A→B' in result
+    
+    def test_single_line_passthrough(self):
+        """Test that single-line queries pass through unchanged"""
+        from vulcan.reasoning.selection.tool_selector import SymbolicToolWrapper
+        from unittest.mock import MagicMock
+        
+        mock_engine = MagicMock()
+        wrapper = SymbolicToolWrapper(mock_engine)
+        
+        query = "A→B, B→C"
+        
+        result = wrapper._skip_header_lines(query)
+        
+        # Single-line should pass through
+        assert result == query
+    
+    def test_preprocess_query_uses_header_skipping(self):
+        """Test that _preprocess_query calls _skip_header_lines first"""
+        from vulcan.reasoning.selection.tool_selector import SymbolicToolWrapper
+        from unittest.mock import MagicMock
+        
+        mock_engine = MagicMock()
+        wrapper = SymbolicToolWrapper(mock_engine)
+        
+        # Query with header AND formal content
+        query = """Symbolic Reasoning
+S1 — Satisfiability
+
+A→B, B→C, ¬C
+"""
+        
+        result = wrapper._preprocess_query(query)
+        
+        # Header should be removed
+        assert 'Symbolic Reasoning' not in result
+        # Formal content should be extracted
+        assert '→' in result
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "--tb=short"])
