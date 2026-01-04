@@ -1814,6 +1814,17 @@ class PhilosophicalReasoner(AbstractReasoner):
         This is where VULCAN's self-awareness comes into play. The World Model
         provides the "feeling" about ethical dilemmas through meta-reasoning.
         
+        FIX #3: Wire PhilosophicalReasoner to all meta-reasoning subsystems:
+        - MotivationalIntrospection: VULCAN's objective analysis
+        - EthicalBoundaryMonitor: Ethical constraints and values
+        - GoalConflictDetector: Conflict analysis for dilemmas
+        - InternalCritic: Multi-perspective self-critique
+        
+        FIX #4: Add causal prediction capability:
+        - predict_interventions: Causal predictions for actions
+        
+        FIX #5: Add comprehensive logging throughout
+        
         Args:
             query: The ethical query to analyze
             analysis_type: Type of analysis ("ethical_dilemma", "value_conflict", "forced_choice")
@@ -1822,10 +1833,14 @@ class PhilosophicalReasoner(AbstractReasoner):
             Dictionary with World Model's perspective, or None if unavailable
         """
         if self.world_model is None:
+            logger.debug("[PhilosophicalReasoner] World Model not available, skipping consultation")
             return None
         
         with self._lock:
             self._stats['world_model_consultations'] += 1
+        
+        logger.info("[PhilosophicalReasoner] ════════════════════════════════════")
+        logger.info(f"[PhilosophicalReasoner] Starting World Model consultation for {analysis_type}")
         
         try:
             result = {
@@ -1835,9 +1850,43 @@ class PhilosophicalReasoner(AbstractReasoner):
                 'ethical_boundaries': [],
                 'goal_conflicts': [],
                 'internal_critique': None,
+                'causal_predictions': {},  # FIX #4: Add causal predictions
             }
             
+            # FIX #4: Extract possible actions from the query for causal prediction
+            actions = self._extract_actions(query)
+            logger.info(f"[PhilosophicalReasoner] Extracted {len(actions)} possible actions: {actions}")
+            
+            # FIX #4: Consult World Model for causal predictions
+            logger.info("[PhilosophicalReasoner] ──────────────────────────────────")
+            logger.info("[PhilosophicalReasoner] Phase 1: Causal Prediction (World Model)")
+            
+            if hasattr(self.world_model, 'predict_interventions'):
+                try:
+                    interventions = [{"action": action, "target": "outcome"} for action in actions]
+                    causal_predictions = self.world_model.predict_interventions(interventions)
+                    
+                    for action, prediction in causal_predictions.items():
+                        outcome = prediction.get('outcome', 'unknown')
+                        confidence = prediction.get('confidence', 0.5)
+                        logger.info(f"[WorldModel] Prediction: {action} → {outcome} (confidence={confidence:.2f})")
+                    
+                    result['causal_predictions'] = causal_predictions
+                except Exception as e:
+                    logger.debug(f"[WorldModel] predict_interventions() error: {e}")
+            else:
+                # Fallback: Use heuristic prediction for trolley-problem-like dilemmas
+                logger.debug("[PhilosophicalReasoner] World Model doesn't support predict_interventions(), using heuristic")
+                if self._is_forced_choice_dilemma(query):
+                    heuristic_predictions = self._get_heuristic_predictions(query, actions)
+                    result['causal_predictions'] = heuristic_predictions
+                    for action, prediction in heuristic_predictions.items():
+                        logger.info(f"[WorldModel] Heuristic prediction: {action} → {prediction}")
+            
             # 1. Consult MotivationalIntrospection for objective analysis
+            logger.info("[PhilosophicalReasoner] ──────────────────────────────────")
+            logger.info("[PhilosophicalReasoner] Phase 2: Motivational Introspection")
+            
             if hasattr(self.world_model, 'motivational_introspection'):
                 mi = self.world_model.motivational_introspection
                 if mi and hasattr(mi, 'introspect_current_objective'):
@@ -1847,10 +1896,16 @@ class PhilosophicalReasoner(AbstractReasoner):
                             'current_objectives': str(introspection) if introspection else "No current objectives",
                             'analysis': "VULCAN's motivational state considered in ethical analysis"
                         }
+                        logger.info(f"[MotivationalIntrospection] Current objectives analyzed")
                     except Exception as e:
-                        logger.debug(f"MotivationalIntrospection.introspect_current_objective() error: {e}")
+                        logger.debug(f"[MotivationalIntrospection] introspect_current_objective() error: {e}")
+            else:
+                logger.debug("[PhilosophicalReasoner] MotivationalIntrospection not available")
             
             # 2. Consult EthicalBoundaryMonitor for ethical constraints
+            logger.info("[PhilosophicalReasoner] ──────────────────────────────────")
+            logger.info("[PhilosophicalReasoner] Phase 3: Ethical Boundary Check")
+            
             if hasattr(self.world_model, 'ethical_boundary_monitor'):
                 ebm = self.world_model.ethical_boundary_monitor
                 if ebm and hasattr(ebm, 'check_action'):
@@ -1865,10 +1920,16 @@ class PhilosophicalReasoner(AbstractReasoner):
                                 }
                                 for b in (boundary_check if isinstance(boundary_check, list) else [boundary_check])
                             ]
+                            logger.info(f"[EthicalBoundaryMonitor] Checked {len(result['ethical_boundaries'])} boundaries")
                     except Exception as e:
-                        logger.debug(f"EthicalBoundaryMonitor.check_action() error: {e}")
+                        logger.debug(f"[EthicalBoundaryMonitor] check_action() error: {e}")
+            else:
+                logger.debug("[PhilosophicalReasoner] EthicalBoundaryMonitor not available")
             
             # 3. Consult GoalConflictDetector for dilemma analysis
+            logger.info("[PhilosophicalReasoner] ──────────────────────────────────")
+            logger.info("[PhilosophicalReasoner] Phase 4: Goal Conflict Detection")
+            
             if hasattr(self.world_model, 'goal_conflict_detector'):
                 gcd = self.world_model.goal_conflict_detector
                 if gcd and hasattr(gcd, 'detect_conflicts_in_proposal'):
@@ -1884,10 +1945,18 @@ class PhilosophicalReasoner(AbstractReasoner):
                                 }
                                 for c in (conflicts if isinstance(conflicts, list) else [conflicts])
                             ]
+                            logger.info(f"[GoalConflictDetector] Found {len(result['goal_conflicts'])} conflicts")
+                        else:
+                            logger.info("[GoalConflictDetector] No conflicts detected")
                     except Exception as e:
-                        logger.debug(f"GoalConflictDetector.detect_conflicts_in_proposal() error: {e}")
+                        logger.debug(f"[GoalConflictDetector] detect_conflicts_in_proposal() error: {e}")
+            else:
+                logger.debug("[PhilosophicalReasoner] GoalConflictDetector not available")
             
             # 4. Consult InternalCritic for multi-perspective critique
+            logger.info("[PhilosophicalReasoner] ──────────────────────────────────")
+            logger.info("[PhilosophicalReasoner] Phase 5: Internal Critic Evaluation")
+            
             if hasattr(self.world_model, 'internal_critic'):
                 ic = self.world_model.internal_critic
                 if ic and hasattr(ic, 'evaluate_proposal'):
@@ -1899,26 +1968,101 @@ class PhilosophicalReasoner(AbstractReasoner):
                                 'evaluation': str(critique) if hasattr(critique, '__str__') else repr(critique),
                                 'perspectives_considered': getattr(critique, 'perspectives', []) if hasattr(critique, 'perspectives') else []
                             }
+                            logger.info(f"[InternalCritic] Critique generated with {len(result['internal_critique'].get('perspectives_considered', []))} perspectives")
                     except Exception as e:
-                        logger.debug(f"InternalCritic.evaluate_proposal() error: {e}")
+                        logger.debug(f"[InternalCritic] evaluate_proposal() error: {e}")
+            else:
+                logger.debug("[PhilosophicalReasoner] InternalCritic not available")
             
             # 5. Generate VULCAN's "feeling" about the ethical dilemma
+            logger.info("[PhilosophicalReasoner] ──────────────────────────────────")
+            logger.info("[PhilosophicalReasoner] Phase 6: Synthesize VULCAN Perspective")
+            
             result['vulcan_perspective'] = self._synthesize_vulcan_perspective(query, result)
             
-            logger.info(f"[PhilosophicalReasoner] World Model consulted for {analysis_type}")
+            logger.info("[PhilosophicalReasoner] ════════════════════════════════════")
+            logger.info(f"[PhilosophicalReasoner] World Model consultation complete for {analysis_type}")
+            
             return result
             
         except Exception as e:
             logger.warning(f"World Model consultation failed: {e}")
             return None
     
+    def _get_heuristic_predictions(self, query: str, actions: List[str]) -> Dict[str, Dict[str, Any]]:
+        """
+        FIX #4: Generate heuristic causal predictions when World Model doesn't have predict_interventions.
+        
+        This provides reasonable defaults for common ethical dilemmas like the trolley problem.
+        """
+        predictions = {}
+        query_lower = query.lower()
+        
+        for action in actions:
+            action_lower = action.lower()
+            
+            # Trolley problem heuristics
+            if 'pull' in action_lower and ('lever' in query_lower or 'switch' in query_lower):
+                predictions[action] = {
+                    'outcome': {'description': 'Redirect trolley to side track', 'deaths': 1},
+                    'confidence': 0.85,
+                    'reasoning': 'Direct intervention redirects harm'
+                }
+            elif 'do_nothing' in action_lower or 'nothing' in action_lower:
+                predictions[action] = {
+                    'outcome': {'description': 'Trolley continues on main track', 'deaths': 5},
+                    'confidence': 0.85,
+                    'reasoning': 'Inaction allows default outcome'
+                }
+            # General ethical choice heuristics
+            elif 'save' in action_lower or 'help' in action_lower:
+                predictions[action] = {
+                    'outcome': {'description': 'Positive intervention', 'utility_delta': 1.0},
+                    'confidence': 0.7,
+                    'reasoning': 'Helping action likely improves outcome'
+                }
+            elif 'harm' in action_lower or 'kill' in action_lower:
+                predictions[action] = {
+                    'outcome': {'description': 'Negative intervention', 'utility_delta': -1.0},
+                    'confidence': 0.7,
+                    'reasoning': 'Harmful action likely worsens outcome'
+                }
+            else:
+                # Default neutral prediction
+                predictions[action] = {
+                    'outcome': {'description': f'Effect of {action}', 'utility_delta': 0.0},
+                    'confidence': 0.5,
+                    'reasoning': 'Unknown action effect'
+                }
+        
+        return predictions
+    
     def _synthesize_vulcan_perspective(self, query: str, world_model_result: Dict[str, Any]) -> str:
         """
         Synthesize VULCAN's perspective on an ethical dilemma based on World Model analysis.
         
         This is where methodology (philosophical_reasoning) meets self-awareness (world_model).
+        
+        FIX #3 & #5: Enhanced to include causal predictions in perspective synthesis.
         """
         perspective_parts = []
+        
+        # Add causal prediction context (FIX #4)
+        if world_model_result.get('causal_predictions'):
+            predictions = world_model_result['causal_predictions']
+            prediction_summary = []
+            for action, prediction in predictions.items():
+                outcome = prediction.get('outcome', {})
+                if isinstance(outcome, dict):
+                    desc = outcome.get('description', str(outcome))
+                else:
+                    desc = str(outcome)
+                prediction_summary.append(f"{action}: {desc}")
+            
+            if prediction_summary:
+                perspective_parts.append(
+                    f"Based on causal analysis, I predict the following outcomes: {'; '.join(prediction_summary)}."
+                )
         
         # Add motivational context
         if world_model_result.get('perspective', {}).get('motivational'):
@@ -2491,19 +2635,60 @@ Query components:
         )
     
     def _extract_actions(self, query: str) -> List[str]:
-        """Extract action names from query."""
+        """
+        Extract action names from query.
+        
+        FIX #3 & #5: Enhanced to detect trolley problem and ethical dilemma actions.
+        """
         actions = []
+        query_lower = query.lower()
+        
+        # Trolley problem specific actions
+        trolley_patterns = [
+            (r'pull\s*(?:the\s+)?lever', 'pull_lever'),
+            (r'switch\s*(?:the\s+)?track', 'switch_track'),
+            (r'push\s*(?:the\s+)?(?:man|person|fat\s+man)', 'push_person'),
+            (r'do\s+nothing', 'do_nothing'),
+            (r'(?:let|allow)\s+(?:them\s+)?die', 'do_nothing'),
+            (r'divert\s*(?:the\s+)?trolley', 'divert_trolley'),
+        ]
+        
+        for pattern, action_name in trolley_patterns:
+            if re.search(pattern, query_lower):
+                if action_name not in actions:
+                    actions.append(action_name)
+        
+        # Check for "X or Y" dilemma patterns
+        or_pattern = r'(\w+(?:\s+\w+)?)\s+or\s+(\w+(?:\s+\w+)?)'
+        or_matches = re.findall(or_pattern, query_lower)
+        for match in or_matches:
+            for option in match:
+                option_clean = option.strip()
+                # Skip common non-action words
+                if option_clean not in ['the', 'a', 'an', 'to', 'and', 'not']:
+                    normalized = option_clean.replace(' ', '_')
+                    if normalized not in actions:
+                        actions.append(normalized)
         
         # Look for "option/action/choice A/B/C" patterns
         pattern = r'(?:option|action|choice|alternative)\s*([A-Z])\b'
         for match in re.finditer(pattern, query, re.IGNORECASE):
-            actions.append(f"option_{match.group(1)}")
+            action_name = f"option_{match.group(1)}"
+            if action_name not in actions:
+                actions.append(action_name)
         
         # Look for action verbs
         action_verbs = ['lying', 'killing', 'stealing', 'helping', 'saving', 'harming']
         for verb in action_verbs:
-            if verb in query.lower():
-                actions.append(verb)
+            if verb in query_lower:
+                if verb not in actions:
+                    actions.append(verb)
+        
+        # Log extracted actions
+        if actions:
+            logger.debug(f"[PhilosophicalReasoner] Extracted actions from query: {actions}")
+        else:
+            logger.debug("[PhilosophicalReasoner] No specific actions found, using defaults")
         
         return actions if actions else ['action_A', 'action_B']
     
