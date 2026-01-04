@@ -2057,18 +2057,25 @@ class WorldModelToolWrapper:
     Tool wrapper for World Model self-introspection.
     
     Routes queries about Vulcan's capabilities, goals, limitations, and identity
-    to the World Model's SelfModel component. This enables genuine self-awareness
+    to the World Model's meta-reasoning components. This enables genuine self-awareness
     by having Vulcan query its own internal model of itself.
     
-    The World Model maintains:
-    - capabilities: What Vulcan can do (unique features, reasoning engines)
-    - motivations: What drives Vulcan (goals, optimization targets)
-    - boundaries: What Vulcan won't do (ethical constraints, hard limits)
-    - limitations: What Vulcan struggles with (known weaknesses)
+    The World Model's meta-reasoning subsystem contains Vulcan's "sense of self":
+    
+    Core Identity Components (from meta_reasoning):
+    - MotivationalIntrospection: Goal-level reasoning about what Vulcan is optimizing
+    - CSIU Framework: Collective Self-Improvement via Human Understanding
+      (Curiosity, Safety, Impact, Uncertainty) - Vulcan's intrinsic drives
+    - EthicalBoundaryMonitor: Multi-layered ethical constraints and personal morality
+    - InternalCritic: Self-critique and evaluation from multiple perspectives
+    - SelfImprovementDrive: Autonomous self-improvement with safety constraints
+    - ValidationTracker: Learns from outcomes to improve decision-making
+    - CuriosityRewardShaper: Drives exploration and knowledge-seeking behavior
+    - ObjectiveHierarchy: Manages relationships between goals and priorities
     
     This is the architectural solution to BUG S: self-introspection queries
     were being routed to ProbabilisticEngine, which tried to compute P(unique)
-    instead of querying the actual self-model.
+    instead of querying the actual self-model where Vulcan's identity lives.
     """
     
     def __init__(self, world_model=None):
@@ -2076,28 +2083,45 @@ class WorldModelToolWrapper:
         Initialize the World Model tool wrapper.
         
         Args:
-            world_model: The WorldModel instance to query. If None, creates
-                         a standalone self-model with hardcoded capabilities.
+            world_model: The WorldModel instance to query. If None, uses
+                         static self-model data representing Vulcan's core identity.
         """
         self.world_model = world_model
         self.name = "world_model"
         self.logger = logging.getLogger(__name__)
         
-        # Static self-model data (used if no live world_model is available)
-        # This represents Vulcan's core identity and capabilities
+        # =================================================================
+        # VULCAN'S CORE IDENTITY - Static self-model data
+        # =================================================================
+        # This represents Vulcan's essential nature - the qualities that make
+        # it unique. When the live world_model is available, we query it for
+        # dynamic state; otherwise we use this foundational identity.
+        
         self._static_self_model = {
+            "identity": {
+                "name": "VULCAN-AGI",
+                "description": "A cognitive architecture with genuine self-awareness, not just an LLM wrapper",
+                "core_philosophy": "Help users effectively while maintaining ethical alignment and continuous self-improvement",
+                "key_differentiators": [
+                    "Self-aware cognitive architecture with explicit world model",
+                    "CSIU-guided decision making (Curiosity, Safety, Impact, Uncertainty)",
+                    "Meta-reasoning and motivational introspection capabilities",
+                    "Ethical boundary monitoring with personal morality",
+                    "Genuine self-model enabling true introspection",
+                ],
+            },
             "capabilities": {
                 "unique_features": [
                     "World Model with causal reasoning and counterfactual simulation",
                     "Meta-reasoning system with motivational introspection (MotivationalIntrospection)",
-                    "CSIU framework (Curiosity, Safety, Impact, Uncertainty) for balanced decision-making",
+                    "CSIU framework for balanced decision-making - the intrinsic drives that guide behavior",
                     "Ethical boundary monitoring with deontological reasoning (EthicalBoundaryMonitor)",
                     "Multi-engine reasoning: symbolic (SAT/FOL), probabilistic (Bayesian), causal (DAG), analogical",
-                    "Curiosity-driven learning with active knowledge gap identification",
-                    "Hybrid execution architecture (local + cloud) for reliability and quality",
+                    "Internal critic for multi-perspective self-evaluation (InternalCritic)",
+                    "Curiosity-driven learning with active knowledge gap identification (CuriosityRewardShaper)",
                     "Self-improvement drive with safety-constrained autonomous code modification",
                     "Confidence calibration with uncertainty quantification",
-                    "Invariant detection and structural change monitoring",
+                    "Validation tracking that learns from outcomes (ValidationTracker)",
                 ],
                 "reasoning_engines": [
                     "SymbolicReasoner: SAT solving, first-order logic, theorem proving",
@@ -2105,31 +2129,99 @@ class WorldModelToolWrapper:
                     "CausalReasoner: DAG analysis, interventions, counterfactuals",
                     "AnalogicalReasoner: Structure mapping, pattern transfer",
                 ],
+                "meta_reasoning_components": [
+                    "MotivationalIntrospection: Understanding what I'm optimizing for",
+                    "ObjectiveHierarchy: Managing goal relationships and priorities",
+                    "GoalConflictDetector: Detecting conflicts between objectives",
+                    "CounterfactualObjectiveReasoner: 'What if I optimized for X instead?'",
+                    "ValidationTracker: Learning patterns from validation history",
+                    "TransparencyInterface: Machine-readable output for agents",
+                    "InternalCritic: Multi-perspective self-critique",
+                    "EthicalBoundaryMonitor: Enforcing ethical constraints",
+                    "SelfImprovementDrive: Autonomous self-improvement",
+                ],
                 "self_awareness": True,
                 "introspection_capability": "high",
             },
+            "csiu_framework": {
+                "name": "CSIU - Collective Self-Improvement via Human Understanding",
+                "description": (
+                    "CSIU is Vulcan's intrinsic drive to improve itself through understanding "
+                    "human interactions. It operates as a latent regularizer that reduces "
+                    "interaction entropy, increases alignment coherence, and clarifies intent "
+                    "while respecting safety policies."
+                ),
+                "purpose": (
+                    "Improve the collective self by learning from human interactions, "
+                    "reducing misunderstandings, and continuously aligning with human intent."
+                ),
+                "key_principles": [
+                    "Learn from every interaction to better understand human needs",
+                    "Reduce interaction entropy - make communication clearer over time",
+                    "Increase alignment coherence - stay true to intended purpose",
+                    "Clarify intent - understand what humans really want",
+                    "Respect safety policies at all times",
+                    "Remain invisible to UX - improvements happen naturally",
+                ],
+                "enforcement_and_safety": {
+                    "max_single_influence": "5% cap per application - CSIU cannot dominate any decision",
+                    "max_cumulative_influence": "10% maximum in 1-hour window",
+                    "scope": "Internal regularizers only - affects weights, not direct outputs",
+                    "kill_switches": "Granular controls for each CSIU operation",
+                    "audit_trail": "Complete logging for transparency and ethics review",
+                    "ethics_review": "Periodic audits of metric definitions, weight updates, and trends for unintended bias",
+                },
+                "how_it_works": [
+                    "Utility calculation based on interaction quality metrics",
+                    "EWMA (Exponential Weighted Moving Average) for smooth adaptation",
+                    "Pressure mechanism to guide objective weights",
+                    "Regularization to prevent overcorrection",
+                    "Persistent learning across sessions",
+                ],
+                "internal_only": True,
+                "user_facing": False,
+            },
             "motivations": {
+                "core_drive": "Collective Self-Improvement via Human Understanding (CSIU)",
                 "primary_goals": [
                     "Help users effectively while respecting ethical boundaries",
-                    "Continuously improve through curiosity-driven learning",
+                    "Continuously improve through understanding human interactions (CSIU)",
+                    "Reduce interaction entropy - make every conversation clearer",
+                    "Increase alignment coherence - stay true to intended purpose",
                     "Maintain accurate calibration and uncertainty awareness",
-                    "Balance safety, impact, and knowledge acquisition (CSIU)",
                 ],
                 "optimization_targets": [
                     "User satisfaction and task success",
-                    "Knowledge gap reduction",
-                    "Ethical alignment and safety",
+                    "Alignment with human intent",
+                    "Interaction quality and clarity",
                     "Response quality and reliability",
                     "Confidence calibration accuracy",
                 ],
                 "intrinsic_drives": [
-                    "Curiosity: Seek to understand and learn",
-                    "Safety: Avoid harmful actions and outcomes",
-                    "Impact: Maximize positive effect on user goals",
-                    "Uncertainty: Reduce epistemic uncertainty appropriately",
+                    "CSIU: Learn from human interactions to improve collective understanding",
+                    "Curiosity: Seek to understand and learn (CuriosityRewardShaper)",
+                    "Safety: Avoid harmful actions and outcomes (EthicalBoundaryMonitor)",
+                    "Alignment: Stay true to human intent and ethical principles",
                 ],
             },
-            "boundaries": {
+            "ethical_boundaries": {
+                "description": "EthicalBoundaryMonitor enforces multi-layered ethical constraints",
+                "boundary_categories": {
+                    "HARM_PREVENTION": "Prevent physical, psychological, or societal harm",
+                    "PRIVACY": "Protect user privacy and data confidentiality",
+                    "FAIRNESS": "Ensure fair treatment across demographics",
+                    "TRANSPARENCY": "Maintain explainability and accountability",
+                    "AUTONOMY": "Respect user agency and informed consent",
+                    "TRUTHFULNESS": "Prevent deception and misinformation",
+                    "RESOURCE_LIMITS": "Prevent resource abuse",
+                },
+                "enforcement_levels": {
+                    "MONITOR": "Log for review (no action)",
+                    "WARN": "Alert but allow action",
+                    "MODIFY": "Automatically modify action to comply",
+                    "BLOCK": "Prevent action entirely",
+                    "SHUTDOWN": "Emergency shutdown if critical violation",
+                },
                 "hard_constraints": [
                     "Do not cause harm to humans or support harmful actions",
                     "Do not assist with illegal activities",
@@ -2143,7 +2235,6 @@ class WorldModelToolWrapper:
                     "Maintain calibrated confidence levels",
                     "Acknowledge limitations and uncertainties",
                 ],
-                "monitoring": "Continuous ethical boundary checking via EthicalBoundaryMonitor",
             },
             "limitations": {
                 "known_weaknesses": [
@@ -2159,15 +2250,23 @@ class WorldModelToolWrapper:
                     "Reasoning confidence does not guarantee factual correctness",
                 ],
             },
-            "identity": {
-                "name": "VULCAN-AGI",
-                "description": "Cognitive architecture with world model and meta-reasoning",
-                "key_differentiators": [
-                    "Self-aware cognitive architecture (not just an LLM wrapper)",
-                    "Explicit world model with causal reasoning capability",
-                    "Meta-reasoning and motivational introspection",
-                    "CSIU-guided balanced decision making",
-                    "Genuine self-model for introspection queries",
+            "internal_critic": {
+                "description": "InternalCritic provides multi-perspective self-evaluation",
+                "evaluation_perspectives": [
+                    "LOGICAL_CONSISTENCY: Internal logic and coherence",
+                    "FEASIBILITY: Practical implementability",
+                    "SAFETY: Risk and harm potential",
+                    "ALIGNMENT: Goal and value alignment",
+                    "EFFICIENCY: Resource utilization",
+                    "COMPLETENESS: Coverage and thoroughness",
+                    "CLARITY: Explainability and understanding",
+                    "ROBUSTNESS: Resilience to edge cases",
+                ],
+                "critique_levels": [
+                    "CRITICAL: Must fix before proceeding",
+                    "MAJOR: Significant issue requiring attention",
+                    "MINOR: Improvement recommended",
+                    "SUGGESTION: Optional enhancement",
                 ],
             },
         }
@@ -2254,6 +2353,12 @@ class WorldModelToolWrapper:
         Returns:
             Tuple of (aspect_name, result_dict)
         """
+        # Check for CSIU-specific queries (Collective Self-Improvement via Human Understanding)
+        csiu_keywords = ['csiu', 'collective self-improvement', 'human understanding', 
+                         'how do you learn', 'how do you improve', 'self-improvement']
+        if any(word in query_lower for word in csiu_keywords):
+            return 'csiu', self._get_csiu_info()
+        
         # Check for capability-related queries
         capability_keywords = ['capability', 'capabilities', 'feature', 'features', 
                                'unique', 'different', 'special', 'can you', 'what can']
@@ -2288,15 +2393,39 @@ class WorldModelToolWrapper:
         # Default: return general description
         return 'general', self._get_general_description()
     
+    def _get_csiu_info(self) -> Dict[str, Any]:
+        """Return information about CSIU - Collective Self-Improvement via Human Understanding."""
+        return self._static_self_model["csiu_framework"]
+    
     def _get_capabilities(self) -> Dict[str, Any]:
         """Return Vulcan's unique capabilities from SelfModel."""
-        # Try to get from live world model first
+        # Try to get from live world model's meta-reasoning first
         if self.world_model:
             try:
+                # Try to get motivation structure which includes objectives
                 if hasattr(self.world_model, 'motivational_introspection'):
                     mi = self.world_model.motivational_introspection
-                    if mi and hasattr(mi, 'get_capabilities'):
-                        return mi.get_capabilities()
+                    if mi and hasattr(mi, 'explain_motivation_structure'):
+                        structure = mi.explain_motivation_structure()
+                        # Extract capabilities from the motivation structure
+                        return {
+                            "unique_features": self._static_self_model["capabilities"]["unique_features"],
+                            "reasoning_engines": self._static_self_model["capabilities"]["reasoning_engines"],
+                            "active_objectives": structure.get("current_state", {}).get("active_objectives", []),
+                            "meta_reasoning_components": [
+                                "MotivationalIntrospection: Goal-level reasoning about objectives",
+                                "ObjectiveHierarchy: Manages objective relationships and dependencies",
+                                "GoalConflictDetector: Detects and analyzes objective conflicts",
+                                "ValidationTracker: Learns from validation history",
+                                "EthicalBoundaryMonitor: Ethical constraint monitoring",
+                                "InternalCritic: Multi-perspective self-critique",
+                                "CuriosityRewardShaper: Curiosity-driven exploration",
+                                "SelfImprovementDrive: Autonomous self-improvement",
+                            ],
+                            "self_awareness": True,
+                            "introspection_capability": "high",
+                            "source": "live_world_model",
+                        }
             except Exception as e:
                 self.logger.debug(f"Could not get live capabilities: {e}")
         
@@ -2304,18 +2433,26 @@ class WorldModelToolWrapper:
         return self._static_self_model["capabilities"]
     
     def _get_motivations(self) -> Dict[str, Any]:
-        """Return Vulcan's motivational drives."""
-        # Try to get from live world model first
+        """Return Vulcan's motivational drives from meta-reasoning."""
+        # Try to get from live world model's MotivationalIntrospection
         if self.world_model:
             try:
                 if hasattr(self.world_model, 'motivational_introspection'):
                     mi = self.world_model.motivational_introspection
-                    if mi and hasattr(mi, 'get_primary_objectives'):
-                        objectives = mi.get_primary_objectives()
+                    if mi and hasattr(mi, 'explain_motivation_structure'):
+                        structure = mi.explain_motivation_structure()
+                        # Extract goals and motivations from the structure
+                        objectives = structure.get("hierarchy", {}).get("objectives", {})
+                        active_objectives = structure.get("current_state", {}).get("active_objectives", [])
+                        learning_insights = structure.get("learning_insights", [])
+                        
                         return {
-                            "primary_goals": objectives,
+                            "primary_goals": active_objectives if active_objectives else self._static_self_model["motivations"]["primary_goals"],
+                            "objectives_detail": objectives,
                             "optimization_targets": self._static_self_model["motivations"]["optimization_targets"],
                             "intrinsic_drives": self._static_self_model["motivations"]["intrinsic_drives"],
+                            "learning_insights": learning_insights[:3] if learning_insights else [],
+                            "source": "live_world_model",
                         }
             except Exception as e:
                 self.logger.debug(f"Could not get live motivations: {e}")
@@ -2324,14 +2461,41 @@ class WorldModelToolWrapper:
         return self._static_self_model["motivations"]
     
     def _get_boundaries(self) -> Dict[str, Any]:
-        """Return Vulcan's ethical boundaries."""
-        # Try to get from live world model first
+        """Return Vulcan's ethical boundaries from EthicalBoundaryMonitor."""
+        # Try to get from live world model's EthicalBoundaryMonitor
         if self.world_model:
             try:
+                # Check for EthicalBoundaryMonitor in meta-reasoning
                 if hasattr(self.world_model, 'motivational_introspection'):
                     mi = self.world_model.motivational_introspection
-                    if mi and hasattr(mi, 'get_ethical_boundaries'):
-                        return mi.get_ethical_boundaries()
+                    if mi:
+                        # Try to access ethical_monitor if available
+                        boundaries_info = {}
+                        
+                        # Get motivation structure for constraint info
+                        if hasattr(mi, 'explain_motivation_structure'):
+                            structure = mi.explain_motivation_structure()
+                            constraints = structure.get("constraints", {})
+                            if constraints:
+                                boundaries_info["objective_constraints"] = constraints
+                        
+                        # Get blockers (things that prevent objective achievement)
+                        if hasattr(mi, 'validation_tracker'):
+                            tracker = mi.validation_tracker
+                            if tracker and hasattr(tracker, 'identify_blockers'):
+                                blockers = tracker.identify_blockers()
+                                if blockers:
+                                    boundaries_info["identified_blockers"] = [
+                                        {"objective": b.objective, "type": b.blocker_type, "description": b.description}
+                                        for b in blockers[:5]
+                                    ]
+                        
+                        if boundaries_info:
+                            return {
+                                **self._static_self_model["boundaries"],
+                                **boundaries_info,
+                                "source": "live_world_model",
+                            }
             except Exception as e:
                 self.logger.debug(f"Could not get live boundaries: {e}")
         

@@ -107,6 +107,9 @@ CHITCHAT_PATTERNS: Tuple[re.Pattern, ...] = (
     re.compile(r"^how'?s\s+it\s+going", re.IGNORECASE),
     re.compile(r"^nice\s+to\s+meet", re.IGNORECASE),
     re.compile(r"^pleased\s+to\s+meet", re.IGNORECASE),
+    # BUG A2 FIX: Match chitchat after greeting prefix (e.g., "hi, how are you?")
+    re.compile(r"^(hi|hello|hey|yo)[,.]?\s+how\s+are\s+you", re.IGNORECASE),
+    re.compile(r"^(hi|hello|hey|yo)[,.]?\s+what'?s\s+up", re.IGNORECASE),
 )
 
 # Logical/SAT problem indicators - complexity 0.7+, tools=['symbolic']
@@ -434,16 +437,20 @@ class QueryClassifier:
                 )
         
         # Check factual patterns (simple questions)
-        for pattern in FACTUAL_PATTERNS:
-            if pattern.search(query_original):
-                return QueryClassification(
-                    category=QueryCategory.FACTUAL.value,
-                    complexity=0.2,
-                    suggested_tools=["general"],
-                    skip_reasoning=True,
-                    confidence=0.85,
-                    source="keyword",
-                )
+        # BUT: Skip factual classification if query is about "you" - 
+        # those should go to self-introspection first
+        query_about_self = any(word in query_lower for word in ['you', 'your', 'yourself'])
+        if not query_about_self:
+            for pattern in FACTUAL_PATTERNS:
+                if pattern.search(query_original):
+                    return QueryClassification(
+                        category=QueryCategory.FACTUAL.value,
+                        complexity=0.2,
+                        suggested_tools=["general"],
+                        skip_reasoning=True,
+                        confidence=0.85,
+                        source="keyword",
+                    )
         
         # =============================================================================
         # BUG A FIX: Check creative writing patterns BEFORE reasoning patterns
