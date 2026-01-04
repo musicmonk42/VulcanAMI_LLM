@@ -764,8 +764,8 @@ class ContextualBandit:
 
     def _get_tool_name(self, action_id: int) -> str:
         """Map action to tool"""
-        # BUG FIX: Added mathematical and philosophical to complete tool list
-        tools = ["symbolic", "probabilistic", "causal", "analogical", "multimodal", "mathematical", "philosophical"]
+        # BUG FIX: Added mathematical, philosophical, and world_model to complete tool list
+        tools = ["symbolic", "probabilistic", "causal", "analogical", "multimodal", "mathematical", "philosophical", "world_model"]
         return tools[action_id % len(tools)]
 
     def _compute_action_probability(
@@ -879,8 +879,8 @@ class LinUCBBandit:
             logger.error(f"LinUCB update failed: {e}")
 
     def _get_tool_name(self, action_id: int) -> str:
-        # BUG FIX: Added mathematical and philosophical to complete tool list
-        tools = ["symbolic", "probabilistic", "causal", "analogical", "multimodal", "mathematical", "philosophical"]
+        # BUG FIX: Added mathematical, philosophical, and world_model to complete tool list
+        tools = ["symbolic", "probabilistic", "causal", "analogical", "multimodal", "mathematical", "philosophical", "world_model"]
         return tools[action_id % len(tools)]
 
 
@@ -1021,8 +1021,8 @@ class NeuralContextualBandit(nn.Module):
             logger.error(f"Neural update failed: {e}")
 
     def _get_tool_name(self, action_id: int) -> str:
-        # BUG FIX: Added mathematical and philosophical to complete tool list
-        tools = ["symbolic", "probabilistic", "causal", "analogical", "multimodal", "mathematical", "philosophical"]
+        # BUG FIX: Added mathematical, philosophical, and world_model to complete tool list
+        tools = ["symbolic", "probabilistic", "causal", "analogical", "multimodal", "mathematical", "philosophical", "world_model"]
         return tools[action_id % len(tools)]
 
     def _compute_selection_probability(
@@ -1457,12 +1457,13 @@ class ToolSelectionBandit(AdaptiveBanditOrchestrator):
     """Tool selection bandit"""
 
     def __init__(self):
-        # BUG FIX: Updated n_actions to 7 to include mathematical and philosophical tools
-        super().__init__(n_actions=7, context_dim=128)
+        # BUG FIX: Updated n_actions to 8 to include mathematical, philosophical, and world_model tools
+        super().__init__(n_actions=8, context_dim=128)
 
-        # BUG FIX: Added 'mathematical' and 'philosophical' to tool_names
+        # BUG FIX: Added 'mathematical', 'philosophical', and 'world_model' to tool_names
         # These were missing, causing the bandit to be unable to select them
         # even when the QueryRouter recommended them
+        # Error: "Unknown tool name 'world_model' in bandit update"
         self.tool_names = [
             "symbolic",
             "probabilistic",
@@ -1471,6 +1472,7 @@ class ToolSelectionBandit(AdaptiveBanditOrchestrator):
             "multimodal",
             "mathematical",  # BUG FIX: Added for math queries
             "philosophical",  # BUG FIX: Added for ethical/philosophical queries
+            "world_model",   # BUG FIX: Added for meta-cognitive self-introspection queries
         ]
         self.tool_costs = {
             "symbolic": {"time": 50, "energy": 50},
@@ -1480,6 +1482,7 @@ class ToolSelectionBandit(AdaptiveBanditOrchestrator):
             "multimodal": {"time": 300, "energy": 300},
             "mathematical": {"time": 60, "energy": 40},  # BUG FIX: Added
             "philosophical": {"time": 150, "energy": 100},  # BUG FIX: Added
+            "world_model": {"time": 180, "energy": 120},  # BUG FIX: Added for self-introspection
         }
 
     def select_tool(self, features: np.ndarray, constraints: Dict[str, float]) -> str:

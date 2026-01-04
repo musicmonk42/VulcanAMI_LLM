@@ -703,9 +703,10 @@ class TestToolSelectionBandit:
 
     def test_initialization(self):
         tsb = ToolSelectionBandit()
-        assert tsb.n_actions == 5
-        assert len(tsb.tool_names) == 5
-        assert len(tsb.tool_costs) == 5
+        # BUG FIX: Updated from 5 to 8 to include mathematical, philosophical, and world_model tools
+        assert tsb.n_actions == 8
+        assert len(tsb.tool_names) == 8
+        assert len(tsb.tool_costs) == 8
 
     def test_tool_selection(self, tool_selection_bandit):
         features = np.random.randn(128)
