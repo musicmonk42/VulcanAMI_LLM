@@ -311,27 +311,26 @@ SPECULATION_PATTERNS: Tuple[re.Pattern, ...] = (
     # "imagine if" patterns
     re.compile(r"\bimagine\s+if\b", re.IGNORECASE),
     re.compile(r"\bimagine\s+(what|how|that)\b", re.IGNORECASE),
-    # "what would...be like" patterns
-    re.compile(r"\bwhat\s+would\s+(?:it\s+)?(?:be|feel)\s+like\b", re.IGNORECASE),
-    re.compile(r"\bwhat\s+would\s+\w+\s+be\s+like\b", re.IGNORECASE),
+    # "what would...be like" patterns - combined to avoid overlap
+    re.compile(r"\bwhat\s+would\s+(?:it\s+)?(?:\w+\s+)?(?:be|feel)\s+like\b", re.IGNORECASE),
     # "hypothetically" patterns
     re.compile(r"\bhypothetically\b", re.IGNORECASE),
     re.compile(r"\bhypothetical\s+(?:scenario|situation|case)\b", re.IGNORECASE),
-    # "if you could/had" patterns (counterfactual about AI capabilities)
-    re.compile(r"\bif\s+you\s+(?:could|had|were\s+able\s+to)\b", re.IGNORECASE),
-    # "suppose" patterns
-    re.compile(r"\bsuppose\s+(?:you|that)\b", re.IGNORECASE),
+    # "if you could/had" patterns - made more specific to require experience/feeling context
+    # Matches: "if you could experience/feel/have emotions/consciousness"
+    re.compile(r"\bif\s+you\s+(?:could|had|were\s+able\s+to)\s+(?:experience|feel|have\s+(?:emotions?|feelings?|consciousness))\b", re.IGNORECASE),
+    # "suppose" patterns - specific to AI self-reflection
+    re.compile(r"\bsuppose\s+you\s+(?:could|had|felt|were)\b", re.IGNORECASE),
+    re.compile(r"\bsuppose\s+that\s+you\b", re.IGNORECASE),
     # "what if" + experience/feeling patterns
     re.compile(r"\bwhat\s+if\s+you\s+(?:could|had|felt|experienced)\b", re.IGNORECASE),
 )
 
+# Single-word keywords only - multi-word phrases are handled by regex patterns above
 SPECULATION_KEYWORDS: FrozenSet[str] = frozenset([
     "speculate", "speculation", "speculative",
     "hypothetically", "hypothetical",
     "counterfactual",
-    "imagine if",
-    "what if",
-    "suppose",
     "conjecture",
 ])
 
