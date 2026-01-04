@@ -208,7 +208,7 @@ jobs:
           pip install -e .
           
           for i in 1 2 3; do
-            pip install --no-cache-dir pytest pytest-cov pytest-asyncio pytest-timeout mock hypothesis faker numpy python-dotenv scipy lz4 && \
+            pip install --no-cache-dir pytest pytest-cov pytest-asyncio pytest-timeout mock hypothesis faker numpy python-dotenv scipy lz4 psutil && \
             break || (echo "Retry $i/3: test dependencies install failed"; sleep $((i*10)))
           done
           for i in 1 2 3; do
