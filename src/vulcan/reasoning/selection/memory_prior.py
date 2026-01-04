@@ -508,11 +508,24 @@ class BayesianMemoryPrior:
                 logger.error(f"Prior computation failed: {e}")
                 prior = self._uniform_prior(available_tools)
 
-        # Apply semantic boost based on query content
-        # DEBUG: Log semantic matcher availability and context
-        logger.debug(f"[SemanticBoost] semantic_matcher={self.semantic_matcher is not None}, context_type={type(context).__name__}, context_keys={list(context.keys()) if isinstance(context, dict) else 'N/A'}")
+        # ================================================================
+        # BUG #0 FIX EXTENSION: Check if semantic boost should be skipped
+        # When the LLM classifier has made an authoritative decision about
+        # the query category (UNKNOWN, CREATIVE, CONVERSATIONAL, etc.),
+        # we should NOT override it with semantic embedding matching.
+        # The LLM has better language understanding than embedding similarity.
+        # ================================================================
+        skip_semantic_boost = False
+        if isinstance(context, dict):
+            skip_semantic_boost = context.get('skip_semantic_boost', False)
         
-        if self.semantic_matcher is not None and context:
+        if skip_semantic_boost:
+            logger.info(
+                "[SemanticBoost] SKIPPED: LLM classifier is authoritative for this query category"
+            )
+            prior.metadata['semantic_boost_applied'] = False
+            prior.metadata['semantic_boost_skipped_reason'] = 'classifier_is_authoritative'
+        elif self.semantic_matcher is not None and context:
             query_text = None
             if isinstance(context, dict):
                 query_text = context.get('query') or context.get('problem') or context.get('text')

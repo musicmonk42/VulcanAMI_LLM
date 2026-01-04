@@ -1325,9 +1325,54 @@ class SymbolicToolWrapper:
             
             logger.info(f"[SymbolicEngine] Processing query: {query_str[:100]}...")
             
-            # FIX #1: Preprocess natural language into formal logic
-            # This transforms queries like "Is A→B, B→C, ¬C satisfiable?" into "A→B, B→C, ¬C"
-            preprocessed_query = self._preprocess_query(query_str)
+            # ================================================================
+            # CRITICAL FIX: Check if QueryPreprocessor already extracted formal input
+            # If preprocessing was done by reasoning_integration.py, use that result!
+            # This prevents double-preprocessing which causes the bug where
+            # SymbolicToolWrapper._preprocess_query() fails because it's working
+            # on already-partially-processed text.
+            # ================================================================
+            preprocessed_query = query_str  # Default to original
+            
+            if isinstance(problem, dict):
+                # Check for preprocessing result from reasoning_integration.py
+                # The preprocessing result is stored in problem['preprocessing'] or problem['formal_input']
+                preprocessing_result = problem.get('preprocessing') or problem.get('formal_input')
+                
+                if preprocessing_result:
+                    if hasattr(preprocessing_result, 'formal_input'):
+                        # PreprocessingResult dataclass with formal_input attribute
+                        formal_input = preprocessing_result.formal_input
+                        if formal_input and len(str(formal_input)) > 0:
+                            preprocessed_query = str(formal_input) if not isinstance(formal_input, str) else formal_input
+                            logger.info(
+                                f"[SymbolicEngine] Using preprocessed input from QueryPreprocessor: "
+                                f"'{preprocessed_query[:50]}...'"
+                            )
+                    elif isinstance(preprocessing_result, dict):
+                        # Extract from preprocessing dict
+                        formal_input = preprocessing_result.get('formal_input')
+                        if formal_input and len(str(formal_input)) > 0:
+                            preprocessed_query = str(formal_input) if not isinstance(formal_input, str) else formal_input
+                            logger.info(
+                                f"[SymbolicEngine] Using preprocessed input from QueryPreprocessor: "
+                                f"'{preprocessed_query[:50]}...'"
+                            )
+                    elif isinstance(preprocessing_result, str) and len(preprocessing_result) > 0:
+                        # Direct string
+                        preprocessed_query = preprocessing_result
+                        logger.info(
+                            f"[SymbolicEngine] Using preprocessed input: '{preprocessing_result[:50]}...'"
+                        )
+            
+            # If no preprocessing was provided, try to extract formal logic ourselves
+            if preprocessed_query == query_str:
+                preprocessed_query = self._preprocess_query(query_str)
+                if preprocessed_query != query_str:
+                    logger.info(
+                        f"[SymbolicEngine] Preprocessed query locally: "
+                        f"'{query_str[:50]}...' → '{preprocessed_query[:50]}...'"
+                    )
             
             # Check if problem contains rules/facts to add to knowledge base
             if isinstance(problem, dict):
@@ -2577,39 +2622,71 @@ class ToolSelector:
             if hasattr(request, 'context') and request.context:
                 prior_context = request.context.copy() if isinstance(request.context, dict) else {}
             
-            # Extract query text from problem for semantic matching
-            # Try multiple sources for query text
-            query_text = None
+            # ================================================================
+            # BUG #0 FIX EXTENSION: Skip SemanticBoost if LLM classifier is authoritative
+            # When classifier identifies UNKNOWN, CREATIVE, CONVERSATIONAL, or GENERAL queries,
+            # its tool selection is authoritative and should not be overridden by
+            # semantic matching (which uses embeddings, not language understanding).
+            # ================================================================
+            skip_semantic_boost = False
+            classifier_category = None
             
-            # Source 1: request.context
             if hasattr(request, 'context') and isinstance(request.context, dict):
-                query_text = request.context.get('query')
-            
-            # Source 2: request.problem (string)
-            if not query_text and hasattr(request, 'problem'):
-                if isinstance(request.problem, str):
-                    query_text = request.problem
-                elif isinstance(request.problem, dict):
-                    query_text = (
-                        request.problem.get('text') or 
-                        request.problem.get('query') or 
-                        request.problem.get('content')
+                classifier_category = request.context.get('classifier_category')
+                classifier_is_authoritative = request.context.get('classifier_is_authoritative', False)
+                prevent_router_override = request.context.get('prevent_router_tool_override', False)
+                
+                # For these categories, the LLM's language understanding is more reliable
+                # than semantic embedding similarity
+                authoritative_categories = frozenset([
+                    'UNKNOWN', 'CREATIVE', 'CONVERSATIONAL', 'GENERAL',
+                    'GREETING', 'FACTUAL',
+                    # Lowercase variants for safety
+                    'unknown', 'creative', 'conversational', 'general',
+                    'greeting', 'factual',
+                ])
+                
+                if classifier_category in authoritative_categories or classifier_is_authoritative or prevent_router_override:
+                    skip_semantic_boost = True
+                    prior_context['skip_semantic_boost'] = True
+                    logger.info(
+                        f"[ToolSelector] Skipping SemanticBoost: LLM classifier is authoritative "
+                        f"for category={classifier_category}"
                     )
             
-            # Source 3: request.query directly
-            if not query_text and hasattr(request, 'query'):
-                query_text = request.query
+            # Extract query text from problem for semantic matching (if not skipping)
+            query_text = None
             
-            if query_text:
-                prior_context['query'] = str(query_text)
-                # Log only query length to avoid exposing sensitive user data
-                logger.info(f"[ToolSelector] Found query for semantic matching (length={len(str(query_text))} chars)")
-            else:
-                logger.warning("[ToolSelector] NO QUERY TEXT found - semantic matching will use features only")
-                # Log only safe attributes (type names) to avoid exposing sensitive data
-                safe_attrs = ['problem', 'context', 'query', 'constraints', 'mode', 'available_tools']
-                available_attrs = [attr for attr in safe_attrs if hasattr(request, attr)]
-                logger.debug(f"[ToolSelector] Request has attributes: {available_attrs}")
+            if not skip_semantic_boost:
+                # Source 1: request.context
+                if hasattr(request, 'context') and isinstance(request.context, dict):
+                    query_text = request.context.get('query')
+                
+                # Source 2: request.problem (string)
+                if not query_text and hasattr(request, 'problem'):
+                    if isinstance(request.problem, str):
+                        query_text = request.problem
+                    elif isinstance(request.problem, dict):
+                        query_text = (
+                            request.problem.get('text') or 
+                            request.problem.get('query') or 
+                            request.problem.get('content')
+                        )
+                
+                # Source 3: request.query directly
+                if not query_text and hasattr(request, 'query'):
+                    query_text = request.query
+                
+                if query_text:
+                    prior_context['query'] = str(query_text)
+                    # Log only query length to avoid exposing sensitive user data
+                    logger.info(f"[ToolSelector] Found query for semantic matching (length={len(str(query_text))} chars)")
+                else:
+                    logger.warning("[ToolSelector] NO QUERY TEXT found - semantic matching will use features only")
+                    # Log only safe attributes (type names) to avoid exposing sensitive data
+                    safe_attrs = ['problem', 'context', 'query', 'constraints', 'mode', 'available_tools']
+                    available_attrs = [attr for attr in safe_attrs if hasattr(request, attr)]
+                    logger.debug(f"[ToolSelector] Request has attributes: {available_attrs}")
             
             # DEBUG: Log what we're passing to compute_prior
             logger.info(f"[ToolSelector] Calling compute_prior with context keys: {list(prior_context.keys())}")
