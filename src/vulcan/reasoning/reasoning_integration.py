@@ -69,6 +69,7 @@ Error Handling:
 """
 
 import atexit
+import hashlib
 import logging
 import os
 import threading
@@ -78,6 +79,18 @@ from enum import Enum
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
+
+# =============================================================================
+# Query Preprocessor Import (FIX #1)
+# =============================================================================
+# Import query preprocessor for extracting formal syntax from natural language
+# This prevents parse errors like "Unexpected token 'Reasoning'" in engines
+try:
+    from .query_preprocessor import get_query_preprocessor
+    QUERY_PREPROCESSOR_AVAILABLE = True
+except ImportError:
+    QUERY_PREPROCESSOR_AVAILABLE = False
+    get_query_preprocessor = None  # type: ignore
 
 # =============================================================================
 # Configuration Constants
@@ -829,6 +842,42 @@ class ReasoningIntegration:
                     logger.info(
                         f"{LOG_PREFIX} Using classifier suggested tools: {classification.suggested_tools}"
                     )
+                
+                # =============================================================
+                # FIX #4: Prevent tool override for simple/factual queries
+                # =============================================================
+                # The LLM classifier correctly identifies simple factual queries
+                # (e.g., "What is the capital of France?") but QueryRouter may
+                # incorrectly override with specialized tools like ['probabilistic'].
+                # Respect the LLM classifier's judgment for these categories.
+                SIMPLE_QUERY_CATEGORIES = frozenset([
+                    'FACTUAL', 'CONVERSATIONAL', 'UNKNOWN', 'GREETING',
+                    'factual', 'conversational', 'unknown', 'greeting',
+                ])
+                
+                if classification.category in SIMPLE_QUERY_CATEGORIES:
+                    # For simple queries, ensure we use general tools
+                    if classification.suggested_tools != ['general']:
+                        logger.warning(
+                            f"{LOG_PREFIX} FIX#4: LLM classifier suggested "
+                            f"{classification.suggested_tools} for category "
+                            f"{classification.category}, overriding to ['general'] "
+                            f"for simple factual query"
+                        )
+                        classification.suggested_tools = ['general']
+                        if context is None:
+                            context = {}
+                        context['classifier_suggested_tools'] = ['general']
+                    
+                    # Set flag to prevent router override downstream
+                    if context is None:
+                        context = {}
+                    context['prevent_router_tool_override'] = True
+                    context['classifier_is_authoritative'] = True
+                    logger.info(
+                        f"{LOG_PREFIX} FIX#4: Preventing router tool override - "
+                        f"LLM classifier identified this as {classification.category}"
+                    )
                     
             except ImportError:
                 logger.debug(f"{LOG_PREFIX} QueryClassifier not available, using heuristic fallback")
@@ -892,6 +941,41 @@ class ReasoningIntegration:
                     },
                 )
 
+            # ================================================================
+            # FIX #1: QUERY PREPROCESSING - Extract formal syntax
+            # ================================================================
+            # Preprocess query BEFORE passing to reasoning engines
+            # This prevents parse errors like "Unexpected token 'Reasoning'"
+            preprocessing_result = None
+            if QUERY_PREPROCESSOR_AVAILABLE and get_query_preprocessor is not None:
+                try:
+                    # Determine which tools are likely to be used
+                    # Use a quick heuristic based on query type
+                    predicted_tools = self._predict_tools_for_preprocessing(query, query_type)
+                    
+                    # Now preprocess based on predicted tools
+                    preprocessor = get_query_preprocessor()
+                    preprocessing_result = preprocessor.preprocess(
+                        query=query,
+                        query_type=query_type,
+                        reasoning_tools=predicted_tools
+                    )
+                    
+                    # PreprocessingResult is a dataclass with attribute access
+                    if preprocessing_result.preprocessing_applied:
+                        logger.info(
+                            f"{LOG_PREFIX} Preprocessing extracted formal input "
+                            f"(confidence={preprocessing_result.extraction_confidence:.2f})"
+                        )
+                        
+                        # Store preprocessing result in context for engines
+                        if context is None:
+                            context = {}
+                        context['preprocessing'] = preprocessing_result
+                        
+                except Exception as e:
+                    logger.warning(f"{LOG_PREFIX} Query preprocessing failed: {e}")
+
             # Check if we should use decomposition for complex queries
             if self._should_use_decomposition(complexity):
                 # Use decomposition path for complex queries
@@ -914,6 +998,39 @@ class ReasoningIntegration:
 
             # Add timing to metadata
             result.metadata["selection_time_ms"] = selection_time
+
+            # ================================================================
+            # FIX #3: LEARN FROM SUCCESSFUL REASONING
+            # ================================================================
+            # After successful reasoning, extract reusable principles using
+            # KnowledgeCrystallizer. This enables learning patterns like:
+            # "SAT queries with explicit constraints need preprocessing"
+            try:
+                preprocessing_applied = False
+                if context and 'preprocessing' in context:
+                    prep_result = context['preprocessing']
+                    # Handle both dict and PreprocessingResult dataclass
+                    if hasattr(prep_result, 'preprocessing_applied'):
+                        preprocessing_applied = prep_result.preprocessing_applied
+                    elif isinstance(prep_result, dict):
+                        preprocessing_applied = prep_result.get('preprocessing_applied', False)
+
+                # Learn from outcome if confidence is high enough
+                if result.confidence >= 0.7:
+                    self._learn_from_reasoning_outcome(
+                        query=query,
+                        query_type=query_type,
+                        complexity=complexity,
+                        selected_tools=result.selected_tools,
+                        reasoning_strategy=result.reasoning_strategy,
+                        success=True,
+                        confidence=result.confidence,
+                        execution_time=selection_time / 1000.0,  # Convert ms to seconds
+                        preprocessing_applied=preprocessing_applied,
+                    )
+            except Exception as e:
+                # Learning is non-critical - log but don't fail
+                logger.debug(f"{LOG_PREFIX} Learning step failed (non-critical): {e}")
 
             return result
 
@@ -1245,6 +1362,76 @@ class ReasoningIntegration:
 
         # Default fallback
         return ["general"]
+
+    def _predict_tools_for_preprocessing(
+        self,
+        query: str,
+        query_type: str,
+    ) -> List[str]:
+        """
+        Predict which tools will be used for query preprocessing.
+
+        This method provides a quick heuristic-based prediction of tools
+        before the full tool selection process runs. It's used to determine
+        if query preprocessing should be applied.
+
+        The prediction is based on:
+        1. Query type from router
+        2. Presence of logical/mathematical operators in query
+        3. Keywords indicating specific reasoning domains
+
+        Args:
+            query: The query text to analyze
+            query_type: Type from router (reasoning, symbolic, etc.)
+
+        Returns:
+            List of predicted tool names for preprocessing
+        """
+        predicted_tools: List[str] = []
+
+        # Map query types to likely tools
+        type_to_tools = {
+            'symbolic': ['symbolic'],
+            'mathematical': ['mathematical'],
+            'probabilistic': ['probabilistic'],
+            'causal': ['causal'],
+            'reasoning': ['symbolic', 'causal'],  # Generic reasoning may use multiple
+            'general': ['general'],
+        }
+
+        # Start with type-based prediction
+        if query_type in type_to_tools:
+            predicted_tools.extend(type_to_tools[query_type])
+
+        # Check for logical operators that indicate symbolic reasoning
+        logical_indicators = ['→', '∧', '∨', '¬', '∀', '∃', '->', 'AND', 'OR', 'NOT']
+        if any(op in query for op in logical_indicators):
+            if 'symbolic' not in predicted_tools:
+                predicted_tools.append('symbolic')
+
+        # Check for SAT-specific keywords
+        sat_keywords = ['propositions', 'constraints', 'satisfiability', 'sat']
+        if any(kw in query.lower() for kw in sat_keywords):
+            if 'symbolic' not in predicted_tools:
+                predicted_tools.append('symbolic')
+
+        # Check for mathematical indicators
+        math_indicators = ['formula:', 'equation:', 'prove', 'theorem', '∫', '∑', 'lim']
+        if any(ind in query.lower() for ind in math_indicators):
+            if 'mathematical' not in predicted_tools:
+                predicted_tools.append('mathematical')
+
+        # Check for probabilistic indicators
+        prob_indicators = ['P(', 'probability', 'E[', 'expectation', 'distribution']
+        if any(ind in query for ind in prob_indicators):
+            if 'probabilistic' not in predicted_tools:
+                predicted_tools.append('probabilistic')
+
+        # Default to general if nothing matched
+        if not predicted_tools:
+            predicted_tools = ['general']
+
+        return predicted_tools
 
     def _determine_selection_mode(self, complexity: float, selection_mode_enum: Any) -> Any:
         """
@@ -1830,7 +2017,6 @@ class ReasoningIntegration:
             
             # Create pattern outcome for learning
             from vulcan.semantic_bridge import PatternOutcome
-            import hashlib
             
             # Use deterministic SHA-256 hash for pattern ID (hash() is not deterministic across runs)
             pattern_hash = hashlib.sha256(query.encode()).hexdigest()[:8]
@@ -1865,6 +2051,128 @@ class ReasoningIntegration:
                 
         except Exception as e:
             logger.debug(f"{LOG_PREFIX} Failed to learn from outcome: {e}")
+
+    def _learn_from_reasoning_outcome(
+        self,
+        query: str,
+        query_type: str,
+        complexity: float,
+        selected_tools: List[str],
+        reasoning_strategy: str,
+        success: bool,
+        confidence: float,
+        execution_time: float,
+        preprocessing_applied: bool = False,
+    ) -> None:
+        """
+        Learn from successful reasoning outcomes using KnowledgeCrystallizer.
+
+        This method is called after successful reasoning to extract reusable
+        principles that can improve future query processing. It integrates
+        with the KnowledgeCrystallizer to store patterns like:
+        - "SAT queries with propositions + constraints need preprocessing"
+        - "High-complexity ethical queries need philosophical reasoning"
+        - "Mathematical proofs require step-by-step validation"
+
+        Args:
+            query: Original query text
+            query_type: Type of query (symbolic, reasoning, etc.)
+            complexity: Query complexity score (0.0 to 1.0)
+            selected_tools: Tools that were used for this query
+            reasoning_strategy: Strategy that was applied
+            success: Whether reasoning succeeded
+            confidence: Confidence in the result (0.0 to 1.0)
+            execution_time: Time taken in seconds
+            preprocessing_applied: Whether query preprocessing was needed
+
+        Note:
+            This method is designed to be non-blocking and non-critical.
+            Failures are logged but do not affect the main reasoning pipeline.
+        """
+        # Only learn from successful outcomes with sufficient confidence
+        if not success or confidence < 0.7:
+            logger.debug(
+                f"{LOG_PREFIX} Skipping crystallizer learning: "
+                f"success={success}, confidence={confidence:.2f}"
+            )
+            return
+
+        try:
+            # Try to import KnowledgeCrystallizer
+            from vulcan.knowledge_crystallizer import (
+                KnowledgeCrystallizer,
+                ExecutionTrace,
+                KNOWLEDGE_CRYSTALLIZER_AVAILABLE,
+            )
+
+            if not KNOWLEDGE_CRYSTALLIZER_AVAILABLE or KnowledgeCrystallizer is None:
+                logger.debug(f"{LOG_PREFIX} KnowledgeCrystallizer not available")
+                return
+
+            # Create execution trace for crystallization
+            trace_id = hashlib.sha256(
+                f"{query}:{time.time()}".encode()
+            ).hexdigest()[:12]
+
+            trace = ExecutionTrace(
+                trace_id=trace_id,
+                actions=[
+                    {
+                        'type': 'tool_selection',
+                        'tools': selected_tools,
+                        'strategy': reasoning_strategy,
+                    },
+                    {
+                        'type': 'preprocessing',
+                        'applied': preprocessing_applied,
+                    },
+                ],
+                outcomes={
+                    'success': success,
+                    'confidence': confidence,
+                    'execution_time': execution_time,
+                },
+                context={
+                    'query_type': query_type,
+                    'complexity': complexity,
+                    'query_length': len(query),
+                },
+                success=success,
+                domain=query_type,
+                metadata={
+                    'preprocessing_required': preprocessing_applied,
+                    'tools_used': selected_tools,
+                    'strategy': reasoning_strategy,
+                },
+            )
+
+            # Get or create crystallizer instance (lazy initialization)
+            if not hasattr(self, '_knowledge_crystallizer') or self._knowledge_crystallizer is None:
+                self._knowledge_crystallizer = KnowledgeCrystallizer()
+                logger.info(f"{LOG_PREFIX} KnowledgeCrystallizer initialized for learning")
+
+            # Crystallize knowledge from the trace
+            # Use incremental mode for single-trace learning
+            from vulcan.knowledge_crystallizer import CrystallizationMode
+
+            crystallization_result = self._knowledge_crystallizer.crystallize(
+                traces=[trace],
+                mode=CrystallizationMode.INCREMENTAL,
+            )
+
+            if crystallization_result and crystallization_result.principles:
+                logger.info(
+                    f"{LOG_PREFIX} Extracted {len(crystallization_result.principles)} "
+                    f"principles from successful reasoning"
+                )
+            else:
+                logger.debug(f"{LOG_PREFIX} No new principles extracted from trace")
+
+        except ImportError:
+            logger.debug(f"{LOG_PREFIX} KnowledgeCrystallizer module not available")
+        except Exception as e:
+            # Log but don't fail - learning is non-critical
+            logger.debug(f"{LOG_PREFIX} Crystallizer learning failed: {e}")
 
     def shutdown(self, timeout: float = 5.0) -> None:
         """
