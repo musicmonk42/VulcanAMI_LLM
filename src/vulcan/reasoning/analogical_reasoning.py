@@ -51,29 +51,54 @@ try:
     import spacy
 
     SPACY_AVAILABLE = True
-    # Try to load model - prefer larger models that may be installed
-    nlp = None
-    for model_name in ["en_core_web_lg", "en_core_web_md", "en_core_web_sm"]:
-        try:
-            nlp = spacy.load(model_name)
-            logger.info(f"Loaded spaCy model '{model_name}' for analogical reasoning")
-            break
-        except OSError:
-            # Model not installed, try next one
-            continue
-        except Exception as e:
-            logger.warning(f"Error loading spaCy model '{model_name}': {e}")
-            continue
-
-    if nlp is None:
-        logger.warning(
-            "spaCy model not loaded for analogical reasoning. "
-            "Install a model with: python -m spacy download en_core_web_lg (recommended) "
-            "or: python -m spacy download en_core_web_md "
-            "or: python -m spacy download en_core_web_sm"
-        )
+    # LAZY LOADING FIX: Don't load spaCy model at import time
+    # This prevents blocking server startup during module import
+    # The model will be loaded on first use via get_nlp()
+    _nlp = None
+    _nlp_lock = threading.Lock()
+    _nlp_loaded = False
+    
+    def get_nlp():
+        """Lazy-load spaCy model on first use."""
+        global _nlp, _nlp_loaded
+        if _nlp_loaded:
+            return _nlp
+        with _nlp_lock:
+            if _nlp_loaded:  # Double-check after acquiring lock
+                return _nlp
+            for model_name in ["en_core_web_lg", "en_core_web_md", "en_core_web_sm"]:
+                try:
+                    _nlp = spacy.load(model_name)
+                    logger.info(f"Loaded spaCy model '{model_name}' for analogical reasoning")
+                    break
+                except OSError:
+                    # Model not installed, try next one
+                    continue
+                except Exception as e:
+                    logger.warning(f"Error loading spaCy model '{model_name}': {e}")
+                    continue
+            if _nlp is None:
+                logger.warning(
+                    "spaCy model not loaded for analogical reasoning. "
+                    "Install a model with: python -m spacy download en_core_web_lg (recommended) "
+                    "or: python -m spacy download en_core_web_md "
+                    "or: python -m spacy download en_core_web_sm"
+                )
+            _nlp_loaded = True
+        return _nlp
+    
+    # For backward compatibility - nlp is now a property that triggers lazy loading
+    nlp = None  # Will be set to None initially, use get_nlp() to access
 except ImportError:
     SPACY_AVAILABLE = False
+    _nlp = None
+    _nlp_lock = None
+    _nlp_loaded = True  # Mark as loaded to prevent retry
+    
+    def get_nlp():
+        """Return None when spaCy is not available."""
+        return None
+    
     nlp = None
     logger.warning("spaCy not available, NLP features limited")
 
@@ -510,9 +535,10 @@ class SemanticEnricher:
         )
 
         # POS tagging if spaCy available
-        if nlp:
+        _nlp_instance = get_nlp()
+        if _nlp_instance:
             try:
-                doc = nlp(entity.name)
+                doc = _nlp_instance(entity.name)
                 if doc:
                     entity.pos_tag = doc[0].pos_ if len(doc) > 0 else None
             except Exception as e:
@@ -721,7 +747,7 @@ class GoalRelevanceAnalyzer:
 
     def __init__(self, semantic_enricher: SemanticEnricher):
         self.semantic_enricher = semantic_enricher
-        self.use_spacy = nlp is not None
+        self.use_spacy = SPACY_AVAILABLE  # Check availability, actual model loaded lazily
 
     def analyze_goal_relevance(
         self, mappings: Dict[str, str], goal: Any, source: Dict, target: Dict
@@ -763,19 +789,21 @@ class GoalRelevanceAnalyzer:
         entities = set()
 
         if self.use_spacy:
-            try:
-                doc = nlp(goal_text)
+            _nlp_instance = get_nlp()
+            if _nlp_instance:
+                try:
+                    doc = _nlp_instance(goal_text)
 
-                # Named entities
-                for ent in doc.ents:
-                    entities.add(ent.text.lower())
+                    # Named entities
+                    for ent in doc.ents:
+                        entities.add(ent.text.lower())
 
-                # Important nouns
-                for token in doc:
-                    if token.pos_ in ["NOUN", "PROPN"] and not token.is_stop:
-                        entities.add(token.text.lower())
-            except Exception as e:
-                logger.debug(f"Failed to extract entities from text: {e}")
+                    # Important nouns
+                    for token in doc:
+                        if token.pos_ in ["NOUN", "PROPN"] and not token.is_stop:
+                            entities.add(token.text.lower())
+                except Exception as e:
+                    logger.debug(f"Failed to extract entities from text: {e}")
 
         # Fallback: extract capitalized words and nouns heuristically
         words = goal_text.split()
@@ -790,20 +818,22 @@ class GoalRelevanceAnalyzer:
         concepts = set()
 
         if self.use_spacy:
-            try:
-                doc = nlp(goal_text)
+            _nlp_instance = get_nlp()
+            if _nlp_instance:
+                try:
+                    doc = _nlp_instance(goal_text)
 
-                # Verbs (actions)
-                for token in doc:
-                    if token.pos_ == "VERB" and not token.is_stop:
-                        concepts.add(token.lemma_.lower())
+                    # Verbs (actions)
+                    for token in doc:
+                        if token.pos_ == "VERB" and not token.is_stop:
+                            concepts.add(token.lemma_.lower())
 
-                # Key adjectives
-                for token in doc:
-                    if token.pos_ == "ADJ" and not token.is_stop:
-                        concepts.add(token.text.lower())
-            except Exception as e:
-                logger.debug(f"Failed to extract concepts from text: {e}")
+                    # Key adjectives
+                    for token in doc:
+                        if token.pos_ == "ADJ" and not token.is_stop:
+                            concepts.add(token.text.lower())
+                except Exception as e:
+                    logger.debug(f"Failed to extract concepts from text: {e}")
 
         # Fallback: extract action words
         action_indicators = [
@@ -932,8 +962,11 @@ class GoalRelevanceAnalyzer:
         self, source_entity: str, target_entity: str, goal_text: str
     ) -> float:
         """Use dependency parsing to determine relevance"""
+        _nlp_instance = get_nlp()
+        if not _nlp_instance:
+            return 0.3  # Fallback when spaCy not available
         try:
-            doc = nlp(goal_text)
+            doc = _nlp_instance(goal_text)
 
             # Find if entities play important syntactic roles
             source_lower = source_entity.lower()
@@ -2275,9 +2308,10 @@ class AnalogicalReasoningEngine(AnalogicalReasoner):
             "attributes": {},
         }
 
-        if nlp:
+        _nlp_instance = get_nlp()
+        if _nlp_instance:
             try:
-                doc = nlp(text)
+                doc = _nlp_instance(text)
 
                 # Extract entities
                 for ent in doc.ents:
