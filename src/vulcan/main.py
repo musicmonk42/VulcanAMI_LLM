@@ -2845,12 +2845,112 @@ async def chat(request: ChatRequest):
         return _mem_context, _systems
 
     async def _reasoning_task_process():
-        """STEP 3: Apply Vulcan's Reasoning Systems (ALL of them in parallel)"""
+        """
+        STEP 3: Apply Vulcan's Reasoning Systems (SELECTIVE based on classification)
+        
+        BUG N FIX: Only run reasoning engines that are RELEVANT to the query.
+        Previously, ALL engines ran on every query, causing:
+        - Math output appearing in non-math queries (e.g., "x² + 2x + 1" in greetings)
+        - Wasted compute on irrelevant reasoning
+        - Confusing response concatenation
+        
+        The fix uses routing_plan.query_type and routing_selected_tools to
+        determine which engines to invoke.
+        """
         _reasoning = {}
         _systems = []
 
-        # Create subtasks for each reasoning type
+        # ================================================================
+        # BUG N FIX: Determine which reasoning engines to run based on
+        # query classification. Default to minimal reasoning for unknown.
+        # ================================================================
+        relevant_engines = set()
+        
+        # Extract routing info from closure scope
+        if routing_plan is not None:
+            query_type = routing_plan.query_type.value.lower()
+            
+            # Extract selected_tools from telemetry if available
+            selected_tools = []
+            if hasattr(routing_plan, 'telemetry_data'):
+                selected_tools = routing_plan.telemetry_data.get("selected_tools", []) or []
+            
+            # Map query types to relevant engines
+            if query_type in ('logical', 'symbolic', 'mathematical'):
+                relevant_engines.add('symbolic')
+            elif query_type in ('probabilistic', 'factual'):
+                relevant_engines.add('probabilistic')
+            elif query_type in ('causal',):
+                relevant_engines.add('causal')
+            elif query_type in ('analogical', 'perception'):
+                relevant_engines.add('analogical')
+            elif query_type in ('reasoning',):
+                # Generic reasoning - use symbolic and causal
+                relevant_engines.update(['symbolic', 'causal'])
+            elif query_type in ('greeting', 'chitchat', 'conversational', 'creative', 'factual'):
+                # These don't need reasoning engines at all
+                # BUG N FIX: Skip reasoning entirely for these categories
+                logger.info(
+                    f"[VULCAN] BUG N FIX: Skipping reasoning for query_type={query_type}"
+                )
+                return _reasoning, _systems
+            elif query_type in ('self_introspection',):
+                # Self-introspection uses world model, not these engines
+                logger.info(
+                    f"[VULCAN] BUG N FIX: Skipping reasoning for self_introspection "
+                    f"(handled by world model)"
+                )
+                return _reasoning, _systems
+            else:
+                # Unknown type - check for specific indicators in query
+                if is_causal_query:
+                    relevant_engines.add('causal')
+                elif is_uncertain:
+                    relevant_engines.add('probabilistic')
+                # Default: minimal reasoning
+                if not relevant_engines:
+                    logger.debug(
+                        f"[VULCAN] No specific reasoning needed for query_type={query_type}"
+                    )
+                    return _reasoning, _systems
+            
+            # Override with selected_tools if specified
+            if selected_tools:
+                relevant_engines = set()
+                for tool in selected_tools:
+                    tool_lower = tool.lower()
+                    if tool_lower in ('symbolic', 'mathematical', 'logical'):
+                        relevant_engines.add('symbolic')
+                    elif tool_lower == 'probabilistic':
+                        relevant_engines.add('probabilistic')
+                    elif tool_lower == 'causal':
+                        relevant_engines.add('causal')
+                    elif tool_lower in ('analogical', 'analogy'):
+                        relevant_engines.add('analogical')
+                    elif tool_lower in ('general', 'world_model'):
+                        # These don't map to reasoning engines
+                        pass
+        else:
+            # No routing plan - check local indicators
+            if is_causal_query:
+                relevant_engines.add('causal')
+            elif is_uncertain:
+                relevant_engines.add('probabilistic')
+            # Default: no reasoning if no indicators
+            if not relevant_engines:
+                logger.debug(
+                    f"[VULCAN] No routing plan and no indicators - skipping reasoning"
+                )
+                return _reasoning, _systems
+        
+        logger.info(
+            f"[VULCAN] BUG N FIX: Running only relevant engines: {relevant_engines}"
+        )
+
+        # Create subtasks for each reasoning type (only if relevant)
         async def _symbolic():
+            if 'symbolic' not in relevant_engines:
+                return None
             if deps.symbolic:
                 try:
                     if hasattr(deps.symbolic, "reason"):
@@ -2870,6 +2970,8 @@ async def chat(request: ChatRequest):
             return None
 
         async def _probabilistic():
+            if 'probabilistic' not in relevant_engines:
+                return None
             # PERFORMANCE FIX: Use pre-computed embedding instead of re-generating
             if deps.probabilistic and _precomputed_embedding_step is not None:
                 try:
@@ -2894,9 +2996,22 @@ async def chat(request: ChatRequest):
             return None
 
         async def _causal():
+            if 'causal' not in relevant_engines:
+                return None
             if deps.causal:
                 try:
-                    if hasattr(deps.causal, "estimate_causal_effect"):
+                    # BUG L FIX: Use full CausalReasoner.reason() method for
+                    # natural language causal queries, not just estimate_causal_effect
+                    if hasattr(deps.causal, "reason"):
+                        result = await loop.run_in_executor(
+                            None,
+                            deps.causal.reason,
+                            {"query": processed_prompt},
+                        )
+                        if result:
+                            logger.info("[VULCAN] Applied enhanced causal reasoning")
+                            return ("causal", result, "causal_reasoning")
+                    elif hasattr(deps.causal, "estimate_causal_effect"):
                         result = await loop.run_in_executor(
                             None,
                             deps.causal.estimate_causal_effect,
@@ -2911,9 +3026,23 @@ async def chat(request: ChatRequest):
             return None
 
         async def _analogical():
+            if 'analogical' not in relevant_engines:
+                return None
+            # BUG M FIX: Use AnalogicalReasoningEngine.reason() for
+            # structure mapping queries
             if deps.abstract:
                 try:
-                    if hasattr(deps.abstract, "find_analogies"):
+                    # First try enhanced reason() method
+                    if hasattr(deps.abstract, "reason"):
+                        result = await loop.run_in_executor(
+                            None,
+                            deps.abstract.reason,
+                            {"query": processed_prompt},
+                        )
+                        if result:
+                            logger.info("[VULCAN] Applied enhanced analogical reasoning")
+                            return ("analogical", result, "analogical_reasoning")
+                    elif hasattr(deps.abstract, "find_analogies"):
                         result = await loop.run_in_executor(
                             None, deps.abstract.find_analogies, processed_prompt
                         )
@@ -2924,11 +3053,22 @@ async def chat(request: ChatRequest):
                     logger.debug(f"[VULCAN] Analogical reasoning failed: {e}")
             return None
 
-        # Run all reasoning subtasks in parallel
-        results = await asyncio.gather(
-            _symbolic(), _probabilistic(), _causal(), _analogical(),
-            return_exceptions=True
-        )
+        # BUG N FIX: Only run relevant reasoning subtasks
+        tasks_to_run = []
+        if 'symbolic' in relevant_engines:
+            tasks_to_run.append(_symbolic())
+        if 'probabilistic' in relevant_engines:
+            tasks_to_run.append(_probabilistic())
+        if 'causal' in relevant_engines:
+            tasks_to_run.append(_causal())
+        if 'analogical' in relevant_engines:
+            tasks_to_run.append(_analogical())
+        
+        if not tasks_to_run:
+            logger.debug("[VULCAN] No reasoning tasks to run")
+            return _reasoning, _systems
+        
+        results = await asyncio.gather(*tasks_to_run, return_exceptions=True)
 
         for r in results:
             if isinstance(r, Exception):
