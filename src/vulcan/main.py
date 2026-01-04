@@ -5322,26 +5322,88 @@ async def unified_chat(request: UnifiedChatRequest):
             return _plan, _systems, _meta
 
         async def _world_model_task():
-            """STEP 5: World Model Consultation"""
+            """STEP 5: World Model Consultation
+            
+            BUG FIX: Reconnected world_model.update and meta_reasoning integration.
+            This ensures the world model is updated with each observation and
+            meta-reasoning is consulted for intelligent query handling.
+            """
             _task_start = time.perf_counter()
-            _insight = None
+            _insights = {}
             _systems = []
-            if not (hasattr(deps, "world_model") and deps.world_model):
-                return _insight, _systems
+            _meta_reasoning_result = None
+            
+            world_model = getattr(deps, "world_model", None)
+            if not world_model:
+                return _insights, _systems
 
             try:
-                if hasattr(deps.world_model, "predict"):
+                # RECONNECTED: Update world model with observation
+                # This was disconnected and is now properly integrated
+                if _precomputed_embedding is not None and hasattr(world_model, "update_state"):
+                    try:
+                        _op_start = time.perf_counter()
+                        await loop.run_in_executor(
+                            None,
+                            world_model.update_state,
+                            _precomputed_embedding,
+                            {"type": "user_query", "source": "v1_chat"},
+                            0.0,  # reward signal
+                        )
+                        logger.debug(f"[TIMING] world_model.update_state took {time.perf_counter() - _op_start:.2f}s")
+                        _systems.append("world_model_update")
+                    except Exception as e:
+                        logger.debug(f"[VULCAN/v1/chat] World model update failed: {e}")
+                
+                # RECONNECTED: Meta-reasoning introspection check
+                # Check if meta-reasoning should handle this query before specialized reasoners
+                if hasattr(world_model, "meta_reasoning"):
+                    try:
+                        meta_reasoning = world_model.meta_reasoning
+                        if meta_reasoning and hasattr(meta_reasoning, "introspect"):
+                            _op_start = time.perf_counter()
+                            _meta_reasoning_result = await loop.run_in_executor(
+                                None, meta_reasoning.introspect, user_message
+                            )
+                            logger.debug(f"[TIMING] meta_reasoning.introspect took {time.perf_counter() - _op_start:.2f}s")
+                            if _meta_reasoning_result:
+                                _insights["meta_reasoning"] = _meta_reasoning_result
+                                _systems.append("meta_reasoning")
+                    except Exception as e:
+                        logger.debug(f"[VULCAN/v1/chat] Meta-reasoning introspection failed: {e}")
+                
+                # RECONNECTED: Motivational introspection (from meta-reasoning subsystem)
+                if hasattr(world_model, "motivational_introspection"):
+                    mi = world_model.motivational_introspection
+                    if mi and hasattr(mi, "analyze_query"):
+                        try:
+                            _op_start = time.perf_counter()
+                            mi_result = await loop.run_in_executor(
+                                None, mi.analyze_query, user_message
+                            )
+                            logger.debug(f"[TIMING] motivational_introspection.analyze_query took {time.perf_counter() - _op_start:.2f}s")
+                            if mi_result:
+                                _insights["motivational_analysis"] = mi_result
+                                _systems.append("motivational_introspection")
+                        except Exception as e:
+                            logger.debug(f"[VULCAN/v1/chat] Motivational introspection failed: {e}")
+                
+                # World model prediction
+                if hasattr(world_model, "predict"):
                     _op_start = time.perf_counter()
-                    _insight = await loop.run_in_executor(
-                        None, deps.world_model.predict, user_message, {}
+                    prediction = await loop.run_in_executor(
+                        None, world_model.predict, user_message, {}
                     )
                     logger.debug(f"[TIMING] world_model.predict took {time.perf_counter() - _op_start:.2f}s")
-                    _systems.append("world_model")
+                    if prediction:
+                        _insights["prediction"] = prediction
+                        _systems.append("world_model_predict")
+                        
             except Exception as e:
                 logger.debug(f"World model skipped: {e}")
 
             logger.debug(f"[TIMING] _world_model_task completed in {time.perf_counter() - _task_start:.2f}s")
-            return _insight, _systems
+            return _insights, _systems
 
         async def _semantic_bridge_task():
             """STEP 6: Semantic Bridge (cross-domain knowledge)"""
@@ -5715,6 +5777,24 @@ async def unified_chat(request: UnifiedChatRequest):
                     except Exception:
                         plan_str = ""
 
+                # BUG FIX: Include world model insights in the LLM context
+                # This reconnects the world_model and meta_reasoning to the response generation
+                world_model_str = ""
+                if world_model_insight and isinstance(world_model_insight, dict):
+                    try:
+                        insight_parts = []
+                        if world_model_insight.get("prediction"):
+                            insight_parts.append(f"Prediction: {str(world_model_insight['prediction'])[:200]}")
+                        if world_model_insight.get("meta_reasoning"):
+                            insight_parts.append(f"Meta-reasoning: {str(world_model_insight['meta_reasoning'])[:200]}")
+                        if world_model_insight.get("motivational_analysis"):
+                            insight_parts.append(f"Motivational Analysis: {str(world_model_insight['motivational_analysis'])[:200]}")
+                        if insight_parts:
+                            world_model_str = "\nWorld Model Insights: " + "; ".join(insight_parts)
+                            logger.debug(f"[VULCAN] World model insights added to context: {world_model_str[:100]}...")
+                    except Exception as e:
+                        logger.debug(f"[VULCAN] Failed to format world model insights: {e}")
+
                 # CRITICAL FIX: Use proper formatting for reasoning results
                 # This ensures the LLM actually USES the reasoning engine output
                 # instead of generating generic responses
@@ -5747,6 +5827,7 @@ async def unified_chat(request: UnifiedChatRequest):
 User Query: {user_message}
 {memory_str}
 {reasoning_str}
+{world_model_str}
 {plan_str}
 
 IMPORTANT: The reasoning analysis above was produced by specialized reasoning engines.
@@ -5757,6 +5838,7 @@ Your response MUST:
 4. If the reasoning shows a logical proof, present the proof steps
 5. If the reasoning shows probabilities, include the specific numbers
 6. If the reasoning shows causal analysis, explain the causal relationships found
+7. If world model insights are provided, consider them in your response
 
 Provide your response based on the reasoning analysis above:"""
                 else:
@@ -5764,7 +5846,7 @@ Provide your response based on the reasoning analysis above:"""
                     enhanced_prompt = f"""You are VULCAN, an advanced AI assistant powered by a comprehensive cognitive architecture.
 
 User Query: {user_message}
-{memory_str}{plan_str}
+{memory_str}{world_model_str}{plan_str}
 
 Provide a helpful, accurate, and comprehensive response to the user's query. Be concise but thorough."""
 
