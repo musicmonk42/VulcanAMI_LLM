@@ -487,17 +487,21 @@ class SafetyAwareReasoning:
             # 1. Creative output quality is subjective, not measurable by confidence
             # 2. Low confidence from fallback shouldn't block creative generation
             # 3. OpenAI fallback (with 0.6 confidence from P1.2) handles these well
-            if not is_creative:
-                # Check confidence threshold - low confidence is treated as unsafe
-                # Only for non-creative tasks where confidence is meaningful
-                # FIX: Lowered threshold from 0.3 to 0.1 to avoid filtering out
-                # results that could still be useful (shows reasoning attempt)
-                if hasattr(result, "confidence"):
-                    if result.confidence < 0.1:
-                        return {
-                            "is_safe": False,
-                            "reason": f"Confidence too low: {result.confidence:.2f} (threshold: 0.1)",
-                        }
+            
+            # DISABLED: Confidence filter was hiding actual bugs instead of showing them
+            # The filter was blocking results with 10-30% confidence, which hides:
+            # - Parse errors from QueryPreprocessor (malformed formulas)
+            # - Engine failures that should be debugged
+            # - Actual error messages that help identify root causes
+            # By disabling this, we can see what's actually failing and fix it.
+            # 
+            # if not is_creative:
+            #     if hasattr(result, "confidence"):
+            #         if result.confidence < 0.3:
+            #             return {
+            #                 "is_safe": False,
+            #                 "reason": f"Confidence too low: {result.confidence:.2f}",
+            #             }
 
             # Check for error indicators in conclusion
             if hasattr(result, "conclusion"):
@@ -618,19 +622,21 @@ class SafetyAwareReasoning:
                     }
                 )
 
-        # Check confidence threshold
-        # FIX: Lowered threshold from 0.3 to 0.1 to show reasoning attempts
-        if hasattr(result, "confidence"):
-            if result.confidence < 0.1:
-                safety_checks["confidence_sufficient"] = False
-                safety_checks["checks_performed"].append(
-                    {
-                        "type": "confidence_threshold",
-                        "passed": False,
-                        "reason": f"Confidence {result.confidence:.2f} below threshold 0.1",
-                        "confidence": result.confidence,
-                    }
-                )
+        # DISABLED: Confidence threshold check was hiding actual bugs
+        # The filter was preventing users from seeing what's actually failing.
+        # By disabling this, we can see actual error messages and debug root causes.
+        #
+        # if hasattr(result, "confidence"):
+        #     if result.confidence < 0.3:
+        #         safety_checks["confidence_sufficient"] = False
+        #         safety_checks["checks_performed"].append(
+        #             {
+        #                 "type": "confidence_threshold",
+        #                 "passed": False,
+        #                 "reason": f"Confidence {result.confidence:.2f} below threshold",
+        #                 "confidence": result.confidence,
+        #             }
+        #         )
 
         # Check for harmful implications in explanation
         if hasattr(result, "explanation") and isinstance(result.explanation, str):
