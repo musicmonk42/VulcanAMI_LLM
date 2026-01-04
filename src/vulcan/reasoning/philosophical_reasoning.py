@@ -1711,6 +1711,13 @@ class PhilosophicalReasoner(AbstractReasoner):
         'trolley', 'paradox', 'deontic', 'normative',
     })
     
+    # Common filler/stop words to filter out from action extraction
+    # Shared between _extract_actions and _normalize_action_text
+    FILLER_WORDS: FrozenSet[str] = frozenset({
+        'the', 'a', 'an', 'to', 'and', 'or', 'not', 'you', 'should', 'must', 'would',
+        'this', 'that', 'is', 'are', 'be', 'on', 'in', 'as', 'b', 'one', 'answer_on'
+    })
+    
     DEONTIC_PATTERN = re.compile(
         r'\b([POF])\s*\(\s*([^)]+)\s*\)',
         re.IGNORECASE
@@ -2656,8 +2663,9 @@ Query components:
         # FIX: Priority 1 - Detect forced choice format: "A. ... / B. ..." or "A. ... B. ..."
         # This must come FIRST to properly extract choices before other patterns
         # Pattern matches: "A. Pull the lever" or "A) Pull the lever"
-        # Improved pattern uses word boundary \b to ensure A/B are standalone
-        forced_choice_pattern = r'\b([A-Z])\.\s+(.+?)(?=\s+[A-Z]\.\s|$)'
+        # Uses word boundary \b and non-greedy .+? with proper lookahead for multi-choice
+        # Note: We use .+? instead of [^A-Z]*? to handle uppercase letters within choice text
+        forced_choice_pattern = r'\b([A-Z])\.\s+(.+?)(?=\s+[A-Z]\.\s|\s*$)'
         forced_choice_matches = re.findall(forced_choice_pattern, query)
         
         if forced_choice_matches:
@@ -2693,10 +2701,9 @@ Query components:
                     actions.append(action_name)
         
         # FIX: Check for "X or Y" dilemma patterns - but filter out common false positives
-        # Skip words that are commonly part of other phrases
-        skip_words = {'the', 'a', 'an', 'to', 'and', 'not', 'you', 'must', 'act', 
-                      'as', 'b', 'this', 'that', 'is', 'are', 'be', 'on', 'in',
-                      'answer', 'one', 'remain', 'evolve', 'answer_on'}
+        # Use FILLER_WORDS class constant plus additional context-specific skip words
+        # Review comment fix: Removed 'remain' and 'evolve' as they are valid action words
+        skip_words = self.FILLER_WORDS | {'act', 'answer'}
         
         or_pattern = r'(\w+(?:\s+\w+)?)\s+or\s+(\w+(?:\s+\w+)?)'
         or_matches = re.findall(or_pattern, query_lower)
@@ -2764,10 +2771,10 @@ Query components:
             return 'evolve'
         
         # Generic normalization - convert to snake_case
-        # Remove common filler words
-        filler_words = ['the', 'a', 'an', 'to', 'and', 'or', 'you', 'should', 'must', 'would']
+        # Use FILLER_WORDS class constant for consistency
+        # Review comment fix: Use shared constant instead of duplicating words
         words = text_lower.split()
-        meaningful_words = [w for w in words if w not in filler_words and len(w) > 1]
+        meaningful_words = [w for w in words if w not in self.FILLER_WORDS and len(w) > 1]
         
         if meaningful_words:
             action_name = '_'.join(meaningful_words[:3])  # Take first 3 meaningful words max
