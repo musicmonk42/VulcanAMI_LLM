@@ -1323,6 +1323,44 @@ class TestQueryClassifier:
         assert hello_result.complexity < 0.2
         assert sat_result.complexity >= 0.5
 
+    def test_creative_writing_skips_reasoning(self):
+        """BUG A FIX: Test that creative writing queries skip reasoning"""
+        from vulcan.routing.query_classifier import classify_query
+        
+        # Test various creative writing patterns
+        creative_queries = [
+            "write a three paragraph story about a lost dog",
+            "write me a poem about nature",
+            "create a short essay about climate change",
+            "tell me a story about a brave knight",
+        ]
+        
+        for query in creative_queries:
+            result = classify_query(query)
+            assert result.skip_reasoning, \
+                f"Creative query '{query}' should skip reasoning"
+            assert result.category == "CREATIVE", \
+                f"Creative query '{query}' should be categorized as CREATIVE, got {result.category}"
+            assert result.complexity <= 0.3, \
+                f"Creative query '{query}' should have low complexity"
+
+    def test_conversational_skips_reasoning(self):
+        """BUG A FIX: Test that conversational queries skip reasoning"""
+        from vulcan.routing.query_classifier import classify_query
+        
+        conversational_queries = [
+            "what's the capital of France?",
+            "tell me about the moon",
+            "explain quantum computing",
+        ]
+        
+        for query in conversational_queries:
+            result = classify_query(query)
+            assert result.skip_reasoning, \
+                f"Conversational query '{query}' should skip reasoning"
+            assert result.complexity <= 0.3, \
+                f"Conversational query '{query}' should have low complexity"
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "--tb=short"])

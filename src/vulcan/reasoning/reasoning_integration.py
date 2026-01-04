@@ -427,12 +427,35 @@ class ReasoningIntegration:
         Returns:
             True if decomposition should be used, False otherwise
         """
-        return (
+        should_decompose = (
             self._decomposition_enabled
             and complexity >= DECOMPOSITION_COMPLEXITY_THRESHOLD
             and self._problem_decomposer is not None
             and self._query_bridge is not None
         )
+        
+        # Diagnostic logging for ProblemDecomposer utilization tracking
+        if not should_decompose and complexity >= 0.3:
+            reasons = []
+            if not self._decomposition_enabled:
+                reasons.append("decomposition_disabled")
+            if complexity < DECOMPOSITION_COMPLEXITY_THRESHOLD:
+                reasons.append(f"complexity {complexity:.2f} < threshold {DECOMPOSITION_COMPLEXITY_THRESHOLD}")
+            if self._problem_decomposer is None:
+                reasons.append("problem_decomposer_unavailable")
+            if self._query_bridge is None:
+                reasons.append("query_bridge_unavailable")
+            logger.debug(
+                f"{LOG_PREFIX} Decomposition skipped: {', '.join(reasons)} "
+                f"(complexity={complexity:.2f})"
+            )
+        elif should_decompose:
+            logger.info(
+                f"{LOG_PREFIX} Decomposition ENABLED: complexity={complexity:.2f} >= "
+                f"threshold={DECOMPOSITION_COMPLEXITY_THRESHOLD}"
+            )
+        
+        return should_decompose
 
     def _init_components(self) -> None:
         """
@@ -850,9 +873,12 @@ class ReasoningIntegration:
                 # (e.g., "What is the capital of France?") but QueryRouter may
                 # incorrectly override with specialized tools like ['probabilistic'].
                 # Respect the LLM classifier's judgment for these categories.
+                # BUG A FIX: Added CREATIVE and CHITCHAT to skip reasoning
                 SIMPLE_QUERY_CATEGORIES = frozenset([
                     'FACTUAL', 'CONVERSATIONAL', 'UNKNOWN', 'GREETING',
+                    'CREATIVE', 'CHITCHAT',  # BUG A FIX: Creative/chitchat skip reasoning
                     'factual', 'conversational', 'unknown', 'greeting',
+                    'creative', 'chitchat',  # lowercase variants
                 ])
                 
                 if classification.category in SIMPLE_QUERY_CATEGORIES:
@@ -1017,6 +1043,9 @@ class ReasoningIntegration:
 
                 # Learn from outcome if confidence is high enough
                 if result.confidence >= 0.7:
+                    logger.info(
+                        f"{LOG_PREFIX} LEARNING TRIGGERED: confidence={result.confidence:.2f} >= 0.7"
+                    )
                     self._learn_from_reasoning_outcome(
                         query=query,
                         query_type=query_type,
@@ -1027,6 +1056,10 @@ class ReasoningIntegration:
                         confidence=result.confidence,
                         execution_time=selection_time / 1000.0,  # Convert ms to seconds
                         preprocessing_applied=preprocessing_applied,
+                    )
+                else:
+                    logger.debug(
+                        f"{LOG_PREFIX} Learning skipped: confidence={result.confidence:.2f} < 0.7"
                     )
             except Exception as e:
                 # Learning is non-critical - log but don't fail
@@ -1097,9 +1130,30 @@ class ReasoningIntegration:
                     ),
                 }
 
+                # ================================================================
+                # BUG C FIX: Pass preprocessing result as part of problem dict
+                # ================================================================
+                # The SymbolicToolWrapper.reason() method expects preprocessing
+                # to be in problem['preprocessing'], not just in context.
+                # When preprocessing was applied, create a problem dict with
+                # both the query and the preprocessing result.
+                problem_for_request = query  # Default: just the query string
+                
+                if context and context.get('preprocessing'):
+                    preprocessing = context.get('preprocessing')
+                    # Check if preprocessing was actually applied
+                    if hasattr(preprocessing, 'preprocessing_applied') and preprocessing.preprocessing_applied:
+                        problem_for_request = {
+                            'query': query,
+                            'preprocessing': preprocessing,
+                        }
+                        logger.info(
+                            f"{LOG_PREFIX} BUG C FIX: Passing preprocessing to tool via problem dict"
+                        )
+                
                 # Create selection request
                 request = SelectionRequest(
-                    problem=query,
+                    problem=problem_for_request,
                     constraints=constraints,
                     mode=mode,
                     context=context or {},
