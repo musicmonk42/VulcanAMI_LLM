@@ -1638,9 +1638,11 @@ class ProbabilisticToolWrapper:
         
         try:
             # FIX #1: Gate check - is this actually a probability query?
+            # Extract meaningful text from problem for keyword detection
+            query_str = self._extract_query_text(problem)
+            
             # Check if the underlying engine has the gate check method
-            query_str = str(problem) if not isinstance(problem, str) else problem
-            if hasattr(self.engine, '_is_probability_query'):
+            if query_str and hasattr(self.engine, '_is_probability_query'):
                 if not self.engine._is_probability_query(query_str):
                     logger.info(
                         f"[ProbabilisticEngine] Gate check: Query does not appear to be a probability question"
@@ -1713,6 +1715,57 @@ class ProbabilisticToolWrapper:
         except Exception as e:
             logger.error(f"[ProbabilisticEngine] Reasoning failed: {e}", exc_info=True)
             return self._error_result(str(e))
+    
+    def _extract_query_text(self, problem: Any) -> str:
+        """
+        Extract meaningful query text from problem for keyword detection.
+        
+        Handles various problem formats:
+        - String: return as-is
+        - Dict: extract text/query/content fields
+        - Object: try to get text representation from known attributes
+        
+        Returns:
+            Extracted query text, or empty string if no meaningful text found
+        """
+        # String is the simple case
+        if isinstance(problem, str):
+            return problem
+        
+        # Dict: extract text fields
+        if isinstance(problem, dict):
+            # Try common text fields in order of priority
+            text_fields = ['text', 'query', 'content', 'message', 'question', 'input']
+            for field in text_fields:
+                if field in problem and isinstance(problem[field], str):
+                    return problem[field]
+            
+            # If no text fields, check for nested structures
+            if 'problem' in problem:
+                return self._extract_query_text(problem['problem'])
+            
+            # Last resort: stringify dict values (skip technical keys)
+            skip_keys = {'id', 'timestamp', 'metadata', 'config', 'settings'}
+            text_parts = []
+            for key, value in problem.items():
+                if key not in skip_keys and isinstance(value, str):
+                    text_parts.append(value)
+            return ' '.join(text_parts) if text_parts else ''
+        
+        # Object: check for text attributes
+        text_attrs = ['text', 'query', 'content', 'message', 'question']
+        for attr in text_attrs:
+            if hasattr(problem, attr):
+                value = getattr(problem, attr)
+                if isinstance(value, str):
+                    return value
+        
+        # Final fallback: str() but only if it doesn't look like a memory address
+        str_repr = str(problem)
+        if not str_repr.startswith('<') or 'object at 0x' not in str_repr:
+            return str_repr
+        
+        return ''
     
     def _try_bayesian_calculation(self, problem: Any) -> Optional[Dict[str, Any]]:
         """

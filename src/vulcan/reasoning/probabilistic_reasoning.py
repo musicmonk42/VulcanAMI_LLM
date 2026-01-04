@@ -1686,14 +1686,18 @@ class ProbabilisticReasoner(EnhancedProbabilisticReasoner):
     
     # FIX #1: Keywords that indicate a query involves probability concepts
     # Used for gate check to avoid wasting computation on non-probability queries
+    # Note: These are single-word keywords for reliable matching
     PROBABILITY_KEYWORDS = frozenset([
         'probability', 'chance', 'likely', 'likelihood', 'odds', 'percent',
         'bayesian', 'bayes', 'prior', 'posterior', 'expected', 'random',
         'uncertain', 'distribution', 'sample', 'frequency', 'proportion',
         'risk', 'confidence', 'interval', 'p-value', 'significance',
-        'sensitivity', 'specificity', 'prevalence', 'false positive',
-        'true positive', 'predictive value', 'conditional'
+        'sensitivity', 'specificity', 'prevalence', 'predictive', 'conditional',
+        'stochastic', 'variance', 'deviation', 'mean', 'median', 'percentile'
     ])
+    
+    # Regex pattern for word boundary keyword matching (compiled once)
+    _PROBABILITY_KEYWORDS_PATTERN = None
 
     def __init__(self, enable_learning: bool = True):
         super().__init__(enable_learning=enable_learning)
@@ -1717,6 +1721,13 @@ class ProbabilisticReasoner(EnhancedProbabilisticReasoner):
             r'(?:prevalence|prior|base\s*rate)\s*[=:]\s*(\d+(?:\.\d*)?|\.\d+)',
             re.IGNORECASE
         )
+        
+        # Compile word-boundary keyword pattern once for efficient matching
+        if ProbabilisticReasoner._PROBABILITY_KEYWORDS_PATTERN is None:
+            # Build pattern with word boundaries to avoid false positives like "exchange" matching "chance"
+            keywords_sorted = sorted(self.PROBABILITY_KEYWORDS, key=len, reverse=True)
+            pattern = r'\b(?:' + '|'.join(re.escape(kw) for kw in keywords_sorted) + r')\b'
+            ProbabilisticReasoner._PROBABILITY_KEYWORDS_PATTERN = re.compile(pattern, re.IGNORECASE)
     
     def _is_probability_query(self, query: str) -> bool:
         """
@@ -1724,6 +1735,8 @@ class ProbabilisticReasoner(EnhancedProbabilisticReasoner):
         
         This prevents wasting computation on queries like "What color is the sky?"
         that have nothing to do with probability reasoning.
+        
+        Uses word boundary matching to avoid false positives (e.g., "exchange" matching "chance").
         
         Args:
             query: The input query string
@@ -1734,20 +1747,30 @@ class ProbabilisticReasoner(EnhancedProbabilisticReasoner):
         if not isinstance(query, str):
             return False
         
-        query_lower = query.lower()
-        
-        # Check for any probability keywords
-        for keyword in self.PROBABILITY_KEYWORDS:
-            if keyword in query_lower:
+        # Check for probability keywords using word-boundary pattern
+        # This avoids false positives like "exchange" matching "chance"
+        if ProbabilisticReasoner._PROBABILITY_KEYWORDS_PATTERN is not None:
+            if ProbabilisticReasoner._PROBABILITY_KEYWORDS_PATTERN.search(query):
                 return True
         
-        # Check for percentage patterns (e.g., "50%", "0.5")
-        if re.search(r'\d+\.?\d*\s*%', query_lower):
+        # Check for percentage patterns (e.g., "50%", "0.5%", ".5%")
+        # Pattern matches: 50%, 0.5%, .5%, etc.
+        if re.search(r'(?:\d+\.?\d*|\.\d+)\s*%', query):
             return True
         
         # Check for probability notation (e.g., "P(A|B)")
         if re.search(r'P\s*\([^)]*\)', query):
             return True
+        
+        # Check for multi-word probability phrases
+        query_lower = query.lower()
+        probability_phrases = [
+            'false positive', 'true positive', 'false negative', 'true negative',
+            'base rate', 'confidence interval', 'standard deviation'
+        ]
+        for phrase in probability_phrases:
+            if phrase in query_lower:
+                return True
         
         return False
 
