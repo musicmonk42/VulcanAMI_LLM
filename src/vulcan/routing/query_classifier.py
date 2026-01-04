@@ -43,6 +43,8 @@ class QueryCategory(Enum):
     GREETING = "GREETING"
     CHITCHAT = "CHITCHAT"
     FACTUAL = "FACTUAL"
+    CREATIVE = "CREATIVE"  # BUG A FIX: Creative writing, stories, poems
+    CONVERSATIONAL = "CONVERSATIONAL"  # BUG A FIX: General conversation
     MATHEMATICAL = "MATHEMATICAL"
     LOGICAL = "LOGICAL"
     PROBABILISTIC = "PROBABILISTIC"
@@ -168,6 +170,40 @@ FACTUAL_PATTERNS: Tuple[re.Pattern, ...] = (
     re.compile(r"^where\s+(is|was|are|were)\s+", re.IGNORECASE),
     re.compile(r"^define\s+", re.IGNORECASE),
     re.compile(r"^what\s+does\s+.*\s+mean", re.IGNORECASE),
+)
+
+# =============================================================================
+# BUG A FIX: Creative writing patterns - complexity 0.2, skip reasoning
+# =============================================================================
+# Creative writing queries should NOT go through reasoning engines
+# They should be routed directly to LLM for generation
+CREATIVE_PATTERNS: Tuple[re.Pattern, ...] = (
+    re.compile(r"^write\s+(me\s+)?(a|an|the)\s+", re.IGNORECASE),
+    re.compile(r"^write\s+a\s+\w+\s+paragraph", re.IGNORECASE),
+    re.compile(r"^write\s+\d+\s+paragraph", re.IGNORECASE),
+    re.compile(r"^(create|compose|draft|pen)\s+(me\s+)?(a|an)\s+", re.IGNORECASE),
+    re.compile(r"^tell\s+(me\s+)?a\s+story", re.IGNORECASE),
+    re.compile(r"^(can\s+you\s+)?write\s+", re.IGNORECASE),
+    re.compile(r"\bstory\s+about\b", re.IGNORECASE),
+    re.compile(r"\bpoem\s+about\b", re.IGNORECASE),
+    re.compile(r"\bessay\s+about\b", re.IGNORECASE),
+    re.compile(r"\bsong\s+about\b", re.IGNORECASE),
+)
+
+# Creative writing keywords
+CREATIVE_KEYWORDS: FrozenSet[str] = frozenset([
+    "write", "story", "poem", "essay", "song", "lyrics",
+    "fiction", "narrative", "tale", "creative", "compose",
+    "paragraph", "paragraphs", "draft", "letter",
+])
+
+# Conversational patterns - complexity 0.1, skip reasoning
+CONVERSATIONAL_PATTERNS: Tuple[re.Pattern, ...] = (
+    re.compile(r"^what'?s?\s+(the\s+)?capital\s+of\s+", re.IGNORECASE),
+    re.compile(r"^tell\s+me\s+about\s+", re.IGNORECASE),
+    re.compile(r"^explain\s+", re.IGNORECASE),
+    re.compile(r"^describe\s+", re.IGNORECASE),
+    re.compile(r"^what\s+do\s+you\s+(think|know)\s+about\s+", re.IGNORECASE),
 )
 
 
@@ -353,6 +389,45 @@ class QueryClassifier:
                     source="keyword",
                 )
         
+        # =============================================================================
+        # BUG A FIX: Check creative writing patterns BEFORE reasoning patterns
+        # =============================================================================
+        # Creative queries like "write a story about..." should NOT go to reasoning engines
+        for pattern in CREATIVE_PATTERNS:
+            if pattern.search(query_original):
+                return QueryClassification(
+                    category=QueryCategory.CREATIVE.value,
+                    complexity=0.2,  # Low complexity - LLM can handle directly
+                    suggested_tools=["general"],  # Route to LLM, not reasoning engines
+                    skip_reasoning=True,  # CRITICAL: Skip reasoning entirely
+                    confidence=0.95,
+                    source="keyword",
+                )
+        
+        # Check creative keywords
+        creative_count = sum(1 for kw in CREATIVE_KEYWORDS if kw in query_lower)
+        if creative_count >= 2:
+            return QueryClassification(
+                category=QueryCategory.CREATIVE.value,
+                complexity=0.2,
+                suggested_tools=["general"],
+                skip_reasoning=True,
+                confidence=0.85,
+                source="keyword",
+            )
+        
+        # Check conversational patterns
+        for pattern in CONVERSATIONAL_PATTERNS:
+            if pattern.search(query_original):
+                return QueryClassification(
+                    category=QueryCategory.CONVERSATIONAL.value,
+                    complexity=0.2,
+                    suggested_tools=["general"],
+                    skip_reasoning=True,
+                    confidence=0.85,
+                    source="keyword",
+                )
+        
         # Check logical/SAT indicators
         logical_count = sum(1 for kw in LOGICAL_KEYWORDS if kw in query_lower)
         if logical_count >= 2 or any(sym in query_lower for sym in ['∧', '∨', '→', '¬', '⊢', '⊨']):
@@ -484,6 +559,8 @@ Categories:
 - GREETING: Simple hello, hi, thanks, bye (complexity: 0.0)
 - CHITCHAT: Casual conversation, how are you (complexity: 0.1)
 - FACTUAL: Simple factual question (complexity: 0.2)
+- CREATIVE: Creative writing requests - stories, poems, essays (complexity: 0.2, skip_reasoning: true)
+- CONVERSATIONAL: General questions, capital of a country (complexity: 0.2, skip_reasoning: true)
 - MATHEMATICAL: Math calculations, equations (complexity: 0.4-0.7)
 - LOGICAL: SAT, propositional logic, proofs (complexity: 0.6-0.9)
 - PROBABILISTIC: Bayes, probability, statistics (complexity: 0.5-0.8)
