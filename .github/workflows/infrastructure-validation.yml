@@ -525,6 +525,9 @@ jobs:
     name: Validate Docker Configurations
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      HADOLINT_VERSION: "2.14.0"
+      HADOLINT_CHECKSUM: "6bf226944684f56c84dd014e8b979d27425c0148f61b3bd99bcc6f39e9dc5a47"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -586,7 +589,8 @@ jobs:
 
       - name: Install Hadolint
         run: |
-          wget -qO /tmp/hadolint https://github.com/hadolint/hadolint/releases/download/v2.14.0/hadolint-Linux-x86_64
+          wget -qO /tmp/hadolint https://github.com/hadolint/hadolint/releases/download/v${HADOLINT_VERSION}/hadolint-Linux-x86_64
+          echo "${HADOLINT_CHECKSUM}  /tmp/hadolint" | sha256sum -c -
           chmod +x /tmp/hadolint
           sudo mv /tmp/hadolint /usr/local/bin/hadolint
 
