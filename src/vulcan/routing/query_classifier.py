@@ -46,6 +46,7 @@ class QueryCategory(Enum):
     CREATIVE = "CREATIVE"  # BUG A FIX: Creative writing, stories, poems
     CONVERSATIONAL = "CONVERSATIONAL"  # BUG A FIX: General conversation
     SELF_INTROSPECTION = "SELF_INTROSPECTION"  # BUG S FIX: Questions about Vulcan's capabilities/identity
+    SPECULATION = "SPECULATION"  # Counterfactual/hypothetical reasoning queries
     MATHEMATICAL = "MATHEMATICAL"
     LOGICAL = "LOGICAL"
     PROBABILISTIC = "PROBABILISTIC"
@@ -288,6 +289,55 @@ SELF_INTROSPECTION_KEYWORDS: FrozenSet[str] = frozenset([
     "feature", "features", "goal", "goals", "purpose", "motivation",
     "limitation", "limitations", "weakness", "strength",
     "value", "values", "ethics", "principle", "principles",
+])
+
+# =============================================================================
+# SPECULATION patterns - Counterfactual/hypothetical reasoning queries
+# =============================================================================
+# These queries are semantically complex but syntactically simple.
+# They require counterfactual reasoning, world model simulation, and imagination.
+# Without proper handling, they get UNKNOWN category with low complexity (0.05)
+# and get deflected instead of engaged with.
+#
+# Examples:
+#   - "speculate what love would be like for you"
+#   - "imagine if you could experience emotions"
+#   - "what would it be like to feel happiness"
+#   - "hypothetically, if you had consciousness"
+
+SPECULATION_PATTERNS: Tuple[re.Pattern, ...] = (
+    # "speculate" keyword patterns
+    re.compile(r"\bspeculate\b", re.IGNORECASE),
+    # "imagine if" patterns
+    re.compile(r"\bimagine\s+if\b", re.IGNORECASE),
+    re.compile(r"\bimagine\s+(what|how|that)\b", re.IGNORECASE),
+    # "what would...be like" patterns - combined to avoid overlap
+    re.compile(r"\bwhat\s+would\s+(?:it\s+)?(?:\w+\s+)?(?:be|feel)\s+like\b", re.IGNORECASE),
+    # "hypothetically" patterns
+    re.compile(r"\bhypothetically\b", re.IGNORECASE),
+    re.compile(r"\bhypothetical\s+(?:scenario|situation|case)\b", re.IGNORECASE),
+    # "if you could/had" patterns - requires experience/feeling/cognitive context
+    # Matches: "if you could experience/feel/have emotions/dream/think/remember"
+    re.compile(
+        r"\bif\s+you\s+(?:could|had|were\s+able\s+to)\s+"
+        r"(?:experience|feel|have\s+(?:emotions?|feelings?|consciousness)|"
+        r"dream|think|remember|sense|perceive|understand|love|hate|fear)\b",
+        re.IGNORECASE
+    ),
+    # "suppose" patterns - specific to AI self-reflection
+    re.compile(r"\bsuppose\s+you\s+(?:could|had|felt|were)\b", re.IGNORECASE),
+    re.compile(r"\bsuppose\s+that\s+you\b", re.IGNORECASE),
+    # "what if" + counterfactual about AI capabilities
+    # Matches: "what if you could/had/felt/experienced" followed by any word
+    re.compile(r"\bwhat\s+if\s+you\s+(?:could|had|felt|experienced)\b", re.IGNORECASE),
+)
+
+# Single-word keywords only - multi-word phrases are handled by regex patterns above
+SPECULATION_KEYWORDS: FrozenSet[str] = frozenset([
+    "speculate", "speculation", "speculative",
+    "hypothetically", "hypothetical",
+    "counterfactual",
+    "conjecture",
 ])
 
 
@@ -545,6 +595,24 @@ class QueryClassifier:
                     source="keyword",
                 )
         
+        # =============================================================================
+        # SPECULATION FIX: Check speculation/counterfactual patterns
+        # =============================================================================
+        # Speculation queries are semantically complex (require counterfactual reasoning,
+        # world model simulation, imagination) but syntactically simple.
+        # Without this check, they fall through to UNKNOWN with complexity 0.05 and
+        # trigger Arena routing loop -> deflection.
+        # Complexity 0.40 is above Arena threshold (0.10), ensuring proper routing.
+        if self._check_speculation(query_lower, query_original):
+            return QueryClassification(
+                category=QueryCategory.SPECULATION.value,
+                complexity=0.40,  # Semantic complexity override - above Arena threshold
+                suggested_tools=["world_model", "philosophical"],
+                skip_reasoning=False,  # Requires counterfactual reasoning
+                confidence=0.85,
+                source="keyword",
+            )
+        
         # Check logical/SAT indicators
         logical_count = sum(1 for kw in LOGICAL_KEYWORDS if kw in query_lower)
         if logical_count >= LOGICAL_KEYWORD_THRESHOLD or any(sym in query_lower for sym in ['∧', '∨', '→', '¬', '⊢', '⊨']):
@@ -662,6 +730,38 @@ class QueryClassifier:
             source="keyword",
         )
     
+    def _check_speculation(self, query_lower: str, query_original: str) -> bool:
+        """
+        Check if query is a speculation/counterfactual query.
+        
+        Speculation queries require counterfactual reasoning, world model simulation,
+        and imagination. They are semantically complex but syntactically simple.
+        
+        Examples:
+            - "speculate what love would be like for you"
+            - "imagine if you could experience emotions"
+            - "what would it be like to feel happiness"
+            - "hypothetically, if you had consciousness"
+        
+        Args:
+            query_lower: Lowercased query string
+            query_original: Original query string (for regex matching)
+            
+        Returns:
+            True if query matches speculation patterns
+        """
+        # Check regex patterns
+        for pattern in SPECULATION_PATTERNS:
+            if pattern.search(query_original):
+                return True
+        
+        # Check keywords
+        for keyword in SPECULATION_KEYWORDS:
+            if keyword in query_lower:
+                return True
+        
+        return False
+    
     def _classify_by_llm(self, query: str) -> Optional[QueryClassification]:
         """
         Use LLM for query classification.
@@ -692,6 +792,7 @@ Categories:
 - FACTUAL: Simple factual question (complexity: 0.2)
 - CREATIVE: Creative writing requests - stories, poems, essays (complexity: 0.2, skip_reasoning: true)
 - CONVERSATIONAL: General questions, capital of a country (complexity: 0.2, skip_reasoning: true)
+- SPECULATION: Counterfactual/hypothetical queries like "imagine if...", "what would...be like" (complexity: 0.4)
 - MATHEMATICAL: Math calculations, equations (complexity: 0.4-0.7)
 - LOGICAL: SAT, propositional logic, proofs (complexity: 0.6-0.9)
 - PROBABILISTIC: Bayes, probability, statistics (complexity: 0.5-0.8)
