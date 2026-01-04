@@ -1104,17 +1104,22 @@ class TestCompatibility:
         # Verify that the DAG was constructed
         assert "causal_graph" in result
         
-        # The DAG should contain E -> S, NOT S -> E
-        # Access the internal DAG to verify edge direction
-        dag = reasoner._query_dag
-        if NETWORKX_AVAILABLE and dag is not None:
-            # E should point to S (exercise causes supplement-taking)
-            assert dag.has_edge('E', 'S'), "Missing edge E -> S (exercise causes supplement use)"
-            # S should NOT point to E (supplements don't cause exercise)
-            assert not dag.has_edge('S', 'E'), "Incorrect edge S -> E should not exist"
-            
-            # E should be identified as a confounder between S and D
-            assert 'E' in result.get('confounders', []), "E should be identified as a confounder"
+        # Verify the causal graph string representation contains E→S
+        # This is the expected edge direction after the BUG L FIX
+        causal_graph_str = result.get("causal_graph", "")
+        assert "E→S" in causal_graph_str or "E->S" in causal_graph_str or (
+            reasoner._query_dag is not None and 
+            NETWORKX_AVAILABLE and 
+            reasoner._query_dag.has_edge('E', 'S')
+        ), f"Expected E→S in causal graph, got: {causal_graph_str}"
+        
+        # The incorrect edge S→E should NOT be in the graph
+        # (unless added by some other pattern, which it shouldn't be)
+        if reasoner._query_dag is not None and NETWORKX_AVAILABLE:
+            assert not reasoner._query_dag.has_edge('S', 'E'), "Incorrect edge S→E should not exist"
+        
+        # E should be identified as a confounder between S and D
+        assert 'E' in result.get('confounders', []), "E should be identified as a confounder"
         
         # Verify the reasoning type
         assert result.get("reasoning_type") == "causal"
