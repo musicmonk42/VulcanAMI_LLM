@@ -1259,6 +1259,85 @@ service_manager = AsyncServiceManager()
 # LIFESPAN MANAGEMENT
 # =============================================================================
 
+# Global flag to track background initialization status
+# This is used by /health/ready to know if the platform is fully ready
+_background_init_started = False
+_background_init_complete = False
+
+
+async def _background_model_loading(app_state: Any, components_status: dict, logger) -> None:
+    """
+    Background task to load heavy ML models AFTER server starts accepting connections.
+    
+    This function is called after the lifespan yields, allowing the /health/live endpoint
+    to respond immediately while models load in the background.
+    
+    CRITICAL FIX: This prevents Railway healthcheck failures by ensuring the server
+    accepts connections before heavy model loading completes.
+    """
+    global _background_init_complete
+    
+    try:
+        logger.info("=" * 70)
+        logger.info("Background Model Loading Started (non-blocking)")
+        logger.info("=" * 70)
+        
+        # Give the event loop time to process incoming requests
+        await asyncio.sleep(0.1)
+        
+        try:
+            # 1. Pre-load BERT model (GraphixTransformer singleton)
+            logger.info("Pre-loading BERT model...")
+            from vulcan.processing import GraphixTransformer
+            _ = GraphixTransformer.get_instance()  # Force singleton initialization
+            logger.info("  ✅ BERT model pre-loaded")
+            components_status["BERT Model"] = True
+        except Exception as e:
+            logger.warning(f"  ⚠ BERT model pre-load failed: {e}")
+            components_status["BERT Model"] = False
+        
+        # Give the event loop time to process incoming requests
+        await asyncio.sleep(0.1)
+        
+        try:
+            # 2. Pre-load QueryAnalyzer singleton (includes safety validators)
+            logger.info("Pre-loading QueryAnalyzer...")
+            from vulcan.routing.query_router import get_query_analyzer
+            _ = get_query_analyzer()  # Force singleton initialization
+            logger.info("  ✅ QueryAnalyzer pre-loaded")
+            components_status["QueryAnalyzer"] = True
+        except Exception as e:
+            logger.warning(f"  ⚠ QueryAnalyzer pre-load failed: {e}")
+            components_status["QueryAnalyzer"] = False
+        
+        # Give the event loop time to process incoming requests
+        await asyncio.sleep(0.1)
+        
+        try:
+            # 3. Pre-load DynamicModelManager and essential models
+            logger.info("Pre-loading text embedding model...")
+            from vulcan.processing import DynamicModelManager
+            model_manager = DynamicModelManager()
+            model_manager.preload_essential_models()
+            logger.info("  ✅ Text embedding model pre-loaded")
+            components_status["Text Embedding Model"] = True
+        except Exception as e:
+            logger.warning(f"  ⚠ Text embedding model pre-load failed: {e}")
+            components_status["Text Embedding Model"] = False
+        
+        # Mark as complete
+        _background_init_complete = True
+        app_state.models_loaded = True
+        
+        logger.info("=" * 70)
+        logger.info("Background Model Loading Complete!")
+        logger.info("=" * 70)
+        
+    except Exception as e:
+        logger.error(f"Background model loading failed: {e}", exc_info=True)
+        _background_init_complete = True  # Still mark complete so we don't block forever
+        app_state.models_loaded = False
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -1341,6 +1420,9 @@ async def lifespan(app: FastAPI):
     # and *inside* the worker process.
     setup_unified_logging()
 
+    # Initialize models_loaded flag early - models will be loaded in background
+    app.state.models_loaded = False
+    
     # STARTUP
     try:
         logger.info("=" * 70)
@@ -2484,49 +2566,13 @@ async def lifespan(app: FastAPI):
             logger.error(f"  ❌ Query Routing Layer failed: {e}")
 
         # ================================================================
-        # PRE-LOAD MODELS TO AVOID FIRST-QUERY LATENCY (Issue #55)
+        # NOTE: MODEL PRE-LOADING MOVED TO BACKGROUND TASK (Issue #55 + Railway Fix)
         # ================================================================
-        # Pre-load BERT and embedding models at startup to prevent
-        # 1.7+ second latency on first query
-        logger.info("=" * 70)
-        logger.info("Pre-loading Models (avoiding first-query latency)")
-        logger.info("=" * 70)
-        
-        try:
-            # 1. Pre-load BERT model (GraphixTransformer singleton)
-            logger.info("Pre-loading BERT model...")
-            from vulcan.processing import GraphixTransformer
-            _ = GraphixTransformer.get_instance()  # Force singleton initialization
-            logger.info("  ✅ BERT model pre-loaded")
-            components_status["BERT Model"] = True
-        except Exception as e:
-            logger.warning(f"  ⚠ BERT model pre-load failed: {e}")
-            components_status["BERT Model"] = False
-        
-        try:
-            # 2. Pre-load QueryAnalyzer singleton (includes safety validators)
-            # Note: This may have already been initialized if unified_learning is available,
-            # but we ensure it's always pre-loaded regardless of learning system status
-            logger.info("Pre-loading QueryAnalyzer...")
-            from vulcan.routing.query_router import get_query_analyzer
-            _ = get_query_analyzer()  # Force singleton initialization (no-op if already created)
-            logger.info("  ✅ QueryAnalyzer pre-loaded")
-            components_status["QueryAnalyzer"] = True
-        except Exception as e:
-            logger.warning(f"  ⚠ QueryAnalyzer pre-load failed: {e}")
-            components_status["QueryAnalyzer"] = False
-        
-        try:
-            # 3. Pre-load DynamicModelManager and essential models
-            logger.info("Pre-loading text embedding model...")
-            from vulcan.processing import DynamicModelManager
-            model_manager = DynamicModelManager()
-            model_manager.preload_essential_models()
-            logger.info("  ✅ Text embedding model pre-loaded")
-            components_status["Text Embedding Model"] = True
-        except Exception as e:
-            logger.warning(f"  ⚠ Text embedding model pre-load failed: {e}")
-            components_status["Text Embedding Model"] = False
+        # Heavy model loading (BERT, embeddings) is now done in _background_model_loading()
+        # which runs AFTER the server starts accepting connections. This prevents Railway
+        # healthcheck failures while still avoiding first-query latency.
+        # The models will be loaded asynchronously after /health/live becomes available.
+        logger.info("ℹ️  Model pre-loading will run in background after server starts")
 
         # Summary counts
         # Count mounted FastAPI/Flask services (excluding background processes)
@@ -2562,6 +2608,20 @@ async def lifespan(app: FastAPI):
         logger.info("=" * 70)
         logger.info(f"Platform Ready! (Worker {worker_id})")
         logger.info("=" * 70)
+        
+        # ================================================================
+        # SCHEDULE BACKGROUND MODEL LOADING (NON-BLOCKING)
+        # ================================================================
+        # Schedule the heavy model loading to run in the background.
+        # The yield will happen immediately, allowing the server to accept
+        # connections while models load. This fixes Railway healthcheck failures.
+        global _background_init_started
+        if not _background_init_started:
+            _background_init_started = True
+            logger.info("🚀 Scheduling background model loading...")
+            asyncio.create_task(
+                _background_model_loading(app.state, components_status, logger)
+            )
 
     except asyncio.CancelledError:
         logger.warning(f"Unified Platform (Worker {worker_id}) startup cancelled")
@@ -3028,13 +3088,21 @@ async def health_ready():
         )
         total_services = len(service_status)
         
+        # Check if models are loaded (for full readiness)
+        models_loaded = getattr(app.state, "models_loaded", False)
+        
         # Ready if we have at least one mounted service
+        # Note: We return 200 even if models aren't loaded yet, because
+        # the server can still handle basic requests. Models loading in
+        # background is indicated in the response.
         if mounted_services > 0:
             return {
                 "status": "ready", 
                 "timestamp": datetime.utcnow().isoformat(),
                 "mounted_services": mounted_services,
-                "total_services": total_services
+                "total_services": total_services,
+                "models_loaded": models_loaded,
+                "note": "Models are still loading in background." if not models_loaded else None
             }
         else:
             return JSONResponse(
