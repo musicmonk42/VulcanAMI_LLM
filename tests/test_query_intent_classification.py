@@ -96,7 +96,7 @@ class TestPhilosophicalQueryDetection:
         - Correct routing: PHILOSOPHICAL-FAST-PATH
         
         NOTE: The system now correctly routes to philosophical fast-path with
-        appropriate philosophical tools (may include 'philosophical', 'symbolic', 'causal').
+        'philosophical' or 'general' tools, avoiding pure 'mathematical' tools.
         """
         # The exact type of query that was causing the bug
         test_queries = [

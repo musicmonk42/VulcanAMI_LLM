@@ -873,9 +873,7 @@ CATEGORIES:
 - PROBABILISTIC: Bayesian inference, probability calculations, statistical reasoning
 - MATHEMATICAL: Proofs, calculus, algebra, theorem proving
 - ANALOGICAL: Domain mapping, analogical reasoning, transfer learning
-- SELF_INTROSPECTION: Questions about AI's nature, capabilities, self-awareness, existence, 
-  what makes the AI different, philosophical questions about the AI itself, metaphysical 
-  questions about AI being/consciousness, "what are you", "nature of what you are"
+- SELF_INTROSPECTION: Questions about AI's nature, capabilities, consciousness, and existence
 - PHILOSOPHICAL: Ethical dilemmas, trolley problems, moral reasoning (about external situations)
 - UNKNOWN: None of the above
 
