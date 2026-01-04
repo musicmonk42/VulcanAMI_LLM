@@ -585,7 +585,7 @@ jobs:
           echo "Dockerfile validation passed!"
 
       - name: Lint Dockerfile with Hadolint
-        uses: hadolint/hadolint-action@v2
+        uses: hadolint/hadolint-action@v3.1.0
         with:
           dockerfile: Dockerfile
           failure-threshold: warning
