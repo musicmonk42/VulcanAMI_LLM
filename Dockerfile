@@ -47,6 +47,14 @@
 # into the image, pass:
 #   --build-arg REJECT_INSECURE_JWT=ack
 #
+# DEPENDENCY HASH ENFORCEMENT:
+# Pass --build-arg REQUIRE_HASHES=1 to enforce hash-verified installs.
+# If REQUIRE_HASHES=1 and hashed install fails, the build will fail.
+# Default is REQUIRE_HASHES=0 (fallback to unhashed install allowed).
+# Build output includes one of:
+#   HASHED_DEPS=ENFORCED        - Hashed install succeeded
+#   HASHED_DEPS=FALLBACK_UNHASHED - Fallback to unhashed install used
+#
 # =============================================================================
 
 # -----------------------------
@@ -55,6 +63,7 @@
 FROM python:3.11-slim AS builder
 
 ARG REJECT_INSECURE_JWT="default-super-secret-key-change-me"
+ARG REQUIRE_HASHES=0
 
 # Fail build unless acknowledgement arg changed from default
 RUN test "$REJECT_INSECURE_JWT" != "default-super-secret-key-change-me" || \
@@ -113,22 +122,36 @@ COPY setup.py ./setup.py
 # NOTE: The requirements-hashed.txt was generated with Python 3.12. If hash mismatches occur
 # on different Python versions or platforms, the build will fall back to unhashed install.
 # For maximum security, regenerate hashes on the target platform.
+#
+# REQUIRE_HASHES build argument controls enforcement:
+#   REQUIRE_HASHES=1: Enforce --require-hashes and fail the build if it does not succeed
+#   REQUIRE_HASHES=0 (default): Attempt hashed install first, allow fallback to requirements.txt
 RUN if [ -f requirements-hashed.txt ] && grep -qE '^[^#]' requirements-hashed.txt; then \
         echo "=== Attempting hashed dependency installation ==="; \
         echo "File: requirements-hashed.txt ($(grep -cE '^[^#]' requirements-hashed.txt) non-comment lines)"; \
         if pip install --no-cache-dir --root-user-action=ignore --require-hashes -r requirements-hashed.txt; then \
-            echo "=== SUCCESS: Hashed dependency verification passed ==="; \
+            echo "HASHED_DEPS=ENFORCED"; \
         else \
-            echo "=== WARNING: Hashed install failed (exit code: $?), falling back to unhashed install ==="; \
+            if [ "${REQUIRE_HASHES}" = "1" ]; then \
+                echo "ERROR: Hashed install failed and REQUIRE_HASHES=1 is set. Failing build." >&2; \
+                exit 1; \
+            fi; \
+            echo "=== WARNING: Hashed install failed, falling back to unhashed install ==="; \
             echo "This may happen due to platform/architecture differences or hash mismatches."; \
             echo "For full supply chain security, regenerate requirements-hashed.txt on target platform."; \
             pip install --no-cache-dir --root-user-action=ignore -r requirements.txt; \
+            echo "HASHED_DEPS=FALLBACK_UNHASHED"; \
         fi; \
     else \
+        if [ "${REQUIRE_HASHES}" = "1" ]; then \
+            echo "ERROR: requirements-hashed.txt not found or empty, and REQUIRE_HASHES=1 is set. Failing build." >&2; \
+            exit 1; \
+        fi; \
         echo "=== WARNING: requirements-hashed.txt not found or empty ==="; \
         echo "Using unhashed install (NOT RECOMMENDED FOR PRODUCTION)"; \
         echo "Generate with: pip-compile --generate-hashes requirements.txt"; \
         pip install --no-cache-dir --root-user-action=ignore -r requirements.txt; \
+        echo "HASHED_DEPS=FALLBACK_UNHASHED"; \
     fi
 
 # Optional: Generate CycloneDX SBOM (can be skipped by removing lines)
