@@ -2858,14 +2858,19 @@ class ToolSelector:
         # to be routed to the World Model's SelfModel instead of reasoning engines.
         try:
             # Try to get the world model instance from the global context
-            # The WorldModelToolWrapper can work without a live world model
-            # using its static self-model data as a fallback
+            # The WorldModelToolWrapper is DESIGNED to work without a live world model
+            # using its static self-model data as a fallback. The live world model
+            # should be injected via the orchestrator/main.py at runtime when available.
+            # This initialization creates a functional wrapper that can serve
+            # self-introspection queries even during standalone testing.
             world_model_instance = None
             try:
                 from ...world_model.world_model_core import WorldModel
-                # Note: We don't create a new WorldModel here - that should be done
+                # Note: We don't instantiate WorldModel here - that should be done
                 # at application startup. The wrapper can function without it.
-                logger.info("[ToolSelector] WorldModel module available")
+                # When a live world model is available, it will be passed to the
+                # wrapper via the orchestrator or main.py.
+                logger.info("[ToolSelector] WorldModel module available for future injection")
             except ImportError:
                 logger.debug("[ToolSelector] WorldModel module not available, using static self-model")
             
