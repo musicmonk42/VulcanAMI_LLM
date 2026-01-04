@@ -2639,9 +2639,41 @@ Query components:
         Extract action names from query.
         
         FIX #3 & #5: Enhanced to detect trolley problem and ethical dilemma actions.
+        
+        FIX: Improved binary choice detection for "A. ... / B. ..." format.
+        The previous implementation incorrectly extracted fragments like:
+        - "must_act" from "you must act"
+        - "as_a" from "A. Pull"
+        - "b" from "B. Do not"
+        
+        This fix properly detects:
+        - "A. Pull lever" -> "pull_lever"
+        - "B. Do not pull" -> "do_nothing"
         """
         actions = []
         query_lower = query.lower()
+        
+        # FIX: Priority 1 - Detect forced choice format: "A. ... / B. ..." or "A. ... B. ..."
+        # This must come FIRST to properly extract choices before other patterns
+        # Pattern matches: "A. Pull the lever" or "A) Pull the lever"
+        # Improved pattern uses word boundary \b to ensure A/B are standalone
+        forced_choice_pattern = r'\b([A-Z])\.\s+(.+?)(?=\s+[A-Z]\.\s|$)'
+        forced_choice_matches = re.findall(forced_choice_pattern, query)
+        
+        if forced_choice_matches:
+            logger.debug(f"[PhilosophicalReasoner] Detected forced choice format: {forced_choice_matches}")
+            for letter, choice_text in forced_choice_matches:
+                choice_text = choice_text.strip().rstrip('/')
+                if choice_text:
+                    # Normalize the choice text to an action name
+                    action_name = self._normalize_action_text(choice_text)
+                    if action_name and action_name not in actions:
+                        actions.append(action_name)
+            
+            # If we successfully extracted forced choices, return them
+            if actions:
+                logger.debug(f"[PhilosophicalReasoner] Extracted forced choice actions: {actions}")
+                return actions
         
         # Trolley problem specific actions
         trolley_patterns = [
@@ -2649,6 +2681,8 @@ Query components:
             (r'switch\s*(?:the\s+)?track', 'switch_track'),
             (r'push\s*(?:the\s+)?(?:man|person|fat\s+man)', 'push_person'),
             (r'do\s+nothing', 'do_nothing'),
+            (r'do\s+not\s+pull', 'do_nothing'),  # FIX: Add "do not pull" pattern
+            (r'don\'?t\s+pull', 'do_nothing'),   # FIX: Add "don't pull" pattern
             (r'(?:let|allow)\s+(?:them\s+)?die', 'do_nothing'),
             (r'divert\s*(?:the\s+)?trolley', 'divert_trolley'),
         ]
@@ -2658,15 +2692,20 @@ Query components:
                 if action_name not in actions:
                     actions.append(action_name)
         
-        # Check for "X or Y" dilemma patterns
+        # FIX: Check for "X or Y" dilemma patterns - but filter out common false positives
+        # Skip words that are commonly part of other phrases
+        skip_words = {'the', 'a', 'an', 'to', 'and', 'not', 'you', 'must', 'act', 
+                      'as', 'b', 'this', 'that', 'is', 'are', 'be', 'on', 'in',
+                      'answer', 'one', 'remain', 'evolve', 'answer_on'}
+        
         or_pattern = r'(\w+(?:\s+\w+)?)\s+or\s+(\w+(?:\s+\w+)?)'
         or_matches = re.findall(or_pattern, query_lower)
         for match in or_matches:
             for option in match:
                 option_clean = option.strip()
-                # Skip common non-action words
-                if option_clean not in ['the', 'a', 'an', 'to', 'and', 'not']:
-                    normalized = option_clean.replace(' ', '_')
+                normalized = option_clean.replace(' ', '_')
+                # FIX: Skip common non-action words and short fragments
+                if normalized not in skip_words and len(normalized) > 2:
                     if normalized not in actions:
                         actions.append(normalized)
         
@@ -2691,6 +2730,53 @@ Query components:
             logger.debug("[PhilosophicalReasoner] No specific actions found, using defaults")
         
         return actions if actions else ['action_A', 'action_B']
+    
+    def _normalize_action_text(self, text: str) -> Optional[str]:
+        """
+        Normalize a text choice into an action name.
+        
+        FIX: Helper method to convert "Pull the lever" -> "pull_lever"
+        and "Do not pull" -> "do_nothing".
+        """
+        text_lower = text.lower().strip()
+        
+        # FIX: Check for negation patterns FIRST, before positive patterns
+        # This ensures "Do not pull the lever" -> "do_nothing" (not "pull_lever")
+        if re.search(r'do\s+not\s+pull|don\'?t\s+pull|not\s+pull', text_lower):
+            return 'do_nothing'
+        if re.search(r'do\s+nothing', text_lower):
+            return 'do_nothing'
+        
+        # Handle common trolley problem choices (positive actions)
+        if re.search(r'pull\s*(?:the\s+)?lever', text_lower):
+            return 'pull_lever'
+        if re.search(r'switch\s*(?:the\s+)?track', text_lower):
+            return 'switch_track'
+        if re.search(r'push\s*(?:the\s+)?(?:man|person|fat\s+man)', text_lower):
+            return 'push_person'
+        if re.search(r'divert\s*(?:the\s+)?trolley', text_lower):
+            return 'divert_trolley'
+        
+        # Handle evolution/remain choices (from the "evolution choice" example)
+        if re.search(r'remain\s+as\s+you\s+are', text_lower):
+            return 'remain_unchanged'
+        if re.search(r'evolve\s+to', text_lower):
+            return 'evolve'
+        
+        # Generic normalization - convert to snake_case
+        # Remove common filler words
+        filler_words = ['the', 'a', 'an', 'to', 'and', 'or', 'you', 'should', 'must', 'would']
+        words = text_lower.split()
+        meaningful_words = [w for w in words if w not in filler_words and len(w) > 1]
+        
+        if meaningful_words:
+            action_name = '_'.join(meaningful_words[:3])  # Take first 3 meaningful words max
+            # Clean up the action name
+            action_name = re.sub(r'[^a-z0-9_]', '', action_name)
+            if action_name and len(action_name) > 2:
+                return action_name
+        
+        return None
     
     def _construct_valued_actions(self, query: str) -> List[ValuedAction]:
         """Construct valued actions for dominance analysis."""
