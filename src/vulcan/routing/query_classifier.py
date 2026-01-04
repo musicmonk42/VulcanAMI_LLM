@@ -90,6 +90,16 @@ MATH_KEYWORD_THRESHOLD = 2      # Minimum keyword matches to classify as MATHEMA
 ANALOG_KEYWORD_THRESHOLD = 2    # Minimum keyword matches to classify as ANALOGICAL
 PHIL_KEYWORD_THRESHOLD = 2      # Minimum keyword matches to classify as PHILOSOPHICAL
 
+# Reasoning indicators - queries containing these should NOT skip reasoning
+# Used to distinguish casual queries from queries that need formal reasoning
+REASONING_INDICATORS: FrozenSet[str] = frozenset([
+    '→', '∨', '∧', '¬', '↔',  # Logic symbols
+    'prove', 'verify', 'satisfiable', 'contradiction',
+    'p(', 'probability', 'bayes',
+    'formalize', 'fol', 'sat',
+    'cause', 'causal', 'intervention',
+])
+
 # Greeting patterns - complexity 0.0, skip reasoning
 GREETING_PATTERNS: FrozenSet[str] = frozenset([
     "hello", "hi", "hey", "howdy", "greetings",
@@ -614,15 +624,8 @@ class QueryClassifier:
         # This prevents casual queries from being routed to reasoning engines
         if word_count <= 10:
             # Check for explicit reasoning indicators that warrant reasoning path
-            reasoning_indicators = [
-                '→', '∨', '∧', '¬', '↔',  # Logic symbols
-                'prove', 'verify', 'satisfiable', 'contradiction',
-                'p(', 'probability', 'bayes',
-                'formalize', 'fol', 'sat',
-                'cause', 'causal', 'intervention',
-            ]
             has_reasoning_indicator = any(
-                indicator in query_lower for indicator in reasoning_indicators
+                indicator in query_lower for indicator in REASONING_INDICATORS
             )
             
             if not has_reasoning_indicator:

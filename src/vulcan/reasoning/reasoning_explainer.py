@@ -481,27 +481,11 @@ class SafetyAwareReasoning:
 
         # Check if result has required structure for ReasoningResult
         if isinstance(result, ReasoningResult):
-            # P0.2 FIX: Skip confidence filtering for creative tasks
-            # Creative tasks (writing poems, sonnets, stories, etc.) should not be
-            # filtered based on confidence because:
-            # 1. Creative output quality is subjective, not measurable by confidence
-            # 2. Low confidence from fallback shouldn't block creative generation
-            # 3. OpenAI fallback (with 0.6 confidence from P1.2) handles these well
-            
-            # DISABLED: Confidence filter was hiding actual bugs instead of showing them
-            # The filter was blocking results with 10-30% confidence, which hides:
+            # DISABLED: Confidence filtering was hiding actual bugs.
+            # Previously filtered results with <30% confidence, but this hid:
             # - Parse errors from QueryPreprocessor (malformed formulas)
             # - Engine failures that should be debugged
-            # - Actual error messages that help identify root causes
-            # By disabling this, we can see what's actually failing and fix it.
-            # 
-            # if not is_creative:
-            #     if hasattr(result, "confidence"):
-            #         if result.confidence < 0.3:
-            #             return {
-            #                 "is_safe": False,
-            #                 "reason": f"Confidence too low: {result.confidence:.2f}",
-            #             }
+            # Now we show all results so root causes can be identified and fixed.
 
             # Check for error indicators in conclusion
             if hasattr(result, "conclusion"):
@@ -622,21 +606,8 @@ class SafetyAwareReasoning:
                     }
                 )
 
-        # DISABLED: Confidence threshold check was hiding actual bugs
-        # The filter was preventing users from seeing what's actually failing.
-        # By disabling this, we can see actual error messages and debug root causes.
-        #
-        # if hasattr(result, "confidence"):
-        #     if result.confidence < 0.3:
-        #         safety_checks["confidence_sufficient"] = False
-        #         safety_checks["checks_performed"].append(
-        #             {
-        #                 "type": "confidence_threshold",
-        #                 "passed": False,
-        #                 "reason": f"Confidence {result.confidence:.2f} below threshold",
-        #                 "confidence": result.confidence,
-        #             }
-        #         )
+        # DISABLED: Confidence filtering was hiding actual bugs and preventing debugging.
+        # Now all results are shown so root causes can be identified.
 
         # Check for harmful implications in explanation
         if hasattr(result, "explanation") and isinstance(result.explanation, str):
