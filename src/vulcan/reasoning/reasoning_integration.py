@@ -440,7 +440,7 @@ class ReasoningIntegration:
             if not self._decomposition_enabled:
                 reasons.append("decomposition_disabled")
             if complexity < DECOMPOSITION_COMPLEXITY_THRESHOLD:
-                reasons.append(f"complexity_{complexity:.2f}<threshold_{DECOMPOSITION_COMPLEXITY_THRESHOLD}")
+                reasons.append(f"complexity {complexity:.2f} < threshold {DECOMPOSITION_COMPLEXITY_THRESHOLD}")
             if self._problem_decomposer is None:
                 reasons.append("problem_decomposer_unavailable")
             if self._query_bridge is None:

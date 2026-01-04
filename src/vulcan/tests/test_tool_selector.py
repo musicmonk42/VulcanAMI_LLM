@@ -1337,7 +1337,7 @@ class TestQueryClassifier:
         
         for query in creative_queries:
             result = classify_query(query)
-            assert result.skip_reasoning == True, \
+            assert result.skip_reasoning, \
                 f"Creative query '{query}' should skip reasoning"
             assert result.category == "CREATIVE", \
                 f"Creative query '{query}' should be categorized as CREATIVE, got {result.category}"
@@ -1356,7 +1356,7 @@ class TestQueryClassifier:
         
         for query in conversational_queries:
             result = classify_query(query)
-            assert result.skip_reasoning == True, \
+            assert result.skip_reasoning, \
                 f"Conversational query '{query}' should skip reasoning"
             assert result.complexity <= 0.3, \
                 f"Conversational query '{query}' should have low complexity"

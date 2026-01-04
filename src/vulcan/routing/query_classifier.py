@@ -80,6 +80,15 @@ class QueryClassification:
 # Keyword-Based Classification Patterns
 # =============================================================================
 
+# Classification thresholds for keyword matching
+CREATIVE_KEYWORD_THRESHOLD = 2  # Minimum keyword matches to classify as CREATIVE
+LOGICAL_KEYWORD_THRESHOLD = 2   # Minimum keyword matches to classify as LOGICAL
+PROBABILISTIC_KEYWORD_THRESHOLD = 2  # Minimum keyword matches to classify as PROBABILISTIC
+CAUSAL_KEYWORD_THRESHOLD = 2    # Minimum keyword matches to classify as CAUSAL
+MATH_KEYWORD_THRESHOLD = 2      # Minimum keyword matches to classify as MATHEMATICAL
+ANALOG_KEYWORD_THRESHOLD = 2    # Minimum keyword matches to classify as ANALOGICAL
+PHIL_KEYWORD_THRESHOLD = 2      # Minimum keyword matches to classify as PHILOSOPHICAL
+
 # Greeting patterns - complexity 0.0, skip reasoning
 GREETING_PATTERNS: FrozenSet[str] = frozenset([
     "hello", "hi", "hey", "howdy", "greetings",
@@ -406,7 +415,7 @@ class QueryClassifier:
         
         # Check creative keywords
         creative_count = sum(1 for kw in CREATIVE_KEYWORDS if kw in query_lower)
-        if creative_count >= 2:
+        if creative_count >= CREATIVE_KEYWORD_THRESHOLD:
             return QueryClassification(
                 category=QueryCategory.CREATIVE.value,
                 complexity=0.2,
@@ -430,7 +439,7 @@ class QueryClassifier:
         
         # Check logical/SAT indicators
         logical_count = sum(1 for kw in LOGICAL_KEYWORDS if kw in query_lower)
-        if logical_count >= 2 or any(sym in query_lower for sym in ['∧', '∨', '→', '¬', '⊢', '⊨']):
+        if logical_count >= LOGICAL_KEYWORD_THRESHOLD or any(sym in query_lower for sym in ['∧', '∨', '→', '¬', '⊢', '⊨']):
             return QueryClassification(
                 category=QueryCategory.LOGICAL.value,
                 complexity=0.7 + min(0.2, logical_count * 0.05),
@@ -442,7 +451,7 @@ class QueryClassifier:
         
         # Check probabilistic/Bayesian indicators
         prob_count = sum(1 for kw in PROBABILISTIC_KEYWORDS if kw in query_lower)
-        if prob_count >= 2 or "p(" in query_lower or ("bayes" in query_lower):
+        if prob_count >= PROBABILISTIC_KEYWORD_THRESHOLD or "p(" in query_lower or ("bayes" in query_lower):
             return QueryClassification(
                 category=QueryCategory.PROBABILISTIC.value,
                 complexity=0.5 + min(0.3, prob_count * 0.05),
@@ -454,7 +463,7 @@ class QueryClassifier:
         
         # Check causal indicators
         causal_count = sum(1 for kw in CAUSAL_KEYWORDS if kw in query_lower)
-        if causal_count >= 2 or "do(" in query_lower:
+        if causal_count >= CAUSAL_KEYWORD_THRESHOLD or "do(" in query_lower:
             return QueryClassification(
                 category=QueryCategory.CAUSAL.value,
                 complexity=0.6 + min(0.3, causal_count * 0.05),
@@ -466,7 +475,7 @@ class QueryClassifier:
         
         # Check mathematical indicators
         math_count = sum(1 for kw in MATHEMATICAL_KEYWORDS if kw in query_lower)
-        if math_count >= 2:
+        if math_count >= MATH_KEYWORD_THRESHOLD:
             return QueryClassification(
                 category=QueryCategory.MATHEMATICAL.value,
                 complexity=0.4 + min(0.4, math_count * 0.05),
@@ -478,7 +487,7 @@ class QueryClassifier:
         
         # Check analogical indicators
         analog_count = sum(1 for kw in ANALOGICAL_KEYWORDS if kw in query_lower)
-        if analog_count >= 2:
+        if analog_count >= ANALOG_KEYWORD_THRESHOLD:
             return QueryClassification(
                 category=QueryCategory.ANALOGICAL.value,
                 complexity=0.5 + min(0.3, analog_count * 0.05),
@@ -490,7 +499,7 @@ class QueryClassifier:
         
         # Check philosophical indicators
         phil_count = sum(1 for kw in PHILOSOPHICAL_KEYWORDS if kw in query_lower)
-        if phil_count >= 2:
+        if phil_count >= PHIL_KEYWORD_THRESHOLD:
             return QueryClassification(
                 category=QueryCategory.PHILOSOPHICAL.value,
                 complexity=0.4 + min(0.3, phil_count * 0.05),
