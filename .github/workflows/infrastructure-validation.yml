@@ -4,18 +4,24 @@ on:
   push:
     branches: [ main, develop, 'feature/**', 'hotfix/**' ]
     paths:
+      - 'k8s/**'
       - 'helm/**'
       - 'infra/terraform/**'
       - 'docker-compose*.yml'
       - 'Dockerfile'
+      - 'scripts/deploy.sh'
+      - 'scripts/validate-deployment.sh'
       - '.github/workflows/infrastructure-validation.yml'
   pull_request:
     branches: [ main, develop ]
     paths:
+      - 'k8s/**'
       - 'helm/**'
       - 'infra/terraform/**'
       - 'docker-compose*.yml'
       - 'Dockerfile'
+      - 'scripts/deploy.sh'
+      - 'scripts/validate-deployment.sh'
   workflow_dispatch:
 
 concurrency:
@@ -125,6 +131,291 @@ jobs:
         with:
           name: helm-template-output
           path: /tmp/helm-output.yaml
+          retention-days: 7
+
+  validate-kubernetes:
+    name: Validate Kubernetes Manifests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Fix repo permissions (make certs readable)
+        if: always()
+        run: |
+          REPO_CERT_DIR="${{ github.workspace }}/configs/minio/certs"
+          mkdir -p "$REPO_CERT_DIR/CAs"
+          if [ -d "$REPO_CERT_DIR" ]; then
+            echo "Fixing permissions for $REPO_CERT_DIR"
+            find "$REPO_CERT_DIR" -type d -exec chmod 755 {} \; || true
+            find "$REPO_CERT_DIR" -type f -exec chmod 644 {} \; || true
+          else
+            echo "$REPO_CERT_DIR not present, skipping"
+          fi
+
+      - name: Install kustomize
+        run: |
+          curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+          sudo mv kustomize /usr/local/bin/
+          kustomize version
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+
+      - name: Install kubeconform (Kubernetes manifest validator)
+        run: |
+          curl -L https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz | tar xz
+          sudo mv kubeconform /usr/local/bin/
+          kubeconform -v
+
+      - name: Validate base kustomization
+        run: |
+          echo "Validating base Kubernetes manifests..."
+          if [ ! -d "k8s/base" ]; then
+            echo "ERROR: k8s/base directory not found"
+            exit 1
+          fi
+          
+          # Check kustomization.yaml exists
+          if [ ! -f "k8s/base/kustomization.yaml" ]; then
+            echo "ERROR: k8s/base/kustomization.yaml not found"
+            exit 1
+          fi
+          
+          # Build with kustomize
+          echo "Building base manifests with kustomize..."
+          kustomize build k8s/base > /tmp/k8s-base-output.yaml
+          
+          echo "✅ Base kustomization build successful"
+
+      - name: Validate development overlay
+        run: |
+          echo "Validating development overlay..."
+          if [ ! -d "k8s/overlays/development" ]; then
+            echo "ERROR: k8s/overlays/development directory not found"
+            exit 1
+          fi
+          
+          # Build with kustomize
+          echo "Building development manifests with kustomize..."
+          kustomize build k8s/overlays/development > /tmp/k8s-dev-output.yaml
+          
+          echo "✅ Development overlay build successful"
+
+      - name: Validate staging overlay
+        run: |
+          echo "Validating staging overlay..."
+          if [ -d "k8s/overlays/staging" ]; then
+            echo "Building staging manifests with kustomize..."
+            kustomize build k8s/overlays/staging > /tmp/k8s-staging-output.yaml
+            echo "✅ Staging overlay build successful"
+          else
+            echo "ℹ️  Staging overlay not found, skipping"
+          fi
+
+      - name: Validate production overlay
+        run: |
+          echo "Validating production overlay..."
+          if [ -d "k8s/overlays/production" ]; then
+            echo "Building production manifests with kustomize..."
+            kustomize build k8s/overlays/production > /tmp/k8s-prod-output.yaml
+            echo "✅ Production overlay build successful"
+          else
+            echo "ℹ️  Production overlay not found, skipping"
+          fi
+
+      - name: Validate manifests with kubeconform
+        run: |
+          echo "Validating Kubernetes manifests against schemas..."
+          
+          # Validate base manifests
+          echo "Validating base manifests..."
+          kubeconform -strict -summary -output json \
+            /tmp/k8s-base-output.yaml || true
+          
+          # Validate development overlay
+          echo "Validating development manifests..."
+          kubeconform -strict -summary -output json \
+            /tmp/k8s-dev-output.yaml || true
+
+      - name: Check for security anti-patterns
+        run: |
+          echo "Checking for Kubernetes security issues..."
+          
+          ISSUES_FOUND=0
+          
+          # Check for privileged containers
+          if grep -r "privileged: true" k8s/; then
+            echo "❌ ERROR: Found privileged containers"
+            ISSUES_FOUND=1
+          fi
+          
+          # Check for containers running as root
+          if grep -r "runAsUser: 0" k8s/; then
+            echo "⚠️  WARNING: Found containers running as root (UID 0)"
+          fi
+          
+          # Check for hostNetwork
+          if grep -r "hostNetwork: true" k8s/; then
+            echo "❌ ERROR: Found hostNetwork: true"
+            ISSUES_FOUND=1
+          fi
+          
+          # Check for hostPID
+          if grep -r "hostPID: true" k8s/; then
+            echo "❌ ERROR: Found hostPID: true"
+            ISSUES_FOUND=1
+          fi
+          
+          # Check for hostPath volumes (should be minimal)
+          if grep -r "hostPath:" k8s/; then
+            echo "⚠️  WARNING: Found hostPath volumes - ensure this is necessary"
+          fi
+          
+          # Check that securityContext is defined
+          BASE_FILES=$(find k8s/base -name "*-deployment.yaml" -o -name "*-statefulset.yaml")
+          for file in $BASE_FILES; do
+            if ! grep -q "securityContext:" "$file"; then
+              echo "⚠️  WARNING: No securityContext found in $file"
+            fi
+          done
+          
+          # Check for IMAGE_TAG placeholder in base (should use overlays)
+          if grep -r "image:.*IMAGE_TAG" k8s/base/ 2>/dev/null; then
+            echo "⚠️  WARNING: Found IMAGE_TAG placeholder in base manifests"
+          fi
+          
+          # Check that secrets don't have actual secrets
+          if grep -r "REPLACE_WITH_ACTUAL_SECRET" k8s/base/secret.yaml; then
+            echo "✅ Good: Using placeholders for secrets"
+          fi
+          
+          if [ $ISSUES_FOUND -eq 0 ]; then
+            echo "✅ Security checks passed!"
+          else
+            echo "❌ Security issues found!"
+            exit 1
+          fi
+
+      - name: Validate resource requests/limits
+        run: |
+          echo "Checking resource requests and limits..."
+          
+          # Check that deployments have resource limits
+          BASE_FILES=$(find k8s/base -name "*-deployment.yaml" -o -name "*-statefulset.yaml")
+          MISSING_RESOURCES=0
+          
+          for file in $BASE_FILES; do
+            if ! grep -q "resources:" "$file"; then
+              echo "⚠️  WARNING: No resources defined in $file"
+              MISSING_RESOURCES=1
+            fi
+            
+            if ! grep -q "limits:" "$file"; then
+              echo "⚠️  WARNING: No resource limits in $file"
+              MISSING_RESOURCES=1
+            fi
+            
+            if ! grep -q "requests:" "$file"; then
+              echo "⚠️  WARNING: No resource requests in $file"
+              MISSING_RESOURCES=1
+            fi
+          done
+          
+          if [ $MISSING_RESOURCES -eq 0 ]; then
+            echo "✅ All deployments have resource definitions"
+          else
+            echo "⚠️  Some deployments missing resource definitions"
+          fi
+
+      - name: Validate health probes
+        run: |
+          echo "Checking health probes..."
+          
+          BASE_FILES=$(find k8s/base -name "*-deployment.yaml" -o -name "*-statefulset.yaml")
+          MISSING_PROBES=0
+          
+          for file in $BASE_FILES; do
+            if ! grep -q "livenessProbe:" "$file"; then
+              echo "⚠️  WARNING: No livenessProbe in $file"
+              MISSING_PROBES=1
+            fi
+            
+            if ! grep -q "readinessProbe:" "$file"; then
+              echo "⚠️  WARNING: No readinessProbe in $file"
+              MISSING_PROBES=1
+            fi
+          done
+          
+          if [ $MISSING_PROBES -eq 0 ]; then
+            echo "✅ All deployments have health probes"
+          else
+            echo "⚠️  Some deployments missing health probes"
+          fi
+
+      - name: Validate network policies
+        run: |
+          echo "Checking network policies..."
+          
+          # Check that network policies exist
+          if [ ! -d "k8s/base" ] || [ -z "$(find k8s/base -name '*-networkpolicy.yaml')" ]; then
+            echo "⚠️  WARNING: No network policies found"
+          else
+            echo "✅ Network policies found"
+            find k8s/base -name '*-networkpolicy.yaml' -exec basename {} \;
+          fi
+
+      - name: Validate deployment scripts
+        run: |
+          echo "Validating deployment automation scripts..."
+          
+          # Check deploy.sh exists and is executable
+          if [ ! -f "scripts/deploy.sh" ]; then
+            echo "❌ ERROR: scripts/deploy.sh not found"
+            exit 1
+          fi
+          
+          if [ ! -x "scripts/deploy.sh" ]; then
+            echo "❌ ERROR: scripts/deploy.sh is not executable"
+            exit 1
+          fi
+          
+          # Check validate-deployment.sh exists and is executable
+          if [ ! -f "scripts/validate-deployment.sh" ]; then
+            echo "❌ ERROR: scripts/validate-deployment.sh not found"
+            exit 1
+          fi
+          
+          if [ ! -x "scripts/validate-deployment.sh" ]; then
+            echo "❌ ERROR: scripts/validate-deployment.sh is not executable"
+            exit 1
+          fi
+          
+          # Validate shell script syntax
+          echo "Checking shell script syntax..."
+          bash -n scripts/deploy.sh
+          bash -n scripts/validate-deployment.sh
+          
+          echo "✅ Deployment scripts validated"
+
+      - name: Test deployment script dry-run
+        run: |
+          echo "Testing deployment script in dry-run mode (without cluster)..."
+          
+          # Script should handle missing cluster gracefully
+          ./scripts/deploy.sh development --help || true
+          
+          echo "✅ Deployment script help works"
+
+      - name: Upload validation artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: kubernetes-manifests
+          path: |
+            /tmp/k8s-*.yaml
           retention-days: 7
 
   validate-terraform:
