@@ -2030,17 +2030,21 @@ class CausalReasoner(EnhancedCausalReasoning):
         query_lower = query_text.lower()
         
         # Pattern 1: "X users are also more likely to Y"
-        # This indicates X -> Y (confounding behavior)
+        # BUG L FIX: This indicates Y -> X (behavior Y causes X usage)
+        # Example: "S users are more likely to exercise E" means E -> S
+        # Interpretation: People who exercise (E) are more likely to take supplements (S)
+        # Therefore exercise causes supplement-taking behavior, not vice versa
         pattern1 = re.findall(
             r'([A-Z])\s+users.*?(?:more\s+likely|tend)\s+to\s+(?:\w+\s+)?([A-Z])',
             query_text, re.IGNORECASE
         )
-        for cause, effect in pattern1:
-            cause = cause.upper()
-            effect = effect.upper()
-            if cause != effect:
-                dag.add_edge(cause, effect)
-                logger.debug(f"Pattern 1: {cause} -> {effect}")
+        for users_of, behavior in pattern1:
+            users_of = users_of.upper()
+            behavior = behavior.upper()
+            if users_of != behavior:
+                # BUG L FIX: Add edge behavior -> users_of (not users_of -> behavior)
+                dag.add_edge(behavior, users_of)
+                logger.debug(f"Pattern 1 (FIXED): {behavior} -> {users_of} (people who {behavior} become {users_of} users)")
         
         # Pattern 2: "take/use X have lower/higher Y"
         pattern2 = re.findall(
@@ -2081,9 +2085,10 @@ class CausalReasoner(EnhancedCausalReasoning):
         # Infer common confounding patterns
         # If we see S (supplement) and E (exercise) mentioned together,
         # and S linked to D (disease), E likely confounds
+        # NOTE: With BUG L FIX, Pattern 1 now correctly adds E -> S
+        # This inference ensures the edge is present even if Pattern 1 didn't match
         if 'S' in variables and 'E' in variables and 'D' in variables:
             # Common pattern: E -> S and E -> D (exercise affects both)
-            # or S users more likely to exercise: implies some confounding
             if 'exercise' in query_lower or 'E' in query_text:
                 if not dag.has_edge('E', 'S'):
                     dag.add_edge('E', 'S')
