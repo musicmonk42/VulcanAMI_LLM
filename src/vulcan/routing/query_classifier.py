@@ -151,6 +151,7 @@ CAUSAL_KEYWORDS: FrozenSet[str] = frozenset([
     "intervention", "do(", "counterfactual",
     "randomize", "randomized", "rct",
     "pearl", "dag", "backdoor", "frontdoor",
+    "collider",  # FIX: Collider is a causal graph concept, not logical
     "observational", "experimental",
 ])
 
