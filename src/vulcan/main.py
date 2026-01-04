@@ -4218,6 +4218,65 @@ def _truncate_history(
     return truncated_history
 
 
+def build_context(
+    current_query: str, 
+    history: List[Dict[str, str]], 
+    reasoning_results: Optional[Dict[str, Any]] = None,
+    max_history: int = 3,
+) -> Dict[str, Any]:
+    """
+    Build context with recency bias to prevent old queries bleeding in.
+    
+    CONTEXT BLEEDING FIX: This function implements recency weighting to ensure
+    that conversation history provides context without contaminating the current
+    response. Older exchanges get exponentially decaying weights, signaling to
+    the LLM that they are for background context only.
+    
+    Args:
+        current_query: The current user query to answer
+        history: List of previous exchanges (role/content dicts)
+        reasoning_results: Optional reasoning engine outputs for current query
+        max_history: Maximum number of recent exchanges to include (default: 3)
+        
+    Returns:
+        Context dictionary with weighted history and explicit instructions
+    """
+    # CURRENT QUERY gets highest weight
+    context = {
+        "current_query": current_query,
+        "weight": 1.0,  # Full weight
+    }
+    
+    # RECENT HISTORY gets decaying weight
+    if history:
+        weighted_history = []
+        recent_exchanges = list(reversed(history[-max_history:]))
+        
+        for i, exchange in enumerate(recent_exchanges):
+            # Exponential decay: 0.3, 0.15, 0.075, ...
+            weight = 0.3 * (0.5 ** i)
+            weighted_history.append({
+                "content": exchange,
+                "weight": weight,
+                "note": "Context only - NOT the current question",
+            })
+        
+        context["history"] = weighted_history
+    
+    # REASONING RESULTS for CURRENT query only
+    if reasoning_results:
+        context["reasoning"] = reasoning_results
+    
+    # EXPLICIT INSTRUCTION to prevent context bleeding
+    context["instruction"] = (
+        "Answer ONLY the current_query. "
+        "History is for context, not to be re-answered. "
+        "Do not respond to previous queries."
+    )
+    
+    return context
+
+
 def _format_reasoning_results(reasoning_results: Dict[str, Any]) -> str:
     """
     Format reasoning engine outputs into a structured text for LLM context.

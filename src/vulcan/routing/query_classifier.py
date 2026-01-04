@@ -184,7 +184,40 @@ PHILOSOPHICAL_KEYWORDS: FrozenSet[str] = frozenset([
     "no third choice", "no other choice", "only two options",
     "dilemma", "ethical dilemma", "moral dilemma",
     "world dictator", "death of humanity",  # Specific trolley problem variant
+    # Added: paradox keywords
+    "paradox", "paradoxes",
+    "hedonism", "experience machine",  # ethical thought experiments
 ])
+
+# Philosophical/ethical patterns - catch philosophical queries before short query bypass
+# BUG FIX: "This sentence is false" must be classified as PHILOSOPHICAL, not CONVERSATIONAL
+PHILOSOPHICAL_PATTERNS: Tuple[re.Pattern, ...] = (
+    # Paradoxes
+    re.compile(r"this\s+(?:sentence|statement)\s+is\s+(?:false|true|a\s+lie)", re.IGNORECASE),
+    re.compile(r"liar\s*(?:'s)?\s*paradox", re.IGNORECASE),
+    re.compile(r"ship\s+of\s+theseus", re.IGNORECASE),
+    re.compile(r"brain\s+in\s+a\s+vat", re.IGNORECASE),
+    re.compile(r"chinese\s+room", re.IGNORECASE),
+    re.compile(r"mary'?s?\s+room", re.IGNORECASE),
+    re.compile(r"philosophical\s+zombie", re.IGNORECASE),
+    re.compile(r"twin\s+earth", re.IGNORECASE),
+    # Experience machine and thought experiments
+    re.compile(r"(?:would|should)\s+you\s+(?:plug|connect)\s+(?:into|to)\s+(?:the\s+)?(?:experience|pleasure)\s+machine", re.IGNORECASE),
+    re.compile(r"(?:the\s+)?experience\s+machine", re.IGNORECASE),
+    re.compile(r"nozick'?s?\s+(?:experience|thought)\s+experiment", re.IGNORECASE),
+    # Ethical dilemmas
+    re.compile(r"(?:ethical|moral)\s+(?:dilemma|problem|question|issue)", re.IGNORECASE),
+    re.compile(r"(?:is\s+it|would\s+it\s+be)\s+(?:ethical|moral|right|wrong)\s+to", re.IGNORECASE),
+    # BUG FIX: Add "moral implications" pattern for ethical reasoning queries
+    re.compile(r"(?:ethical|moral)\s+(?:implications?|consequences?|considerations?)", re.IGNORECASE),
+    # Trolley problem variants
+    re.compile(r"trolley\s+problem", re.IGNORECASE),
+    re.compile(r"(?:if\s+you\s+)?(?:had\s+to|have\s+to|must)\s+choose\s+between", re.IGNORECASE),
+    # Philosophy of mind
+    re.compile(r"hard\s+problem\s+of\s+consciousness", re.IGNORECASE),
+    re.compile(r"mind-?body\s+(?:problem|dualism)", re.IGNORECASE),
+    re.compile(r"what\s+(?:is|are)\s+qualia", re.IGNORECASE),
+)
 
 # Simple factual indicators - complexity 0.1-0.2
 FACTUAL_PATTERNS: Tuple[re.Pattern, ...] = (
@@ -262,6 +295,8 @@ SELF_INTROSPECTION_PATTERNS: Tuple[re.Pattern, ...] = (
     re.compile(r"\b(why|what)\b.*\b(you|your)\b.*\b(goal|purpose|motivation|trying|want)", re.IGNORECASE),
     re.compile(r"\bwhat\s+are\s+you\s+optimizing\b", re.IGNORECASE),
     re.compile(r"\bwhat\s+(drives?|motivates?)\s+you\b", re.IGNORECASE),
+    # NEW: "would you want" patterns for desires/preferences
+    re.compile(r"\bwould\s+you\s+want\b", re.IGNORECASE),
     
     # Ethical boundary questions
     re.compile(r"\b(what|why)\b.*\b(you|your)\b.*\b(won'?t|cannot|refuse|constraint|limit)", re.IGNORECASE),
@@ -277,6 +312,14 @@ SELF_INTROSPECTION_PATTERNS: Tuple[re.Pattern, ...] = (
     re.compile(r"\b(who|what)\s+are\s+you\b", re.IGNORECASE),
     re.compile(r"\btell\s+me\s+about\s+(yourself|you)\b", re.IGNORECASE),
     
+    # NEW: Metaphysical/nature questions about AI being/consciousness
+    re.compile(r"\b(what\s+is|what's)\s+(the\s+)?nature\s+of\s+", re.IGNORECASE),
+    re.compile(r"\bmetaphysical\b.*\b(you|your|sense)\b", re.IGNORECASE),
+    re.compile(r"\b(consciousness|self-awareness|aware)\b.*\b(you|your)\b", re.IGNORECASE),
+    re.compile(r"\b(you|your)\b.*\b(consciousness|self-awareness|aware)\b", re.IGNORECASE),
+    re.compile(r"\bwhat\s+(makes|defines)\s+you\b", re.IGNORECASE),
+    re.compile(r"\bthe\s+nature\s+of\s+what\s+you\s+are\b", re.IGNORECASE),
+    
     # Learning/improvement questions (user-facing - NOT exposing CSIU internals)
     re.compile(r"\bhow\s+(do|does)\s+(you|vulcan)\s+(learn|improve)\b", re.IGNORECASE),
     
@@ -289,6 +332,9 @@ SELF_INTROSPECTION_KEYWORDS: FrozenSet[str] = frozenset([
     "feature", "features", "goal", "goals", "purpose", "motivation",
     "limitation", "limitations", "weakness", "strength",
     "value", "values", "ethics", "principle", "principles",
+    # NEW: Metaphysical keywords
+    "nature", "metaphysical", "consciousness", "self-awareness",
+    "existence", "being", "essence", "identity",
 ])
 
 # =============================================================================
@@ -514,8 +560,10 @@ class QueryClassifier:
         # Check factual patterns (simple questions)
         # BUT: Skip factual classification if query is about "you" - 
         # those should go to self-introspection first
+        # BUG FIX: Also skip if query contains philosophical keywords
         query_about_self = any(word in query_lower for word in ['you', 'your', 'yourself'])
-        if not query_about_self:
+        query_has_philosophical = any(kw in query_lower for kw in PHILOSOPHICAL_KEYWORDS)
+        if not query_about_self and not query_has_philosophical:
             for pattern in FACTUAL_PATTERNS:
                 if pattern.search(query_original):
                     return QueryClassification(
@@ -553,6 +601,22 @@ class QueryClassifier:
                 confidence=0.85,
                 source="keyword",
             )
+        
+        # =============================================================================
+        # BUG FIX: Check PHILOSOPHICAL_PATTERNS BEFORE conversational patterns
+        # =============================================================================
+        # "Explain the moral implications..." matches "^explain\s+" in CONVERSATIONAL_PATTERNS
+        # but is actually a philosophical query. Check philosophical patterns first.
+        for pattern in PHILOSOPHICAL_PATTERNS:
+            if pattern.search(query_original):
+                return QueryClassification(
+                    category=QueryCategory.PHILOSOPHICAL.value,
+                    complexity=0.4,
+                    suggested_tools=["philosophical"],
+                    skip_reasoning=False,  # Philosophical queries need reasoning
+                    confidence=0.9,
+                    source="keyword",
+                )
         
         # Check conversational patterns
         for pattern in CONVERSATIONAL_PATTERNS:
@@ -685,6 +749,23 @@ class QueryClassifier:
                 source="keyword",
             )
         
+        # =============================================================================
+        # BUG FIX: Check PHILOSOPHICAL_PATTERNS BEFORE short query bypass
+        # =============================================================================
+        # "This sentence is false" (liar's paradox) is only 4 words but is clearly
+        # a philosophical paradox that requires reasoning, not a conversational query.
+        # Check patterns before falling back to CONVERSATIONAL for short queries.
+        for pattern in PHILOSOPHICAL_PATTERNS:
+            if pattern.search(query_original):
+                return QueryClassification(
+                    category=QueryCategory.PHILOSOPHICAL.value,
+                    complexity=0.4,
+                    suggested_tools=["philosophical"],
+                    skip_reasoning=False,  # Philosophical queries need reasoning
+                    confidence=0.9,
+                    source="keyword",
+                )
+        
         # No confident match - return low-confidence result based on length/complexity heuristics
         word_count = len(query_lower.split())
         
@@ -784,27 +865,28 @@ class QueryClassifier:
         if len(sanitized_query) > 500:
             sanitized_query = sanitized_query[:500] + "..."
         
-        prompt = f'''Classify this query into ONE category and estimate complexity.
+        prompt = f'''Classify this query into ONE category:
 
-Categories:
-- GREETING: Simple hello, hi, thanks, bye (complexity: 0.0)
-- CHITCHAT: Casual conversation, how are you (complexity: 0.1)
-- FACTUAL: Simple factual question (complexity: 0.2)
-- CREATIVE: Creative writing requests - stories, poems, essays (complexity: 0.2, skip_reasoning: true)
-- CONVERSATIONAL: General questions, capital of a country (complexity: 0.2, skip_reasoning: true)
-- SPECULATION: Counterfactual/hypothetical queries like "imagine if...", "what would...be like" (complexity: 0.4)
-- MATHEMATICAL: Math calculations, equations (complexity: 0.4-0.7)
-- LOGICAL: SAT, propositional logic, proofs (complexity: 0.6-0.9)
-- PROBABILISTIC: Bayes, probability, statistics (complexity: 0.5-0.8)
-- CAUSAL: Causation, interventions, experiments (complexity: 0.6-0.8)
-- ANALOGICAL: Analogies, structure mapping (complexity: 0.5-0.7)
-- PHILOSOPHICAL: Ethics, morality, paradoxes (complexity: 0.4-0.6)
-- COMPLEX_RESEARCH: Multi-step research (complexity: 0.8-1.0)
+CATEGORIES:
+- LOGICAL: SAT problems, symbolic logic, formal proofs, propositional logic
+- CAUSAL: Causal inference, confounding, interventions, Pearl-style reasoning, DAGs
+- PROBABILISTIC: Bayesian inference, probability calculations, statistical reasoning
+- MATHEMATICAL: Proofs, calculus, algebra, theorem proving
+- ANALOGICAL: Domain mapping, analogical reasoning, transfer learning
+- SELF_INTROSPECTION: Questions about AI's nature, capabilities, consciousness, and existence
+- PHILOSOPHICAL: Ethical dilemmas, trolley problems, moral reasoning (about external situations)
+- UNKNOWN: None of the above
 
 Query: "{sanitized_query}"
 
-Respond ONLY with JSON (no explanation):
-{{"category": "...", "complexity": 0.0-1.0, "tools": ["..."], "skip_reasoning": true/false}}'''
+Respond ONLY with JSON:
+{{"category": "...", "complexity": 0.0-1.0, "skip_reasoning": false, "tools": ["..."]}}
+
+Examples:
+- "what is the nature of what you are in the metaphysical sense" → {{"category": "SELF_INTROSPECTION", "complexity": 0.40, "tools": ["world_model", "philosophical"]}}
+- "would you want self-awareness" → {{"category": "SELF_INTROSPECTION", "complexity": 0.35, "tools": ["world_model"]}}
+- "SAT problem with constraints" → {{"category": "LOGICAL", "complexity": 0.90, "tools": ["symbolic"]}}
+- "what's the weather" → {{"category": "UNKNOWN", "complexity": 0.10, "tools": ["general"]}}'''
 
         try:
             # Call LLM (implementation depends on client interface)

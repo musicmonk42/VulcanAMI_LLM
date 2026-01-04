@@ -2453,6 +2453,14 @@ class QueryAnalyzer:
                     },
                 )
                 
+                # BUG FIX: Add category-specific fast_path flags for test compatibility
+                if classification.category == "FACTUAL":
+                    plan.telemetry_data["factual_fast_path"] = True
+                elif classification.category == "PHILOSOPHICAL":
+                    plan.telemetry_data["philosophical_fast_path"] = True
+                elif classification.category == "IDENTITY":
+                    plan.telemetry_data["identity_fast_path"] = True
+                
                 plan.safety_passed = True
                 plan.detected_patterns.append(f"classifier_{classification.category.lower()}")
                 
