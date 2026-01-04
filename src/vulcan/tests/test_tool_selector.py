@@ -1475,6 +1475,8 @@ Task: Is it satisfiable?
         assert 'Constraints:' in result
         assert 'A→B' in result
         assert '¬B' in result
+        # Task line is content, not a header - should be preserved
+        assert 'Task: Is it satisfiable?' in result
     
     def test_no_header_passthrough(self):
         """Test that queries without headers pass through unchanged"""

@@ -1545,8 +1545,6 @@ class SymbolicToolWrapper:
             'reasoning',  # "Symbolic Reasoning", "Language Reasoning"
             '—',         # Section markers like "S1 — Satisfiability"
             '–',         # Alternative dash
-            'task:',     # "Task:" section header
-            'claim:',    # "Claim:" section header  
         ]
         
         # Content start markers (keep these lines)
@@ -1557,6 +1555,8 @@ class SymbolicToolWrapper:
             'given',        # "Given:"
             'prove',        # "Prove:"
             'variables:',   # "Variables:"
+            'task:',        # "Task: Is it satisfiable?" - this is content, not a header
+            'claim:',       # "Claim:" - this is content, not a header
         ]
         
         for line in lines:
