@@ -1625,6 +1625,9 @@ class ProbabilisticToolWrapper:
         """
         Execute probabilistic reasoning on the problem.
         
+        FIX #1: Now includes gate check for probability applicability to avoid
+        wasting computation on non-probability queries.
+        
         Args:
             problem: Dict with query_var, evidence, and optional rules
             
@@ -1634,6 +1637,23 @@ class ProbabilisticToolWrapper:
         start_time = time.time()
         
         try:
+            # FIX #1: Gate check - is this actually a probability query?
+            # Check if the underlying engine has the gate check method
+            query_str = str(problem) if not isinstance(problem, str) else problem
+            if hasattr(self.engine, '_is_probability_query'):
+                if not self.engine._is_probability_query(query_str):
+                    logger.info(
+                        f"[ProbabilisticEngine] Gate check: Query does not appear to be a probability question"
+                    )
+                    return {
+                        "tool": self.name,
+                        "applicable": False,
+                        "reason": "Query does not involve probability concepts",
+                        "confidence": 0.0,
+                        "engine": "ProbabilisticReasoner",
+                        "execution_time_ms": (time.time() - start_time) * 1000,
+                    }
+            
             # BUG #4 FIX: Clear state before each query
             if hasattr(self.engine, 'clear_state'):
                 self.engine.clear_state()
