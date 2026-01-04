@@ -1,0 +1,140 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: milvus
+  namespace: vulcanami
+  labels:
+    app: milvus
+    component: vector-database
+spec:
+  serviceName: milvus-service
+  replicas: 1
+  selector:
+    matchLabels:
+      app: milvus
+  template:
+    metadata:
+      labels:
+        app: milvus
+        component: vector-database
+    spec:
+      # Disable automount service account token
+      automountServiceAccountToken: false
+
+      # Pod-level security context
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+
+      containers:
+      - name: milvus
+        # Using stable Milvus version 2.3.3
+        image: milvusdb/milvus:v2.3.3
+        imagePullPolicy: IfNotPresent
+        command:
+          - milvus
+          - run
+          - standalone
+        ports:
+        - containerPort: 19530
+          name: grpc
+          protocol: TCP
+        - containerPort: 9091
+          name: metrics
+          protocol: TCP
+
+        # Container-level security context
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 1000
+          seccompProfile:
+            type: RuntimeDefault
+          capabilities:
+            drop:
+              - ALL
+
+        env:
+        # Milvus standalone configuration with embedded etcd
+        - name: ETCD_USE_EMBED
+          value: "true"
+        - name: ETCD_DATA_DIR
+          value: /var/lib/milvus/etcd
+        - name: COMMON_STORAGETYPE
+          value: local
+        - name: LOG_LEVEL
+          value: info
+        - name: MILVUS_DATA_PATH
+          value: /var/lib/milvus/data
+
+        volumeMounts:
+        - name: milvus-storage
+          mountPath: /var/lib/milvus
+        - name: tmp
+          mountPath: /tmp
+
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 2000m
+            memory: 4Gi
+
+        # Liveness probe checks if Milvus is responding
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 9091
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 5
+
+        # Readiness probe checks if Milvus is ready to accept connections
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 9091
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+
+      volumes:
+      - name: tmp
+        emptyDir: {}
+
+  volumeClaimTemplates:
+  - metadata:
+      name: milvus-storage
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 50Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: milvus-service
+  namespace: vulcanami
+  labels:
+    app: milvus
+spec:
+  type: ClusterIP
+  ports:
+  - port: 19530
+    targetPort: 19530
+    protocol: TCP
+    name: grpc
+  - port: 9091
+    targetPort: 9091
+    protocol: TCP
+    name: metrics
+  selector:
+    app: milvus

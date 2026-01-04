@@ -1,0 +1,40 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: milvus-netpol
+  namespace: vulcanami
+  labels:
+    app: milvus
+spec:
+  podSelector:
+    matchLabels:
+      app: milvus
+  policyTypes:
+  - Ingress
+  - Egress
+
+  ingress:
+  # Allow ingress only from vulcanami-api pods
+  - from:
+    - podSelector:
+        matchLabels:
+          app: vulcanami-api
+    ports:
+    - protocol: TCP
+      port: 19530
+    - protocol: TCP
+      port: 9091
+
+  egress:
+  # Allow DNS resolution
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+    ports:
+    - protocol: UDP
+      port: 53
+
+  # Allow egress to pods in the same namespace (if needed for clustering)
+  - to:
+    - podSelector: {}

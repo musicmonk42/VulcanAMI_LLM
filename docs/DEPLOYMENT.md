@@ -157,6 +157,128 @@ done
 
 **Best Practice**: Always use specific version tags (e.g., `v1.0.0`, `main-abc1234`) instead of `latest` for production deployments to ensure reproducibility.
 
+#### Quick Start with Automated Scripts
+
+For the fastest and most reliable deployment, use the provided automation scripts:
+
+```bash
+# Step 1: Validate your cluster is ready
+./scripts/validate-deployment.sh development
+
+# Step 2: Deploy to development
+./scripts/deploy.sh development --image-tag v1.0.0
+
+# Or deploy to production
+./scripts/deploy.sh production --image-tag v1.0.0
+```
+
+The deployment script provides:
+- ✅ Comprehensive pre-deployment validation
+- ✅ Automatic secret checking
+- ✅ Rollout status monitoring
+- ✅ Health checks after deployment
+- ✅ Automatic rollback on failure
+- ✅ Dry-run mode for testing
+
+**Script Options:**
+```bash
+# Dry-run mode (test without applying changes)
+./scripts/deploy.sh development --dry-run
+
+# Skip validation checks (not recommended)
+./scripts/deploy.sh production --skip-validation --image-tag v1.0.0
+
+# Custom namespace
+./scripts/deploy.sh staging --namespace my-custom-namespace --image-tag v1.0.0
+
+# Longer rollout timeout for slow clusters
+./scripts/deploy.sh production --wait-timeout 900 --image-tag v1.0.0
+```
+
+#### Prerequisites for Kubernetes Deployment
+
+Before deploying, ensure you have:
+
+**Required:**
+- ✅ Kubernetes cluster 1.24+ (EKS, AKS, GKE, or on-premises)
+- ✅ kubectl 1.24+ installed and configured
+- ✅ kustomize 4.5+ installed
+- ✅ At least 235Gi available storage (20Gi postgres + 5Gi redis + 50Gi milvus + 100Gi minio + 60Gi app)
+- ✅ OpenSSL for secret generation
+
+**Recommended:**
+- ⚠️ NGINX Ingress Controller (for external access)
+- ⚠️ cert-manager (for TLS certificates)
+- ⚠️ Prometheus + Grafana (for monitoring)
+- ⚠️ Storage class with ReadWriteOnce support
+
+**Check your cluster:**
+```bash
+# Verify cluster access
+kubectl cluster-info
+
+# Check kubectl version
+kubectl version --client
+
+# Verify storage classes
+kubectl get storageclasses
+
+# Check available nodes
+kubectl get nodes
+
+# Run comprehensive validation
+./scripts/validate-deployment.sh development
+```
+
+#### Secret Management
+
+Secrets must be created before deployment. You have three options:
+
+**Option 1: Use the provided script (Recommended)**
+```bash
+# Generate secrets and create in cluster
+./scripts/generate-secrets.sh | kubectl apply -f - -n vulcanami-development
+
+# For production with custom API keys
+./scripts/generate-secrets.sh | \
+  sed 's/OPENAI_API_KEY: ""/OPENAI_API_KEY: "sk-your-key"/' | \
+  kubectl apply -f - -n vulcanami-production
+```
+
+**Option 2: Manual creation with kubectl**
+```bash
+kubectl create secret generic vulcanami-secrets \
+  --from-literal=JWT_SECRET_KEY=$(openssl rand -base64 48) \
+  --from-literal=BOOTSTRAP_KEY=$(openssl rand -base64 32) \
+  --from-literal=POSTGRES_PASSWORD=$(openssl rand -base64 32) \
+  --from-literal=REDIS_PASSWORD=$(openssl rand -base64 32) \
+  --from-literal=MINIO_ROOT_USER=minioadmin \
+  --from-literal=MINIO_ROOT_PASSWORD=$(openssl rand -base64 32) \
+  --from-literal=MINIO_SECRET_KEY=$(openssl rand -base64 24) \
+  --from-literal=OPENAI_API_KEY=sk-your-openai-api-key \
+  --from-literal=VULCAN_LLM_API_KEY=sk-your-openai-api-key \
+  --from-literal=AWS_ACCESS_KEY_ID=minioadmin \
+  --from-literal=AWS_SECRET_ACCESS_KEY=$(openssl rand -base64 32) \
+  -n vulcanami-development
+```
+
+**Option 3: External Secret Manager (Production)**
+```bash
+# Using AWS Secrets Manager with External Secrets Operator
+# Install External Secrets Operator first
+kubectl apply -f https://raw.githubusercontent.com/external-secrets/external-secrets/main/deploy/crds/bundle.yaml
+
+# Then create ExternalSecret resource
+# See: https://external-secrets.io/latest/
+```
+
+**⚠️ Security Best Practices:**
+- Never commit secrets to git
+- Use different secrets for each environment
+- Rotate secrets regularly (every 90 days recommended)
+- Use external secret managers (AWS Secrets Manager, HashiCorp Vault) for production
+- Limit RBAC access to secrets
+
 #### Using kubectl with Kustomize
 
 ##### Development Deployment
@@ -737,13 +859,518 @@ kubectl rollout undo deployment/prod-vulcanami-api -n vulcanami-production
 ## Health Checks
 
 All services expose health endpoints:
-- Liveness: `/health`
-- Readiness: `/health`
-- Metrics: `/metrics`
+- Liveness: `/health/live` - Basic health check (service is running)
+- Readiness: `/health/ready` - Service is ready to handle traffic
+- Metrics: `/metrics` - Prometheus metrics endpoint
 
-Test health:
+Test health endpoints:
 ```bash
-curl http://api.vulcanami.example.com/health
+# API health check
+kubectl port-forward -n vulcanami-development svc/vulcanami-api 8000:8000
+curl http://localhost:8000/health/live
+curl http://localhost:8000/health/ready
+
+# Or use kubectl exec
+kubectl exec -n vulcanami-development deploy/vulcanami-api -- curl -s http://localhost:8000/health/live
+```
+
+## Troubleshooting Guide
+
+### Common Issues and Solutions
+
+#### Issue: Pods stuck in Pending state
+
+**Symptoms:**
+```bash
+$ kubectl get pods -n vulcanami-development
+NAME                           READY   STATUS    RESTARTS   AGE
+vulcanami-api-xxx             0/1     Pending   0          5m
+```
+
+**Diagnosis:**
+```bash
+# Check pod events
+kubectl describe pod <pod-name> -n vulcanami-development
+
+# Common causes:
+# 1. Insufficient resources
+# 2. Storage class not available
+# 3. Node selector/affinity mismatch
+```
+
+**Solutions:**
+```bash
+# Check node resources
+kubectl top nodes
+
+# Check PVC status
+kubectl get pvc -n vulcanami-development
+
+# Check storage class
+kubectl get storageclasses
+```
+
+#### Issue: Milvus bootstrap fails
+
+**Symptoms:**
+```bash
+# Init container fails
+kubectl logs <pod-name> -n vulcanami-development -c milvus-bootstrap
+Error: Cannot connect to milvus-service:19530
+```
+
+**Solutions:**
+```bash
+# 1. Check Milvus pod is running
+kubectl get pods -n vulcanami-development -l app=milvus
+
+# 2. Check Milvus service
+kubectl get svc -n vulcanami-development milvus-service
+
+# 3. Check Milvus logs
+kubectl logs -n vulcanami-development -l app=milvus --tail=100
+
+# 4. Test connectivity from API pod
+kubectl exec -n vulcanami-development deploy/vulcanami-api -- \
+  nc -zv milvus-service 19530
+```
+
+#### Issue: MinIO bucket not created
+
+**Symptoms:**
+```bash
+# API logs show S3 errors
+Error: Bucket 'vulcanami-memory' does not exist
+```
+
+**Solutions:**
+```bash
+# 1. Check MinIO bucket setup job
+kubectl get jobs -n vulcanami-development -l app=minio
+
+# 2. Check job logs
+kubectl logs -n vulcanami-development job/minio-bucket-setup
+
+# 3. Manually create bucket if job failed
+kubectl exec -n vulcanami-development -it sts/minio -- \
+  mc alias set myminio http://localhost:9000 minioadmin <password>
+kubectl exec -n vulcanami-development -it sts/minio -- \
+  mc mb myminio/vulcanami-memory
+
+# 4. Restart the bucket setup job
+kubectl delete job minio-bucket-setup -n vulcanami-development
+kubectl apply -k k8s/overlays/development/
+```
+
+#### Issue: Image pull errors
+
+**Symptoms:**
+```bash
+# Pod shows ImagePullBackOff
+Status: ImagePullBackOff
+```
+
+**Solutions:**
+```bash
+# 1. Check if image exists
+docker pull ghcr.io/musicmonk42/vulcanami_llm-api:v1.0.0
+
+# 2. Check image pull secrets (if registry is private)
+kubectl get secrets -n vulcanami-development
+
+# 3. Create image pull secret if needed
+kubectl create secret docker-registry ghcr-secret \
+  --docker-server=ghcr.io \
+  --docker-username=<your-username> \
+  --docker-password=<your-token> \
+  -n vulcanami-development
+
+# 4. Patch service account to use secret
+kubectl patch serviceaccount default \
+  -n vulcanami-development \
+  -p '{"imagePullSecrets": [{"name": "ghcr-secret"}]}'
+```
+
+#### Issue: Secrets contain placeholder values
+
+**Symptoms:**
+```bash
+# Validation warns about placeholder values
+Secret key 'POSTGRES_PASSWORD' contains placeholder value
+```
+
+**Solutions:**
+```bash
+# Delete and recreate secrets
+kubectl delete secret vulcanami-secrets -n vulcanami-development
+
+# Regenerate with proper values
+./scripts/generate-secrets.sh | kubectl apply -f - -n vulcanami-development
+
+# Or update specific secret keys
+kubectl patch secret vulcanami-secrets -n vulcanami-development \
+  -p="{\"data\":{\"POSTGRES_PASSWORD\":\"$(echo -n 'your-password' | base64)\"}}"
+```
+
+#### Issue: Network policy blocking connections
+
+**Symptoms:**
+```bash
+# Timeout errors between services
+Error: timeout connecting to postgres-service:5432
+```
+
+**Solutions:**
+```bash
+# 1. Check network policies
+kubectl get networkpolicies -n vulcanami-development
+
+# 2. Describe policy to see rules
+kubectl describe networkpolicy -n vulcanami-development
+
+# 3. Temporarily disable network policy for testing
+kubectl delete networkpolicy <policy-name> -n vulcanami-development
+
+# 4. Re-enable after fixing
+kubectl apply -k k8s/overlays/development/
+```
+
+#### Issue: Persistent volume claims not binding
+
+**Symptoms:**
+```bash
+$ kubectl get pvc -n vulcanami-development
+NAME                    STATUS    VOLUME   CAPACITY
+milvus-storage-milvus-0 Pending            
+```
+
+**Solutions:**
+```bash
+# 1. Check if storage class exists
+kubectl get storageclasses
+
+# 2. Check PVC events
+kubectl describe pvc milvus-storage-milvus-0 -n vulcanami-development
+
+# 3. If storage class is wrong, update manifests
+# Edit k8s/base/*-deployment.yaml and change storageClassName
+
+# 4. Check if cluster has available storage
+kubectl get pv
+```
+
+### Debugging Commands
+
+```bash
+# Get all resources in namespace
+kubectl get all -n vulcanami-development
+
+# Check pod logs
+kubectl logs -n vulcanami-development <pod-name>
+kubectl logs -n vulcanami-development <pod-name> -c <container-name>
+kubectl logs -n vulcanami-development <pod-name> --previous  # Previous container
+
+# Follow logs in real-time
+kubectl logs -f -n vulcanami-development -l app=vulcanami-api
+
+# Execute commands in pod
+kubectl exec -it -n vulcanami-development <pod-name> -- /bin/bash
+
+# Check pod resource usage
+kubectl top pods -n vulcanami-development
+
+# Check node resource usage
+kubectl top nodes
+
+# Get pod YAML
+kubectl get pod <pod-name> -n vulcanami-development -o yaml
+
+# Check events
+kubectl get events -n vulcanami-development --sort-by='.lastTimestamp'
+
+# Port forward for local testing
+kubectl port-forward -n vulcanami-development svc/vulcanami-api 8000:8000
+kubectl port-forward -n vulcanami-development svc/minio-service 9000:9000 9001:9001
+
+# Scale deployment
+kubectl scale deployment vulcanami-api -n vulcanami-development --replicas=0
+kubectl scale deployment vulcanami-api -n vulcanami-development --replicas=3
+```
+
+## Monitoring and Observability
+
+### Prometheus Metrics
+
+All services expose Prometheus metrics:
+
+```bash
+# Check metrics endpoint
+kubectl port-forward -n vulcanami-development svc/vulcanami-api 8000:8000
+curl http://localhost:8000/metrics
+
+# Milvus metrics
+kubectl port-forward -n vulcanami-development svc/milvus-service 9091:9091
+curl http://localhost:9091/metrics
+```
+
+### Install Prometheus Stack (Recommended)
+
+```bash
+# Add Prometheus helm repo
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
+
+# Install kube-prometheus-stack
+helm install prometheus prometheus-community/kube-prometheus-stack \
+  --namespace monitoring \
+  --create-namespace \
+  --set prometheus.prometheusSpec.serviceMonitorSelectorNilUsesHelmValues=false
+
+# Access Grafana dashboard
+kubectl port-forward -n monitoring svc/prometheus-grafana 3000:80
+
+# Default credentials: admin / prom-operator
+```
+
+### Key Metrics to Monitor
+
+**Application Metrics:**
+- `http_requests_total` - Total HTTP requests
+- `http_request_duration_seconds` - Request latency
+- `http_requests_in_progress` - Active requests
+- `vulcan_llm_inference_duration_seconds` - LLM inference time
+- `vulcan_memory_operations_total` - Memory system operations
+
+**System Metrics:**
+- `container_cpu_usage_seconds_total` - CPU usage
+- `container_memory_working_set_bytes` - Memory usage
+- `kube_pod_status_phase` - Pod status
+- `kube_deployment_status_replicas_available` - Available replicas
+
+**Database Metrics:**
+- `pg_stat_database_*` - PostgreSQL statistics
+- `redis_connected_clients` - Redis connections
+- `milvus_*` - Milvus vector operations
+
+### Logging
+
+```bash
+# View API logs
+kubectl logs -n vulcanami-development -l app=vulcanami-api --tail=100 -f
+
+# View all pod logs
+kubectl logs -n vulcanami-development --all-containers=true --tail=100
+
+# Filter logs by severity
+kubectl logs -n vulcanami-development -l app=vulcanami-api | grep ERROR
+
+# Export logs to file
+kubectl logs -n vulcanami-development -l app=vulcanami-api --tail=1000 > api.log
+```
+
+### Centralized Logging (Optional)
+
+Install EFK Stack (Elasticsearch, Fluentd, Kibana):
+
+```bash
+# Add elastic helm repo
+helm repo add elastic https://helm.elastic.co
+helm repo update
+
+# Install Elasticsearch
+helm install elasticsearch elastic/elasticsearch \
+  --namespace logging \
+  --create-namespace
+
+# Install Fluentd
+kubectl apply -f https://raw.githubusercontent.com/fluent/fluentd-kubernetes-daemonset/master/fluentd-daemonset-elasticsearch.yaml
+
+# Install Kibana
+helm install kibana elastic/kibana \
+  --namespace logging \
+  --set elasticsearchHosts=http://elasticsearch-master:9200
+```
+
+## Rollback Procedures
+
+### Rollback a Failed Deployment
+
+```bash
+# Check rollout history
+kubectl rollout history deployment/vulcanami-api -n vulcanami-development
+
+# Rollback to previous version
+kubectl rollout undo deployment/vulcanami-api -n vulcanami-development
+
+# Rollback to specific revision
+kubectl rollout undo deployment/vulcanami-api -n vulcanami-development --to-revision=3
+
+# Check rollout status
+kubectl rollout status deployment/vulcanami-api -n vulcanami-development
+```
+
+### Complete Environment Rollback
+
+```bash
+# 1. Tag current state
+kubectl get all -n vulcanami-development -o yaml > backup-$(date +%Y%m%d-%H%M%S).yaml
+
+# 2. Delete current deployment
+kubectl delete -k k8s/overlays/development/
+
+# 3. Restore previous version
+git checkout <previous-commit>
+kubectl apply -k k8s/overlays/development/
+
+# 4. Verify rollback
+./scripts/validate-deployment.sh development
+```
+
+### Emergency Rollback
+
+If deployment is completely broken:
+
+```bash
+# Scale down all deployments immediately
+kubectl scale deployment --all --replicas=0 -n vulcanami-development
+
+# Delete problematic resources
+kubectl delete deployment vulcanami-api -n vulcanami-development
+
+# Restore from backup
+kubectl apply -f backup-<timestamp>.yaml
+
+# Or redeploy from last known good version
+git checkout <last-good-commit>
+./scripts/deploy.sh development --image-tag <last-good-version>
+```
+
+## Upgrade Procedures
+
+### Minor Version Upgrade
+
+```bash
+# 1. Backup current state
+kubectl get all -n vulcanami-production -o yaml > backup-pre-upgrade.yaml
+
+# 2. Update image tag
+cd k8s/overlays/production
+kustomize edit set image ghcr.io/musicmonk42/vulcanami_llm-api:v1.1.0
+
+# 3. Run validation
+./scripts/validate-deployment.sh production
+
+# 4. Apply upgrade
+kubectl apply -k k8s/overlays/production/
+
+# 5. Monitor rollout
+kubectl rollout status deployment/prod-vulcanami-api -n vulcanami-production
+
+# 6. Verify health
+kubectl exec -n vulcanami-production deploy/prod-vulcanami-api -- \
+  curl -s http://localhost:8000/health/ready
+```
+
+### Major Version Upgrade
+
+For major version upgrades (e.g., v1.x to v2.x):
+
+```bash
+# 1. Review CHANGELOG.md for breaking changes
+
+# 2. Test upgrade in development first
+./scripts/deploy.sh development --image-tag v2.0.0
+
+# 3. Run integration tests
+kubectl exec -n vulcanami-development deploy/vulcanami-api -- python -m pytest /app/tests/
+
+# 4. Backup production data
+kubectl exec -n vulcanami-production sts/postgres-0 -- \
+  pg_dump -U vulcanami vulcanami > backup-$(date +%Y%m%d).sql
+
+# 5. Schedule maintenance window
+
+# 6. Deploy to production with canary strategy (if using service mesh)
+# Or use blue-green deployment
+
+# 7. Monitor logs and metrics closely
+kubectl logs -f -n vulcanami-production -l app=vulcanami-api
+```
+
+### Zero-Downtime Upgrade Strategy
+
+```bash
+# 1. Ensure replicas > 1
+kubectl scale deployment vulcanami-api -n vulcanami-production --replicas=5
+
+# 2. Update image with rolling update strategy
+kubectl set image deployment/vulcanami-api \
+  api=ghcr.io/musicmonk42/vulcanami_llm-api:v1.1.0 \
+  -n vulcanami-production
+
+# 3. Monitor rollout
+kubectl rollout status deployment/vulcanami-api -n vulcanami-production
+
+# 4. Verify no downtime
+# Monitor http_requests_total metric for continuous traffic
+```
+
+## Performance Tuning
+
+### Resource Optimization
+
+```bash
+# Monitor resource usage
+kubectl top pods -n vulcanami-production
+
+# Adjust resource requests/limits based on actual usage
+kubectl set resources deployment vulcanami-api \
+  -n vulcanami-production \
+  --limits=cpu=4000m,memory=8Gi \
+  --requests=cpu=1000m,memory=2Gi
+```
+
+### Horizontal Pod Autoscaling
+
+```bash
+# Create HPA based on CPU
+kubectl autoscale deployment vulcanami-api \
+  -n vulcanami-production \
+  --cpu-percent=70 \
+  --min=3 \
+  --max=20
+
+# Or create HPA based on custom metrics
+cat <<EOF | kubectl apply -f -
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: vulcanami-api-hpa
+  namespace: vulcanami-production
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: vulcanami-api
+  minReplicas: 3
+  maxReplicas: 20
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+EOF
+
+# Check HPA status
+kubectl get hpa -n vulcanami-production
 ```
 
 ## Support
