@@ -87,8 +87,9 @@ try:
             _nlp_loaded = True
         return _nlp
     
-    # For backward compatibility - nlp is now a property that triggers lazy loading
-    nlp = None  # Will be set to None initially, use get_nlp() to access
+    # For backward compatibility - nlp variable is kept as None
+    # Consumers should use get_nlp() to access the lazily-loaded model
+    nlp = None  # DEPRECATED: Use get_nlp() instead
 except ImportError:
     SPACY_AVAILABLE = False
     _nlp = None
@@ -747,7 +748,8 @@ class GoalRelevanceAnalyzer:
 
     def __init__(self, semantic_enricher: SemanticEnricher):
         self.semantic_enricher = semantic_enricher
-        self.use_spacy = SPACY_AVAILABLE  # Check availability, actual model loaded lazily
+        # Check if spaCy is available AND model can be loaded
+        self.use_spacy = SPACY_AVAILABLE and get_nlp() is not None
 
     def analyze_goal_relevance(
         self, mappings: Dict[str, str], goal: Any, source: Dict, target: Dict

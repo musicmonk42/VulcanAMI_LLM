@@ -1265,7 +1265,7 @@ _background_init_started = False
 _background_init_complete = False
 
 
-async def _background_model_loading(app_state, components_status: dict, logger):
+async def _background_model_loading(app_state: Any, components_status: dict, logger) -> None:
     """
     Background task to load heavy ML models AFTER server starts accepting connections.
     
@@ -3102,7 +3102,7 @@ async def health_ready():
                 "mounted_services": mounted_services,
                 "total_services": total_services,
                 "models_loaded": models_loaded,
-                "note": "Server is ready. Models are loaded in background." if not models_loaded else None
+                "note": "Models are still loading in background." if not models_loaded else None
             }
         else:
             return JSONResponse(
