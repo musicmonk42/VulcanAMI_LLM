@@ -1340,29 +1340,13 @@ class SymbolicToolWrapper:
                 preprocessing_result = problem.get('preprocessing') or problem.get('formal_input')
                 
                 if preprocessing_result:
-                    if hasattr(preprocessing_result, 'formal_input'):
-                        # PreprocessingResult dataclass with formal_input attribute
-                        formal_input = preprocessing_result.formal_input
-                        if formal_input and len(str(formal_input)) > 0:
-                            preprocessed_query = str(formal_input) if not isinstance(formal_input, str) else formal_input
-                            logger.info(
-                                f"[SymbolicEngine] Using preprocessed input from QueryPreprocessor: "
-                                f"'{preprocessed_query[:50]}...'"
-                            )
-                    elif isinstance(preprocessing_result, dict):
-                        # Extract from preprocessing dict
-                        formal_input = preprocessing_result.get('formal_input')
-                        if formal_input and len(str(formal_input)) > 0:
-                            preprocessed_query = str(formal_input) if not isinstance(formal_input, str) else formal_input
-                            logger.info(
-                                f"[SymbolicEngine] Using preprocessed input from QueryPreprocessor: "
-                                f"'{preprocessed_query[:50]}...'"
-                            )
-                    elif isinstance(preprocessing_result, str) and len(preprocessing_result) > 0:
-                        # Direct string
-                        preprocessed_query = preprocessing_result
+                    # Extract formal_input from various possible structures
+                    formal_input = self._extract_formal_input(preprocessing_result)
+                    if formal_input:
+                        preprocessed_query = formal_input
                         logger.info(
-                            f"[SymbolicEngine] Using preprocessed input: '{preprocessing_result[:50]}...'"
+                            f"[SymbolicEngine] Using preprocessed input from QueryPreprocessor: "
+                            f"'{preprocessed_query[:50]}...'"
                         )
             
             # If no preprocessing was provided, try to extract formal logic ourselves
@@ -1417,6 +1401,37 @@ class SymbolicToolWrapper:
             return problem.get("query") or problem.get("text") or problem.get("formula") or ""
         else:
             return str(problem)
+    
+    def _extract_formal_input(self, preprocessing_result: Any) -> Optional[str]:
+        """
+        Extract formal input from various preprocessing result structures.
+        
+        Args:
+            preprocessing_result: Can be:
+                - PreprocessingResult dataclass with formal_input attribute
+                - Dict with 'formal_input' key
+                - Direct string
+        
+        Returns:
+            Extracted formal input string, or None if not found/empty
+        """
+        formal_input = None
+        
+        # Try dataclass with formal_input attribute
+        if hasattr(preprocessing_result, 'formal_input'):
+            formal_input = preprocessing_result.formal_input
+        # Try dict with formal_input key
+        elif isinstance(preprocessing_result, dict):
+            formal_input = preprocessing_result.get('formal_input')
+        # Direct string
+        elif isinstance(preprocessing_result, str):
+            formal_input = preprocessing_result
+        
+        # Validate and convert to string
+        if formal_input and len(str(formal_input)) > 0:
+            return str(formal_input) if not isinstance(formal_input, str) else formal_input
+        
+        return None
     
     def _preprocess_query(self, query: str) -> str:
         """
@@ -2637,16 +2652,16 @@ class ToolSelector:
                 prevent_router_override = request.context.get('prevent_router_tool_override', False)
                 
                 # For these categories, the LLM's language understanding is more reliable
-                # than semantic embedding similarity
-                authoritative_categories = frozenset([
+                # than semantic embedding similarity. Normalize to uppercase for comparison.
+                AUTHORITATIVE_CATEGORIES = frozenset([
                     'UNKNOWN', 'CREATIVE', 'CONVERSATIONAL', 'GENERAL',
                     'GREETING', 'FACTUAL',
-                    # Lowercase variants for safety
-                    'unknown', 'creative', 'conversational', 'general',
-                    'greeting', 'factual',
                 ])
                 
-                if classifier_category in authoritative_categories or classifier_is_authoritative or prevent_router_override:
+                # Normalize category to uppercase for comparison
+                category_upper = classifier_category.upper() if classifier_category else None
+                
+                if category_upper in AUTHORITATIVE_CATEGORIES or classifier_is_authoritative or prevent_router_override:
                     skip_semantic_boost = True
                     prior_context['skip_semantic_boost'] = True
                     logger.info(
