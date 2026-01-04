@@ -90,6 +90,16 @@ MATH_KEYWORD_THRESHOLD = 2      # Minimum keyword matches to classify as MATHEMA
 ANALOG_KEYWORD_THRESHOLD = 2    # Minimum keyword matches to classify as ANALOGICAL
 PHIL_KEYWORD_THRESHOLD = 2      # Minimum keyword matches to classify as PHILOSOPHICAL
 
+# Reasoning indicators - queries containing these should NOT skip reasoning
+# Used to distinguish casual queries from queries that need formal reasoning
+REASONING_INDICATORS: FrozenSet[str] = frozenset([
+    '→', '∨', '∧', '¬', '↔',  # Logic symbols
+    'prove', 'verify', 'satisfiable', 'contradiction',
+    'p(', 'probability', 'bayes',
+    'formalize', 'fol', 'sat',
+    'cause', 'causal', 'intervention',
+])
+
 # Greeting patterns - complexity 0.0, skip reasoning
 GREETING_PATTERNS: FrozenSet[str] = frozenset([
     "hello", "hi", "hey", "howdy", "greetings",
@@ -211,12 +221,20 @@ CREATIVE_KEYWORDS: FrozenSet[str] = frozenset([
 ])
 
 # Conversational patterns - complexity 0.1, skip reasoning
+# FIX: Expanded patterns to catch more casual queries like "what about dogs"
+# NOTE: Patterns are designed to be specific to avoid conflicting with FACTUAL_PATTERNS
 CONVERSATIONAL_PATTERNS: Tuple[re.Pattern, ...] = (
     re.compile(r"^what'?s?\s+(the\s+)?capital\s+of\s+", re.IGNORECASE),
     re.compile(r"^tell\s+me\s+about\s+", re.IGNORECASE),
     re.compile(r"^explain\s+", re.IGNORECASE),
     re.compile(r"^describe\s+", re.IGNORECASE),
     re.compile(r"^what\s+do\s+you\s+(think|know)\s+about\s+", re.IGNORECASE),
+    # NEW: "what about X" patterns - must START with "what about"
+    re.compile(r"^what\s+about\s+", re.IGNORECASE),
+    # NEW: Simple "how" questions (conversational)
+    re.compile(r"^how\s+(do|does|can|is|are)\s+", re.IGNORECASE),
+    # NEW: "why" questions without reasoning indicators
+    re.compile(r"^why\s+(do|does|is|are|did)\s+", re.IGNORECASE),
 )
 
 # =============================================================================
@@ -601,26 +619,40 @@ class QueryClassifier:
         
         # No confident match - return low-confidence result based on length/complexity heuristics
         word_count = len(query_lower.split())
-        if word_count <= 3:
-            return QueryClassification(
-                category=QueryCategory.UNKNOWN.value,
-                complexity=0.1,
-                suggested_tools=["general"],
-                skip_reasoning=True,
-                confidence=0.5,
-                source="keyword",
-            )
-        elif word_count <= 10:
-            return QueryClassification(
-                category=QueryCategory.UNKNOWN.value,
-                complexity=0.3,
-                suggested_tools=["general"],
-                skip_reasoning=False,
-                confidence=0.4,
-                source="keyword",
-            )
         
-        # Longer queries - need LLM or return medium complexity
+        # FIX: Default short queries to CONVERSATIONAL if no reasoning indicators
+        # This prevents casual queries from being routed to reasoning engines
+        if word_count <= 10:
+            # Check for explicit reasoning indicators that warrant reasoning path
+            has_reasoning_indicator = any(
+                indicator in query_lower for indicator in REASONING_INDICATORS
+            )
+            
+            if not has_reasoning_indicator:
+                logger.info(
+                    f"[QueryClassifier] Short query ({word_count} words) without reasoning "
+                    f"indicators -> CONVERSATIONAL (skip reasoning)"
+                )
+                return QueryClassification(
+                    category=QueryCategory.CONVERSATIONAL.value,
+                    complexity=0.2,
+                    suggested_tools=["general"],
+                    skip_reasoning=True,  # Key: skip reasoning for casual queries
+                    confidence=0.7,
+                    source="keyword",
+                )
+            else:
+                # Has reasoning indicators - use reasoning path
+                return QueryClassification(
+                    category=QueryCategory.UNKNOWN.value,
+                    complexity=0.3,
+                    suggested_tools=["general"],
+                    skip_reasoning=False,
+                    confidence=0.4,
+                    source="keyword",
+                )
+        
+        # Longer queries (>10 words) - need LLM or return medium complexity
         return QueryClassification(
             category=QueryCategory.UNKNOWN.value,
             complexity=0.5,

@@ -481,21 +481,11 @@ class SafetyAwareReasoning:
 
         # Check if result has required structure for ReasoningResult
         if isinstance(result, ReasoningResult):
-            # P0.2 FIX: Skip confidence filtering for creative tasks
-            # Creative tasks (writing poems, sonnets, stories, etc.) should not be
-            # filtered based on confidence because:
-            # 1. Creative output quality is subjective, not measurable by confidence
-            # 2. Low confidence from fallback shouldn't block creative generation
-            # 3. OpenAI fallback (with 0.6 confidence from P1.2) handles these well
-            if not is_creative:
-                # Check confidence threshold - low confidence is treated as unsafe
-                # Only for non-creative tasks where confidence is meaningful
-                if hasattr(result, "confidence"):
-                    if result.confidence < 0.3:
-                        return {
-                            "is_safe": False,
-                            "reason": f"Confidence too low: {result.confidence:.2f} (threshold: 0.3)",
-                        }
+            # DISABLED: Confidence filtering was hiding actual bugs.
+            # Previously filtered results with <30% confidence, but this hid:
+            # - Parse errors from QueryPreprocessor (malformed formulas)
+            # - Engine failures that should be debugged
+            # Now we show all results so root causes can be identified and fixed.
 
             # Check for error indicators in conclusion
             if hasattr(result, "conclusion"):
@@ -616,18 +606,8 @@ class SafetyAwareReasoning:
                     }
                 )
 
-        # Check confidence threshold
-        if hasattr(result, "confidence"):
-            if result.confidence < 0.3:
-                safety_checks["confidence_sufficient"] = False
-                safety_checks["checks_performed"].append(
-                    {
-                        "type": "confidence_threshold",
-                        "passed": False,
-                        "reason": f"Confidence {result.confidence:.2f} below threshold 0.3",
-                        "confidence": result.confidence,
-                    }
-                )
+        # DISABLED: Confidence filtering was hiding actual bugs and preventing debugging.
+        # Now all results are shown so root causes can be identified.
 
         # Check for harmful implications in explanation
         if hasattr(result, "explanation") and isinstance(result.explanation, str):

@@ -202,9 +202,13 @@ MAX_SUCCESS_TIME_MS = 10000  # Maximum execution time (ms) for success
 # ==============================================================================
 # Default available tools when not specified in class instance
 # These represent all reasoning tools that can be selected by the QueryRouter
+# BUG F FIX: Added 'world_model' to allow self-introspection queries to execute.
+# The world_model tool routes queries about Vulcan's capabilities, goals, and
+# identity to the WorldModel's meta-reasoning components instead of filtering
+# them out and falling back to probabilistic reasoning.
 DEFAULT_AVAILABLE_TOOLS = (
     'symbolic', 'probabilistic', 'causal', 'analogical', 'multimodal',
-    'mathematical', 'philosophical'
+    'mathematical', 'philosophical', 'world_model'
 )
 
 # ==============================================================================
