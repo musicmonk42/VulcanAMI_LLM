@@ -359,7 +359,8 @@ class TestInterventions:
         result = engine.perform_intervention("X", 5.0)
 
         assert isinstance(result, InterventionResult)
-        assert result.confidence == 0.0
+        # When no DAG is available, minimum confidence floor (0.1) is returned
+        assert result.confidence == 0.1
 
 
 # ============================================================================
@@ -1066,12 +1067,15 @@ class TestCompatibility:
         assert "total_effect" in result
 
     def test_reason_with_unsupported_format(self):
-        """Test reasoning with unsupported input"""
+        """Test reasoning with string input (now supported as natural language query)"""
         reasoner = CausalReasoner()
 
+        # String input is now treated as a natural language causal query
         result = reasoner.reason("unsupported")
 
-        assert "error" in result
+        # BUG L FIX: String input now triggers causal query analysis
+        assert "reasoning_type" in result or "causal_graph" in result
+        assert result.get("confidence", 0) > 0
 
 
 # ============================================================================
