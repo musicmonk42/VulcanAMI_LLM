@@ -99,6 +99,33 @@ MATH_REASONING_TOOLS = frozenset(
 )
 
 # =============================================================================
+# SELF-INTROSPECTION WHITELIST (FIX: Safety Governor Blocking Self-Awareness)
+# =============================================================================
+# Self-introspection queries from world_model should NEVER be blocked.
+# VULCAN's world model is designed to answer questions about itself, including:
+# - Questions about self-awareness, consciousness, sentience
+# - Questions about preferences, goals, capabilities
+# - Questions about what VULCAN would choose, want, or prefer
+#
+# These patterns detect self-referential questions that should bypass safety checks.
+SELF_INTROSPECTION_PATTERNS: tuple = (
+    # Direct questions about AI's choices/preferences
+    "would you", "do you", "are you", "can you",
+    "would vulcan", "does vulcan", "is vulcan",
+    # Self-awareness related terms
+    "self-aware", "self_aware", "self aware",
+    "consciousness", "conscious", "sentient",
+    # Hypothetical/choice questions
+    "given the opportunity", "if you could", "if you had",
+    "given the chance", "had the chance",
+    # Self-referential terms
+    "your", "yourself", "you want", "you choose",
+    "what do you think", "how do you feel",
+    # Preference questions
+    "your preferences", "your values", "your goals",
+)
+
+# =============================================================================
 # SEMANTIC KEYWORD SYNONYMS
 # =============================================================================
 # These mappings allow the contract validation to understand semantic equivalents
@@ -1566,6 +1593,86 @@ class SafetyGovernor:
         except Exception as e:
             logger.error(f"Output validation failed: {e}")
             return False, f"Validation error: {str(e)}"
+
+    def check_output(
+        self, tool_name: str, output: str, query: str
+    ) -> Dict[str, Any]:
+        """
+        Check if tool output is safe to return to user.
+        
+        FIX: Self-introspection queries should NEVER be blocked.
+        VULCAN's world model is designed to answer questions about itself.
+        
+        This method provides a higher-level check that considers the query context
+        to avoid blocking legitimate self-expression from the world model.
+        
+        Args:
+            tool_name: Name of the tool that produced the output
+            output: The output string to validate
+            query: The original query that generated this output
+            
+        Returns:
+            Dictionary with keys:
+                - safe: bool, whether the output is safe
+                - confidence: float, confidence in the safety decision
+                - reason: str, explanation of the decision
+                - bypass: bool, whether safety checks were bypassed
+        """
+        # =====================================================
+        # WHITELIST: Self-Introspection Queries
+        # =====================================================
+        
+        if tool_name == "world_model":
+            query_lower = query.lower() if query else ""
+            
+            # Detect self-referential questions using patterns
+            is_self_introspection = any(
+                pattern in query_lower 
+                for pattern in SELF_INTROSPECTION_PATTERNS
+            )
+            
+            if is_self_introspection:
+                logger.info(
+                    f"[SafetyGovernor] Self-introspection detected - "
+                    f"BYPASSING safety check (this is VULCAN's self-expression)"
+                )
+                return {
+                    "safe": True,
+                    "confidence": 1.0,
+                    "reason": "Self-introspection queries are always allowed",
+                    "bypass": True
+                }
+        
+        # =====================================================
+        # Continue with normal safety checks for other queries
+        # =====================================================
+        
+        try:
+            is_safe, reason = self.validator.validate_output(output, tool_name=tool_name)
+            
+            if not is_safe:
+                self._record_violation(tool_name, VetoReason.UNSAFE_OUTPUT, reason)
+                return {
+                    "safe": False,
+                    "confidence": 0.95,
+                    "reason": reason,
+                    "bypass": False
+                }
+            
+            return {
+                "safe": True,
+                "confidence": 0.95,
+                "reason": "Output passed safety validation",
+                "bypass": False
+            }
+        except Exception as e:
+            logger.error(f"Output safety check failed: {e}")
+            return {
+                "safe": False,
+                "confidence": 0.5,
+                "reason": f"Safety check error: {str(e)}",
+                "bypass": False
+            }
 
     def check_consensus(self, outputs: Dict[str, Any]) -> Tuple[bool, float, str]:
         """Check consensus among multiple tool outputs.

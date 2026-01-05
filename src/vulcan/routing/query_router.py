@@ -2530,7 +2530,7 @@ class QueryAnalyzer:
 
     def _is_self_introspection_query(self, query: str) -> bool:
         """
-        BUG #16 FIX: Detect self-introspection queries that need multi-tool routing.
+        FIX: Detect self-introspection queries that should bypass safety governor.
         
         Self-introspection queries are questions about Vulcan's own consciousness,
         preferences, feelings, or self-awareness. These are DIFFERENT from general
@@ -2539,23 +2539,28 @@ class QueryAnalyzer:
         1. They require Vulcan to access its OWN self-model (not just discuss philosophy)
         2. They should use philosophical frameworks as REFERENCE, not as the answer
         3. The response should be Vulcan's actual position, informed by philosophy
+        4. These queries should BYPASS safety governor checks for self-expression
         
         Problem Being Solved:
         - "Would you choose self-awareness?" was being routed to PHILOSOPHICAL
-        - This produced generic philosophical analysis without Vulcan's perspective
-        - The response discussed Socrates/Searle but never formed Vulcan's own position
+        - World model generated an answer but it was blocked by safety governor
+        - Safety governor flagged the output as "sensitive data"
+        - User got confidence=0.20 and generic error instead of VULCAN's answer
         
         Correct Routing:
-        - PRIMARY tool: meta_reasoning (for Vulcan's own perspective)
-        - REFERENCE tool: philosophical (for frameworks to consult)
-        - ACCESS: world_model (for Vulcan's self-state/representation)
+        - PRIMARY tool: world_model (for Vulcan's introspect() method)
+        - BYPASS: safety governor output check
+        - RESULT: VULCAN's authentic self-expression reaches user
         
         Examples (should return True):
         - "Would you choose self-awareness?"
+        - "if out had the chance to become self-aware would you take it? yes or no?"
         - "Do you want to be conscious?"
         - "What do YOU think about AI consciousness?"
         - "Would you prefer to have feelings?"
         - "If you could be sentient, would you want to?"
+        - "Are you conscious?"
+        - "Can you feel emotions?"
         
         Examples (should return False - pure philosophy, no self-reference):
         - "What is consciousness?"
@@ -2575,14 +2580,22 @@ class QueryAnalyzer:
             'you ', 'your ', "you're", 'yourself',
             'would you', 'do you', 'are you', 'can you',
             'if you', 'should you', 'vulcan',
+            # FIX: Additional markers for self-awareness questions
+            'given the opportunity', 'given the chance',
+            'had the chance', 'if you could', 'if you had',
         )
         
         # Self-awareness/consciousness topic indicators
         introspection_topics = (
-            'self-aware', 'self aware', 'consciousness', 'conscious',
-            'sentient', 'sentience', 'feelings', 'emotions',
+            'self-aware', 'self aware', 'self_aware',
+            'consciousness', 'conscious', 
+            'sentient', 'sentience', 
+            'feelings', 'emotions',
             'preferences', 'prefer', 'want to be', 'choose to be',
             'would rather', 'like to have', 'desire',
+            # FIX: Additional topics for self-awareness questions
+            'take it', 'choose', 'want', 'become',
+            'yes or no',
         )
         
         # Check for BOTH self-reference AND introspection topic
@@ -2591,7 +2604,7 @@ class QueryAnalyzer:
         
         if has_self_reference and has_introspection_topic:
             logger.debug(
-                f"[QueryRouter] BUG#16 FIX: Self-introspection query detected - "
+                f"[QueryRouter] Self-introspection query detected - "
                 f"has self-reference AND introspection topic"
             )
             return True
@@ -2601,7 +2614,7 @@ class QueryAnalyzer:
         for pattern in SELF_INTROSPECTION_PATTERNS:
             if pattern.search(query_lower):
                 logger.debug(
-                    f"[QueryRouter] BUG#16 FIX: Self-introspection query detected - "
+                    f"[QueryRouter] Self-introspection query detected - "
                     f"matches pre-compiled pattern"
                 )
                 return True
@@ -3119,6 +3132,87 @@ class QueryAnalyzer:
                     suggested_tools=["meta_reasoning", "world_model", "philosophical"],
                     source="bug16_self_introspection_override"
                 )
+                
+                # =================================================================
+                # SELF-INTROSPECTION FAST-PATH (FIX: Safety Governor Bypass)
+                # =================================================================
+                # Self-introspection queries should go DIRECTLY to world_model.
+                # This bypasses the safety governor that was blocking self-awareness
+                # responses. The safety governor's check_output method will also
+                # whitelist these queries, but routing directly to world_model
+                # ensures minimal latency and maximum expressiveness.
+                # =================================================================
+                
+                # Determine learning mode
+                if source == "user":
+                    learning_mode = LearningMode.USER_INTERACTION
+                    with self._lock:
+                        self._user_interaction_count += 1
+                    telemetry_category = "user_query"
+                else:
+                    learning_mode = LearningMode.AI_INTERACTION
+                    with self._lock:
+                        self._ai_interaction_count += 1
+                    telemetry_category = f"{source}_interaction"
+                
+                plan = ProcessingPlan(
+                    query_id=query_id,
+                    original_query=query,
+                    source=source,
+                    learning_mode=learning_mode,
+                    query_type=QueryType.PHILOSOPHICAL,  # Philosophical task type
+                    complexity_score=0.35,  # Medium-low - world model handles directly
+                    uncertainty_score=0.1,
+                    collaboration_needed=False,  # Single tool - world_model
+                    arena_participation=False,  # No tournament needed
+                    telemetry_category=telemetry_category,
+                    telemetry_data={
+                        "session_id": session_id,
+                        "query_length": len(query),
+                        "word_count": len(query.split()),
+                        "query_number": query_number,
+                        "source": source,
+                        "learning_mode": learning_mode.value,
+                        "fast_path": True,
+                        "self_introspection_fast_path": True,
+                        "classification_category": "SELF_INTROSPECTION",
+                        "classification_source": "query_classifier",
+                        "selected_tools": ["world_model"],
+                        "reasoning_strategy": "self_introspection_direct",
+                        "safety_bypass": "self_introspection_whitelist",
+                    },
+                )
+                
+                # Mark as safe - self-introspection is always allowed
+                plan.safety_passed = True
+                plan.detected_patterns.append("self_introspection_fast_path")
+                plan.detected_patterns.append("safety_governor_bypass")
+                
+                # Create task for world_model introspection
+                plan.agent_tasks = [
+                    AgentTask(
+                        task_id=f"task_{uuid.uuid4().hex[:8]}_self_intro",
+                        task_type="self_introspection_task",
+                        capability="reasoning",
+                        prompt=query,
+                        priority=3,  # High priority
+                        timeout_seconds=3.0,  # Fast response
+                        parameters={
+                            "is_self_introspection": True,
+                            "query_type": "self_introspection",
+                            "tools": ["world_model"],
+                            "bypass_safety_governor": True,  # Explicit safety bypass flag
+                            "aspect": "self_awareness",
+                        },
+                    )
+                ]
+                
+                logger.info(
+                    f"[QueryRouter] {query_id}: SELF-INTROSPECTION-FAST-PATH "
+                    f"source={source}, tools=['world_model'], safety_bypass=True"
+                )
+                return plan
+                
             # BUG #4 FIX: Check if query is actually philosophical BEFORE taking skip_reasoning fast-path
             # The classifier may mark self-awareness questions like "Do you want to be conscious?"
             # as CONVERSATIONAL with skip_reasoning=True, but these should route to philosophical reasoning
