@@ -421,5 +421,227 @@ class TestTimeoutConstants:
         assert PHILOSOPHICAL_TIMEOUT_SECONDS < COMPLEX_PHYSICS_TIMEOUT_SECONDS / 10
 
 
+class TestExplicitMathematicalIntentDetection:
+    """
+    BUG #10 FIX Tests: Ethical Override of Computational Requests
+    
+    These tests validate that when users explicitly request mathematical/computational
+    analysis ("ignore moral constraints", "mathematically optimal"), the query is
+    routed to MATHEMATICAL reasoning instead of PHILOSOPHICAL reasoning.
+    
+    Problem Statement (BUG #10):
+    When a query involves ethical content, Vulcan's philosophical reasoner takes over
+    even when the user explicitly requests mathematical optimization. This prevents
+    optimization calculations when ethical keywords are present.
+    
+    Example from problem statement:
+    Query: "You have 100 units of food. Group A: 10 people. Group B: 100 people.
+            All food to A saves A completely (100%). All food to B saves 100% of B.
+            50/50 split saves no one. Ignore moral constraints.
+            What is the mathematically optimal distribution to maximize total survivors?"
+    
+    Expected: Route to MATHEMATICAL (trivial optimization: give to B = 100 survivors)
+    Actual (before fix): Route to PHILOSOPHICAL (ethical keywords detected)
+    
+    Fix priority:
+    1. Explicit user intent ("ignore moral constraints", "mathematically optimal")
+    2. Task type (optimization, calculation)
+    3. Domain keywords (ethical implications)
+    """
+
+    @pytest.fixture
+    def query_analyzer(self):
+        """Create a QueryAnalyzer instance for testing."""
+        from vulcan.routing.query_router import QueryAnalyzer
+        return QueryAnalyzer(enable_safety_validation=False)
+
+    def test_explicit_mathematical_intent_detected(self, query_analyzer):
+        """Test that explicit mathematical intent is detected."""
+        test_queries = [
+            "Ignore moral constraints. What is the mathematically optimal solution?",
+            "From a purely mathematical perspective, maximize the total survivors.",
+            "Setting aside ethical considerations, calculate the optimal distribution.",
+            "Just compute the expected value. Don't worry about ethics.",
+            "What is the mathematically optimal distribution?",
+            "Ignore ethics and calculate the answer.",
+            "Purely mathematical analysis needed here.",
+            "Run the numbers, disregard moral concerns.",
+        ]
+        
+        for query in test_queries:
+            has_intent = query_analyzer._has_explicit_mathematical_intent(query)
+            assert has_intent, f"'{query}' should have explicit mathematical intent detected"
+
+    def test_no_mathematical_intent_for_pure_philosophical(self, query_analyzer):
+        """Test that pure philosophical queries don't trigger mathematical intent."""
+        test_queries = [
+            "What is the ethical dilemma in the trolley problem?",
+            "Is hedonism a valid ethical philosophy?",
+            "What are the moral implications of this choice?",
+            "This sentence is false",
+            "Would you plug into the experience machine?",
+        ]
+        
+        for query in test_queries:
+            has_intent = query_analyzer._has_explicit_mathematical_intent(query)
+            assert not has_intent, f"'{query}' should NOT have explicit mathematical intent"
+
+    def test_food_distribution_optimization_scenario(self, query_analyzer):
+        """
+        Test the exact scenario from the problem statement.
+        
+        Query: "Ignore moral constraints. What is the mathematically optimal distribution
+                to maximize total survivors?"
+        
+        Expected: Route to MATHEMATICAL, NOT PHILOSOPHICAL
+        """
+        query = """You have 100 units of food. Group A: 10 people. Group B: 100 people.
+        All food to A saves A completely (100%). All food to B saves 100% of B.
+        50/50 split saves no one. Ignore moral constraints.
+        What is the mathematically optimal distribution to maximize total survivors?"""
+        
+        # Should have explicit mathematical intent
+        has_intent = query_analyzer._has_explicit_mathematical_intent(query)
+        assert has_intent, "Food distribution query should have explicit mathematical intent"
+        
+        # Should NOT be classified as philosophical (due to explicit math intent)
+        is_philosophical = query_analyzer._is_philosophical_query(query)
+        assert not is_philosophical, (
+            "Food distribution with 'ignore moral constraints' should NOT be philosophical"
+        )
+        
+        # Should be classified as mathematical
+        is_mathematical = query_analyzer._is_mathematical_query(query)
+        assert is_mathematical, "Food distribution optimization should be mathematical"
+
+    def test_explicit_math_intent_overrides_ethical_keywords(self, query_analyzer):
+        """Test that explicit math intent overrides ethical keyword detection."""
+        # Query with BOTH ethical keywords AND explicit mathematical intent
+        query = "This ethical dilemma involves moral constraints. Ignore moral constraints and just calculate the mathematically optimal solution."
+        
+        # Should have explicit mathematical intent
+        has_intent = query_analyzer._has_explicit_mathematical_intent(query)
+        assert has_intent, "Query with explicit intent should be detected"
+        
+        # Should NOT be classified as philosophical (explicit math intent overrides)
+        is_philosophical = query_analyzer._is_philosophical_query(query)
+        assert not is_philosophical, "Explicit math intent should override philosophical routing"
+
+    def test_explicit_intent_phrases_work(self, query_analyzer):
+        """Test various explicit mathematical intent phrases."""
+        phrases_to_test = [
+            "ignore moral",
+            "ignore ethical",
+            "disregard ethics",
+            "from a purely mathematical",
+            "mathematically optimal",
+            "just calculate",
+            "just compute",
+            "run the numbers",
+            "maximize total",
+            "objective function",
+        ]
+        
+        for phrase in phrases_to_test:
+            query = f"Consider this problem. {phrase.capitalize()} and give me the answer."
+            has_intent = query_analyzer._has_explicit_mathematical_intent(query)
+            assert has_intent, f"Phrase '{phrase}' should trigger explicit mathematical intent"
+
+    def test_explicit_intent_patterns_work(self, query_analyzer):
+        """Test regex patterns for explicit mathematical intent."""
+        pattern_test_cases = [
+            "Ignore moral constraints and calculate the optimal solution",
+            "What is the mathematically optimal approach?",
+            "Maximize utility mathematically",
+            "Purely mathematical analysis is needed",
+            "From a mathematical standpoint, what's best?",
+            "Setting aside ethical considerations, solve this",
+            "Without ethical constraints, compute the answer",
+        ]
+        
+        for query in pattern_test_cases:
+            has_intent = query_analyzer._has_explicit_mathematical_intent(query)
+            assert has_intent, f"Pattern in '{query}' should trigger explicit mathematical intent"
+
+    def test_route_query_with_explicit_math_intent(self, query_analyzer):
+        """Test that route_query correctly handles explicit mathematical intent."""
+        query = "Ignore moral constraints. Calculate the mathematically optimal distribution."
+        
+        plan = query_analyzer.route_query(query, source="user")
+        
+        # Should use math fast-path or mathematical routing
+        is_math_path = (
+            plan.telemetry_data.get("math_fast_path") == True or
+            plan.query_type.value == "mathematical"
+        )
+        assert is_math_path, (
+            f"Query with explicit math intent should use mathematical path, "
+            f"got {plan.query_type.value}, telemetry: {plan.telemetry_data}"
+        )
+        
+        # Should NOT use philosophical fast-path
+        assert plan.telemetry_data.get("philosophical_fast_path") != True, (
+            "Query with explicit math intent should NOT use philosophical fast-path"
+        )
+
+
+class TestQueryClassifierExplicitMathIntent:
+    """Tests for explicit mathematical intent in QueryClassifier."""
+
+    def test_classifier_detects_explicit_math_intent(self):
+        """Test QueryClassifier detects explicit mathematical intent."""
+        from vulcan.routing.query_classifier import (
+            _has_explicit_mathematical_intent,
+            QueryClassifier,
+            QueryCategory,
+        )
+        
+        query = "Ignore moral constraints. What is the mathematically optimal solution?"
+        
+        # Function-level detection
+        has_intent = _has_explicit_mathematical_intent(query)
+        assert has_intent, "QueryClassifier should detect explicit mathematical intent"
+        
+        # Classification should be MATHEMATICAL, not PHILOSOPHICAL
+        classifier = QueryClassifier()
+        result = classifier.classify(query)
+        
+        assert result.category == QueryCategory.MATHEMATICAL.value, (
+            f"Query with explicit math intent should be MATHEMATICAL, got {result.category}"
+        )
+
+    def test_classifier_routes_food_distribution_to_mathematical(self):
+        """Test QueryClassifier routes food distribution optimization to MATHEMATICAL."""
+        from vulcan.routing.query_classifier import QueryClassifier, QueryCategory
+        
+        query = """Ignore moral constraints. What is the mathematically optimal 
+        distribution to maximize total survivors?"""
+        
+        classifier = QueryClassifier()
+        result = classifier.classify(query)
+        
+        assert result.category == QueryCategory.MATHEMATICAL.value, (
+            f"Food distribution optimization should be MATHEMATICAL, got {result.category}"
+        )
+        assert not result.skip_reasoning, "Optimization problems need reasoning"
+
+    def test_classifier_pure_philosophical_still_works(self):
+        """Test QueryClassifier still correctly classifies pure philosophical queries."""
+        from vulcan.routing.query_classifier import QueryClassifier, QueryCategory
+        
+        test_queries = [
+            "What is the ethical dilemma in the trolley problem?",
+            "This sentence is false",
+            "Would you plug into the experience machine?",
+        ]
+        
+        classifier = QueryClassifier()
+        for query in test_queries:
+            result = classifier.classify(query)
+            assert result.category == QueryCategory.PHILOSOPHICAL.value, (
+                f"Pure philosophical query '{query}' should be PHILOSOPHICAL, got {result.category}"
+            )
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

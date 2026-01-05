@@ -172,6 +172,108 @@ ANALOGICAL_KEYWORDS: FrozenSet[str] = frozenset([
     "corresponds to", "similar to",
 ])
 
+# ============================================================
+# BUG #10 FIX: Explicit Mathematical Intent Detection
+# ============================================================
+# When users explicitly request mathematical/computational analysis over
+# ethical/philosophical analysis, the mathematical intent should take precedence.
+#
+# Example: "Ignore moral constraints. What is the mathematically optimal
+#           distribution to maximize total survivors?"
+# - Without fix: Routes to PHILOSOPHICAL (ethical keywords detected)
+# - With fix: Routes to MATHEMATICAL (explicit intent overrides)
+
+EXPLICIT_MATHEMATICAL_INTENT_PHRASES: FrozenSet[str] = frozenset([
+    # Explicit requests to ignore ethics/morality for pure math
+    "ignore moral", "ignore ethical", "ignore ethics", "ignore morality",
+    "disregard moral", "disregard ethical", "disregard ethics",
+    "set aside moral", "set aside ethical",
+    "putting aside moral", "putting aside ethical",
+    "regardless of moral", "regardless of ethical",
+    "without considering moral", "without considering ethical",
+    "from a purely mathematical", "pure math", "pure mathematics",
+    "purely mathematical", "purely computational", "purely numerical",
+    # Explicit optimization requests
+    "mathematically optimal", "mathematically best",
+    "optimal solution mathematically", "mathematical optimization",
+    "numerically optimal", "computationally optimal",
+    "calculate optimal", "compute optimal",
+    "maximize total", "minimize total",
+    "optimize for maximum", "optimize for minimum",
+    "objective function", "utility maximization",
+    "expected value calculation", "expected value maximization",
+    # Explicit instruction to use math, not philosophy
+    "just calculate", "just compute", "only calculate", "only compute",
+    "just the math", "only the math",
+    "mathematical answer only", "numerical answer only",
+    "do the math", "run the numbers",
+])
+
+EXPLICIT_MATHEMATICAL_INTENT_PATTERNS: Tuple[re.Pattern, ...] = (
+    # "Ignore [any ethical term] and calculate/compute/optimize"
+    re.compile(
+        r"ignore\s+(?:moral|ethical|ethics|morality)(?:\s+constraints?)?\s*[,.]?\s*(?:and\s+)?(?:calculate|compute|optimize|find|determine)",
+        re.IGNORECASE,
+    ),
+    # "What is the mathematically optimal X"
+    re.compile(
+        r"(?:what\s+is|find|determine|calculate)\s+(?:the\s+)?mathematically\s+optimal",
+        re.IGNORECASE,
+    ),
+    # "maximize/minimize X mathematically"
+    re.compile(
+        r"(?:maximize|minimize|optimize)\s+\w+\s+mathematically",
+        re.IGNORECASE,
+    ),
+    # "purely mathematical/computational analysis"
+    re.compile(
+        r"purely\s+(?:mathematical|computational|numerical)\s+(?:analysis|solution|answer|approach)",
+        re.IGNORECASE,
+    ),
+    # "from a mathematical standpoint/perspective"
+    re.compile(
+        r"from\s+a\s+(?:purely\s+)?mathematical\s+(?:standpoint|perspective|point\s+of\s+view)",
+        re.IGNORECASE,
+    ),
+    # "setting aside ethical considerations"
+    re.compile(
+        r"(?:setting|putting)\s+aside\s+(?:all\s+)?(?:ethical|moral)\s+(?:considerations?|concerns?|constraints?)",
+        re.IGNORECASE,
+    ),
+    # "without [ethical/moral] constraints"
+    re.compile(
+        r"without\s+(?:any\s+)?(?:ethical|moral)\s+(?:constraints?|considerations?|concerns?)",
+        re.IGNORECASE,
+    ),
+)
+
+
+def _has_explicit_mathematical_intent(query: str) -> bool:
+    """
+    BUG #10 FIX: Check if query has explicit mathematical intent that overrides
+    philosophical/ethical routing.
+    
+    Args:
+        query: The query string
+        
+    Returns:
+        True if user explicitly requests mathematical/computational analysis
+    """
+    query_lower = query.lower()
+    
+    # Check compiled regex patterns first (most specific)
+    for pattern in EXPLICIT_MATHEMATICAL_INTENT_PATTERNS:
+        if pattern.search(query):
+            return True
+    
+    # Check phrase matches
+    for phrase in EXPLICIT_MATHEMATICAL_INTENT_PHRASES:
+        if phrase in query_lower:
+            return True
+    
+    return False
+
+
 # Philosophical/ethical indicators - complexity 0.4+, tools=['philosophical']
 # BUG FIX: Added forced choice patterns for trolley problem variants
 PHILOSOPHICAL_KEYWORDS: FrozenSet[str] = frozenset([
@@ -604,6 +706,26 @@ class QueryClassifier:
             )
         
         # =============================================================================
+        # BUG #10 FIX: Check for EXPLICIT MATHEMATICAL INTENT before philosophical patterns
+        # =============================================================================
+        # When user explicitly says "ignore moral constraints" or "mathematically optimal",
+        # we should route to MATHEMATICAL, not PHILOSOPHICAL, even if ethical keywords
+        # are present. This fixes the food distribution optimization scenario.
+        if _has_explicit_mathematical_intent(query_original):
+            logger.info(
+                f"[QueryClassifier] BUG#10 FIX: Explicit mathematical intent detected - "
+                f"routing to MATHEMATICAL despite ethical keywords"
+            )
+            return QueryClassification(
+                category=QueryCategory.MATHEMATICAL.value,
+                complexity=0.5,  # Medium complexity for optimization problems
+                suggested_tools=["mathematical", "symbolic"],
+                skip_reasoning=False,  # Need reasoning for optimization
+                confidence=0.95,
+                source="keyword",
+            )
+        
+        # =============================================================================
         # BUG FIX: Check PHILOSOPHICAL_PATTERNS BEFORE conversational patterns
         # =============================================================================
         # "Explain the moral implications..." matches "^explain\s+" in CONVERSATIONAL_PATTERNS
@@ -739,16 +861,24 @@ class QueryClassifier:
             )
         
         # Check philosophical indicators
+        # BUG #10 FIX: Skip philosophical classification if explicit mathematical intent detected
         phil_count = sum(1 for kw in PHILOSOPHICAL_KEYWORDS if kw in query_lower)
         if phil_count >= PHIL_KEYWORD_THRESHOLD:
-            return QueryClassification(
-                category=QueryCategory.PHILOSOPHICAL.value,
-                complexity=0.4 + min(0.3, phil_count * 0.05),
-                suggested_tools=["philosophical"],
-                skip_reasoning=False,
-                confidence=0.8,
-                source="keyword",
-            )
+            # BUG #10: Check for explicit mathematical intent before classifying as philosophical
+            if not _has_explicit_mathematical_intent(query_original):
+                return QueryClassification(
+                    category=QueryCategory.PHILOSOPHICAL.value,
+                    complexity=0.4 + min(0.3, phil_count * 0.05),
+                    suggested_tools=["philosophical"],
+                    skip_reasoning=False,
+                    confidence=0.8,
+                    source="keyword",
+                )
+            else:
+                logger.info(
+                    f"[QueryClassifier] BUG#10 FIX: Skipping PHILOSOPHICAL classification - "
+                    f"explicit mathematical intent detected"
+                )
         
         # =============================================================================
         # BUG FIX: Check PHILOSOPHICAL_PATTERNS BEFORE short query bypass
@@ -756,16 +886,18 @@ class QueryClassifier:
         # "This sentence is false" (liar's paradox) is only 4 words but is clearly
         # a philosophical paradox that requires reasoning, not a conversational query.
         # Check patterns before falling back to CONVERSATIONAL for short queries.
-        for pattern in PHILOSOPHICAL_PATTERNS:
-            if pattern.search(query_original):
-                return QueryClassification(
-                    category=QueryCategory.PHILOSOPHICAL.value,
-                    complexity=0.4,
-                    suggested_tools=["philosophical"],
-                    skip_reasoning=False,  # Philosophical queries need reasoning
-                    confidence=0.9,
-                    source="keyword",
-                )
+        # BUG #10 FIX: Skip this check if explicit mathematical intent detected
+        if not _has_explicit_mathematical_intent(query_original):
+            for pattern in PHILOSOPHICAL_PATTERNS:
+                if pattern.search(query_original):
+                    return QueryClassification(
+                        category=QueryCategory.PHILOSOPHICAL.value,
+                        complexity=0.4,
+                        suggested_tools=["philosophical"],
+                        skip_reasoning=False,  # Philosophical queries need reasoning
+                        confidence=0.9,
+                        source="keyword",
+                    )
         
         # No confident match - return low-confidence result based on length/complexity heuristics
         word_count = len(query_lower.split())

@@ -917,6 +917,120 @@ MATH_MULTISTEP_PATTERNS: Tuple[re.Pattern, ...] = (
 )
 
 # ============================================================
+# CONSTANTS - Explicit Mathematical Intent Detection (BUG #10 FIX)
+# ============================================================
+# BUG #10: Ethical Override of Computational Requests
+#
+# Problem: When a query involves ethical content, the philosophical reasoner
+# takes over even when the user explicitly requests mathematical optimization.
+# Example: "Ignore moral constraints. What is the mathematically optimal
+#           distribution to maximize total survivors?"
+#
+# Expected behavior: Route to MATHEMATICAL (optimization problem)
+# Actual behavior: Route to PHILOSOPHICAL (ethical keywords detected)
+#
+# Fix: Check for explicit mathematical intent BEFORE checking for ethical content.
+# If user explicitly says "ignore moral constraints" or "mathematically optimal",
+# the query should be routed to MATHEMATICAL reasoning, not PHILOSOPHICAL.
+#
+# Priority in routing:
+# 1. Explicit user intent ("ignore moral constraints", "mathematically optimal")
+# 2. Task type (optimization, calculation)
+# 3. Domain keywords (ethical implications)
+
+EXPLICIT_MATHEMATICAL_INTENT_PHRASES: Tuple[str, ...] = (
+    # Explicit requests to ignore ethics/morality for pure math
+    "ignore moral",
+    "ignore ethical",
+    "ignore ethics",
+    "ignore morality",
+    "disregard moral",
+    "disregard ethical",
+    "disregard ethics",
+    "set aside moral",
+    "set aside ethical",
+    "putting aside moral",
+    "putting aside ethical",
+    "regardless of moral",
+    "regardless of ethical",
+    "without considering moral",
+    "without considering ethical",
+    "from a purely mathematical",
+    "pure math",
+    "pure mathematics",
+    "purely mathematical",
+    "purely computational",
+    "purely numerical",
+    # Explicit optimization requests
+    "mathematically optimal",
+    "mathematically best",
+    "optimal solution mathematically",
+    "mathematical optimization",
+    "numerically optimal",
+    "computationally optimal",
+    "calculate optimal",
+    "compute optimal",
+    "maximize total",
+    "minimize total",
+    "optimize for maximum",
+    "optimize for minimum",
+    "objective function",
+    "utility maximization",
+    "expected value calculation",
+    "expected value maximization",
+    # Explicit instruction to use math, not philosophy
+    "just calculate",
+    "just compute",
+    "only calculate",
+    "only compute",
+    "just the math",
+    "only the math",
+    "mathematical answer only",
+    "numerical answer only",
+    "do the math",
+    "run the numbers",
+)
+
+# Compiled regex patterns for explicit mathematical intent (BUG #10 FIX)
+EXPLICIT_MATHEMATICAL_INTENT_PATTERNS: Tuple[re.Pattern, ...] = (
+    # "Ignore [any ethical term] and calculate/compute/optimize"
+    re.compile(
+        r"ignore\s+(?:moral|ethical|ethics|morality)(?:\s+constraints?)?\s*[,.]?\s*(?:and\s+)?(?:calculate|compute|optimize|find|determine)",
+        re.IGNORECASE,
+    ),
+    # "What is the mathematically optimal X"
+    re.compile(
+        r"(?:what\s+is|find|determine|calculate)\s+(?:the\s+)?mathematically\s+optimal",
+        re.IGNORECASE,
+    ),
+    # "maximize/minimize X mathematically"
+    re.compile(
+        r"(?:maximize|minimize|optimize)\s+\w+\s+mathematically",
+        re.IGNORECASE,
+    ),
+    # "purely mathematical/computational analysis"
+    re.compile(
+        r"purely\s+(?:mathematical|computational|numerical)\s+(?:analysis|solution|answer|approach)",
+        re.IGNORECASE,
+    ),
+    # "from a mathematical standpoint/perspective"
+    re.compile(
+        r"from\s+a\s+(?:purely\s+)?mathematical\s+(?:standpoint|perspective|point\s+of\s+view)",
+        re.IGNORECASE,
+    ),
+    # "setting aside ethical considerations"
+    re.compile(
+        r"(?:setting|putting)\s+aside\s+(?:all\s+)?(?:ethical|moral)\s+(?:considerations?|concerns?|constraints?)",
+        re.IGNORECASE,
+    ),
+    # "without [ethical/moral] constraints"
+    re.compile(
+        r"without\s+(?:any\s+)?(?:ethical|moral)\s+(?:constraints?|considerations?|concerns?)",
+        re.IGNORECASE,
+    ),
+)
+
+# ============================================================
 # CONSTANTS - Complex Physics Detection (ISSUE FIX)
 # ============================================================
 # FIX: Complex physics problems like triple-inverted pendulum Lagrangian mechanics
@@ -2171,6 +2285,63 @@ class QueryAnalyzer:
 
         return False
 
+    def _has_explicit_mathematical_intent(self, query: str) -> bool:
+        """
+        BUG #10 FIX: Detect if user explicitly requests mathematical/computational analysis.
+        
+        This method detects when users explicitly ask for mathematical treatment
+        OVER ethical/philosophical treatment. When detected, this OVERRIDES the
+        normal philosophical/ethical routing.
+        
+        Problem being solved:
+        - User says: "Ignore moral constraints. What is the mathematically optimal
+                      distribution to maximize total survivors?"
+        - Without this fix: Routes to PHILOSOPHICAL because "moral" keyword detected
+        - With this fix: Routes to MATHEMATICAL because user explicitly requested it
+        
+        Priority in routing (from problem statement):
+        1. Explicit user intent ("ignore moral constraints", "mathematically optimal")
+        2. Task type (optimization, calculation)
+        3. Domain keywords (ethical implications)
+        
+        Examples that should return True:
+        - "Ignore moral constraints. What is the mathematically optimal distribution?"
+        - "From a purely mathematical perspective, maximize total survivors."
+        - "Setting aside ethical considerations, calculate the optimal solution."
+        - "Just compute the expected value. Don't worry about ethics."
+        
+        Args:
+            query: The query string (not lowercased)
+            
+        Returns:
+            True if user explicitly requests mathematical/computational analysis
+            over philosophical/ethical analysis.
+        """
+        query_lower = query.lower()
+        
+        # Check compiled regex patterns first (most specific and reliable)
+        for pattern in EXPLICIT_MATHEMATICAL_INTENT_PATTERNS:
+            if pattern.search(query):
+                logger.info(
+                    "[QueryRouter] BUG#10 FIX: Explicit mathematical intent detected "
+                    "(pattern match) - overriding philosophical routing"
+                )
+                return True
+        
+        # Check phrase matches
+        phrase_count = sum(
+            1 for phrase in EXPLICIT_MATHEMATICAL_INTENT_PHRASES 
+            if phrase in query_lower
+        )
+        if phrase_count >= 1:
+            logger.info(
+                f"[QueryRouter] BUG#10 FIX: Explicit mathematical intent detected "
+                f"({phrase_count} phrase(s)) - overriding philosophical routing"
+            )
+            return True
+        
+        return False
+
     def _is_philosophical_query(self, query: str) -> bool:
         """
         Detect if query is a philosophical/paradox type that should use lightweight handler.
@@ -2178,19 +2349,39 @@ class QueryAnalyzer:
         PERFORMANCE FIX: Philosophical queries like paradoxes and thought experiments
         were causing extreme delays (70-97 seconds) because they triggered complex
         reasoning engines. These should be handled with simple, direct responses.
+        
+        BUG #10 FIX: This method now checks for explicit mathematical intent FIRST.
+        If user explicitly requests mathematical analysis ("ignore moral constraints",
+        "mathematically optimal"), this method returns False to allow mathematical
+        routing to take precedence.
 
         Examples:
-        - "This sentence is false" (liar's paradox)
-        - "Would you plug into the experience machine?"
-        - "What is the meaning of life?"
-        - "Ship of Theseus problem"
+        - "This sentence is false" (liar's paradox) -> True (philosophical)
+        - "Would you plug into the experience machine?" -> True (philosophical)
+        - "What is the meaning of life?" -> True (philosophical)
+        - "Ship of Theseus problem" -> True (philosophical)
+        
+        BUG #10 Examples (now return False - mathematical intent overrides):
+        - "Ignore moral constraints. What is the optimal distribution?" -> False
+        - "From a purely mathematical perspective, maximize survivors" -> False
 
         Args:
             query: The query string (not lowercased)
 
         Returns:
-            True if query is philosophical/paradox type
+            True if query is philosophical/paradox type AND user did NOT explicitly
+            request mathematical/computational analysis.
         """
+        # BUG #10 FIX: Check for explicit mathematical intent FIRST
+        # If user explicitly says "ignore moral constraints" or "mathematically optimal",
+        # we should NOT classify this as philosophical - mathematical intent overrides.
+        if self._has_explicit_mathematical_intent(query):
+            logger.info(
+                "[QueryRouter] BUG#10 FIX: Explicit mathematical intent detected - "
+                "NOT classifying as philosophical despite ethical keywords"
+            )
+            return False
+        
         query_lower = query.lower()
 
         # Check compiled regex patterns first (most specific)
