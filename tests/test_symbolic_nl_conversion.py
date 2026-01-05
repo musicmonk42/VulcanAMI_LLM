@@ -11,6 +11,7 @@ Test cases:
 - Negation ("No X does Y", "Not X")
 - Simple predicates ("X is Y", "X verbs Y")
 - Already formal logic (should pass through unchanged)
+- Verb normalization utility functions
 """
 
 import pytest
@@ -18,6 +19,9 @@ import pytest
 from src.vulcan.reasoning.symbolic.nl_converter import (
     NaturalLanguageToLogicConverter,
     convert_nl_to_logic,
+    normalize_verb,
+    PatternConfig,
+    FORMAL_LOGIC_SYMBOLS,
 )
 
 
@@ -238,6 +242,148 @@ class TestIntegrationWithSymbolicReasoner:
         
         # Should have a new converter instance
         assert reasoner.nl_converter is not old_converter
+
+
+class TestVerbNormalization:
+    """Tests for the verb normalization utility function."""
+    
+    def test_normalize_past_tense_ed(self):
+        """Test: passed -> pass"""
+        assert normalize_verb('passed') == 'pass'
+    
+    def test_normalize_past_tense_ied(self):
+        """Test: studied -> study"""
+        assert normalize_verb('studied') == 'study'
+    
+    def test_normalize_third_person_s(self):
+        """Test: loves -> love"""
+        assert normalize_verb('loves') == 'love'
+    
+    def test_normalize_third_person_es(self):
+        """Test: watches -> watch"""
+        assert normalize_verb('watches') == 'watch'
+    
+    def test_normalize_double_s(self):
+        """Test: pass -> pass (not normalized, double s)"""
+        result = normalize_verb('pass')
+        assert result == 'pass'
+    
+    def test_normalize_empty(self):
+        """Test: empty string returns empty"""
+        assert normalize_verb('') == ''
+    
+    def test_normalize_already_base(self):
+        """Test: base verbs stay unchanged"""
+        assert normalize_verb('love') == 'love'
+        assert normalize_verb('run') == 'run'
+
+
+class TestPatternConfig:
+    """Tests for the PatternConfig dataclass."""
+    
+    def test_pattern_config_immutable(self):
+        """Test that PatternConfig is frozen (immutable)."""
+        import re
+        config = PatternConfig(
+            pattern=re.compile(r'test'),
+            handler_name='_handle_test',
+            description='Test pattern'
+        )
+        
+        # Should raise FrozenInstanceError when trying to modify
+        with pytest.raises(Exception):  # dataclass.FrozenInstanceError
+            config.handler_name = 'new_value'
+    
+    def test_pattern_config_attributes(self):
+        """Test PatternConfig has correct attributes."""
+        import re
+        pattern = re.compile(r'test')
+        config = PatternConfig(
+            pattern=pattern,
+            handler_name='_handle_test',
+            description='Test pattern'
+        )
+        
+        assert config.pattern == pattern
+        assert config.handler_name == '_handle_test'
+        assert config.description == 'Test pattern'
+
+
+class TestConverterThreadSafety:
+    """Tests related to thread safety of the converter."""
+    
+    def test_patterns_are_immutable_tuple(self):
+        """Test that patterns are stored as immutable tuple."""
+        converter = NaturalLanguageToLogicConverter()
+        assert isinstance(converter.patterns, tuple)
+    
+    def test_patterns_contain_pattern_configs(self):
+        """Test that patterns tuple contains PatternConfig objects."""
+        converter = NaturalLanguageToLogicConverter()
+        for pattern in converter.patterns:
+            assert isinstance(pattern, PatternConfig)
+    
+    def test_multiple_converters_independent(self):
+        """Test that multiple converter instances are independent."""
+        c1 = NaturalLanguageToLogicConverter()
+        c2 = NaturalLanguageToLogicConverter()
+        
+        # They should have separate pattern tuples (though identical content)
+        assert c1.patterns is not c2.patterns
+        # But same number of patterns
+        assert len(c1.patterns) == len(c2.patterns)
+
+
+class TestFormalLogicDetection:
+    """Tests for formal logic symbol detection."""
+    
+    def test_all_formal_symbols_detected(self):
+        """Test that all formal logic symbols are recognized."""
+        converter = NaturalLanguageToLogicConverter()
+        
+        for symbol in FORMAL_LOGIC_SYMBOLS:
+            text = f"P(x) {symbol} Q(x)"
+            result = converter.convert(text)
+            # Should return unchanged (pass through)
+            assert result == text, f"Symbol {symbol} not detected"
+    
+    def test_mixed_formal_and_nl_returns_formal(self):
+        """Test: Text with formal symbols passes through unchanged."""
+        converter = NaturalLanguageToLogicConverter()
+        formal = "∀x (Human(x) → Mortal(x))"
+        result = converter.convert(formal)
+        assert result == formal
+
+
+class TestEdgeCases:
+    """Additional edge case tests for robustness."""
+    
+    def test_very_long_input(self):
+        """Test handling of very long input strings."""
+        converter = NaturalLanguageToLogicConverter()
+        long_text = "Every " + "very " * 100 + "long sentence"
+        # Should not raise, may return None or converted form
+        result = converter.convert(long_text)
+        assert result is None or isinstance(result, str)
+    
+    def test_special_characters(self):
+        """Test handling of special characters in input."""
+        converter = NaturalLanguageToLogicConverter()
+        result = converter.convert("Every user@domain.com is valid")
+        # Should not raise
+        assert result is None or isinstance(result, str)
+    
+    def test_unicode_input(self):
+        """Test handling of unicode input."""
+        converter = NaturalLanguageToLogicConverter()
+        result = converter.convert("Every café is cozy")
+        assert result is None or isinstance(result, str)
+    
+    def test_numeric_entities(self):
+        """Test handling of numeric entities."""
+        converter = NaturalLanguageToLogicConverter()
+        result = converter.convert("123 is greater than 100")
+        assert result is None or isinstance(result, str)
 
 
 # Run tests if executed directly
