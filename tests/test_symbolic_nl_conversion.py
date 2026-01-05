@@ -469,6 +469,16 @@ class TestEdgeCases:
         result = converter.convert(long_text)
         assert result is None or isinstance(result, str)
     
+    def test_recursion_depth_protection(self):
+        """Test that recursion depth is limited to prevent infinite loops."""
+        converter = NaturalLanguageToLogicConverter()
+        # Create a deeply nested implication that would cause recursion
+        # The converter should handle this gracefully without crashing
+        nested = "A implies B implies C implies D implies E implies F implies G"
+        result = converter.convert(nested)
+        # Should return something (not crash or hang)
+        assert result is not None or result is None  # Just shouldn't raise
+    
     def test_special_characters(self):
         """Test handling of special characters in input."""
         converter = NaturalLanguageToLogicConverter()

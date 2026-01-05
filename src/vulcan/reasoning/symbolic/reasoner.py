@@ -456,20 +456,22 @@ class SymbolicReasoner:
 
         except Exception as e:
             # BUG #5 FIX: Try NL to Logic conversion before fallback
-            logger.info(
-                f"[SymbolicReasoner] BUG#5 FIX: Standard parser failed for '{formula_str[:50]}...', "
-                f"attempting NL to Logic conversion"
-            )
+            if logger.isEnabledFor(logging.INFO):
+                logger.info(
+                    f"[SymbolicReasoner] BUG#5 FIX: Standard parser failed for "
+                    f"'{formula_str[:50]}...', attempting NL to Logic conversion"
+                )
             
             try:
                 # Try converting natural language to formal logic
                 formal_logic = self.nl_converter.convert(formula_str)
                 
                 if formal_logic and formal_logic != formula_str:
-                    logger.info(
-                        f"[SymbolicReasoner] BUG#5 FIX: Converted NL to formal logic: "
-                        f"'{formula_str[:30]}...' -> '{formal_logic}'"
-                    )
+                    if logger.isEnabledFor(logging.INFO):
+                        logger.info(
+                            f"[SymbolicReasoner] BUG#5 FIX: Converted NL to formal logic: "
+                            f"'{formula_str[:30]}...' -> '{formal_logic}'"
+                        )
                     
                     # Try parsing the converted formal logic
                     try:

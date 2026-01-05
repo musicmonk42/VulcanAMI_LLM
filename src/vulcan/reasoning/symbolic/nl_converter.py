@@ -40,10 +40,12 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
-from enum import Enum
-from typing import Callable, Dict, List, Optional, Pattern, Tuple
+from typing import Dict, Optional, Pattern, Tuple
 
 logger = logging.getLogger(__name__)
+
+# Maximum recursion depth for pattern conversion to prevent infinite loops
+MAX_RECURSION_DEPTH = 10
 
 
 # =============================================================================
@@ -515,7 +517,7 @@ class NaturalLanguageToLogicConverter:
         sorted_patterns = sorted(patterns, key=lambda p: p.priority, reverse=True)
         return tuple(sorted_patterns)
     
-    def convert(self, text: str) -> Optional[str]:
+    def convert(self, text: str, _depth: int = 0) -> Optional[str]:
         """
         Convert natural language to formal logic.
         
@@ -524,6 +526,7 @@ class NaturalLanguageToLogicConverter:
         
         Args:
             text: Natural language text to convert
+            _depth: Internal recursion depth counter (do not set manually)
             
         Returns:
             Formal logic string, or None if conversion fails
@@ -536,6 +539,14 @@ class NaturalLanguageToLogicConverter:
             >>> converter.convert("Every engineer reviewed a document")
             '∀e ∃d Reviewed(e, d)'
         """
+        # Guard against infinite recursion
+        if _depth > MAX_RECURSION_DEPTH:
+            logger.warning(
+                f"[NLConverter] Maximum recursion depth ({MAX_RECURSION_DEPTH}) exceeded, "
+                f"returning predicate form for: '{text[:30]}...'"
+            )
+            return self._phrase_to_predicate(text) if text else None
+        
         if not text:
             return None
             
@@ -555,12 +566,13 @@ class NaturalLanguageToLogicConverter:
             if match:
                 try:
                     handler = getattr(self, pattern_config.handler_name)
-                    formal = handler(match, text)
+                    formal = handler(match, text, _depth)
                     if formal:
-                        logger.info(
-                            f"[NLConverter] BUG#5 FIX: Converted NL to formal logic: "
-                            f"'{text[:50]}...' -> '{formal}'"
-                        )
+                        if logger.isEnabledFor(logging.INFO):
+                            logger.info(
+                                f"[NLConverter] BUG#5 FIX: Converted NL to formal logic: "
+                                f"'{text[:50]}...' -> '{formal}'"
+                            )
                         return formal
                 except Exception as e:
                     logger.debug(
@@ -572,10 +584,11 @@ class NaturalLanguageToLogicConverter:
         # No pattern matched - try to extract a simple predicate
         simple = self._extract_simple_predicate(text)
         if simple:
-            logger.info(
-                f"[NLConverter] BUG#5 FIX: Extracted simple predicate: "
-                f"'{text[:50]}...' -> '{simple}'"
-            )
+            if logger.isEnabledFor(logging.INFO):
+                logger.info(
+                    f"[NLConverter] BUG#5 FIX: Extracted simple predicate: "
+                    f"'{text[:50]}...' -> '{simple}'"
+                )
             return simple
         
         logger.debug(
@@ -599,7 +612,7 @@ class NaturalLanguageToLogicConverter:
     # Pattern Handlers
     # =========================================================================
     
-    def _handle_universal_existential(self, match: re.Match, text: str) -> str:
+    def _handle_universal_existential(self, match: re.Match, text: str, _depth: int = 0) -> str:
         """
         Handle universal quantifier with existential object.
         
@@ -628,7 +641,7 @@ class NaturalLanguageToLogicConverter:
         
         return f"∀{var1} ∃{var2} {predicate}({var1}, {var2})"
     
-    def _handle_universal(self, match: re.Match, text: str) -> str:
+    def _handle_universal(self, match: re.Match, text: str, _depth: int = 0) -> str:
         """
         Handle universal quantifier: Every/All X is Y.
         
@@ -661,7 +674,7 @@ class NaturalLanguageToLogicConverter:
         predicate = self._phrase_to_predicate(object_phrase)
         return f"∀{var} {predicate}({var})"
     
-    def _handle_existential(self, match: re.Match, text: str) -> str:
+    def _handle_existential(self, match: re.Match, text: str, _depth: int = 0) -> str:
         """
         Handle existential quantifier with auxiliary verb: Some X does Y.
         
@@ -684,7 +697,7 @@ class NaturalLanguageToLogicConverter:
         
         return f"∃{var} {predicate}({var})"
     
-    def _handle_existential_action(self, match: re.Match, text: str) -> str:
+    def _handle_existential_action(self, match: re.Match, text: str, _depth: int = 0) -> str:
         """
         Handle existential quantifier with action verb: Some X verbed Y.
         
@@ -714,7 +727,7 @@ class NaturalLanguageToLogicConverter:
         
         return f"∃{var} {predicate}({var})"
     
-    def _handle_existential_detailed(self, match: re.Match, text: str) -> str:
+    def _handle_existential_detailed(self, match: re.Match, text: str, _depth: int = 0) -> str:
         """
         Handle existential with "such that": There exists X such that Y.
         
@@ -733,7 +746,7 @@ class NaturalLanguageToLogicConverter:
         
         return f"∃{var} {predicate}({var})"
     
-    def _handle_implication(self, match: re.Match, text: str) -> str:
+    def _handle_implication(self, match: re.Match, text: str, _depth: int = 0) -> str:
         """
         Handle if-then statements.
         
@@ -748,8 +761,8 @@ class NaturalLanguageToLogicConverter:
         consequent = match.group(2).strip()
         
         # Recursively convert both parts
-        ant_formal = self.convert(antecedent)
-        con_formal = self.convert(consequent)
+        ant_formal = self.convert(antecedent, _depth + 1)
+        con_formal = self.convert(consequent, _depth + 1)
         
         # If conversion failed, use simplified predicate form
         if not ant_formal:
@@ -759,7 +772,7 @@ class NaturalLanguageToLogicConverter:
         
         return f"{ant_formal} → {con_formal}"
     
-    def _handle_biconditional(self, match: re.Match, text: str) -> str:
+    def _handle_biconditional(self, match: re.Match, text: str, _depth: int = 0) -> str:
         """
         Handle biconditional (iff) statements.
         
@@ -774,12 +787,12 @@ class NaturalLanguageToLogicConverter:
         right = match.group(2).strip()
         
         # Recursively convert both parts
-        left_formal = self.convert(left) or self._phrase_to_predicate(left)
-        right_formal = self.convert(right) or self._phrase_to_predicate(right)
+        left_formal = self.convert(left, _depth + 1) or self._phrase_to_predicate(left)
+        right_formal = self.convert(right, _depth + 1) or self._phrase_to_predicate(right)
         
         return f"{left_formal} ↔ {right_formal}"
     
-    def _handle_conjunction(self, match: re.Match, text: str) -> str:
+    def _handle_conjunction(self, match: re.Match, text: str, _depth: int = 0) -> str:
         """
         Handle conjunction: X and Y.
         
@@ -797,12 +810,12 @@ class NaturalLanguageToLogicConverter:
         right = match.group(2).strip()
         
         # Recursively convert both parts
-        left_formal = self.convert(left) or self._phrase_to_predicate(left)
-        right_formal = self.convert(right) or self._phrase_to_predicate(right)
+        left_formal = self.convert(left, _depth + 1) or self._phrase_to_predicate(left)
+        right_formal = self.convert(right, _depth + 1) or self._phrase_to_predicate(right)
         
         return f"({left_formal} ∧ {right_formal})"
     
-    def _handle_disjunction(self, match: re.Match, text: str) -> str:
+    def _handle_disjunction(self, match: re.Match, text: str, _depth: int = 0) -> str:
         """
         Handle disjunction: X or Y.
         
@@ -820,12 +833,12 @@ class NaturalLanguageToLogicConverter:
         right = match.group(2).strip()
         
         # Recursively convert both parts
-        left_formal = self.convert(left) or self._phrase_to_predicate(left)
-        right_formal = self.convert(right) or self._phrase_to_predicate(right)
+        left_formal = self.convert(left, _depth + 1) or self._phrase_to_predicate(left)
+        right_formal = self.convert(right, _depth + 1) or self._phrase_to_predicate(right)
         
         return f"({left_formal} ∨ {right_formal})"
     
-    def _handle_neither_nor(self, match: re.Match, text: str) -> str:
+    def _handle_neither_nor(self, match: re.Match, text: str, _depth: int = 0) -> str:
         """
         Handle neither/nor: Neither X nor Y.
         
@@ -843,12 +856,12 @@ class NaturalLanguageToLogicConverter:
         right = match.group(2).strip()
         
         # Recursively convert both parts
-        left_formal = self.convert(left) or self._phrase_to_predicate(left)
-        right_formal = self.convert(right) or self._phrase_to_predicate(right)
+        left_formal = self.convert(left, _depth + 1) or self._phrase_to_predicate(left)
+        right_formal = self.convert(right, _depth + 1) or self._phrase_to_predicate(right)
         
         return f"(¬{left_formal} ∧ ¬{right_formal})"
     
-    def _handle_both_and(self, match: re.Match, text: str) -> str:
+    def _handle_both_and(self, match: re.Match, text: str, _depth: int = 0) -> str:
         """
         Handle both/and: Both X and Y are Z.
         
@@ -870,7 +883,7 @@ class NaturalLanguageToLogicConverter:
         
         return f"({predicate}({subj1}) ∧ {predicate}({subj2}))"
     
-    def _handle_either_or(self, match: re.Match, text: str) -> str:
+    def _handle_either_or(self, match: re.Match, text: str, _depth: int = 0) -> str:
         """
         Handle either/or: Either X or Y is Z.
         
@@ -892,7 +905,7 @@ class NaturalLanguageToLogicConverter:
         
         return f"({predicate}({subj1}) ∨ {predicate}({subj2}))"
     
-    def _handle_universal_negation(self, match: re.Match, text: str) -> str:
+    def _handle_universal_negation(self, match: re.Match, text: str, _depth: int = 0) -> str:
         """
         Handle universal negation: No X does Y.
         
@@ -915,7 +928,7 @@ class NaturalLanguageToLogicConverter:
         
         return f"∀{var} ¬{predicate}({var})"
     
-    def _handle_negation(self, match: re.Match, text: str) -> str:
+    def _handle_negation(self, match: re.Match, text: str, _depth: int = 0) -> str:
         """
         Handle negation (not, it is not the case that).
         
@@ -927,14 +940,14 @@ class NaturalLanguageToLogicConverter:
             Formal logic string
         """
         statement = match.group(1).strip()
-        formal = self.convert(statement)
+        formal = self.convert(statement, _depth + 1)
         
         if not formal:
             formal = self._phrase_to_predicate(statement)
         
         return f"¬{formal}"
     
-    def _handle_simple_predicate(self, match: re.Match, text: str) -> str:
+    def _handle_simple_predicate(self, match: re.Match, text: str, _depth: int = 0) -> str:
         """
         Handle simple predicates: X is Y.
         
@@ -950,7 +963,7 @@ class NaturalLanguageToLogicConverter:
         
         return f"{predicate}({subject})"
     
-    def _handle_binary_predicate(self, match: re.Match, text: str) -> str:
+    def _handle_binary_predicate(self, match: re.Match, text: str, _depth: int = 0) -> str:
         """
         Handle binary predicates: X verb Y.
         
