@@ -575,8 +575,8 @@ class QueryPreprocessor:
             # First, normalize operators in the entire constraint string
             normalized_constraints_str = self._normalize_operators(constraints_str)
             
-            # Split by comma, but be careful with commas inside formulas
-            # Use smart splitting that respects parentheses
+            # Split by comma to separate individual constraints
+            # Note: Simple comma split works for most SAT constraint formats
             inline_constraints = self._split_inline_constraints(normalized_constraints_str)
             
             if inline_constraints:
