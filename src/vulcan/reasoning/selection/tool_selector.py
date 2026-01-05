@@ -3211,9 +3211,27 @@ class ToolSelector:
             # The classifier uses LLM-based language understanding to identify
             # the correct tool based on query intent (not heuristics).
             # This is the PRIMARY tool selection path.
+            #
+            # BUG #1 FIX (CRITICAL): Skip classifier if this is a fallback attempt.
+            # When a tool fails and we're trying a fallback (fallback_attempt=True),
+            # the classifier must NOT override the explicit fallback tool selection.
+            # The classifier would just re-select the same failed tool (e.g., symbolic
+            # for logic queries), causing an infinite retry loop.
             # ================================================================
             if hasattr(request, 'context') and isinstance(request.context, dict):
-                classifier_tools = request.context.get('classifier_suggested_tools')
+                # BUG #1 FIX: Check if this is a fallback attempt - skip classifier if so
+                is_fallback_attempt = request.context.get('fallback_attempt', False)
+                
+                if is_fallback_attempt:
+                    logger.info(
+                        f"[ToolSelector] BUG#1 FIX: Fallback attempt detected - skipping "
+                        f"classifier to allow direct tool override via router_tools"
+                    )
+                    # Fall through to router_tools check below
+                    classifier_tools = None
+                else:
+                    classifier_tools = request.context.get('classifier_suggested_tools')
+                
                 classifier_category = request.context.get('classifier_category')
                 
                 if classifier_tools and isinstance(classifier_tools, (list, tuple)) and len(classifier_tools) > 0:
@@ -3224,6 +3242,35 @@ class ToolSelector:
                     # Filter to only include available tools
                     available_tools = getattr(self, 'available_tools', None) or DEFAULT_AVAILABLE_TOOLS
                     valid_classifier_tools = [t for t in classifier_tools if t in available_tools]
+                    
+                    # ================================================================
+                    # BUG #5 FIX: Respect learned weights - skip tools with very negative weights
+                    # The learning system punishes failing tools, but previously the
+                    # classifier/router bypassed this. Now we filter out tools that have
+                    # been learned to be unreliable (weight < -0.05).
+                    # ================================================================
+                    if self.learning_system:
+                        filtered_tools = []
+                        for tool in valid_classifier_tools:
+                            weight = self.learning_system.get_tool_weight_adjustment(tool)
+                            if weight < -0.05:  # Threshold for "too negative"
+                                logger.info(
+                                    f"[ToolSelector] BUG#5 FIX: Skipping '{tool}' - learned weight "
+                                    f"too low ({weight:.3f}), suggesting alternative"
+                                )
+                                # Don't add this tool - it has been learned to be unreliable
+                            else:
+                                filtered_tools.append(tool)
+                        
+                        # If all classifier tools were filtered out, suggest fallback
+                        if not filtered_tools and valid_classifier_tools:
+                            logger.warning(
+                                f"[ToolSelector] BUG#5 FIX: All classifier tools rejected by "
+                                f"learned weights, using world_model as fallback"
+                            )
+                            filtered_tools = ['world_model']
+                        
+                        valid_classifier_tools = filtered_tools
                     
                     if valid_classifier_tools:
                         # Execute with classifier's selected tools directly
