@@ -3567,6 +3567,62 @@ Based on your analysis through memory retrieval, multi-modal reasoning, causal m
     # ================================================================
     response_text = ""
 
+    # ================================================================
+    # BUG #17 FIX: Check for deterministic fast-path results FIRST
+    # Cryptographic and mathematical fast-path results are precomputed
+    # by QueryRouter and MUST be returned directly, NOT sent to LLM.
+    # This prevents OpenAI from returning "unable to calculate" errors.
+    # ================================================================
+    telemetry_data = routing_plan.telemetry_data if (routing_plan and hasattr(routing_plan, 'telemetry_data')) else {}
+    is_crypto_fast_path = telemetry_data.get('crypto_fast_path', False)
+    is_math_fast_path = telemetry_data.get('math_fast_path', False)
+    
+    if is_crypto_fast_path:
+        # BUG #17 FIX: Return precomputed cryptographic result directly
+        crypto_result = telemetry_data.get('crypto_result')
+        crypto_operation = telemetry_data.get('crypto_operation', 'hash')
+        
+        if crypto_result:
+            logger.info(
+                f"[VULCAN] BUG#17 FIX: Returning deterministic crypto result directly, "
+                f"skipping LLM generation entirely. operation={crypto_operation}"
+            )
+            response_text = f"The {crypto_operation.upper()} hash is: {crypto_result}"
+            systems_used.append("cryptographic_engine")
+            
+            # Build final response without LLM
+            final_response = VulcanResponse(
+                response=response_text,
+                systems_used=list(set(systems_used)),
+                confidence=1.0,  # Deterministic operations have 100% confidence
+                metadata={
+                    "fast_path": "cryptographic",
+                    "deterministic": True,
+                    "operation": crypto_operation,
+                    "result": crypto_result,
+                    "skip_llm_synthesis": True,
+                },
+            )
+            
+            # Record learning outcome for deterministic result
+            if deps.learning_system:
+                try:
+                    await asyncio.get_event_loop().run_in_executor(
+                        None,
+                        lambda: deps.learning_system.record_outcome({
+                            "query_id": routing_plan.query_id if routing_plan else query_id,
+                            "query": processed_prompt,
+                            "tools_used": ["cryptographic"],
+                            "confidence": 1.0,
+                            "deterministic": True,
+                            "success": True,
+                        })
+                    )
+                except Exception as e:
+                    logger.debug(f"[VULCAN] Learning record for crypto failed: {e}")
+            
+            return final_response
+
     # Get local LLM if available
     local_llm = app.state.llm if hasattr(app.state, "llm") else None
 
@@ -5912,6 +5968,62 @@ User Query: {user_message}
 {memory_str}{world_model_str}{plan_str}
 
 Provide a helpful, accurate, and comprehensive response to the user's query. Be concise but thorough."""
+
+                # ================================================================
+                # BUG #17 FIX: Check for deterministic fast-path results FIRST
+                # Cryptographic and mathematical fast-path results are precomputed
+                # by QueryRouter and MUST be returned directly, NOT sent to LLM.
+                # This prevents OpenAI from returning "unable to calculate" errors.
+                # ================================================================
+                v1_telemetry_data = routing_plan.telemetry_data if (routing_plan and hasattr(routing_plan, 'telemetry_data')) else {}
+                v1_is_crypto_fast_path = v1_telemetry_data.get('crypto_fast_path', False)
+                
+                if v1_is_crypto_fast_path:
+                    # BUG #17 FIX: Return precomputed cryptographic result directly
+                    crypto_result = v1_telemetry_data.get('crypto_result')
+                    crypto_operation = v1_telemetry_data.get('crypto_operation', 'hash')
+                    
+                    if crypto_result:
+                        logger.info(
+                            f"[VULCAN/v1/chat] BUG#17 FIX: Returning deterministic crypto result directly, "
+                            f"skipping LLM generation entirely. operation={crypto_operation}"
+                        )
+                        response_text = f"The {crypto_operation.upper()} hash is: {crypto_result}"
+                        systems_used.append("cryptographic_engine")
+                        
+                        # Build final response without LLM
+                        final_response = VulcanResponse(
+                            response=response_text,
+                            systems_used=list(set(systems_used)),
+                            confidence=1.0,  # Deterministic operations have 100% confidence
+                            metadata={
+                                "fast_path": "cryptographic",
+                                "deterministic": True,
+                                "operation": crypto_operation,
+                                "result": crypto_result,
+                                "skip_llm_synthesis": True,
+                                "conversation_id": request.conversation_id,
+                            },
+                        )
+                        
+                        # Record learning outcome for deterministic result
+                        if deps.learning_system:
+                            try:
+                                await asyncio.get_event_loop().run_in_executor(
+                                    None,
+                                    lambda: deps.learning_system.record_outcome({
+                                        "query_id": routing_plan.query_id if routing_plan else None,
+                                        "query": user_message,
+                                        "tools_used": ["cryptographic"],
+                                        "confidence": 1.0,
+                                        "deterministic": True,
+                                        "success": True,
+                                    })
+                                )
+                            except Exception as e:
+                                logger.debug(f"[VULCAN/v1/chat] Learning record for crypto failed: {e}")
+                        
+                        return final_response
 
                 # PERFORMANCE FIX (Issue #1): Use singleton HybridLLMExecutor
                 # First try app.state, then fall back to module-level singleton
