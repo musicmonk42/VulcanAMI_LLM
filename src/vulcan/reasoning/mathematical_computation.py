@@ -133,7 +133,8 @@ def extract_math_expression(query: str) -> Optional[str]:
     
     # Pattern 1: Unicode math symbols (∑, ∏, ∫, √, π)
     # Matches: "∑_{k=1}^n (2k-1)" or "∫_0^1 x dx"
-    unicode_pattern = r'[∑∏∫√π][\w\d\s+\-*/()^._{}\|,<>=]+'
+    # Note: Hyphen at end of character class to avoid ambiguity
+    unicode_pattern = r'[∑∏∫√π][\w\d\s+*/()^._{}|,<>=\-]+'
     match = re.search(unicode_pattern, query)
     if match:
         # Get from symbol to end of line or period
@@ -170,7 +171,8 @@ def extract_math_expression(query: str) -> Optional[str]:
         return candidate
     
     # Pattern 5: Standard algebraic (fallback)
-    algebra_pattern = r'[a-zA-Z0-9+\-*/()^._\s]+'
+    # Note: Hyphen at end of character class to avoid ambiguity
+    algebra_pattern = r'[a-zA-Z0-9+*/()^._\s\-]+'
     match = re.search(algebra_pattern, query)
     if match:
         expr = match.group(0).strip()

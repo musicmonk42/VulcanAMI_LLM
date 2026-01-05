@@ -4175,9 +4175,10 @@ How would you like me to explore this query further?
                     "enabled": self.meta_reasoning_enabled,
                     # Issue #4 & #5 FIX: Include full meta-reasoning component status
                     "components": {
-                        "motivational_introspection": self.motivational_introspection is not None,
-                        "validation_tracker": self.validation_tracker is not None,
-                        "transparency_interface": self.transparency_interface is not None,
+                        # Use getattr consistently for all attributes to ensure safety
+                        "motivational_introspection": getattr(self, "motivational_introspection", None) is not None,
+                        "validation_tracker": getattr(self, "validation_tracker", None) is not None,
+                        "transparency_interface": getattr(self, "transparency_interface", None) is not None,
                         "internal_critic": getattr(self, "internal_critic", None) is not None,
                         "curiosity_reward_shaper": getattr(self, "curiosity_reward_shaper", None) is not None,
                         "ethical_boundary_monitor": getattr(self, "ethical_boundary_monitor", None) is not None,
@@ -4191,11 +4192,11 @@ How would you like me to explore this query further?
                 "self_improvement": {
                     "available": META_REASONING_AVAILABLE
                     and SelfImprovementDrive is not None,
-                    "enabled": self.self_improvement_enabled,
+                    "enabled": getattr(self, "self_improvement_enabled", False),
                 },
                 "safety_validator": {
                     "available": EnhancedSafetyValidator is not None,
-                    "enabled": self.safety_mode == "enabled",
+                    "enabled": getattr(self, "safety_mode", "disabled") == "enabled",
                 },
             },
         }

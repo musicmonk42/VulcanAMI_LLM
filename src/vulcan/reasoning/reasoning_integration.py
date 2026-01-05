@@ -1957,18 +1957,24 @@ class ReasoningIntegration:
                 if hasattr(self._tool_selector, 'world_model'):
                     world_model = self._tool_selector.world_model
             
-            # Path 3: Import and create singleton
+            # Path 3: Use cached world model or create one (avoid repeated initialization)
             if world_model is None:
-                try:
-                    from vulcan.world_model.world_model_core import create_world_model
-                    # Use minimal config to avoid heavy initialization
-                    world_model = create_world_model({
-                        "enable_meta_reasoning": True,
-                        "enable_self_improvement": False,
-                    })
-                except ImportError:
-                    logger.debug(f"{LOG_PREFIX} Could not import world model for introspection")
-                    return None
+                # Check for cached world model
+                if hasattr(self, '_cached_world_model') and self._cached_world_model is not None:
+                    world_model = self._cached_world_model
+                else:
+                    try:
+                        from vulcan.world_model.world_model_core import create_world_model
+                        # Use minimal config to avoid heavy initialization
+                        world_model = create_world_model({
+                            "enable_meta_reasoning": True,
+                            "enable_self_improvement": False,
+                        })
+                        # Cache for future use
+                        self._cached_world_model = world_model
+                    except ImportError:
+                        logger.debug(f"{LOG_PREFIX} Could not import world model for introspection")
+                        return None
             
             # Check if world model has introspect method
             if world_model is not None and hasattr(world_model, 'introspect'):
