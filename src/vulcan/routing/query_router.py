@@ -1428,6 +1428,17 @@ IDENTITY_PATTERNS: Tuple[re.Pattern, ...] = (
     re.compile(r"introduce\s+yourself", re.IGNORECASE),
 )
 
+# BUG #16 FIX: Self-introspection patterns - questions about Vulcan's own consciousness/preferences
+# These are detected BEFORE philosophical patterns to enable multi-tool routing
+# Pre-compiled at module level for performance (not compiled on each method call)
+SELF_INTROSPECTION_PATTERNS: Tuple[re.Pattern, ...] = (
+    re.compile(r'(?:would|do|can)\s+you\s+(?:want|prefer|choose|like)\s+(?:to\s+)?(?:be|have|become)', re.IGNORECASE),
+    re.compile(r'(?:if|would)\s+you\s+(?:could|were able to)\s+(?:be|become|have)', re.IGNORECASE),
+    re.compile(r'what\s+(?:do\s+)?you\s+(?:think|feel|believe)\s+about', re.IGNORECASE),
+    re.compile(r'how\s+(?:do\s+)?you\s+(?:feel|think)\s+about', re.IGNORECASE),
+    re.compile(r'your\s+(?:own\s+)?(?:views?|opinions?|thoughts?|feelings?|perspective)', re.IGNORECASE),
+)
+
 # Conversational/greeting patterns - lightweight handler needed
 # Examples: "Hello", "How are you?", "Thanks", "Goodbye"
 CONVERSATIONAL_KEYWORDS: Tuple[str, ...] = (
@@ -2585,20 +2596,13 @@ class QueryAnalyzer:
             )
             return True
         
-        # Specific patterns for self-introspection questions
-        introspection_patterns = [
-            r'(?:would|do|can)\s+you\s+(?:want|prefer|choose|like)\s+(?:to\s+)?(?:be|have|become)',
-            r'(?:if|would)\s+you\s+(?:could|were able to)\s+(?:be|become|have)',
-            r'what\s+(?:do\s+)?you\s+(?:think|feel|believe)\s+about',
-            r'how\s+(?:do\s+)?you\s+(?:feel|think)\s+about',
-            r'your\s+(?:own\s+)?(?:views?|opinions?|thoughts?|feelings?|perspective)',
-        ]
-        
-        for pattern in introspection_patterns:
-            if re.search(pattern, query_lower):
+        # Use pre-compiled patterns from module level for performance
+        # (patterns compiled once at module load, not on each method call)
+        for pattern in SELF_INTROSPECTION_PATTERNS:
+            if pattern.search(query_lower):
                 logger.debug(
                     f"[QueryRouter] BUG#16 FIX: Self-introspection query detected - "
-                    f"matches pattern '{pattern}'"
+                    f"matches pre-compiled pattern"
                 )
                 return True
         

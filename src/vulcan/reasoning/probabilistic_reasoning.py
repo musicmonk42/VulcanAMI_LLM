@@ -1868,18 +1868,24 @@ class ProbabilisticReasoner(EnhancedProbabilisticReasoner):
         )
         
         # Complex/conditional markers (indicate need for Bayesian inference)
+        # Note: We use specific patterns to avoid false positives
+        # - 'p(' + '|' together indicates conditional probability notation P(A|B)
+        # - Single '|' alone is too broad and would match "this | that"
         complex_markers = (
             'given that', 'given', 'conditioning on', 'conditional',
             'posterior', 'prior', 'bayes',
             'updated probability', 'after observing',
             'sensitivity', 'specificity', 'prevalence',
-            'p(', '|',  # Conditional probability notation
         )
         
         has_simple = any(marker in query_lower for marker in simple_markers)
         has_complex = any(marker in query_lower for marker in complex_markers)
         
-        return has_simple and not has_complex
+        # Check for conditional probability notation P(A|B) separately
+        # This is more specific than just checking for '|'
+        has_conditional_notation = 'p(' in query_lower and '|' in query_lower
+        
+        return has_simple and not has_complex and not has_conditional_notation
 
     def _compute_simple_probability(self, query: str) -> Optional[ReasoningResult]:
         """
