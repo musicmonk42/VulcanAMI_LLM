@@ -73,6 +73,7 @@ class ReasoningType(Enum):
     HIERARCHICAL = "hierarchical"  # FINAL FIX: Added missing enum member
     MATHEMATICAL = "mathematical"  # Mathematical computation using SymPy
     PHILOSOPHICAL = "philosophical"  # FIX TASK 3: Philosophical reasoning (ethics, paradoxes)
+    LANGUAGE = "language"  # FIX: Neural language generation reasoning
     UNKNOWN = "unknown"
 
 
