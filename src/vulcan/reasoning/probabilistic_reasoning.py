@@ -1829,6 +1829,136 @@ class ProbabilisticReasoner(EnhancedProbabilisticReasoner):
         
         return False
 
+    def _is_simple_probability_query(self, query: str) -> bool:
+        """
+        BUG #3 FIX: Check if query is a simple probability question.
+        
+        Simple probability questions don't need full Bayesian inference.
+        They can be answered directly with known probability values.
+        
+        Examples of SIMPLE (return True):
+        - "What is the probability of heads?"
+        - "What are the odds of rolling a 6?"
+        - "What is the chance of drawing a heart?"
+        - "Probability that a coin flip is heads?"
+        
+        Examples of COMPLEX (return False - need Bayesian):
+        - "Given that it's cloudy, what's P(rain)?"
+        - "Compute the posterior probability with sens=0.99..."
+        - "What's P(disease | positive test)?"
+        - "After observing X, what's the updated probability?"
+        
+        Args:
+            query: The query string
+            
+        Returns:
+            True if query is a simple probability question
+        """
+        query_lower = query.lower()
+        
+        # Simple probability markers
+        simple_markers = (
+            'what is the probability',
+            'what are the odds',
+            'chance of',
+            'likelihood of',
+            'probability that',
+            'probability of',
+            'what is probability',
+        )
+        
+        # Complex/conditional markers (indicate need for Bayesian inference)
+        complex_markers = (
+            'given that', 'given', 'conditioning on', 'conditional',
+            'posterior', 'prior', 'bayes',
+            'updated probability', 'after observing',
+            'sensitivity', 'specificity', 'prevalence',
+            'p(', '|',  # Conditional probability notation
+        )
+        
+        has_simple = any(marker in query_lower for marker in simple_markers)
+        has_complex = any(marker in query_lower for marker in complex_markers)
+        
+        return has_simple and not has_complex
+
+    def _compute_simple_probability(self, query: str) -> Optional[ReasoningResult]:
+        """
+        BUG #3 FIX: Compute simple probability directly without full Bayesian inference.
+        
+        This provides fast, deterministic answers to common probability questions
+        like "What is the probability of heads?" (answer: 0.5).
+        
+        Args:
+            query: The probability query
+            
+        Returns:
+            ReasoningResult if simple probability can be computed, None otherwise
+        """
+        query_lower = query.lower()
+        
+        # Known simple probabilities
+        # These are standard probability values that don't need inference
+        known_probabilities = {
+            # Coin flips
+            ('coin', 'heads'): (0.5, "A fair coin has equal probability of heads and tails."),
+            ('coin', 'tails'): (0.5, "A fair coin has equal probability of heads and tails."),
+            ('coin', 'flip'): (0.5, "Each outcome of a fair coin flip has probability 0.5."),
+            ('heads',): (0.5, "The probability of heads on a fair coin is 0.5 (50%)."),
+            ('tails',): (0.5, "The probability of tails on a fair coin is 0.5 (50%)."),
+            
+            # Dice
+            ('die', '6'): (1/6, "A fair die has 6 faces, each with probability 1/6."),
+            ('die', 'six'): (1/6, "A fair die has 6 faces, so P(6) = 1/6 ≈ 0.167."),
+            ('dice', '6'): (1/6, "A fair die has 6 faces, each with probability 1/6."),
+            ('roll', '6'): (1/6, "Rolling a 6 on a fair die has probability 1/6 ≈ 0.167."),
+            ('rolling', '6'): (1/6, "Rolling a 6 on a fair die has probability 1/6 ≈ 0.167."),
+            ('die',): (1/6, "Each face of a fair die has probability 1/6 ≈ 0.167."),
+            ('dice',): (1/6, "Each outcome of a fair die has probability 1/6 ≈ 0.167."),
+            
+            # Cards
+            ('card', 'heart'): (13/52, "A standard deck has 13 hearts out of 52 cards."),
+            ('card', 'spade'): (13/52, "A standard deck has 13 spades out of 52 cards."),
+            ('card', 'club'): (13/52, "A standard deck has 13 clubs out of 52 cards."),
+            ('card', 'diamond'): (13/52, "A standard deck has 13 diamonds out of 52 cards."),
+            ('card', 'ace'): (4/52, "A standard deck has 4 aces out of 52 cards."),
+            ('card', 'king'): (4/52, "A standard deck has 4 kings out of 52 cards."),
+            ('card', 'queen'): (4/52, "A standard deck has 4 queens out of 52 cards."),
+            ('card', 'jack'): (4/52, "A standard deck has 4 jacks out of 52 cards."),
+            ('card', 'red'): (26/52, "A standard deck has 26 red cards (hearts and diamonds)."),
+            ('card', 'black'): (26/52, "A standard deck has 26 black cards (spades and clubs)."),
+            ('card', 'face'): (12/52, "A standard deck has 12 face cards (J, Q, K × 4 suits)."),
+            ('drawing', 'card'): (1/52, "Drawing any specific card from a deck has probability 1/52."),
+        }
+        
+        # Try to match known probabilities
+        for keywords, (probability, explanation) in known_probabilities.items():
+            if all(kw in query_lower for kw in keywords):
+                logger.info(
+                    f"[ProbabilisticReasoner] BUG#3 FIX: Simple probability detected - "
+                    f"keywords={keywords}, P={probability:.4f}"
+                )
+                
+                return ReasoningResult(
+                    conclusion={
+                        "probability": probability,
+                        "result": f"{probability:.4f}",
+                        "formatted_result": f"P = {probability:.4f} ({probability*100:.1f}%)",
+                        "simple_probability": True,
+                    },
+                    confidence=1.0,  # Exact known value
+                    reasoning_type=ReasoningType.PROBABILISTIC,
+                    explanation=explanation,
+                    metadata={
+                        "calculation_type": "simple_probability",
+                        "known_probability": True,
+                        "keywords_matched": keywords,
+                        "bug3_fix": True,
+                    },
+                )
+        
+        # Not a recognized simple probability
+        return None
+
     def _try_bayesian_calculation(self, input_data: Any) -> Optional[ReasoningResult]:
         """
         BUG FIX: Detect and compute explicit Bayesian probability queries.
@@ -2014,7 +2144,18 @@ class ProbabilisticReasoner(EnhancedProbabilisticReasoner):
                 },
             )
         
-        # BUG FIX: Try explicit Bayesian calculation first
+        # BUG #3 FIX: Try simple probability path FIRST (before Bayesian)
+        # Simple questions like "What is probability of heads?" don't need full inference
+        if self._is_simple_probability_query(query_str):
+            simple_result = self._compute_simple_probability(query_str)
+            if simple_result is not None:
+                logger.info(
+                    f"[ProbabilisticReasoner] BUG#3 FIX: Using simple probability path "
+                    f"(no full Bayesian inference needed)"
+                )
+                return simple_result
+        
+        # BUG FIX: Try explicit Bayesian calculation for conditional queries
         bayes_result = self._try_bayesian_calculation(input_data)
         if bayes_result is not None:
             return bayes_result

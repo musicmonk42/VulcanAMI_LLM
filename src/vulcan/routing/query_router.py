@@ -158,6 +158,47 @@ class BoundedLRUCache:
         with self._lock:
             self._cache.clear()
 
+    def clear_old_entries(self, max_age: Optional[float] = None) -> int:
+        """
+        BUG #6 FIX: Clear entries older than max_age seconds.
+        
+        This method proactively cleans up old entries to prevent state
+        accumulation. Should be called periodically or when memory pressure
+        is detected.
+        
+        Args:
+            max_age: Maximum age in seconds. If None, uses self._ttl_seconds.
+            
+        Returns:
+            Number of entries removed.
+        """
+        if max_age is None:
+            max_age = self._ttl_seconds
+        
+        current_time = time.time()
+        removed_count = 0
+        
+        with self._lock:
+            # Create list of keys to remove (can't modify dict during iteration)
+            keys_to_remove = []
+            for key, entry in self._cache.items():
+                age = current_time - entry.get("timestamp", 0)
+                if age > max_age:
+                    keys_to_remove.append(key)
+            
+            # Remove old entries
+            for key in keys_to_remove:
+                del self._cache[key]
+                removed_count += 1
+        
+        if removed_count > 0:
+            logger.info(
+                f"[BoundedLRUCache] BUG#6 FIX: Cleared {removed_count} old entries "
+                f"(age > {max_age:.0f}s)"
+            )
+        
+        return removed_count
+
     def stats(self) -> Dict[str, Any]:
         """Get cache statistics."""
         with self._lock:
@@ -2097,6 +2138,48 @@ class QueryAnalyzer:
 
         logger.info(f"[QueryRouter] Caches cleared. Stats before: {stats_before}")
         return stats_before
+
+    def clear_old_state(self, max_age: float = 3600.0) -> Dict[str, int]:
+        """
+        BUG #6 FIX: Clear state older than max_age seconds.
+        
+        This method proactively cleans up old state to prevent memory accumulation.
+        Unlike clear_caches() which clears everything, this only removes entries
+        that have exceeded their TTL.
+        
+        Args:
+            max_age: Maximum age in seconds (default: 1 hour = 3600s)
+            
+        Returns:
+            Dictionary with counts of removed entries per cache
+        """
+        removed = {
+            "safety_cache": self._safety_cache.clear_old_entries(max_age),
+            "adversarial_cache": self._adversarial_cache.clear_old_entries(max_age),
+            "complexity_cache": self._complexity_cache.clear_old_entries(max_age),
+            "routing_log": 0,
+        }
+        
+        # Also clean up routing log
+        current_time = time.time()
+        with self._routing_log_lock:
+            keys_to_remove = []
+            for key, entry in self._routing_log.items():
+                if current_time - entry.get("timestamp", 0) > max_age:
+                    keys_to_remove.append(key)
+            
+            for key in keys_to_remove:
+                del self._routing_log[key]
+                removed["routing_log"] += 1
+        
+        total_removed = sum(removed.values())
+        if total_removed > 0:
+            logger.info(
+                f"[QueryRouter] BUG#6 FIX: Cleared {total_removed} old state entries "
+                f"(age > {max_age:.0f}s): {removed}"
+            )
+        
+        return removed
 
     def get_cache_stats(self) -> Dict[str, Any]:
         """Get statistics about internal caches for monitoring."""

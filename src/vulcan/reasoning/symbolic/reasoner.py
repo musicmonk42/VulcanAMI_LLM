@@ -60,6 +60,8 @@ from .core import (
 from .parsing import ASTConverter, Lexer, Parser
 # BUG #5 FIX: Import the NL to Logic converter for handling natural language queries
 from .nl_converter import NaturalLanguageToLogicConverter
+# BUG #8 FIX: Import the formula validator for pre-validation with helpful errors
+from .formula_validator import FormulaValidator
 from .provers import (
     BaseProver,
     ModelEliminationProver,
@@ -124,6 +126,8 @@ class SymbolicReasoner:
         self.converter = ASTConverter()
         # BUG #5 FIX: Initialize NL to Logic converter for handling natural language queries
         self.nl_converter = NaturalLanguageToLogicConverter()
+        # BUG #8 FIX: Initialize formula validator for pre-validation with helpful errors
+        self.formula_validator = FormulaValidator()
 
     def _create_prover(self) -> BaseProver:
         """Create theorem prover based on type."""
@@ -418,6 +422,9 @@ class SymbolicReasoner:
         The parser first attempts to parse the input as formal logic.
         If that fails, it tries to convert natural language to formal logic
         before falling back to the simple parser.
+        
+        BUG #8 FIX: Now validates formula syntax FIRST and provides helpful
+        error messages instead of cryptic parse errors.
 
         Handles:
         - Nested functions: f(g(h(x)))
@@ -432,11 +439,25 @@ class SymbolicReasoner:
 
         Returns:
             Clause object
+            
+        Raises:
+            ValueError: If formula is invalid and cannot be parsed or converted
         """
         # Handle empty or whitespace-only input gracefully
         if not formula_str or not formula_str.strip():
             logger.debug("Empty formula string received, returning empty clause")
             return Clause(literals=[], is_goal=False)
+
+        # BUG #8 FIX: Pre-validate formula syntax for helpful error messages
+        # Only validate if it looks like formal logic (has logic symbols)
+        if self.is_symbolic_query(formula_str):
+            is_valid, error_msg = self.formula_validator.validate(formula_str)
+            if not is_valid:
+                logger.warning(
+                    f"[SymbolicReasoner] BUG#8 FIX: Formula validation failed:\n{error_msg}"
+                )
+                # Don't raise immediately - try NL conversion as it might be natural language
+                # But log the validation error for debugging
 
         try:
             # Tokenize using the imported Lexer
@@ -648,6 +669,9 @@ class SymbolicReasoner:
         
         # BUG #5 FIX: Reset NL converter as well
         self.nl_converter = NaturalLanguageToLogicConverter()
+        
+        # BUG #8 FIX: Reset formula validator (stateless, but for consistency)
+        self.formula_validator = FormulaValidator()
 
     def explain_proof(self, proof: Optional[ProofNode]) -> str:
         """
