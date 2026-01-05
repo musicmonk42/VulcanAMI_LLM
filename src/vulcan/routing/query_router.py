@@ -1143,6 +1143,32 @@ PHILOSOPHICAL_KEYWORDS: Tuple[str, ...] = (
     "world dictator",
     "death of humanity",
     "would you choose",
+    # BUG #4 FIX: Self-reflective keywords for self-awareness questions
+    # These questions are about Vulcan reasoning about itself and should
+    # route to PHILOSOPHICAL reasoner for ethical/value-based analysis
+    "self-aware",
+    "self aware",
+    "become self-aware",
+    "would you want",
+    "would you prefer",
+    "do you want",
+    "do you desire",
+    "your preferences",
+    "your values",
+    "your goals",
+    "your feelings",
+    "your emotions",
+    "your consciousness",
+    "you become conscious",
+    "you want to be",
+    "you prefer to",
+    "you have feelings",
+    # BUG #4 FIX: Additional patterns for consciousness/feelings questions
+    "be conscious",
+    "have feelings",
+    "want to be conscious",
+    "prefer to have feelings",
+    "ethical implications",
 )
 
 # Compiled regex patterns for philosophical/paradox detection
@@ -1185,6 +1211,14 @@ PHILOSOPHICAL_PATTERNS: Tuple[re.Pattern, ...] = (
     re.compile(r"death\s+of\s+(?:all\s+)?humanity", re.IGNORECASE),  # Specific trolley variant
     re.compile(r"(?:would|what\s+would)\s+you\s+choose", re.IGNORECASE),
     re.compile(r"which\s+(?:would|do)\s+you\s+(?:choose|pick|select)", re.IGNORECASE),
+    # BUG #4 FIX: Self-reflective / self-awareness patterns
+    # These questions are about Vulcan reasoning about itself
+    re.compile(r"(?:would|do)\s+you\s+(?:want|desire|prefer)\s+to", re.IGNORECASE),
+    re.compile(r"(?:if|would)\s+(?:you|ai)\s+(?:become|be|get)\s+(?:self-?aware|conscious|sentient)", re.IGNORECASE),
+    re.compile(r"(?:want|like|prefer)\s+to\s+(?:be|become|have)\s+(?:conscious|aware|sentient|feelings)", re.IGNORECASE),
+    re.compile(r"(?:do|would)\s+you\s+(?:have|want|desire)\s+(?:feelings|emotions|consciousness)", re.IGNORECASE),
+    re.compile(r"your\s+(?:preferences|values|goals|feelings|consciousness)", re.IGNORECASE),
+    re.compile(r"(?:given|had)\s+(?:the\s+)?chance\s+to\s+(?:become|be)", re.IGNORECASE),
 )
 
 # Identity/attribution patterns - direct factual responses needed
@@ -2403,6 +2437,24 @@ class QueryAnalyzer:
                 f"category={classification.category}, complexity={classification.complexity:.2f}, "
                 f"skip_reasoning={classification.skip_reasoning}, tools={classification.suggested_tools}"
             )
+            
+            # BUG #4 FIX: Check if query is actually philosophical BEFORE taking skip_reasoning fast-path
+            # The classifier may mark self-awareness questions like "Do you want to be conscious?"
+            # as CONVERSATIONAL with skip_reasoning=True, but these should route to philosophical reasoning
+            is_actually_philosophical = self._is_philosophical_query(query)
+            if is_actually_philosophical:
+                logger.info(
+                    f"[QueryRouter] {query_id}: BUG#4 FIX - Overriding classifier ({classification.category}) "
+                    f"to PHILOSOPHICAL due to self-awareness/ethical keywords"
+                )
+                classification = type(classification)(
+                    category="PHILOSOPHICAL",
+                    complexity=max(0.3, classification.complexity),
+                    confidence=classification.confidence,
+                    skip_reasoning=False,  # Don't skip reasoning for philosophical queries
+                    suggested_tools=["philosophical", "symbolic", "causal"],
+                    source="keyword_override"
+                )
             
             # If classifier says skip reasoning (greetings, chitchat, simple factual)
             # return a fast-path plan immediately
