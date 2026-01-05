@@ -99,9 +99,8 @@ except Exception as e:
     logging.getLogger(__name__).debug(f"Faulthandler not available: {e}")
 
 # Safe-mode environmental guards to reduce native segfault risk on Windows
-# NOTE: Thread count settings are already configured at the top of this file.
-# We only set additional guards here that don't conflict with thread settings.
-import os
+# NOTE: Thread count settings and TOKENIZERS_PARALLELISM are already configured
+# at the top of this file (lines 17-24). We only set additional guards here.
 
 # HOTFIX: Removed conflicting thread count setdefaults that could cause issues
 # The authoritative thread counts are set at the top of this file (lines 17-24)
@@ -109,10 +108,10 @@ import os
 # os.environ.setdefault("MKL_NUM_THREADS", "1")  # REMOVED - conflicts with line 19
 # os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")  # REMOVED - conflicts with line 21
 # os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")  # REMOVED - conflicts with line 23
+# os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")  # REMOVED - already set at line 24
 
 # Non-conflicting safety guards (these are fine to keep)
 os.environ.setdefault("FAISS_NO_GPU", "1")
-os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
 os.environ.setdefault("MKL_SERVICE_FORCE_INTEL", "1")
 os.environ.setdefault("MKL_THREADING_LAYER", "INTEL")
