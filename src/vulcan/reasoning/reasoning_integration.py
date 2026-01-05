@@ -1337,8 +1337,9 @@ class ReasoningIntegration:
                         # If all fallbacks failed but we still have very low confidence,
                         # delegate to Arena as final attempt
                         if confidence < 0.1:
-                            logger.warning(
-                                f"{LOG_PREFIX} All local tools failed. Delegating to Arena."
+                            logger.info(
+                                f"{LOG_PREFIX} All local tools returned low confidence. "
+                                f"Attempting Arena delegation as fallback."
                             )
                             
                             # Try Arena delegation
@@ -1770,7 +1771,16 @@ class ReasoningIntegration:
             }
             
             # Get API key from environment
-            api_key = os.environ.get("GRAPHIX_API_KEY", "internal-bypass")
+            # Note: "internal-bypass" is used for internal service-to-service calls
+            # when both VULCAN and Arena run in the same trusted environment
+            api_key = os.environ.get("GRAPHIX_API_KEY")
+            if not api_key:
+                # For internal delegation, use a special bypass key
+                # This should only work when Arena is configured to accept it
+                api_key = "internal-vulcan-delegation"
+                logger.debug(
+                    f"{LOG_PREFIX} Using internal delegation key for Arena"
+                )
             
             # Make request to Arena
             response = httpx.post(
@@ -1812,9 +1822,15 @@ class ReasoningIntegration:
                 f"Install with: pip install httpx"
             )
             return None
-        except httpx.TimeoutException:
+        except httpx.ConnectTimeout:
             logger.error(
-                f"{LOG_PREFIX} Arena delegation timed out after "
+                f"{LOG_PREFIX} Arena connection timed out after "
+                f"{ARENA_DELEGATION_TIMEOUT}s"
+            )
+            return None
+        except httpx.ReadTimeout:
+            logger.error(
+                f"{LOG_PREFIX} Arena read timed out after "
                 f"{ARENA_DELEGATION_TIMEOUT}s"
             )
             return None

@@ -2087,7 +2087,7 @@ class GraphixArena:
             )
             
             # Use reasoning integration if available
-            if REASONING_AVAILABLE and apply_reasoning:
+            if REASONING_AVAILABLE and apply_reasoning is not None:
                 result = apply_reasoning(
                     query=query,
                     query_type=query_type,
