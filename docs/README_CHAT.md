@@ -62,6 +62,10 @@ Settings are saved in browser localStorage.
 - ✅ Example prompts
 - ✅ Auto-reconnect
 - ✅ Single HTML file (no dependencies)
+- ✅ **Internal Metrics Tabs** - View system internals directly from the UI:
+  - 📊 **Metrics Tab** - Health status, system status, cognitive systems, LLM status
+  - ⚠️ **Warnings Tab** - Safety status, audit logs, adversarial monitoring
+  - 🔧 **Internals Tab** - World model, memory, hardware, routing, and API endpoints list
 
 ### Backend (src/chat_endpoint.py)
 - ✅ Full VULCAN platform integration
@@ -133,6 +137,16 @@ A standalone chat service that can be used independently.
   }
 }
 ```
+
+### Internal Metrics Endpoints (used by Metrics Tabs)
+
+The chat interface's metrics tabs consume the following API endpoints:
+
+| Tab | Endpoints |
+|-----|-----------|
+| Metrics | `/health`, `/v1/status`, `/v1/cognitive/status`, `/v1/llm/status` |
+| Warnings | `/safety/status`, `/safety/audit/recent`, `/api/adversarial/status` |
+| Internals | `/world-model/status`, `/memory/status`, `/hardware/status`, `/v1/routing/status` |
 
 ## Customization
 
