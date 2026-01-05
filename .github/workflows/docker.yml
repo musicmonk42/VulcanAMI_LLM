@@ -194,6 +194,55 @@ jobs:
             exit 1
           fi
 
+      - name: Pre-pull base images with retry
+        if: steps.check_dockerfile.outputs.exists == 'true'
+        run: |
+          # Pre-pull base images with retry logic to handle transient network issues
+          # This prevents TLS handshake timeout errors during Docker build
+          pull_with_retry() {
+            local image=$1
+            local max_attempts=5
+            local attempt=1
+            local wait_time=10
+
+            echo "=== Pre-pulling base image: $image ==="
+            while [ $attempt -le $max_attempts ]; do
+              echo "Attempt $attempt of $max_attempts..."
+              if docker pull "$image"; then
+                echo "✅ Successfully pulled $image"
+                return 0
+              fi
+              echo "⚠️ Pull failed, waiting ${wait_time}s before retry..."
+              sleep $wait_time
+              wait_time=$((wait_time * 2))
+              attempt=$((attempt + 1))
+            done
+            echo "❌ Failed to pull $image after $max_attempts attempts"
+            return 1
+          }
+
+          # Extract base images from Dockerfile
+          DOCKERFILE="${{ matrix.service.dockerfile }}"
+          if [ -f "$DOCKERFILE" ]; then
+            # Get all FROM statements (base images)
+            BASE_IMAGES=$(grep -E '^FROM ' "$DOCKERFILE" | awk '{print $2}' | sort -u)
+            echo "Found base images in $DOCKERFILE:"
+            echo "$BASE_IMAGES"
+            echo ""
+
+            for image in $BASE_IMAGES; do
+              # Skip build stage references (e.g., builder, runtime)
+              if echo "$image" | grep -qE '^[a-z]+$'; then
+                echo "Skipping build stage reference: $image"
+                continue
+              fi
+              pull_with_retry "$image" || {
+                echo "WARNING: Could not pre-pull $image, build may still succeed with buildx cache"
+              }
+            done
+          fi
+          echo "=== Base image pre-pull complete ==="
+
       - name: Determine build platforms
         id: platforms
         run: |
