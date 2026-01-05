@@ -105,6 +105,9 @@ class SymbolicReasoner:
     # BUG #4 FIX: Constants for symbolic query detection
     # Minimum number of logic keywords required to classify as symbolic
     MIN_LOGIC_KEYWORDS = 2
+    
+    # Maximum length for short queries that can be simple propositional formulas
+    MAX_SHORT_QUERY_LENGTH = 50
 
     def __init__(self, prover_type: str = "parallel"):
         """
@@ -205,8 +208,9 @@ class SymbolicReasoner:
         #   - mortal(socrates)
         #   - loves(john, mary)
         #   - P(X) -> Q(X) (implications using ASCII operator)
-        # Pattern: word followed by parentheses with arguments
-        predicate_pattern = re.search(r'[A-Za-z_][A-Za-z0-9_]*\([^)]+\)', query)
+        # Pattern: word followed by parentheses with valid predicate arguments
+        # Arguments can be: letters, numbers, underscores, commas, spaces
+        predicate_pattern = re.search(r'[A-Za-z_][A-Za-z0-9_]*\([A-Za-z0-9_,\s]+\)', query)
         if predicate_pattern:
             return True
         
@@ -215,9 +219,13 @@ class SymbolicReasoner:
         # But only if the query is short and looks like a pure formula
         # (not a natural language sentence that happens to contain a single letter)
         query_stripped = query.strip()
-        if len(query_stripped) <= 50:  # Short queries only
-            # Match patterns like: A, P, A | B, P & Q
-            simple_prop_pattern = re.search(r'^[A-Z](\s*[&|]\s*[A-Z])*$', query_stripped)
+        if len(query_stripped) <= self.MAX_SHORT_QUERY_LENGTH:
+            # Match patterns like: A, P, A | B, P & Q, A -> B, A <-> B
+            # Supports ASCII operators: &, |, &&, ||, ->, <->
+            simple_prop_pattern = re.search(
+                r'^[A-Z](\s*(&{1,2}|\|{1,2}|->|<->)\s*[A-Z])*$', 
+                query_stripped
+            )
             if simple_prop_pattern:
                 return True
         
