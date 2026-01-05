@@ -1737,6 +1737,16 @@ class ProbabilisticToolWrapper:
         re.IGNORECASE
     )
     
+    # BUG #5 FIX: Keywords that indicate probability/statistical queries
+    # Used by gate check to reject non-probability queries and prevent P(if) errors
+    # Extracted to class constant to avoid duplication (per code review feedback)
+    _PROBABILITY_KEYWORDS = (
+        'probability', 'bayes', 'bayesian', 'posterior', 'prior',
+        'likelihood', 'sensitivity', 'specificity', 'prevalence',
+        'conditional', 'p(', 'e[', 'distribution', 'odds', 'ratio',
+        '%', 'percent', 'chance', 'risk', 'uncertainty',
+    )
+    
     def __init__(self, engine):
         self.engine = engine
         self.name = "probabilistic"
@@ -1770,16 +1780,10 @@ class ProbabilisticToolWrapper:
             if query_str and hasattr(self.engine, '_is_probability_query'):
                 is_probability_query = self.engine._is_probability_query(query_str)
             else:
-                # BUG #5 FIX: Fallback gate check for probability keywords
+                # BUG #5 FIX: Fallback gate check using class constant
                 # This prevents "Computing P(if | evidence={})" errors
-                probability_keywords = [
-                    'probability', 'bayes', 'bayesian', 'posterior', 'prior',
-                    'likelihood', 'sensitivity', 'specificity', 'prevalence',
-                    'conditional', 'p(', 'e[', 'distribution', 'odds', 'ratio',
-                    '%', 'percent', 'chance', 'risk', 'uncertainty',
-                ]
                 query_lower = query_str.lower() if query_str else ''
-                is_probability_query = any(kw in query_lower for kw in probability_keywords)
+                is_probability_query = any(kw in query_lower for kw in self._PROBABILITY_KEYWORDS)
             
             if query_str and not is_probability_query:
                 logger.info(

@@ -47,15 +47,13 @@ class TestBug5ProbabilisticFirstWordParsing:
                     pass
                 
                 def _is_probability_query(self, query: str) -> bool:
-                    # Mock implementation - matches the keywords in the real gate check
-                    # BUG #5 FIX: Include all probability-related keywords
-                    prob_keywords = [
-                        'probability', 'bayes', 'bayesian', 'posterior', 'prior',
-                        'likelihood', 'sensitivity', 'specificity', 'prevalence',
-                        'conditional', 'p(', 'e[', 'distribution', 'odds', 'ratio',
-                        '%', 'percent', 'chance', 'risk', 'uncertainty',
-                    ]
-                    return any(kw in query.lower() for kw in prob_keywords)
+                    # Use the class constant from ProbabilisticToolWrapper
+                    # This ensures test stays in sync with production code
+                    # (per code review feedback about avoiding duplication)
+                    return any(
+                        kw in query.lower() 
+                        for kw in ProbabilisticToolWrapper._PROBABILITY_KEYWORDS
+                    )
                 
                 def add_rule(self, rule, confidence):
                     pass
@@ -347,12 +345,13 @@ class TestDeepDiveBugFixesIntegration:
         try:
             from vulcan.reasoning.selection.tool_selector import ProbabilisticToolWrapper
             
-            # Create wrapper with mock engine
+            # Create wrapper with mock engine using class constant
             class MockEngine:
                 def clear_state(self):
                     pass
                 def _is_probability_query(self, q):
-                    return 'probability' in q.lower() or 'p(' in q.lower()
+                    # Use class constant to stay in sync with production code
+                    return any(kw in q.lower() for kw in ProbabilisticToolWrapper._PROBABILITY_KEYWORDS)
                 def add_rule(self, r, c):
                     pass
                 def query(self, v, e):
