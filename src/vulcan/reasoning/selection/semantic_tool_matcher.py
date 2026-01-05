@@ -1166,6 +1166,63 @@ class SemanticToolMatcher:
             any(query_lower.startswith(p + ',') and len(query_lower) <= len(p) + 15
                 for p in SIMPLE_GREETING_PATTERNS)
         )
+        
+        # =====================================================================
+        # BUG #9 FIX: Task type detection takes PRIORITY over domain keywords
+        # Problem: "Write a sonnet about quantum entanglement" was routing to
+        #          mathematical/symbolic due to "quantum" keyword, but the
+        #          TASK TYPE is creative writing ("Write a sonnet").
+        # Fix: Detect task type first (verbs like "write", "compose", etc.)
+        #      and override domain-based routing when task type is clear.
+        # =====================================================================
+        
+        # Creative task indicators (verbs and nouns that indicate creative output)
+        CREATIVE_TASK_VERBS = {
+            'write', 'compose', 'create', 'craft', 'generate', 'draft',
+            'author', 'pen', 'produce', 'design', 'invent', 'imagine',
+        }
+        CREATIVE_TASK_NOUNS = {
+            'poem', 'sonnet', 'haiku', 'story', 'essay', 'article',
+            'song', 'lyrics', 'script', 'novel', 'play', 'limerick',
+            'verse', 'prose', 'fiction', 'narrative', 'tale',
+        }
+        
+        # Check if this is a creative task (task type takes priority over domain)
+        is_creative_task = False
+        words = query_lower.split()
+        if words:
+            # Check if query starts with a creative verb
+            first_word = words[0].rstrip(',.!?')
+            is_creative_task = first_word in CREATIVE_TASK_VERBS
+            
+            # Also check for creative nouns in the query
+            if not is_creative_task:
+                is_creative_task = any(noun in query_lower for noun in CREATIVE_TASK_NOUNS)
+        
+        # BUG #10 FIX: Mathematical task detection to prevent ethical override
+        # Problem: "Optimize welfare function" was routing to philosophical due
+        #          to "welfare" keyword, but this is an optimization problem.
+        MATHEMATICAL_TASK_VERBS = {
+            'optimize', 'maximize', 'minimize', 'calculate', 'compute',
+            'solve', 'derive', 'integrate', 'differentiate', 'evaluate',
+            'factor', 'simplify', 'expand', 'reduce',
+        }
+        is_math_task = False
+        if words:
+            first_word = words[0].rstrip(',.!?')
+            is_math_task = first_word in MATHEMATICAL_TASK_VERBS
+        
+        if is_creative_task:
+            logger.debug(
+                f"[SemanticToolMatcher] BUG#9 FIX: Detected CREATIVE task - "
+                f"task type overrides domain keywords for query: {query_lower[:50]}..."
+            )
+        
+        if is_math_task:
+            logger.debug(
+                f"[SemanticToolMatcher] BUG#10 FIX: Detected MATHEMATICAL task - "
+                f"task type overrides ethical keywords for query: {query_lower[:50]}..."
+            )
 
         # ISSUE #2 FIX: Pre-compute query embedding ONCE before the tool loop
         # Previously this was done inside the loop, causing N embedding computations
@@ -1200,6 +1257,32 @@ class SemanticToolMatcher:
             # Probabilistic tool should NOT handle greetings - it returns "mean prediction 0.500"
             if is_simple_greeting and tool_name == 'probabilistic':
                 keyword_boost = max(0.0, keyword_boost - 0.3)  # Significant penalty
+            
+            # =====================================================================
+            # BUG #9 FIX: Creative task type overrides domain-based routing
+            # "Write a sonnet about quantum" should go to general/creative, not symbolic
+            # =====================================================================
+            if is_creative_task:
+                if tool_name == 'general':
+                    # Boost general tool significantly for creative tasks
+                    keyword_boost = max(keyword_boost, 0.7)
+                    keyword_matches.append('creative_task_override')
+                elif tool_name in ('symbolic', 'probabilistic', 'causal'):
+                    # Penalize reasoning tools for creative tasks
+                    keyword_boost = max(0.0, keyword_boost - 0.4)
+            
+            # =====================================================================
+            # BUG #10 FIX: Mathematical task type overrides ethical keyword routing
+            # "Optimize welfare function" should go to symbolic/math, not philosophical
+            # =====================================================================
+            if is_math_task:
+                if tool_name == 'symbolic':
+                    # Boost symbolic tool significantly for math tasks
+                    keyword_boost = max(keyword_boost, 0.6)
+                    keyword_matches.append('math_task_override')
+                elif tool_name in ('philosophical', 'analogical'):
+                    # Penalize philosophical for math tasks
+                    keyword_boost = max(0.0, keyword_boost - 0.3)
 
             # 2. Embedding similarity (now uses pre-computed query embedding)
             similarity_score = 0.0

@@ -1130,8 +1130,20 @@ class ToolSelectionBandit:
         time_ms: float,
         energy_mj: float,
         constraints: Dict[str, float],
+        is_verified: bool = False,
+        is_fallback: bool = False,
     ):
-        """Update the bandit orchestrator with execution results."""
+        """
+        Update the bandit orchestrator with execution results.
+        
+        BUG #15 FIX: Now accepts is_verified parameter to indicate if the
+        result was mathematically verified as correct. Unverified results
+        receive reduced rewards.
+        
+        BUG #7 FIX: Now accepts is_fallback parameter to indicate if the
+        result came from a fallback mechanism. Fallback results receive
+        heavily reduced rewards.
+        """
 
         # **************************************************************************
         # START CRITICAL FIX: Wrap entire method in lock to prevent race conditions
@@ -1141,13 +1153,20 @@ class ToolSelectionBandit:
                 if tool_name not in self.statistics:
                     self.statistics[tool_name] = {"pulls": 0, "rewards": []}
                 self.statistics[tool_name]["pulls"] += 1
-                reward = self._compute_reward(quality, time_ms, energy_mj, constraints)
+                reward = self._compute_reward(
+                    quality, time_ms, energy_mj, constraints,
+                    is_verified=is_verified, is_fallback=is_fallback
+                )
                 self.statistics[tool_name]["rewards"].append(reward)
                 return
 
             try:
                 # 1. Compute reward from the outcome
-                reward = self._compute_reward(quality, time_ms, energy_mj, constraints)
+                # BUG #15 & #7 FIX: Pass verification and fallback status
+                reward = self._compute_reward(
+                    quality, time_ms, energy_mj, constraints,
+                    is_verified=is_verified, is_fallback=is_fallback
+                )
 
                 # 2. Create the context and action objects
                 context = BanditContext(
@@ -1194,16 +1213,60 @@ class ToolSelectionBandit:
         time_ms: float,
         energy_mj: float,
         constraints: Dict[str, float],
+        is_verified: bool = False,
+        is_fallback: bool = False,
     ) -> float:
-        """Computes a reward score between 0 and 1."""
+        """
+        Computes a reward score between 0 and 1.
+        
+        BUG #15 FIX: Now considers whether the answer was verified as correct
+        before rewarding. Unverified answers with high confidence should NOT
+        receive full reward - confidence != correctness.
+        
+        BUG #7 FIX: Fallback results receive reduced rewards to prevent
+        learning from potentially incorrect LLM responses.
+        
+        Args:
+            quality: Confidence score from the tool (0-1)
+            time_ms: Execution time in milliseconds
+            energy_mj: Energy used in millijoules
+            constraints: Dict with time_budget_ms, energy_budget_mj
+            is_verified: Whether the result was mathematically verified
+            is_fallback: Whether this result came from a fallback mechanism
+            
+        Returns:
+            Reward score between 0 and 1
+        """
         time_budget = constraints.get("time_budget_ms", 1000)
         energy_budget = constraints.get("energy_budget_mj", 1000)
 
         time_score = max(0, 1 - (time_ms / time_budget))
         energy_score = max(0, 1 - (energy_mj / energy_budget))
 
+        # BUG #15 FIX: Penalize unverified high-confidence results
+        # If result is not verified, reduce the effective quality score
+        # to prevent learning from potentially wrong but confident answers
+        effective_quality = quality
+        if not is_verified and quality > 0.7:
+            # Reduce confidence for unverified high-confidence answers
+            effective_quality = quality * 0.7  # Cap at ~70% of claimed confidence
+            logger.debug(
+                f"[BUG#15 FIX] Reduced reward for unverified high-confidence result: "
+                f"{quality:.2f} -> {effective_quality:.2f}"
+            )
+        
+        # BUG #7 FIX: Significantly reduce reward for fallback results
+        # Fallback typically means primary engine failed, so we shouldn't
+        # strongly reinforce this path
+        if is_fallback:
+            effective_quality = effective_quality * 0.3  # Heavy penalty for fallback
+            logger.debug(
+                f"[BUG#7 FIX] Reduced reward for fallback result: "
+                f"{quality:.2f} -> {effective_quality:.2f}"
+            )
+
         # Weighted combination, prioritizing quality
-        reward = 0.6 * quality + 0.3 * time_score + 0.1 * energy_score
+        reward = 0.6 * effective_quality + 0.3 * time_score + 0.1 * energy_score
         return float(np.clip(reward, 0.0, 1.0))
 
     def get_statistics(self) -> Dict[str, Any]:
@@ -4286,10 +4349,39 @@ class ToolSelector:
             return self._create_failure_result()
 
     def _update_learning(self, request: SelectionRequest, result: SelectionResult):
-        """Update learning components including mathematical accuracy feedback."""
+        """
+        Update learning components including mathematical accuracy feedback.
+        
+        BUG #15 FIX: Now checks if result was verified before rewarding.
+        BUG #7 FIX: Now checks if result came from fallback.
+        """
 
         try:
-            # Update bandit
+            # BUG #15 FIX: Check if result was mathematically verified
+            is_verified = False
+            if result.metadata:
+                math_verification = result.metadata.get("math_verification", {})
+                is_verified = math_verification.get("status") == "verified"
+            
+            # BUG #7 FIX: Check if result came from fallback
+            is_fallback = False
+            if result.metadata:
+                is_fallback = result.metadata.get("used_fallback", False)
+                # Also check execution result for fallback indicators
+                if isinstance(result.execution_result, dict):
+                    is_fallback = is_fallback or result.execution_result.get("is_fallback", False)
+            
+            # Log learning update with verification status
+            if is_fallback:
+                logger.info(
+                    f"[BUG#7 FIX] Learning update for FALLBACK result - reduced reward"
+                )
+            if not is_verified and result.confidence > 0.7:
+                logger.info(
+                    f"[BUG#15 FIX] Learning update for UNVERIFIED high-confidence result - reduced reward"
+                )
+            
+            # Update bandit with verification and fallback status
             self.bandit.update_from_execution(
                 features=request.features,
                 tool_name=result.selected_tool,
@@ -4297,6 +4389,8 @@ class ToolSelector:
                 time_ms=result.execution_time_ms,
                 energy_mj=result.energy_used_mj,
                 constraints=request.constraints,
+                is_verified=is_verified,
+                is_fallback=is_fallback,
             )
 
             # Update memory prior
