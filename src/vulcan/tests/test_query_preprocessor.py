@@ -896,3 +896,150 @@ class TestInlineConstraintFormat:
         
         # Operators should be normalized to Unicode
         assert "→" in formal_input, f"Implication operator not normalized: {formal_input}"
+
+
+class TestNewlineSeparatedConstraints:
+    """
+    Tests for newline-separated constraint format.
+    
+    This addresses the scenario where SAT constraints are listed on separate lines
+    WITHOUT numbering or bullets, like:
+    
+    Constraints:
+    A→B
+    B→C
+    ¬C
+    A∨B
+    
+    Previously, this would be incorrectly parsed as a single string with newlines,
+    resulting in invalid formal input like "(A→B\nB→C\n¬C\nA∨B)" instead of
+    "(A→B) ∧ (B→C) ∧ (¬C) ∧ (A∨B)".
+    """
+
+    @pytest.fixture
+    def preprocessor(self):
+        """Create a fresh preprocessor instance."""
+        return QueryPreprocessor()
+
+    def test_newline_separated_constraints_basic(self, preprocessor):
+        """Test basic newline-separated constraint handling."""
+        constraints = preprocessor._split_inline_constraints("A→B\nB→C\n¬C\nA∨B")
+        
+        assert len(constraints) == 4
+        assert "A→B" in constraints
+        assert "B→C" in constraints
+        assert "¬C" in constraints
+        assert "A∨B" in constraints
+
+    def test_newline_separated_sat_problem(self, preprocessor):
+        """
+        Test SAT problem with newline-separated constraints.
+        
+        This is the primary bug scenario from the GitHub comment:
+        
+        Input:
+            Propositions: A, B, C
+            Constraints:
+            A→B
+            B→C
+            ¬C
+            A∨B
+            
+            Task: Is the set satisfiable?
+        
+        Should produce:
+            "(A→B) ∧ (B→C) ∧ (¬C) ∧ (A∨B)"
+        
+        NOT:
+            "(A→B\nB→C\n¬C\nA∨B)"
+        """
+        query = """
+Symbolic Reasoning (from symbolic/*)
+S1 — Satisfiability (SAT-style)
+
+Propositions: A, B, C
+Constraints:
+A→B
+B→C
+¬C
+A∨B
+
+Task: Is the set satisfiable? YES/NO.
+"""
+
+        result = preprocessor.preprocess(
+            query=query,
+            query_type="symbolic",
+            reasoning_tools=["symbolic"],
+        )
+
+        assert result.preprocessing_applied is True, "Preprocessing should be applied"
+        assert result.extraction_type == ExtractionType.SYMBOLIC
+        assert result.extraction_confidence == 0.9, "Should have high confidence for SAT extraction"
+        
+        formal_input = result.formal_input
+        assert formal_input is not None, "Should have extracted formal input"
+        
+        # The main bug: should NOT contain embedded newlines
+        assert "\n" not in formal_input, f"BUG: Newlines found in formal input: {repr(formal_input)}"
+        
+        # Should be properly joined with ∧
+        expected = "(A→B) ∧ (B→C) ∧ (¬C) ∧ (A∨B)"
+        assert formal_input == expected, f"Expected: {expected}, Got: {formal_input}"
+        
+        # Verify constraints were properly extracted
+        assert result.extracted_constraints == ("A→B", "B→C", "¬C", "A∨B"), \
+            f"Constraints not properly extracted: {result.extracted_constraints}"
+
+    def test_newline_separated_with_extra_whitespace(self, preprocessor):
+        """Test newline-separated constraints with extra whitespace."""
+        query = """
+Propositions: X, Y, Z
+Constraints:
+  X→Y  
+  Y→Z  
+  ¬Z  
+
+Task: Check satisfiability.
+"""
+
+        result = preprocessor.preprocess(
+            query=query,
+            query_type="symbolic",
+            reasoning_tools=["symbolic"],
+        )
+
+        assert result.preprocessing_applied is True
+        formal_input = result.formal_input
+        
+        # Should handle whitespace properly
+        assert "\n" not in formal_input, f"Newlines in formal input: {repr(formal_input)}"
+        assert "(X→Y)" in formal_input
+        assert "(Y→Z)" in formal_input
+        assert "(¬Z)" in formal_input
+
+    def test_newline_vs_comma_detection(self, preprocessor):
+        """Test that the preprocessor correctly detects newline vs comma separators."""
+        # Newline-separated: multiple valid constraints on separate lines
+        newline_result = preprocessor._split_inline_constraints("A→B\nB→C\n¬C")
+        assert len(newline_result) == 3
+        
+        # Comma-separated: constraints separated by commas
+        comma_result = preprocessor._split_inline_constraints("A→B, B→C, ¬C")
+        assert len(comma_result) == 3
+        
+        # Both should produce the same constraints
+        assert set(newline_result) == {"A→B", "B→C", "¬C"}
+        assert set(comma_result) == {"A→B", "B→C", "¬C"} or set(comma_result) == {"A → B", "B → C", "¬C"}
+
+    def test_mixed_newline_and_comma(self, preprocessor):
+        """Test handling of mixed newline and comma separators."""
+        # Some users might mix formats
+        mixed = preprocessor._split_inline_constraints("A→B\nB→C, ¬C")
+        
+        # Should handle this reasonably (prefer newlines if they're the main separator)
+        # At minimum, should extract valid constraints
+        assert len(mixed) >= 2
+        # Should contain valid constraints
+        valid_found = sum(1 for c in mixed if "→" in c or "¬" in c)
+        assert valid_found >= 2

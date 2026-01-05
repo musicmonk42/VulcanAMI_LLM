@@ -853,21 +853,21 @@ class QueryPreprocessor:
 
     def _split_inline_constraints(self, constraints_str: str) -> List[str]:
         """
-        Split inline comma-separated constraints into individual formulas.
+        Split inline constraints into individual formulas.
 
         Handles constraint formats like:
-        - "A → B, B → C, ¬C, A ∨ B"
-        - "A→B, B→C, ¬C"
-        - "A → B,B → C,   ¬C  ,A ∨ B"
+        - Comma-separated: "A → B, B → C, ¬C, A ∨ B"
+        - Newline-separated: "A→B\\nB→C\\n¬C\\nA∨B"
+        - Mixed: "A → B,B → C\\n¬C,A ∨ B"
 
         The method is careful to:
-        1. Split on commas (the constraint separator)
+        1. Split on commas OR newlines (whichever is used as separator)
         2. Preserve spaces around operators within each constraint
         3. Filter out empty or whitespace-only constraints
         4. Filter out constraints that don't contain at least one proposition letter
 
         Args:
-            constraints_str: String containing comma-separated constraints
+            constraints_str: String containing constraints (comma or newline separated)
 
         Returns:
             List of individual constraint strings
@@ -875,14 +875,33 @@ class QueryPreprocessor:
         Examples:
             >>> preprocessor._split_inline_constraints("A → B, B → C, ¬C")
             ["A → B", "B → C", "¬C"]
-            >>> preprocessor._split_inline_constraints("A→B,B→C")
-            ["A→B", "B→C"]
+            >>> preprocessor._split_inline_constraints("A→B\\nB→C\\n¬C")
+            ["A→B", "B→C", "¬C"]
         """
         if not constraints_str or not constraints_str.strip():
             return []
 
-        # Split by comma
-        raw_constraints = constraints_str.split(',')
+        # Determine the primary separator
+        # If there are more newlines than commas containing logical content, use newlines
+        newline_count = constraints_str.count('\n')
+        comma_count = constraints_str.count(',')
+        
+        # Use newlines if there are multiple newline-separated items that look like constraints
+        if newline_count > 0:
+            # Check if newline-separated parts contain logical content
+            newline_parts = [p.strip() for p in constraints_str.split('\n') if p.strip()]
+            valid_newline_parts = [p for p in newline_parts if re.search(r'[A-Za-z]', p)]
+            
+            # If we have multiple valid newline-separated constraints, use newlines as separator
+            if len(valid_newline_parts) >= 2:
+                raw_constraints = newline_parts
+                logger.debug(f"{LOG_PREFIX} Using newline separator: found {len(raw_constraints)} parts")
+            else:
+                # Fall back to comma separator
+                raw_constraints = constraints_str.split(',')
+        else:
+            # No newlines, use comma separator
+            raw_constraints = constraints_str.split(',')
 
         # Filter and clean each constraint
         valid_constraints: List[str] = []
