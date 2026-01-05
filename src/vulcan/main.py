@@ -3567,15 +3567,30 @@ Based on your analysis through memory retrieval, multi-modal reasoning, causal m
     # ================================================================
     response_text = ""
 
-    # ================================================================
-    # BUG #17 FIX: Check for deterministic fast-path results FIRST
-    # Cryptographic and mathematical fast-path results are precomputed
-    # by QueryRouter and MUST be returned directly, NOT sent to LLM.
-    # This prevents OpenAI from returning "unable to calculate" errors.
-    # ================================================================
-    telemetry_data = routing_plan.telemetry_data if (routing_plan and hasattr(routing_plan, 'telemetry_data')) else {}
-    is_crypto_fast_path = telemetry_data.get('crypto_fast_path', False)
-    is_math_fast_path = telemetry_data.get('math_fast_path', False)
+        # ================================================================
+        # BUG #17 FIX: Check for deterministic fast-path results FIRST
+        # Cryptographic and mathematical fast-path results are precomputed
+        # by QueryRouter and MUST be returned directly, NOT sent to LLM.
+        # This prevents OpenAI from returning "unable to calculate" errors.
+        # ================================================================
+        telemetry_data = routing_plan.telemetry_data if (routing_plan and hasattr(routing_plan, 'telemetry_data')) else {}
+        self_introspection_text = telemetry_data.get('self_introspection_result')
+        if self_introspection_text:
+            systems_used.append("self_introspection_engine")
+            logger.info("[VULCAN] Self-introspection fast-path result returned directly")
+            final_response = VulcanResponse(
+                response=self_introspection_text,
+                systems_used=list(set(systems_used)),
+                confidence=telemetry_data.get("self_introspection_confidence", 0.7),
+                metadata={
+                    "fast_path": "self_introspection",
+                    "deterministic": True,
+                    "skip_llm_synthesis": True,
+                },
+            )
+            return final_response
+        is_crypto_fast_path = telemetry_data.get('crypto_fast_path', False)
+        is_math_fast_path = telemetry_data.get('math_fast_path', False)
     
     if is_crypto_fast_path:
         # BUG #17 FIX: Return precomputed cryptographic result directly
@@ -5976,6 +5991,22 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
                 # This prevents OpenAI from returning "unable to calculate" errors.
                 # ================================================================
                 v1_telemetry_data = routing_plan.telemetry_data if (routing_plan and hasattr(routing_plan, 'telemetry_data')) else {}
+                v1_self_introspection_text = v1_telemetry_data.get('self_introspection_result')
+                if v1_self_introspection_text:
+                    systems_used.append("self_introspection_engine")
+                    logger.info("[VULCAN/v1/chat] Self-introspection fast-path result returned directly")
+                    final_response = VulcanResponse(
+                        response=v1_self_introspection_text,
+                        systems_used=list(set(systems_used)),
+                        confidence=v1_telemetry_data.get("self_introspection_confidence", 0.7),
+                        metadata={
+                            "fast_path": "self_introspection",
+                            "deterministic": True,
+                            "skip_llm_synthesis": True,
+                            "conversation_id": request.conversation_id,
+                        },
+                    )
+                    return final_response
                 v1_is_crypto_fast_path = v1_telemetry_data.get('crypto_fast_path', False)
                 
                 if v1_is_crypto_fast_path:

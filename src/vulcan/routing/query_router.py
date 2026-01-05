@@ -332,6 +332,19 @@ except ImportError:
         CRYPTO_ENGINE_AVAILABLE = False
         logger.debug("CryptographicEngine not available for query routing")
 
+# Lightweight self-introspection engine (safe, no self-modification)
+try:
+    from ..reasoning.self_introspection_engine import SelfIntrospectionEngine
+    SELF_INTROSPECTION_ENGINE_AVAILABLE = True
+except ImportError:
+    try:
+        from vulcan.reasoning.self_introspection_engine import SelfIntrospectionEngine
+        SELF_INTROSPECTION_ENGINE_AVAILABLE = True
+    except ImportError:
+        SelfIntrospectionEngine = None
+        SELF_INTROSPECTION_ENGINE_AVAILABLE = False
+        logger.debug("SelfIntrospectionEngine not available for query routing")
+
 # ============================================================
 # CONSTANTS - Query Classification Keywords
 # ============================================================
@@ -2093,6 +2106,16 @@ class QueryAnalyzer:
                 logger.warning(f"Failed to initialize CryptographicEngine: {e}")
                 self._crypto_engine = None
 
+        # Lightweight self-introspection engine (safe, no self-modification)
+        self._self_introspection_engine = None
+        if SELF_INTROSPECTION_ENGINE_AVAILABLE and SelfIntrospectionEngine:
+            try:
+                self._self_introspection_engine = SelfIntrospectionEngine()
+                logger.info("[QueryRouter] SelfIntrospectionEngine initialized")
+            except Exception as e:
+                logger.warning(f"Failed to initialize SelfIntrospectionEngine: {e}")
+                self._self_introspection_engine = None
+
         # Learning system integration (set externally for adaptive routing)
         self.learning_system: Optional["UnifiedLearningSystem"] = None
 
@@ -3034,6 +3057,9 @@ class QueryAnalyzer:
                         "source": source,
                         "learning_mode": learning_mode.value,
                         "fast_path": True,
+                        "fast_path_result": True,
+                        "deterministic": True,
+                        "skip_llm_synthesis": True,
                         "crypto_fast_path": True,
                         "crypto_operation": result['operation'],
                         "crypto_result": result['result'],
@@ -3505,17 +3531,20 @@ class QueryAnalyzer:
                 collaboration_needed=False,  # No multi-agent needed
                 arena_participation=False,  # Skip arena orchestration
                 telemetry_category=telemetry_category,
-                telemetry_data={
-                    "session_id": session_id,
-                    "query_length": len(query),
-                    "word_count": len(query.split()),
-                    "query_number": query_number,
-                    "source": source,
-                    "learning_mode": learning_mode.value,
-                    "fast_path": True,
-                    "math_fast_path": True,  # Mark as math fast-path
-                },
-            )
+                    telemetry_data={
+                        "session_id": session_id,
+                        "query_length": len(query),
+                        "word_count": len(query.split()),
+                        "query_number": query_number,
+                        "source": source,
+                        "learning_mode": learning_mode.value,
+                        "fast_path": True,
+                        "fast_path_result": True,
+                        "deterministic": True,
+                        "skip_llm_synthesis": True,
+                        "math_fast_path": True,  # Mark as math fast-path
+                    },
+                )
 
             # Mark as safe for mathematical scenarios (bypass HIPAA false positives)
             plan.safety_passed = True
@@ -3596,7 +3625,52 @@ class QueryAnalyzer:
                 with self._lock:
                     self._ai_interaction_count += 1
                 telemetry_category = f"{source}_interaction"
-            
+
+            # Lightweight, safe self-introspection engine (no self-modification)
+            if self._self_introspection_engine:
+                try:
+                    engine_result = self._self_introspection_engine.reflect(query)
+                except Exception as e:
+                    logger.warning(f"[QueryRouter] SelfIntrospectionEngine failed: {e}")
+                    engine_result = None
+                if engine_result and engine_result.get("text"):
+                    plan = ProcessingPlan(
+                        query_id=query_id,
+                        original_query=query,
+                        source=source,
+                        learning_mode=learning_mode,
+                        query_type=QueryType.SELF_INTROSPECTION,
+                        complexity_score=0.5,
+                        uncertainty_score=0.2,
+                        collaboration_needed=False,
+                        arena_participation=False,
+                        telemetry_category=telemetry_category,
+                        telemetry_data={
+                            "session_id": session_id,
+                            "query_length": len(query),
+                            "word_count": len(query.split()),
+                            "query_number": query_number,
+                            "source": source,
+                            "learning_mode": learning_mode.value,
+                            "fast_path": True,
+                            "fast_path_result": True,
+                            "deterministic": True,
+                            "skip_llm_synthesis": True,
+                            "self_introspection_fast_path": True,
+                            "self_introspection_result": engine_result.get("text"),
+                            "self_introspection_confidence": engine_result.get(
+                                "confidence", 0.7
+                            ),
+                        },
+                    )
+                    plan.safety_passed = True
+                    plan.detected_patterns.append("self_introspection_fast_path")
+                    logger.info(
+                        f"[QueryRouter] {query_id}: SELF-INTROSPECTION fast-path executed "
+                        f"(confidence={engine_result.get('confidence', 0.7):.2f})"
+                    )
+                    return plan
+
             # Create plan for self-introspection with multi-tool routing
             plan = ProcessingPlan(
                 query_id=query_id,

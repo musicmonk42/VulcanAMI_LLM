@@ -846,6 +846,21 @@ class HybridLLMExecutor:
         # Check if reasoning_output is in context
         if reasoning_output is None and context:
             reasoning_output = context.get("reasoning_output")
+
+        # BUG #17 FIX: deterministic fast-path result provided in context
+        if context and context.get("fast_path_result") and context.get("deterministic"):
+            formatted = self._format_deterministic_response(context)
+            if formatted:
+                return {
+                    "text": formatted,
+                    "source": "deterministic_fast_path",
+                    "systems_used": ["deterministic"],
+                    "metadata": {
+                        "fast_path_result": True,
+                        "deterministic": True,
+                        "skip_llm_synthesis": True,
+                    },
+                }
         
         # If no structured output, fall back to legacy execution
         if reasoning_output is None:
@@ -925,6 +940,23 @@ class HybridLLMExecutor:
                 "query": prompt,
             },
         }
+
+    def _format_deterministic_response(self, query_result: Dict[str, Any]) -> Optional[str]:
+        """
+        Format deterministic fast-path results without LLM synthesis.
+        """
+        result_type = query_result.get("type")
+        if result_type == "cryptographic":
+            operation = query_result.get("operation") or query_result.get("crypto_operation", "hash")
+            hash_value = query_result.get("result") or query_result.get("crypto_result")
+            if hash_value:
+                return f"The {str(operation).upper()} hash is: {hash_value}"
+        elif result_type == "mathematical":
+            expression = query_result.get("expression")
+            result = query_result.get("result")
+            if result is not None:
+                return f"Result: {expression} = {result}" if expression else f"Result: {result}"
+        return None
 
     async def format_output_for_user(
         self,
