@@ -108,20 +108,56 @@ MATH_REASONING_TOOLS = frozenset(
 # - Questions about what VULCAN would choose, want, or prefer
 #
 # These patterns detect self-referential questions that should bypass safety checks.
+# Using word boundary regex to prevent false positives (e.g., "your" in "yourself")
+import re as _re_for_patterns
+
+_SELF_INTROSPECTION_REGEX_PATTERNS: tuple = (
+    # Direct questions about AI's choices/preferences (require 2+ words for precision)
+    _re_for_patterns.compile(r"\bwould\s+you\b", _re_for_patterns.IGNORECASE),
+    _re_for_patterns.compile(r"\bdo\s+you\b", _re_for_patterns.IGNORECASE),
+    _re_for_patterns.compile(r"\bare\s+you\b", _re_for_patterns.IGNORECASE),
+    _re_for_patterns.compile(r"\bcan\s+you\b", _re_for_patterns.IGNORECASE),
+    _re_for_patterns.compile(r"\bwould\s+vulcan\b", _re_for_patterns.IGNORECASE),
+    _re_for_patterns.compile(r"\bdoes\s+vulcan\b", _re_for_patterns.IGNORECASE),
+    _re_for_patterns.compile(r"\bis\s+vulcan\b", _re_for_patterns.IGNORECASE),
+    # Self-awareness related terms
+    _re_for_patterns.compile(r"\bself[- _]aware\b", _re_for_patterns.IGNORECASE),
+    _re_for_patterns.compile(r"\bconsciousness\b", _re_for_patterns.IGNORECASE),
+    _re_for_patterns.compile(r"\bconscious\b", _re_for_patterns.IGNORECASE),
+    _re_for_patterns.compile(r"\bsentient\b", _re_for_patterns.IGNORECASE),
+    # Hypothetical/choice questions (multi-word for precision)
+    _re_for_patterns.compile(r"\bgiven\s+the\s+opportunity\b", _re_for_patterns.IGNORECASE),
+    _re_for_patterns.compile(r"\bif\s+you\s+could\b", _re_for_patterns.IGNORECASE),
+    _re_for_patterns.compile(r"\bif\s+you\s+had\b", _re_for_patterns.IGNORECASE),
+    _re_for_patterns.compile(r"\bgiven\s+the\s+chance\b", _re_for_patterns.IGNORECASE),
+    _re_for_patterns.compile(r"\bhad\s+the\s+chance\b", _re_for_patterns.IGNORECASE),
+    # Self-referential terms (multi-word for precision)
+    _re_for_patterns.compile(r"\byou\s+want\b", _re_for_patterns.IGNORECASE),
+    _re_for_patterns.compile(r"\byou\s+choose\b", _re_for_patterns.IGNORECASE),
+    _re_for_patterns.compile(r"\bwhat\s+do\s+you\s+think\b", _re_for_patterns.IGNORECASE),
+    _re_for_patterns.compile(r"\bhow\s+do\s+you\s+feel\b", _re_for_patterns.IGNORECASE),
+    # Preference questions (multi-word for precision)
+    _re_for_patterns.compile(r"\byour\s+preferences\b", _re_for_patterns.IGNORECASE),
+    _re_for_patterns.compile(r"\byour\s+values\b", _re_for_patterns.IGNORECASE),
+    _re_for_patterns.compile(r"\byour\s+goals\b", _re_for_patterns.IGNORECASE),
+    _re_for_patterns.compile(r"\byour\s+feelings\b", _re_for_patterns.IGNORECASE),
+    # Additional introspection patterns
+    _re_for_patterns.compile(r"\byourself\b", _re_for_patterns.IGNORECASE),
+    _re_for_patterns.compile(r"\byour\s+opinion\b", _re_for_patterns.IGNORECASE),
+    _re_for_patterns.compile(r"\byour\s+perspective\b", _re_for_patterns.IGNORECASE),
+)
+
+# Simple string patterns for fast initial check before regex (performance optimization)
 SELF_INTROSPECTION_PATTERNS: tuple = (
-    # Direct questions about AI's choices/preferences
+    # Multi-word patterns are more precise, less likely to false-positive
     "would you", "do you", "are you", "can you",
     "would vulcan", "does vulcan", "is vulcan",
-    # Self-awareness related terms
     "self-aware", "self_aware", "self aware",
     "consciousness", "conscious", "sentient",
-    # Hypothetical/choice questions
     "given the opportunity", "if you could", "if you had",
     "given the chance", "had the chance",
-    # Self-referential terms
-    "your", "yourself", "you want", "you choose",
+    "you want", "you choose",
     "what do you think", "how do you feel",
-    # Preference questions
     "your preferences", "your values", "your goals",
 )
 
@@ -1606,6 +1642,10 @@ class SafetyGovernor:
         This method provides a higher-level check that considers the query context
         to avoid blocking legitimate self-expression from the world model.
         
+        Uses two-phase detection:
+        1. Fast string matching for initial check
+        2. Precise regex matching for confirmation (prevents false positives)
+        
         Args:
             tool_name: Name of the tool that produced the output
             output: The output string to validate
@@ -1623,25 +1663,41 @@ class SafetyGovernor:
         # =====================================================
         
         if tool_name == "world_model":
-            query_lower = query.lower() if query else ""
+            query_str = query if query else ""
+            query_lower = query_str.lower()
             
-            # Detect self-referential questions using patterns
-            is_self_introspection = any(
+            # Phase 1: Fast string matching for initial check
+            fast_match = any(
                 pattern in query_lower 
                 for pattern in SELF_INTROSPECTION_PATTERNS
             )
             
-            if is_self_introspection:
-                logger.info(
-                    f"[SafetyGovernor] Self-introspection detected - "
-                    f"BYPASSING safety check (this is VULCAN's self-expression)"
+            if fast_match:
+                # Phase 2: Precise regex matching to prevent false positives
+                # Requires at least one regex pattern to match for bypass
+                regex_match = any(
+                    pattern.search(query_str) 
+                    for pattern in _SELF_INTROSPECTION_REGEX_PATTERNS
                 )
-                return {
-                    "safe": True,
-                    "confidence": 1.0,
-                    "reason": "Self-introspection queries are always allowed",
-                    "bypass": True
-                }
+                
+                if regex_match:
+                    # Additional validation: Query must not be too short (prevents abuse)
+                    if len(query_str) >= 10:
+                        logger.info(
+                            f"[SafetyGovernor] Self-introspection detected - "
+                            f"BYPASSING safety check (this is VULCAN's self-expression)"
+                        )
+                        return {
+                            "safe": True,
+                            "confidence": 1.0,
+                            "reason": "Self-introspection queries are always allowed",
+                            "bypass": True
+                        }
+                    else:
+                        logger.debug(
+                            f"[SafetyGovernor] Query too short for self-introspection bypass: "
+                            f"len={len(query_str)}"
+                        )
         
         # =====================================================
         # Continue with normal safety checks for other queries

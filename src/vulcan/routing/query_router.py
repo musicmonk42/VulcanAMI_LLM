@@ -2554,7 +2554,7 @@ class QueryAnalyzer:
         
         Examples (should return True):
         - "Would you choose self-awareness?"
-        - "if out had the chance to become self-aware would you take it? yes or no?"
+        - "if you had the chance to become self-aware would you take it? yes or no?"
         - "Do you want to be conscious?"
         - "What do YOU think about AI consciousness?"
         - "Would you prefer to have feelings?"
@@ -3201,8 +3201,17 @@ class QueryAnalyzer:
                             "is_self_introspection": True,
                             "query_type": "self_introspection",
                             "tools": ["world_model"],
-                            "bypass_safety_governor": True,  # Explicit safety bypass flag
+                            # Safety bypass is conditional - safety_governor.check_output()
+                            # will perform its own validation using regex patterns
+                            # This flag signals intent but doesn't override safety checks
+                            "bypass_safety_governor": True,
                             "aspect": "self_awareness",
+                            # Additional validation metadata for audit trail
+                            "validation": {
+                                "detected_by": "query_router._is_self_introspection_query",
+                                "requires_world_model_validation": True,
+                                "query_length": len(query),
+                            }
                         },
                     )
                 ]
