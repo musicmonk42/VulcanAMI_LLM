@@ -721,3 +721,178 @@ class TestBugDStandaloneOperatorFiltering:
         
         # Should NOT have standalone operators
         assert "(→)" not in formal_input or "(→) ∧" not in formal_input
+
+
+# =============================================================================
+# INLINE CONSTRAINT FORMAT FIX: Tests for comma-separated constraint parsing
+# =============================================================================
+class TestInlineConstraintFormat:
+    """
+    Tests for inline comma-separated constraint format.
+    
+    This addresses the SAT problem root cause where constraints in the format:
+    "Constraints: A → B, B → C, ¬C, A ∨ B" 
+    
+    were being incorrectly processed, with the logical operators (→, ¬, ∨) being
+    filtered out because the parser only understood numbered/bulleted list format.
+    """
+
+    @pytest.fixture
+    def preprocessor(self):
+        """Create a fresh preprocessor instance."""
+        return QueryPreprocessor()
+
+    def test_split_inline_constraints_basic(self, preprocessor):
+        """Test basic inline constraint splitting."""
+        constraints = preprocessor._split_inline_constraints("A → B, B → C, ¬C")
+        
+        assert len(constraints) == 3
+        assert "A → B" in constraints
+        assert "B → C" in constraints
+        assert "¬C" in constraints
+
+    def test_split_inline_constraints_with_spaces(self, preprocessor):
+        """Test inline constraint splitting with varied spacing."""
+        constraints = preprocessor._split_inline_constraints("A→B,  B→C ,   ¬C")
+        
+        assert len(constraints) == 3
+        assert "A→B" in constraints
+        assert "B→C" in constraints
+        assert "¬C" in constraints
+
+    def test_split_inline_constraints_filters_standalone_operators(self, preprocessor):
+        """Test that standalone operators are filtered out during splitting."""
+        # If somehow "→" ends up as a constraint, it should be filtered
+        constraints = preprocessor._split_inline_constraints("A→B, →, B→C")
+        
+        # Should only have valid constraints with propositions
+        assert len(constraints) == 2
+        assert "A→B" in constraints
+        assert "B→C" in constraints
+        # Standalone → should be filtered out
+        assert "→" not in constraints
+
+    def test_split_inline_constraints_empty_input(self, preprocessor):
+        """Test inline constraint splitting with empty input."""
+        constraints = preprocessor._split_inline_constraints("")
+        assert constraints == []
+        
+        constraints = preprocessor._split_inline_constraints("   ")
+        assert constraints == []
+
+    def test_inline_constraints_sat_problem(self, preprocessor):
+        """
+        Test SAT problem extraction with inline comma-separated constraints.
+        
+        This is the main fix scenario from the bug report where:
+        Input:
+            Propositions: A, B, C
+            Constraints: A → B, B → C, ¬C, A ∨ B
+            Is this satisfiable?
+        
+        Was producing:
+            A  B    (operators removed!)
+            B  C    (operators removed!)
+            C       (operators removed!)
+            A  B    (operators removed!)
+        
+        Should produce:
+            "(A→B) ∧ (B→C) ∧ (¬C) ∧ (A∨B)"
+        """
+        query = """
+        Propositions: A, B, C
+        Constraints: A → B, B → C, ¬C, A ∨ B
+        Task: Is this satisfiable?
+        """
+
+        result = preprocessor.preprocess(
+            query=query,
+            query_type="symbolic",
+            reasoning_tools=["symbolic"],
+        )
+
+        assert result.preprocessing_applied is True, "Preprocessing should be applied for inline constraints"
+        assert result.extraction_confidence == 0.9, "Should have high confidence for SAT extraction"
+        assert result.extraction_type == ExtractionType.SYMBOLIC
+        
+        formal_input = result.formal_input
+        assert formal_input is not None, "Should have extracted formal input"
+        
+        # Check that all constraints are properly extracted WITH their operators
+        assert "(A→B)" in formal_input or "(A → B)" in formal_input, f"Missing A→B in: {formal_input}"
+        assert "(B→C)" in formal_input or "(B → C)" in formal_input, f"Missing B→C in: {formal_input}"
+        assert "(¬C)" in formal_input, f"Missing ¬C in: {formal_input}"
+        assert "(A∨B)" in formal_input or "(A ∨ B)" in formal_input, f"Missing A∨B in: {formal_input}"
+        
+        # Verify conjunction is used
+        assert "∧" in formal_input, f"Missing conjunction in: {formal_input}"
+        
+        # Should NOT have standalone operators
+        assert "(→) ∧" not in formal_input, f"BUG: Standalone (→) found in: {formal_input}"
+
+    def test_inline_constraints_mixed_format(self, preprocessor):
+        """Test that numbered list format still works alongside inline support."""
+        query = """
+        Propositions: X, Y, Z
+        
+        Constraints:
+        1. X → Y
+        2. Y → Z
+        3. ¬Z
+        
+        Task: Check validity.
+        """
+
+        result = preprocessor.preprocess(
+            query=query,
+            query_type="symbolic",
+            reasoning_tools=["symbolic"],
+        )
+
+        assert result.preprocessing_applied is True
+        formal_input = result.formal_input
+        
+        assert "(X→Y)" in formal_input or "(X → Y)" in formal_input
+        assert "(Y→Z)" in formal_input or "(Y → Z)" in formal_input
+        assert "(¬Z)" in formal_input
+
+    def test_inline_constraints_disjunction_and_negation(self, preprocessor):
+        """Test inline constraints with various operators."""
+        query = """
+        Propositions: P, Q, R
+        Constraints: P ∨ Q, ¬R, P → R
+        Task: Satisfiable?
+        """
+
+        result = preprocessor.preprocess(
+            query=query,
+            query_type="symbolic",
+            reasoning_tools=["symbolic"],
+        )
+
+        assert result.preprocessing_applied is True
+        formal_input = result.formal_input
+        
+        assert "(P∨Q)" in formal_input or "(P ∨ Q)" in formal_input
+        assert "(¬R)" in formal_input
+        assert "(P→R)" in formal_input or "(P → R)" in formal_input
+
+    def test_inline_constraints_ascii_operators(self, preprocessor):
+        """Test inline constraints with ASCII operators that need normalization."""
+        query = """
+        Propositions: A, B
+        Constraints: A -> B, NOT A OR B
+        Task: Check.
+        """
+
+        result = preprocessor.preprocess(
+            query=query,
+            query_type="symbolic",
+            reasoning_tools=["symbolic"],
+        )
+
+        assert result.preprocessing_applied is True
+        formal_input = result.formal_input
+        
+        # Operators should be normalized to Unicode
+        assert "→" in formal_input, f"Implication operator not normalized: {formal_input}"

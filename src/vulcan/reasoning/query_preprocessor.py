@@ -339,8 +339,15 @@ class QueryPreprocessor:
         )
 
         # Constraint line pattern: numbered lists and bullet points
+        # CRITICAL FIX: Require bullet/number to be at line start to avoid
+        # matching operators like '->' as bullets. The pattern:
+        # - ^: start of string (when used with MULTILINE)
+        # - \d+\.: numbered list (1., 2., etc.)
+        # - •: bullet point
+        # - [-*]: dash or asterisk bullets (at line start only)
         self._constraint_line_pattern = re.compile(
-            r'(?:\d+\.|•|[-*])\s*([^\n]+)'
+            r'(?:^|\n)\s*(?:\d+\.|•|[-*])\s*([^\n]+)',
+            re.MULTILINE
         )
 
         # Equation pattern: something = something (but not assignment-like text)
@@ -545,8 +552,38 @@ class QueryPreprocessor:
             if p.strip()
         )
 
-        # Parse constraints (numbered list or bullet points)
+        # Parse constraints - try numbered list first, then inline comma-separated
         constraint_matches = self._constraint_line_pattern.findall(constraints_str)
+
+        # =======================================================================
+        # FIX: Handle inline comma-separated constraint format
+        # =======================================================================
+        # If numbered/bulleted list pattern fails, try parsing inline format like:
+        # "A → B, B → C, ¬C, A ∨ B"
+        #
+        # The problem: When constraints are in inline format (not numbered list),
+        # the _constraint_line_pattern regex fails and returns empty list.
+        # This causes the method to return early with preprocessing_applied=False,
+        # and the query then hits _extract_direct_formulas() which incorrectly
+        # splits by newlines and treats individual operators as "formulas".
+        #
+        # The fix: Parse inline comma-separated constraints when numbered list fails.
+        # Each constraint must contain at least one proposition letter (A-Z or a-z).
+        # =======================================================================
+        if not constraint_matches:
+            # Try inline comma-separated format
+            # First, normalize operators in the entire constraint string
+            normalized_constraints_str = self._normalize_operators(constraints_str)
+            
+            # Split by comma to separate individual constraints
+            # Note: Simple comma split works for most SAT constraint formats
+            inline_constraints = self._split_inline_constraints(normalized_constraints_str)
+            
+            if inline_constraints:
+                constraint_matches = inline_constraints
+                logger.info(
+                    f"{LOG_PREFIX} Using inline constraint format: found {len(inline_constraints)} constraints"
+                )
 
         if not constraint_matches:
             return PreprocessingResult(
@@ -813,6 +850,60 @@ class QueryPreprocessor:
         for pattern, replacement in self._operator_normalizations:
             result = result.replace(pattern, replacement)
         return result.strip()
+
+    def _split_inline_constraints(self, constraints_str: str) -> List[str]:
+        """
+        Split inline comma-separated constraints into individual formulas.
+
+        Handles constraint formats like:
+        - "A → B, B → C, ¬C, A ∨ B"
+        - "A→B, B→C, ¬C"
+        - "A → B,B → C,   ¬C  ,A ∨ B"
+
+        The method is careful to:
+        1. Split on commas (the constraint separator)
+        2. Preserve spaces around operators within each constraint
+        3. Filter out empty or whitespace-only constraints
+        4. Filter out constraints that don't contain at least one proposition letter
+
+        Args:
+            constraints_str: String containing comma-separated constraints
+
+        Returns:
+            List of individual constraint strings
+
+        Examples:
+            >>> preprocessor._split_inline_constraints("A → B, B → C, ¬C")
+            ["A → B", "B → C", "¬C"]
+            >>> preprocessor._split_inline_constraints("A→B,B→C")
+            ["A→B", "B→C"]
+        """
+        if not constraints_str or not constraints_str.strip():
+            return []
+
+        # Split by comma
+        raw_constraints = constraints_str.split(',')
+
+        # Filter and clean each constraint
+        valid_constraints: List[str] = []
+        for constraint in raw_constraints:
+            constraint = constraint.strip()
+
+            # Skip empty constraints
+            if not constraint:
+                continue
+
+            # Validate that constraint contains at least one proposition letter
+            # This prevents standalone operators like "→" or "∧" from being included
+            if not re.search(r'[A-Za-z]', constraint):
+                logger.debug(
+                    f"{LOG_PREFIX} Skipping inline constraint without proposition: '{constraint}'"
+                )
+                continue
+
+            valid_constraints.append(constraint)
+
+        return valid_constraints
 
     def _clean_formula_line(self, line: str) -> str:
         """
