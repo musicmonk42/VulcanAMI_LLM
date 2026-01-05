@@ -1744,6 +1744,9 @@ class ProcessingPlan:
                 continue
             
             # Calculate word overlap between original query and task prompt
+            # FIX: Explicit division by zero protection
+            if len(original_words) == 0:
+                continue
             overlap = len(original_words & prompt_words) / len(original_words)
             
             if overlap < MIN_OVERLAP_THRESHOLD:

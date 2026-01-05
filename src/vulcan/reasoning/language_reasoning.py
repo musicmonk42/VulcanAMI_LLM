@@ -726,8 +726,8 @@ class LanguageReasoner:
             )
 
             # FIX: Early stopping with configurable conditions
-            # Check for low confidence
-            if confidence and confidence < MIN_CONFIDENCE_THRESHOLD:
+            # Check for low confidence (including 0.0 which is falsy but should trigger)
+            if confidence is not None and confidence < MIN_CONFIDENCE_THRESHOLD:
                 logger.debug(f"Early stopping: low confidence ({confidence:.3f})")
                 break
             # FIX: Use configurable EOS token check instead of hardcoded 0
