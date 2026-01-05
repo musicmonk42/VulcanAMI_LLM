@@ -576,9 +576,17 @@ result = simplify(integral)
                 # Step 3: Generate code
                 code = self._generate_code(query, classification, strategy, llm)
                 
-                if not code.strip():
+                # BUG #12 FIX: Handle None return when no math expression found
+                # Previously this assumed code was always a string. Now _generate_code
+                # returns None when no mathematical content is detected, which means
+                # the math engine should gracefully decline rather than compute garbage.
+                if not code or not code.strip():
+                    logger.info(
+                        f"[MathTool] BUG#12 FIX: No mathematical expression found in query. "
+                        f"Returning failure result instead of computing default expression."
+                    )
                     return self._create_error_result(
-                        query, "", "Failed to generate code", 
+                        query, "", "No mathematical expression found in query", 
                         classification, strategy, time.time() - start_time
                     )
 
@@ -665,11 +673,20 @@ result = simplify(integral)
         classification: ProblemClassification,
         strategy: SolutionStrategy,
         llm
-    ) -> str:
+    ) -> Optional[str]:
         """
         Generate SymPy code to solve the problem.
         
         Uses strategy-appropriate code generation method.
+        
+        BUG #12 FIX: Returns None when no mathematical content is found.
+        Previously, this always returned code (falling back to default expression).
+        Now returns None if the query doesn't contain mathematical content,
+        allowing callers to handle non-math queries appropriately.
+        
+        Returns:
+            Generated code string if mathematical content is found,
+            None if the query doesn't contain mathematical content.
         """
         # Try template first for common patterns
         if strategy == SolutionStrategy.TEMPLATE or (strategy == SolutionStrategy.SYMBOLIC and self.prefer_templates):
@@ -683,15 +700,25 @@ result = simplify(integral)
             if llm_code:
                 return llm_code
         
-        # Fallback to template
+        # BUG #12 FIX: Fallback to template - but this can now return None
+        # if no mathematical content is found in the query
         return self._generate_template_code(query, classification)
 
-    def _generate_template_code(self, query: str, classification: ProblemClassification) -> str:
+    def _generate_template_code(self, query: str, classification: ProblemClassification) -> Optional[str]:
         """
         Generate code using templates based on problem classification.
         
         Uses a priority-based matching system where more specific patterns
         are checked before general ones to ensure correct template selection.
+        
+        BUG #12 FIX: Returns None when no mathematical expression is found.
+        Previously, this method returned a default expression "x**2 + 2*x + 1"
+        which caused irrelevant mathematical output to be sent to OpenAI when
+        non-math queries were incorrectly routed to the math engine.
+        
+        Returns:
+            Generated code string if a mathematical pattern is found,
+            None if no mathematical content is detected in the query.
         """
         query_lower = query.lower()
         variables = classification.variables or ['x']
@@ -774,8 +801,16 @@ result = simplify(integral)
         elif classification.problem_type == ProblemType.ALGEBRA:
             return self._templates.solve_equation("x**2 - 4", var)
         
-        # DEFAULT: Generic simplification
-        return self._templates.simplify_expression("x**2 + 2*x + 1")
+        # BUG #12 FIX: Return None when no mathematical content is found
+        # Previously this returned "x**2 + 2*x + 1" as a default, which caused
+        # irrelevant math output (the expansion of (x+1)²) to be included in
+        # responses to non-mathematical queries. The math engine should NOT
+        # compute anything when no math expression is found in the query.
+        logger.warning(
+            f"[MathTool] BUG#12 FIX: No mathematical expression found in query. "
+            f"Returning None instead of default expression. Query: {query[:100]}..."
+        )
+        return None
 
     def _generate_llm_code(self, query: str, llm) -> Optional[str]:
         """
