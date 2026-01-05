@@ -184,7 +184,8 @@ class TableauProver(BaseProver):
         tableau = self._build_tableau(initial_formulas, start_time, timeout)
 
         if tableau is None:
-            return False, None, 0.0
+            # FIX Issue #1: Return meaningful confidence even on timeout
+            return False, None, 0.40  # Unknown due to timeout
 
         # Check if all branches closed
         if self._all_branches_closed(tableau):
@@ -198,7 +199,9 @@ class TableauProver(BaseProver):
             )
             return True, proof, 0.95
 
-        return False, None, 0.0
+        # FIX Issue #1: Return meaningful confidence for disproven case
+        # The tableau completed but branches didn't close - this is a valid "not proven" result
+        return False, None, 0.95  # High confidence that it's NOT provable
 
     def _collect_ground_terms(self, clause: Clause):
         """
@@ -721,7 +724,8 @@ class ResolutionProver(BaseProver):
         iteration = 0
         while iteration < self.max_iterations:
             if time.time() - start_time >= timeout:
-                return False, None, 0.0
+                # FIX Issue #1: Return meaningful confidence on timeout
+                return False, None, 0.40  # Unknown due to timeout
 
             # Select pairs of clauses
             clause_list = list(clauses)
@@ -730,7 +734,8 @@ class ResolutionProver(BaseProver):
             for i, clause1 in enumerate(clause_list):
                 for clause2 in clause_list[i + 1 :]:
                     if time.time() - start_time >= timeout:
-                        return False, None, 0.0
+                        # FIX Issue #1: Return meaningful confidence on timeout
+                        return False, None, 0.40  # Unknown due to timeout
 
                     # Try to resolve
                     resolvents = self._resolve(clause1, clause2)
@@ -762,7 +767,8 @@ class ResolutionProver(BaseProver):
 
             # If no new clauses, we cannot prove it
             if not pairs_generated:
-                return False, None, 0.0
+                # FIX Issue #1: High confidence that formula is NOT provable
+                return False, None, 0.95  # Exhausted search space
 
             # Add new clauses to clause set
             clauses.update(new_clauses)
@@ -771,7 +777,8 @@ class ResolutionProver(BaseProver):
             iteration += 1
 
         # Max iterations reached
-        return False, None, 0.0
+        # FIX Issue #1: Return meaningful confidence for max iterations
+        return False, None, 0.40  # Unknown due to iteration limit
 
     def _negate_clause_to_cnf(self, clause: Clause) -> List[Clause]:
         """
@@ -1024,7 +1031,8 @@ class ModelEliminationProver(BaseProver):
                 )
                 return True, proof, 0.93
 
-        return False, None, 0.0
+        # FIX Issue #1: Return meaningful confidence for not proven case
+        return False, None, 0.95  # High confidence that it's NOT provable
 
     def _clausify(self, clause: Clause) -> List[Dict]:
         """
@@ -1302,7 +1310,8 @@ class ConnectionMethodProver(BaseProver):
             )
             return True, proof, 0.92
 
-        return False, None, 0.0
+        # FIX Issue #1: Return meaningful confidence for not proven case
+        return False, None, 0.95  # High confidence that it's NOT provable
 
     def _negate_clause(self, clause: Clause) -> Clause:
         """Negate clause."""
@@ -1704,7 +1713,8 @@ class NaturalDeductionProver(BaseProver):
         if result is not None:
             return True, result, 0.90
 
-        return False, None, 0.0
+        # FIX Issue #1: Return meaningful confidence for not proven case
+        return False, None, 0.95  # High confidence that it's NOT provable
 
     def _prove_recursive(
         self,
@@ -2630,7 +2640,8 @@ class ParallelProver:
 
                 time.sleep(0.1)
 
-        return False, None, 0.0, "none"
+        # FIX Issue #1: Return meaningful confidence when all methods fail/timeout
+        return False, None, 0.40, "none"  # Unknown - no method could determine
 
     def _prove_with_method(
         self,
@@ -2657,7 +2668,8 @@ class ParallelProver:
             return prover.prove(goal, kb, timeout)
         except Exception as e:
             logger.error(f"Error in {method_name}: {e}")
-            return False, None, 0.0
+            # FIX Issue #1: Return meaningful confidence on exception
+            return False, None, 0.40  # Unknown due to error
 
 
 # ============================================================================

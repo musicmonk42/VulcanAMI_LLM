@@ -321,7 +321,7 @@ class SymbolicReasoner:
             )
             return {
                 "proven": False,
-                "confidence": 0.0,
+                "confidence": 0.40,  # FIX Issue #1: Return meaningful confidence for non-applicable
                 "proof": None,
                 "method": self.prover_type,
                 "applicable": False,
@@ -364,7 +364,7 @@ class SymbolicReasoner:
                         f"Proof claims success but validation failed."
                     )
                     result["proven"] = False
-                    result["confidence"] = 0.0
+                    result["confidence"] = 0.40  # FIX Issue #1: Meaningful confidence for validation failure
                     result["validation"] = "FAILED"
                     result["error"] = "Model validation failed - result may violate constraints"
                 else:

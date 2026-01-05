@@ -106,6 +106,84 @@ except ImportError:
 
 
 # ============================================================================
+# UNICODE EXPRESSION EXTRACTION (Issue #2 Fix)
+# ============================================================================
+
+
+def extract_math_expression(query: str) -> Optional[str]:
+    """
+    Extract mathematical expressions from query text.
+    
+    FIX Issue #2: Handles Unicode math symbols that were previously not extracted.
+    
+    Handles:
+    - Unicode math: ∑, ∏, ∫, √, π
+    - LaTeX-style: \\sum_{k=1}^n
+    - Probability: P(X|Y)
+    - Standard algebraic: x^2 + 2x + 1
+    
+    Args:
+        query: Input query text
+        
+    Returns:
+        Extracted mathematical expression, or None if not found
+    """
+    if not query or not query.strip():
+        return None
+    
+    # Pattern 1: Unicode math symbols (∑, ∏, ∫, √, π)
+    # Matches: "∑_{k=1}^n (2k-1)" or "∫_0^1 x dx"
+    unicode_pattern = r'[∑∏∫√π][\w\d\s+\-*/()^._{}\|,<>=]+'
+    match = re.search(unicode_pattern, query)
+    if match:
+        # Get from symbol to end of line or period
+        start = match.start()
+        rest = query[start:]
+        # Find natural boundary (newline, period, "Task:", "Then")
+        for boundary in ['\n', '.', 'Task:', 'Then', 'and verify']:
+            if boundary in rest:
+                rest = rest.split(boundary)[0]
+                break
+        return rest.strip()
+    
+    # Pattern 2: Probability notation P(X|Y), P(A ∧ B)
+    prob_pattern = r'P\s*\([^)]+\)'
+    match = re.search(prob_pattern, query)
+    if match:
+        return match.group(0)
+    
+    # Pattern 3: LaTeX-style \sum_{k=1}^{n}, \frac{a}{b}
+    latex_pattern = r'\\[a-z]+(\{[^}]*\})*'
+    match = re.search(latex_pattern, query)
+    if match:
+        return match.group(0)
+    
+    # Pattern 4: "Compute:" or "Calculate:" followed by expression
+    compute_pattern = r'(?:Compute|Calculate|Evaluate|Solve|Verify)[\s:]+([^\n]+)'
+    match = re.search(compute_pattern, query, re.IGNORECASE)
+    if match:
+        candidate = match.group(1).strip()
+        # Recursively extract from this substring
+        recursive_result = extract_math_expression(candidate)
+        if recursive_result:
+            return recursive_result
+        return candidate
+    
+    # Pattern 5: Standard algebraic (fallback)
+    algebra_pattern = r'[a-zA-Z0-9+\-*/()^._\s]+'
+    match = re.search(algebra_pattern, query)
+    if match:
+        expr = match.group(0).strip()
+        # Must contain operators or single-letter variables
+        has_ops = any(op in expr for op in ['+', '-', '*', '/', '^', '('])
+        has_vars = any(c.isalpha() and len(c) == 1 for c in expr.split())
+        if has_ops or has_vars:
+            return expr
+    
+    return None
+
+
+# ============================================================================
 # PROBLEM CLASSIFIER
 # ============================================================================
 
@@ -1309,6 +1387,8 @@ __all__ = [
     "CodeTemplates",
     # Factory
     "create_mathematical_computation_tool",
+    # Expression extraction (Issue #2 Fix)
+    "extract_math_expression",
     # Module status
     "SAFE_EXECUTION_AVAILABLE",
 ]

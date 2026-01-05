@@ -1786,12 +1786,16 @@ class ProbabilisticReasoner(EnhancedProbabilisticReasoner):
     
     def _is_probability_query(self, query: str) -> bool:
         """
-        FIX #1: Gate check to determine if query involves probability concepts.
+        FIX Issue #3: Relaxed gate check to accept more probability queries.
         
-        This prevents wasting computation on queries like "What color is the sky?"
-        that have nothing to do with probability reasoning.
+        Check if query involves probability concepts.
         
-        Uses word boundary matching to avoid false positives (e.g., "exchange" matching "chance").
+        Returns True if query mentions:
+        - Probability notation: P(X), P(X|Y)
+        - Bayes theorem keywords
+        - Statistical concepts
+        - Uncertainty quantification
+        - Percentage or rate patterns
         
         Args:
             query: The input query string
@@ -1802,31 +1806,51 @@ class ProbabilisticReasoner(EnhancedProbabilisticReasoner):
         if not isinstance(query, str):
             return False
         
-        # Check for probability keywords using word-boundary pattern
-        # This avoids false positives like "exchange" matching "chance"
-        if ProbabilisticReasoner._PROBABILITY_KEYWORDS_PATTERN is not None:
-            if ProbabilisticReasoner._PROBABILITY_KEYWORDS_PATTERN.search(query):
+        query_lower = query.lower()
+        
+        # FIX Issue #3: Expanded probability keywords for more permissive matching
+        prob_keywords = [
+            'probability', 'P(', 'p(',
+            'bayes', 'bayesian',
+            'prior', 'posterior', 'likelihood',
+            'sensitivity', 'specificity', 'prevalence',
+            'conditional', 'joint probability',
+            'false positive', 'false negative',
+            'true positive', 'true negative',
+            'odds', 'chance',
+            'random', 'stochastic',
+            'distribution', 'expected',
+            'variance', 'deviation', 'mean',
+            'confidence interval', 'p-value',
+            'uncertain', 'percent', 'rate',
+            'frequency', 'sample', 'proportion',
+            'risk', 'predictive',
+        ]
+        
+        # Check for keywords
+        for keyword in prob_keywords:
+            if keyword in query_lower:
                 return True
         
+        # Check for probability notation in original query (case-sensitive)
+        # Matches P(X), P(X|Y), P(A ∧ B), etc.
+        prob_notation = r'P\s*\([^)]+\)'
+        if re.search(prob_notation, query):
+            return True
+        
         # Check for percentage patterns (e.g., "50%", "0.5%", ".5%")
-        # Pattern matches: 50%, 0.5%, .5%, etc.
         if re.search(r'(?:\d+\.?\d*|\.\d+)\s*%', query):
             return True
         
-        # Check for probability notation (e.g., "P(A|B)")
-        if re.search(r'P\s*\([^)]*\)', query):
-            return True
-        
-        # Check for multi-word probability phrases
-        query_lower = query.lower()
-        probability_phrases = [
-            'false positive', 'true positive', 'false negative', 'true negative',
-            'base rate', 'confidence interval', 'standard deviation'
-        ]
-        for phrase in probability_phrases:
-            if phrase in query_lower:
+        # Check for decimal probability values (e.g., "0.99", ".95", "0.01")
+        # These often indicate probability values
+        if re.search(r'\b0\.\d+\b|\.\d+\b', query):
+            # Additional check: query should mention something probability-related
+            # This avoids matching random decimals in non-probability contexts
+            if any(word in query_lower for word in ['test', 'rate', 'given', 'if', 'when', 'disease', 'positive', 'negative']):
                 return True
         
+        # Default: not a probability query
         return False
 
     def _is_simple_probability_query(self, query: str) -> bool:
