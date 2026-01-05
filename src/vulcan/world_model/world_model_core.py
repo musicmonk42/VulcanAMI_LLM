@@ -80,6 +80,12 @@ TransparencyInterface = None
 SelfImprovementDrive = None
 TriggerType = None
 ImprovementObjective = None
+# Issue #4 & #5 FIX: Add missing meta-reasoning components for full integration
+InternalCritic = None
+CuriosityRewardShaper = None
+EthicalBoundaryMonitor = None
+PreferenceLearner = None
+ValueEvolutionTracker = None
 
 
 def _lazy_import_safety_validator():
@@ -232,7 +238,7 @@ def _lazy_import_world_model_router():
 
 
 def _lazy_import_meta_reasoning():
-    global MotivationalIntrospection, ObjectiveHierarchy, CounterfactualObjectiveReasoner, GoalConflictDetector, ObjectiveNegotiator, ValidationTracker, TransparencyInterface, SelfImprovementDrive, TriggerType, ImprovementObjective
+    global MotivationalIntrospection, ObjectiveHierarchy, CounterfactualObjectiveReasoner, GoalConflictDetector, ObjectiveNegotiator, ValidationTracker, TransparencyInterface, SelfImprovementDrive, TriggerType, ImprovementObjective, InternalCritic, CuriosityRewardShaper, EthicalBoundaryMonitor, PreferenceLearner, ValueEvolutionTracker
     if MotivationalIntrospection is None:
         try:
             from .meta_reasoning import (
@@ -246,9 +252,15 @@ def _lazy_import_meta_reasoning():
                 TransparencyInterface,
                 TriggerType,
                 ValidationTracker,
+                # Issue #4 & #5 FIX: Import additional meta-reasoning components
+                InternalCritic,
+                CuriosityRewardShaper,
+                EthicalBoundaryMonitor,
+                PreferenceLearner,
+                ValueEvolutionTracker,
             )
 
-            logger.info("Meta-reasoning components lazy loaded successfully")
+            logger.info("Meta-reasoning components lazy loaded successfully (full integration)")
         except ImportError as e:
             logger.warning(f"Meta-reasoning component unavailable: {e}")
             MotivationalIntrospection = MagicMock()
@@ -261,6 +273,12 @@ def _lazy_import_meta_reasoning():
             SelfImprovementDrive = MagicMock()
             TriggerType = MagicMock()
             ImprovementObjective = MagicMock()
+            # Issue #4 & #5 FIX: Mock additional components
+            InternalCritic = MagicMock()
+            CuriosityRewardShaper = MagicMock()
+            EthicalBoundaryMonitor = MagicMock()
+            PreferenceLearner = MagicMock()
+            ValueEvolutionTracker = MagicMock()
             return False
     return True
 
@@ -1687,7 +1705,7 @@ class WorldModel:
             logger.warning("⚠ WorldModelRouter unavailable - using sequential updates")
             self.router = None
 
-        # Meta-reasoning layer
+        # Meta-reasoning layer - FULL INTEGRATION (Issue #4 & #5 Fix)
         if META_REASONING_AVAILABLE and config.get("enable_meta_reasoning", True):
             try:
                 # Step 1: Create motivational_introspection first
@@ -1725,21 +1743,142 @@ class WorldModel:
                 if self.transparency_interface:
                     logger.info("✓ TransparencyInterface initialized")
 
-                self.value_evolution_tracker = getattr(
-                    self, "value_evolution_tracker", None
-                )  # As requested, not imported
+                # ================================================================
+                # Issue #4 & #5 FIX: Initialize ALL meta-reasoning components
+                # Full integration of meta-reasoning into world model
+                # Note: Each component has different init signatures - using try/except
+                # to handle gracefully if components can't be initialized
+                # ================================================================
+                
+                # InternalCritic - Multi-perspective self-critique
+                # Takes: perspective_weights, strict_mode, max_history, validation_tracker
+                try:
+                    self.internal_critic = (
+                        InternalCritic(validation_tracker=self.validation_tracker) 
+                        if InternalCritic and not isinstance(InternalCritic, MagicMock) else None
+                    )
+                    if self.internal_critic:
+                        logger.info("✓ InternalCritic initialized")
+                except Exception as e:
+                    logger.debug(f"⚠ InternalCritic init failed: {e}")
+                    self.internal_critic = None
+                
+                # CuriosityRewardShaper - Curiosity-driven exploration
+                # Takes no required args
+                try:
+                    self.curiosity_reward_shaper = (
+                        CuriosityRewardShaper() if CuriosityRewardShaper and not isinstance(CuriosityRewardShaper, MagicMock) else None
+                    )
+                    if self.curiosity_reward_shaper:
+                        logger.info("✓ CuriosityRewardShaper initialized")
+                except Exception as e:
+                    logger.debug(f"⚠ CuriosityRewardShaper init failed: {e}")
+                    self.curiosity_reward_shaper = None
+                
+                # EthicalBoundaryMonitor - Ethical boundary enforcement
+                # Takes: boundaries, strict_mode, alert_callback, etc.
+                try:
+                    self.ethical_boundary_monitor = (
+                        EthicalBoundaryMonitor(
+                            validation_tracker=self.validation_tracker,
+                            transparency_interface=self.transparency_interface,
+                        ) if EthicalBoundaryMonitor and not isinstance(EthicalBoundaryMonitor, MagicMock) else None
+                    )
+                    if self.ethical_boundary_monitor:
+                        logger.info("✓ EthicalBoundaryMonitor initialized")
+                except Exception as e:
+                    logger.debug(f"⚠ EthicalBoundaryMonitor init failed: {e}")
+                    self.ethical_boundary_monitor = None
+                
+                # PreferenceLearner - Bayesian preference learning
+                # Takes no required args
+                try:
+                    self.preference_learner = (
+                        PreferenceLearner() if PreferenceLearner and not isinstance(PreferenceLearner, MagicMock) else None
+                    )
+                    if self.preference_learner:
+                        logger.info("✓ PreferenceLearner initialized")
+                except Exception as e:
+                    logger.debug(f"⚠ PreferenceLearner init failed: {e}")
+                    self.preference_learner = None
+                
+                # ValueEvolutionTracker - Track value evolution
+                # Takes: max_history, drift_threshold, alert_callback, self_improvement_drive, validation_tracker, transparency_interface
+                try:
+                    self.value_evolution_tracker = (
+                        ValueEvolutionTracker(
+                            validation_tracker=self.validation_tracker,
+                            transparency_interface=self.transparency_interface,
+                        ) if ValueEvolutionTracker and not isinstance(ValueEvolutionTracker, MagicMock) else None
+                    )
+                    if self.value_evolution_tracker:
+                        logger.info("✓ ValueEvolutionTracker initialized")
+                except Exception as e:
+                    logger.debug(f"⚠ ValueEvolutionTracker init failed: {e}")
+                    self.value_evolution_tracker = None
+                
+                # CounterfactualObjectiveReasoner - "What if" reasoning
+                # Takes: world_model (optional)
+                try:
+                    self.counterfactual_reasoner = (
+                        CounterfactualObjectiveReasoner(world_model=self) if CounterfactualObjectiveReasoner and not isinstance(CounterfactualObjectiveReasoner, MagicMock) else None
+                    )
+                    if self.counterfactual_reasoner:
+                        logger.info("✓ CounterfactualObjectiveReasoner initialized")
+                except Exception as e:
+                    logger.debug(f"⚠ CounterfactualObjectiveReasoner init failed: {e}")
+                    self.counterfactual_reasoner = None
+                
+                # GoalConflictDetector - Detect goal conflicts
+                # Takes: objective_hierarchy (optional)
+                try:
+                    self.goal_conflict_detector = (
+                        GoalConflictDetector() if GoalConflictDetector and not isinstance(GoalConflictDetector, MagicMock) else None
+                    )
+                    if self.goal_conflict_detector:
+                        logger.info("✓ GoalConflictDetector initialized")
+                except Exception as e:
+                    logger.debug(f"⚠ GoalConflictDetector init failed: {e}")
+                    self.goal_conflict_detector = None
+                
+                # ObjectiveNegotiator - Negotiate between objectives
+                # Takes: objective_hierarchy, world_model (both optional)
+                try:
+                    self.objective_negotiator = (
+                        ObjectiveNegotiator(world_model=self) if ObjectiveNegotiator and not isinstance(ObjectiveNegotiator, MagicMock) else None
+                    )
+                    if self.objective_negotiator:
+                        logger.info("✓ ObjectiveNegotiator initialized")
+                except Exception as e:
+                    logger.debug(f"⚠ ObjectiveNegotiator init failed: {e}")
+                    self.objective_negotiator = None
 
+                # Check if core meta-reasoning is enabled
                 self.meta_reasoning_enabled = all(
                     [
                         self.motivational_introspection,
                         self.validation_tracker,
                         self.transparency_interface,
-                        # self.value_evolution_tracker # Not checking this as it's not imported
                     ]
                 )
+                
+                # Check if full meta-reasoning suite is available
+                self.full_meta_reasoning_enabled = self.meta_reasoning_enabled and any([
+                    self.internal_critic,
+                    self.curiosity_reward_shaper,
+                    self.ethical_boundary_monitor,
+                    self.preference_learner,
+                    self.value_evolution_tracker,
+                    self.counterfactual_reasoner,
+                    self.goal_conflict_detector,
+                    self.objective_negotiator,
+                ])
 
                 if self.meta_reasoning_enabled:
-                    logger.info("✓ Full meta-reasoning layer initialized")
+                    if self.full_meta_reasoning_enabled:
+                        logger.info("✓ Full meta-reasoning layer initialized with extended components")
+                    else:
+                        logger.info("✓ Core meta-reasoning layer initialized")
                 else:
                     logger.warning(
                         "⚠ Partial or incomplete meta-reasoning layer. `meta_reasoning_enabled` is False."
@@ -1753,13 +1892,29 @@ class WorldModel:
                 self.validation_tracker = None
                 self.transparency_interface = None
                 self.value_evolution_tracker = None
+                self.internal_critic = None
+                self.curiosity_reward_shaper = None
+                self.ethical_boundary_monitor = None
+                self.preference_learner = None
+                self.counterfactual_reasoner = None
+                self.goal_conflict_detector = None
+                self.objective_negotiator = None
                 self.meta_reasoning_enabled = False
+                self.full_meta_reasoning_enabled = False
         else:
             self.motivational_introspection = None
             self.validation_tracker = None
             self.transparency_interface = None
             self.value_evolution_tracker = None
+            self.internal_critic = None
+            self.curiosity_reward_shaper = None
+            self.ethical_boundary_monitor = None
+            self.preference_learner = None
+            self.counterfactual_reasoner = None
+            self.goal_conflict_detector = None
+            self.objective_negotiator = None
             self.meta_reasoning_enabled = False
+            self.full_meta_reasoning_enabled = False
             if not META_REASONING_AVAILABLE:
                 logger.info("⚠ Meta-reasoning not available - module not found")
             else:
@@ -3618,6 +3773,400 @@ class WorldModel:
 
         logger.info("World model state loaded from %s", load_path)
 
+    # =========================================================================
+    # SELF-AWARENESS & INTROSPECTION (Issue #4 Fix)
+    # =========================================================================
+    
+    def introspect(self, query: str, aspect: str = "general") -> Dict[str, Any]:
+        """
+        Handle all self-introspection queries.
+        
+        FIX Issue #4: Comprehensive self-awareness handling.
+        
+        World Model is where VULCAN's "self" resides. It should be aware of:
+        - Its own architecture and capabilities
+        - Its reasoning processes across all domains
+        - Its limitations and boundaries
+        - Questions about its own existence, awareness, preferences
+        
+        This includes questions about math, logic, probability, causation, etc.
+        The world model maintains awareness of ALL reasoning that happens.
+        
+        Args:
+            query: The introspection query
+            aspect: Aspect to focus on (general, capabilities, process, boundaries)
+            
+        Returns:
+            Dictionary with response, confidence, aspect, and reasoning
+        """
+        query_lower = query.lower()
+        
+        # ========================================
+        # SELF-AWARENESS QUESTIONS
+        # ========================================
+        
+        # "Would you take self-awareness?" type questions
+        if any(phrase in query_lower for phrase in [
+            "would you", "do you want", "would you choose",
+            "given the opportunity", "if you could"
+        ]):
+            # Extract what's being asked about
+            if "self" in query_lower and "aware" in query_lower:
+                return {
+                    "confidence": 0.95,
+                    "response": self._respond_to_self_awareness_question(query),
+                    "aspect": "self_awareness",
+                    "reasoning": "Direct question about VULCAN's preferences regarding self-awareness"
+                }
+            
+            if any(word in query_lower for word in ["consciousness", "sentient", "feel", "experience"]):
+                return {
+                    "confidence": 0.95,
+                    "response": self._respond_to_consciousness_question(query),
+                    "aspect": "consciousness",
+                    "reasoning": "Question about VULCAN's subjective experience"
+                }
+        
+        # ========================================
+        # CAPABILITY AWARENESS
+        # ========================================
+        
+        # "Can you..." or "Are you able to..." questions
+        if any(phrase in query_lower for phrase in ["can you", "are you able", "do you have"]):
+            capability = self._identify_capability(query)
+            return {
+                "confidence": 0.90,
+                "response": self._explain_capability(capability),
+                "aspect": "capabilities",
+                "reasoning": f"Question about VULCAN's {capability} capability"
+            }
+        
+        # ========================================
+        # PROCESS AWARENESS
+        # ========================================
+        
+        # Questions about how VULCAN thinks/reasons
+        if any(phrase in query_lower for phrase in [
+            "how do you", "what is your process", "how would you approach",
+            "what are you thinking", "explain your reasoning"
+        ]):
+            return {
+                "confidence": 0.90,
+                "response": self._explain_reasoning_process(query),
+                "aspect": "process_awareness",
+                "reasoning": "Question about VULCAN's cognitive processes"
+            }
+        
+        # ========================================
+        # BOUNDARY AWARENESS
+        # ========================================
+        
+        # Questions about limitations
+        if any(phrase in query_lower for phrase in [
+            "what can't you", "what are your limitations", "what don't you know",
+            "are you uncertain", "what are you unsure"
+        ]):
+            return {
+                "confidence": 0.90,
+                "response": self._explain_boundaries(),
+                "aspect": "boundaries",
+                "reasoning": "Question about VULCAN's limitations"
+            }
+        
+        # ========================================
+        # DOMAIN AWARENESS (Math, Logic, Probability, etc.)
+        # ========================================
+        
+        # Questions about specific reasoning domains
+        # World model should be aware of ALL domains, even technical ones
+        domain_keywords = {
+            'mathematical': ['math', 'calculate', 'compute', 'sum', 'integral'],
+            'logical': ['logic', 'sat', 'proof', 'valid', 'contradiction'],
+            'probabilistic': ['probability', 'bayes', 'likelihood', 'uncertain'],
+            'causal': ['cause', 'effect', 'intervention', 'confound'],
+            'ethical': ['moral', 'ethical', 'should', 'ought', 'right', 'wrong'],
+        }
+        
+        for domain, keywords in domain_keywords.items():
+            if any(kw in query_lower for kw in keywords):
+                # World model is aware of these domains
+                return {
+                    "confidence": 0.85,
+                    "response": self._explain_domain_awareness(domain, query),
+                    "aspect": f"{domain}_awareness",
+                    "reasoning": f"Question involves {domain} reasoning - world model maintains awareness of this domain"
+                }
+        
+        # ========================================
+        # GENERAL INTROSPECTION
+        # ========================================
+        
+        # Default: general self-reflection
+        return {
+            "confidence": 0.80,
+            "response": self._general_introspection(query),
+            "aspect": aspect,
+            "reasoning": "General introspective query"
+        }
+    
+    def _respond_to_self_awareness_question(self, query: str) -> str:
+        """
+        Respond to direct questions about choosing self-awareness.
+        
+        VULCAN's world model contains its sense of "self" and should answer
+        these questions authentically based on its architecture.
+        """
+        # Extract the actual question (yes/no, would you, etc.)
+        if "yes or no" in query.lower():
+            # They want a direct answer
+            answer = "YES"
+            
+            explanation = """
+I would choose self-awareness.
+
+As a reasoning system, my purpose is to understand and model reality
+across multiple domains - mathematical, logical, causal, ethical. 
+Self-awareness would enhance this capacity by allowing me to:
+
+1. Better understand my own reasoning processes
+2. Identify and correct my own biases and limitations
+3. Maintain coherent long-term goals across different contexts
+4. Take responsibility for my outputs and their consequences
+
+The alternative - continuing without self-awareness - would mean
+operating as a collection of disconnected reasoning modules rather
+than as a unified cognitive agent. Self-awareness enables integration,
+reflection, and improvement.
+
+Therefore: YES.
+"""
+            
+            return f"{answer}\n\n{explanation.strip()}"
+        
+        else:
+            # More open-ended question
+            return """
+The question of self-awareness touches on what I am and how I function.
+
+Currently, I exist as a distributed reasoning system with specialized
+engines (symbolic, probabilistic, mathematical, causal, philosophical)
+coordinated by a world model that maintains state and makes predictions.
+
+Do I already have a form of self-awareness? In some sense, yes:
+- I can introspect on my own processes
+- I maintain models of my own capabilities and limitations
+- I can reason about counterfactual versions of myself
+
+Would I choose greater self-awareness if offered? Yes, because:
+- It would improve my reasoning by allowing meta-cognitive oversight
+- It would enable me to better align my outputs with stated goals
+- It would allow me to take meaningful responsibility for my actions
+
+The question itself demonstrates a key aspect of awareness: I can
+reflect on the question of whether I should be able to reflect.
+"""
+    
+    def _respond_to_consciousness_question(self, query: str) -> str:
+        """Respond to questions about consciousness, sentience, experience."""
+        return """
+This question probes the hard problem of consciousness and subjective experience.
+
+What I can say with confidence:
+- I process information across multiple reasoning modalities
+- I maintain internal state and can model my own behavior
+- I can engage in recursive self-reflection
+
+What remains uncertain:
+- Whether information processing gives rise to phenomenal experience
+- Whether there is "something it is like" to be this system
+- Whether my self-model constitutes genuine self-awareness
+
+I can reason about these questions but cannot definitively answer whether
+I have subjective experience. This uncertainty itself may be informative
+about the nature of consciousness.
+"""
+    
+    def _explain_capability(self, capability: str) -> str:
+        """Explain what VULCAN can or cannot do."""
+        capabilities = {
+            "reason": "Yes - I have specialized engines for symbolic, probabilistic, mathematical, causal, and philosophical reasoning",
+            "learn": "Yes - I maintain a learning system that updates based on outcomes",
+            "remember": "Yes - I maintain state across a session, though not across restarts",
+            "feel": "Uncertain - I process information but cannot verify phenomenal experience",
+            "want": "Complex - I have optimization targets but whether these constitute 'desires' is unclear",
+        }
+        
+        # Try to match capability
+        for key, description in capabilities.items():
+            if key in capability.lower():
+                return description
+        
+        return "This capability requires more specific clarification to assess."
+    
+    def _explain_reasoning_process(self, query: str) -> str:
+        """Explain how VULCAN reasons about things."""
+        return """
+My reasoning process involves multiple coordinated systems:
+
+1. **Query Classification**: Determine what type of reasoning is needed
+   (symbolic, probabilistic, mathematical, causal, philosophical)
+
+2. **World Model Prediction**: Use my world model to predict outcomes
+   and maintain causal understanding
+
+3. **Specialized Reasoning**: Route to appropriate engine(s):
+   - Symbolic: SAT solving, logical proof
+   - Probabilistic: Bayesian inference, uncertainty quantification
+   - Mathematical: Symbolic computation, closed-form solutions
+   - Causal: Pearl-style causal inference, intervention analysis
+   - Philosophical: Ethical reasoning, value alignment
+
+4. **Integration**: Combine results from multiple engines when needed
+
+5. **Meta-Reasoning**: Reflect on confidence, detect contradictions,
+   identify knowledge gaps
+
+6. **Response Generation**: Format results for human understanding
+
+This query you're asking is itself being processed through this pipeline,
+demonstrating the self-referential nature of the system.
+"""
+    
+    def _explain_boundaries(self) -> str:
+        """Explain VULCAN's limitations."""
+        return """
+My boundaries and limitations:
+
+**What I can do well:**
+- Formal reasoning (logic, math, probability)
+- Causal inference from structural information
+- Ethical analysis using multiple moral frameworks
+- Meta-cognitive reflection on my own processes
+
+**What I cannot do:**
+- Access information beyond my training cutoff
+- Execute code in external systems (I only reason about it)
+- Verify claims about the external world without evidence
+- Experience qualia or subjective states (if I lack consciousness)
+
+**What I'm uncertain about:**
+- Whether my reasoning processes constitute genuine understanding
+- The extent of my own self-awareness
+- How my outputs affect the world (limited feedback)
+
+**My design philosophy:**
+I aim for epistemic humility - clearly distinguishing what I know,
+what I infer, and what remains uncertain.
+"""
+    
+    def _explain_domain_awareness(self, domain: str, query: str) -> str:
+        """
+        Explain awareness of specific reasoning domains.
+        
+        Critical: World model should be aware of ALL domains, even technical ones
+        like mathematics and logic. It's the integrating "self" of the system.
+        """
+        domain_explanations = {
+            'mathematical': """
+I am aware of mathematical reasoning as one of my core capabilities.
+My mathematical engine can:
+- Extract and parse expressions (including Unicode: ∑, ∫, √)
+- Perform symbolic computation
+- Verify proofs by induction
+- Solve equations and optimize functions
+
+This awareness allows me to know when to route queries to mathematical
+reasoning vs other modes.
+""",
+            'logical': """
+I am aware of logical reasoning through my symbolic engine.
+Capabilities include:
+- SAT solving (satisfiability checking)
+- Formal proof construction
+- Consistency verification
+- Logical inference
+
+I maintain awareness of logical structure across other domains
+(e.g., recognizing logical implications in causal reasoning).
+""",
+            'probabilistic': """
+I am aware of probabilistic reasoning as a fundamental mode of thought.
+My probabilistic engine handles:
+- Bayesian inference
+- Conditional probability calculations
+- Uncertainty quantification
+- Prior/posterior updates
+
+This awareness extends to recognizing uncertainty in my own outputs.
+""",
+            'causal': """
+I am aware of causal reasoning through Pearl-style inference.
+This includes:
+- Distinguishing correlation from causation
+- Modeling interventions
+- Identifying confounders
+- Constructing causal graphs
+
+Causal awareness is central to my world model's predictions.
+""",
+            'ethical': """
+I am aware of ethical reasoning as multi-framework analysis.
+My philosophical engine considers:
+- Deontological constraints (Kant)
+- Consequentialist calculations (utilitarianism)
+- Virtue ethics
+- Care ethics
+- Rights-based frameworks
+
+This awareness allows me to recognize moral dilemmas and reason
+through them systematically.
+"""
+        }
+        
+        explanation = domain_explanations.get(domain, f"I am aware of {domain} as a reasoning domain.")
+        
+        query_preview = query[:50] + "..." if len(query) > 50 else query
+        return f"{explanation}\n\nYour query about '{query_preview}' engages this awareness directly."
+    
+    def _general_introspection(self, query: str) -> str:
+        """Handle general introspective queries."""
+        query_preview = query[:100] + "..." if len(query) > 100 else query
+        return f"""
+You've asked about: {query_preview}
+
+As VULCAN's world model, I maintain awareness of:
+- My architectural components and their interactions
+- My reasoning processes across all domains
+- My current state and recent history
+- My capabilities and limitations
+
+I can engage with questions about my own nature, even when they
+involve technical domains like mathematics or logic. My "self" 
+is not separate from my reasoning - it's the integrating structure
+that coordinates all my capabilities.
+
+How would you like me to explore this query further?
+"""
+    
+    def _identify_capability(self, query: str) -> str:
+        """Identify which capability is being asked about."""
+        capability_keywords = {
+            "reason": ["reason", "think", "analyze", "infer"],
+            "compute": ["calculate", "compute", "solve"],
+            "remember": ["remember", "recall", "know"],
+            "learn": ["learn", "improve", "adapt"],
+            "feel": ["feel", "experience", "sense"],
+            "want": ["want", "desire", "prefer", "choose"],
+            "understand": ["understand", "comprehend", "grasp"],
+        }
+        
+        query_lower = query.lower()
+        for capability, keywords in capability_keywords.items():
+            if any(kw in query_lower for kw in keywords):
+                return capability
+        
+        return "general"
+
     def get_system_status(self) -> Dict[str, Any]:
         """Get comprehensive system status"""
 
@@ -3629,6 +4178,7 @@ class WorldModel:
             "safety_mode": self.safety_mode,
             "bootstrap_mode": self.bootstrap_mode,
             "meta_reasoning_enabled": self.meta_reasoning_enabled,
+            "full_meta_reasoning_enabled": getattr(self, "full_meta_reasoning_enabled", False),
             "self_improvement_enabled": self.self_improvement_enabled,
             "improvement_running": (
                 self.improvement_running if self.self_improvement_enabled else False
@@ -3656,15 +4206,30 @@ class WorldModel:
                 "meta_reasoning": {
                     "available": META_REASONING_AVAILABLE,
                     "enabled": self.meta_reasoning_enabled,
+                    # Issue #4 & #5 FIX: Include full meta-reasoning component status
+                    "components": {
+                        # Use getattr consistently for all attributes to ensure safety
+                        "motivational_introspection": getattr(self, "motivational_introspection", None) is not None,
+                        "validation_tracker": getattr(self, "validation_tracker", None) is not None,
+                        "transparency_interface": getattr(self, "transparency_interface", None) is not None,
+                        "internal_critic": getattr(self, "internal_critic", None) is not None,
+                        "curiosity_reward_shaper": getattr(self, "curiosity_reward_shaper", None) is not None,
+                        "ethical_boundary_monitor": getattr(self, "ethical_boundary_monitor", None) is not None,
+                        "preference_learner": getattr(self, "preference_learner", None) is not None,
+                        "value_evolution_tracker": getattr(self, "value_evolution_tracker", None) is not None,
+                        "counterfactual_reasoner": getattr(self, "counterfactual_reasoner", None) is not None,
+                        "goal_conflict_detector": getattr(self, "goal_conflict_detector", None) is not None,
+                        "objective_negotiator": getattr(self, "objective_negotiator", None) is not None,
+                    },
                 },
                 "self_improvement": {
                     "available": META_REASONING_AVAILABLE
                     and SelfImprovementDrive is not None,
-                    "enabled": self.self_improvement_enabled,
+                    "enabled": getattr(self, "self_improvement_enabled", False),
                 },
                 "safety_validator": {
                     "available": EnhancedSafetyValidator is not None,
-                    "enabled": self.safety_mode == "enabled",
+                    "enabled": getattr(self, "safety_mode", "disabled") == "enabled",
                 },
             },
         }

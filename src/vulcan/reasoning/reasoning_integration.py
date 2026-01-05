@@ -819,6 +819,35 @@ class ReasoningIntegration:
 
         try:
             # =================================================================
+            # Issue #5 FIX: Check for self-referential queries FIRST
+            # =================================================================
+            # World model handles queries about VULCAN's self directly.
+            # For ALL queries that are about VULCAN itself (capabilities,
+            # preferences, self-awareness, etc.), consult world model first.
+            # =================================================================
+            if self._is_self_referential(query):
+                logger.info(f"{LOG_PREFIX} Issue#5 FIX: Self-referential query detected - consulting world model first")
+                wm_result = self._consult_world_model_introspection(query)
+                
+                if wm_result is not None and wm_result.get("confidence", 0) > 0.7:
+                    # World model can handle this directly
+                    selection_time = (time.perf_counter() - selection_start) * 1000
+                    return ReasoningResult(
+                        selected_tools=["world_model"],
+                        reasoning_strategy=ReasoningStrategyType.PHILOSOPHICAL_REASONING.value,
+                        confidence=wm_result["confidence"],
+                        rationale=wm_result.get("reasoning", "World model introspection"),
+                        metadata={
+                            "query_type": query_type,
+                            "complexity": complexity,
+                            "self_referential": True,
+                            "world_model_response": wm_result.get("response", ""),
+                            "aspect": wm_result.get("aspect", "general"),
+                            "selection_time_ms": selection_time,
+                        },
+                    )
+
+            # =================================================================
             # BUG #0 FIX: LLM-BASED QUERY CLASSIFICATION (ROOT CAUSE FIX)
             # =================================================================
             # The problem: "hello" (5 chars) was getting complexity=0.50 from
@@ -1855,6 +1884,111 @@ class ReasoningIntegration:
             return None
         except Exception as e:
             logger.error(f"{LOG_PREFIX} Arena delegation failed: {e}")
+            return None
+
+    # =========================================================================
+    # Issue #5 FIX: Self-Referential Query Handling
+    # =========================================================================
+    
+    def _is_self_referential(self, query: str) -> bool:
+        """
+        Check if query is about VULCAN itself (self-awareness, capabilities, etc.)
+        
+        Issue #5 FIX: Self-referential queries should be routed to the world model's
+        introspection system rather than domain-specific reasoners.
+        
+        Args:
+            query: The query string to analyze
+            
+        Returns:
+            True if query is about VULCAN's self, capabilities, or preferences
+        """
+        if not query:
+            return False
+            
+        query_lower = query.lower()
+        
+        # Keywords indicating self-referential queries
+        self_keywords = [
+            # Direct self-reference
+            "would you", "do you", "are you", "can you",
+            "your", "yourself", "vulcan",
+            # Capability questions
+            "what can you", "what do you", "how do you",
+            "are you able", "do you have", "do you want",
+            # Self-awareness questions
+            "self-aware", "self aware", "consciousness", "sentient",
+            "given the opportunity", "if you could", "would you choose",
+            # Meta-questions about reasoning
+            "how would you approach", "what is your process",
+            "explain your reasoning", "what are you thinking",
+            # Limitation questions
+            "what can't you", "what are your limitations",
+            "what don't you know", "are you uncertain",
+        ]
+        
+        return any(kw in query_lower for kw in self_keywords)
+    
+    def _consult_world_model_introspection(self, query: str) -> Optional[Dict[str, Any]]:
+        """
+        Consult the world model's introspection system for self-referential queries.
+        
+        Issue #5 FIX: Route self-awareness queries to the world model which maintains
+        VULCAN's sense of "self" and can answer questions about capabilities,
+        preferences, and limitations.
+        
+        Args:
+            query: The self-referential query
+            
+        Returns:
+            Introspection result from world model, or None if unavailable
+        """
+        try:
+            # Try to access world model
+            # The world model might be accessible through different paths
+            world_model = None
+            
+            # Path 1: Direct attribute
+            if hasattr(self, 'world_model') and self.world_model is not None:
+                world_model = self.world_model
+            
+            # Path 2: Through tool_selector
+            elif hasattr(self, '_tool_selector') and self._tool_selector is not None:
+                if hasattr(self._tool_selector, 'world_model'):
+                    world_model = self._tool_selector.world_model
+            
+            # Path 3: Use cached world model or create one (avoid repeated initialization)
+            if world_model is None:
+                # Check for cached world model
+                if hasattr(self, '_cached_world_model') and self._cached_world_model is not None:
+                    world_model = self._cached_world_model
+                else:
+                    try:
+                        from vulcan.world_model.world_model_core import create_world_model
+                        # Use minimal config to avoid heavy initialization
+                        world_model = create_world_model({
+                            "enable_meta_reasoning": True,
+                            "enable_self_improvement": False,
+                        })
+                        # Cache for future use
+                        self._cached_world_model = world_model
+                    except ImportError:
+                        logger.debug(f"{LOG_PREFIX} Could not import world model for introspection")
+                        return None
+            
+            # Check if world model has introspect method
+            if world_model is not None and hasattr(world_model, 'introspect'):
+                result = world_model.introspect(query)
+                logger.info(
+                    f"{LOG_PREFIX} World model introspection returned confidence={result.get('confidence', 0)}"
+                )
+                return result
+            else:
+                logger.debug(f"{LOG_PREFIX} World model does not have introspect method")
+                return None
+                
+        except Exception as e:
+            logger.warning(f"{LOG_PREFIX} World model introspection failed: {e}")
             return None
 
     def _create_default_result(
