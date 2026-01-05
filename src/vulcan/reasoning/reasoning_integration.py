@@ -110,6 +110,10 @@ DEFAULT_MIN_CONFIDENCE = 0.5  # Minimum confidence threshold for results
 # This limit ensures we stop retrying after a reasonable number of attempts
 MAX_FALLBACK_ATTEMPTS = 2  # Don't retry more than 2 times per query
 
+# BUG #3 FIX: Minimum confidence floor when all tools fail
+# When all fallback attempts fail, set this minimum floor to allow processing
+MIN_CONFIDENCE_FLOOR = 0.15  # Prevent total query refusal
+
 # Complexity thresholds for strategy selection
 FAST_PATH_COMPLEXITY_THRESHOLD = 0.3  # Below this, use fast path
 LOW_COMPLEXITY_THRESHOLD = 0.4  # Below this, use FAST mode
@@ -1237,7 +1241,8 @@ class ReasoningIntegration:
                     original_tool = selected_tools[0] if selected_tools else 'unknown'
                     
                     # BUG #3 FIX: Check and increment fallback attempt counter
-                    query_hash = hashlib.md5(query.encode()).hexdigest()[:8]
+                    # Using SHA-256 instead of MD5 for security (per code review)
+                    query_hash = hashlib.sha256(query.encode()).hexdigest()[:16]
                     with self._fallback_attempts_lock:
                         current_attempts = self._fallback_attempts.get(query_hash, 0)
                         
@@ -1248,7 +1253,7 @@ class ReasoningIntegration:
                                 f"Stopping retry loop to prevent resource waste."
                             )
                             # Set minimum floor and continue without more retries
-                            confidence = 0.15
+                            confidence = MIN_CONFIDENCE_FLOOR
                         else:
                             # Increment attempt counter
                             self._fallback_attempts[query_hash] = current_attempts + 1
@@ -1326,9 +1331,9 @@ class ReasoningIntegration:
                         if confidence < 0.1:
                             logger.warning(
                                 f"{LOG_PREFIX} All tools returned low confidence. "
-                                f"Setting minimum confidence floor of 0.15 to allow processing."
+                                f"Setting minimum confidence floor of {MIN_CONFIDENCE_FLOOR} to allow processing."
                             )
-                            confidence = 0.15  # Minimum floor to prevent total refusal
+                            confidence = MIN_CONFIDENCE_FLOOR  # Minimum floor to prevent total refusal
 
             except ImportError as e:
                 logger.warning(f"{LOG_PREFIX} ToolSelector imports unavailable: {e}")

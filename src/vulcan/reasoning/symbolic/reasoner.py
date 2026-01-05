@@ -102,6 +102,10 @@ class SymbolicReasoner:
         >>> result = reasoner.query("mortal(socrates)")
     """
 
+    # BUG #4 FIX: Constants for symbolic query detection
+    # Minimum number of logic keywords required to classify as symbolic
+    MIN_LOGIC_KEYWORDS = 2
+
     def __init__(self, prover_type: str = "parallel"):
         """
         Initialize symbolic reasoner.
@@ -182,14 +186,15 @@ class SymbolicReasoner:
         if has_ascii_ops:
             return True
         
-        # Check for logic keywords (need at least 2 for confidence)
+        # Check for logic keywords (need at least MIN_LOGIC_KEYWORDS for confidence)
         keyword_count = sum(1 for kw in logic_keywords if kw in query_lower)
-        if keyword_count >= 2:
+        if keyword_count >= self.MIN_LOGIC_KEYWORDS:
             return True
         
         # Check for formal notation patterns like "A→B", "P(x)", "∀X"
         # Pattern: uppercase letter followed by logic operator followed by uppercase letter
-        formal_pattern = re.search(r'\b[A-Z]\s*[-→∧∨¬]\s*[A-Z]\b', query)
+        # Note: Using raw string with explicit Unicode characters for cross-platform compatibility
+        formal_pattern = re.search(r'\b[A-Z]\s*[-\u2192\u2227\u2228\u00AC]\s*[A-Z]\b', query)
         if formal_pattern:
             return True
         

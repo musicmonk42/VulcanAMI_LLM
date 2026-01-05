@@ -198,6 +198,13 @@ SUCCESS_CONFIDENCE_THRESHOLD = 0.5  # Minimum confidence for success
 MAX_SUCCESS_TIME_MS = 10000  # Maximum execution time (ms) for success
 
 # ==============================================================================
+# Constants for BUG #5 FIX - Learned Weight Thresholds
+# ==============================================================================
+# Threshold below which tools are considered "too unreliable" based on learned weights
+# Tools with weight below this are skipped in classifier suggestions
+NEGATIVE_WEIGHT_THRESHOLD = -0.05
+
+# ==============================================================================
 # Constants for BUG #1 FIX - QueryRouter Tool Selection
 # ==============================================================================
 # Default available tools when not specified in class instance
@@ -3247,13 +3254,13 @@ class ToolSelector:
                     # BUG #5 FIX: Respect learned weights - skip tools with very negative weights
                     # The learning system punishes failing tools, but previously the
                     # classifier/router bypassed this. Now we filter out tools that have
-                    # been learned to be unreliable (weight < -0.05).
+                    # been learned to be unreliable (weight < NEGATIVE_WEIGHT_THRESHOLD).
                     # ================================================================
                     if self.learning_system:
                         filtered_tools = []
                         for tool in valid_classifier_tools:
                             weight = self.learning_system.get_tool_weight_adjustment(tool)
-                            if weight < -0.05:  # Threshold for "too negative"
+                            if weight < NEGATIVE_WEIGHT_THRESHOLD:
                                 logger.info(
                                     f"[ToolSelector] BUG#5 FIX: Skipping '{tool}' - learned weight "
                                     f"too low ({weight:.3f}), suggesting alternative"
