@@ -2056,6 +2056,95 @@ class GraphixArena:
 
         return {"status": "rollback", "reason": reason}
 
+    async def run_reasoning_task(self, request: Request):
+        """
+        Execute reasoning task using UnifiedReasoner.
+        
+        This endpoint is called by VULCAN when reasoning engines fail and need
+        Arena's full reasoning pipeline with evolution/tournaments.
+        
+        Args:
+            request: HTTP request containing query, tools, and context
+            
+        Returns:
+            Reasoning result with conclusion, confidence, and explanation
+        """
+        try:
+            data = await request.json()
+            
+            query = data.get("query")
+            selected_tools = data.get("selected_tools", [])
+            query_type = data.get("query_type", "reasoning")
+            complexity = data.get("complexity", 0.5)
+            context = data.get("context", {})
+            
+            if not query:
+                raise HTTPException(status_code=400, detail="Missing 'query' field")
+            
+            logger.info(
+                f"[Arena] Reasoning task received: query_type={query_type}, "
+                f"tools={selected_tools}, complexity={complexity:.2f}"
+            )
+            
+            # Use reasoning integration if available
+            if REASONING_AVAILABLE and apply_reasoning:
+                result = apply_reasoning(
+                    query=query,
+                    query_type=query_type,
+                    complexity=complexity,
+                    context={
+                        **context,
+                        'arena_delegation': True,  # Mark as Arena-delegated
+                    },
+                )
+                
+                # Extract result attributes
+                conclusion = None
+                explanation = None
+                confidence = 0.7
+                result_tools = selected_tools
+                
+                if hasattr(result, "selected_tools"):
+                    result_tools = result.selected_tools
+                if hasattr(result, "confidence"):
+                    confidence = result.confidence
+                if hasattr(result, "rationale"):
+                    explanation = result.rationale
+                if hasattr(result, "reasoning_strategy"):
+                    conclusion = f"Strategy: {result.reasoning_strategy}"
+                
+                logger.info(
+                    f"[Arena] Reasoning task completed: confidence={confidence:.2f}, "
+                    f"tools={result_tools}"
+                )
+                
+                return {
+                    "status": "success",
+                    "result": {
+                        "conclusion": conclusion,
+                        "confidence": confidence,
+                        "explanation": explanation,
+                    },
+                    "selected_tools": result_tools,
+                    "metadata": {
+                        "arena_processed": True,
+                        "original_query_type": query_type,
+                        "original_complexity": complexity,
+                    },
+                }
+            else:
+                logger.warning("[Arena] Reasoning integration not available")
+                raise HTTPException(
+                    status_code=503, 
+                    detail="Reasoning integration not available"
+                )
+                
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"[Arena] Reasoning task failed: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
     async def run_agent_task(self, agent_id: str, request: Request):
         """
         Run agent task with comprehensive validation.
@@ -2597,6 +2686,7 @@ async def root_status():
         "version": "2.0.0",
         "endpoints": [
             "/api/run/{agent_id}",
+            "/api/run/reasoner",
             "/api/feedback",
             "/api/feedback_dispatch",
             "/api/tournament",
@@ -2737,6 +2827,9 @@ def register_routes(arena: "GraphixArena"):
     add_once("/api/run/{agent_id}", arena.run_agent_task, "30/minute", ["POST"])
     add_once("/api/feedback", arena.feedback_ingestion, "60/minute", ["POST"])
     add_once("/api/tournament", arena.run_tournament_task, "20/minute", ["POST"])
+    
+    # Reasoning endpoint - called by VULCAN when reasoning engines fail
+    add_once("/api/run/reasoner", arena.run_reasoning_task, "30/minute", ["POST"])
 
     # Metrics (no API key, allow scraping)
     if "/api/metrics" not in existing_paths:

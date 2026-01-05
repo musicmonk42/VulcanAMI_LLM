@@ -114,6 +114,14 @@ MAX_FALLBACK_ATTEMPTS = 2  # Don't retry more than 2 times per query
 # When all fallback attempts fail, set this minimum floor to allow processing
 MIN_CONFIDENCE_FLOOR = 0.15  # Prevent total query refusal
 
+# Arena delegation configuration - used when all local tools fail
+# VULCAN delegates to Arena's reasoning endpoint for a final attempt
+ARENA_REASONING_URL = os.environ.get(
+    "ARENA_REASONING_URL", 
+    "http://127.0.0.1:8080/arena/api/run/reasoner"
+)
+ARENA_DELEGATION_TIMEOUT = 60.0  # Timeout for Arena delegation requests
+
 # Complexity thresholds for strategy selection
 FAST_PATH_COMPLEXITY_THRESHOLD = 0.3  # Below this, use fast path
 LOW_COMPLEXITY_THRESHOLD = 0.4  # Below this, use FAST mode
@@ -1327,13 +1335,38 @@ class ReasoningIntegration:
                                 continue
                         
                         # If all fallbacks failed but we still have very low confidence,
-                        # set a minimum floor so the query is still attempted
+                        # delegate to Arena as final attempt
                         if confidence < 0.1:
                             logger.warning(
-                                f"{LOG_PREFIX} All tools returned low confidence. "
-                                f"Setting minimum confidence floor of {MIN_CONFIDENCE_FLOOR} to allow processing."
+                                f"{LOG_PREFIX} All local tools failed. Delegating to Arena."
                             )
-                            confidence = MIN_CONFIDENCE_FLOOR  # Minimum floor to prevent total refusal
+                            
+                            # Try Arena delegation
+                            arena_result = self._delegate_to_arena(
+                                query=query,
+                                original_tool=original_tool,
+                                query_type=query_type,
+                                complexity=complexity,
+                                context=context,
+                            )
+                            
+                            if arena_result is not None:
+                                # Arena succeeded - use its result
+                                arena_confidence = arena_result.get('confidence', 0.5)
+                                if arena_confidence > confidence:
+                                    confidence = arena_confidence
+                                    rationale = f"Arena delegation after {original_tool} failed"
+                                    logger.info(
+                                        f"{LOG_PREFIX} Arena delegation succeeded: "
+                                        f"confidence={arena_confidence:.3f}"
+                                    )
+                            else:
+                                # Arena failed too - set minimum floor
+                                logger.warning(
+                                    f"{LOG_PREFIX} Arena delegation failed. "
+                                    f"Setting minimum confidence floor of {MIN_CONFIDENCE_FLOOR}."
+                                )
+                                confidence = MIN_CONFIDENCE_FLOOR
 
             except ImportError as e:
                 logger.warning(f"{LOG_PREFIX} ToolSelector imports unavailable: {e}")
@@ -1685,6 +1718,109 @@ class ReasoningIntegration:
 
         # Default to direct for simple queries
         return ReasoningStrategyType.DIRECT.value
+
+    def _delegate_to_arena(
+        self,
+        query: str,
+        original_tool: str,
+        query_type: str,
+        complexity: float,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Delegate reasoning task to Arena when local tools fail.
+        
+        Arena provides a full reasoning pipeline with evolution/tournaments
+        that may succeed where individual tools fail. This is the final
+        fallback before returning a low-confidence result.
+        
+        Args:
+            query: The original query text
+            original_tool: The tool that initially failed
+            query_type: Type of query (reasoning, symbolic, etc.)
+            complexity: Query complexity score (0.0 to 1.0)
+            context: Optional context dictionary
+            
+        Returns:
+            Dictionary with Arena result if successful, None otherwise
+            
+        Note:
+            This method uses httpx for synchronous HTTP requests to Arena.
+            It will not block the event loop in async contexts.
+        """
+        try:
+            import httpx
+            
+            logger.info(
+                f"{LOG_PREFIX} Delegating to Arena: tool={original_tool}, "
+                f"query_type={query_type}, complexity={complexity:.2f}"
+            )
+            
+            # Build request payload
+            arena_payload = {
+                "query": query,
+                "selected_tools": [original_tool],
+                "query_type": query_type,
+                "complexity": complexity,
+                "context": {
+                    **(context or {}),
+                    'vulcan_fallback': True,
+                    'original_tool': original_tool,
+                },
+            }
+            
+            # Get API key from environment
+            api_key = os.environ.get("GRAPHIX_API_KEY", "internal-bypass")
+            
+            # Make request to Arena
+            response = httpx.post(
+                ARENA_REASONING_URL,
+                json=arena_payload,
+                headers={
+                    "X-API-Key": api_key,
+                    "Content-Type": "application/json",
+                },
+                timeout=ARENA_DELEGATION_TIMEOUT,
+            )
+            
+            if response.status_code == 200:
+                arena_result = response.json()
+                result_data = arena_result.get('result', {})
+                
+                logger.info(
+                    f"{LOG_PREFIX} Arena delegation successful: "
+                    f"confidence={result_data.get('confidence', 'N/A')}"
+                )
+                
+                return {
+                    'conclusion': result_data.get('conclusion'),
+                    'confidence': result_data.get('confidence', 0.5),
+                    'explanation': result_data.get('explanation'),
+                    'arena_fallback': True,
+                    'original_tool': original_tool,
+                }
+            else:
+                logger.warning(
+                    f"{LOG_PREFIX} Arena returned status {response.status_code}: "
+                    f"{response.text[:200]}"
+                )
+                return None
+                
+        except ImportError:
+            logger.warning(
+                f"{LOG_PREFIX} httpx not available for Arena delegation. "
+                f"Install with: pip install httpx"
+            )
+            return None
+        except httpx.TimeoutException:
+            logger.error(
+                f"{LOG_PREFIX} Arena delegation timed out after "
+                f"{ARENA_DELEGATION_TIMEOUT}s"
+            )
+            return None
+        except Exception as e:
+            logger.error(f"{LOG_PREFIX} Arena delegation failed: {e}")
+            return None
 
     def _create_default_result(
         self,
