@@ -75,6 +75,16 @@ from .parsing import (
 # BUG #5 FIX: Natural Language to Logic Converter
 from .nl_converter import NaturalLanguageToLogicConverter, convert_nl_to_logic
 
+# BUG #8 FIX: Formula Validator for pre-validation with helpful error messages
+from .formula_validator import (
+    FormulaValidator,
+    ValidationError,
+    ValidationResult,
+    ValidationErrorType,
+    validate_formula,
+    validate_formula_strict,
+)
+
 # --- Theorem Provers ---
 from .provers import (
     BaseProver,
@@ -141,6 +151,13 @@ __all__ = [
     # BUG #5 FIX: NL to Logic Converter
     "NaturalLanguageToLogicConverter",
     "convert_nl_to_logic",
+    # BUG #8 FIX: Formula Validator
+    "FormulaValidator",
+    "ValidationError",
+    "ValidationResult",
+    "ValidationErrorType",
+    "validate_formula",
+    "validate_formula_strict",
     # ========================================================================
     # THEOREM PROVERS
     # ========================================================================

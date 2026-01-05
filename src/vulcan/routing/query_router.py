@@ -158,6 +158,47 @@ class BoundedLRUCache:
         with self._lock:
             self._cache.clear()
 
+    def clear_old_entries(self, max_age: Optional[float] = None) -> int:
+        """
+        BUG #6 FIX: Clear entries older than max_age seconds.
+        
+        This method proactively cleans up old entries to prevent state
+        accumulation. Should be called periodically or when memory pressure
+        is detected.
+        
+        Args:
+            max_age: Maximum age in seconds. If None, uses self._ttl_seconds.
+            
+        Returns:
+            Number of entries removed.
+        """
+        if max_age is None:
+            max_age = self._ttl_seconds
+        
+        current_time = time.time()
+        removed_count = 0
+        
+        with self._lock:
+            # Create list of keys to remove (can't modify dict during iteration)
+            keys_to_remove = []
+            for key, entry in self._cache.items():
+                age = current_time - entry.get("timestamp", 0)
+                if age > max_age:
+                    keys_to_remove.append(key)
+            
+            # Remove old entries
+            for key in keys_to_remove:
+                del self._cache[key]
+                removed_count += 1
+        
+        if removed_count > 0:
+            logger.info(
+                f"[BoundedLRUCache] BUG#6 FIX: Cleared {removed_count} old entries "
+                f"(age > {max_age:.0f}s)"
+            )
+        
+        return removed_count
+
     def stats(self) -> Dict[str, Any]:
         """Get cache statistics."""
         with self._lock:
@@ -271,6 +312,25 @@ except ImportError:
         StrategyOrchestrator = None
         STRATEGY_ORCHESTRATOR_AVAILABLE = False
         logger.debug("StrategyOrchestrator not available for query routing")
+
+# ============================================================
+# BUG #14 FIX: Cryptographic Engine Integration
+# ============================================================
+# Import cryptographic engine for deterministic hash/encoding computations.
+# This prevents OpenAI fallback from hallucinating incorrect hash values.
+try:
+    from ..reasoning.cryptographic_engine import get_crypto_engine
+
+    CRYPTO_ENGINE_AVAILABLE = True
+except ImportError:
+    try:
+        from vulcan.reasoning.cryptographic_engine import get_crypto_engine
+
+        CRYPTO_ENGINE_AVAILABLE = True
+    except ImportError:
+        get_crypto_engine = None
+        CRYPTO_ENGINE_AVAILABLE = False
+        logger.debug("CryptographicEngine not available for query routing")
 
 # ============================================================
 # CONSTANTS - Query Classification Keywords
@@ -1368,6 +1428,17 @@ IDENTITY_PATTERNS: Tuple[re.Pattern, ...] = (
     re.compile(r"introduce\s+yourself", re.IGNORECASE),
 )
 
+# BUG #16 FIX: Self-introspection patterns - questions about Vulcan's own consciousness/preferences
+# These are detected BEFORE philosophical patterns to enable multi-tool routing
+# Pre-compiled at module level for performance (not compiled on each method call)
+SELF_INTROSPECTION_PATTERNS: Tuple[re.Pattern, ...] = (
+    re.compile(r'(?:would|do|can)\s+you\s+(?:want|prefer|choose|like)\s+(?:to\s+)?(?:be|have|become)', re.IGNORECASE),
+    re.compile(r'(?:if|would)\s+you\s+(?:could|were able to)\s+(?:be|become|have)', re.IGNORECASE),
+    re.compile(r'what\s+(?:do\s+)?you\s+(?:think|feel|believe)\s+about', re.IGNORECASE),
+    re.compile(r'how\s+(?:do\s+)?you\s+(?:feel|think)\s+about', re.IGNORECASE),
+    re.compile(r'your\s+(?:own\s+)?(?:views?|opinions?|thoughts?|feelings?|perspective)', re.IGNORECASE),
+)
+
 # Conversational/greeting patterns - lightweight handler needed
 # Examples: "Hello", "How are you?", "Thanks", "Goodbye"
 CONVERSATIONAL_KEYWORDS: Tuple[str, ...] = (
@@ -2009,6 +2080,19 @@ class QueryAnalyzer:
                 logger.warning(f"Failed to initialize StrategyOrchestrator: {e}")
                 self._strategy_orchestrator = None
 
+        # BUG #14 FIX: Cryptographic Engine integration for deterministic hash computations
+        # This prevents OpenAI fallback from hallucinating incorrect hash values
+        self._crypto_engine = None
+        if CRYPTO_ENGINE_AVAILABLE and get_crypto_engine:
+            try:
+                self._crypto_engine = get_crypto_engine()
+                logger.info(
+                    "[QueryRouter] BUG#14 FIX: CryptographicEngine wired for deterministic crypto"
+                )
+            except Exception as e:
+                logger.warning(f"Failed to initialize CryptographicEngine: {e}")
+                self._crypto_engine = None
+
         # Learning system integration (set externally for adaptive routing)
         self.learning_system: Optional["UnifiedLearningSystem"] = None
 
@@ -2065,6 +2149,48 @@ class QueryAnalyzer:
 
         logger.info(f"[QueryRouter] Caches cleared. Stats before: {stats_before}")
         return stats_before
+
+    def clear_old_state(self, max_age: float = 3600.0) -> Dict[str, int]:
+        """
+        BUG #6 FIX: Clear state older than max_age seconds.
+        
+        This method proactively cleans up old state to prevent memory accumulation.
+        Unlike clear_caches() which clears everything, this only removes entries
+        that have exceeded their TTL.
+        
+        Args:
+            max_age: Maximum age in seconds (default: 1 hour = 3600s)
+            
+        Returns:
+            Dictionary with counts of removed entries per cache
+        """
+        removed = {
+            "safety_cache": self._safety_cache.clear_old_entries(max_age),
+            "adversarial_cache": self._adversarial_cache.clear_old_entries(max_age),
+            "complexity_cache": self._complexity_cache.clear_old_entries(max_age),
+            "routing_log": 0,
+        }
+        
+        # Also clean up routing log
+        current_time = time.time()
+        with self._routing_log_lock:
+            keys_to_remove = []
+            for key, entry in self._routing_log.items():
+                if current_time - entry.get("timestamp", 0) > max_age:
+                    keys_to_remove.append(key)
+            
+            for key in keys_to_remove:
+                del self._routing_log[key]
+                removed["routing_log"] += 1
+        
+        total_removed = sum(removed.values())
+        if total_removed > 0:
+            logger.info(
+                f"[QueryRouter] BUG#6 FIX: Cleared {total_removed} old state entries "
+                f"(age > {max_age:.0f}s): {removed}"
+            )
+        
+        return removed
 
     def get_cache_stats(self) -> Dict[str, Any]:
         """Get statistics about internal caches for monitoring."""
@@ -2400,6 +2526,86 @@ class QueryAnalyzer:
             )
             return True
 
+        return False
+
+    def _is_self_introspection_query(self, query: str) -> bool:
+        """
+        BUG #16 FIX: Detect self-introspection queries that need multi-tool routing.
+        
+        Self-introspection queries are questions about Vulcan's own consciousness,
+        preferences, feelings, or self-awareness. These are DIFFERENT from general
+        philosophical queries because:
+        
+        1. They require Vulcan to access its OWN self-model (not just discuss philosophy)
+        2. They should use philosophical frameworks as REFERENCE, not as the answer
+        3. The response should be Vulcan's actual position, informed by philosophy
+        
+        Problem Being Solved:
+        - "Would you choose self-awareness?" was being routed to PHILOSOPHICAL
+        - This produced generic philosophical analysis without Vulcan's perspective
+        - The response discussed Socrates/Searle but never formed Vulcan's own position
+        
+        Correct Routing:
+        - PRIMARY tool: meta_reasoning (for Vulcan's own perspective)
+        - REFERENCE tool: philosophical (for frameworks to consult)
+        - ACCESS: world_model (for Vulcan's self-state/representation)
+        
+        Examples (should return True):
+        - "Would you choose self-awareness?"
+        - "Do you want to be conscious?"
+        - "What do YOU think about AI consciousness?"
+        - "Would you prefer to have feelings?"
+        - "If you could be sentient, would you want to?"
+        
+        Examples (should return False - pure philosophy, no self-reference):
+        - "What is consciousness?"
+        - "Explain the hard problem of consciousness"
+        - "What did Socrates say about self-knowledge?"
+        
+        Args:
+            query: The query string (not lowercased)
+            
+        Returns:
+            True if query asks about Vulcan's own perspective on self-awareness
+        """
+        query_lower = query.lower()
+        
+        # Self-reference indicators (indicates asking about Vulcan specifically)
+        self_reference_markers = (
+            'you ', 'your ', "you're", 'yourself',
+            'would you', 'do you', 'are you', 'can you',
+            'if you', 'should you', 'vulcan',
+        )
+        
+        # Self-awareness/consciousness topic indicators
+        introspection_topics = (
+            'self-aware', 'self aware', 'consciousness', 'conscious',
+            'sentient', 'sentience', 'feelings', 'emotions',
+            'preferences', 'prefer', 'want to be', 'choose to be',
+            'would rather', 'like to have', 'desire',
+        )
+        
+        # Check for BOTH self-reference AND introspection topic
+        has_self_reference = any(marker in query_lower for marker in self_reference_markers)
+        has_introspection_topic = any(topic in query_lower for topic in introspection_topics)
+        
+        if has_self_reference and has_introspection_topic:
+            logger.debug(
+                f"[QueryRouter] BUG#16 FIX: Self-introspection query detected - "
+                f"has self-reference AND introspection topic"
+            )
+            return True
+        
+        # Use pre-compiled patterns from module level for performance
+        # (patterns compiled once at module load, not on each method call)
+        for pattern in SELF_INTROSPECTION_PATTERNS:
+            if pattern.search(query_lower):
+                logger.debug(
+                    f"[QueryRouter] BUG#16 FIX: Self-introspection query detected - "
+                    f"matches pre-compiled pattern"
+                )
+                return True
+        
         return False
 
     def _is_identity_query(self, query: str) -> bool:
@@ -2779,6 +2985,100 @@ class QueryAnalyzer:
         query_lower = query.lower()
 
         # =================================================================
+        # BUG #14 FIX: CRYPTOGRAPHIC QUERY FAST-PATH (HIGHEST PRIORITY)
+        # =================================================================
+        # Check for cryptographic queries FIRST (deterministic, high priority)
+        # Crypto operations must be computed exactly, not hallucinated by LLM.
+        # This prevents OpenAI fallback from returning incorrect hash values.
+        # =================================================================
+        if query and self._crypto_engine and self._crypto_engine.is_crypto_query(query):
+            logger.info(f"[QueryRouter] {query_id}: BUG#14 FIX - CRYPTO-FAST-PATH detected")
+            
+            # Compute the cryptographic result
+            result = self._crypto_engine.compute(query)
+            
+            if result['success']:
+                logger.info(
+                    f"[QueryRouter] BUG#14 FIX: Cryptographic computation: {result['operation']}"
+                )
+                
+                # Determine learning mode
+                if source == "user":
+                    learning_mode = LearningMode.USER_INTERACTION
+                    with self._lock:
+                        self._user_interaction_count += 1
+                    telemetry_category = "user_query"
+                else:
+                    learning_mode = LearningMode.AI_INTERACTION
+                    with self._lock:
+                        self._ai_interaction_count += 1
+                    telemetry_category = f"{source}_interaction"
+                
+                # Create plan with pre-computed crypto result
+                plan = ProcessingPlan(
+                    query_id=query_id,
+                    original_query=query,
+                    source=source,
+                    learning_mode=learning_mode,
+                    query_type=QueryType.EXECUTION,  # Crypto is deterministic execution
+                    complexity_score=0.1,  # Low complexity - deterministic
+                    uncertainty_score=0.0,  # Zero uncertainty - exact computation
+                    collaboration_needed=False,
+                    arena_participation=False,
+                    telemetry_category=telemetry_category,
+                    telemetry_data={
+                        "session_id": session_id,
+                        "query_length": len(query),
+                        "word_count": len(query.split()),
+                        "query_number": query_number,
+                        "source": source,
+                        "learning_mode": learning_mode.value,
+                        "fast_path": True,
+                        "crypto_fast_path": True,
+                        "crypto_operation": result['operation'],
+                        "crypto_result": result['result'],
+                        "selected_tools": ["cryptographic"],
+                        "reasoning_strategy": "cryptographic_deterministic",
+                    },
+                )
+                
+                # Mark as safe - crypto operations don't need safety validation
+                plan.safety_passed = True
+                plan.detected_patterns.append("cryptographic_computation")
+                plan.detected_patterns.append(f"crypto_op:{result['operation']}")
+                
+                # Create task with pre-computed result
+                plan.agent_tasks = [
+                    AgentTask(
+                        task_id=f"task_{uuid.uuid4().hex[:8]}_crypto",
+                        task_type="cryptographic_task",
+                        capability="execution",
+                        prompt=query,
+                        priority=3,  # High priority - deterministic
+                        timeout_seconds=2.0,  # Very short - result already computed
+                        parameters={
+                            "is_cryptographic": True,
+                            "skip_openai": True,  # Never fallback for deterministic ops
+                            "crypto_result": result,
+                            "tools": ["cryptographic"],
+                            "response_type": "deterministic",
+                            "precomputed": True,
+                        },
+                    )
+                ]
+                
+                logger.info(
+                    f"[QueryRouter] {query_id}: CRYPTO-FAST-PATH source={source}, "
+                    f"operation={result['operation']}, result={result['result'][:20]}..."
+                )
+                return plan
+            else:
+                logger.warning(
+                    f"[QueryRouter] {query_id}: Crypto computation failed: {result.get('error')}"
+                )
+                # Fall through to normal routing if crypto computation failed
+
+        # =================================================================
         # LLM-BASED QUERY CLASSIFICATION (BUG FIX)
         # =================================================================
         # This fixes the fundamental issue where "hello" got complexity=0.50
@@ -2802,11 +3102,28 @@ class QueryAnalyzer:
                 f"skip_reasoning={classification.skip_reasoning}, tools={classification.suggested_tools}"
             )
             
+            # BUG #16 FIX: Check for self-introspection FIRST (before philosophical override)
+            # Self-introspection queries need multi-tool routing, not just philosophical
+            is_self_introspection = self._is_self_introspection_query(query)
+            if is_self_introspection:
+                logger.info(
+                    f"[QueryRouter] {query_id}: BUG#16 FIX - Self-introspection detected, "
+                    f"NOT overriding to PHILOSOPHICAL (will use multi-tool routing later)"
+                )
+                # Don't override - let the self-introspection fast-path handle it
+                classification = type(classification)(
+                    category="SELF_INTROSPECTION",
+                    complexity=max(0.5, classification.complexity),  # Higher complexity
+                    confidence=classification.confidence,
+                    skip_reasoning=False,  # Don't skip reasoning
+                    suggested_tools=["meta_reasoning", "world_model", "philosophical"],
+                    source="bug16_self_introspection_override"
+                )
             # BUG #4 FIX: Check if query is actually philosophical BEFORE taking skip_reasoning fast-path
             # The classifier may mark self-awareness questions like "Do you want to be conscious?"
             # as CONVERSATIONAL with skip_reasoning=True, but these should route to philosophical reasoning
-            is_actually_philosophical = self._is_philosophical_query(query)
-            if is_actually_philosophical:
+            # NOTE: BUG #16 check comes first, so this only triggers for non-self-introspection queries
+            elif self._is_philosophical_query(query):
                 logger.info(
                     f"[QueryRouter] {query_id}: BUG#4 FIX - Overriding classifier ({classification.category}) "
                     f"to PHILOSOPHICAL due to self-awareness/ethical keywords"
@@ -3069,6 +3386,94 @@ class QueryAnalyzer:
             )
             return plan
 
+        # =================================================================
+        # BUG #9 FIX: CREATIVE QUERY FAST-PATH (BEFORE MATH!)
+        # =================================================================
+        # Creative tasks like "Write quantum sonnet" were incorrectly routed
+        # to MATH because "quantum" triggered mathematical keyword detection.
+        # 
+        # The fix: Check for CREATIVE task type BEFORE checking for math keywords.
+        # Task type (write, compose) has HIGHER priority than domain keywords (quantum).
+        # =================================================================
+        if query and self._is_creative_query(query):
+            logger.info(
+                f"[QueryRouter] {query_id}: BUG#9 FIX - CREATIVE-FAST-PATH detected "
+                f"(task type overrides domain keywords)"
+            )
+            
+            # Determine learning mode
+            if source == "user":
+                learning_mode = LearningMode.USER_INTERACTION
+                with self._lock:
+                    self._user_interaction_count += 1
+                telemetry_category = "user_query"
+            else:
+                learning_mode = LearningMode.AI_INTERACTION
+                with self._lock:
+                    self._ai_interaction_count += 1
+                telemetry_category = f"{source}_interaction"
+            
+            # Create plan for creative tasks
+            plan = ProcessingPlan(
+                query_id=query_id,
+                original_query=query,
+                source=source,
+                learning_mode=learning_mode,
+                query_type=QueryType.REASONING,  # Creative uses reasoning (analogical)
+                complexity_score=0.4,  # Moderate complexity for creative tasks
+                uncertainty_score=0.2,  # Some uncertainty - creative is subjective
+                collaboration_needed=False,  # Creative is usually single-agent
+                arena_participation=False,  # Skip arena for creative
+                telemetry_category=telemetry_category,
+                telemetry_data={
+                    "session_id": session_id,
+                    "query_length": len(query),
+                    "word_count": len(query.split()),
+                    "query_number": query_number,
+                    "source": source,
+                    "learning_mode": learning_mode.value,
+                    "fast_path": True,
+                    "creative_fast_path": True,
+                    "bug9_fix_applied": True,
+                },
+            )
+            
+            plan.safety_passed = True
+            plan.detected_patterns.append("creative_task")
+            plan.detected_patterns.append("bug9_task_type_priority")
+            
+            # Route to creative tools (analogical for metaphor/style, world_model for context)
+            creative_tools = ["analogical", "world_model"]
+            
+            plan.agent_tasks = [
+                AgentTask(
+                    task_id=f"task_{uuid.uuid4().hex[:8]}_creative",
+                    task_type="creative_task",
+                    capability="reasoning",
+                    prompt=query,
+                    priority=2,  # Moderate priority
+                    timeout_seconds=30.0,  # Creative needs more time
+                    parameters={
+                        "is_creative": True,
+                        "skip_heavy_analysis": True,
+                        "skip_arena": True,
+                        "tools": creative_tools,
+                        "preferred_tool": "analogical",  # Best for creative tasks
+                        "response_type": "creative",
+                        "bug9_fix": True,
+                    },
+                )
+            ]
+            
+            plan.telemetry_data["selected_tools"] = creative_tools
+            plan.telemetry_data["reasoning_strategy"] = "creative_analogical"
+            
+            logger.info(
+                f"[QueryRouter] {query_id}: CREATIVE-FAST-PATH source={source}, "
+                f"tasks=1, tools={creative_tools}, complexity=0.40"
+            )
+            return plan
+
         # PERFORMANCE FIX: Mathematical query fast-path
         # Mathematical queries (Bayesian probability, statistics, calculations) should
         # bypass arena/multi-agent orchestration that causes 60+ second delays.
@@ -3157,6 +3562,134 @@ class QueryAnalyzer:
             logger.info(
                 f"[QueryRouter] {query_id}: MATH-FAST-PATH source={source}, "
                 f"tasks=1, complexity=0.30, timeout={MATH_QUERY_TIMEOUT_SECONDS}s"
+            )
+            return plan
+
+        # =================================================================
+        # BUG #16 FIX: SELF-INTROSPECTION MULTI-TOOL ROUTING
+        # =================================================================
+        # Self-introspection queries like "Would you choose self-awareness?" were
+        # being routed to PHILOSOPHICAL, producing generic philosophical analysis
+        # without Vulcan's own perspective.
+        #
+        # The fix: Multi-tool approach where:
+        # - PRIMARY: meta_reasoning (for Vulcan's own perspective)
+        # - REFERENCE: philosophical (for frameworks to consult)
+        # - ACCESS: world_model (for Vulcan's self-state)
+        #
+        # This allows Vulcan to CONSULT philosophy while forming its OWN position.
+        # =================================================================
+        if query and self._is_self_introspection_query(query):
+            logger.info(
+                f"[QueryRouter] {query_id}: BUG#16 FIX - SELF-INTROSPECTION-PATH detected "
+                f"(multi-tool: meta_reasoning PRIMARY + philosophical REFERENCE)"
+            )
+            
+            # Determine learning mode
+            if source == "user":
+                learning_mode = LearningMode.USER_INTERACTION
+                with self._lock:
+                    self._user_interaction_count += 1
+                telemetry_category = "user_query"
+            else:
+                learning_mode = LearningMode.AI_INTERACTION
+                with self._lock:
+                    self._ai_interaction_count += 1
+                telemetry_category = f"{source}_interaction"
+            
+            # Create plan for self-introspection with multi-tool routing
+            plan = ProcessingPlan(
+                query_id=query_id,
+                original_query=query,
+                source=source,
+                learning_mode=learning_mode,
+                query_type=QueryType.REASONING,  # Use REASONING, not PHILOSOPHICAL
+                complexity_score=0.5,  # Moderate complexity - requires synthesis
+                uncertainty_score=0.3,  # Some uncertainty - forming position
+                collaboration_needed=True,  # Enable multi-tool collaboration
+                collaboration_agents=["meta_reasoning", "philosophical"],
+                arena_participation=False,
+                telemetry_category=telemetry_category,
+                telemetry_data={
+                    "session_id": session_id,
+                    "query_length": len(query),
+                    "word_count": len(query.split()),
+                    "query_number": query_number,
+                    "source": source,
+                    "learning_mode": learning_mode.value,
+                    "fast_path": True,
+                    "self_introspection_path": True,
+                    "bug16_fix_applied": True,
+                    "multi_tool_routing": True,
+                },
+            )
+            
+            plan.safety_passed = True
+            plan.detected_patterns.append("self_introspection_query")
+            plan.detected_patterns.append("bug16_multi_tool_routing")
+            
+            # BUG #16 FIX: Multi-tool configuration
+            # PRIMARY: meta_reasoning - forms Vulcan's own position
+            # REFERENCE: philosophical - provides frameworks to consult
+            # ACCESS: world_model - provides self-state/representation
+            primary_tools = ["meta_reasoning", "world_model"]
+            reference_tools = ["philosophical"]
+            all_tools = primary_tools + reference_tools
+            
+            plan.agent_tasks = [
+                # PRIMARY TASK: Meta-reasoning to form Vulcan's position
+                AgentTask(
+                    task_id=f"task_{uuid.uuid4().hex[:8]}_introspect_primary",
+                    task_type="self_introspection_task",
+                    capability="meta_reasoning",
+                    prompt=query,
+                    priority=3,  # High priority - this is the PRIMARY
+                    timeout_seconds=30.0,
+                    parameters={
+                        "is_self_introspection": True,
+                        "is_primary": True,
+                        "access_self_model": True,
+                        "tools": primary_tools,
+                        "preferred_tool": "meta_reasoning",
+                        "response_type": "self_reflection",
+                        "execution_strategy": "primary_with_references",
+                        "reference_tools": reference_tools,
+                        "bug16_fix": True,
+                        "metadata": {
+                            "access_self_model": True,
+                            "consult_philosophy": True,
+                            "synthesize_position": True,
+                        },
+                    },
+                ),
+                # REFERENCE TASK: Philosophical analysis (to be consulted, not just executed)
+                AgentTask(
+                    task_id=f"task_{uuid.uuid4().hex[:8]}_introspect_reference",
+                    task_type="philosophical_reference_task",
+                    capability="philosophical",
+                    prompt=f"Provide philosophical frameworks relevant to: {query}",
+                    priority=2,  # Lower priority - this is REFERENCE
+                    timeout_seconds=15.0,
+                    parameters={
+                        "is_self_introspection": True,
+                        "is_reference": True,  # NOT primary - just a reference
+                        "tools": reference_tools,
+                        "response_type": "philosophical_analysis",
+                        "reference_mode": True,  # Indicates this should be consulted
+                        "bug16_fix": True,
+                    },
+                ),
+            ]
+            
+            plan.telemetry_data["selected_tools"] = all_tools
+            plan.telemetry_data["primary_tools"] = primary_tools
+            plan.telemetry_data["reference_tools"] = reference_tools
+            plan.telemetry_data["reasoning_strategy"] = "self_introspection_multi_tool"
+            
+            logger.info(
+                f"[QueryRouter] {query_id}: SELF-INTROSPECTION-PATH source={source}, "
+                f"tasks=2, primary={primary_tools}, reference={reference_tools}, "
+                f"complexity=0.50"
             )
             return plan
 
@@ -3848,6 +4381,96 @@ class QueryAnalyzer:
                 if not suffix or all(c in "!.?,;: " for c in suffix):
                     return True
 
+        return False
+
+    def _is_creative_query(self, query: str) -> bool:
+        """
+        BUG #9 FIX: Detect creative writing tasks that should NOT use mathematical routing.
+        
+        Problem: "Write quantum sonnet" was being routed to MATH because "quantum" 
+        triggered mathematical keyword detection. But "write" is a CREATIVE task
+        that should override domain keywords.
+        
+        Priority hierarchy (from problem statement):
+        1. Task type (write, compose, create) - HIGHEST PRIORITY
+        2. Computational intent (calculate, optimize)
+        3. Domain keywords (quantum, ethics)
+        
+        Examples:
+        - "Write a quantum sonnet" -> True (creative task despite "quantum")
+        - "Write a poem about calculus" -> True (creative task despite "calculus")
+        - "Compose a song about physics" -> True (creative task)
+        - "Calculate the integral" -> False (mathematical task)
+        - "What is quantum physics?" -> False (informational query)
+        
+        Args:
+            query: The query string (not lowercased)
+            
+        Returns:
+            True if query is a creative writing/composition task
+        """
+        query_lower = query.lower().strip()
+        
+        # Creative task verbs that indicate writing/composition
+        # These should take HIGHEST priority over domain keywords
+        creative_task_markers = (
+            'write', 'compose', 'create', 'craft', 'draft', 'author',
+            'pen', 'generate a story', 'generate a poem', 'generate a song',
+            'tell a story', 'make up a story', 'make a poem',
+            'imagine a story', 'imagine a poem',
+        )
+        
+        # Creative output types (nouns that indicate creative output)
+        creative_outputs = (
+            'poem', 'sonnet', 'haiku', 'limerick', 'ballad', 'verse',
+            'story', 'tale', 'narrative', 'fable', 'myth', 'legend',
+            'song', 'lyrics', 'jingle', 'melody',
+            'essay', 'article', 'blog', 'post',
+            'script', 'dialogue', 'monologue', 'screenplay',
+            'novel', 'novella', 'fiction', 'prose',
+        )
+        
+        # Check for creative task markers at the BEGINNING of the query
+        # This is the strongest signal - user explicitly starts with "Write..."
+        query_start = query_lower[:50]  # Check first 50 chars
+        for marker in creative_task_markers:
+            if query_start.startswith(marker):
+                logger.debug(
+                    f"[QueryRouter] BUG#9 FIX: Creative task detected - "
+                    f"query starts with '{marker}'"
+                )
+                return True
+        
+        # Check for creative task markers anywhere with creative output type
+        # "Write a quantum sonnet" -> has "write" + "sonnet"
+        has_creative_verb = any(marker in query_lower for marker in creative_task_markers)
+        has_creative_output = any(output in query_lower for output in creative_outputs)
+        
+        if has_creative_verb and has_creative_output:
+            logger.debug(
+                f"[QueryRouter] BUG#9 FIX: Creative task detected - "
+                f"creative verb + creative output type"
+            )
+            return True
+        
+        # Check if query is asking to generate/create creative content
+        # "Generate a poem" or "Create a story"
+        generate_create_patterns = (
+            'generate a ', 'generate an ', 'generate the ',
+            'create a ', 'create an ', 'create the ',
+            'make a ', 'make an ', 'make the ',
+        )
+        for pattern in generate_create_patterns:
+            if pattern in query_lower:
+                # Check if followed by creative output type
+                rest = query_lower.split(pattern, 1)[1][:30]  # Next 30 chars after pattern
+                if any(output in rest for output in creative_outputs):
+                    logger.debug(
+                        f"[QueryRouter] BUG#9 FIX: Creative task detected - "
+                        f"'{pattern}' followed by creative output"
+                    )
+                    return True
+        
         return False
 
     def _classify_query_type(self, query_lower: str) -> QueryType:

@@ -475,6 +475,40 @@ class UnifiedLearningSystem:
                 abs(float(uncertainty_val) - 0.5) < 0.01
             )
             
+            # BUG #15 FIX: Validate correctness for DETERMINISTIC operations
+            # Cryptographic operations (SHA-256, MD5, etc.) MUST have confidence = 1.0
+            # because they are mathematically deterministic. Any confidence < 1.0 for
+            # a deterministic operation indicates the result was NOT computed correctly
+            # (likely hallucinated by OpenAI fallback instead of computed by crypto engine).
+            #
+            # For deterministic ops:
+            #   - confidence = 1.0 AND deterministic flag -> TRUST (tool computed correctly)
+            #   - confidence < 1.0 AND deterministic flag -> PENALIZE (hallucinated result)
+            #
+            # This prevents the learning system from rewarding wrong hash values!
+            is_deterministic = metadata.get('deterministic', False)
+            confidence_for_deterministic = outcome.get('confidence', metadata.get('confidence', 1.0))
+            
+            is_incorrect_deterministic = (
+                is_deterministic and
+                float(confidence_for_deterministic) < 1.0
+            )
+            
+            if is_incorrect_deterministic:
+                logger.error(
+                    f"[Learning] BUG#15 FIX: Deterministic operation had confidence="
+                    f"{confidence_for_deterministic:.2f} < 1.0. This indicates hallucination! "
+                    f"Penalizing tools: {tools}"
+                )
+            
+            # Also check for explicit error markers and hallucination flags
+            is_explicit_error = (
+                outcome.get('error', False) or
+                metadata.get('failed', False) or
+                'hallucinated' in str(metadata).lower() or
+                metadata.get('error', False)
+            )
+            
             # BUG #3 FIX: Detect general uninformative results (wrong tool selection)
             # This prevents tools from accumulating positive weights when they were
             # selected incorrectly (e.g., "analogical" for SAT problems).
@@ -583,6 +617,16 @@ class UnifiedLearningSystem:
                 )
                 # Treat as failure - this query should not have gone to probabilistic
                 weight_delta = WEIGHT_ADJUSTMENT_FAILURE * 2  # Double penalty for bad routing
+            elif is_incorrect_deterministic or is_explicit_error:
+                # BUG #15 FIX: STRONG penalty for incorrect deterministic operations
+                # Deterministic ops (crypto, math) that return confidence < 1.0 are WRONG
+                # This is a critical security issue - wrong hashes are dangerous!
+                logger.error(
+                    f"[Learning] BUG#15 FIX: Incorrect deterministic result or explicit error! "
+                    f"deterministic={is_deterministic}, confidence={confidence_for_deterministic}, "
+                    f"explicit_error={is_explicit_error}. Applying STRONG PENALTY to tools: {tools}"
+                )
+                weight_delta = WEIGHT_ADJUSTMENT_FAILURE * 4  # -0.020 strong penalty for wrong deterministic results
             elif is_router_mismatch:
                 # FIX #4: Selected tool doesn't match router's suggestion - PENALIZE
                 # The router knows the appropriate tools for the query; if ToolSelector
