@@ -580,7 +580,7 @@ result = simplify(integral)
                 # Previously this assumed code was always a string. Now _generate_code
                 # returns None when no mathematical content is detected, which means
                 # the math engine should gracefully decline rather than compute garbage.
-                if code is None or not code.strip():
+                if not code or not code.strip():
                     logger.info(
                         f"[MathTool] BUG#12 FIX: No mathematical expression found in query. "
                         f"Returning failure result instead of computing default expression."
