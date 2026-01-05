@@ -107,10 +107,16 @@ class PatternConfig:
         pattern: Compiled regex pattern
         handler_name: Name of the handler method to call
         description: Human-readable description of what this pattern matches
+        priority: Higher priority patterns are tried first (default 50)
+                  - 100: Most specific patterns (exact structural matches)
+                  - 75: Logical operators (and, or, implies)
+                  - 50: Quantifiers and predicates
+                  - 25: Generic fallback patterns
     """
     pattern: Pattern[str]
     handler_name: str
     description: str
+    priority: int = 50
 
 
 # =============================================================================
@@ -272,10 +278,37 @@ class NaturalLanguageToLogicConverter:
         """
         Compile regex patterns for common logical structures.
         
+        Patterns are sorted by priority (highest first) to ensure more specific
+        patterns are tried before generic ones. This prevents the fragile
+        pattern order issue where generic patterns could incorrectly match
+        before more specific ones.
+        
+        Priority levels:
+        - 100: Most specific (biconditional, universal+existential)
+        - 90: Logical connectives (and, or, implies, if-then)
+        - 80: Quantifiers (every, all, some, no, there exists)
+        - 70: Negation patterns
+        - 50: Simple predicates
+        - 25: Generic fallback patterns (binary predicate)
+        
         Returns:
-            Tuple of PatternConfig objects with compiled patterns
+            Tuple of PatternConfig objects sorted by priority (descending)
         """
-        return (
+        patterns = [
+            # ================================================================
+            # PRIORITY 100: Most specific patterns
+            # ================================================================
+            
+            # Biconditional: "X if and only if Y" (most specific logical form)
+            PatternConfig(
+                pattern=re.compile(
+                    r'^(.+?)\s+if\s+and\s+only\s+if\s+(.+)$',
+                    re.I
+                ),
+                handler_name='_handle_biconditional',
+                description='Biconditional: X if and only if Y',
+                priority=100
+            ),
             # Universal quantifier with existential object: "Every X reviewed a Y"
             PatternConfig(
                 pattern=re.compile(
@@ -283,52 +316,33 @@ class NaturalLanguageToLogicConverter:
                     re.I
                 ),
                 handler_name='_handle_universal_existential',
-                description='Universal with existential: Every X verb a Y'
+                description='Universal with existential: Every X verb a Y',
+                priority=100
             ),
-            # Universal quantifier: "Every X is Y" or "Every X does Y"
+            
+            # ================================================================
+            # PRIORITY 90: Logical connectives (conjunction, disjunction, implication)
+            # ================================================================
+            
+            # Conjunction: "X and Y" (both conditions)
             PatternConfig(
                 pattern=re.compile(
-                    r'^every\s+(\w+)\s+(is|are|has|have|does|do|did|can|will|must|should)\s+(.+)$',
+                    r'^(.+?)\s+and\s+(.+)$',
                     re.I
                 ),
-                handler_name='_handle_universal',
-                description='Universal: Every X is/does Y'
+                handler_name='_handle_conjunction',
+                description='Conjunction: X and Y',
+                priority=90
             ),
-            # Universal quantifier: "All X are Y"
+            # Disjunction: "X or Y" (either condition)
             PatternConfig(
                 pattern=re.compile(
-                    r'^all\s+(\w+s?)\s+(is|are|have|can|will|must|should)\s+(.+)$',
+                    r'^(.+?)\s+or\s+(.+)$',
                     re.I
                 ),
-                handler_name='_handle_universal',
-                description='Universal: All X are Y'
-            ),
-            # Existential with auxiliary: "Some X does Y"
-            PatternConfig(
-                pattern=re.compile(
-                    r'^some\s+(\w+s?)\s+(is|are|has|have|does|do|did|can|will)\s+(.+)$',
-                    re.I
-                ),
-                handler_name='_handle_existential',
-                description='Existential: Some X does Y'
-            ),
-            # Existential with action verb: "Some X verbed Y"
-            PatternConfig(
-                pattern=re.compile(
-                    r'^some\s+(\w+s?)\s+(\w+(?:ed|s|es)?)\s+(.*)$',
-                    re.I
-                ),
-                handler_name='_handle_existential_action',
-                description='Existential with action: Some X verbed Y'
-            ),
-            # Existential: "There exists X such that Y"
-            PatternConfig(
-                pattern=re.compile(
-                    r'^there\s+(?:exists?|is|are)\s+(?:a[n]?\s+)?(\w+)\s+(?:such\s+that|that|which|who)\s+(.+)$',
-                    re.I
-                ),
-                handler_name='_handle_existential_detailed',
-                description='Existential: There exists X such that Y'
+                handler_name='_handle_disjunction',
+                description='Disjunction: X or Y',
+                priority=90
             ),
             # Implication: "If X then Y"
             PatternConfig(
@@ -337,7 +351,8 @@ class NaturalLanguageToLogicConverter:
                     re.I
                 ),
                 handler_name='_handle_implication',
-                description='Implication: If X then Y'
+                description='Implication: If X then Y',
+                priority=90
             ),
             # Implication: "X implies Y"
             PatternConfig(
@@ -346,26 +361,84 @@ class NaturalLanguageToLogicConverter:
                     re.I
                 ),
                 handler_name='_handle_implication',
-                description='Implication: X implies Y'
+                description='Implication: X implies Y',
+                priority=90
             ),
-            # Biconditional: "X if and only if Y"
+            
+            # ================================================================
+            # PRIORITY 80: Quantifiers
+            # ================================================================
+            
+            # Universal quantifier: "Every X is Y" or "Every X does Y"
             PatternConfig(
                 pattern=re.compile(
-                    r'^(.+?)\s+if\s+and\s+only\s+if\s+(.+)$',
+                    r'^every\s+(\w+)\s+(is|are|has|have|does|do|did|can|will|must|should)\s+(.+)$',
                     re.I
                 ),
-                handler_name='_handle_biconditional',
-                description='Biconditional: X if and only if Y'
+                handler_name='_handle_universal',
+                description='Universal: Every X is/does Y',
+                priority=80
             ),
-            # Negation: "No X does Y" or "No X is Y"
+            # Universal quantifier: "All X are Y"
+            PatternConfig(
+                pattern=re.compile(
+                    r'^all\s+(\w+s?)\s+(is|are|have|can|will|must|should)\s+(.+)$',
+                    re.I
+                ),
+                handler_name='_handle_universal',
+                description='Universal: All X are Y',
+                priority=80
+            ),
+            # Existential with auxiliary: "Some X does Y"
+            PatternConfig(
+                pattern=re.compile(
+                    r'^some\s+(\w+s?)\s+(is|are|has|have|does|do|did|can|will)\s+(.+)$',
+                    re.I
+                ),
+                handler_name='_handle_existential',
+                description='Existential: Some X does Y',
+                priority=80
+            ),
+            # Existential: "There exists X such that Y"
+            PatternConfig(
+                pattern=re.compile(
+                    r'^there\s+(?:exists?|is|are)\s+(?:a[n]?\s+)?(\w+)\s+(?:such\s+that|that|which|who)\s+(.+)$',
+                    re.I
+                ),
+                handler_name='_handle_existential_detailed',
+                description='Existential: There exists X such that Y',
+                priority=80
+            ),
+            # Universal negation: "No X does Y" or "No X is Y"
             PatternConfig(
                 pattern=re.compile(
                     r'^no\s+(\w+s?)\s+(is|are|has|have|does|do|did|can|will)\s+(.+)$',
                     re.I
                 ),
                 handler_name='_handle_universal_negation',
-                description='Universal negation: No X is/does Y'
+                description='Universal negation: No X is/does Y',
+                priority=80
             ),
+            
+            # ================================================================
+            # PRIORITY 75: Existential with action verb (less specific)
+            # ================================================================
+            
+            # Existential with action verb: "Some X verbed Y"
+            PatternConfig(
+                pattern=re.compile(
+                    r'^some\s+(\w+s?)\s+(\w+(?:ed|s|es)?)\s+(.*)$',
+                    re.I
+                ),
+                handler_name='_handle_existential_action',
+                description='Existential with action: Some X verbed Y',
+                priority=75
+            ),
+            
+            # ================================================================
+            # PRIORITY 70: Negation patterns
+            # ================================================================
+            
             # Negation: "Not X" or "It is not the case that X"
             PatternConfig(
                 pattern=re.compile(
@@ -373,8 +446,24 @@ class NaturalLanguageToLogicConverter:
                     re.I
                 ),
                 handler_name='_handle_negation',
-                description='Negation: Not X'
+                description='Negation: Not X',
+                priority=70
             ),
+            # Negation: "Neither X nor Y"
+            PatternConfig(
+                pattern=re.compile(
+                    r'^neither\s+(.+?)\s+nor\s+(.+)$',
+                    re.I
+                ),
+                handler_name='_handle_neither_nor',
+                description='Negation: Neither X nor Y',
+                priority=70
+            ),
+            
+            # ================================================================
+            # PRIORITY 50: Simple predicates
+            # ================================================================
+            
             # Simple predicate: "X is Y" (e.g., "Socrates is mortal")
             PatternConfig(
                 pattern=re.compile(
@@ -382,8 +471,34 @@ class NaturalLanguageToLogicConverter:
                     re.I
                 ),
                 handler_name='_handle_simple_predicate',
-                description='Simple predicate: X is Y'
+                description='Simple predicate: X is Y',
+                priority=50
             ),
+            # "Both X and Y are Z"
+            PatternConfig(
+                pattern=re.compile(
+                    r'^both\s+(\w+)\s+and\s+(\w+)\s+(?:is|are)\s+(.+)$',
+                    re.I
+                ),
+                handler_name='_handle_both_and',
+                description='Both X and Y are Z',
+                priority=50
+            ),
+            # "Either X or Y is Z"
+            PatternConfig(
+                pattern=re.compile(
+                    r'^either\s+(\w+)\s+or\s+(\w+)\s+(?:is|are)\s+(.+)$',
+                    re.I
+                ),
+                handler_name='_handle_either_or',
+                description='Either X or Y is Z',
+                priority=50
+            ),
+            
+            # ================================================================
+            # PRIORITY 25: Generic fallback patterns (least specific)
+            # ================================================================
+            
             # Binary predicate: "X verb Y" (e.g., "John loves Mary")
             PatternConfig(
                 pattern=re.compile(
@@ -391,9 +506,14 @@ class NaturalLanguageToLogicConverter:
                     re.I
                 ),
                 handler_name='_handle_binary_predicate',
-                description='Binary predicate: X verbs Y'
+                description='Binary predicate: X verbs Y',
+                priority=25
             ),
-        )
+        ]
+        
+        # Sort by priority (highest first) to ensure specific patterns match first
+        sorted_patterns = sorted(patterns, key=lambda p: p.priority, reverse=True)
+        return tuple(sorted_patterns)
     
     def convert(self, text: str) -> Optional[str]:
         """
@@ -658,6 +778,119 @@ class NaturalLanguageToLogicConverter:
         right_formal = self.convert(right) or self._phrase_to_predicate(right)
         
         return f"{left_formal} ↔ {right_formal}"
+    
+    def _handle_conjunction(self, match: re.Match, text: str) -> str:
+        """
+        Handle conjunction: X and Y.
+        
+        Pattern: "X and Y"
+        Result: X ∧ Y
+        
+        Args:
+            match: Regex match object
+            text: Original text
+            
+        Returns:
+            Formal logic string with conjunction operator
+        """
+        left = match.group(1).strip()
+        right = match.group(2).strip()
+        
+        # Recursively convert both parts
+        left_formal = self.convert(left) or self._phrase_to_predicate(left)
+        right_formal = self.convert(right) or self._phrase_to_predicate(right)
+        
+        return f"({left_formal} ∧ {right_formal})"
+    
+    def _handle_disjunction(self, match: re.Match, text: str) -> str:
+        """
+        Handle disjunction: X or Y.
+        
+        Pattern: "X or Y"
+        Result: X ∨ Y
+        
+        Args:
+            match: Regex match object
+            text: Original text
+            
+        Returns:
+            Formal logic string with disjunction operator
+        """
+        left = match.group(1).strip()
+        right = match.group(2).strip()
+        
+        # Recursively convert both parts
+        left_formal = self.convert(left) or self._phrase_to_predicate(left)
+        right_formal = self.convert(right) or self._phrase_to_predicate(right)
+        
+        return f"({left_formal} ∨ {right_formal})"
+    
+    def _handle_neither_nor(self, match: re.Match, text: str) -> str:
+        """
+        Handle neither/nor: Neither X nor Y.
+        
+        Pattern: "Neither X nor Y"
+        Result: ¬X ∧ ¬Y (equivalent to ¬(X ∨ Y))
+        
+        Args:
+            match: Regex match object
+            text: Original text
+            
+        Returns:
+            Formal logic string with negated conjunction
+        """
+        left = match.group(1).strip()
+        right = match.group(2).strip()
+        
+        # Recursively convert both parts
+        left_formal = self.convert(left) or self._phrase_to_predicate(left)
+        right_formal = self.convert(right) or self._phrase_to_predicate(right)
+        
+        return f"(¬{left_formal} ∧ ¬{right_formal})"
+    
+    def _handle_both_and(self, match: re.Match, text: str) -> str:
+        """
+        Handle both/and: Both X and Y are Z.
+        
+        Pattern: "Both X and Y are Z"
+        Result: Z(X) ∧ Z(Y)
+        
+        Args:
+            match: Regex match object
+            text: Original text
+            
+        Returns:
+            Formal logic string with conjunction of predicates
+        """
+        subj1 = match.group(1).lower()
+        subj2 = match.group(2).lower()
+        predicate_phrase = match.group(3).strip()
+        
+        predicate = self._phrase_to_predicate(predicate_phrase)
+        
+        return f"({predicate}({subj1}) ∧ {predicate}({subj2}))"
+    
+    def _handle_either_or(self, match: re.Match, text: str) -> str:
+        """
+        Handle either/or: Either X or Y is Z.
+        
+        Pattern: "Either X or Y is Z"
+        Result: Z(X) ∨ Z(Y)
+        
+        Args:
+            match: Regex match object
+            text: Original text
+            
+        Returns:
+            Formal logic string with disjunction of predicates
+        """
+        subj1 = match.group(1).lower()
+        subj2 = match.group(2).lower()
+        predicate_phrase = match.group(3).strip()
+        
+        predicate = self._phrase_to_predicate(predicate_phrase)
+        
+        return f"({predicate}({subj1}) ∨ {predicate}({subj2}))"
     
     def _handle_universal_negation(self, match: re.Match, text: str) -> str:
         """

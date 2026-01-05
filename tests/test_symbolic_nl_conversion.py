@@ -110,6 +110,51 @@ class TestNaturalLanguageToLogicConverter:
         assert "↔" in result
     
     # =========================================================================
+    # Conjunction Tests
+    # =========================================================================
+    
+    def test_conjunction_simple(self):
+        """Test: A and B -> (A ∧ B)"""
+        result = self.converter.convert("Rain and snow")
+        assert result is not None
+        assert "∧" in result
+    
+    def test_conjunction_predicates(self):
+        """Test: Socrates is wise and mortal -> conjunction"""
+        result = self.converter.convert("Socrates is wise and mortal")
+        assert result is not None
+        assert "∧" in result
+    
+    def test_both_and(self):
+        """Test: Both dogs and cats are animals -> Animals(dogs) ∧ Animals(cats)"""
+        result = self.converter.convert("Both dogs and cats are animals")
+        assert result is not None
+        assert "∧" in result
+    
+    # =========================================================================
+    # Disjunction Tests
+    # =========================================================================
+    
+    def test_disjunction_simple(self):
+        """Test: A or B -> (A ∨ B)"""
+        result = self.converter.convert("Rain or shine")
+        assert result is not None
+        assert "∨" in result
+    
+    def test_either_or(self):
+        """Test: Either John or Mary is correct -> Correct(john) ∨ Correct(mary)"""
+        result = self.converter.convert("Either John or Mary is correct")
+        assert result is not None
+        assert "∨" in result
+    
+    def test_neither_nor(self):
+        """Test: Neither rain nor snow -> (¬Rain ∧ ¬Snow)"""
+        result = self.converter.convert("Neither rain nor snow")
+        assert result is not None
+        assert "¬" in result
+        assert "∧" in result
+    
+    # =========================================================================
     # Negation Tests
     # =========================================================================
     
@@ -307,6 +352,64 @@ class TestPatternConfig:
         assert config.pattern == pattern
         assert config.handler_name == '_handle_test'
         assert config.description == 'Test pattern'
+    
+    def test_pattern_config_priority(self):
+        """Test PatternConfig has priority attribute."""
+        import re
+        config = PatternConfig(
+            pattern=re.compile(r'test'),
+            handler_name='_handle_test',
+            description='Test pattern',
+            priority=75
+        )
+        
+        assert config.priority == 75
+    
+    def test_pattern_config_default_priority(self):
+        """Test PatternConfig has default priority of 50."""
+        import re
+        config = PatternConfig(
+            pattern=re.compile(r'test'),
+            handler_name='_handle_test',
+            description='Test pattern'
+        )
+        
+        assert config.priority == 50
+
+
+class TestPatternPriority:
+    """Tests for pattern priority sorting."""
+    
+    def test_patterns_sorted_by_priority(self):
+        """Test that patterns are sorted by priority (highest first)."""
+        converter = NaturalLanguageToLogicConverter()
+        priorities = [p.priority for p in converter.patterns]
+        
+        # Should be sorted in descending order
+        assert priorities == sorted(priorities, reverse=True)
+    
+    def test_biconditional_has_highest_priority(self):
+        """Test that biconditional pattern has highest priority."""
+        converter = NaturalLanguageToLogicConverter()
+        
+        # Find biconditional pattern
+        biconditional_priority = None
+        for p in converter.patterns:
+            if 'biconditional' in p.description.lower():
+                biconditional_priority = p.priority
+                break
+        
+        assert biconditional_priority is not None
+        assert biconditional_priority >= 100
+    
+    def test_binary_predicate_has_lowest_priority(self):
+        """Test that binary predicate (fallback) has lowest priority."""
+        converter = NaturalLanguageToLogicConverter()
+        
+        # Last pattern should be binary predicate (lowest priority)
+        last_pattern = converter.patterns[-1]
+        assert 'binary predicate' in last_pattern.description.lower()
+        assert last_pattern.priority <= 25
 
 
 class TestConverterThreadSafety:
