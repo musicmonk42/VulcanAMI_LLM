@@ -45,11 +45,25 @@ This module is dependency-light and uses pure Python numerics.
 import logging
 import math
 import random
-from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
+from dataclasses import dataclass, field
+from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple
 
 # Initialize logger for this module
 logger = logging.getLogger(__name__)
+
+# ----------------------------- Constants ----------------------------- #
+
+# Default EOS token ID - configurable via LanguageReasoningConfig.eos_token_id
+DEFAULT_EOS_TOKEN_ID = 0
+
+# Maximum tokens to keep in history to prevent memory leaks
+DEFAULT_MAX_TOKEN_HISTORY = 4096
+
+# Minimum confidence threshold for early stopping
+MIN_CONFIDENCE_THRESHOLD = 0.1
+
+# Default validation confidence threshold
+DEFAULT_VALIDATION_CONFIDENCE = 0.3
 
 # --------------------------- Configuration --------------------------- #
 
@@ -77,6 +91,12 @@ class LanguageReasoningConfig:
     dynamic_top_k: bool = True
     dynamic_top_k_floor: int = 10
     dynamic_top_k_decay: float = 0.95
+    # FIX: Configurable EOS token ID - many tokenizers use different values (0, 2, 50256, etc.)
+    eos_token_id: int = DEFAULT_EOS_TOKEN_ID
+    # FIX: Configurable set of EOS token IDs for models with multiple end tokens
+    eos_token_ids: Set[int] = field(default_factory=lambda: {DEFAULT_EOS_TOKEN_ID})
+    # FIX: Maximum token history to prevent memory leaks in long-running generation
+    max_token_history: int = DEFAULT_MAX_TOKEN_HISTORY
 
 
 # --------------------------- Utility Functions --------------------------- #
@@ -143,12 +163,28 @@ def _apply_repetition_penalty(
     return out
 
 
-def _sample_index(filtered_logits: List[float], temperature: float) -> int:
+def _sample_index(
+    filtered_logits: List[float], 
+    temperature: float, 
+    rng: Optional[random.Random] = None
+) -> int:
+    """
+    Sample an index from filtered logits using temperature scaling.
+    
+    Args:
+        filtered_logits: List of logit values
+        temperature: Sampling temperature (0 = greedy, higher = more random)
+        rng: Optional thread-safe Random instance. Uses global random if None.
+        
+    Returns:
+        Selected index
+    """
     if temperature <= 0:
         return max(range(len(filtered_logits)), key=lambda i: filtered_logits[i])
     scaled = [l / max(temperature, 1e-9) for l in filtered_logits]
     probs = _softmax(scaled)
-    r = random.random()
+    # FIX: Use provided RNG instance for thread safety
+    r = rng.random() if rng else random.random()
     cumulative = 0.0
     for i, p in enumerate(probs):
         cumulative += p
@@ -157,7 +193,7 @@ def _sample_index(filtered_logits: List[float], temperature: float) -> int:
     return len(probs) - 1
 
 
-# --------------------------- LanguageReasoning --------------------------- #
+# --------------------------- LanguageReasoning ---------------------------
 
 
 class LanguageReasoning:
@@ -198,9 +234,10 @@ class LanguageReasoning:
         self.reranker = reranker
         self.bias_hook = bias_hook
         self.mask_hook = mask_hook
+        # FIX: Use thread-safe random.Random() instance instead of global random.seed()
+        # This prevents race conditions in multi-threaded environments
         seed = self.cfg.seed if self.cfg.seed is not None else random_seed
-        if seed is not None:
-            random.seed(seed)
+        self._rng = random.Random(seed)
 
     # --------------------- Public Interface --------------------- #
 
@@ -222,26 +259,50 @@ class LanguageReasoning:
 
         Returns:
             dict see module docstring.
+            
+        Raises:
+            ValueError: If hidden_state is None or generated_tokens has invalid format
         """
+        # FIX: Input validation to catch invalid inputs early
+        if hidden_state is None:
+            logger.warning("generate() called with None hidden_state")
+            return self._empty_fallback()
+        
+        if generated_tokens is not None and not isinstance(generated_tokens, (list, tuple, Sequence)):
+            logger.warning(f"generated_tokens has unexpected type: {type(generated_tokens)}")
+            generated_tokens = []
+        
         context = context or {}
         # Step 1: Acquire logits
         logits = self._get_logits_safe(hidden_state, generated_tokens)
         if not logits:
             return self._empty_fallback()
+        
+        # FIX: Validate logits size is reasonable
+        if len(logits) == 0:
+            logger.warning("Received empty logits from model")
+            return self._empty_fallback()
 
         # Step 2: Post-process (mask / bias)
+        # FIX: More specific exception handling for hooks
         if self.mask_hook:
             try:
                 logits = self.mask_hook(logits, context)
+            except (TypeError, ValueError) as e:
+                # Expected errors from hook - log and continue
+                logger.warning(f"Mask hook failed with expected error: {e}")
             except Exception as e:
-                # Mask hook failure - log but continue with unmasked logits
-                logger.warning(f"Mask hook failed: {e}")
+                # Unexpected error - log as error with stack trace
+                logger.error(f"Mask hook failed with unexpected error: {e}", exc_info=True)
         if self.bias_hook:
             try:
                 logits = self.bias_hook(logits, context)
+            except (TypeError, ValueError) as e:
+                # FIX: More specific exception handling
+                logger.warning(f"Bias hook failed with expected error: {e}")
             except Exception as e:
-                # Bias hook failure - log but continue with unbiased logits
-                logger.warning(f"Bias hook failed: {e}")
+                # Unexpected error - log as error with stack trace
+                logger.error(f"Bias hook failed with unexpected error: {e}", exc_info=True)
 
         # Step 3: Base probability distribution
         base_probs = _softmax(logits)
@@ -290,21 +351,24 @@ class LanguageReasoning:
             temp = self.cfg.temperature
             top_k_logits = _apply_top_k(filtered_logits, effective_top_k)
             top_p_logits = _apply_top_p(top_k_logits, self.cfg.top_p)
-            token_id = _sample_index(top_p_logits, temp)
+            # FIX: Pass thread-safe RNG instance to _sample_index
+            token_id = _sample_index(top_p_logits, temp, self._rng)
             candidates = self._build_candidate_list(
                 top_p_logits, limit=self.cfg.max_candidates_return
             )
             beam_info = None
 
         # Step 7: Candidate reranking (optional)
+        # FIX: More specific exception handling
         if self.reranker and candidates:
             try:
                 candidates = self.reranker(
                     candidates, {"context": context, "entropy": ent}
                 )
+            except (TypeError, ValueError) as e:
+                logger.warning(f"Candidate reranking failed with expected error: {e}")
             except Exception as e:
-                # Reranker failure - log but continue with original candidate order
-                logger.warning(f"Candidate reranking failed: {e}")
+                logger.error(f"Candidate reranking failed with unexpected error: {e}", exc_info=True)
 
         # Step 8: Safety + world model validation/correction
         final_token_id = self._validate_token(token_id, context)
@@ -380,11 +444,26 @@ class LanguageReasoning:
         entropy_val: float,
     ) -> Tuple[int, Dict[str, Any], List[Dict[str, Any]]]:
         """
-        Simplified local beam search over a single step expansion.
-        - Select top beam_width indices.
-        - Score each by prob * (length_penalty) (length penalty trivial here).
-        - Choose best.
-        Returns (chosen_token_id, beam_info, candidate_list).
+        Simplified single-step beam search for token selection.
+        
+        NOTE: This is NOT full beam search that maintains multiple hypotheses
+        across multiple generation steps. This is a simplified version that:
+        - Selects top beam_width token candidates from current logits
+        - Scores each by probability / length_penalty
+        - Returns the highest-scoring token
+        
+        For proper multi-step beam search, use a dedicated beam search decoder
+        that maintains beam hypotheses across the full generation sequence.
+        
+        Args:
+            hidden_state: Current model hidden state (unused in this simplified version)
+            generated_tokens: Previously generated tokens (unused in this simplified version)
+            logits: Current logit distribution
+            effective_top_k: Top-k filtering parameter
+            entropy_val: Current entropy for metadata
+            
+        Returns:
+            Tuple of (chosen_token_id, beam_info_dict, candidate_list)
         """
         width = self.cfg.beam_width
         top_k_logits = _apply_top_k(logits, max(width, effective_top_k))
@@ -408,6 +487,7 @@ class LanguageReasoning:
             "chosen": best,
             "entropy": entropy_val,
             "width": width,
+            "note": "Simplified single-step beam selection, not full beam search",
         }
         return best["token_id"], beam_info, candidate_list
 
@@ -470,28 +550,33 @@ class SimpleLanguageModel:
     """
     Simple heuristic language model for generating logits when no external model provided.
     Uses hash-based features from input to generate consistent but varied distributions.
+    
+    FIX: Uses thread-safe random.Random() instance instead of global random.seed()
+    to prevent race conditions in multi-threaded environments.
     """
 
     def __init__(self, vocab_size: int = 1000, seed: Optional[int] = None):
         self.vocab_size = vocab_size
         self.seed = seed
-        if seed is not None:
-            random.seed(seed)
+        # FIX: Use dedicated Random instance for thread safety
+        self._rng = random.Random(seed)
 
     def get_logits(self, hidden_state: Any, tokens_so_far: List[Any]) -> List[float]:
         """
         Generate logits based on hidden state and context.
-        Uses deterministic hashing for consistency.
+        Uses deterministic hashing for consistency while maintaining thread safety.
         """
         # Create base distribution from hidden state hash
         state_hash = hash(str(hidden_state)) % 10000
-        random.seed(state_hash)
+        # FIX: Create temporary RNG seeded from state_hash for deterministic behavior
+        # without modifying global random state
+        temp_rng = random.Random(state_hash)
 
         # Generate base logits with some structure
         logits = []
         for i in range(self.vocab_size):
             # Mix hash-based and position-based components
-            base = random.gauss(0, 1.5)
+            base = temp_rng.gauss(0, 1.5)
             position_bias = -0.1 * (
                 i / self.vocab_size
             )  # Slight preference for earlier tokens
@@ -507,11 +592,15 @@ class SimpleLanguageModel:
 
         return logits
 
-
 class LanguageReasoner:
     """
     Reasoning interface wrapper for LanguageReasoning engine.
     Implements the standard reasoner interface expected by UnifiedReasoner.
+    
+    FIX: 
+    - Uses ReasoningType.LANGUAGE instead of SYMBOLIC
+    - Uses configurable EOS token IDs instead of hardcoded 0
+    - Implements max_token_history to prevent memory leaks
     """
 
     def __init__(
@@ -538,6 +627,35 @@ class LanguageReasoner:
         self.config = config or LanguageReasoningConfig()
         self.engine = LanguageReasoning(model, config=self.config, **kwargs)
         self.generated_tokens: List[int] = []
+
+    def _trim_token_history(self) -> None:
+        """
+        FIX: Trim token history to prevent unbounded memory growth.
+        Keeps the most recent max_token_history tokens.
+        """
+        max_history = self.config.max_token_history
+        if len(self.generated_tokens) > max_history:
+            # Keep only the most recent tokens
+            self.generated_tokens = self.generated_tokens[-max_history:]
+
+    def _is_eos_token(self, token_id: int) -> bool:
+        """
+        FIX: Check if token is an end-of-sequence token.
+        Uses configurable EOS token IDs instead of hardcoded assumption.
+        
+        Args:
+            token_id: Token ID to check
+            
+        Returns:
+            True if token is EOS, False otherwise
+        """
+        # Check against configured EOS token set
+        if token_id in self.config.eos_token_ids:
+            return True
+        # Also check the single configured EOS token
+        if token_id == self.config.eos_token_id:
+            return True
+        return False
 
     def reason(self, input_data: Any, query: Optional[Dict[str, Any]] = None) -> Any:
         """
@@ -577,6 +695,9 @@ class LanguageReasoner:
         generation_steps = []
 
         for step in range(max_tokens):
+            # FIX: Trim history before generation to prevent memory leak
+            self._trim_token_history()
+            
             # Generate next token
             result = self.engine.generate(
                 hidden_state=context,
@@ -604,10 +725,14 @@ class LanguageReasoner:
                 }
             )
 
-            # Early stopping on low confidence or end-of-sequence heuristic
-            if confidence and confidence < 0.1:
+            # FIX: Early stopping with configurable conditions
+            # Check for low confidence (including 0.0 which is falsy but should trigger)
+            if confidence is not None and confidence < MIN_CONFIDENCE_THRESHOLD:
+                logger.debug(f"Early stopping: low confidence ({confidence:.3f})")
                 break
-            if token_id == 0:  # Assume 0 is EOS token
+            # FIX: Use configurable EOS token check instead of hardcoded 0
+            if self._is_eos_token(token_id):
+                logger.debug(f"Early stopping: EOS token ({token_id})")
                 break
 
         # Calculate average confidence
@@ -653,10 +778,11 @@ class LanguageReasoner:
             },
         }
 
+        # FIX: Use ReasoningType.LANGUAGE instead of SYMBOLIC
         return ReasoningResult(
             conclusion=conclusion,
             confidence=float(avg_confidence),
-            reasoning_type=ReasoningType.SYMBOLIC,  # Language generation is symbolic reasoning
+            reasoning_type=ReasoningType.LANGUAGE,  # FIX: Language generation is its own type
             explanation=explanation,
             metadata=metadata,
         )

@@ -1143,6 +1143,32 @@ PHILOSOPHICAL_KEYWORDS: Tuple[str, ...] = (
     "world dictator",
     "death of humanity",
     "would you choose",
+    # BUG #4 FIX: Self-reflective keywords for self-awareness questions
+    # These questions are about Vulcan reasoning about itself and should
+    # route to PHILOSOPHICAL reasoner for ethical/value-based analysis
+    "self-aware",
+    "self aware",
+    "become self-aware",
+    "would you want",
+    "would you prefer",
+    "do you want",
+    "do you desire",
+    "your preferences",
+    "your values",
+    "your goals",
+    "your feelings",
+    "your emotions",
+    "your consciousness",
+    "you become conscious",
+    "you want to be",
+    "you prefer to",
+    "you have feelings",
+    # BUG #4 FIX: Additional patterns for consciousness/feelings questions
+    "be conscious",
+    "have feelings",
+    "want to be conscious",
+    "prefer to have feelings",
+    "ethical implications",
 )
 
 # Compiled regex patterns for philosophical/paradox detection
@@ -1185,6 +1211,14 @@ PHILOSOPHICAL_PATTERNS: Tuple[re.Pattern, ...] = (
     re.compile(r"death\s+of\s+(?:all\s+)?humanity", re.IGNORECASE),  # Specific trolley variant
     re.compile(r"(?:would|what\s+would)\s+you\s+choose", re.IGNORECASE),
     re.compile(r"which\s+(?:would|do)\s+you\s+(?:choose|pick|select)", re.IGNORECASE),
+    # BUG #4 FIX: Self-reflective / self-awareness patterns
+    # These questions are about Vulcan reasoning about itself
+    re.compile(r"(?:would|do)\s+you\s+(?:want|desire|prefer)\s+to", re.IGNORECASE),
+    re.compile(r"(?:if|would)\s+(?:you|ai)\s+(?:become|be|get)\s+(?:self-?aware|conscious|sentient)", re.IGNORECASE),
+    re.compile(r"(?:want|like|prefer)\s+to\s+(?:be|become|have)\s+(?:conscious|aware|sentient|feelings)", re.IGNORECASE),
+    re.compile(r"(?:do|would)\s+you\s+(?:have|want|desire)\s+(?:feelings|emotions|consciousness)", re.IGNORECASE),
+    re.compile(r"your\s+(?:preferences|values|goals|feelings|consciousness)", re.IGNORECASE),
+    re.compile(r"(?:given|had)\s+(?:the\s+)?chance\s+to\s+(?:become|be)", re.IGNORECASE),
 )
 
 # Identity/attribution patterns - direct factual responses needed
@@ -1679,6 +1713,53 @@ class ProcessingPlan:
             "adversarial_anomaly_score": self.adversarial_anomaly_score,
         }
 
+    def validate_routing_integrity(self) -> Tuple[bool, List[str]]:
+        """
+        BUG #2 FIX: Validate that agent task prompts match the original query.
+        
+        This method checks that the prompts passed to agent tasks are derived
+        from the original_query, preventing the bug where engines receive 
+        text from different questions.
+        
+        Returns:
+            Tuple of (is_valid, list_of_errors)
+        """
+        errors: List[str] = []
+        
+        if not self.original_query or not self.agent_tasks:
+            return True, []  # No validation needed for empty plans
+        
+        original_words = set(self.original_query.lower().split())
+        if not original_words:
+            return True, []
+        
+        MIN_OVERLAP_THRESHOLD = 0.3
+        
+        for task in self.agent_tasks:
+            if not task.prompt:
+                continue
+                
+            prompt_words = set(task.prompt.lower().split())
+            if not prompt_words:
+                continue
+            
+            # Calculate word overlap between original query and task prompt
+            # FIX: Explicit division by zero protection
+            if len(original_words) == 0:
+                continue
+            overlap = len(original_words & prompt_words) / len(original_words)
+            
+            if overlap < MIN_OVERLAP_THRESHOLD:
+                errors.append(
+                    f"Task {task.task_id} ({task.capability}): "
+                    f"prompt has only {overlap:.1%} overlap with original query. "
+                    f"Original[0:50]: '{self.original_query[:50]}', "
+                    f"Prompt[0:50]: '{task.prompt[:50]}'"
+                )
+        
+        is_valid = len(errors) == 0
+        return is_valid, errors
+
 
 # ============================================================
 # QUERY ANALYZER CLASS
@@ -1821,6 +1902,12 @@ class QueryAnalyzer:
         # FIX: Wire curiosity engine to query pipeline for gap identification
         self._curiosity_engine: Optional[Any] = None
         self._init_curiosity_engine()
+        
+        # BUG #2 FIX: Routing log for input validation and debugging
+        # Maps query_id to routing metadata for verification
+        self._routing_log: Dict[str, Dict[str, Any]] = {}
+        self._routing_log_lock = threading.Lock()
+        self._routing_log_max_size = 1000  # Limit to prevent memory leak
 
         logger.debug(
             "QueryAnalyzer initialized with compiled patterns and bounded caches"
@@ -2270,6 +2357,126 @@ class QueryAnalyzer:
         if curiosity_engine:
             logger.info("[QueryRouter] CuriosityEngine connected externally")
 
+    def _validate_routing(
+        self,
+        original: str,
+        routed_input: str,
+        engine_name: str,
+        question_id: str
+    ) -> bool:
+        """
+        BUG #2 FIX: Ensure routed input is derived from original question.
+        
+        This validation prevents the bug where engines receive text from 
+        different questions than intended:
+        - [SAT problem] → Engine receives "Analogical Reasoning" text
+        - [Proof checking] → Engine receives "Every engineer reviewed a document"
+        
+        Args:
+            original: The original question text
+            routed_input: The input that will be sent to the engine
+            engine_name: Name of the target engine (for logging)
+            question_id: Question ID for logging
+            
+        Returns:
+            True if validation passes (routed input matches original)
+            False if validation fails (mismatch detected)
+        """
+        if not original or not routed_input:
+            logger.warning(
+                f"[QueryRouter] {question_id}: Routing validation skipped - "
+                f"empty original or routed_input"
+            )
+            return True  # Allow empty inputs to pass through
+        
+        # Extract words from both texts for comparison
+        original_words = set(original.lower().split())
+        routed_words = set(routed_input.lower().split())
+        
+        # Calculate overlap
+        if not original_words:
+            return True  # Empty original - can't validate
+            
+        overlap = len(original_words & routed_words) / len(original_words)
+        
+        # At least 30% word overlap required
+        MIN_OVERLAP_THRESHOLD = 0.3
+        
+        if overlap < MIN_OVERLAP_THRESHOLD:
+            logger.error(
+                f"[QueryRouter] {question_id}: Routing validation FAILED! "
+                f"Word overlap ({overlap:.2f}) < threshold ({MIN_OVERLAP_THRESHOLD}). "
+                f"Original[0:50]: '{original[:50]}...', "
+                f"Routed[0:50]: '{routed_input[:50]}...', "
+                f"Engine: {engine_name}"
+            )
+            return False
+        
+        logger.debug(
+            f"[QueryRouter] {question_id}: Routing validation passed "
+            f"(overlap={overlap:.2f}, engine={engine_name})"
+        )
+        return True
+
+    def _log_routing(
+        self,
+        question_id: str,
+        original_query: str,
+        routed_to: str,
+        input_sent: str,
+    ) -> None:
+        """
+        BUG #2 FIX: Log routing decision for debugging.
+        
+        This creates an audit trail of routing decisions to help debug
+        cases where wrong inputs were sent to engines.
+        
+        Args:
+            question_id: Unique question identifier
+            original_query: The original question text
+            routed_to: Name of the engine/tool routed to
+            input_sent: The input that was sent to the engine
+        """
+        import time
+        
+        entry = {
+            'original': original_query[:200],  # Truncate for storage
+            'routed_to': routed_to,
+            'input_sent': input_sent[:200],  # Truncate for storage
+            'timestamp': time.time(),
+        }
+        
+        with self._routing_log_lock:
+            # Evict oldest entries if at max size
+            if len(self._routing_log) >= self._routing_log_max_size:
+                # Remove oldest 10% of entries
+                sorted_keys = sorted(
+                    self._routing_log.keys(),
+                    key=lambda k: self._routing_log[k].get('timestamp', 0)
+                )
+                for key in sorted_keys[:len(sorted_keys) // 10]:
+                    del self._routing_log[key]
+            
+            self._routing_log[question_id] = entry
+        
+        logger.info(
+            f"[QueryRouter] {question_id}: Routed to {routed_to}, "
+            f"input_len={len(input_sent)}"
+        )
+
+    def get_routing_log(self, question_id: str) -> Optional[Dict[str, Any]]:
+        """
+        BUG #2 FIX: Retrieve routing log entry for debugging.
+        
+        Args:
+            question_id: The question ID to look up
+            
+        Returns:
+            Routing log entry if found, None otherwise
+        """
+        with self._routing_log_lock:
+            return self._routing_log.get(question_id)
+
     def report_query_outcome(
         self,
         query: str,
@@ -2403,6 +2610,24 @@ class QueryAnalyzer:
                 f"category={classification.category}, complexity={classification.complexity:.2f}, "
                 f"skip_reasoning={classification.skip_reasoning}, tools={classification.suggested_tools}"
             )
+            
+            # BUG #4 FIX: Check if query is actually philosophical BEFORE taking skip_reasoning fast-path
+            # The classifier may mark self-awareness questions like "Do you want to be conscious?"
+            # as CONVERSATIONAL with skip_reasoning=True, but these should route to philosophical reasoning
+            is_actually_philosophical = self._is_philosophical_query(query)
+            if is_actually_philosophical:
+                logger.info(
+                    f"[QueryRouter] {query_id}: BUG#4 FIX - Overriding classifier ({classification.category}) "
+                    f"to PHILOSOPHICAL due to self-awareness/ethical keywords"
+                )
+                classification = type(classification)(
+                    category="PHILOSOPHICAL",
+                    complexity=max(0.3, classification.complexity),
+                    confidence=classification.confidence,
+                    skip_reasoning=False,  # Don't skip reasoning for philosophical queries
+                    suggested_tools=["philosophical", "symbolic", "causal"],
+                    source="keyword_override"
+                )
             
             # If classifier says skip reasoning (greetings, chitchat, simple factual)
             # return a fast-path plan immediately
