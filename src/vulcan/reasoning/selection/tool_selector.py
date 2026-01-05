@@ -205,6 +205,17 @@ MAX_SUCCESS_TIME_MS = 10000  # Maximum execution time (ms) for success
 NEGATIVE_WEIGHT_THRESHOLD = -0.05
 
 # ==============================================================================
+# Constants for BUG #15 & #7 FIX - Learning Reward Penalties
+# ==============================================================================
+# BUG #15: Penalty factor for unverified high-confidence results
+# Prevents learning from potentially wrong but confident answers
+UNVERIFIED_QUALITY_PENALTY = 0.7  # Reduce to 70% of claimed confidence
+
+# BUG #7: Penalty factor for fallback results
+# Heavily penalizes fallback paths to prevent reinforcing failures
+FALLBACK_QUALITY_PENALTY = 0.3  # Reduce to 30% of quality
+
+# ==============================================================================
 # Constants for BUG #1 FIX - QueryRouter Tool Selection
 # ==============================================================================
 # Default available tools when not specified in class instance
@@ -1249,7 +1260,7 @@ class ToolSelectionBandit:
         effective_quality = quality
         if not is_verified and quality > 0.7:
             # Reduce confidence for unverified high-confidence answers
-            effective_quality = quality * 0.7  # Cap at ~70% of claimed confidence
+            effective_quality = quality * UNVERIFIED_QUALITY_PENALTY
             logger.debug(
                 f"[BUG#15 FIX] Reduced reward for unverified high-confidence result: "
                 f"{quality:.2f} -> {effective_quality:.2f}"
@@ -1259,7 +1270,7 @@ class ToolSelectionBandit:
         # Fallback typically means primary engine failed, so we shouldn't
         # strongly reinforce this path
         if is_fallback:
-            effective_quality = effective_quality * 0.3  # Heavy penalty for fallback
+            effective_quality = effective_quality * FALLBACK_QUALITY_PENALTY
             logger.debug(
                 f"[BUG#7 FIX] Reduced reward for fallback result: "
                 f"{quality:.2f} -> {effective_quality:.2f}"
