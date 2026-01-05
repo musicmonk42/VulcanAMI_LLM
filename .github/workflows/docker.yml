@@ -249,7 +249,8 @@ jobs:
 
             for image in $BASE_IMAGES; do
               # Skip build stage references (e.g., builder, runtime)
-              if echo "$image" | grep -qE '^[a-z]+$'; then
+              # These are internal stage names, not real Docker images
+              if echo "$image" | grep -qE '^(builder|runtime|base|final|production|development|test)$'; then
                 echo "Skipping build stage reference: $image"
                 continue
               fi
