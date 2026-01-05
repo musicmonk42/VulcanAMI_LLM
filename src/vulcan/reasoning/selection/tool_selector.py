@@ -1761,20 +1761,39 @@ class ProbabilisticToolWrapper:
             # Extract meaningful text from problem for keyword detection
             query_str = self._extract_query_text(problem)
             
+            # BUG #5 FIX: Add fallback gate check directly in wrapper
+            # This catches cases where the engine's gate check is not available
+            # Examples that should be rejected: "if given opportunity...", "What color is the sky?"
+            is_probability_query = False
+            
             # Check if the underlying engine has the gate check method
             if query_str and hasattr(self.engine, '_is_probability_query'):
-                if not self.engine._is_probability_query(query_str):
-                    logger.info(
-                        f"[ProbabilisticEngine] Gate check: Query does not appear to be a probability question"
-                    )
-                    return {
-                        "tool": self.name,
-                        "applicable": False,
-                        "reason": "Query does not involve probability concepts",
-                        "confidence": 0.0,
-                        "engine": "ProbabilisticReasoner",
-                        "execution_time_ms": (time.time() - start_time) * 1000,
-                    }
+                is_probability_query = self.engine._is_probability_query(query_str)
+            else:
+                # BUG #5 FIX: Fallback gate check for probability keywords
+                # This prevents "Computing P(if | evidence={})" errors
+                probability_keywords = [
+                    'probability', 'bayes', 'bayesian', 'posterior', 'prior',
+                    'likelihood', 'sensitivity', 'specificity', 'prevalence',
+                    'conditional', 'p(', 'e[', 'distribution', 'odds', 'ratio',
+                    '%', 'percent', 'chance', 'risk', 'uncertainty',
+                ]
+                query_lower = query_str.lower() if query_str else ''
+                is_probability_query = any(kw in query_lower for kw in probability_keywords)
+            
+            if query_str and not is_probability_query:
+                logger.info(
+                    f"[ProbabilisticEngine] Gate check: Query does not appear to be a probability question "
+                    f"(BUG#5 FIX prevents P(if) style errors)"
+                )
+                return {
+                    "tool": self.name,
+                    "applicable": False,
+                    "reason": "Query does not involve probability concepts",
+                    "confidence": 0.0,
+                    "engine": "ProbabilisticReasoner",
+                    "execution_time_ms": (time.time() - start_time) * 1000,
+                }
             
             # BUG #4 FIX: Clear state before each query
             if hasattr(self.engine, 'clear_state'):
@@ -2001,27 +2020,73 @@ class ProbabilisticToolWrapper:
         else:
             return str(problem), {}, []
     
+    # BUG #5 FIX: Common English words that should NOT be used as probability variable names
+    # This prevents absurd queries like "Computing P(if | evidence={})"
+    _COMMON_ENGLISH_WORDS = frozenset([
+        # Conjunctions and conditionals
+        'if', 'then', 'else', 'and', 'or', 'but', 'not', 'nor', 'yet', 'so', 'for',
+        # Question words
+        'what', 'when', 'where', 'which', 'who', 'whom', 'whose', 'why', 'how',
+        # Pronouns
+        'i', 'you', 'he', 'she', 'it', 'we', 'they', 'me', 'him', 'her', 'us', 'them',
+        # Articles and determiners
+        'a', 'an', 'the', 'this', 'that', 'these', 'those',
+        # Prepositions
+        'in', 'on', 'at', 'by', 'to', 'from', 'with', 'of', 'about', 'into',
+        # Common verbs
+        'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had',
+        'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might',
+        'can', 'must', 'shall', 'given', 'choose', 'become', 'make', 'get',
+        # Common nouns and adjectives
+        'yes', 'no', 'self', 'aware', 'opportunity', 'answer', 'question',
+        'first', 'second', 'third', 'one', 'two', 'three',
+    ])
+    
     def _extract_variable_from_text(self, text: str) -> str:
         """
         BUG #2 FIX: Extract a meaningful variable name from natural language text.
+        BUG #5 FIX: Reject common English words to prevent P(if), P(the), etc.
         
         Instead of:
             Computing P(Multimodal Reasoning (cross-constraints))  # WRONG
+            Computing P(if | evidence={})  # WRONG - BUG #5
         
         We want:
             Computing P(X)  # Where X is a properly extracted variable
+            
+        NOTE: Single uppercase letters (A, B, C, X, Y, Z) are allowed as they are
+        standard mathematical variable names, even though their lowercase versions
+        might be common English words.
         """
         import re
+        
+        def is_valid_variable(var_name: str) -> bool:
+            """Check if variable name is valid (not a common English word).
+            
+            Single uppercase letters are ALWAYS valid as they are standard
+            mathematical notation (A, B, X, Y, etc.).
+            """
+            # Single uppercase letter is always a valid variable
+            if len(var_name) == 1 and var_name.isupper():
+                return True
+            # Otherwise check against common words
+            return var_name.lower() not in self._COMMON_ENGLISH_WORDS
         
         # Try to find an explicit variable reference like P(X) or P(var_name)
         prob_match = re.search(r'P\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*(?:\||\))', text)
         if prob_match:
-            return prob_match.group(1)
+            var_name = prob_match.group(1)
+            # BUG #5 FIX: Still reject common English words even in P(X) notation
+            # But allow single uppercase letters like P(A), P(X)
+            if is_valid_variable(var_name):
+                return var_name
         
         # Try to find "query:" or "variable:" prefix
         var_match = re.search(r'(?:query|variable|compute)\s*[=:]\s*([A-Za-z_][A-Za-z0-9_]*)', text, re.IGNORECASE)
         if var_match:
-            return var_match.group(1)
+            var_name = var_match.group(1)
+            if is_valid_variable(var_name):
+                return var_name
         
         # Look for common probability query patterns
         patterns = [
@@ -2033,16 +2098,17 @@ class ProbabilisticToolWrapper:
         for pattern in patterns:
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
-                return match.group(1)
+                var_name = match.group(1)
+                # BUG #5 FIX: Reject common English words
+                if is_valid_variable(var_name):
+                    return var_name
         
-        # If nothing found, extract first word that looks like a variable name
-        # This is a fallback - better than using the whole query title
-        words = text.split()
-        for word in words[:5]:  # Check first 5 words
-            clean_word = re.sub(r'[^A-Za-z0-9_]', '', word)
-            if clean_word and not clean_word.isdigit() and len(clean_word) > 1:
-                return clean_word
-        
+        # BUG #5 FIX: If we couldn't find a valid variable name, return "X"
+        # This is better than extracting nonsense like "if" from "if given opportunity..."
+        #
+        # REMOVED the fallback that extracted first word - this was the root cause of
+        # the bug where "Computing P(if | evidence={})" appeared in logs.
+        #
         # Ultimate fallback - return a generic variable name
         return "X"
     
