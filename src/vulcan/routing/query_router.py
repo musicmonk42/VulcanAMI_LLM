@@ -273,6 +273,25 @@ except ImportError:
         logger.debug("StrategyOrchestrator not available for query routing")
 
 # ============================================================
+# BUG #14 FIX: Cryptographic Engine Integration
+# ============================================================
+# Import cryptographic engine for deterministic hash/encoding computations.
+# This prevents OpenAI fallback from hallucinating incorrect hash values.
+try:
+    from ..reasoning.cryptographic_engine import get_crypto_engine
+
+    CRYPTO_ENGINE_AVAILABLE = True
+except ImportError:
+    try:
+        from vulcan.reasoning.cryptographic_engine import get_crypto_engine
+
+        CRYPTO_ENGINE_AVAILABLE = True
+    except ImportError:
+        get_crypto_engine = None
+        CRYPTO_ENGINE_AVAILABLE = False
+        logger.debug("CryptographicEngine not available for query routing")
+
+# ============================================================
 # CONSTANTS - Query Classification Keywords
 # ============================================================
 
@@ -2009,6 +2028,19 @@ class QueryAnalyzer:
                 logger.warning(f"Failed to initialize StrategyOrchestrator: {e}")
                 self._strategy_orchestrator = None
 
+        # BUG #14 FIX: Cryptographic Engine integration for deterministic hash computations
+        # This prevents OpenAI fallback from hallucinating incorrect hash values
+        self._crypto_engine = None
+        if CRYPTO_ENGINE_AVAILABLE and get_crypto_engine:
+            try:
+                self._crypto_engine = get_crypto_engine()
+                logger.info(
+                    "[QueryRouter] BUG#14 FIX: CryptographicEngine wired for deterministic crypto"
+                )
+            except Exception as e:
+                logger.warning(f"Failed to initialize CryptographicEngine: {e}")
+                self._crypto_engine = None
+
         # Learning system integration (set externally for adaptive routing)
         self.learning_system: Optional["UnifiedLearningSystem"] = None
 
@@ -2777,6 +2809,100 @@ class QueryAnalyzer:
 
         query_id = f"q_{uuid.uuid4().hex[:12]}"
         query_lower = query.lower()
+
+        # =================================================================
+        # BUG #14 FIX: CRYPTOGRAPHIC QUERY FAST-PATH (HIGHEST PRIORITY)
+        # =================================================================
+        # Check for cryptographic queries FIRST (deterministic, high priority)
+        # Crypto operations must be computed exactly, not hallucinated by LLM.
+        # This prevents OpenAI fallback from returning incorrect hash values.
+        # =================================================================
+        if query and self._crypto_engine and self._crypto_engine.is_crypto_query(query):
+            logger.info(f"[QueryRouter] {query_id}: BUG#14 FIX - CRYPTO-FAST-PATH detected")
+            
+            # Compute the cryptographic result
+            result = self._crypto_engine.compute(query)
+            
+            if result['success']:
+                logger.info(
+                    f"[QueryRouter] BUG#14 FIX: Cryptographic computation: {result['operation']}"
+                )
+                
+                # Determine learning mode
+                if source == "user":
+                    learning_mode = LearningMode.USER_INTERACTION
+                    with self._lock:
+                        self._user_interaction_count += 1
+                    telemetry_category = "user_query"
+                else:
+                    learning_mode = LearningMode.AI_INTERACTION
+                    with self._lock:
+                        self._ai_interaction_count += 1
+                    telemetry_category = f"{source}_interaction"
+                
+                # Create plan with pre-computed crypto result
+                plan = ProcessingPlan(
+                    query_id=query_id,
+                    original_query=query,
+                    source=source,
+                    learning_mode=learning_mode,
+                    query_type=QueryType.EXECUTION,  # Crypto is deterministic execution
+                    complexity_score=0.1,  # Low complexity - deterministic
+                    uncertainty_score=0.0,  # Zero uncertainty - exact computation
+                    collaboration_needed=False,
+                    arena_participation=False,
+                    telemetry_category=telemetry_category,
+                    telemetry_data={
+                        "session_id": session_id,
+                        "query_length": len(query),
+                        "word_count": len(query.split()),
+                        "query_number": query_number,
+                        "source": source,
+                        "learning_mode": learning_mode.value,
+                        "fast_path": True,
+                        "crypto_fast_path": True,
+                        "crypto_operation": result['operation'],
+                        "crypto_result": result['result'],
+                        "selected_tools": ["cryptographic"],
+                        "reasoning_strategy": "cryptographic_deterministic",
+                    },
+                )
+                
+                # Mark as safe - crypto operations don't need safety validation
+                plan.safety_passed = True
+                plan.detected_patterns.append("cryptographic_computation")
+                plan.detected_patterns.append(f"crypto_op:{result['operation']}")
+                
+                # Create task with pre-computed result
+                plan.agent_tasks = [
+                    AgentTask(
+                        task_id=f"task_{uuid.uuid4().hex[:8]}_crypto",
+                        task_type="cryptographic_task",
+                        capability="execution",
+                        prompt=query,
+                        priority=3,  # High priority - deterministic
+                        timeout_seconds=2.0,  # Very short - result already computed
+                        parameters={
+                            "is_cryptographic": True,
+                            "skip_openai": True,  # Never fallback for deterministic ops
+                            "crypto_result": result,
+                            "tools": ["cryptographic"],
+                            "response_type": "deterministic",
+                            "precomputed": True,
+                        },
+                    )
+                ]
+                
+                logger.info(
+                    f"[QueryRouter] {query_id}: CRYPTO-FAST-PATH source={source}, "
+                    f"operation={result['operation']}, result={result['result'][:20]}..."
+                )
+                return plan
+            else:
+                logger.warning(
+                    f"[QueryRouter] {query_id}: Crypto computation failed: {result.get('error')}"
+                )
+                # Fall through to normal routing if crypto computation failed
 
         # =================================================================
         # LLM-BASED QUERY CLASSIFICATION (BUG FIX)
