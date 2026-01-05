@@ -72,6 +72,9 @@ from .parsing import (
     VariableRenamer,
 )
 
+# BUG #5 FIX: Natural Language to Logic Converter
+from .nl_converter import NaturalLanguageToLogicConverter, convert_nl_to_logic
+
 # --- Theorem Provers ---
 from .provers import (
     BaseProver,
@@ -135,6 +138,9 @@ __all__ = [
     "ClauseExtractor",
     "FormulaParser",
     "FormulaBuilder",
+    # BUG #5 FIX: NL to Logic Converter
+    "NaturalLanguageToLogicConverter",
+    "convert_nl_to_logic",
     # ========================================================================
     # THEOREM PROVERS
     # ========================================================================

@@ -58,6 +58,8 @@ from .core import (
 
 # FIX: This import will now work correctly after the move of the classes
 from .parsing import ASTConverter, Lexer, Parser
+# BUG #5 FIX: Import the NL to Logic converter for handling natural language queries
+from .nl_converter import NaturalLanguageToLogicConverter
 from .provers import (
     BaseProver,
     ModelEliminationProver,
@@ -120,6 +122,8 @@ class SymbolicReasoner:
         self.prover_type = prover_type
         self.prover = self._create_prover()
         self.converter = ASTConverter()
+        # BUG #5 FIX: Initialize NL to Logic converter for handling natural language queries
+        self.nl_converter = NaturalLanguageToLogicConverter()
 
     def _create_prover(self) -> BaseProver:
         """Create theorem prover based on type."""
@@ -410,15 +414,21 @@ class SymbolicReasoner:
         """
         FIXED: Complete formula parser with comprehensive support.
 
+        BUG #5 FIX: Now includes Natural Language to Logic conversion.
+        The parser first attempts to parse the input as formal logic.
+        If that fails, it tries to convert natural language to formal logic
+        before falling back to the simple parser.
+
         Handles:
         - Nested functions: f(g(h(x)))
         - Complex operators: ->, <=>, forall, exists
         - Parenthesized expressions
         - Quantifiers with variables
         - Empty input (returns empty clause)
+        - Natural language sentences (converted to formal logic first)
 
         Args:
-            formula_str: Formula string
+            formula_str: Formula string (formal logic or natural language)
 
         Returns:
             Clause object
@@ -445,6 +455,38 @@ class SymbolicReasoner:
             return clause
 
         except Exception as e:
+            # BUG #5 FIX: Try NL to Logic conversion before fallback
+            logger.info(
+                f"[SymbolicReasoner] BUG#5 FIX: Standard parser failed for '{formula_str[:50]}...', "
+                f"attempting NL to Logic conversion"
+            )
+            
+            try:
+                # Try converting natural language to formal logic
+                formal_logic = self.nl_converter.convert(formula_str)
+                
+                if formal_logic and formal_logic != formula_str:
+                    logger.info(
+                        f"[SymbolicReasoner] BUG#5 FIX: Converted NL to formal logic: "
+                        f"'{formula_str[:30]}...' -> '{formal_logic}'"
+                    )
+                    
+                    # Try parsing the converted formal logic
+                    try:
+                        lexer = Lexer(formal_logic)
+                        tokens = lexer.tokenize()
+                        parser = Parser(tokens)
+                        ast = parser.parse()
+                        clause = self.converter.convert(ast)
+                        return clause
+                    except Exception as inner_e:
+                        logger.warning(
+                            f"[SymbolicReasoner] BUG#5 FIX: Converted logic still failed to parse: {inner_e}"
+                        )
+            except Exception as nl_e:
+                logger.debug(f"[SymbolicReasoner] NL conversion failed: {nl_e}")
+            
+            # Fall back to simple parser as last resort
             logger.warning(f"Advanced parser failed, trying fallback: {e}")
             return self._fallback_parse(formula_str)
 
@@ -601,6 +643,9 @@ class SymbolicReasoner:
         
         # Re-create converter to clear any internal state
         self.converter = ASTConverter()
+        
+        # BUG #5 FIX: Reset NL converter as well
+        self.nl_converter = NaturalLanguageToLogicConverter()
 
     def explain_proof(self, proof: Optional[ProofNode]) -> str:
         """
