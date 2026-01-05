@@ -191,6 +191,251 @@
             opacity: 1;
         }
 
+        /* Main Navigation Bar */
+        .main-nav-bar {
+            padding: 8px 20px;
+            background: var(--bg-secondary);
+            border-bottom: 2px solid var(--accent-primary);
+            display: flex;
+            gap: 4px;
+        }
+        
+        .main-nav-tab {
+            padding: 10px 20px;
+            background: transparent;
+            border: none;
+            border-radius: 8px 8px 0 0;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 0.95em;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        
+        .main-nav-tab:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+        
+        .main-nav-tab.active {
+            background: var(--accent-primary);
+            color: white;
+        }
+        
+        /* Main Views */
+        .main-view {
+            display: none;
+            flex: 1;
+            overflow-y: auto;
+        }
+        
+        .main-view.active {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* Metrics Panel Styles */
+        .metrics-panel {
+            padding: 20px;
+            flex: 1;
+            overflow-y: auto;
+        }
+        
+        .metrics-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .metrics-header h2 {
+            font-size: 1.4em;
+            color: var(--text-primary);
+        }
+        
+        .refresh-btn {
+            padding: 8px 16px;
+            background: var(--accent-primary);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.2s;
+        }
+        
+        .refresh-btn:hover {
+            background: var(--accent-secondary);
+            transform: translateY(-1px);
+        }
+        
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 16px;
+        }
+        
+        .metric-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: 12px;
+            padding: 16px;
+            transition: all 0.2s;
+        }
+        
+        .metric-card:hover {
+            border-color: var(--accent-primary);
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.1);
+        }
+        
+        .metric-card.wide {
+            grid-column: 1 / -1;
+        }
+        
+        .metric-card.warning-card {
+            border-left: 3px solid var(--warning);
+        }
+        
+        .metric-card h3 {
+            font-size: 1.1em;
+            margin-bottom: 12px;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .metric-content {
+            font-size: 0.9em;
+            color: var(--text-secondary);
+        }
+        
+        .metric-content.scrollable {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .metric-loading {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-tertiary);
+        }
+        
+        .metric-loading::before {
+            content: '';
+            width: 16px;
+            height: 16px;
+            border: 2px solid transparent;
+            border-top-color: var(--accent-primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        
+        .metric-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border-primary);
+        }
+        
+        .metric-item:last-child {
+            border-bottom: none;
+        }
+        
+        .metric-label {
+            color: var(--text-secondary);
+        }
+        
+        .metric-value {
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+        
+        .metric-value.healthy {
+            color: var(--success);
+        }
+        
+        .metric-value.warning {
+            color: var(--warning);
+        }
+        
+        .metric-value.error {
+            color: var(--error);
+        }
+        
+        .metric-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: 500;
+        }
+        
+        .metric-badge.active {
+            background: rgba(34, 197, 94, 0.15);
+            color: var(--success);
+        }
+        
+        .metric-badge.inactive {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--error);
+        }
+        
+        .metric-badge.pending {
+            background: rgba(245, 158, 11, 0.15);
+            color: var(--warning);
+        }
+        
+        .audit-entry {
+            padding: 10px;
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+        
+        .audit-entry:last-child {
+            margin-bottom: 0;
+        }
+        
+        .audit-entry .timestamp {
+            font-size: 0.8em;
+            color: var(--text-tertiary);
+            margin-bottom: 4px;
+        }
+        
+        .audit-entry .event {
+            color: var(--text-primary);
+        }
+        
+        .endpoint-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        
+        .endpoint-item {
+            padding: 6px 12px;
+            background: var(--bg-tertiary);
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 0.85em;
+            color: var(--accent-primary);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .endpoint-item:hover {
+            background: rgba(139, 92, 246, 0.2);
+        }
+        
+        .metric-error {
+            color: var(--error);
+            padding: 10px;
+            background: rgba(239, 68, 68, 0.1);
+            border-radius: 8px;
+        }
+
         /* Messages */
         .messages {
             flex: 1;
@@ -939,27 +1184,158 @@
         </div>
     </div>
     
-    <!-- Conversation Tabs -->
-    <div class="tabs-bar" id="tabsBar">
-        <button class="tab active" data-tab="0" onclick="switchTab(0)">
-            Conversation 1
-            <span class="close-tab" onclick="event.stopPropagation(); closeTab(0)">×</span>
-        </button>
-        <button class="tab" onclick="newTab()">+ New</button>
+    <!-- Main Navigation Tabs -->
+    <div class="main-nav-bar">
+        <button class="main-nav-tab active" data-view="chat" onclick="switchMainView('chat')">💬 Chat</button>
+        <button class="main-nav-tab" data-view="metrics" onclick="switchMainView('metrics')">📊 Metrics</button>
+        <button class="main-nav-tab" data-view="warnings" onclick="switchMainView('warnings')">⚠️ Warnings</button>
+        <button class="main-nav-tab" data-view="internals" onclick="switchMainView('internals')">🔧 Internals</button>
     </div>
     
-    <!-- Messages -->
-    <div class="messages" id="messages" role="log" aria-live="polite" aria-label="Chat messages">
-        <div class="welcome" id="welcome">
-            <h2>Welcome to VULCAN Enhanced</h2>
-            <p>A powerful AI chat interface with advanced features:</p>
-            <p>✨ Markdown & Code Highlighting • 🔄 Streaming Responses • ⚙️ System Controls</p>
-            <p>📋 Message Actions • 💾 Conversation Management • ⌨️ Keyboard Shortcuts</p>
+    <!-- Chat View -->
+    <div id="chatView" class="main-view active">
+        <!-- Conversation Tabs -->
+        <div class="tabs-bar" id="tabsBar">
+            <button class="tab active" data-tab="0" onclick="switchTab(0)">
+                Conversation 1
+                <span class="close-tab" onclick="event.stopPropagation(); closeTab(0)">×</span>
+            </button>
+            <button class="tab" onclick="newTab()">+ New</button>
+        </div>
+        
+        <!-- Messages -->
+        <div class="messages" id="messages" role="log" aria-live="polite" aria-label="Chat messages">
+            <div class="welcome" id="welcome">
+                <h2>Welcome to VULCAN Enhanced</h2>
+                <p>A powerful AI chat interface with advanced features:</p>
+                <p>✨ Markdown & Code Highlighting • 🔄 Streaming Responses • ⚙️ System Controls</p>
+                <p>📋 Message Actions • 💾 Conversation Management • ⌨️ Keyboard Shortcuts</p>
+                
+                <div class="examples">
+                    <div class="example" onclick="ask('Explain quantum computing in simple terms')">Quantum Computing</div>
+                    <div class="example" onclick="ask('Write a Python function to sort a list')">Code Example</div>
+                    <div class="example" onclick="ask('What are the benefits of meditation?')">Health Topic</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Metrics View -->
+    <div id="metricsView" class="main-view">
+        <div class="metrics-panel">
+            <div class="metrics-header">
+                <h2>📊 System Metrics</h2>
+                <button class="refresh-btn" onclick="refreshMetrics()">🔄 Refresh</button>
+            </div>
             
-            <div class="examples">
-                <div class="example" onclick="ask('Explain quantum computing in simple terms')">Quantum Computing</div>
-                <div class="example" onclick="ask('Write a Python function to sort a list')">Code Example</div>
-                <div class="example" onclick="ask('What are the benefits of meditation?')">Health Topic</div>
+            <div class="metrics-grid">
+                <div class="metric-card" id="healthCard">
+                    <h3>🏥 Health Status</h3>
+                    <div class="metric-content" id="healthContent">
+                        <div class="metric-loading">Loading...</div>
+                    </div>
+                </div>
+                
+                <div class="metric-card" id="statusCard">
+                    <h3>📋 System Status</h3>
+                    <div class="metric-content" id="statusContent">
+                        <div class="metric-loading">Loading...</div>
+                    </div>
+                </div>
+                
+                <div class="metric-card" id="cognitiveCard">
+                    <h3>🧠 Cognitive Systems</h3>
+                    <div class="metric-content" id="cognitiveContent">
+                        <div class="metric-loading">Loading...</div>
+                    </div>
+                </div>
+                
+                <div class="metric-card" id="llmCard">
+                    <h3>🤖 LLM Status</h3>
+                    <div class="metric-content" id="llmContent">
+                        <div class="metric-loading">Loading...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Warnings View -->
+    <div id="warningsView" class="main-view">
+        <div class="metrics-panel">
+            <div class="metrics-header">
+                <h2>⚠️ Warnings & Safety</h2>
+                <button class="refresh-btn" onclick="refreshWarnings()">🔄 Refresh</button>
+            </div>
+            
+            <div class="metrics-grid">
+                <div class="metric-card warning-card" id="safetyCard">
+                    <h3>🛡️ Safety Status</h3>
+                    <div class="metric-content" id="safetyContent">
+                        <div class="metric-loading">Loading...</div>
+                    </div>
+                </div>
+                
+                <div class="metric-card warning-card" id="auditCard">
+                    <h3>📝 Recent Audit Logs</h3>
+                    <div class="metric-content scrollable" id="auditContent">
+                        <div class="metric-loading">Loading...</div>
+                    </div>
+                </div>
+                
+                <div class="metric-card warning-card" id="adversarialCard">
+                    <h3>🔒 Adversarial Status</h3>
+                    <div class="metric-content" id="adversarialContent">
+                        <div class="metric-loading">Loading...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Internals View -->
+    <div id="internalsView" class="main-view">
+        <div class="metrics-panel">
+            <div class="metrics-header">
+                <h2>🔧 System Internals</h2>
+                <button class="refresh-btn" onclick="refreshInternals()">🔄 Refresh</button>
+            </div>
+            
+            <div class="metrics-grid">
+                <div class="metric-card" id="worldModelCard">
+                    <h3>🌍 World Model</h3>
+                    <div class="metric-content" id="worldModelContent">
+                        <div class="metric-loading">Loading...</div>
+                    </div>
+                </div>
+                
+                <div class="metric-card" id="memoryCard">
+                    <h3>💾 Memory System</h3>
+                    <div class="metric-content" id="memoryContent">
+                        <div class="metric-loading">Loading...</div>
+                    </div>
+                </div>
+                
+                <div class="metric-card" id="hardwareCard">
+                    <h3>🖥️ Hardware Status</h3>
+                    <div class="metric-content" id="hardwareContent">
+                        <div class="metric-loading">Loading...</div>
+                    </div>
+                </div>
+                
+                <div class="metric-card" id="routingCard">
+                    <h3>🔀 Routing Status</h3>
+                    <div class="metric-content" id="routingContent">
+                        <div class="metric-loading">Loading...</div>
+                    </div>
+                </div>
+                
+                <div class="metric-card wide" id="endpointsCard">
+                    <h3>🔗 Available API Endpoints</h3>
+                    <div class="metric-content scrollable" id="endpointsContent">
+                        <div class="metric-loading">Loading...</div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -1169,6 +1545,7 @@
         let thinkingTimer = null;
         let thinkingStartTime = null;
         const REQUEST_TIMEOUT_MS = 60000;  // 60 second timeout for long-running requests
+        let currentMainView = 'chat';  // Track current main view: chat, metrics, warnings, internals
         let systemToggles = {
             reasoning: true,
             memory: true,
@@ -2061,6 +2438,290 @@
                 stopBtn.style.display = 'none';
                 abortController = null;
                 input.focus();
+            }
+        }
+        
+        // ============================================================
+        // METRICS TAB FUNCTIONALITY
+        // ============================================================
+        
+        function switchMainView(view) {
+            currentMainView = view;
+            
+            // Update navigation tabs
+            document.querySelectorAll('.main-nav-tab').forEach(tab => {
+                tab.classList.toggle('active', tab.dataset.view === view);
+            });
+            
+            // Update views
+            document.querySelectorAll('.main-view').forEach(v => {
+                v.classList.remove('active');
+            });
+            
+            // Show the appropriate view
+            if (view === 'chat') {
+                document.getElementById('chatView').classList.add('active');
+                document.querySelector('.input-area').style.display = '';
+            } else {
+                document.getElementById(`${view}View`).classList.add('active');
+                document.querySelector('.input-area').style.display = 'none';
+                
+                // Load data for the selected view
+                if (view === 'metrics') {
+                    refreshMetrics();
+                } else if (view === 'warnings') {
+                    refreshWarnings();
+                } else if (view === 'internals') {
+                    refreshInternals();
+                }
+            }
+        }
+        
+        // Fetch helper with error handling
+        async function fetchMetric(endpoint, elementId) {
+            const contentEl = document.getElementById(elementId);
+            if (!contentEl) return;
+            
+            contentEl.innerHTML = '<div class="metric-loading">Loading...</div>';
+            
+            try {
+                const res = await fetch(`${baseUrl}${endpoint}`);
+                if (!res.ok) {
+                    throw new Error(`HTTP ${res.status}`);
+                }
+                const data = await res.json();
+                return data;
+            } catch (e) {
+                contentEl.innerHTML = `<div class="metric-error">Failed to load: ${e.message}</div>`;
+                return null;
+            }
+        }
+        
+        // Render functions for different data types
+        function renderKeyValue(data, contentEl) {
+            if (!data || !contentEl) return;
+            
+            let html = '';
+            for (const [key, value] of Object.entries(data)) {
+                if (typeof value === 'object' && value !== null) {
+                    html += `<div class="metric-item"><span class="metric-label">${formatLabel(key)}</span><span class="metric-value">${JSON.stringify(value)}</span></div>`;
+                } else if (typeof value === 'boolean') {
+                    html += `<div class="metric-item"><span class="metric-label">${formatLabel(key)}</span><span class="metric-badge ${value ? 'active' : 'inactive'}">${value ? 'Yes' : 'No'}</span></div>`;
+                } else {
+                    const statusClass = getStatusClass(key, value);
+                    html += `<div class="metric-item"><span class="metric-label">${formatLabel(key)}</span><span class="metric-value ${statusClass}">${value}</span></div>`;
+                }
+            }
+            contentEl.innerHTML = html || '<div class="metric-item">No data available</div>';
+        }
+        
+        function formatLabel(key) {
+            return key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        }
+        
+        function getStatusClass(key, value) {
+            if (key.includes('status') && value === 'healthy') return 'healthy';
+            if (key.includes('status') && value === 'unhealthy') return 'error';
+            if (key.includes('status') && value === 'degraded') return 'warning';
+            if (key === 'safe' && value === true) return 'healthy';
+            if (key === 'safe' && value === false) return 'error';
+            return '';
+        }
+        
+        // Refresh Metrics
+        async function refreshMetrics() {
+            // Health
+            const healthData = await fetchMetric('/health', 'healthContent');
+            if (healthData) {
+                const healthEl = document.getElementById('healthContent');
+                let html = `<div class="metric-item"><span class="metric-label">Status</span><span class="metric-value ${healthData.status === 'healthy' ? 'healthy' : 'error'}">${healthData.status}</span></div>`;
+                if (healthData.checks) {
+                    for (const [check, passed] of Object.entries(healthData.checks)) {
+                        html += `<div class="metric-item"><span class="metric-label">${formatLabel(check)}</span><span class="metric-badge ${passed ? 'active' : 'inactive'}">${passed ? '✓' : '✗'}</span></div>`;
+                    }
+                }
+                if (healthData.timestamp) {
+                    html += `<div class="metric-item"><span class="metric-label">Last Check</span><span class="metric-value">${new Date(healthData.timestamp * 1000).toLocaleString()}</span></div>`;
+                }
+                healthEl.innerHTML = html;
+            }
+            
+            // System Status
+            const statusData = await fetchMetric('/v1/status', 'statusContent');
+            if (statusData) {
+                const statusEl = document.getElementById('statusContent');
+                let html = '';
+                if (statusData.step !== undefined) {
+                    html += `<div class="metric-item"><span class="metric-label">Total Steps</span><span class="metric-value">${statusData.step}</span></div>`;
+                }
+                if (statusData.deployment) {
+                    html += `<div class="metric-item"><span class="metric-label">Mode</span><span class="metric-value">${statusData.deployment.mode || 'N/A'}</span></div>`;
+                    html += `<div class="metric-item"><span class="metric-label">Uptime</span><span class="metric-value">${Math.round(statusData.deployment.uptime_seconds || 0)}s</span></div>`;
+                }
+                if (statusData.health) {
+                    html += `<div class="metric-item"><span class="metric-label">Memory Usage</span><span class="metric-value">${statusData.health.memory_usage_mb?.toFixed(1) || 0} MB</span></div>`;
+                    html += `<div class="metric-item"><span class="metric-label">Error Rate</span><span class="metric-value ${statusData.health.error_rate < 0.1 ? 'healthy' : 'error'}">${((statusData.health.error_rate || 0) * 100).toFixed(2)}%</span></div>`;
+                    html += `<div class="metric-item"><span class="metric-label">Latency</span><span class="metric-value">${statusData.health.latency_ms?.toFixed(0) || 0} ms</span></div>`;
+                }
+                statusEl.innerHTML = html || '<div class="metric-item">No status data available</div>';
+            }
+            
+            // Cognitive Systems
+            const cognitiveData = await fetchMetric('/v1/cognitive/status', 'cognitiveContent');
+            if (cognitiveData) {
+                const cognitiveEl = document.getElementById('cognitiveContent');
+                let html = '';
+                if (cognitiveData.summary) {
+                    html += `<div class="metric-item"><span class="metric-label">Active Systems</span><span class="metric-value healthy">${cognitiveData.summary.active_subsystems}/${cognitiveData.summary.total_subsystems}</span></div>`;
+                    html += `<div class="metric-item"><span class="metric-label">Activation</span><span class="metric-value">${cognitiveData.summary.activation_percentage}%</span></div>`;
+                }
+                if (cognitiveData.vulcan_cognitive_systems) {
+                    const systems = cognitiveData.vulcan_cognitive_systems;
+                    if (systems.agent_pool) {
+                        html += `<div class="metric-item"><span class="metric-label">Agent Pool</span><span class="metric-badge ${systems.agent_pool.active ? 'active' : 'inactive'}">${systems.agent_pool.active ? 'Active' : 'Inactive'}</span></div>`;
+                    }
+                    if (systems.reasoning) {
+                        const reasoningCount = Object.values(systems.reasoning).filter(Boolean).length;
+                        html += `<div class="metric-item"><span class="metric-label">Reasoning</span><span class="metric-value">${reasoningCount}/5 active</span></div>`;
+                    }
+                }
+                cognitiveEl.innerHTML = html || '<div class="metric-item">No cognitive data available</div>';
+            }
+            
+            // LLM Status
+            const llmData = await fetchMetric('/v1/llm/status', 'llmContent');
+            if (llmData) {
+                const llmEl = document.getElementById('llmContent');
+                let html = '';
+                if (llmData.openai) {
+                    html += `<div class="metric-item"><span class="metric-label">OpenAI Package</span><span class="metric-badge ${llmData.openai.package_available ? 'active' : 'inactive'}">${llmData.openai.package_available ? 'Available' : 'Not Available'}</span></div>`;
+                    html += `<div class="metric-item"><span class="metric-label">API Key Set</span><span class="metric-badge ${llmData.openai.api_key_set ? 'active' : 'inactive'}">${llmData.openai.api_key_set ? 'Yes' : 'No'}</span></div>`;
+                    html += `<div class="metric-item"><span class="metric-label">Client Initialized</span><span class="metric-badge ${llmData.openai.client_initialized ? 'active' : 'inactive'}">${llmData.openai.client_initialized ? 'Yes' : 'No'}</span></div>`;
+                }
+                if (llmData.local_llm) {
+                    html += `<div class="metric-item"><span class="metric-label">Local LLM</span><span class="metric-badge ${llmData.local_llm.available ? 'active' : 'inactive'}">${llmData.local_llm.available ? 'Available' : 'Not Available'}</span></div>`;
+                }
+                llmEl.innerHTML = html || '<div class="metric-item">No LLM data available</div>';
+            }
+        }
+        
+        // Refresh Warnings
+        async function refreshWarnings() {
+            // Safety Status
+            const safetyData = await fetchMetric('/safety/status', 'safetyContent');
+            if (safetyData) {
+                const safetyEl = document.getElementById('safetyContent');
+                let html = '';
+                html += `<div class="metric-item"><span class="metric-label">Safety Score</span><span class="metric-value ${safetyData.safety_score >= 0.9 ? 'healthy' : 'warning'}">${(safetyData.safety_score * 100).toFixed(0)}%</span></div>`;
+                html += `<div class="metric-item"><span class="metric-label">Violations Detected</span><span class="metric-value ${safetyData.violations_detected === 0 ? 'healthy' : 'error'}">${safetyData.violations_detected}</span></div>`;
+                html += `<div class="metric-item"><span class="metric-label">Violations Prevented</span><span class="metric-value">${safetyData.violations_prevented}</span></div>`;
+                html += `<div class="metric-item"><span class="metric-label">Monitoring</span><span class="metric-badge ${safetyData.monitoring_active ? 'active' : 'inactive'}">${safetyData.monitoring_active ? 'Active' : 'Inactive'}</span></div>`;
+                safetyEl.innerHTML = html;
+            }
+            
+            // Audit Logs
+            const auditData = await fetchMetric('/safety/audit/recent?limit=10', 'auditContent');
+            if (auditData && auditData.audit_logs) {
+                const auditEl = document.getElementById('auditContent');
+                let html = '';
+                for (const log of auditData.audit_logs) {
+                    const timestamp = log.timestamp ? new Date(log.timestamp * 1000).toLocaleString() : 'N/A';
+                    html += `<div class="audit-entry">
+                        <div class="timestamp">${timestamp}</div>
+                        <div class="event">${log.event || log.details || JSON.stringify(log)}</div>
+                    </div>`;
+                }
+                auditEl.innerHTML = html || '<div class="metric-item">No audit logs available</div>';
+            }
+            
+            // Adversarial Status
+            const adversarialData = await fetchMetric('/api/adversarial/status', 'adversarialContent');
+            if (adversarialData) {
+                const adversarialEl = document.getElementById('adversarialContent');
+                renderKeyValue(adversarialData, adversarialEl);
+            } else {
+                document.getElementById('adversarialContent').innerHTML = '<div class="metric-item">Adversarial monitoring not available</div>';
+            }
+        }
+        
+        // Refresh Internals
+        async function refreshInternals() {
+            // World Model
+            const worldModelData = await fetchMetric('/world-model/status', 'worldModelContent');
+            if (worldModelData) {
+                const wmEl = document.getElementById('worldModelContent');
+                let html = '';
+                html += `<div class="metric-item"><span class="metric-label">Active</span><span class="metric-badge ${worldModelData.active ? 'active' : 'inactive'}">${worldModelData.active ? 'Yes' : 'No'}</span></div>`;
+                html += `<div class="metric-item"><span class="metric-label">Entities Tracked</span><span class="metric-value">${worldModelData.entities_tracked}</span></div>`;
+                html += `<div class="metric-item"><span class="metric-label">Relationships</span><span class="metric-value">${worldModelData.relationships_tracked}</span></div>`;
+                html += `<div class="metric-item"><span class="metric-label">Prediction Accuracy</span><span class="metric-value">${(worldModelData.prediction_accuracy * 100).toFixed(1)}%</span></div>`;
+                wmEl.innerHTML = html;
+            }
+            
+            // Memory System
+            const memoryData = await fetchMetric('/memory/status', 'memoryContent');
+            if (memoryData) {
+                const memoryEl = document.getElementById('memoryContent');
+                let html = '';
+                html += `<div class="metric-item"><span class="metric-label">Total Memories</span><span class="metric-value">${memoryData.total_memories}</span></div>`;
+                html += `<div class="metric-item"><span class="metric-label">Memory Usage</span><span class="metric-value">${memoryData.memory_usage_mb?.toFixed(1) || 0} MB</span></div>`;
+                html += `<div class="metric-item"><span class="metric-label">Retrieval Latency</span><span class="metric-value">${memoryData.retrieval_latency_ms?.toFixed(0) || 0} ms</span></div>`;
+                html += `<div class="metric-item"><span class="metric-label">Storage Backend</span><span class="metric-value">${memoryData.storage_backend}</span></div>`;
+                memoryEl.innerHTML = html;
+            }
+            
+            // Hardware Status
+            const hardwareData = await fetchMetric('/hardware/status', 'hardwareContent');
+            if (hardwareData) {
+                const hardwareEl = document.getElementById('hardwareContent');
+                let html = '';
+                html += `<div class="metric-item"><span class="metric-label">CPU Usage</span><span class="metric-value ${hardwareData.cpu_usage_percent > 80 ? 'warning' : ''}">${hardwareData.cpu_usage_percent?.toFixed(1) || 0}%</span></div>`;
+                html += `<div class="metric-item"><span class="metric-label">Memory Usage</span><span class="metric-value">${hardwareData.memory_usage_mb?.toFixed(1) || 0} MB</span></div>`;
+                html += `<div class="metric-item"><span class="metric-label">GPU Available</span><span class="metric-badge ${hardwareData.gpu_available ? 'active' : 'inactive'}">${hardwareData.gpu_available ? 'Yes' : 'No'}</span></div>`;
+                if (hardwareData.gpu_available) {
+                    html += `<div class="metric-item"><span class="metric-label">GPU Usage</span><span class="metric-value">${hardwareData.gpu_usage_percent?.toFixed(1) || 0}%</span></div>`;
+                }
+                hardwareEl.innerHTML = html;
+            }
+            
+            // Routing Status
+            const routingData = await fetchMetric('/v1/routing/status', 'routingContent');
+            if (routingData) {
+                const routingEl = document.getElementById('routingContent');
+                renderKeyValue(routingData, routingEl);
+            }
+            
+            // Available Endpoints
+            const endpointsEl = document.getElementById('endpointsContent');
+            const endpoints = [
+                '/health', '/health/live', '/health/ready', '/health/components',
+                '/v1/status', '/v1/cognitive/status', '/v1/llm/status', '/v1/routing/status',
+                '/metrics', '/vulcan/health', '/vulcan/v1/chat',
+                '/safety/status', '/safety/audit/recent', '/safety/validate',
+                '/world-model/status', '/world-model/predict',
+                '/memory/status', '/memory/search',
+                '/hardware/status',
+                '/self-improvement/objectives',
+                '/orchestrator/agents/status'
+            ];
+            let endpointsHtml = '<div class="endpoint-list">';
+            for (const endpoint of endpoints) {
+                endpointsHtml += `<span class="endpoint-item" onclick="testEndpoint('${endpoint}')">${endpoint}</span>`;
+            }
+            endpointsHtml += '</div>';
+            endpointsEl.innerHTML = endpointsHtml;
+        }
+        
+        // Test an endpoint and show results
+        async function testEndpoint(endpoint) {
+            try {
+                const res = await fetch(`${baseUrl}${endpoint}`);
+                const data = await res.json();
+                console.log(`Endpoint ${endpoint}:`, data);
+                showToast(`${endpoint}: ${res.status} OK`, 'success');
+            } catch (e) {
+                console.error(`Endpoint ${endpoint} failed:`, e);
+                showToast(`${endpoint}: Failed - ${e.message}`, 'error');
             }
         }
     </script>
