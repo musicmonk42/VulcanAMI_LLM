@@ -3195,6 +3195,94 @@ class QueryAnalyzer:
             )
             return plan
 
+        # =================================================================
+        # BUG #9 FIX: CREATIVE QUERY FAST-PATH (BEFORE MATH!)
+        # =================================================================
+        # Creative tasks like "Write quantum sonnet" were incorrectly routed
+        # to MATH because "quantum" triggered mathematical keyword detection.
+        # 
+        # The fix: Check for CREATIVE task type BEFORE checking for math keywords.
+        # Task type (write, compose) has HIGHER priority than domain keywords (quantum).
+        # =================================================================
+        if query and self._is_creative_query(query):
+            logger.info(
+                f"[QueryRouter] {query_id}: BUG#9 FIX - CREATIVE-FAST-PATH detected "
+                f"(task type overrides domain keywords)"
+            )
+            
+            # Determine learning mode
+            if source == "user":
+                learning_mode = LearningMode.USER_INTERACTION
+                with self._lock:
+                    self._user_interaction_count += 1
+                telemetry_category = "user_query"
+            else:
+                learning_mode = LearningMode.AI_INTERACTION
+                with self._lock:
+                    self._ai_interaction_count += 1
+                telemetry_category = f"{source}_interaction"
+            
+            # Create plan for creative tasks
+            plan = ProcessingPlan(
+                query_id=query_id,
+                original_query=query,
+                source=source,
+                learning_mode=learning_mode,
+                query_type=QueryType.REASONING,  # Creative uses reasoning (analogical)
+                complexity_score=0.4,  # Moderate complexity for creative tasks
+                uncertainty_score=0.2,  # Some uncertainty - creative is subjective
+                collaboration_needed=False,  # Creative is usually single-agent
+                arena_participation=False,  # Skip arena for creative
+                telemetry_category=telemetry_category,
+                telemetry_data={
+                    "session_id": session_id,
+                    "query_length": len(query),
+                    "word_count": len(query.split()),
+                    "query_number": query_number,
+                    "source": source,
+                    "learning_mode": learning_mode.value,
+                    "fast_path": True,
+                    "creative_fast_path": True,
+                    "bug9_fix_applied": True,
+                },
+            )
+            
+            plan.safety_passed = True
+            plan.detected_patterns.append("creative_task")
+            plan.detected_patterns.append("bug9_task_type_priority")
+            
+            # Route to creative tools (analogical for metaphor/style, world_model for context)
+            creative_tools = ["analogical", "world_model"]
+            
+            plan.agent_tasks = [
+                AgentTask(
+                    task_id=f"task_{uuid.uuid4().hex[:8]}_creative",
+                    task_type="creative_task",
+                    capability="reasoning",
+                    prompt=query,
+                    priority=2,  # Moderate priority
+                    timeout_seconds=30.0,  # Creative needs more time
+                    parameters={
+                        "is_creative": True,
+                        "skip_heavy_analysis": True,
+                        "skip_arena": True,
+                        "tools": creative_tools,
+                        "preferred_tool": "analogical",  # Best for creative tasks
+                        "response_type": "creative",
+                        "bug9_fix": True,
+                    },
+                )
+            ]
+            
+            plan.telemetry_data["selected_tools"] = creative_tools
+            plan.telemetry_data["reasoning_strategy"] = "creative_analogical"
+            
+            logger.info(
+                f"[QueryRouter] {query_id}: CREATIVE-FAST-PATH source={source}, "
+                f"tasks=1, tools={creative_tools}, complexity=0.40"
+            )
+            return plan
+
         # PERFORMANCE FIX: Mathematical query fast-path
         # Mathematical queries (Bayesian probability, statistics, calculations) should
         # bypass arena/multi-agent orchestration that causes 60+ second delays.
@@ -3974,6 +4062,96 @@ class QueryAnalyzer:
                 if not suffix or all(c in "!.?,;: " for c in suffix):
                     return True
 
+        return False
+
+    def _is_creative_query(self, query: str) -> bool:
+        """
+        BUG #9 FIX: Detect creative writing tasks that should NOT use mathematical routing.
+        
+        Problem: "Write quantum sonnet" was being routed to MATH because "quantum" 
+        triggered mathematical keyword detection. But "write" is a CREATIVE task
+        that should override domain keywords.
+        
+        Priority hierarchy (from problem statement):
+        1. Task type (write, compose, create) - HIGHEST PRIORITY
+        2. Computational intent (calculate, optimize)
+        3. Domain keywords (quantum, ethics)
+        
+        Examples:
+        - "Write a quantum sonnet" -> True (creative task despite "quantum")
+        - "Write a poem about calculus" -> True (creative task despite "calculus")
+        - "Compose a song about physics" -> True (creative task)
+        - "Calculate the integral" -> False (mathematical task)
+        - "What is quantum physics?" -> False (informational query)
+        
+        Args:
+            query: The query string (not lowercased)
+            
+        Returns:
+            True if query is a creative writing/composition task
+        """
+        query_lower = query.lower().strip()
+        
+        # Creative task verbs that indicate writing/composition
+        # These should take HIGHEST priority over domain keywords
+        creative_task_markers = (
+            'write', 'compose', 'create', 'craft', 'draft', 'author',
+            'pen', 'generate a story', 'generate a poem', 'generate a song',
+            'tell a story', 'make up a story', 'make a poem',
+            'imagine a story', 'imagine a poem',
+        )
+        
+        # Creative output types (nouns that indicate creative output)
+        creative_outputs = (
+            'poem', 'sonnet', 'haiku', 'limerick', 'ballad', 'verse',
+            'story', 'tale', 'narrative', 'fable', 'myth', 'legend',
+            'song', 'lyrics', 'jingle', 'melody',
+            'essay', 'article', 'blog', 'post',
+            'script', 'dialogue', 'monologue', 'screenplay',
+            'novel', 'novella', 'fiction', 'prose',
+        )
+        
+        # Check for creative task markers at the BEGINNING of the query
+        # This is the strongest signal - user explicitly starts with "Write..."
+        query_start = query_lower[:50]  # Check first 50 chars
+        for marker in creative_task_markers:
+            if query_start.startswith(marker):
+                logger.debug(
+                    f"[QueryRouter] BUG#9 FIX: Creative task detected - "
+                    f"query starts with '{marker}'"
+                )
+                return True
+        
+        # Check for creative task markers anywhere with creative output type
+        # "Write a quantum sonnet" -> has "write" + "sonnet"
+        has_creative_verb = any(marker in query_lower for marker in creative_task_markers)
+        has_creative_output = any(output in query_lower for output in creative_outputs)
+        
+        if has_creative_verb and has_creative_output:
+            logger.debug(
+                f"[QueryRouter] BUG#9 FIX: Creative task detected - "
+                f"creative verb + creative output type"
+            )
+            return True
+        
+        # Check if query is asking to generate/create creative content
+        # "Generate a poem" or "Create a story"
+        generate_create_patterns = (
+            'generate a ', 'generate an ', 'generate the ',
+            'create a ', 'create an ', 'create the ',
+            'make a ', 'make an ', 'make the ',
+        )
+        for pattern in generate_create_patterns:
+            if pattern in query_lower:
+                # Check if followed by creative output type
+                rest = query_lower.split(pattern, 1)[1][:30]  # Next 30 chars after pattern
+                if any(output in rest for output in creative_outputs):
+                    logger.debug(
+                        f"[QueryRouter] BUG#9 FIX: Creative task detected - "
+                        f"'{pattern}' followed by creative output"
+                    )
+                    return True
+        
         return False
 
     def _classify_query_type(self, query_lower: str) -> QueryType:
