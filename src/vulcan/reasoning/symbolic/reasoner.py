@@ -102,6 +102,10 @@ class SymbolicReasoner:
         >>> result = reasoner.query("mortal(socrates)")
     """
 
+    # BUG #4 FIX: Constants for symbolic query detection
+    # Minimum number of logic keywords required to classify as symbolic
+    MIN_LOGIC_KEYWORDS = 2
+
     def __init__(self, prover_type: str = "parallel"):
         """
         Initialize symbolic reasoner.
@@ -126,6 +130,109 @@ class SymbolicReasoner:
             return ParallelProver()
         else:
             return ResolutionProver()
+
+    def is_symbolic_query(self, query: str) -> bool:
+        """
+        BUG #4 FIX: Check if query is actually about formal logic.
+        
+        The symbolic parser expects formal logic but often receives natural language,
+        causing parse errors like "Unexpected token 'the' at line 1, column 5".
+        
+        This method checks if a query is appropriate for symbolic reasoning before
+        attempting to parse it. This prevents wasted computation and provides
+        meaningful feedback when queries are not applicable.
+        
+        Args:
+            query: Query string to check
+            
+        Returns:
+            True if query appears to contain formal logic notation, False otherwise
+            
+        Examples:
+            >>> reasoner = SymbolicReasoner()
+            >>> reasoner.is_symbolic_query("A→B ∧ B→C")  # Contains logic operators
+            True
+            >>> reasoner.is_symbolic_query("Is it raining?")  # Natural language
+            False
+            >>> reasoner.is_symbolic_query("∀X (human(X) → mortal(X))")
+            True
+        """
+        if not query or not query.strip():
+            return False
+            
+        query_lower = query.lower()
+        
+        # Strong indicators of formal logic - Unicode symbols
+        logic_symbols = ['→', '∧', '∨', '¬', '⇒', '⇔', '∀', '∃', '⊢', '⊨']
+        
+        # ASCII alternatives for logic symbols
+        ascii_logic = ['->', '<->', '&&', '||', '~', '!']
+        
+        # Logic keywords that indicate formal reasoning
+        logic_keywords = [
+            'satisfiable', 'validity', 'entails', 'proof',
+            'theorem', 'axiom', 'proposition', 'predicate',
+            'forall', 'exists', 'implies', 'iff',
+            'cnf', 'dnf', 'horn clause', 'resolution'
+        ]
+        
+        # Check for Unicode logic symbols
+        has_symbols = any(sym in query for sym in logic_symbols)
+        if has_symbols:
+            return True
+        
+        # Check for ASCII logic operators
+        has_ascii_ops = any(op in query for op in ascii_logic)
+        if has_ascii_ops:
+            return True
+        
+        # Check for logic keywords (need at least MIN_LOGIC_KEYWORDS for confidence)
+        keyword_count = sum(1 for kw in logic_keywords if kw in query_lower)
+        if keyword_count >= self.MIN_LOGIC_KEYWORDS:
+            return True
+        
+        # Check for formal notation patterns like "A→B", "P(x)", "∀X"
+        # Pattern: uppercase letter followed by logic operator followed by uppercase letter
+        # Note: Using raw string with explicit Unicode characters for cross-platform compatibility
+        formal_pattern = re.search(r'\b[A-Z]\s*[-\u2192\u2227\u2228\u00AC]\s*[A-Z]\b', query)
+        if formal_pattern:
+            return True
+        
+        # Check for predicate-style notation: P(x), Human(socrates), etc.
+        predicate_pattern = re.search(r'[A-Za-z]+\([A-Za-z,\s]+\)', query)
+        if predicate_pattern and keyword_count >= 1:
+            return True
+        
+        return False
+
+    def check_applicability(self, query: str) -> Dict[str, Any]:
+        """
+        BUG #4 FIX: Check if query is applicable for symbolic reasoning.
+        
+        This is the public interface for applicability checking. Use this before
+        calling query() to avoid parse errors on non-symbolic queries.
+        
+        Args:
+            query: Query string to check
+            
+        Returns:
+            Dictionary with:
+                - applicable: bool - Whether symbolic reasoning applies
+                - reason: str - Explanation if not applicable
+                - confidence: float - Confidence in the applicability decision
+        """
+        if self.is_symbolic_query(query):
+            return {
+                'applicable': True,
+                'reason': 'Query contains formal logic notation',
+                'confidence': 0.85
+            }
+        else:
+            return {
+                'applicable': False,
+                'reason': 'Query does not contain formal logic notation (no symbols like →, ∧, ∨, ¬, ∀, ∃)',
+                'confidence': 0.0
+            }
 
     def add_rule(self, formula_str: str, confidence: float = 1.0):
         """
@@ -153,13 +260,14 @@ class SymbolicReasoner:
         """
         self.add_rule(formula_str, confidence)
 
-    def query(self, query_str: str, timeout: float = 10.0) -> Dict[str, Any]:
+    def query(self, query_str: str, timeout: float = 10.0, check_applicability: bool = True) -> Dict[str, Any]:
         """
         Query the knowledge base.
 
         Args:
             query_str: Query formula
             timeout: Timeout in seconds
+            check_applicability: BUG #4 FIX - If True, check if query is symbolic before parsing
 
         Returns:
             Dictionary with:
@@ -167,7 +275,24 @@ class SymbolicReasoner:
                 - confidence: float
                 - proof: ProofNode or None
                 - method: str (if parallel prover)
+                - applicable: bool (BUG #4 FIX - whether query was applicable for symbolic reasoning)
         """
+        # BUG #4 FIX: Check applicability before attempting to parse
+        # This prevents parse errors like "Unexpected token 'the'" on natural language
+        if check_applicability and not self.is_symbolic_query(query_str):
+            logger.warning(
+                f"[SymbolicReasoner] Query does not appear to contain formal logic, "
+                f"returning not applicable (BUG#4 FIX prevents wasted computation)"
+            )
+            return {
+                "proven": False,
+                "confidence": 0.0,
+                "proof": None,
+                "method": self.prover_type,
+                "applicable": False,
+                "reason": "Query does not contain formal logic notation",
+            }
+        
         try:
             query_clause = self.parse_formula(query_str)
 
@@ -180,6 +305,7 @@ class SymbolicReasoner:
                     "confidence": confidence,
                     "proof": proof,
                     "method": method,
+                    "applicable": True,
                 }
             else:
                 proven, proof, confidence = self.prover.prove(
@@ -190,11 +316,13 @@ class SymbolicReasoner:
                     "confidence": confidence,
                     "proof": proof,
                     "method": self.prover_type,
+                    "applicable": True,
                 }
         except Exception as e:
             logger.error(f"Query failed: {e}")
             # FIX: Return minimum confidence floor instead of 0.0 for errors
-            return {"proven": False, "confidence": 0.1, "proof": None, "error": str(e)}
+            return {"proven": False, "confidence": 0.1, "proof": None, "error": str(e), "applicable": True}
+
 
     def parse_formula(self, formula_str: str) -> Clause:
         """

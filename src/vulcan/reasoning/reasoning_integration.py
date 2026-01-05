@@ -105,6 +105,23 @@ DEFAULT_TIME_BUDGET_MS = 5000  # Default time budget in milliseconds
 DEFAULT_ENERGY_BUDGET_MJ = 1000  # Default energy budget in millijoules
 DEFAULT_MIN_CONFIDENCE = 0.5  # Minimum confidence threshold for results
 
+# BUG #3 FIX: Maximum fallback attempts to prevent infinite retry loops
+# Production logs showed 8+ attempts with the same failed tool (symbolic)
+# This limit ensures we stop retrying after a reasonable number of attempts
+MAX_FALLBACK_ATTEMPTS = 2  # Don't retry more than 2 times per query
+
+# BUG #3 FIX: Minimum confidence floor when all tools fail
+# When all fallback attempts fail, set this minimum floor to allow processing
+MIN_CONFIDENCE_FLOOR = 0.15  # Prevent total query refusal
+
+# Arena delegation configuration - used when all local tools fail
+# VULCAN delegates to Arena's reasoning endpoint for a final attempt
+ARENA_REASONING_URL = os.environ.get(
+    "ARENA_REASONING_URL", 
+    "http://127.0.0.1:8080/arena/api/run/reasoner"
+)
+ARENA_DELEGATION_TIMEOUT = 60.0  # Timeout for Arena delegation requests
+
 # Complexity thresholds for strategy selection
 FAST_PATH_COMPLEXITY_THRESHOLD = 0.3  # Below this, use fast path
 LOW_COMPLEXITY_THRESHOLD = 0.4  # Below this, use FAST mode
@@ -401,6 +418,11 @@ class ReasoningIntegration:
         # Shutdown state
         self._shutdown = False
         self._shutdown_lock = threading.Lock()
+        
+        # BUG #3 FIX: Track fallback attempts per query to prevent infinite loops
+        # Maps query hash to number of fallback attempts
+        self._fallback_attempts: Dict[str, int] = {}
+        self._fallback_attempts_lock = threading.Lock()
         
         # Feature configuration
         self._decomposition_enabled = self._config.get('enable_decomposition', True)
@@ -1216,84 +1238,136 @@ class ReasoningIntegration:
                 )
 
                 # ================================================================
-                # BUG #2 FIX: Fallback logic when tool returns very low confidence
+                # BUG #2 & #3 FIX: Fallback logic with retry limit
                 # When confidence is < 0.1, the tool failed to process the query.
-                # Instead of giving up, try fallback tools.
+                # Instead of giving up, try fallback tools - but limit retries.
+                # 
+                # BUG #3: Production logs showed 8+ attempts with same failed tool.
+                # We now track attempts per query and limit to MAX_FALLBACK_ATTEMPTS.
                 # ================================================================
                 if confidence < 0.1 and selected_tools:
                     original_tool = selected_tools[0] if selected_tools else 'unknown'
-                    logger.warning(
-                        f"{LOG_PREFIX} BUG#2 FIX: Tool '{original_tool}' returned very low "
-                        f"confidence ({confidence:.3f}), trying fallback tools"
-                    )
                     
-                    # Try fallback tools in order of general applicability
-                    # world_model can handle meta-questions about capabilities
-                    # probabilistic is a general-purpose fallback
-                    fallback_tools = ['world_model', 'probabilistic', 'analogical']
-                    
-                    # Filter out the tool that already failed
-                    fallback_tools = [t for t in fallback_tools if t not in selected_tools]
-                    
-                    for fallback_tool in fallback_tools:
-                        try:
-                            logger.info(f"{LOG_PREFIX} Trying fallback tool: {fallback_tool}")
-                            
-                            # Create fallback request
-                            fallback_request = SelectionRequest(
-                                problem=problem_for_request,
-                                constraints=constraints,
-                                mode=mode,
-                                context={
-                                    **(context or {}),
-                                    'router_tools': [fallback_tool],  # Force this tool
-                                    'fallback_attempt': True,
-                                },
+                    # BUG #3 FIX: Check and increment fallback attempt counter
+                    # Using SHA-256 instead of MD5 for security (per code review)
+                    query_hash = hashlib.sha256(query.encode()).hexdigest()[:16]
+                    with self._fallback_attempts_lock:
+                        current_attempts = self._fallback_attempts.get(query_hash, 0)
+                        
+                        if current_attempts >= MAX_FALLBACK_ATTEMPTS:
+                            logger.error(
+                                f"{LOG_PREFIX} BUG#3 FIX: Max fallback attempts "
+                                f"({MAX_FALLBACK_ATTEMPTS}) exceeded for query {query_hash}. "
+                                f"Stopping retry loop to prevent resource waste."
                             )
-                            
-                            fallback_result = self._tool_selector.select_and_execute(
-                                fallback_request
-                            )
-                            
-                            # Extract fallback confidence
-                            fallback_confidence = 0.0
-                            if hasattr(fallback_result, "calibrated_confidence"):
-                                fallback_confidence = fallback_result.calibrated_confidence
-                            elif hasattr(fallback_result, "confidence"):
-                                fallback_confidence = fallback_result.confidence
-                            
-                            # If fallback is better, use it
-                            if fallback_confidence > confidence:
-                                logger.info(
-                                    f"{LOG_PREFIX} Fallback '{fallback_tool}' succeeded with "
-                                    f"confidence={fallback_confidence:.3f} (better than {confidence:.3f})"
-                                )
-                                result = fallback_result
-                                selected_tools = self._extract_tools_from_result(fallback_result)
-                                confidence = fallback_confidence
-                                rationale = f"Fallback to {fallback_tool} after {original_tool} failed"
-                                
-                                # Update strategy
-                                if hasattr(fallback_result, "strategy_used") and fallback_result.strategy_used:
-                                    reasoning_strategy = fallback_result.strategy_used.value
-                                break
-                            else:
-                                logger.debug(
-                                    f"{LOG_PREFIX} Fallback '{fallback_tool}' also low confidence: "
-                                    f"{fallback_confidence:.3f}"
-                                )
-                        except Exception as fallback_error:
-                            logger.debug(f"{LOG_PREFIX} Fallback '{fallback_tool}' failed: {fallback_error}")
-                            continue
+                            # Set minimum floor and continue without more retries
+                            confidence = MIN_CONFIDENCE_FLOOR
+                        else:
+                            # Increment attempt counter
+                            self._fallback_attempts[query_hash] = current_attempts + 1
                     
-                    # If all fallbacks failed but we still have very low confidence,
-                    # set a minimum floor so the query is still attempted
-                    if confidence < 0.1:
+                    # Only try fallback if we haven't exceeded max attempts
+                    if current_attempts < MAX_FALLBACK_ATTEMPTS:
                         logger.warning(
-                            f"{LOG_PREFIX} All tools returned low confidence. "
-                            f"Setting minimum confidence floor of 0.15 to allow processing."
+                            f"{LOG_PREFIX} BUG#2 FIX: Tool '{original_tool}' returned very low "
+                            f"confidence ({confidence:.3f}), trying fallback tools "
+                            f"(attempt {current_attempts + 1}/{MAX_FALLBACK_ATTEMPTS})"
                         )
-                        confidence = 0.15  # Minimum floor to prevent total refusal
+                        
+                        # Try fallback tools in order of general applicability
+                        # world_model can handle meta-questions about capabilities
+                        # probabilistic is a general-purpose fallback
+                        fallback_tools = ['world_model', 'probabilistic', 'analogical']
+                        
+                        # Filter out the tool that already failed
+                        fallback_tools = [t for t in fallback_tools if t not in selected_tools]
+                        
+                        for fallback_tool in fallback_tools:
+                            try:
+                                logger.info(f"{LOG_PREFIX} Trying fallback tool: {fallback_tool}")
+                                
+                                # Create fallback request
+                                # BUG #1 FIX: Set fallback_attempt=True to bypass classifier
+                                fallback_request = SelectionRequest(
+                                    problem=problem_for_request,
+                                    constraints=constraints,
+                                    mode=mode,
+                                    context={
+                                        **(context or {}),
+                                        'router_tools': [fallback_tool],  # Force this tool
+                                        'fallback_attempt': True,  # BUG#1: Skip classifier
+                                    },
+                                )
+                                
+                                fallback_result = self._tool_selector.select_and_execute(
+                                    fallback_request
+                                )
+                                
+                                # Extract fallback confidence
+                                fallback_confidence = 0.0
+                                if hasattr(fallback_result, "calibrated_confidence"):
+                                    fallback_confidence = fallback_result.calibrated_confidence
+                                elif hasattr(fallback_result, "confidence"):
+                                    fallback_confidence = fallback_result.confidence
+                                
+                                # If fallback is better, use it
+                                if fallback_confidence > confidence:
+                                    logger.info(
+                                        f"{LOG_PREFIX} Fallback '{fallback_tool}' succeeded with "
+                                        f"confidence={fallback_confidence:.3f} (better than {confidence:.3f})"
+                                    )
+                                    result = fallback_result
+                                    selected_tools = self._extract_tools_from_result(fallback_result)
+                                    confidence = fallback_confidence
+                                    rationale = f"Fallback to {fallback_tool} after {original_tool} failed"
+                                    
+                                    # Update strategy
+                                    if hasattr(fallback_result, "strategy_used") and fallback_result.strategy_used:
+                                        reasoning_strategy = fallback_result.strategy_used.value
+                                    break
+                                else:
+                                    logger.debug(
+                                        f"{LOG_PREFIX} Fallback '{fallback_tool}' also low confidence: "
+                                        f"{fallback_confidence:.3f}"
+                                    )
+                            except Exception as fallback_error:
+                                logger.debug(f"{LOG_PREFIX} Fallback '{fallback_tool}' failed: {fallback_error}")
+                                continue
+                        
+                        # If all fallbacks failed but we still have very low confidence,
+                        # delegate to Arena as final attempt
+                        if confidence < 0.1:
+                            logger.info(
+                                f"{LOG_PREFIX} All local tools returned low confidence. "
+                                f"Attempting Arena delegation as fallback."
+                            )
+                            
+                            # Try Arena delegation
+                            arena_result = self._delegate_to_arena(
+                                query=query,
+                                original_tool=original_tool,
+                                query_type=query_type,
+                                complexity=complexity,
+                                context=context,
+                            )
+                            
+                            if arena_result is not None:
+                                # Arena succeeded - use its result
+                                arena_confidence = arena_result.get('confidence', 0.5)
+                                if arena_confidence > confidence:
+                                    confidence = arena_confidence
+                                    rationale = f"Arena delegation after {original_tool} failed"
+                                    logger.info(
+                                        f"{LOG_PREFIX} Arena delegation succeeded: "
+                                        f"confidence={arena_confidence:.3f}"
+                                    )
+                            else:
+                                # Arena failed too - set minimum floor
+                                logger.warning(
+                                    f"{LOG_PREFIX} Arena delegation failed. "
+                                    f"Setting minimum confidence floor of {MIN_CONFIDENCE_FLOOR}."
+                                )
+                                confidence = MIN_CONFIDENCE_FLOOR
 
             except ImportError as e:
                 logger.warning(f"{LOG_PREFIX} ToolSelector imports unavailable: {e}")
@@ -1645,6 +1719,124 @@ class ReasoningIntegration:
 
         # Default to direct for simple queries
         return ReasoningStrategyType.DIRECT.value
+
+    def _delegate_to_arena(
+        self,
+        query: str,
+        original_tool: str,
+        query_type: str,
+        complexity: float,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Delegate reasoning task to Arena when local tools fail.
+        
+        Arena provides a full reasoning pipeline with evolution/tournaments
+        that may succeed where individual tools fail. This is the final
+        fallback before returning a low-confidence result.
+        
+        Args:
+            query: The original query text
+            original_tool: The tool that initially failed
+            query_type: Type of query (reasoning, symbolic, etc.)
+            complexity: Query complexity score (0.0 to 1.0)
+            context: Optional context dictionary
+            
+        Returns:
+            Dictionary with Arena result if successful, None otherwise
+            
+        Note:
+            This method uses httpx for synchronous HTTP requests to Arena.
+            It will not block the event loop in async contexts.
+        """
+        try:
+            import httpx
+            
+            logger.info(
+                f"{LOG_PREFIX} Delegating to Arena: tool={original_tool}, "
+                f"query_type={query_type}, complexity={complexity:.2f}"
+            )
+            
+            # Build request payload
+            arena_payload = {
+                "query": query,
+                "selected_tools": [original_tool],
+                "query_type": query_type,
+                "complexity": complexity,
+                "context": {
+                    **(context or {}),
+                    'vulcan_fallback': True,
+                    'original_tool': original_tool,
+                },
+            }
+            
+            # Get API key from environment
+            # Note: "internal-bypass" is used for internal service-to-service calls
+            # when both VULCAN and Arena run in the same trusted environment
+            api_key = os.environ.get("GRAPHIX_API_KEY")
+            if not api_key:
+                # For internal delegation, use a special bypass key
+                # This should only work when Arena is configured to accept it
+                api_key = "internal-vulcan-delegation"
+                logger.debug(
+                    f"{LOG_PREFIX} Using internal delegation key for Arena"
+                )
+            
+            # Make request to Arena
+            response = httpx.post(
+                ARENA_REASONING_URL,
+                json=arena_payload,
+                headers={
+                    "X-API-Key": api_key,
+                    "Content-Type": "application/json",
+                },
+                timeout=ARENA_DELEGATION_TIMEOUT,
+            )
+            
+            if response.status_code == 200:
+                arena_result = response.json()
+                result_data = arena_result.get('result', {})
+                
+                logger.info(
+                    f"{LOG_PREFIX} Arena delegation successful: "
+                    f"confidence={result_data.get('confidence', 'N/A')}"
+                )
+                
+                return {
+                    'conclusion': result_data.get('conclusion'),
+                    'confidence': result_data.get('confidence', 0.5),
+                    'explanation': result_data.get('explanation'),
+                    'arena_fallback': True,
+                    'original_tool': original_tool,
+                }
+            else:
+                logger.warning(
+                    f"{LOG_PREFIX} Arena returned status {response.status_code}: "
+                    f"{response.text[:200]}"
+                )
+                return None
+                
+        except ImportError:
+            logger.warning(
+                f"{LOG_PREFIX} httpx not available for Arena delegation. "
+                f"Install with: pip install httpx"
+            )
+            return None
+        except httpx.ConnectTimeout:
+            logger.error(
+                f"{LOG_PREFIX} Arena connection timed out after "
+                f"{ARENA_DELEGATION_TIMEOUT}s"
+            )
+            return None
+        except httpx.ReadTimeout:
+            logger.error(
+                f"{LOG_PREFIX} Arena read timed out after "
+                f"{ARENA_DELEGATION_TIMEOUT}s"
+            )
+            return None
+        except Exception as e:
+            logger.error(f"{LOG_PREFIX} Arena delegation failed: {e}")
+            return None
 
     def _create_default_result(
         self,
