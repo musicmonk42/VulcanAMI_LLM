@@ -882,9 +882,9 @@ class QueryPreprocessor:
             return []
 
         # Determine the primary separator
-        # If there are more newlines than commas containing logical content, use newlines
+        # Strategy: Use newlines as separator if there are multiple valid constraints
+        # on separate lines; otherwise fall back to comma separator.
         newline_count = constraints_str.count('\n')
-        comma_count = constraints_str.count(',')
         
         # Use newlines if there are multiple newline-separated items that look like constraints
         if newline_count > 0:

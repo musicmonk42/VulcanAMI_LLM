@@ -1024,13 +1024,17 @@ Task: Check satisfiability.
         newline_result = preprocessor._split_inline_constraints("A→B\nB→C\n¬C")
         assert len(newline_result) == 3
         
-        # Comma-separated: constraints separated by commas
+        # Comma-separated: constraints separated by commas (with spaces preserved)
         comma_result = preprocessor._split_inline_constraints("A→B, B→C, ¬C")
         assert len(comma_result) == 3
         
-        # Both should produce the same constraints
+        # Both should produce equivalent constraints (after stripping)
         assert set(newline_result) == {"A→B", "B→C", "¬C"}
-        assert set(comma_result) == {"A→B", "B→C", "¬C"} or set(comma_result) == {"A → B", "B → C", "¬C"}
+        # Comma-separated result preserves internal spacing from input
+        comma_stripped = {c.strip() for c in comma_result}
+        assert "A→B" in comma_stripped
+        assert "B→C" in comma_stripped
+        assert "¬C" in comma_stripped
 
     def test_mixed_newline_and_comma(self, preprocessor):
         """Test handling of mixed newline and comma separators."""
