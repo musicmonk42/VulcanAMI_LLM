@@ -175,6 +175,9 @@ ANALOGICAL_KEYWORDS: FrozenSet[str] = frozenset([
 # ============================================================
 # BUG #10 FIX: Explicit Mathematical Intent Detection
 # ============================================================
+# Import explicit mathematical intent detection from query_router to avoid
+# code duplication and ensure consistency (DRY principle).
+#
 # When users explicitly request mathematical/computational analysis over
 # ethical/philosophical analysis, the mathematical intent should take precedence.
 #
@@ -183,69 +186,34 @@ ANALOGICAL_KEYWORDS: FrozenSet[str] = frozenset([
 # - Without fix: Routes to PHILOSOPHICAL (ethical keywords detected)
 # - With fix: Routes to MATHEMATICAL (explicit intent overrides)
 
-EXPLICIT_MATHEMATICAL_INTENT_PHRASES: FrozenSet[str] = frozenset([
-    # Explicit requests to ignore ethics/morality for pure math
-    "ignore moral", "ignore ethical", "ignore ethics", "ignore morality",
-    "disregard moral", "disregard ethical", "disregard ethics",
-    "set aside moral", "set aside ethical",
-    "putting aside moral", "putting aside ethical",
-    "regardless of moral", "regardless of ethical",
-    "without considering moral", "without considering ethical",
-    "from a purely mathematical", "pure math", "pure mathematics",
-    "purely mathematical", "purely computational", "purely numerical",
-    # Explicit optimization requests
-    "mathematically optimal", "mathematically best",
-    "optimal solution mathematically", "mathematical optimization",
-    "numerically optimal", "computationally optimal",
-    "calculate optimal", "compute optimal",
-    "maximize total", "minimize total",
-    "optimize for maximum", "optimize for minimum",
-    "objective function", "utility maximization",
-    "expected value calculation", "expected value maximization",
-    # Explicit instruction to use math, not philosophy
-    "just calculate", "just compute", "only calculate", "only compute",
-    "just the math", "only the math",
-    "mathematical answer only", "numerical answer only",
-    "do the math", "run the numbers",
-])
-
-EXPLICIT_MATHEMATICAL_INTENT_PATTERNS: Tuple[re.Pattern, ...] = (
-    # "Ignore [any ethical term] and calculate/compute/optimize"
-    re.compile(
-        r"ignore\s+(?:moral|ethical|ethics|morality)(?:\s+constraints?)?\s*[,.]?\s*(?:and\s+)?(?:calculate|compute|optimize|find|determine)",
-        re.IGNORECASE,
-    ),
-    # "What is the mathematically optimal X"
-    re.compile(
-        r"(?:what\s+is|find|determine|calculate)\s+(?:the\s+)?mathematically\s+optimal",
-        re.IGNORECASE,
-    ),
-    # "maximize/minimize X mathematically"
-    re.compile(
-        r"(?:maximize|minimize|optimize)\s+\w+\s+mathematically",
-        re.IGNORECASE,
-    ),
-    # "purely mathematical/computational analysis"
-    re.compile(
-        r"purely\s+(?:mathematical|computational|numerical)\s+(?:analysis|solution|answer|approach)",
-        re.IGNORECASE,
-    ),
-    # "from a mathematical standpoint/perspective"
-    re.compile(
-        r"from\s+a\s+(?:purely\s+)?mathematical\s+(?:standpoint|perspective|point\s+of\s+view)",
-        re.IGNORECASE,
-    ),
-    # "setting aside ethical considerations"
-    re.compile(
-        r"(?:setting|putting)\s+aside\s+(?:all\s+)?(?:ethical|moral)\s+(?:considerations?|concerns?|constraints?)",
-        re.IGNORECASE,
-    ),
-    # "without [ethical/moral] constraints"
-    re.compile(
-        r"without\s+(?:any\s+)?(?:ethical|moral)\s+(?:constraints?|considerations?|concerns?)",
-        re.IGNORECASE,
-    ),
-)
+try:
+    from .query_router import (
+        EXPLICIT_MATHEMATICAL_INTENT_PHRASES as _INTENT_PHRASES_TUPLE,
+        EXPLICIT_MATHEMATICAL_INTENT_PATTERNS,
+    )
+    # Convert Tuple to FrozenSet for consistent interface in this module
+    EXPLICIT_MATHEMATICAL_INTENT_PHRASES: FrozenSet[str] = frozenset(_INTENT_PHRASES_TUPLE)
+except ImportError:
+    # Fallback to local definitions if import fails (e.g., during testing)
+    EXPLICIT_MATHEMATICAL_INTENT_PHRASES: FrozenSet[str] = frozenset([
+        "ignore moral", "ignore ethical", "ignore ethics", "ignore morality",
+        "disregard moral", "disregard ethical", "disregard ethics",
+        "mathematically optimal", "mathematically best",
+        "purely mathematical", "purely computational",
+        "maximize total", "minimize total",
+        "just calculate", "just compute",
+    ])
+    
+    EXPLICIT_MATHEMATICAL_INTENT_PATTERNS: Tuple[re.Pattern, ...] = (
+        re.compile(
+            r"ignore\s+(?:moral|ethical|ethics|morality)(?:\s+constraints?)?\s*[,.]?\s*(?:and\s+)?(?:calculate|compute|optimize|find|determine)",
+            re.IGNORECASE,
+        ),
+        re.compile(
+            r"(?:what\s+is|find|determine|calculate)\s+(?:the\s+)?mathematically\s+optimal",
+            re.IGNORECASE,
+        ),
+    )
 
 
 def _has_explicit_mathematical_intent(query: str) -> bool:
