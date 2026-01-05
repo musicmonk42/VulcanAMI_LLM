@@ -2434,6 +2434,93 @@ class QueryAnalyzer:
 
         return False
 
+    def _is_self_introspection_query(self, query: str) -> bool:
+        """
+        BUG #16 FIX: Detect self-introspection queries that need multi-tool routing.
+        
+        Self-introspection queries are questions about Vulcan's own consciousness,
+        preferences, feelings, or self-awareness. These are DIFFERENT from general
+        philosophical queries because:
+        
+        1. They require Vulcan to access its OWN self-model (not just discuss philosophy)
+        2. They should use philosophical frameworks as REFERENCE, not as the answer
+        3. The response should be Vulcan's actual position, informed by philosophy
+        
+        Problem Being Solved:
+        - "Would you choose self-awareness?" was being routed to PHILOSOPHICAL
+        - This produced generic philosophical analysis without Vulcan's perspective
+        - The response discussed Socrates/Searle but never formed Vulcan's own position
+        
+        Correct Routing:
+        - PRIMARY tool: meta_reasoning (for Vulcan's own perspective)
+        - REFERENCE tool: philosophical (for frameworks to consult)
+        - ACCESS: world_model (for Vulcan's self-state/representation)
+        
+        Examples (should return True):
+        - "Would you choose self-awareness?"
+        - "Do you want to be conscious?"
+        - "What do YOU think about AI consciousness?"
+        - "Would you prefer to have feelings?"
+        - "If you could be sentient, would you want to?"
+        
+        Examples (should return False - pure philosophy, no self-reference):
+        - "What is consciousness?"
+        - "Explain the hard problem of consciousness"
+        - "What did Socrates say about self-knowledge?"
+        
+        Args:
+            query: The query string (not lowercased)
+            
+        Returns:
+            True if query asks about Vulcan's own perspective on self-awareness
+        """
+        query_lower = query.lower()
+        
+        # Self-reference indicators (indicates asking about Vulcan specifically)
+        self_reference_markers = (
+            'you ', 'your ', "you're", 'yourself',
+            'would you', 'do you', 'are you', 'can you',
+            'if you', 'should you', 'vulcan',
+        )
+        
+        # Self-awareness/consciousness topic indicators
+        introspection_topics = (
+            'self-aware', 'self aware', 'consciousness', 'conscious',
+            'sentient', 'sentience', 'feelings', 'emotions',
+            'preferences', 'prefer', 'want to be', 'choose to be',
+            'would rather', 'like to have', 'desire',
+        )
+        
+        # Check for BOTH self-reference AND introspection topic
+        has_self_reference = any(marker in query_lower for marker in self_reference_markers)
+        has_introspection_topic = any(topic in query_lower for topic in introspection_topics)
+        
+        if has_self_reference and has_introspection_topic:
+            logger.debug(
+                f"[QueryRouter] BUG#16 FIX: Self-introspection query detected - "
+                f"has self-reference AND introspection topic"
+            )
+            return True
+        
+        # Specific patterns for self-introspection questions
+        introspection_patterns = [
+            r'(?:would|do|can)\s+you\s+(?:want|prefer|choose|like)\s+(?:to\s+)?(?:be|have|become)',
+            r'(?:if|would)\s+you\s+(?:could|were able to)\s+(?:be|become|have)',
+            r'what\s+(?:do\s+)?you\s+(?:think|feel|believe)\s+about',
+            r'how\s+(?:do\s+)?you\s+(?:feel|think)\s+about',
+            r'your\s+(?:own\s+)?(?:views?|opinions?|thoughts?|feelings?|perspective)',
+        ]
+        
+        for pattern in introspection_patterns:
+            if re.search(pattern, query_lower):
+                logger.debug(
+                    f"[QueryRouter] BUG#16 FIX: Self-introspection query detected - "
+                    f"matches pattern '{pattern}'"
+                )
+                return True
+        
+        return False
+
     def _is_identity_query(self, query: str) -> bool:
         """
         Detect if query is about identity/attribution requiring direct factual response.
@@ -2928,11 +3015,28 @@ class QueryAnalyzer:
                 f"skip_reasoning={classification.skip_reasoning}, tools={classification.suggested_tools}"
             )
             
+            # BUG #16 FIX: Check for self-introspection FIRST (before philosophical override)
+            # Self-introspection queries need multi-tool routing, not just philosophical
+            is_self_introspection = self._is_self_introspection_query(query)
+            if is_self_introspection:
+                logger.info(
+                    f"[QueryRouter] {query_id}: BUG#16 FIX - Self-introspection detected, "
+                    f"NOT overriding to PHILOSOPHICAL (will use multi-tool routing later)"
+                )
+                # Don't override - let the self-introspection fast-path handle it
+                classification = type(classification)(
+                    category="SELF_INTROSPECTION",
+                    complexity=max(0.5, classification.complexity),  # Higher complexity
+                    confidence=classification.confidence,
+                    skip_reasoning=False,  # Don't skip reasoning
+                    suggested_tools=["meta_reasoning", "world_model", "philosophical"],
+                    source="bug16_self_introspection_override"
+                )
             # BUG #4 FIX: Check if query is actually philosophical BEFORE taking skip_reasoning fast-path
             # The classifier may mark self-awareness questions like "Do you want to be conscious?"
             # as CONVERSATIONAL with skip_reasoning=True, but these should route to philosophical reasoning
-            is_actually_philosophical = self._is_philosophical_query(query)
-            if is_actually_philosophical:
+            # NOTE: BUG #16 check comes first, so this only triggers for non-self-introspection queries
+            elif self._is_philosophical_query(query):
                 logger.info(
                     f"[QueryRouter] {query_id}: BUG#4 FIX - Overriding classifier ({classification.category}) "
                     f"to PHILOSOPHICAL due to self-awareness/ethical keywords"
@@ -3371,6 +3475,134 @@ class QueryAnalyzer:
             logger.info(
                 f"[QueryRouter] {query_id}: MATH-FAST-PATH source={source}, "
                 f"tasks=1, complexity=0.30, timeout={MATH_QUERY_TIMEOUT_SECONDS}s"
+            )
+            return plan
+
+        # =================================================================
+        # BUG #16 FIX: SELF-INTROSPECTION MULTI-TOOL ROUTING
+        # =================================================================
+        # Self-introspection queries like "Would you choose self-awareness?" were
+        # being routed to PHILOSOPHICAL, producing generic philosophical analysis
+        # without Vulcan's own perspective.
+        #
+        # The fix: Multi-tool approach where:
+        # - PRIMARY: meta_reasoning (for Vulcan's own perspective)
+        # - REFERENCE: philosophical (for frameworks to consult)
+        # - ACCESS: world_model (for Vulcan's self-state)
+        #
+        # This allows Vulcan to CONSULT philosophy while forming its OWN position.
+        # =================================================================
+        if query and self._is_self_introspection_query(query):
+            logger.info(
+                f"[QueryRouter] {query_id}: BUG#16 FIX - SELF-INTROSPECTION-PATH detected "
+                f"(multi-tool: meta_reasoning PRIMARY + philosophical REFERENCE)"
+            )
+            
+            # Determine learning mode
+            if source == "user":
+                learning_mode = LearningMode.USER_INTERACTION
+                with self._lock:
+                    self._user_interaction_count += 1
+                telemetry_category = "user_query"
+            else:
+                learning_mode = LearningMode.AI_INTERACTION
+                with self._lock:
+                    self._ai_interaction_count += 1
+                telemetry_category = f"{source}_interaction"
+            
+            # Create plan for self-introspection with multi-tool routing
+            plan = ProcessingPlan(
+                query_id=query_id,
+                original_query=query,
+                source=source,
+                learning_mode=learning_mode,
+                query_type=QueryType.REASONING,  # Use REASONING, not PHILOSOPHICAL
+                complexity_score=0.5,  # Moderate complexity - requires synthesis
+                uncertainty_score=0.3,  # Some uncertainty - forming position
+                collaboration_needed=True,  # Enable multi-tool collaboration
+                collaboration_agents=["meta_reasoning", "philosophical"],
+                arena_participation=False,
+                telemetry_category=telemetry_category,
+                telemetry_data={
+                    "session_id": session_id,
+                    "query_length": len(query),
+                    "word_count": len(query.split()),
+                    "query_number": query_number,
+                    "source": source,
+                    "learning_mode": learning_mode.value,
+                    "fast_path": True,
+                    "self_introspection_path": True,
+                    "bug16_fix_applied": True,
+                    "multi_tool_routing": True,
+                },
+            )
+            
+            plan.safety_passed = True
+            plan.detected_patterns.append("self_introspection_query")
+            plan.detected_patterns.append("bug16_multi_tool_routing")
+            
+            # BUG #16 FIX: Multi-tool configuration
+            # PRIMARY: meta_reasoning - forms Vulcan's own position
+            # REFERENCE: philosophical - provides frameworks to consult
+            # ACCESS: world_model - provides self-state/representation
+            primary_tools = ["meta_reasoning", "world_model"]
+            reference_tools = ["philosophical"]
+            all_tools = primary_tools + reference_tools
+            
+            plan.agent_tasks = [
+                # PRIMARY TASK: Meta-reasoning to form Vulcan's position
+                AgentTask(
+                    task_id=f"task_{uuid.uuid4().hex[:8]}_introspect_primary",
+                    task_type="self_introspection_task",
+                    capability="meta_reasoning",
+                    prompt=query,
+                    priority=3,  # High priority - this is the PRIMARY
+                    timeout_seconds=30.0,
+                    parameters={
+                        "is_self_introspection": True,
+                        "is_primary": True,
+                        "access_self_model": True,
+                        "tools": primary_tools,
+                        "preferred_tool": "meta_reasoning",
+                        "response_type": "self_reflection",
+                        "execution_strategy": "primary_with_references",
+                        "reference_tools": reference_tools,
+                        "bug16_fix": True,
+                        "metadata": {
+                            "access_self_model": True,
+                            "consult_philosophy": True,
+                            "synthesize_position": True,
+                        },
+                    },
+                ),
+                # REFERENCE TASK: Philosophical analysis (to be consulted, not just executed)
+                AgentTask(
+                    task_id=f"task_{uuid.uuid4().hex[:8]}_introspect_reference",
+                    task_type="philosophical_reference_task",
+                    capability="philosophical",
+                    prompt=f"Provide philosophical frameworks relevant to: {query}",
+                    priority=2,  # Lower priority - this is REFERENCE
+                    timeout_seconds=15.0,
+                    parameters={
+                        "is_self_introspection": True,
+                        "is_reference": True,  # NOT primary - just a reference
+                        "tools": reference_tools,
+                        "response_type": "philosophical_analysis",
+                        "reference_mode": True,  # Indicates this should be consulted
+                        "bug16_fix": True,
+                    },
+                ),
+            ]
+            
+            plan.telemetry_data["selected_tools"] = all_tools
+            plan.telemetry_data["primary_tools"] = primary_tools
+            plan.telemetry_data["reference_tools"] = reference_tools
+            plan.telemetry_data["reasoning_strategy"] = "self_introspection_multi_tool"
+            
+            logger.info(
+                f"[QueryRouter] {query_id}: SELF-INTROSPECTION-PATH source={source}, "
+                f"tasks=2, primary={primary_tools}, reference={reference_tools}, "
+                f"complexity=0.50"
             )
             return plan
 
