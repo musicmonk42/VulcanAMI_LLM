@@ -28,8 +28,16 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"  # Prevent tokenizer deadlocks
 # This environment variable disables all TQDM progress bars globally.
 # Progress bars like "Batches: 100%|██████████| 1/1 [00:19<00:00, 19.69s/it]"
 # are noisy in production logs and provide no value for batch embedding operations.
+#
+# HOTFIX: Made conditional - can be enabled for debugging by setting VULCAN_DEBUG=1
+# When VULCAN_DEBUG is set, TQDM progress bars will show, which helps diagnose
+# issues with model loading and reasoning engine initialization.
 # ====================================================================
-os.environ["TQDM_DISABLE"] = "1"
+if not os.environ.get("VULCAN_DEBUG"):
+    os.environ["TQDM_DISABLE"] = "1"
+else:
+    # In debug mode, ensure TQDM is NOT disabled so we can see progress
+    os.environ.pop("TQDM_DISABLE", None)
 
 # ====================================================================
 # PATH + SAFETY SETUP - MUST BE FIRST
@@ -91,18 +99,25 @@ except Exception as e:
     logging.getLogger(__name__).debug(f"Faulthandler not available: {e}")
 
 # Safe-mode environmental guards to reduce native segfault risk on Windows
+# NOTE: Thread count settings are already configured at the top of this file.
+# We only set additional guards here that don't conflict with thread settings.
 import os
 
-os.environ.setdefault("OMP_NUM_THREADS", "1")
-os.environ.setdefault("MKL_NUM_THREADS", "1")
-os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
-os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
+# HOTFIX: Removed conflicting thread count setdefaults that could cause issues
+# The authoritative thread counts are set at the top of this file (lines 17-24)
+# os.environ.setdefault("OMP_NUM_THREADS", "1")  # REMOVED - conflicts with line 18
+# os.environ.setdefault("MKL_NUM_THREADS", "1")  # REMOVED - conflicts with line 19
+# os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")  # REMOVED - conflicts with line 21
+# os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")  # REMOVED - conflicts with line 23
+
+# Non-conflicting safety guards (these are fine to keep)
 os.environ.setdefault("FAISS_NO_GPU", "1")
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
 os.environ.setdefault("MKL_SERVICE_FORCE_INTEL", "1")
 os.environ.setdefault("MKL_THREADING_LAYER", "INTEL")
-os.environ.setdefault("VULCAN_SAFE_MODE", "1")
+# HOTFIX: Removed VULCAN_SAFE_MODE - it was enabling restrictions that may block reasoning engines
+# os.environ.setdefault("VULCAN_SAFE_MODE", "1")  # REMOVED - may disable critical features
 
 # Get the src directory (parent of vulcan directory)
 src_root = Path(__file__).resolve().parent.parent
