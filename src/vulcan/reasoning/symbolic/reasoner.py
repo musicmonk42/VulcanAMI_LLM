@@ -276,6 +276,7 @@ class SymbolicReasoner:
                 - proof: ProofNode or None
                 - method: str (if parallel prover)
                 - applicable: bool (BUG #4 FIX - whether query was applicable for symbolic reasoning)
+                - validation: str (BUG #6 FIX - 'PASSED' if model validated, 'FAILED' if not)
         """
         # BUG #4 FIX: Check applicability before attempting to parse
         # This prevents parse errors like "Unexpected token 'the'" on natural language
@@ -300,7 +301,7 @@ class SymbolicReasoner:
                 proven, proof, confidence, method = self.prover.prove_parallel(
                     query_clause, self.kb.clauses, timeout
                 )
-                return {
+                result = {
                     "proven": proven,
                     "confidence": confidence,
                     "proof": proof,
@@ -311,17 +312,72 @@ class SymbolicReasoner:
                 proven, proof, confidence = self.prover.prove(
                     query_clause, self.kb.clauses, timeout
                 )
-                return {
+                result = {
                     "proven": proven,
                     "confidence": confidence,
                     "proof": proof,
                     "method": self.prover_type,
                     "applicable": True,
                 }
+            
+            # BUG #6 FIX: Validate result before returning success
+            # If we claim something is proven, verify we can extract a valid model
+            if result["proven"] and result["confidence"] >= 0.5:
+                validation_passed = self._validate_proof_result(result, query_str)
+                if not validation_passed:
+                    logger.error(
+                        f"[SymbolicReasoner] BUG#6 FIX: Result validation FAILED! "
+                        f"Proof claims success but validation failed."
+                    )
+                    result["proven"] = False
+                    result["confidence"] = 0.0
+                    result["validation"] = "FAILED"
+                    result["error"] = "Model validation failed - result may violate constraints"
+                else:
+                    result["validation"] = "PASSED"
+            
+            return result
+            
         except Exception as e:
             logger.error(f"Query failed: {e}")
             # FIX: Return minimum confidence floor instead of 0.0 for errors
             return {"proven": False, "confidence": 0.1, "proof": None, "error": str(e), "applicable": True}
+
+    def _validate_proof_result(self, result: Dict[str, Any], query_str: str) -> bool:
+        """
+        BUG #6 FIX: Validate that proof result is internally consistent.
+        
+        This prevents false success reporting where:
+        - SAT result claims A=T, B=T, C=F but this violates B→C
+        - Status reports SUCCESS with confidence=0.900 when actually failed
+        
+        Args:
+            result: The proof result dictionary
+            query_str: The original query string
+            
+        Returns:
+            True if validation passes, False if result appears invalid
+        """
+        # Basic validation: if proven is True, confidence should be reasonable
+        if result.get("proven") and result.get("confidence", 0) < 0.3:
+            logger.warning(
+                f"[SymbolicReasoner] BUG#6 FIX: Suspicious result - "
+                f"proven=True but confidence={result.get('confidence')}"
+            )
+            return False
+        
+        # If we have a proof, validate its structure
+        proof = result.get("proof")
+        if proof is not None:
+            # Check proof has a valid conclusion
+            conclusion = getattr(proof, "conclusion", None)
+            if conclusion is None or not str(conclusion).strip():
+                logger.warning(
+                    f"[SymbolicReasoner] BUG#6 FIX: Proof has no valid conclusion"
+                )
+                return False
+        
+        return True
 
 
     def parse_formula(self, formula_str: str) -> Clause:

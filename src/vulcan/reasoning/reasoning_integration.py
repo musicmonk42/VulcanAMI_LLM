@@ -1382,17 +1382,36 @@ class ReasoningIntegration:
                 query_type, complexity
             )
 
+        # BUG #7 FIX: Include fallback status in result metadata to make failures visible
+        # If rationale contains "Fallback" or "failed", the primary engine failed
+        used_fallback = "fallback" in rationale.lower() or "failed" in rationale.lower()
+        primary_engine_failed = used_fallback and confidence < 0.7
+        
+        result_metadata = {
+            "query_type": query_type,
+            "complexity": complexity,
+            "tool_selector_available": self._tool_selector is not None,
+            "portfolio_executor_available": self._portfolio_executor is not None,
+            # BUG #7 FIX: Explicitly track fallback usage
+            "used_fallback": used_fallback,
+            "primary_engine_failed": primary_engine_failed,
+        }
+        
+        # BUG #7 FIX: If primary engine failed, make it clear in the result
+        if primary_engine_failed:
+            logger.warning(
+                f"{LOG_PREFIX} BUG#7 FIX: Primary reasoning engine failed. "
+                f"Result is from fallback (confidence={confidence:.2f}). "
+                f"Original rationale: {rationale}"
+            )
+            result_metadata["primary_failure_reason"] = rationale
+
         return ReasoningResult(
             selected_tools=selected_tools,
             reasoning_strategy=reasoning_strategy,
             confidence=confidence,
             rationale=rationale,
-            metadata={
-                "query_type": query_type,
-                "complexity": complexity,
-                "tool_selector_available": self._tool_selector is not None,
-                "portfolio_executor_available": self._portfolio_executor is not None,
-            },
+            metadata=result_metadata,
         )
 
     def _process_with_decomposition(

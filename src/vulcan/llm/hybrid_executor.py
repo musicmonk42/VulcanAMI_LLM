@@ -2148,7 +2148,25 @@ You receive JSON containing:
 
 Make this human-readable. Nothing more."""
 
+        # BUG #5 FIX: Check reasoning confidence BEFORE sending to OpenAI
+        # If confidence is too low, don't let OpenAI try to solve the problem
+        MIN_REASONING_CONFIDENCE = 0.5
+        reasoning_confidence = getattr(reasoning_output, 'confidence', None) or 0.0
+        
+        if reasoning_confidence < MIN_REASONING_CONFIDENCE:
+            self.logger.warning(
+                f"[HybridExecutor] BUG#5 FIX: Reasoning confidence ({reasoning_confidence:.2f}) < "
+                f"threshold ({MIN_REASONING_CONFIDENCE}). Returning failure message instead of "
+                f"letting OpenAI compensate."
+            )
+            return (
+                f"I was unable to complete the specialized reasoning for this problem. "
+                f"The reasoning engine returned confidence {reasoning_confidence:.2f}. "
+                f"Please try rephrasing your question or providing more context."
+            )
+
         # Build the user prompt with VULCAN's structured output
+        # BUG #5 FIX: Do NOT include original_query to prevent OpenAI from solving independently
         output_dict = None
         try:
             output_dict = reasoning_output.to_dict()
@@ -2157,14 +2175,16 @@ Make this human-readable. Nothing more."""
             self.logger.warning(f"Failed to serialize reasoning output: {e}")
             output_json = str(reasoning_output)
 
-        user_prompt = f"""Format this VULCAN output for the user.
+        # BUG #5 FIX: Removed original question from prompt
+        # OpenAI should ONLY see the reasoning output, not the original question
+        # This prevents OpenAI from solving problems independently when reasoning fails
+        user_prompt = f"""Format this VULCAN reasoning output for the user.
 
-User's question: {original_query}
-
-VULCAN's output:
+VULCAN's reasoning output (this is what VULCAN computed):
 {output_json}
 
-Write a natural, helpful response based on VULCAN's results."""
+Write a natural, helpful response that explains VULCAN's results and conclusions.
+Do NOT add any analysis or reasoning beyond what is in VULCAN's output."""
 
         try:
             # Use gpt-4o-mini for fast and cheap formatting
@@ -2177,6 +2197,18 @@ Write a natural, helpful response based on VULCAN's results."""
             )
             
             if response and len(response.strip()) > self.MIN_MEANINGFUL_LENGTH:
+                # BUG #8 FIX: Detect hallucinations before returning response
+                if self._is_hallucination(response, output_json):
+                    self.logger.error(
+                        f"[HybridExecutor] BUG#8 FIX: Hallucination detected in OpenAI response. "
+                        f"Response contains fabricated content not in reasoning output."
+                    )
+                    # Return a safe failure message instead of the hallucinated response
+                    return (
+                        "I was unable to solve this problem with the available reasoning engines. "
+                        "Please try rephrasing your question."
+                    )
+                
                 self.logger.info("[HybridExecutor] ✓ OpenAI (gpt-4o-mini) formatted VULCAN's structured output")
                 
                 # Capture training pair for distillation (VULCAN LLM learns from this)
@@ -2245,6 +2277,56 @@ Write a natural, helpful response based on VULCAN's results."""
         except Exception as e:
             self.logger.debug(f"[HybridExecutor] OpenAI formatting call failed: {e}")
             return None
+    
+    def _is_hallucination(self, response: str, reasoning_output_json: str) -> bool:
+        """
+        BUG #8 FIX: Detect if response contains fabricated content.
+        
+        Hallucination indicators are phrases or content that appear in OpenAI's
+        response but were NOT in VULCAN's reasoning output. This typically happens
+        when:
+        1. Reasoning fails (low confidence) but OpenAI tries to answer anyway
+        2. OpenAI invents fake "SymPy computation" or similar technical-sounding claims
+        3. OpenAI uses generic placeholders like "x² + 2x + 1"
+        
+        Args:
+            response: The OpenAI-generated response text
+            reasoning_output_json: The JSON string of VULCAN's reasoning output
+            
+        Returns:
+            True if hallucination is detected, False otherwise
+        """
+        # Common hallucination indicators
+        # These phrases suggest OpenAI is fabricating technical details
+        HALLUCINATION_INDICATORS = [
+            'sympy',           # Never actually invoked by VULCAN
+            'x² + 2x + 1',     # Generic placeholder polynomial
+            'x^2 + 2x + 1',    # Alternative notation
+            'x*2 + 2x + 1',    # Variation
+            'computed using',  # Implies computation that didn't happen
+            'calculation shows',  # Implies math that didn't happen
+            'i calculated',    # OpenAI claiming to do math
+            'my calculation',  # OpenAI claiming computation
+            'i computed',      # OpenAI claiming computation
+            'let me solve',    # OpenAI attempting to solve
+            'solving step by step',  # OpenAI doing independent reasoning
+            'evaluating the expression',  # OpenAI doing independent work
+        ]
+        
+        response_lower = response.lower()
+        reasoning_lower = reasoning_output_json.lower()
+        
+        for indicator in HALLUCINATION_INDICATORS:
+            indicator_lower = indicator.lower()
+            # Check if indicator is in response but NOT in reasoning output
+            if indicator_lower in response_lower and indicator_lower not in reasoning_lower:
+                self.logger.warning(
+                    f"[HybridExecutor] BUG#8 FIX: Possible hallucination detected - "
+                    f"'{indicator}' in response but not in reasoning output"
+                )
+                return True
+        
+        return False
     
     def _capture_formatting_for_distillation(
         self,
