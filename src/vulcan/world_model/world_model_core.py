@@ -1746,79 +1746,112 @@ class WorldModel:
                 # ================================================================
                 # Issue #4 & #5 FIX: Initialize ALL meta-reasoning components
                 # Full integration of meta-reasoning into world model
+                # Note: Each component has different init signatures - using try/except
+                # to handle gracefully if components can't be initialized
                 # ================================================================
                 
                 # InternalCritic - Multi-perspective self-critique
-                self.internal_critic = (
-                    InternalCritic(world_model=self) if InternalCritic and not isinstance(InternalCritic, MagicMock) else None
-                )
-                if self.internal_critic:
-                    logger.info("✓ InternalCritic initialized")
-                else:
-                    logger.debug("⚠ InternalCritic not available")
+                # Takes: perspective_weights, strict_mode, max_history, validation_tracker
+                try:
+                    self.internal_critic = (
+                        InternalCritic(validation_tracker=self.validation_tracker) 
+                        if InternalCritic and not isinstance(InternalCritic, MagicMock) else None
+                    )
+                    if self.internal_critic:
+                        logger.info("✓ InternalCritic initialized")
+                except Exception as e:
+                    logger.debug(f"⚠ InternalCritic init failed: {e}")
+                    self.internal_critic = None
                 
                 # CuriosityRewardShaper - Curiosity-driven exploration
-                self.curiosity_reward_shaper = (
-                    CuriosityRewardShaper() if CuriosityRewardShaper and not isinstance(CuriosityRewardShaper, MagicMock) else None
-                )
-                if self.curiosity_reward_shaper:
-                    logger.info("✓ CuriosityRewardShaper initialized")
-                else:
-                    logger.debug("⚠ CuriosityRewardShaper not available")
+                # Takes no required args
+                try:
+                    self.curiosity_reward_shaper = (
+                        CuriosityRewardShaper() if CuriosityRewardShaper and not isinstance(CuriosityRewardShaper, MagicMock) else None
+                    )
+                    if self.curiosity_reward_shaper:
+                        logger.info("✓ CuriosityRewardShaper initialized")
+                except Exception as e:
+                    logger.debug(f"⚠ CuriosityRewardShaper init failed: {e}")
+                    self.curiosity_reward_shaper = None
                 
                 # EthicalBoundaryMonitor - Ethical boundary enforcement
-                self.ethical_boundary_monitor = (
-                    EthicalBoundaryMonitor(world_model=self) if EthicalBoundaryMonitor and not isinstance(EthicalBoundaryMonitor, MagicMock) else None
-                )
-                if self.ethical_boundary_monitor:
-                    logger.info("✓ EthicalBoundaryMonitor initialized")
-                else:
-                    logger.debug("⚠ EthicalBoundaryMonitor not available")
+                # Takes: boundaries, strict_mode, alert_callback, etc.
+                try:
+                    self.ethical_boundary_monitor = (
+                        EthicalBoundaryMonitor(
+                            validation_tracker=self.validation_tracker,
+                            transparency_interface=self.transparency_interface,
+                        ) if EthicalBoundaryMonitor and not isinstance(EthicalBoundaryMonitor, MagicMock) else None
+                    )
+                    if self.ethical_boundary_monitor:
+                        logger.info("✓ EthicalBoundaryMonitor initialized")
+                except Exception as e:
+                    logger.debug(f"⚠ EthicalBoundaryMonitor init failed: {e}")
+                    self.ethical_boundary_monitor = None
                 
                 # PreferenceLearner - Bayesian preference learning
-                self.preference_learner = (
-                    PreferenceLearner() if PreferenceLearner and not isinstance(PreferenceLearner, MagicMock) else None
-                )
-                if self.preference_learner:
-                    logger.info("✓ PreferenceLearner initialized")
-                else:
-                    logger.debug("⚠ PreferenceLearner not available")
+                # Takes no required args
+                try:
+                    self.preference_learner = (
+                        PreferenceLearner() if PreferenceLearner and not isinstance(PreferenceLearner, MagicMock) else None
+                    )
+                    if self.preference_learner:
+                        logger.info("✓ PreferenceLearner initialized")
+                except Exception as e:
+                    logger.debug(f"⚠ PreferenceLearner init failed: {e}")
+                    self.preference_learner = None
                 
                 # ValueEvolutionTracker - Track value evolution
-                self.value_evolution_tracker = (
-                    ValueEvolutionTracker(world_model=self) if ValueEvolutionTracker and not isinstance(ValueEvolutionTracker, MagicMock) else None
-                )
-                if self.value_evolution_tracker:
-                    logger.info("✓ ValueEvolutionTracker initialized")
-                else:
-                    logger.debug("⚠ ValueEvolutionTracker not available")
+                # Takes: max_history, drift_threshold, alert_callback, self_improvement_drive, validation_tracker, transparency_interface
+                try:
+                    self.value_evolution_tracker = (
+                        ValueEvolutionTracker(
+                            validation_tracker=self.validation_tracker,
+                            transparency_interface=self.transparency_interface,
+                        ) if ValueEvolutionTracker and not isinstance(ValueEvolutionTracker, MagicMock) else None
+                    )
+                    if self.value_evolution_tracker:
+                        logger.info("✓ ValueEvolutionTracker initialized")
+                except Exception as e:
+                    logger.debug(f"⚠ ValueEvolutionTracker init failed: {e}")
+                    self.value_evolution_tracker = None
                 
                 # CounterfactualObjectiveReasoner - "What if" reasoning
-                self.counterfactual_reasoner = (
-                    CounterfactualObjectiveReasoner(world_model=self) if CounterfactualObjectiveReasoner and not isinstance(CounterfactualObjectiveReasoner, MagicMock) else None
-                )
-                if self.counterfactual_reasoner:
-                    logger.info("✓ CounterfactualObjectiveReasoner initialized")
-                else:
-                    logger.debug("⚠ CounterfactualObjectiveReasoner not available")
+                # Takes: world_model (optional)
+                try:
+                    self.counterfactual_reasoner = (
+                        CounterfactualObjectiveReasoner(world_model=self) if CounterfactualObjectiveReasoner and not isinstance(CounterfactualObjectiveReasoner, MagicMock) else None
+                    )
+                    if self.counterfactual_reasoner:
+                        logger.info("✓ CounterfactualObjectiveReasoner initialized")
+                except Exception as e:
+                    logger.debug(f"⚠ CounterfactualObjectiveReasoner init failed: {e}")
+                    self.counterfactual_reasoner = None
                 
                 # GoalConflictDetector - Detect goal conflicts
-                self.goal_conflict_detector = (
-                    GoalConflictDetector() if GoalConflictDetector and not isinstance(GoalConflictDetector, MagicMock) else None
-                )
-                if self.goal_conflict_detector:
-                    logger.info("✓ GoalConflictDetector initialized")
-                else:
-                    logger.debug("⚠ GoalConflictDetector not available")
+                # Takes: objective_hierarchy (optional)
+                try:
+                    self.goal_conflict_detector = (
+                        GoalConflictDetector() if GoalConflictDetector and not isinstance(GoalConflictDetector, MagicMock) else None
+                    )
+                    if self.goal_conflict_detector:
+                        logger.info("✓ GoalConflictDetector initialized")
+                except Exception as e:
+                    logger.debug(f"⚠ GoalConflictDetector init failed: {e}")
+                    self.goal_conflict_detector = None
                 
                 # ObjectiveNegotiator - Negotiate between objectives
-                self.objective_negotiator = (
-                    ObjectiveNegotiator(world_model=self) if ObjectiveNegotiator and not isinstance(ObjectiveNegotiator, MagicMock) else None
-                )
-                if self.objective_negotiator:
-                    logger.info("✓ ObjectiveNegotiator initialized")
-                else:
-                    logger.debug("⚠ ObjectiveNegotiator not available")
+                # Takes: objective_hierarchy, world_model (both optional)
+                try:
+                    self.objective_negotiator = (
+                        ObjectiveNegotiator(world_model=self) if ObjectiveNegotiator and not isinstance(ObjectiveNegotiator, MagicMock) else None
+                    )
+                    if self.objective_negotiator:
+                        logger.info("✓ ObjectiveNegotiator initialized")
+                except Exception as e:
+                    logger.debug(f"⚠ ObjectiveNegotiator init failed: {e}")
+                    self.objective_negotiator = None
 
                 # Check if core meta-reasoning is enabled
                 self.meta_reasoning_enabled = all(
