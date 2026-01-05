@@ -3739,12 +3739,32 @@ async def v1_feedback_stats_proxy():
 # =============================================================================
 
 
-@app.get("/v1/status")
-async def v1_status_proxy():
+async def _proxy_vulcan_status_endpoint(
+    endpoint_name: str,
+    handler_name: str,
+    fallback_response: Optional[Dict[str, Any]] = None,
+    **handler_kwargs
+) -> Any:
     """
-    Proxy endpoint for VULCAN system status.
-    Public endpoint - no authentication required for dashboard display.
+    Helper function to proxy status requests to VULCAN endpoints.
+    
+    Reduces code duplication across all status proxy endpoints by handling:
+    - VULCAN module loading and validation
+    - Dynamic import of the handler function
+    - Error handling and fallback responses
+    
+    Args:
+        endpoint_name: Name of the endpoint for logging (e.g., "v1/status")
+        handler_name: Name of the handler function in src.vulcan.main
+        fallback_response: Response to return if handler import fails
+        **handler_kwargs: Keyword arguments to pass to the handler
+    
+    Returns:
+        Response from the VULCAN handler or error response
     """
+    if fallback_response is None:
+        fallback_response = {"status": "unavailable"}
+    
     try:
         vulcan_module, error_response = _get_vulcan_module()
         if error_response:
@@ -3755,20 +3775,35 @@ async def v1_status_proxy():
             return deployment_error
         
         try:
-            from src.vulcan.main import system_status
-            result = await system_status()
+            # Dynamic import of the handler function
+            vulcan_main = importlib.import_module("src.vulcan.main")
+            handler = getattr(vulcan_main, handler_name, None)
+            if handler is None:
+                logger.warning(f"Handler {handler_name} not found in src.vulcan.main")
+                return fallback_response
+            result = await handler(**handler_kwargs)
             return result
         except ImportError as e:
-            logger.warning(f"Could not import system_status: {e}")
-            # Return basic status from deployment
-            deployment = vulcan_module.app.state.deployment
-            return deployment.get_status() if deployment else {"status": "unavailable"}
+            logger.warning(f"Could not import {handler_name}: {e}")
+            return fallback_response
     except Exception as e:
-        logger.error(f"v1/status proxy error: {e}")
+        logger.error(f"{endpoint_name} proxy error: {e}")
         return JSONResponse(
             status_code=500,
             content={"error": "Internal error", "detail": str(e)}
         )
+
+
+@app.get("/v1/status")
+async def v1_status_proxy():
+    """
+    Proxy endpoint for VULCAN system status.
+    Public endpoint - no authentication required for dashboard display.
+    """
+    return await _proxy_vulcan_status_endpoint(
+        endpoint_name="v1/status",
+        handler_name="system_status"
+    )
 
 
 @app.get("/v1/cognitive/status")
@@ -3777,28 +3812,10 @@ async def v1_cognitive_status_proxy():
     Proxy endpoint for VULCAN cognitive status.
     Public endpoint - no authentication required for dashboard display.
     """
-    try:
-        vulcan_module, error_response = _get_vulcan_module()
-        if error_response:
-            return error_response
-        
-        deployment_error = _check_vulcan_deployment(vulcan_module)
-        if deployment_error:
-            return deployment_error
-        
-        try:
-            from src.vulcan.main import cognitive_status
-            result = await cognitive_status()
-            return result
-        except ImportError as e:
-            logger.warning(f"Could not import cognitive_status: {e}")
-            return {"status": "unavailable", "message": str(e)}
-    except Exception as e:
-        logger.error(f"v1/cognitive/status proxy error: {e}")
-        return JSONResponse(
-            status_code=500,
-            content={"error": "Internal error", "detail": str(e)}
-        )
+    return await _proxy_vulcan_status_endpoint(
+        endpoint_name="v1/cognitive/status",
+        handler_name="cognitive_status"
+    )
 
 
 @app.get("/v1/llm/status")
@@ -3807,28 +3824,10 @@ async def v1_llm_status_proxy():
     Proxy endpoint for VULCAN LLM status.
     Public endpoint - no authentication required for dashboard display.
     """
-    try:
-        vulcan_module, error_response = _get_vulcan_module()
-        if error_response:
-            return error_response
-        
-        deployment_error = _check_vulcan_deployment(vulcan_module)
-        if deployment_error:
-            return deployment_error
-        
-        try:
-            from src.vulcan.main import llm_status
-            result = await llm_status()
-            return result
-        except ImportError as e:
-            logger.warning(f"Could not import llm_status: {e}")
-            return {"status": "unavailable", "message": str(e)}
-    except Exception as e:
-        logger.error(f"v1/llm/status proxy error: {e}")
-        return JSONResponse(
-            status_code=500,
-            content={"error": "Internal error", "detail": str(e)}
-        )
+    return await _proxy_vulcan_status_endpoint(
+        endpoint_name="v1/llm/status",
+        handler_name="llm_status"
+    )
 
 
 @app.get("/v1/routing/status")
@@ -3837,28 +3836,10 @@ async def v1_routing_status_proxy():
     Proxy endpoint for VULCAN routing status.
     Public endpoint - no authentication required for dashboard display.
     """
-    try:
-        vulcan_module, error_response = _get_vulcan_module()
-        if error_response:
-            return error_response
-        
-        deployment_error = _check_vulcan_deployment(vulcan_module)
-        if deployment_error:
-            return deployment_error
-        
-        try:
-            from src.vulcan.main import routing_status
-            result = await routing_status()
-            return result
-        except ImportError as e:
-            logger.warning(f"Could not import routing_status: {e}")
-            return {"status": "unavailable", "message": str(e)}
-    except Exception as e:
-        logger.error(f"v1/routing/status proxy error: {e}")
-        return JSONResponse(
-            status_code=500,
-            content={"error": "Internal error", "detail": str(e)}
-        )
+    return await _proxy_vulcan_status_endpoint(
+        endpoint_name="v1/routing/status",
+        handler_name="routing_status"
+    )
 
 
 @app.get("/safety/status")
@@ -3867,28 +3848,10 @@ async def safety_status_proxy():
     Proxy endpoint for VULCAN safety status.
     Public endpoint - no authentication required for dashboard display.
     """
-    try:
-        vulcan_module, error_response = _get_vulcan_module()
-        if error_response:
-            return error_response
-        
-        deployment_error = _check_vulcan_deployment(vulcan_module)
-        if deployment_error:
-            return deployment_error
-        
-        try:
-            from src.vulcan.main import safety_status
-            result = await safety_status()
-            return result
-        except ImportError as e:
-            logger.warning(f"Could not import safety_status: {e}")
-            return {"status": "unavailable", "message": str(e)}
-    except Exception as e:
-        logger.error(f"safety/status proxy error: {e}")
-        return JSONResponse(
-            status_code=500,
-            content={"error": "Internal error", "detail": str(e)}
-        )
+    return await _proxy_vulcan_status_endpoint(
+        endpoint_name="safety/status",
+        handler_name="safety_status"
+    )
 
 
 @app.get("/safety/audit/recent")
@@ -3897,28 +3860,12 @@ async def safety_audit_recent_proxy(limit: int = 10):
     Proxy endpoint for VULCAN safety audit recent logs.
     Public endpoint - no authentication required for dashboard display.
     """
-    try:
-        vulcan_module, error_response = _get_vulcan_module()
-        if error_response:
-            return error_response
-        
-        deployment_error = _check_vulcan_deployment(vulcan_module)
-        if deployment_error:
-            return deployment_error
-        
-        try:
-            from src.vulcan.main import safety_audit_recent
-            result = await safety_audit_recent(limit=limit)
-            return result
-        except ImportError as e:
-            logger.warning(f"Could not import safety_audit_recent: {e}")
-            return {"logs": [], "message": str(e)}
-    except Exception as e:
-        logger.error(f"safety/audit/recent proxy error: {e}")
-        return JSONResponse(
-            status_code=500,
-            content={"error": "Internal error", "detail": str(e)}
-        )
+    return await _proxy_vulcan_status_endpoint(
+        endpoint_name="safety/audit/recent",
+        handler_name="safety_audit_recent",
+        fallback_response={"logs": []},
+        limit=limit
+    )
 
 
 @app.get("/world-model/status")
@@ -3927,28 +3874,10 @@ async def world_model_status_proxy():
     Proxy endpoint for VULCAN world model status.
     Public endpoint - no authentication required for dashboard display.
     """
-    try:
-        vulcan_module, error_response = _get_vulcan_module()
-        if error_response:
-            return error_response
-        
-        deployment_error = _check_vulcan_deployment(vulcan_module)
-        if deployment_error:
-            return deployment_error
-        
-        try:
-            from src.vulcan.main import world_model_status
-            result = await world_model_status()
-            return result
-        except ImportError as e:
-            logger.warning(f"Could not import world_model_status: {e}")
-            return {"status": "unavailable", "message": str(e)}
-    except Exception as e:
-        logger.error(f"world-model/status proxy error: {e}")
-        return JSONResponse(
-            status_code=500,
-            content={"error": "Internal error", "detail": str(e)}
-        )
+    return await _proxy_vulcan_status_endpoint(
+        endpoint_name="world-model/status",
+        handler_name="world_model_status"
+    )
 
 
 @app.get("/memory/status")
@@ -3957,28 +3886,10 @@ async def memory_status_proxy():
     Proxy endpoint for VULCAN memory status.
     Public endpoint - no authentication required for dashboard display.
     """
-    try:
-        vulcan_module, error_response = _get_vulcan_module()
-        if error_response:
-            return error_response
-        
-        deployment_error = _check_vulcan_deployment(vulcan_module)
-        if deployment_error:
-            return deployment_error
-        
-        try:
-            from src.vulcan.main import memory_status
-            result = await memory_status()
-            return result
-        except ImportError as e:
-            logger.warning(f"Could not import memory_status: {e}")
-            return {"status": "unavailable", "message": str(e)}
-    except Exception as e:
-        logger.error(f"memory/status proxy error: {e}")
-        return JSONResponse(
-            status_code=500,
-            content={"error": "Internal error", "detail": str(e)}
-        )
+    return await _proxy_vulcan_status_endpoint(
+        endpoint_name="memory/status",
+        handler_name="memory_status"
+    )
 
 
 @app.get("/hardware/status")
@@ -3987,28 +3898,10 @@ async def hardware_status_proxy():
     Proxy endpoint for VULCAN hardware status.
     Public endpoint - no authentication required for dashboard display.
     """
-    try:
-        vulcan_module, error_response = _get_vulcan_module()
-        if error_response:
-            return error_response
-        
-        deployment_error = _check_vulcan_deployment(vulcan_module)
-        if deployment_error:
-            return deployment_error
-        
-        try:
-            from src.vulcan.main import hardware_status
-            result = await hardware_status()
-            return result
-        except ImportError as e:
-            logger.warning(f"Could not import hardware_status: {e}")
-            return {"status": "unavailable", "message": str(e)}
-    except Exception as e:
-        logger.error(f"hardware/status proxy error: {e}")
-        return JSONResponse(
-            status_code=500,
-            content={"error": "Internal error", "detail": str(e)}
-        )
+    return await _proxy_vulcan_status_endpoint(
+        endpoint_name="hardware/status",
+        handler_name="hardware_status"
+    )
 
 
 # =============================================================================
