@@ -331,12 +331,23 @@ jobs:
           # Give all users read and directories the execute bit (so runner can scandir)
           chmod -R a+rX "$REPO_CERT_DIR" || true
 
+      - name: Create buildkit config with retry settings
+        run: |
+          mkdir -p /tmp/buildkit
+          cat > /tmp/buildkit/buildkitd.toml << 'EOF'
+          [registry."docker.io"]
+            mirrors = ["mirror.gcr.io"]
+          [registry."registry-1.docker.io"]
+            mirrors = ["mirror.gcr.io"]
+          EOF
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
         with:
           driver-opts: |
             image=moby/buildkit:latest
             network=host
+          config: /tmp/buildkit/buildkitd.toml
 
       - name: Install Docker Compose plugin
         run: |
@@ -447,12 +458,23 @@ jobs:
           # Give all users read and directories the execute bit (so runner can scandir)
           chmod -R a+rX "$REPO_CERT_DIR" || true
 
+      - name: Create buildkit config with retry settings
+        run: |
+          mkdir -p /tmp/buildkit
+          cat > /tmp/buildkit/buildkitd.toml << 'EOF'
+          [registry."docker.io"]
+            mirrors = ["mirror.gcr.io"]
+          [registry."registry-1.docker.io"]
+            mirrors = ["mirror.gcr.io"]
+          EOF
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
         with:
           driver-opts: |
             image=moby/buildkit:latest
             network=host
+          config: /tmp/buildkit/buildkitd.toml
 
       - name: Build Docker image
         uses: docker/build-push-action@v6
@@ -466,7 +488,9 @@ jobs:
           cache-to: type=gha,mode=max
           build-args: |
             REJECT_INSECURE_JWT=ack
-          pull: true
+          # Use pull: false to leverage buildkit config with mirror
+          # This prevents TLS handshake timeout errors with Docker Hub
+          pull: false
 
       - name: Test Docker image
         run: |
