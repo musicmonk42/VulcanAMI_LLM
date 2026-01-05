@@ -217,6 +217,29 @@ except ImportError as e:
     PHILOSOPHICAL_AVAILABLE = False
 
 # ============================================================================
+# BUG #14 FIX: Cryptographic Engine - Deterministic hash/encoding computations
+# ============================================================================
+try:
+    from .cryptographic_engine import (
+        CryptographicEngine,
+        CryptoOperation,
+        CryptoResult,
+        compute_crypto,
+        get_crypto_engine,
+    )
+
+    CRYPTOGRAPHIC_AVAILABLE = True
+    logger.info("BUG#14 FIX: Cryptographic engine loaded successfully")
+except ImportError as e:
+    logger.warning(f"Cryptographic engine import failed: {e}")
+    CryptographicEngine = None
+    CryptoOperation = None
+    CryptoResult = None
+    compute_crypto = None
+    get_crypto_engine = None
+    CRYPTOGRAPHIC_AVAILABLE = False
+
+# ============================================================================
 # Unified Reasoner - Main orchestrator (critical)
 # ============================================================================
 try:
@@ -312,6 +335,12 @@ __all__ = [
     "CrossModalReasoner",  # ADDED: Export CrossModalReasoner
     "PhilosophicalReasoner",  # FIX: Export PhilosophicalReasoner for ethical/deontic reasoning
     "is_philosophical_query",  # FIX: Export helper function
+    # ===== BUG #14 FIX: Cryptographic Engine =====
+    "CryptographicEngine",
+    "CryptoOperation",
+    "CryptoResult",
+    "compute_crypto",
+    "get_crypto_engine",
     # ===== Symbolic Types =====
     "Clause",
     "Literal",
@@ -352,6 +381,7 @@ __all__ = [
     "ANALOGICAL_AVAILABLE",
     "MULTIMODAL_AVAILABLE",
     "PHILOSOPHICAL_AVAILABLE",  # FIX: Add availability flag
+    "CRYPTOGRAPHIC_AVAILABLE",  # BUG #14 FIX: Add availability flag
     "UNIFIED_AVAILABLE",
     "EXPLAINER_AVAILABLE",
     "SELECTION_AVAILABLE",
