@@ -155,11 +155,24 @@ class TestLexer:
             assert t1.type == t2.type == t3.type
 
     def test_lexer_error_handling(self):
-        """Test lexer error handling for invalid input."""
-        # Invalid characters should raise SyntaxError
+        """Test lexer graceful handling of invalid characters.
+        
+        BUG #1 FIX: The Lexer now skips unknown characters instead of raising
+        SyntaxError. This allows natural language text to pass through more
+        gracefully and prevents parsing failures on queries containing
+        unexpected Unicode characters.
+        """
+        # Invalid characters should be skipped gracefully (BUG #1 FIX)
         lexer = Lexer("P(x) @ Q")
-        with pytest.raises(SyntaxError):
-            lexer.tokenize()
+        tokens = lexer.tokenize()
+        
+        # Should produce tokens for P, (, x, ), Q, and EOF
+        # The @ character is skipped
+        token_types = [t.type for t in tokens]
+        assert TokenType.IDENTIFIER in token_types  # P and Q
+        assert TokenType.LPAREN in token_types
+        assert TokenType.RPAREN in token_types
+        assert TokenType.EOF in token_types
 
 
 # ============================================================================
