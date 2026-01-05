@@ -122,6 +122,22 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
+      - name: Create buildkit config with retry settings
+        run: |
+          # Create buildkit config with network retry settings to handle transient TLS timeouts
+          mkdir -p /tmp/buildkit
+          cat > /tmp/buildkit/buildkitd.toml << 'EOF'
+          # BuildKit configuration with network resilience for Docker Hub
+          # Use Google Container Registry mirror as fallback for Docker Hub
+          [registry."docker.io"]
+            mirrors = ["mirror.gcr.io"]
+          
+          [registry."registry-1.docker.io"]
+            mirrors = ["mirror.gcr.io"]
+          EOF
+          echo "=== BuildKit config created ==="
+          cat /tmp/buildkit/buildkitd.toml
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
         with:
@@ -129,6 +145,7 @@ jobs:
             image=moby/buildkit:latest
             network=host
           buildkitd-flags: --debug
+          config: /tmp/buildkit/buildkitd.toml
 
       - name: Log in to Container Registry
         if: github.event_name != 'pull_request'
@@ -194,6 +211,56 @@ jobs:
             exit 1
           fi
 
+      - name: Pre-pull base images with retry
+        if: steps.check_dockerfile.outputs.exists == 'true'
+        run: |
+          # Pre-pull base images with retry logic to handle transient network issues
+          # This prevents TLS handshake timeout errors during Docker build
+          pull_with_retry() {
+            local image=$1
+            local max_attempts=5
+            local attempt=1
+            local wait_time=10
+
+            echo "=== Pre-pulling base image: $image ==="
+            while [ $attempt -le $max_attempts ]; do
+              echo "Attempt $attempt of $max_attempts..."
+              if docker pull "$image"; then
+                echo "✅ Successfully pulled $image"
+                return 0
+              fi
+              echo "⚠️ Pull failed, waiting ${wait_time}s before retry..."
+              sleep $wait_time
+              wait_time=$((wait_time * 2))
+              attempt=$((attempt + 1))
+            done
+            echo "❌ Failed to pull $image after $max_attempts attempts"
+            return 1
+          }
+
+          # Extract base images from Dockerfile
+          DOCKERFILE="${{ matrix.service.dockerfile }}"
+          if [ -f "$DOCKERFILE" ]; then
+            # Get all FROM statements (base images)
+            BASE_IMAGES=$(grep -E '^FROM ' "$DOCKERFILE" | awk '{print $2}' | sort -u)
+            echo "Found base images in $DOCKERFILE:"
+            echo "$BASE_IMAGES"
+            echo ""
+
+            for image in $BASE_IMAGES; do
+              # Skip build stage references (e.g., builder, runtime)
+              # These are internal stage names, not real Docker images
+              if echo "$image" | grep -qE '^(builder|runtime|base|final|production|development|test)$'; then
+                echo "Skipping build stage reference: $image"
+                continue
+              fi
+              pull_with_retry "$image" || {
+                echo "WARNING: Could not pre-pull $image, build may still succeed with buildx cache"
+              }
+            done
+          fi
+          echo "=== Base image pre-pull complete ==="
+
       - name: Determine build platforms
         id: platforms
         run: |
@@ -225,7 +292,9 @@ jobs:
             VCS_REF=${{ github.sha }}
             VERSION=${{ steps.meta.outputs.version }}
           no-cache: false
-          pull: true
+          # Use pull: false to leverage pre-pulled images and buildkit config with mirror
+          # This prevents TLS handshake timeout errors with Docker Hub
+          pull: false
 
       - name: Post-build disk check
         if: steps.check_dockerfile.outputs.exists == 'true'
@@ -362,6 +431,16 @@ jobs:
             echo "WARNING: Less than 15GB available. Build may require additional cleanup."
           fi
 
+      - name: Create buildkit config with retry settings
+        run: |
+          mkdir -p /tmp/buildkit
+          cat > /tmp/buildkit/buildkitd.toml << 'EOF'
+          [registry."docker.io"]
+            mirrors = ["mirror.gcr.io"]
+          [registry."registry-1.docker.io"]
+            mirrors = ["mirror.gcr.io"]
+          EOF
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
         with:
@@ -369,6 +448,7 @@ jobs:
             image=moby/buildkit:latest
             network=host
           buildkitd-flags: --debug
+          config: /tmp/buildkit/buildkitd.toml
 
       - name: Create .env file
         run: |
@@ -420,8 +500,20 @@ jobs:
             echo "$REPO_CERT_DIR not present, skipping"
           fi
 
+      - name: Create buildkit config with retry settings
+        run: |
+          mkdir -p /tmp/buildkit
+          cat > /tmp/buildkit/buildkitd.toml << 'EOF'
+          [registry."docker.io"]
+            mirrors = ["mirror.gcr.io"]
+          [registry."registry-1.docker.io"]
+            mirrors = ["mirror.gcr.io"]
+          EOF
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+        with:
+          config: /tmp/buildkit/buildkitd.toml
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
@@ -519,8 +611,20 @@ jobs:
           echo "=== Disk space after cleanup ==="
           df -h
 
+      - name: Create buildkit config with retry settings
+        run: |
+          mkdir -p /tmp/buildkit
+          cat > /tmp/buildkit/buildkitd.toml << 'EOF'
+          [registry."docker.io"]
+            mirrors = ["mirror.gcr.io"]
+          [registry."registry-1.docker.io"]
+            mirrors = ["mirror.gcr.io"]
+          EOF
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+        with:
+          config: /tmp/buildkit/buildkitd.toml
 
       - name: Build with REQUIRE_HASHES=1
         id: hashed_build

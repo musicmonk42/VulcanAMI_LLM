@@ -285,8 +285,20 @@ jobs:
           echo "Disk space after cleanup:"
           df -h
 
+      - name: Create buildkit config with retry settings
+        run: |
+          mkdir -p /tmp/buildkit
+          cat > /tmp/buildkit/buildkitd.toml << 'EOF'
+          [registry."docker.io"]
+            mirrors = ["mirror.gcr.io"]
+          [registry."registry-1.docker.io"]
+            mirrors = ["mirror.gcr.io"]
+          EOF
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+        with:
+          config: /tmp/buildkit/buildkitd.toml
 
       - name: Build Docker image with caching
         id: docker_build
