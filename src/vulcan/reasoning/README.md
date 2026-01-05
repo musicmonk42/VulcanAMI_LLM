@@ -23,6 +23,10 @@
 11. [Performance Optimization](#performance-optimization)
 12. [Troubleshooting](#troubleshooting)
 13. [API Reference](#api-reference)
+14. [Appendix](#appendix)
+    - [Recent Bug Fixes](#recent-bug-fixes-and-improvements-january-2026)
+    - [Glossary](#glossary)
+    - [License](#license)
 
 ---
 
@@ -37,16 +41,18 @@ The VULCAN Reasoning Module is a **production-grade, multi-paradigm reasoning sy
 - **Intelligent tool selection** using multi-armed bandits
 - **Safety validation** at every step
 - **Transparent explanations** for all reasoning steps
+- **Cryptographic engine** for deterministic hash/encoding computations
 
 ### Key Statistics
 
 | Metric | Value |
 |--------|-------|
-| **Total Code** | ~95,000 lines |
-| **Reasoning Engines** | 18 specialized types |
+| **Total Code** | ~100,000 lines |
+| **Reasoning Engines** | 19 specialized types |
 | **Theorem Provers** | 6 different methods |
-| **Selection Components** | 11 orchestration modules |
+| **Selection Components** | 12 orchestration modules |
 | **Safety Layers** | 5 validation systems |
+| **Hash Algorithms** | 15 (SHA-2, SHA-3, BLAKE2, etc.) |
 
 ### Architecture at a Glance
 
@@ -1547,6 +1553,107 @@ class ReasoningResult:
 
 ## Appendix
 
+
+### Recent Bug Fixes and Improvements (January 2026)
+
+#### BUG #5: Symbolic Parser Cannot Handle Natural Language
+
+**Problem:** The parser expected formal logic notation but received natural language.
+
+**Solution:** Created `nl_converter.py` with pattern-based NL to logic conversion.
+
+```python
+# Before (failed):
+"Every engineer reviewed a document"
+# Parse error: Unexpected token 'Every'
+
+# After (works):
+from vulcan.reasoning.symbolic import SymbolicReasoner
+reasoner = SymbolicReasoner()
+result = reasoner.reason("Every engineer reviewed a document")
+# Converts to: ∀e ∃d Review(e, d)
+```
+
+#### BUG #13: Probabilistic Non-Determinism
+
+**Problem:** Same query produced different results across sessions.
+
+**Solution:** Added `reset_state()` method with deterministic seeding.
+
+```python
+from vulcan.reasoning import ProbabilisticReasoner
+
+reasoner = ProbabilisticReasoner()
+reasoner.reset_state(seed=42)  # Deterministic results
+result = reasoner.reason(query)
+```
+
+#### BUG #14: No Cryptographic Engine
+
+**Problem:** System fell back to OpenAI for hash computations, which hallucinated incorrect values.
+
+**Solution:** Created `cryptographic_engine.py` with deterministic hash/encoding support.
+
+```python
+from vulcan.reasoning import compute_crypto
+
+# SHA-256
+result = compute_crypto("Calculate SHA-256 of 'Hello, World!'")
+# result['result'] = 'dffd6021bb2bd5b0af676290809ec3a53191dd81c7f70a4b28688a362182986f'
+
+# Supported algorithms:
+# - SHA-2: SHA-256, SHA-1, SHA-512, SHA-384, SHA-224
+# - SHA-3: SHA3-256, SHA3-512, SHA3-384, SHA3-224
+# - BLAKE2: BLAKE2b, BLAKE2s
+# - Legacy: MD5, RIPEMD-160
+# - Encoding: Base64, Hex, URL/Percent
+# - HMAC: HMAC-SHA256, HMAC-SHA512
+# - Checksums: CRC32
+```
+
+#### BUG #15: Learning Rewards Wrong Answers
+
+**Problem:** System learned from incorrect but confident answers.
+
+**Solution:** Penalize unverified high-confidence results in learning.
+
+```python
+# Constants in tool_selector.py:
+UNVERIFIED_QUALITY_PENALTY = 0.7  # Reduce to 70% of claimed confidence
+FALLBACK_QUALITY_PENALTY = 0.3   # Reduce fallback rewards to 30%
+```
+
+#### BUG #7: Fallback Reporting Lies
+
+**Problem:** System reported success when using fallback, with misleading confidence.
+
+**Solution:** Fallback results now receive heavily reduced rewards and are tracked in metadata.
+
+#### BUG #9: Router Over-Weights Keywords
+
+**Problem:** "Write a sonnet about quantum" routed to Math due to "quantum" keyword.
+
+**Solution:** Task type detection (verbs like "write", "compose") now takes priority over domain keywords.
+
+```python
+# Now correctly routes:
+# "Write a sonnet about quantum" → general (creative task)
+# "Calculate quantum entanglement probability" → symbolic/mathematical
+```
+
+#### BUG #10: Ethical Override Blocks Math
+
+**Problem:** "Optimize welfare function" routed to Philosophy due to "welfare" keyword.
+
+**Solution:** Mathematical task verbs (optimize, maximize, minimize) override ethical keywords.
+
+```python
+# Now correctly routes:
+# "Optimize welfare function" → symbolic (math task)
+# "Discuss welfare ethics" → philosophical
+```
+
+
 ### Glossary
 
 - **Reasoning Engine:** Specialized module for a particular type of reasoning (causal, symbolic, etc.)
@@ -1557,10 +1664,8 @@ class ReasoningResult:
 - **Contextual Bandit:** Bandit algorithm that considers context when selecting
 - **Warm Start Pool:** Pre-initialized instances for fast access
 - **Circuit Breaker:** Failure handling mechanism
-
-
-
-
+- **Cryptographic Engine:** Deterministic hash/encoding computation engine (BUG #14 fix)
+- **NL Converter:** Natural Language to Logic converter (BUG #5 fix)
 
 ### License
 
@@ -1570,7 +1675,7 @@ See `LICENSE.txt` for complete terms.
 
 **Maintainers:** Brian Anderson  
 **Last Updated:** January 2026  
-**Version:** 1.0.0
+**Version:** 1.1.0
 
 ---
 

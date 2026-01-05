@@ -205,6 +205,17 @@ MAX_SUCCESS_TIME_MS = 10000  # Maximum execution time (ms) for success
 NEGATIVE_WEIGHT_THRESHOLD = -0.05
 
 # ==============================================================================
+# Constants for BUG #15 & #7 FIX - Learning Reward Penalties
+# ==============================================================================
+# BUG #15: Penalty factor for unverified high-confidence results
+# Prevents learning from potentially wrong but confident answers
+UNVERIFIED_QUALITY_PENALTY = 0.7  # Reduce to 70% of claimed confidence
+
+# BUG #7: Penalty factor for fallback results
+# Heavily penalizes fallback paths to prevent reinforcing failures
+FALLBACK_QUALITY_PENALTY = 0.3  # Reduce to 30% of quality
+
+# ==============================================================================
 # Constants for BUG #1 FIX - QueryRouter Tool Selection
 # ==============================================================================
 # Default available tools when not specified in class instance
@@ -1130,8 +1141,20 @@ class ToolSelectionBandit:
         time_ms: float,
         energy_mj: float,
         constraints: Dict[str, float],
+        is_verified: bool = False,
+        is_fallback: bool = False,
     ):
-        """Update the bandit orchestrator with execution results."""
+        """
+        Update the bandit orchestrator with execution results.
+        
+        BUG #15 FIX: Now accepts is_verified parameter to indicate if the
+        result was mathematically verified as correct. Unverified results
+        receive reduced rewards.
+        
+        BUG #7 FIX: Now accepts is_fallback parameter to indicate if the
+        result came from a fallback mechanism. Fallback results receive
+        heavily reduced rewards.
+        """
 
         # **************************************************************************
         # START CRITICAL FIX: Wrap entire method in lock to prevent race conditions
@@ -1141,13 +1164,20 @@ class ToolSelectionBandit:
                 if tool_name not in self.statistics:
                     self.statistics[tool_name] = {"pulls": 0, "rewards": []}
                 self.statistics[tool_name]["pulls"] += 1
-                reward = self._compute_reward(quality, time_ms, energy_mj, constraints)
+                reward = self._compute_reward(
+                    quality, time_ms, energy_mj, constraints,
+                    is_verified=is_verified, is_fallback=is_fallback
+                )
                 self.statistics[tool_name]["rewards"].append(reward)
                 return
 
             try:
                 # 1. Compute reward from the outcome
-                reward = self._compute_reward(quality, time_ms, energy_mj, constraints)
+                # BUG #15 & #7 FIX: Pass verification and fallback status
+                reward = self._compute_reward(
+                    quality, time_ms, energy_mj, constraints,
+                    is_verified=is_verified, is_fallback=is_fallback
+                )
 
                 # 2. Create the context and action objects
                 context = BanditContext(
@@ -1194,16 +1224,60 @@ class ToolSelectionBandit:
         time_ms: float,
         energy_mj: float,
         constraints: Dict[str, float],
+        is_verified: bool = False,
+        is_fallback: bool = False,
     ) -> float:
-        """Computes a reward score between 0 and 1."""
+        """
+        Computes a reward score between 0 and 1.
+        
+        BUG #15 FIX: Now considers whether the answer was verified as correct
+        before rewarding. Unverified answers with high confidence should NOT
+        receive full reward - confidence != correctness.
+        
+        BUG #7 FIX: Fallback results receive reduced rewards to prevent
+        learning from potentially incorrect LLM responses.
+        
+        Args:
+            quality: Confidence score from the tool (0-1)
+            time_ms: Execution time in milliseconds
+            energy_mj: Energy used in millijoules
+            constraints: Dict with time_budget_ms, energy_budget_mj
+            is_verified: Whether the result was mathematically verified
+            is_fallback: Whether this result came from a fallback mechanism
+            
+        Returns:
+            Reward score between 0 and 1
+        """
         time_budget = constraints.get("time_budget_ms", 1000)
         energy_budget = constraints.get("energy_budget_mj", 1000)
 
         time_score = max(0, 1 - (time_ms / time_budget))
         energy_score = max(0, 1 - (energy_mj / energy_budget))
 
+        # BUG #15 FIX: Penalize unverified high-confidence results
+        # If result is not verified, reduce the effective quality score
+        # to prevent learning from potentially wrong but confident answers
+        effective_quality = quality
+        if not is_verified and quality > 0.7:
+            # Reduce confidence for unverified high-confidence answers
+            effective_quality = quality * UNVERIFIED_QUALITY_PENALTY
+            logger.debug(
+                f"[BUG#15 FIX] Reduced reward for unverified high-confidence result: "
+                f"{quality:.2f} -> {effective_quality:.2f}"
+            )
+        
+        # BUG #7 FIX: Significantly reduce reward for fallback results
+        # Fallback typically means primary engine failed, so we shouldn't
+        # strongly reinforce this path
+        if is_fallback:
+            effective_quality = effective_quality * FALLBACK_QUALITY_PENALTY
+            logger.debug(
+                f"[BUG#7 FIX] Reduced reward for fallback result: "
+                f"{quality:.2f} -> {effective_quality:.2f}"
+            )
+
         # Weighted combination, prioritizing quality
-        reward = 0.6 * quality + 0.3 * time_score + 0.1 * energy_score
+        reward = 0.6 * effective_quality + 0.3 * time_score + 0.1 * energy_score
         return float(np.clip(reward, 0.0, 1.0))
 
     def get_statistics(self) -> Dict[str, Any]:
@@ -2807,6 +2881,169 @@ class WorldModelToolWrapper:
             except Exception as e:
                 self.logger.debug(f"Could not notify world model of introspection: {e}")
 
+
+# =============================================================================
+# BUG #14 FIX: Cryptographic Tool Wrapper
+# =============================================================================
+
+class CryptographicToolWrapper:
+    """
+    Wrapper for CryptographicEngine that exposes reason() method.
+    
+    BUG #14 FIX: The system was falling back to OpenAI for cryptographic
+    computations (SHA-256, MD5, etc.), which resulted in hallucinated 
+    (incorrect) hash values.
+    
+    This wrapper:
+    1. Detects if the query involves cryptographic computation
+    2. Routes to the CryptographicEngine for deterministic computation
+    3. Returns accurate, verifiable results (100% confidence)
+    
+    Supported Operations:
+    - Hash functions: SHA-256, SHA-1, SHA-512, SHA-384, SHA-224, MD5
+    - Encoding: Base64, Hexadecimal
+    - Authentication: HMAC-SHA256, HMAC-SHA512
+    - Checksums: CRC32
+    """
+    
+    # Keywords for detecting cryptographic queries
+    _CRYPTO_KEYWORDS = frozenset({
+        'sha-256', 'sha256', 'sha-1', 'sha1', 'sha-512', 'sha512',
+        'sha-384', 'sha384', 'sha-224', 'sha224',
+        'md5', 'hash', 'checksum', 'digest',
+        'base64', 'b64', 'hex', 'hexadecimal',
+        'hmac', 'crc32', 'crc-32', 'encode', 'decode'
+    })
+    
+    _COMPUTE_KEYWORDS = frozenset({
+        'calculate', 'compute', 'generate', 'find', 'get', 
+        'what is', 'determine', 'produce', 'create'
+    })
+    
+    def __init__(self, engine):
+        """
+        Initialize with a CryptographicEngine instance.
+        
+        Args:
+            engine: CryptographicEngine instance
+        """
+        self.engine = engine
+        self.name = "cryptographic"
+    
+    def reason(self, problem: Any) -> Dict[str, Any]:
+        """
+        Execute cryptographic computation on the problem.
+        
+        BUG #14 FIX: Provides deterministic, accurate cryptographic results
+        instead of relying on LLM fallback which hallucinates.
+        
+        Args:
+            problem: Dict with query, or string query
+            
+        Returns:
+            Dict with computation result and confidence
+        """
+        start_time = time.time()
+        
+        try:
+            # Extract query string from problem
+            query_str = self._extract_query_text(problem)
+            
+            if not query_str:
+                return self._not_applicable_result(
+                    "No query text provided",
+                    start_time
+                )
+            
+            # Gate check - is this actually a cryptographic query?
+            if not self._is_crypto_query(query_str):
+                return self._not_applicable_result(
+                    "Query does not involve cryptographic computation",
+                    start_time
+                )
+            
+            # Execute the cryptographic computation
+            result = self.engine.compute(query_str)
+            
+            if result['success']:
+                return {
+                    "tool": self.name,
+                    "applicable": True,
+                    "result": result['result'],
+                    "operation": result['operation'],
+                    "input": result['input'],
+                    "confidence": 1.0,  # Deterministic = 100% confidence
+                    "engine": "CryptographicEngine",
+                    "execution_time_ms": (time.time() - start_time) * 1000,
+                    "metadata": {
+                        "deterministic": True,
+                        "bug_fix": "BUG#14",
+                    }
+                }
+            else:
+                return {
+                    "tool": self.name,
+                    "applicable": False,
+                    "reason": result.get('error', 'Unknown error'),
+                    "confidence": 0.0,
+                    "engine": "CryptographicEngine",
+                    "execution_time_ms": (time.time() - start_time) * 1000,
+                }
+                
+        except Exception as e:
+            logger.error(f"[CryptographicToolWrapper] Error: {e}")
+            return {
+                "tool": self.name,
+                "applicable": False,
+                "reason": f"Computation failed: {str(e)}",
+                "confidence": 0.0,
+                "engine": "CryptographicEngine",
+                "execution_time_ms": (time.time() - start_time) * 1000,
+            }
+    
+    def _extract_query_text(self, problem: Any) -> str:
+        """Extract query text from problem input."""
+        if isinstance(problem, str):
+            return problem
+        elif isinstance(problem, dict):
+            # Try common keys
+            for key in ['query', 'problem', 'question', 'input', 'text']:
+                if key in problem and problem[key]:
+                    return str(problem[key])
+            # Fall back to string representation
+            return str(problem)
+        else:
+            return str(problem)
+    
+    def _is_crypto_query(self, query: str) -> bool:
+        """
+        Check if query involves cryptographic computation.
+        
+        Args:
+            query: The query string
+            
+        Returns:
+            True if query involves cryptographic operations
+        """
+        query_lower = query.lower()
+        
+        has_crypto_keyword = any(kw in query_lower for kw in self._CRYPTO_KEYWORDS)
+        has_compute_keyword = any(kw in query_lower for kw in self._COMPUTE_KEYWORDS)
+        
+        return has_crypto_keyword and has_compute_keyword
+    
+    def _not_applicable_result(self, reason: str, start_time: float) -> Dict[str, Any]:
+        """Return a not-applicable result."""
+        return {
+            "tool": self.name,
+            "applicable": False,
+            "reason": reason,
+            "confidence": 0.0,
+            "engine": "CryptographicEngine",
+            "execution_time_ms": (time.time() - start_time) * 1000,
+        }
+
+
 class ToolSelector:
     """
     Main tool selector orchestrating all components
@@ -3016,6 +3253,7 @@ class ToolSelector:
         Bayesian inference, causal analysis, etc.)
         
         BUG S FIX: Added world_model tool for self-introspection queries.
+        BUG #14 FIX: Added cryptographic tool for hash/encoding computations.
         """
         tool_configs = {
             "symbolic": {"speed": "medium", "accuracy": "high", "energy": "medium"},
@@ -3024,6 +3262,7 @@ class ToolSelector:
             "analogical": {"speed": "fast", "accuracy": "low", "energy": "low"},
             "multimodal": {"speed": "slow", "accuracy": "high", "energy": "very_high"},
             "world_model": {"speed": "fast", "accuracy": "high", "energy": "low"},  # BUG S FIX
+            "cryptographic": {"speed": "fast", "accuracy": "perfect", "energy": "low"},  # BUG #14 FIX
         }
 
         # Try to initialize real reasoning engines
@@ -3147,6 +3386,22 @@ class ToolSelector:
         except Exception as e:
             logger.error(f"[ToolSelector] WorldModelToolWrapper initialization failed: {e}")
             engines["world_model"] = None
+        
+        # ============================================================
+        # BUG #14 FIX: CRYPTOGRAPHIC ENGINE (Hash/encoding computations)
+        # ============================================================
+        # This enables deterministic cryptographic computations (SHA-256, MD5, etc.)
+        # instead of relying on LLM fallback which hallucinates incorrect values.
+        try:
+            from ..cryptographic_engine import CryptographicEngine
+            engines["cryptographic"] = CryptographicToolWrapper(CryptographicEngine())
+            logger.info("[ToolSelector] BUG#14 FIX: CryptographicEngine loaded successfully")
+        except ImportError as e:
+            logger.warning(f"[ToolSelector] CryptographicEngine not available: {e}")
+            engines["cryptographic"] = None
+        except Exception as e:
+            logger.error(f"[ToolSelector] CryptographicEngine initialization failed: {e}")
+            engines["cryptographic"] = None
         
         return engines
 
@@ -4105,10 +4360,39 @@ class ToolSelector:
             return self._create_failure_result()
 
     def _update_learning(self, request: SelectionRequest, result: SelectionResult):
-        """Update learning components including mathematical accuracy feedback."""
+        """
+        Update learning components including mathematical accuracy feedback.
+        
+        BUG #15 FIX: Now checks if result was verified before rewarding.
+        BUG #7 FIX: Now checks if result came from fallback.
+        """
 
         try:
-            # Update bandit
+            # BUG #15 FIX: Check if result was mathematically verified
+            is_verified = False
+            if result.metadata:
+                math_verification = result.metadata.get("math_verification", {})
+                is_verified = math_verification.get("status") == "verified"
+            
+            # BUG #7 FIX: Check if result came from fallback
+            is_fallback = False
+            if result.metadata:
+                is_fallback = result.metadata.get("used_fallback", False)
+                # Also check execution result for fallback indicators
+                if isinstance(result.execution_result, dict):
+                    is_fallback = is_fallback or result.execution_result.get("is_fallback", False)
+            
+            # Log learning update with verification status
+            if is_fallback:
+                logger.info(
+                    f"[BUG#7 FIX] Learning update for FALLBACK result - reduced reward"
+                )
+            if not is_verified and result.confidence > 0.7:
+                logger.info(
+                    f"[BUG#15 FIX] Learning update for UNVERIFIED high-confidence result - reduced reward"
+                )
+            
+            # Update bandit with verification and fallback status
             self.bandit.update_from_execution(
                 features=request.features,
                 tool_name=result.selected_tool,
@@ -4116,6 +4400,8 @@ class ToolSelector:
                 time_ms=result.execution_time_ms,
                 energy_mj=result.energy_used_mj,
                 constraints=request.constraints,
+                is_verified=is_verified,
+                is_fallback=is_fallback,
             )
 
             # Update memory prior

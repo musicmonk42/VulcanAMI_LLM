@@ -7,13 +7,15 @@ FULLY IMPLEMENTED VERSION with:
 - Intelligent feature extraction with multiple strategies
 - Advanced hyperparameter optimization
 - Automatic relevance determination (ARD)
+
+BUG #13 FIX: Added deterministic seeding and state isolation to ensure
+same query produces same result across sessions.
 """
 
-from .reasoning_types import ReasoningResult, ReasoningType
-from .reasoning_explainer import ReasoningExplainer, SafetyAwareReasoning
 import hashlib
 import logging
 import pickle
+import random
 import re
 import time
 from collections import defaultdict, deque
@@ -22,7 +24,13 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 
+from .reasoning_explainer import ReasoningExplainer, SafetyAwareReasoning
+from .reasoning_types import ReasoningResult, ReasoningType
+
 logger = logging.getLogger(__name__)
+
+# BUG #13 FIX: Default seed for deterministic behavior
+DEFAULT_RANDOM_SEED = 42
 
 try:
     pass
@@ -888,6 +896,53 @@ class EnhancedProbabilisticReasoner:
         # Automatic parameter adaptation
         self.adaptation_frequency = 50
         self.update_counter = 0
+        
+        # BUG #13 FIX: Store seed for deterministic behavior
+        self._random_seed = DEFAULT_RANDOM_SEED
+
+    def reset_state(self, seed: Optional[int] = None) -> None:
+        """
+        BUG #13 FIX: Reset all internal state for deterministic behavior.
+        
+        This method clears caches, resets random state, and ensures that
+        the same query will produce the same result across sessions.
+        
+        Args:
+            seed: Optional random seed. If None, uses DEFAULT_RANDOM_SEED (42).
+        
+        Example:
+            >>> reasoner = ProbabilisticReasoner()
+            >>> reasoner.reset_state()  # Reset before each computation
+            >>> result = reasoner.reason(query)
+        """
+        # Use provided seed or default
+        seed = seed if seed is not None else self._random_seed
+        
+        # BUG #13 FIX: Set deterministic seeds
+        random.seed(seed)
+        np.random.seed(seed)
+        
+        # Clear caches
+        self.belief_state.clear()
+        self.observations.clear()
+        self.online_buffer.clear()
+        self.feature_extractor.feature_cache.clear()
+        
+        # Reset diagnostics
+        self.diagnostics = {
+            "mse_history": deque(maxlen=100),
+            "likelihood_history": deque(maxlen=100),
+            "hyperparameter_history": deque(maxlen=100),
+            "optimization_history": deque(maxlen=100),
+        }
+        
+        # Reset counters
+        self.update_counter = 0
+        self.trained = False
+        
+        logger.debug(
+            f"[ProbabilisticReasoner] BUG#13 FIX: State reset with seed={seed}"
+        )
 
     def rbf_kernel(
         self, X1: np.ndarray, X2: np.ndarray = None, length_scale: float = 1.0
@@ -1901,7 +1956,7 @@ class ProbabilisticReasoner(EnhancedProbabilisticReasoner):
         return self.reason_with_uncertainty(input_data, **kwargs)
 
     def reason_with_uncertainty(
-        self, input_data: Any, threshold: float = 0.5
+        self, input_data: Any, threshold: float = 0.5, reset_state: bool = True
     ) -> ReasoningResult:
         """
         FULL IMPLEMENTATION: Intelligent feature extraction and reasoning
@@ -1915,7 +1970,22 @@ class ProbabilisticReasoner(EnhancedProbabilisticReasoner):
         BUG #3 FIX (0.500 Bug): Detects when the model returns uninformative 
         default values (0.5/0.5) and returns a "not applicable" result instead
         of the confusing probabilistic metrics.
+        
+        BUG #13 FIX: Now resets state before computation to ensure deterministic
+        results across sessions.
+        
+        Args:
+            input_data: The query or data to reason about
+            threshold: Confidence threshold for predictions
+            reset_state: If True, reset state before computation for determinism
+            
+        Returns:
+            ReasoningResult with probabilistic conclusions
         """
+        # BUG #13 FIX: Reset state for deterministic behavior
+        if reset_state:
+            self.reset_state()
+        
         # FIX #1: GATE CHECK - Is this actually a probability query?
         # Extract query string for gate check
         query_str = str(input_data) if not isinstance(input_data, str) else input_data
