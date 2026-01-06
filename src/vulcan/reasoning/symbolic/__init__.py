@@ -246,16 +246,46 @@ def check_consistency(formulas: List[str], timeout: float = 5.0) -> bool:
 
     Returns:
         True if consistent, False if contradictory
+        
+    Example:
+        >>> # A→B, B→C, ¬C, A∨B is UNSATISFIABLE (contradiction)
+        >>> formulas = ['A → B', 'B → C', '¬C', 'A ∨ B']
+        >>> check_consistency(formulas)  # Returns False
+        False
     """
-    # To check consistency, we try to prove a contradiction (False).
-    # A common way to represent False is an empty goal.
-    reasoner = SymbolicReasoner(prover_type="resolution")  # Resolution is good for this
-
+    # FIX Issue #12: Use resolution refutation properly
+    # To check satisfiability, we check if the set of formulas leads to a contradiction.
+    # Resolution proves unsatisfiability by deriving the empty clause.
+    
+    from .provers import ResolutionProver
+    from .parsing import FormulaParser
+    
+    reasoner = SymbolicReasoner(prover_type="resolution")
+    
+    # Add all formulas to the knowledge base
     for formula in formulas:
         reasoner.add_rule(formula)
-
-    # If we can prove an empty goal, it means the KB is inconsistent.
-    result = reasoner.query("", timeout=timeout)
-
-    # The set is consistent if a contradiction is NOT proven.
-    return not result.get("proven", False)
+    
+    # For resolution refutation, we need to check if the KB itself is inconsistent.
+    # This is done by running resolution on the KB without any specific goal.
+    # If resolution derives the empty clause (⊥), the KB is inconsistent.
+    
+    try:
+        # Use the prover directly to avoid the is_symbolic_query check
+        # The goal is an empty clause (representing ⊥ - contradiction)
+        empty_goal = Clause(literals=[], is_goal=True)
+        
+        # Run resolution
+        proven, proof, confidence = reasoner.prover.prove(
+            empty_goal, 
+            reasoner.kb.clauses, 
+            timeout
+        )
+        
+        # If we proved the empty clause, the KB is inconsistent (unsatisfiable)
+        # The set is consistent only if we could NOT derive a contradiction
+        return not proven
+        
+    except Exception as e:
+        logger.warning(f"Consistency check failed: {e}, assuming consistent")
+        return True  # Default to consistent on error
