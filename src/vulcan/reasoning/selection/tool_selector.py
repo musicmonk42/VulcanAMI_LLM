@@ -3371,7 +3371,7 @@ class ToolSelector:
         # The check for 'not ', 'and ', 'or ' is too aggressive for natural language.
         ascii_logic_strict = ['->', '<->', '&&', '||']  # Removed 'not ', 'and ', 'or '
         has_proposition = re.search(r'\b[A-Z]\b', query) is not None  # Cache this check
-        if has_proposition and any(pattern in query for pattern in ascii_logic_strict):
+        if has_proposition and any(pattern in query_lower for pattern in ascii_logic_strict):
             logger.debug("[ToolSelector] TASK 3: Detected ASCII logic with propositions")
             return True
         

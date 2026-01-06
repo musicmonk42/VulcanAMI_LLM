@@ -513,7 +513,7 @@ class UnifiedLearningSystem:
             # The symbolic engine can fail with "Parse error: Unexpected token..." but still
             # return confidence=0.6. This should be treated as a FAILURE, not a success.
             # Check for parse errors in various possible locations.
-            error_string = str(outcome.get('error', '')) + str(metadata.get('error', ''))
+            error_string = str(outcome.get('error', '')) + ' ' + str(metadata.get('error', ''))
             has_parse_error = (
                 'parse error' in error_string.lower() or
                 'unexpected token' in error_string.lower() or

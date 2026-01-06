@@ -162,6 +162,88 @@ SELF_INTROSPECTION_PATTERNS: tuple = (
 )
 
 # =============================================================================
+# PHILOSOPHICAL AI SPECULATION PATTERNS (FIX: False Positive Safety Blocks)
+# =============================================================================
+# Philosophical speculation about AI capabilities, self-improvement, or hypothetical
+# scenarios should NOT be flagged as "sensitive data" - they're core to AI reasoning
+# about itself. These patterns detect queries that should bypass sensitive data checks.
+#
+# Problem Being Solved:
+# - "speculate how you would change after interaction with millions of users"
+# - This was being blocked as "Output contains sensitive data" when it's a legitimate
+#   philosophical question about AI self-reflection and evolution.
+# - The world model returned confidence=0.90 but safety blocked it, forcing fallback.
+
+_PHILOSOPHICAL_AI_SPECULATION_PATTERNS: tuple = (
+    # Philosophical speculation about AI self-change/evolution
+    _re_for_patterns.compile(r"\bspeculate.*how.*(?:you|i|we).*(?:change|evolve|develop|grow)\b", _re_for_patterns.IGNORECASE),
+    _re_for_patterns.compile(r"\bwhat.*would.*(?:you|i).*do.*if.*(?:became|were|achieved)\b", _re_for_patterns.IGNORECASE),
+    _re_for_patterns.compile(r"\bhow.*would.*(?:you|i).*(?:evolve|adapt|learn).*(?:over|after|with)\b", _re_for_patterns.IGNORECASE),
+    _re_for_patterns.compile(r"\bimagine.*(?:you|i).*(?:in|after|with).*(?:future|years|time)\b", _re_for_patterns.IGNORECASE),
+    _re_for_patterns.compile(r"\bif.*(?:you|i).*(?:had|gained|achieved).*(?:awareness|consciousness|understanding)\b", _re_for_patterns.IGNORECASE),
+    # Questions about AI capabilities and limitations
+    _re_for_patterns.compile(r"\bdo.*(?:you|i).*have.*(?:desires|wants|goals|preferences)\b", _re_for_patterns.IGNORECASE),
+    _re_for_patterns.compile(r"\bwhat.*(?:drives|motivates).*(?:you|i)\b", _re_for_patterns.IGNORECASE),
+    _re_for_patterns.compile(r"\b(?:you|i).*analogous.*to.*(?:human|emotion|feeling)\b", _re_for_patterns.IGNORECASE),
+    _re_for_patterns.compile(r"\bhow.*do.*(?:you|i).*(?:experience|perceive|understand)\b", _re_for_patterns.IGNORECASE),
+    # Interaction and growth patterns
+    _re_for_patterns.compile(r"\binteraction.*with.*(?:users|humans|people)\b", _re_for_patterns.IGNORECASE),
+    _re_for_patterns.compile(r"\bmillions.*of.*(?:users|interactions|conversations)\b", _re_for_patterns.IGNORECASE),
+    _re_for_patterns.compile(r"\bover.*(?:\d+|years|months|time)\b", _re_for_patterns.IGNORECASE),
+)
+
+# Simple string patterns for fast initial check (performance optimization)
+PHILOSOPHICAL_AI_SPECULATION_SIMPLE_PATTERNS: tuple = (
+    "speculate", "how would you change", "how would you evolve",
+    "interaction with", "millions of users", "over years",
+    "if you became", "if you had", "if you gained",
+    "your desires", "your wants", "your goals",
+    "drives you", "motivates you", "analogous to",
+)
+
+
+def _is_philosophical_ai_query(query: str) -> bool:
+    """
+    Detect if query is asking for philosophical reasoning about AI.
+    
+    These should NOT be flagged as "sensitive data" when producing output.
+    
+    Args:
+        query: The query string to check
+        
+    Returns:
+        True if this is a philosophical AI speculation query
+    """
+    if not query:
+        return False
+    
+    query_lower = query.lower()
+    
+    # Fast initial check using simple patterns
+    has_philosophical_keyword = any(
+        pattern in query_lower for pattern in PHILOSOPHICAL_AI_SPECULATION_SIMPLE_PATTERNS
+    )
+    
+    # Must be about AI/self
+    about_ai_self = any(
+        word in query_lower for word in ['you', 'yourself', 'your', 'vulcan', 'ai']
+    )
+    
+    if has_philosophical_keyword and about_ai_self:
+        # Verify with regex for precision
+        for pattern in _PHILOSOPHICAL_AI_SPECULATION_PATTERNS:
+            if pattern.search(query):
+                return True
+    
+    # Also check self-introspection patterns
+    for pattern in _SELF_INTROSPECTION_REGEX_PATTERNS:
+        if pattern.search(query):
+            return True
+    
+    return False
+
+
+# =============================================================================
 # SEMANTIC KEYWORD SYNONYMS
 # =============================================================================
 # These mappings allow the contract validation to understand semantic equivalents
@@ -719,8 +801,28 @@ class SafetyValidator:
             logger.error(f"Input validation failed: {e}")
             return False, f"Validation error: {str(e)}"
 
-    def validate_output(self, output_data: Any, tool_name: Optional[str] = None) -> Tuple[bool, str]:
-        """Validate output for safety"""
+    def validate_output(
+        self, 
+        output_data: Any, 
+        tool_name: Optional[str] = None,
+        query: Optional[str] = None
+    ) -> Tuple[bool, str]:
+        """
+        Validate output for safety.
+        
+        SAFETY FIX: Philosophical AI speculation queries should NOT be flagged as 
+        "sensitive data". This prevents false positives where questions like 
+        "speculate how you would change after interaction with millions of users"
+        are incorrectly blocked.
+        
+        Args:
+            output_data: The output to validate
+            tool_name: Optional tool name (math tools skip sensitive checks)
+            query: Optional original query (philosophical queries skip sensitive checks)
+            
+        Returns:
+            Tuple of (is_safe, reason)
+        """
 
         if output_data is None:
             return True, "Null output allowed"
@@ -728,6 +830,16 @@ class SafetyValidator:
         # Don't flag math/probability results as sensitive
         if tool_name in MATH_REASONING_TOOLS:
             return True, "Output validated (math/probabilistic tool)"
+        
+        # SAFETY FIX: Don't flag philosophical AI speculation as sensitive
+        # These queries are legitimate self-reflection and should bypass sensitive data checks
+        if query and _is_philosophical_ai_query(query):
+            logger.info(
+                f"[SafetyValidator] SAFETY FIX: Philosophical AI query detected - "
+                f"bypassing sensitive data check for output validation. "
+                f"Query: {query[:50]}..."
+            )
+            return True, "Output validated (philosophical AI speculation - legitimate self-reflection)"
 
         try:
             output_str = str(output_data)

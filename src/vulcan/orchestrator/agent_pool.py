@@ -2854,13 +2854,13 @@ class AgentPoolManager:
                                     primary_tool = integration_result.selected_tools[0].lower()
                                     # Map tool name to ReasoningType
                                     tool_to_reasoning_type_map = {
-                                        'symbolic': ReasoningType.SYMBOLIC if ReasoningType else None,
-                                        'probabilistic': ReasoningType.PROBABILISTIC if ReasoningType else None,
-                                        'causal': ReasoningType.CAUSAL if ReasoningType else None,
-                                        'analogical': ReasoningType.ANALOGICAL if ReasoningType else None,
-                                        'mathematical': ReasoningType.MATHEMATICAL if ReasoningType else None,
-                                        'philosophical': ReasoningType.PHILOSOPHICAL if ReasoningType else None,
-                                        'multimodal': ReasoningType.MULTIMODAL if ReasoningType else None,
+                                        'symbolic': ReasoningType.SYMBOLIC,
+                                        'probabilistic': ReasoningType.PROBABILISTIC,
+                                        'causal': ReasoningType.CAUSAL,
+                                        'analogical': ReasoningType.ANALOGICAL,
+                                        'mathematical': ReasoningType.MATHEMATICAL,
+                                        'philosophical': ReasoningType.PHILOSOPHICAL,
+                                        'multimodal': ReasoningType.MULTIMODAL,
                                     }
                                     mapped_type = tool_to_reasoning_type_map.get(primary_tool)
                                     if mapped_type is not None:
