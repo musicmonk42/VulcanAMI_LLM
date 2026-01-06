@@ -26,6 +26,7 @@ Date: 2024-12-26
 
 import hashlib
 import logging
+import re
 import threading
 import time
 from collections import OrderedDict
@@ -209,6 +210,26 @@ TOOL_DESCRIPTIONS = {
         consequentialist, utilitarian, categorical imperative, trolley problem,
         dilemma, philosophical, deontic, normative, ought, should, must not,
         permissibility, obligation, prohibition
+    """,
+    "mathematical": """
+        Mathematical computation, numerical calculation, and symbolic mathematics.
+        
+        USE THIS TOOL FOR:
+        - Numerical calculations and arithmetic
+        - Calculus: derivatives, integrals, limits
+        - Linear algebra: matrices, vectors, eigenvalues
+        - Solving equations and systems of equations
+        - Optimization problems
+        - Statistical calculations
+        - Numerical methods and approximations
+        - Formula evaluation and simplification
+        - Graph theory calculations
+        - Combinatorics and counting
+        
+        TRIGGER KEYWORDS: calculate, compute, solve, evaluate, simplify,
+        derivative, integral, limit, matrix, vector, eigenvalue, optimize,
+        minimize, maximize, equation, formula, sum, product, factorial,
+        logarithm, exponential, root, sqrt, polynomial, function, graph
     """,
 }
 
@@ -1239,9 +1260,22 @@ class SemanticToolMatcher:
 
             if tool_name in TOOL_KEYWORDS:
                 for keyword in TOOL_KEYWORDS[tool_name]:
-                    if keyword.lower() in query_lower:
-                        keyword_matches.append(keyword)
-                        keyword_boost += 0.1  # Accumulate boost per match
+                    # BUG FIX: Use word boundary matching to prevent false positives
+                    # like "each" matching in "teacher" or "or" matching in "doctor"
+                    # For multi-word keywords (e.g., "is to", "if then"), check if 
+                    # keyword appears as a complete phrase
+                    keyword_lower = keyword.lower()
+                    if ' ' in keyword_lower:
+                        # Multi-word keyword: simple substring match is fine
+                        if keyword_lower in query_lower:
+                            keyword_matches.append(keyword)
+                            keyword_boost += 0.1
+                    else:
+                        # Single word: require word boundary to prevent false positives
+                        pattern = r'\b' + re.escape(keyword_lower) + r'\b'
+                        if re.search(pattern, query_lower):
+                            keyword_matches.append(keyword)
+                            keyword_boost += 0.1
 
                 # Cap keyword boost at 0.5
                 keyword_boost = min(0.5, keyword_boost)
@@ -1273,12 +1307,17 @@ class SemanticToolMatcher:
             
             # =====================================================================
             # BUG #10 FIX: Mathematical task type overrides ethical keyword routing
-            # "Optimize welfare function" should go to symbolic/math, not philosophical
+            # "Calculate the derivative" should go to mathematical tool for computation
+            # "Prove the theorem" should go to symbolic tool for formal proofs
             # =====================================================================
             if is_math_task:
-                if tool_name == 'symbolic':
-                    # Boost symbolic tool significantly for math tasks
-                    keyword_boost = max(keyword_boost, 0.6)
+                if tool_name == 'mathematical':
+                    # Boost mathematical tool significantly for computation tasks
+                    keyword_boost = max(keyword_boost, 0.65)  # Higher than symbolic
+                    keyword_matches.append('math_computation_override')
+                elif tool_name == 'symbolic':
+                    # Also boost symbolic but slightly less for math proofs
+                    keyword_boost = max(keyword_boost, 0.55)
                     keyword_matches.append('math_task_override')
                 elif tool_name in ('philosophical', 'analogical'):
                     # Penalize philosophical for math tasks
@@ -1444,7 +1483,19 @@ class SemanticToolMatcher:
             # Get keywords for this tool
             if tool_name in TOOL_KEYWORDS:
                 keywords = TOOL_KEYWORDS[tool_name]
-                matches = [kw for kw in keywords if kw in query_lower]
+                matches = []
+                for kw in keywords:
+                    kw_lower = kw.lower()
+                    if ' ' in kw_lower:
+                        # Multi-word keyword: simple substring match is fine
+                        if kw_lower in query_lower:
+                            matches.append(kw)
+                    else:
+                        # Single word: require word boundary to prevent false positives
+                        pattern = r'\b' + re.escape(kw_lower) + r'\b'
+                        if re.search(pattern, query_lower):
+                            matches.append(kw)
+                
                 if matches:
                     # Scale boost by number of keyword matches
                     keyword_boost = min(0.3, len(matches) * 0.1)
