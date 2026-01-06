@@ -511,6 +511,42 @@ enable-reasoning-features: ## Enable all reasoning features (Problem Decomposer,
 	@echo "SEMANTIC_BRIDGE_ENABLED=true"
 	@echo "CROSS_DOMAIN_TRANSFER_ENABLED=true"
 	@echo "PATTERN_LEARNING_ENABLED=true"
+	@echo ""
+	@echo "# Direct Reasoning Results (Reasoning System Fix)"
+	@echo "# Use reasoning results directly when confidence is high (prevents OpenAI override)"
+	@echo "VULCAN_USE_REASONING_DIRECTLY=true"
+	@echo "VULCAN_MIN_REASONING_CONFIDENCE=0.5"
+	@echo ""
+	@echo "# Self-Introspection (World Model)"
+	@echo "# Enable world model for self-awareness questions"
+	@echo "VULCAN_SELF_INTROSPECTION_ENABLED=true"
+	@echo "VULCAN_SELF_INTROSPECTION_SAFETY_BYPASS=true"
+
+.PHONY: enable-direct-reasoning
+enable-direct-reasoning: ## Enable direct reasoning results (Reasoning System Fix)
+	@echo "$(GREEN)Enabling direct reasoning results...$(NC)"
+	@echo "When specialized reasoning engines produce high-confidence results,"
+	@echo "they are returned directly without OpenAI synthesis."
+	@echo ""
+	@echo "Add these to your .env file:"
+	@echo ""
+	@echo "# Direct Reasoning Results Configuration"
+	@echo "# Use reasoning results directly when confidence >= threshold"
+	@echo "VULCAN_USE_REASONING_DIRECTLY=true"
+	@echo "VULCAN_MIN_REASONING_CONFIDENCE=0.5"
+	@echo ""
+	@echo "# Self-Introspection (World Model)"
+	@echo "# Enable world model for self-awareness questions"
+	@echo "VULCAN_SELF_INTROSPECTION_ENABLED=true"
+	@echo "VULCAN_SELF_INTROSPECTION_SAFETY_BYPASS=true"
+	@echo ""
+	@echo "$(GREEN)This fixes the 'OpenAI always wins' problem where correct$(NC)"
+	@echo "$(GREEN)reasoning results (e.g., Bayes = 0.166667) were discarded.$(NC)"
+
+.PHONY: test-reasoning-fixes
+test-reasoning-fixes: ## Test the reasoning system fixes
+	@echo "$(GREEN)Testing reasoning system fixes...$(NC)"
+	PYTHONPATH=src pytest src/vulcan/tests/test_reasoning_system_fixes.py -v --tb=short
 
 .PHONY: enable-performance-tuning
 enable-performance-tuning: ## Enable all performance tuning settings (PR Fixes)

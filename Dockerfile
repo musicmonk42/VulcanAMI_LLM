@@ -169,6 +169,9 @@ COPY graphix_vulcan_llm.py ./graphix_vulcan_llm.py
 # Copy configuration files (required by application)
 COPY configs/ ./configs/
 
+# Copy Python config module (includes reasoning.yaml)
+COPY config/ ./config/
+
 # Copy demo files (including vulcan_chat.html)
 COPY demos/ ./demos/
 
@@ -231,6 +234,8 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 COPY --from=builder /app/src ./src
 COPY --from=builder /app/graphix_vulcan_llm.py ./graphix_vulcan_llm.py
 COPY --from=builder /app/configs ./configs
+# Copy Python config module (includes reasoning.yaml)
+COPY --from=builder /app/config ./config
 # Copy demo files (including vulcan_chat.html)
 COPY --from=builder /app/demos ./demos
 # Copy static files (chat interface HTML/CSS/JS)
@@ -243,7 +248,7 @@ COPY --from=builder /app/sbom.json ./sbom.json
 # Note: /app/src is intentionally writable to enable self-improvement features
 # For higher security deployments, consider mounting a separate volume for generated code
 RUN mkdir -p /app/data /app/data/backups /app/memory_store /app/cache && \
-    chown -R graphix:graphix /app/src /app/data /app/configs /app/memory_store /app/cache
+    chown -R graphix:graphix /app/src /app/data /app/configs /app/config /app/memory_store /app/cache
 
 # Add hardened entrypoint script
 # This updated script enforces:

@@ -282,6 +282,24 @@ spec:
           value: {{ .Values.reasoning.semanticBridge.patternLearning | quote }}
         {{- end }}
         {{- end }}
+        {{- /* Direct Reasoning Results Configuration (Reasoning System Fix) */}}
+        {{- if .Values.reasoning.directReasoningResults }}
+        {{- if .Values.reasoning.directReasoningResults.enabled }}
+        - name: VULCAN_USE_REASONING_DIRECTLY
+          value: "true"
+        - name: VULCAN_MIN_REASONING_CONFIDENCE
+          value: {{ .Values.reasoning.directReasoningResults.minConfidenceThreshold | quote }}
+        {{- end }}
+        {{- end }}
+        {{- /* Self-Introspection Configuration (World Model queries) */}}
+        {{- if .Values.reasoning.selfIntrospection }}
+        {{- if .Values.reasoning.selfIntrospection.enabled }}
+        - name: VULCAN_SELF_INTROSPECTION_ENABLED
+          value: "true"
+        - name: VULCAN_SELF_INTROSPECTION_SAFETY_BYPASS
+          value: {{ .Values.reasoning.selfIntrospection.safetyBypass | quote }}
+        {{- end }}
+        {{- end }}
         {{- end }}
         {{- /* Performance Tuning Configuration (PR Fixes) */}}
         {{- if .Values.performanceTuning }}
