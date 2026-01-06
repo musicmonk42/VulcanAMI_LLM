@@ -998,14 +998,29 @@ class ReasoningIntegration:
                     complexity = classification.complexity
                 
                 # If classifier suggested specific tools, pass them to context
+                # BUG #2 FIX: DON'T override world model delegation!
+                # If world_model_delegation is set, the world model has already determined
+                # the correct tool. The classifier should NOT override this expert judgment.
                 if classification.suggested_tools:
                     if context is None:
                         context = {}
-                    context['classifier_suggested_tools'] = classification.suggested_tools
-                    context['classifier_category'] = classification.category
-                    logger.info(
-                        f"{LOG_PREFIX} Using classifier suggested tools: {classification.suggested_tools}"
-                    )
+                    
+                    # BUG #2 FIX: Check if world model delegation is active
+                    if context.get('world_model_delegation'):
+                        logger.info(
+                            f"{LOG_PREFIX} BUG#2 FIX: World model delegation ACTIVE - "
+                            f"NOT overriding with classifier tools {classification.suggested_tools}. "
+                            f"Using delegated tool: {context.get('classifier_suggested_tools')}"
+                        )
+                        # Keep the world model's recommended tool, just add category info
+                        context['classifier_category'] = classification.category
+                    else:
+                        # Normal case: use classifier suggestions
+                        context['classifier_suggested_tools'] = classification.suggested_tools
+                        context['classifier_category'] = classification.category
+                        logger.info(
+                            f"{LOG_PREFIX} Using classifier suggested tools: {classification.suggested_tools}"
+                        )
                 
                 # =============================================================
                 # FIX #4: Prevent tool override for simple/factual queries
