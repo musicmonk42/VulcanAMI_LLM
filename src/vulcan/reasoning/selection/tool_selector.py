@@ -3260,34 +3260,29 @@ class ToolSelector:
         
         query_lower = query.lower()
         
-        # Check for Unicode logic symbols
+        # Check for Unicode logic symbols (optimized using any())
         logic_symbols = ['→', '∧', '∨', '¬', '∀', '∃', '⊢', '⊨', '↔', '⇒', '⇔']
-        for symbol in logic_symbols:
-            if symbol in query:
-                logger.debug(f"[ToolSelector] TASK 3: Detected logic symbol '{symbol}'")
-                return True
+        if any(symbol in query for symbol in logic_symbols):
+            logger.debug("[ToolSelector] TASK 3: Detected Unicode logic symbol")
+            return True
         
         # Check for ASCII logic notation
         ascii_logic = ['->', '<->', '&&', '||', '~', '!', 'not ', 'and ', 'or ']
-        for pattern in ascii_logic:
-            # Only match if followed by a capital letter (proposition)
-            if pattern in query_lower:
-                # Check if it's in a logical context (near propositions)
-                if re.search(r'\b[A-Z]\b', query):  # Single capital letters as propositions
-                    logger.debug(f"[ToolSelector] TASK 3: Detected ASCII logic '{pattern}'")
-                    return True
+        has_proposition = re.search(r'\b[A-Z]\b', query) is not None  # Cache this check
+        if has_proposition and any(pattern in query_lower for pattern in ascii_logic):
+            logger.debug("[ToolSelector] TASK 3: Detected ASCII logic with propositions")
+            return True
         
-        # Check for SAT-style keywords
+        # Check for SAT-style keywords (optimized using any())
         sat_keywords = [
             'satisfiable', 'satisfiability', 'sat', 'cnf', 'dnf',
             'prove', 'theorem', 'proof', 'valid', 'tautology', 
             'contradiction', 'unsatisfiable', 'entailment', 'entails',
             'contrapositive', 'modus ponens', 'modus tollens',
         ]
-        for keyword in sat_keywords:
-            if keyword in query_lower:
-                logger.debug(f"[ToolSelector] TASK 3: Detected SAT keyword '{keyword}'")
-                return True
+        if any(keyword in query_lower for keyword in sat_keywords):
+            logger.debug("[ToolSelector] TASK 3: Detected SAT keyword")
+            return True
         
         # Check for "Propositions: A, B, C" or "Variables: A, B, C" pattern
         if re.search(r'(?:propositions?|variables?)\s*:?\s*[A-Z](?:\s*,\s*[A-Z])+', query, re.IGNORECASE):
@@ -3308,10 +3303,12 @@ class ToolSelector:
             r'\bfor\s+some\b',
             r'\bfor\s+any\b',
         ]
-        for pattern in fol_patterns:
-            if re.search(pattern, query_lower):
-                # Additional check: query should have logical structure
-                if any(w in query_lower for w in ['if', 'then', 'implies', 'therefore', 'conclude']):
+        logical_structure_words = ['if', 'then', 'implies', 'therefore', 'conclude']
+        has_logical_structure = any(w in query_lower for w in logical_structure_words)
+        
+        if has_logical_structure:
+            for pattern in fol_patterns:
+                if re.search(pattern, query_lower):
                     logger.debug(f"[ToolSelector] TASK 3: Detected FOL pattern '{pattern}'")
                     return True
         

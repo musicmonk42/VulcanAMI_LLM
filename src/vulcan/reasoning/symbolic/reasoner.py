@@ -75,6 +75,26 @@ logger = logging.getLogger(__name__)
 
 
 # ============================================================================
+# TASK 5 FIX: Confidence Constants for Symbolic Reasoning
+# ============================================================================
+
+# Confidence when symbolic reasoner successfully proves a query
+SYMBOLIC_PROVEN_CONFIDENCE = 0.85
+
+# Confidence when query is applicable but couldn't be proven
+SYMBOLIC_UNPROVABLE_CONFIDENCE = 0.60
+
+# Confidence when validation fails on a supposed proof
+SYMBOLIC_VALIDATION_FAILED_CONFIDENCE = 0.55
+
+# Confidence when parsing fails on an otherwise applicable query  
+SYMBOLIC_PARSE_ERROR_CONFIDENCE = 0.30
+
+# Confidence for non-applicable queries (should route elsewhere)
+SYMBOLIC_NOT_APPLICABLE_CONFIDENCE = 0.0
+
+
+# ============================================================================
 # SYMBOLIC REASONER (COMPLETE FIXED VERSION)
 # ============================================================================
 
@@ -322,7 +342,7 @@ class SymbolicReasoner:
             return {
                 "proven": False,
                 # TASK 5 FIX: Return 0.0 for non-applicable so it routes to correct engine
-                "confidence": 0.0,
+                "confidence": SYMBOLIC_NOT_APPLICABLE_CONFIDENCE,
                 "proof": None,
                 "method": self.prover_type,
                 "applicable": False,
@@ -360,14 +380,14 @@ class SymbolicReasoner:
             # we should have high confidence - symbolic provers are deterministic
             if result.get("applicable") and result.get("proven"):
                 # Proven results from symbolic reasoner should be high confidence
-                result["confidence"] = max(result.get("confidence", 0.0), 0.85)
+                result["confidence"] = max(result.get("confidence", 0.0), SYMBOLIC_PROVEN_CONFIDENCE)
                 logger.debug(
                     f"[SymbolicReasoner] TASK 5 FIX: Boosted confidence to {result['confidence']:.2f} "
                     f"(proven result in symbolic domain)"
                 )
             elif result.get("applicable") and not result.get("proven"):
                 # We tried but couldn't prove - moderate confidence (we did the work)
-                result["confidence"] = max(result.get("confidence", 0.0), 0.60)
+                result["confidence"] = max(result.get("confidence", 0.0), SYMBOLIC_UNPROVABLE_CONFIDENCE)
             
             # BUG #6 FIX: Validate result before returning success
             # If we claim something is proven, verify we can extract a valid model
@@ -380,7 +400,7 @@ class SymbolicReasoner:
                     )
                     result["proven"] = False
                     # TASK 5 FIX: Still give moderate confidence since we processed the query
-                    result["confidence"] = 0.55
+                    result["confidence"] = SYMBOLIC_VALIDATION_FAILED_CONFIDENCE
                     result["validation"] = "FAILED"
                     result["error"] = "Model validation failed - result may violate constraints"
                 else:
@@ -392,7 +412,7 @@ class SymbolicReasoner:
             logger.error(f"Query failed: {e}")
             # TASK 5 FIX: Return moderate confidence for parse errors on applicable queries
             # The query looked like it was in our domain but failed to parse
-            return {"proven": False, "confidence": 0.3, "proof": None, "error": str(e), "applicable": True}
+            return {"proven": False, "confidence": SYMBOLIC_PARSE_ERROR_CONFIDENCE, "proof": None, "error": str(e), "applicable": True}
 
     def _validate_proof_result(self, result: Dict[str, Any], query_str: str) -> bool:
         """

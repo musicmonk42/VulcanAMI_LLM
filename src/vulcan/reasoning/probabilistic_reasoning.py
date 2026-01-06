@@ -1881,12 +1881,19 @@ class ProbabilisticReasoner(EnhancedProbabilisticReasoner):
         # TASK 1 FIX: Check for decimal probability values WITHOUT requiring context
         # Values between 0 and 1 (exclusive) are very likely probabilities
         # Pattern: standalone decimals like 0.6, 0.4, 0.99, .95
-        decimal_matches = re.findall(r'\b0?\.\d+\b', query)
-        if decimal_matches:
-            # If we have multiple decimal values, it's likely a probability problem
-            if len(decimal_matches) >= 2:
+        # Optimization: Count matches up to 2 instead of collecting all
+        decimal_pattern = re.compile(r'\b0?\.\d+\b')
+        decimal_count = 0
+        first_match = None
+        for match in decimal_pattern.finditer(query):
+            decimal_count += 1
+            if first_match is None:
+                first_match = match.group(0)
+            if decimal_count >= 2:
                 logger.debug(f"[ProbabilisticReasoner] Gate check PASSED: multiple decimal values found")
                 return True
+        
+        if decimal_count >= 1:
             # Single decimal with probability-related context
             probability_context_words = [
                 'test', 'rate', 'given', 'if', 'when', 'disease', 

@@ -146,10 +146,17 @@ def extract_math_expression(query: str) -> Optional[str]:
             return candidate
     
     # TASK 4 FIX: Pattern 1 - Unicode math symbols with improved character set
-    # Added: Greek letters (α, β, γ, δ, ε, λ, μ, σ, θ, φ, ψ, ω)
-    # Added: minus sign variants (−, –)
-    # Matches: "∑_{k=1}^n (2k-1)" or "∫_0^1 x dx" or "∑(k=1 to n)(2k−1)"
-    unicode_pattern = r'[∑∏∫√πα-ωΑ-Ω][\w\d\s+*/()^._{}|,<>=−–\-]+'
+    # Using explicit Unicode characters instead of character class ranges
+    # which may not work correctly across all Python versions/platforms
+    # Math symbols: ∑ (summation), ∏ (product), ∫ (integral), √ (sqrt), π (pi)
+    # Greek letters listed explicitly for cross-platform reliability
+    math_symbols = '∑∏∫√π'
+    greek_lower = 'αβγδεζηθικλμνξοπρστυφχψω'
+    greek_upper = 'ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩ'
+    unicode_start_chars = math_symbols + greek_lower + greek_upper
+    
+    # Check if query starts with or contains a math symbol
+    unicode_pattern = r'[' + re.escape(unicode_start_chars) + r'][\w\d\s+*/()^._{}|,<>=−–\-]+'
     match = re.search(unicode_pattern, query)
     if match:
         # Get from symbol to end of line or natural boundary
@@ -172,8 +179,12 @@ def extract_math_expression(query: str) -> Optional[str]:
     match = re.search(natural_sum_pattern, query, re.IGNORECASE)
     if match:
         index, lower, upper, expr = match.groups()
-        # Convert to summation notation for SymPy
-        result = f"summation({expr.strip()}, ({index}, {lower}, {upper}))"
+        # Convert expression to SymPy-compatible format
+        # Replace common notation: 2k → 2*k, k−1 → k-1
+        expr_clean = expr.strip()
+        expr_clean = expr_clean.replace('−', '-')  # Unicode minus to ASCII
+        expr_clean = re.sub(r'(\d)([a-z])', r'\1*\2', expr_clean)  # 2k → 2*k
+        result = f"summation({expr_clean}, ({index}, {lower}, {upper}))"
         logger.debug(f"[MathTool] TASK 4 FIX: Converted natural sum to: {result}")
         return result
     
