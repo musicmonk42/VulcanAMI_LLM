@@ -831,7 +831,10 @@ class ReasoningIntegration:
             is_ethical = self._is_ethical_query(query)
             
             if is_self_ref or is_ethical:
+                # Handle overlap: prioritize self-referential if both
                 query_type_label = 'self-referential' if is_self_ref else 'ethical'
+                if is_self_ref and is_ethical:
+                    query_type_label = 'self-referential and ethical'
                 logger.info(f"{LOG_PREFIX} Issue#5 FIX: {query_type_label.capitalize()} query detected - consulting world model first")
                 wm_result = self._consult_world_model_introspection(query)
                 
@@ -852,9 +855,13 @@ class ReasoningIntegration:
                         f"without other engines."
                     )
                     
+                    # Determine reasoning type: self-referential takes priority
+                    reasoning_type = "meta_reasoning" if is_self_ref else "philosophical_reasoning"
+                    strategy_type = ReasoningStrategyType.META_REASONING.value if is_self_ref else ReasoningStrategyType.PHILOSOPHICAL_REASONING.value
+                    
                     return ReasoningResult(
                         selected_tools=["world_model"],
-                        reasoning_strategy=ReasoningStrategyType.META_REASONING.value if is_self_ref else ReasoningStrategyType.PHILOSOPHICAL_REASONING.value,
+                        reasoning_strategy=strategy_type,
                         confidence=wm_result["confidence"],
                         rationale=wm_result.get("reasoning", "World model introspection"),
                         metadata={
@@ -866,7 +873,7 @@ class ReasoningIntegration:
                             # TASK 11 FIX: Add conclusion field so main.py can extract it
                             "conclusion": world_model_response,
                             "explanation": wm_result.get("reasoning", ""),
-                            "reasoning_type": "meta_reasoning" if is_self_ref else "philosophical_reasoning",
+                            "reasoning_type": reasoning_type,
                             "aspect": wm_result.get("aspect", "general"),
                             "selection_time_ms": selection_time,
                         },

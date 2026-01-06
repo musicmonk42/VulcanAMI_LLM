@@ -958,7 +958,7 @@ result = simplify(integral)
         if any(kw in query_lower for kw in ["sum", "summation", "∑"]) or "∑" in query:
             # Parse summation expression from query
             # Pattern: ∑_{k=1}^n (2k-1) or sum from k=1 to n of (2k-1)
-            import re
+            # Note: `re` module is imported at top of file
             
             # Try to extract expression and bounds
             # Pattern 1: ∑_{k=lower}^{upper} (expression)
@@ -1011,8 +1011,8 @@ result = simplify(integral)
         has_diff_keyword = any(kw in query_lower for kw in differentiation_keywords)
         
         # Check for "diff" as a standalone word (not part of "differentiable", "difference", etc.)
+        # Note: `re` module is imported at top of file
         if not has_diff_keyword:
-            import re
             has_diff_keyword = bool(re.search(r'\bdiff\b', query_lower))
         
         if has_diff_keyword:
@@ -1235,7 +1235,7 @@ Brief explanation:"""
         Returns:
             The computed result, or None if query is not simple arithmetic
         """
-        import re
+        # Note: `re` module is imported at top of file
         
         # Extract mathematical expression from common question patterns
         # "What is 2+2?" -> "2+2"

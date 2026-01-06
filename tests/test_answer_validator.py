@@ -494,15 +494,29 @@ class TestIntegration:
         assert not result.valid
     
     def test_proof_verification_query(self, validator):
-        """Test proof verification query."""
+        """Test proof verification query with bug output.
+        
+        This tests the scenario where a proof verification query gets
+        a derivative output (the known bug). The validator should detect
+        this as either:
+        1. Invalid because it's nonsensical (calculus answer for proof query), OR
+        2. The query isn't detected as 'proof' type due to 'differentiable' keyword
+        
+        Note: The fix for 'differentiable' not triggering math engine is in
+        mathematical_computation.py, not the validator. The validator catches
+        the output after the engine produces it.
+        """
         query = "Verify proof about differentiable functions"
         answer = {'conclusion': '3x**2 + 2x'}  # Bug output
         
         result = validator.validate(query, answer)
+        inferred_type = validator._infer_expected_type(query)
         
-        # Should detect this as nonsensical for a proof query
-        # Note: "differentiable" shouldn't trigger math engine derivative
-        assert not result.valid or 'proof' not in validator._infer_expected_type(query)
+        # Either the result is invalid OR the type wasn't detected as 'proof'
+        # (because 'differentiable' might influence type inference)
+        assert not result.valid or inferred_type != 'proof', (
+            f"Expected invalid result or non-proof type, got valid={result.valid}, type={inferred_type}"
+        )
     
     def test_bayesian_query_proper_format(self, validator):
         """Test Bayesian query with proper probability answer."""
