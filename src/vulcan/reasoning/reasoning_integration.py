@@ -820,16 +820,28 @@ class ReasoningIntegration:
         try:
             # =================================================================
             # Issue #5 FIX: Check for self-referential queries FIRST
+            # Issue #3 FIX: Also check for ethical queries that need world model
             # =================================================================
             # World model handles queries about VULCAN's self directly.
             # For ALL queries that are about VULCAN itself (capabilities,
             # preferences, self-awareness, etc.), consult world model first.
+            # Ethical queries also benefit from world model's ethical framework.
             # =================================================================
-            if self._is_self_referential(query):
-                logger.info(f"{LOG_PREFIX} Issue#5 FIX: Self-referential query detected - consulting world model first")
+            is_self_ref = self._is_self_referential(query)
+            is_ethical = self._is_ethical_query(query)
+            
+            if is_self_ref or is_ethical:
+                # Handle overlap: prioritize self-referential if both
+                query_type_label = 'self-referential' if is_self_ref else 'ethical'
+                if is_self_ref and is_ethical:
+                    query_type_label = 'self-referential and ethical'
+                logger.info(f"{LOG_PREFIX} Issue#5 FIX: {query_type_label.capitalize()} query detected - consulting world model first")
                 wm_result = self._consult_world_model_introspection(query)
                 
-                if wm_result is not None and wm_result.get("confidence", 0) > 0.7:
+                # Issue #3 FIX: Lower threshold from 0.7 to 0.5 for world model
+                # The problem statement shows world model returning 0.95 confidence
+                # but being overridden. Use 0.5 as minimum threshold.
+                if wm_result is not None and wm_result.get("confidence", 0) >= 0.5:
                     # World model can handle this directly
                     selection_time = (time.perf_counter() - selection_start) * 1000
                     
@@ -837,20 +849,31 @@ class ReasoningIntegration:
                     # The world model's response IS the conclusion for self-introspection queries
                     world_model_response = wm_result.get("response", "")
                     
+                    logger.info(
+                        f"{LOG_PREFIX} Issue#3 FIX: World model returned confidence "
+                        f"{wm_result['confidence']:.2f}. Using this result directly "
+                        f"without other engines."
+                    )
+                    
+                    # Determine reasoning type: self-referential takes priority
+                    reasoning_type = "meta_reasoning" if is_self_ref else "philosophical_reasoning"
+                    strategy_type = ReasoningStrategyType.META_REASONING.value if is_self_ref else ReasoningStrategyType.PHILOSOPHICAL_REASONING.value
+                    
                     return ReasoningResult(
                         selected_tools=["world_model"],
-                        reasoning_strategy=ReasoningStrategyType.META_REASONING.value,  # Use META_REASONING for introspection
+                        reasoning_strategy=strategy_type,
                         confidence=wm_result["confidence"],
                         rationale=wm_result.get("reasoning", "World model introspection"),
                         metadata={
                             "query_type": query_type,
                             "complexity": complexity,
-                            "self_referential": True,
+                            "self_referential": is_self_ref,
+                            "ethical_query": is_ethical,
                             "world_model_response": world_model_response,
                             # TASK 11 FIX: Add conclusion field so main.py can extract it
                             "conclusion": world_model_response,
                             "explanation": wm_result.get("reasoning", ""),
-                            "reasoning_type": "meta_reasoning",
+                            "reasoning_type": reasoning_type,
                             "aspect": wm_result.get("aspect", "general"),
                             "selection_time_ms": selection_time,
                         },
@@ -1937,6 +1960,43 @@ class ReasoningIntegration:
         ]
         
         return any(kw in query_lower for kw in self_keywords)
+    
+    def _is_ethical_query(self, query: str) -> bool:
+        """
+        Detect ethical queries that should use world model.
+        
+        Issue #3 FIX: Ethical/deontic queries need the world model's ethical
+        reasoning capabilities rather than domain-specific reasoners.
+        
+        Examples:
+        - "Is it permissible to..."
+        - "Should I pull the lever..."
+        - "Trolley problem..."
+        
+        Args:
+            query: The query string to analyze
+            
+        Returns:
+            True if query involves ethical reasoning
+        """
+        if not query:
+            return False
+            
+        query_lower = query.lower()
+        
+        # Keywords indicating ethical queries
+        ethical_keywords = [
+            'impermissible', 'permissible', 'forbidden', 'obligatory',
+            'moral', 'morally', 'ethical', 'ethically',
+            'ought', 'should not', 'must not',
+            'right or wrong', 'wrong to', 'right to',
+            'duty', 'obligation', 'responsibility',
+            'trolley', 'dilemma', 'principle',
+            'virtue', 'consequentialism', 'deontology',
+            'harm', 'benefit', 'welfare',
+        ]
+        
+        return any(kw in query_lower for kw in ethical_keywords)
     
     def _consult_world_model_introspection(self, query: str) -> Optional[Dict[str, Any]]:
         """
