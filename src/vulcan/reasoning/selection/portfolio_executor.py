@@ -270,8 +270,6 @@ class PortfolioExecutor:
             f"reasoning engines: {list(engines.keys())}"
         )
 
-        logger.info(f"[PortfolioExecutor] Successfully registered {len(engines)}/8 reasoning engines: {list(engines.keys())}")
-
         return engines
 
     def execute(
