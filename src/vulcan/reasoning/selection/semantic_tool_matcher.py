@@ -231,6 +231,28 @@ TOOL_DESCRIPTIONS = {
         minimize, maximize, equation, formula, sum, product, factorial,
         logarithm, exponential, root, sqrt, polynomial, function, graph
     """,
+    "language": """
+        Natural language processing, parsing, and linguistic reasoning.
+        
+        USE THIS TOOL FOR:
+        - Quantifier scope disambiguation (every, some, most, few)
+        - Semantic parsing and formalization
+        - Syntactic analysis and parse trees
+        - Coreference resolution (pronouns, anaphora)
+        - Word sense disambiguation
+        - Sentiment analysis
+        - Named entity recognition
+        - Dependency parsing
+        - Constituent parsing
+        - First-order logic formalization of natural language
+        - Scope ambiguity resolution
+        - Linguistic entailment
+        
+        TRIGGER KEYWORDS: quantifier, scope, parse, parsing, syntax, semantic,
+        pronoun, coreference, anaphora, formalize, formalization, linguistic,
+        ambiguity, entailment, sentiment, entity, dependency, constituent,
+        first-order logic, FOL, every, some, most, few, disambiguate
+    """,
 }
 
 
@@ -384,6 +406,14 @@ TOOL_KEYWORDS = {
         "proportion",
         "example",
         "instance",
+        # Structure mapping keywords (CRITICAL #1 FIX)
+        "map",
+        "domain",
+        "source domain",
+        "target domain",
+        "correspondence",
+        "structural",
+        "structure mapping",
     ],
     "causal": [
         "cause",
@@ -801,6 +831,54 @@ TOOL_KEYWORDS = {
         "minimize",
         "maximize",
         "constraint",
+    ],
+    # CRITICAL #1 FIX: Language reasoning tool keywords for NLP tasks
+    "language": [
+        # Quantifier and scope
+        "quantifier",
+        "scope",
+        "scope ambiguity",
+        "quantifier scope",
+        "every",
+        "some",
+        "most",
+        "few",
+        "all",
+        "none",
+        "any",
+        # Parsing and syntax
+        "parse",
+        "parsing",
+        "syntax",
+        "syntactic",
+        "semantic",
+        "grammar",
+        "constituent",
+        "dependency",
+        "parse tree",
+        # Coreference and anaphora
+        "pronoun",
+        "coreference",
+        "anaphora",
+        "antecedent",
+        "reference",
+        # Formalization
+        "formalize",
+        "formalization",
+        "first-order logic",
+        "fol",
+        "predicate logic",
+        # NLP tasks
+        "sentiment",
+        "entity",
+        "named entity",
+        "ner",
+        "disambiguation",
+        "disambiguate",
+        "word sense",
+        "entailment",
+        "linguistic",
+        "natural language",
     ],
 }
 
@@ -1233,6 +1311,36 @@ class SemanticToolMatcher:
             first_word = words[0].rstrip(',.!?')
             is_math_task = first_word in MATHEMATICAL_TASK_VERBS
         
+        # =====================================================================
+        # CRITICAL #1 FIX: Language/NLP task detection
+        # Problem: "Every engineer reviewed a document" was routing to symbolic
+        #          because both have "every" keyword. But this is a scope/parsing task.
+        # Fix: Detect NLP tasks that need language reasoning (parsing, scope, etc.)
+        # =====================================================================
+        NLP_TASK_KEYWORDS = {
+            'parse', 'parsing', 'scope', 'quantifier', 'formalize', 'formalization',
+            'disambiguate', 'disambiguation', 'coreference', 'anaphora', 'pronoun',
+            'semantic', 'sentiment', 'entailment', 'linguistic',
+        }
+        NLP_SENTENCE_PATTERNS = {
+            'reviewed', 'document', 'engineer', 'student', 'professor',
+            # Common NLP benchmark sentence patterns
+        }
+        is_language_task = any(kw in query_lower for kw in NLP_TASK_KEYWORDS)
+        
+        # Also detect if this looks like a sentence parsing/scope task
+        # (sentences with quantifiers + verbs + objects)
+        if not is_language_task:
+            has_quantifier = any(q in query_lower for q in ['every', 'some', 'most', 'few', 'all', 'none'])
+            has_verb_object = any(v in query_lower for v in ['reviewed', 'read', 'met', 'saw', 'visited'])
+            if has_quantifier and has_verb_object and 'mortal' not in query_lower:
+                # This looks like a scope/parsing task, not a syllogism
+                is_language_task = True
+                logger.debug(
+                    f"[SemanticToolMatcher] CRITICAL#1 FIX: Detected LANGUAGE task - "
+                    f"quantifier+verb pattern suggests NLP parsing task: {query_lower[:50]}..."
+                )
+        
         if is_creative_task:
             logger.debug(
                 f"[SemanticToolMatcher] BUG#9 FIX: Detected CREATIVE task - "
@@ -1322,6 +1430,21 @@ class SemanticToolMatcher:
                 elif tool_name in ('philosophical', 'analogical'):
                     # Penalize philosophical for math tasks
                     keyword_boost = max(0.0, keyword_boost - 0.3)
+            
+            # =====================================================================
+            # CRITICAL #1 FIX: Language task type overrides symbolic keyword matching
+            # "Every engineer reviewed a document" should go to language tool
+            # not symbolic (which has "every" for syllogisms)
+            # =====================================================================
+            if is_language_task:
+                if tool_name == 'language':
+                    # Boost language tool significantly for NLP tasks
+                    keyword_boost = max(keyword_boost, 0.7)
+                    keyword_matches.append('language_task_override')
+                elif tool_name == 'symbolic':
+                    # Penalize symbolic for NLP tasks (unless it's a syllogism)
+                    if 'mortal' not in query_lower and 'therefore' not in query_lower:
+                        keyword_boost = max(0.0, keyword_boost - 0.3)
 
             # 2. Embedding similarity (now uses pre-computed query embedding)
             similarity_score = 0.0

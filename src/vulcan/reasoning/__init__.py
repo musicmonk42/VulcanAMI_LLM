@@ -217,6 +217,25 @@ except ImportError as e:
     PHILOSOPHICAL_AVAILABLE = False
 
 # ============================================================================
+# Language Reasoning - Neural language reasoning for NLP tasks
+# ============================================================================
+try:
+    from .language_reasoning import (
+        LanguageReasoning,
+        LanguageReasoningConfig,
+        LanguageReasoner,
+    )
+
+    LANGUAGE_AVAILABLE = True
+    logger.info("Language reasoning loaded successfully")
+except ImportError as e:
+    logger.warning(f"Language reasoning import failed: {e}")
+    LanguageReasoning = None
+    LanguageReasoningConfig = None
+    LanguageReasoner = None
+    LANGUAGE_AVAILABLE = False
+
+# ============================================================================
 # BUG #14 FIX: Cryptographic Engine - Deterministic hash/encoding computations
 # ============================================================================
 try:
@@ -335,6 +354,10 @@ __all__ = [
     "CrossModalReasoner",  # ADDED: Export CrossModalReasoner
     "PhilosophicalReasoner",  # FIX: Export PhilosophicalReasoner for ethical/deontic reasoning
     "is_philosophical_query",  # FIX: Export helper function
+    # ===== Language Reasoning =====
+    "LanguageReasoning",
+    "LanguageReasoningConfig",
+    "LanguageReasoner",
     # ===== BUG #14 FIX: Cryptographic Engine =====
     "CryptographicEngine",
     "CryptoOperation",
@@ -381,6 +404,7 @@ __all__ = [
     "ANALOGICAL_AVAILABLE",
     "MULTIMODAL_AVAILABLE",
     "PHILOSOPHICAL_AVAILABLE",  # FIX: Add availability flag
+    "LANGUAGE_AVAILABLE",  # Language reasoning availability flag
     "CRYPTOGRAPHIC_AVAILABLE",  # BUG #14 FIX: Add availability flag
     "UNIFIED_AVAILABLE",
     "EXPLAINER_AVAILABLE",
@@ -421,6 +445,8 @@ def get_module_status() -> dict:
         "symbolic": SYMBOLIC_AVAILABLE,
         "analogical": ANALOGICAL_AVAILABLE,
         "multimodal": MULTIMODAL_AVAILABLE,
+        "language": LANGUAGE_AVAILABLE,
+        "philosophical": PHILOSOPHICAL_AVAILABLE,
         "unified": UNIFIED_AVAILABLE,
         "explainer": EXPLAINER_AVAILABLE,
         "selection": SELECTION_AVAILABLE,
