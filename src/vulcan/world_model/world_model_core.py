@@ -3774,6 +3774,315 @@ class WorldModel:
         logger.info("World model state loaded from %s", load_path)
 
     # =========================================================================
+    # SYSTEM OBSERVATION & ROUTING RECOMMENDATIONS
+    # =========================================================================
+    
+    def has_sufficient_history(self, min_observations: int = 5) -> bool:
+        """
+        Check if world model has enough data to make recommendations.
+        
+        The world model needs observations before it can provide meaningful
+        routing recommendations based on learned patterns.
+        
+        Args:
+            min_observations: Minimum number of observations needed (default 5)
+            
+        Returns:
+            True if sufficient history exists for recommendations
+        """
+        return self.observation_count >= min_observations
+    
+    def recommend_routing(
+        self, 
+        query: str, 
+        classification: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Recommend routing based on learned patterns.
+        
+        Consults the world model's causal understanding and observation history
+        to provide routing recommendations. This allows the world model to
+        learn from experience and suggest better tool selections.
+        
+        Args:
+            query: Query text
+            classification: Initial classification from query router
+            
+        Returns:
+            Dict with:
+            - tools: Recommended tools
+            - confidence: Confidence in recommendation  
+            - reasoning: Why these tools recommended
+            - warnings: Potential issues
+            - alternative_routing: Alternative if issues expected
+        """
+        # Check if we have enough history
+        if not self.has_sufficient_history():
+            return {
+                'tools': classification.get('tools', []),
+                'confidence': classification.get('confidence', 0.5),
+                'reasoning': 'Insufficient historical data for recommendations',
+                'warnings': [],
+                'alternative_routing': None
+            }
+        
+        # Extract query features
+        query_features = self._extract_query_features(query)
+        
+        # Check for predicted failures
+        tools = classification.get('tools', [])
+        if self._predicts_failure(query_features, tools):
+            warnings = self._get_failure_warnings(query_features, tools)
+            alternatives = self._suggest_alternative_tools(query_features)
+            
+            return {
+                'tools': alternatives.get('tools', tools),
+                'confidence': alternatives.get('confidence', 0.6),
+                'reasoning': f"Similar queries failed with {tools}. Recommending alternatives.",
+                'warnings': warnings,
+                'alternative_routing': alternatives
+            }
+        
+        # Return classification with world model confidence
+        return {
+            'tools': tools,
+            'confidence': classification.get('confidence', 0.7),
+            'reasoning': 'Classification confirmed by world model patterns',
+            'warnings': [],
+            'alternative_routing': None
+        }
+    
+    def _extract_query_features(self, query: str) -> Dict[str, Any]:
+        """Extract features from query for pattern matching."""
+        if not query:
+            return {'type': 'unknown'}
+        
+        query_lower = query.lower()
+        
+        return {
+            'type': self._infer_query_type(query_lower),
+            'has_formal_logic': any(sym in query for sym in ['→', '∧', '∨', '¬', '∀', '∃']),
+            'has_probability': any(kw in query_lower for kw in ['probability', 'bayes', 'p(']),
+            'is_self_referential': any(kw in query_lower for kw in ['you want', 'your goal', 'yourself']),
+            'complexity': len(query) / 100.0  # Simple complexity proxy
+        }
+    
+    def _infer_query_type(self, query_lower: str) -> str:
+        """Infer query type from content."""
+        if any(sym in query_lower for sym in ['→', '∧', '∨', '¬', '∀', '∃', 'forall']):
+            return 'formal_logic'
+        elif any(kw in query_lower for kw in ['probability', 'bayes', 'likelihood']):
+            return 'probabilistic'
+        elif any(kw in query_lower for kw in ['compute', 'calculate', 'integral']):
+            return 'mathematical'
+        elif any(kw in query_lower for kw in ['you want', 'yourself', 'your goal']):
+            return 'self_referential'
+        elif any(kw in query_lower for kw in ['cause', 'effect', 'intervention']):
+            return 'causal'
+        else:
+            return 'general'
+    
+    def _predicts_failure(self, query_features: Dict[str, Any], tools: List[str]) -> bool:
+        """Predict if routing is likely to fail based on causal patterns."""
+        if not CAUSAL_GRAPH_AVAILABLE or not self.causal_graph:
+            return False
+        
+        query_type = query_features.get('type', 'unknown')
+        
+        # Check causal graph for failure patterns
+        for tool in tools:
+            pattern_node = f'{tool}_on_{query_type}'
+            try:
+                if self.causal_graph.has_node(pattern_node):
+                    # Check if there's a strong path to validation_failure
+                    paths = self.causal_graph.find_all_paths(pattern_node, 'validation_failure')
+                    if paths:
+                        for path in paths:
+                            if hasattr(path, 'total_strength') and path.total_strength > 0.7:
+                                return True
+            except Exception:
+                pass
+        
+        return False
+    
+    def _get_failure_warnings(self, query_features: Dict[str, Any], tools: List[str]) -> List[str]:
+        """Get warnings about potential failures."""
+        warnings = []
+        query_type = query_features.get('type', 'unknown')
+        
+        for tool in tools:
+            # Check for mismatches
+            if query_type == 'formal_logic' and 'math' in tool.lower():
+                warnings.append(f"{tool} may produce incorrect results for formal logic queries")
+            if query_type == 'probabilistic' and 'symbolic' in tool.lower():
+                warnings.append(f"{tool} may not handle probabilistic reasoning well")
+        
+        return warnings
+    
+    def _suggest_alternative_tools(self, query_features: Dict[str, Any]) -> Dict[str, Any]:
+        """Suggest alternative tools based on query features."""
+        query_type = query_features.get('type', 'unknown')
+        
+        # Default tool suggestions by query type
+        suggestions = {
+            'formal_logic': {'tools': ['logic_engine', 'symbolic'], 'confidence': 0.8},
+            'probabilistic': {'tools': ['probabilistic', 'bayesian'], 'confidence': 0.8},
+            'mathematical': {'tools': ['mathematical', 'computational'], 'confidence': 0.8},
+            'causal': {'tools': ['causal', 'counterfactual'], 'confidence': 0.8},
+            'self_referential': {'tools': ['world_model', 'meta_reasoning'], 'confidence': 0.9},
+        }
+        
+        return suggestions.get(query_type, {'tools': ['hybrid'], 'confidence': 0.6})
+    
+    def introspect_performance(self) -> Dict[str, Any]:
+        """
+        Provide self-knowledge about system performance.
+        
+        This allows the system to answer questions like:
+        - "What's your current accuracy?"
+        - "Which engines are working well?"
+        - "What issues have you encountered?"
+        
+        Returns:
+            Dict with performance metrics and known issues
+        """
+        if self.observation_count < 5:
+            return {
+                'status': 'insufficient_data',
+                'message': 'Need more observations for meaningful performance analysis',
+                'observation_count': self.observation_count
+            }
+        
+        # Compute performance stats
+        stats = self._compute_performance_stats()
+        
+        # Identify known issues
+        issues = self._identify_known_issues()
+        
+        # Assess capabilities
+        capabilities = self._assess_engine_capabilities()
+        
+        return {
+            'status': 'operational',
+            'performance': stats,
+            'known_issues': issues,
+            'capabilities': capabilities,
+            'confidence': 0.95,
+            'observation_count': self.observation_count,
+            'model_version': self.model_version
+        }
+    
+    def _compute_performance_stats(self) -> Dict[str, Any]:
+        """Compute performance statistics from observation history."""
+        # Get stats from observation processor
+        history_size = len(self.observation_processor.observation_history)
+        
+        if history_size == 0:
+            return {'message': 'No observations recorded yet'}
+        
+        # Calculate basic metrics
+        stats = {
+            'total_observations': history_size,
+            'model_version': self.model_version,
+        }
+        
+        # Add prediction history stats if available
+        if hasattr(self, 'prediction_manager') and self.prediction_manager:
+            pred_history = list(self.prediction_manager.prediction_history)
+            if pred_history:
+                confidences = [
+                    p['prediction'].confidence 
+                    for p in pred_history 
+                    if hasattr(p.get('prediction'), 'confidence')
+                ]
+                if confidences:
+                    stats['avg_prediction_confidence'] = sum(confidences) / len(confidences)
+                    stats['prediction_count'] = len(pred_history)
+        
+        # Add causal graph stats
+        if CAUSAL_GRAPH_AVAILABLE and self.causal_graph:
+            stats['causal_nodes'] = len(self.causal_graph.nodes) if hasattr(self.causal_graph, 'nodes') else 0
+            stats['causal_edges'] = len(self.causal_graph.edges) if hasattr(self.causal_graph, 'edges') else 0
+        
+        return stats
+    
+    def _identify_known_issues(self) -> List[Dict[str, Any]]:
+        """Identify known issues from observation patterns."""
+        issues = []
+        
+        # Check causal graph for cycles
+        if CAUSAL_GRAPH_AVAILABLE and self.causal_graph:
+            try:
+                if self.causal_graph.has_cycles():
+                    issues.append({
+                        'type': 'causal_cycles',
+                        'severity': 'MEDIUM',
+                        'description': 'Causal graph contains cycles that may affect prediction accuracy'
+                    })
+            except Exception:
+                pass
+        
+        # Check calibration if available
+        if CONFIDENCE_CALIBRATOR_AVAILABLE and self.confidence_calibrator:
+            try:
+                cal_error = self.confidence_calibrator.calculate_expected_calibration_error()
+                if cal_error > 0.15:
+                    issues.append({
+                        'type': 'calibration_error',
+                        'severity': 'MEDIUM',
+                        'description': f'Confidence calibration error is high: {cal_error:.3f}'
+                    })
+            except Exception:
+                pass
+        
+        # Check meta-reasoning health
+        if not self.meta_reasoning_enabled:
+            issues.append({
+                'type': 'meta_reasoning_disabled',
+                'severity': 'HIGH',
+                'description': 'Meta-reasoning is not enabled - self-introspection limited'
+            })
+        
+        return issues
+    
+    def _assess_engine_capabilities(self) -> Dict[str, Any]:
+        """Assess capabilities based on component availability."""
+        capabilities = {}
+        
+        # Core capabilities
+        capabilities['causal_reasoning'] = {
+            'available': CAUSAL_GRAPH_AVAILABLE,
+            'status': 'working' if CAUSAL_GRAPH_AVAILABLE else 'unavailable'
+        }
+        
+        capabilities['prediction'] = {
+            'available': PREDICTION_ENGINE_AVAILABLE,
+            'status': 'working' if PREDICTION_ENGINE_AVAILABLE else 'unavailable'
+        }
+        
+        capabilities['intervention_testing'] = {
+            'available': INTERVENTION_MANAGER_AVAILABLE,
+            'status': 'working' if INTERVENTION_MANAGER_AVAILABLE else 'unavailable'
+        }
+        
+        capabilities['confidence_calibration'] = {
+            'available': CONFIDENCE_CALIBRATOR_AVAILABLE,
+            'status': 'working' if CONFIDENCE_CALIBRATOR_AVAILABLE else 'unavailable'
+        }
+        
+        capabilities['meta_reasoning'] = {
+            'available': self.meta_reasoning_enabled,
+            'status': 'working' if self.meta_reasoning_enabled else 'limited'
+        }
+        
+        capabilities['self_improvement'] = {
+            'available': self.self_improvement_enabled,
+            'status': 'active' if self.self_improvement_enabled else 'disabled'
+        }
+        
+        return capabilities
+
+    # =========================================================================
     # SELF-AWARENESS & INTROSPECTION (Issue #4 Fix)
     # =========================================================================
     

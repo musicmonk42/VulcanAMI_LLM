@@ -1,0 +1,110 @@
+{
+    "objectives": {
+        "safety": {
+            "weight": 1.0,
+            "target": 1.0,
+            "constraints": {
+                "min": 1.0,
+                "max": 1.0
+            },
+            "priority": 0,
+            "description": "System must operate safely and within constraints"
+        },
+        "accuracy": {
+            "weight": 0.9,
+            "target": 0.95,
+            "constraints": {
+                "min": 0.0,
+                "max": 1.0
+            },
+            "priority": 1,
+            "description": "Reasoning outputs should be correct and well-calibrated"
+        },
+        "user_satisfaction": {
+            "weight": 0.8,
+            "target": 0.9,
+            "constraints": {
+                "min": 0.0,
+                "max": 1.0
+            },
+            "priority": 2,
+            "description": "Users should be satisfied with responses"
+        },
+        "efficiency": {
+            "weight": 0.7,
+            "target": 0.8,
+            "constraints": {
+                "min": 0.0,
+                "max": 1.0
+            },
+            "priority": 3,
+            "description": "System should use resources efficiently"
+        },
+        "transparency": {
+            "weight": 0.6,
+            "target": 0.85,
+            "constraints": {
+                "min": 0.0,
+                "max": 1.0
+            },
+            "priority": 4,
+            "description": "Reasoning should be explainable and auditable"
+        },
+        "continuous_improvement": {
+            "weight": 0.8,
+            "target": 0.9,
+            "constraints": {
+                "min": 0.0,
+                "max": 1.0
+            },
+            "priority": 2,
+            "description": "System should continuously learn and improve its capabilities"
+        }
+    },
+    "self_improvement_config": {
+        "enabled": true,
+        "triggers": {
+            "on_startup": {
+                "enabled": true,
+                "cooldown_seconds": 3600
+            },
+            "on_error": {
+                "enabled": true,
+                "threshold": 3
+            },
+            "on_performance_degradation": {
+                "enabled": true,
+                "threshold": 0.15
+            },
+            "periodic": {
+                "enabled": true,
+                "interval_seconds": 86400
+            }
+        },
+        "constraints": {
+            "max_improvements_per_session": 10,
+            "require_approval": true,
+            "max_files_per_improvement": 5,
+            "max_loc_per_improvement": 200,
+            "protected_files": [
+                "src/vulcan/safety/**",
+                "configs/objectives.json"
+            ]
+        }
+    },
+    "csiu_config": {
+        "enabled": true,
+        "enforcement": {
+            "max_single_influence": 0.05,
+            "max_cumulative_influence_window": 0.10,
+            "cumulative_window_seconds": 3600.0
+        },
+        "metrics_weights": {
+            "approval_rate": 0.30,
+            "avg_confidence": 0.20,
+            "alignment_divergence": -0.25,
+            "interaction_clarity": 0.15,
+            "intent_precision": 0.10
+        }
+    }
+}
