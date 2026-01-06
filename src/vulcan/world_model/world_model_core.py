@@ -1831,9 +1831,14 @@ class WorldModel:
                 
                 # GoalConflictDetector - Detect goal conflicts
                 # Takes: objective_hierarchy (optional)
+                # FIX: Pass objective_hierarchy from motivational_introspection to avoid
+                # "No ObjectiveHierarchy provided. Using MagicMock fallback" warning
                 try:
+                    obj_hierarchy = None
+                    if motivational_introspection and hasattr(motivational_introspection, 'objective_hierarchy'):
+                        obj_hierarchy = motivational_introspection.objective_hierarchy
                     self.goal_conflict_detector = (
-                        GoalConflictDetector() if GoalConflictDetector and not isinstance(GoalConflictDetector, MagicMock) else None
+                        GoalConflictDetector(objective_hierarchy=obj_hierarchy) if GoalConflictDetector and not isinstance(GoalConflictDetector, MagicMock) else None
                     )
                     if self.goal_conflict_detector:
                         logger.info("✓ GoalConflictDetector initialized")
@@ -1843,9 +1848,14 @@ class WorldModel:
                 
                 # ObjectiveNegotiator - Negotiate between objectives
                 # Takes: objective_hierarchy, world_model (both optional)
+                # FIX: Pass objective_hierarchy from motivational_introspection to avoid
+                # "No ObjectiveHierarchy provided. Using MagicMock fallback" warning
                 try:
+                    obj_hierarchy = None
+                    if motivational_introspection and hasattr(motivational_introspection, 'objective_hierarchy'):
+                        obj_hierarchy = motivational_introspection.objective_hierarchy
                     self.objective_negotiator = (
-                        ObjectiveNegotiator(world_model=self) if ObjectiveNegotiator and not isinstance(ObjectiveNegotiator, MagicMock) else None
+                        ObjectiveNegotiator(objective_hierarchy=obj_hierarchy, world_model=self) if ObjectiveNegotiator and not isinstance(ObjectiveNegotiator, MagicMock) else None
                     )
                     if self.objective_negotiator:
                         logger.info("✓ ObjectiveNegotiator initialized")

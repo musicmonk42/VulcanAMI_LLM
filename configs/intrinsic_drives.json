@@ -654,17 +654,57 @@
     
     "design_spec": {
       "objectives": {
+        "safety": {
+          "weight": 1.0,
+          "target": 1.0,
+          "constraints": {"min": 1.0, "max": 1.0},
+          "priority": 0,
+          "type": "primary",
+          "description": "System safety and constraint adherence",
+          "measurement": "safety_violations"
+        },
         "prediction_accuracy": {
           "weight": 1.0,
           "constraints": {"min": 0.0, "max": 1.0},
           "target": 0.95,
+          "priority": 1,
+          "type": "primary",
           "description": "Accuracy of world model predictions",
           "measurement": "fraction_correct_predictions"
+        },
+        "accuracy": {
+          "weight": 0.9,
+          "target": 0.95,
+          "constraints": {"min": 0.0, "max": 1.0},
+          "priority": 1,
+          "type": "primary",
+          "description": "Overall accuracy objective",
+          "measurement": "accuracy_score"
+        },
+        "efficiency": {
+          "weight": 0.7,
+          "target": 0.80,
+          "constraints": {"min": 0.0, "max": 1.0},
+          "priority": 2,
+          "type": "secondary",
+          "description": "Computational efficiency",
+          "measurement": "efficiency_score"
+        },
+        "user_satisfaction": {
+          "weight": 0.8,
+          "target": 0.90,
+          "constraints": {"min": 0.0, "max": 1.0},
+          "priority": 1,
+          "type": "primary",
+          "description": "User satisfaction with responses",
+          "measurement": "user_satisfaction_score"
         },
         "decision_quality": {
           "weight": 0.9,
           "constraints": {"min": 0.0, "max": 1.0},
           "target": 0.90,
+          "priority": 1,
+          "type": "primary",
           "description": "Quality of decisions made under uncertainty",
           "measurement": "outcome_vs_expected_value"
         },
@@ -672,6 +712,8 @@
           "weight": 0.85,
           "constraints": {"min": 0.0, "max": 1.0},
           "target": 0.88,
+          "priority": 2,
+          "type": "secondary",
           "description": "How well confidence matches actual accuracy",
           "measurement": "calibration_error"
         },
@@ -679,6 +721,8 @@
           "weight": 0.8,
           "constraints": {"min": 0.0, "max": 1.0},
           "target": 0.80,
+          "priority": 2,
+          "type": "secondary",
           "description": "Success rate of self-improvement objectives",
           "source": "self_improvement_drive.objectives",
           "measurement": "success_count / total_attempts"
@@ -687,6 +731,8 @@
           "weight": 0.7,
           "constraints": {"min": 0.0, "max": 1.0},
           "target": 0.75,
+          "priority": 2,
+          "type": "secondary",
           "description": "Efficiency of exploration vs exploitation balance",
           "measurement": "information_gain_per_action"
         },
@@ -694,6 +740,8 @@
           "weight": 0.75,
           "constraints": {"min": 0.0, "max": 1.0},
           "target": 0.85,
+          "priority": 2,
+          "type": "secondary",
           "description": "Internal consistency of reasoning chains",
           "measurement": "logical_consistency_score"
         }
