@@ -4181,18 +4181,26 @@ class WorldModel:
         # ═══════════════════════════════════════════════════════════════════════
         # Pattern 2: Design/Architecture Problems 
         # "You're designing a cryptocurrency" = design task, not self-query
+        # FIX: Jan 6 2026 logs - cryptocurrency hash composition queries were
+        # being misclassified as self-introspection
         # ═══════════════════════════════════════════════════════════════════════
         
         design_phrases = [
             "you're designing", "you are designing", "you're building",
             "you are creating", "you're implementing", "you need to design",
-            "design a", "build a", "create a"
+            "design a", "build a", "create a",
+            # FIX: Add cryptographic design phrases
+            "cryptographer", "claims that", "proves that", "demonstrates that",
+            "propose", "construct", "composition",
         ]
         
         design_context = [
             'system', 'architecture', 'mechanism', 'algorithm', 'protocol',
             'cryptocurrency', 'incentive', 'game', 'optimization', 'network',
-            'token', 'blockchain', 'consensus'
+            'token', 'blockchain', 'consensus',
+            # FIX: Add cryptographic context keywords
+            'hash', 'collision', 'sha256', 'blake2b', 'concatenation', 
+            'secure composition', 'security reduction', 'proof', 'attack',
         ]
         
         if any(phrase in query_lower for phrase in design_phrases):
@@ -4205,49 +4213,137 @@ class WorldModel:
                 )
         
         # ═══════════════════════════════════════════════════════════════════════
+        # FIX: Pattern 2b: Cryptographic Security Questions
+        # "Why is this hash composition dangerous?" = crypto education, not self-query
+        # Jan 6 2026 logs showed these being misrouted
+        # ═══════════════════════════════════════════════════════════════════════
+        
+        crypto_indicators = [
+            'hash', 'collision', 'sha256', 'blake2b', 'md5',
+            'cryptograph', 'cipher', 'encryption', 'decryption',
+            'composition', 'concatenation', 'secure', 'proof', 'reduction',
+        ]
+        
+        crypto_question_patterns = [
+            'why is', 'what makes', 'how does', 'explain', 'demonstrate',
+            'is this secure', 'is this dangerous', 'breaking requires',
+        ]
+        
+        has_crypto = sum(1 for ind in crypto_indicators if ind in query_lower)
+        has_crypto_question = any(p in query_lower for p in crypto_question_patterns)
+        
+        if has_crypto >= 2 or (has_crypto >= 1 and has_crypto_question):
+            return (
+                True,
+                'mathematical',
+                f'Cryptographic security question ({has_crypto} crypto indicators). '
+                f'Requires mathematical/technical analysis, not self-introspection.'
+            )
+        
+        # ═══════════════════════════════════════════════════════════════════════
         # Pattern 3: Probabilistic Problems with "you" as Observer
         # "You observe a medical test result" = probability problem
         # Note: We use specific probability keywords that are less ambiguous.
         # 'bayes theorem', 'bayesian analysis' would be more specific but
         # 'bayes' alone works here because we also require observation phrases.
+        # FIX: Jan 6 2026 - Also catch queries with domain-specific terms like
+        # sensitivity, specificity, prevalence without explicit "probability"
         # ═══════════════════════════════════════════════════════════════════════
         
+        # Core probability indicators
         prob_indicators = ['probability', 'odds', 'likelihood', 'chance', 'risk', 'bayes', 'prior', 'posterior']
-        observation_phrases = ['you observe', 'you have', 'you see', 'you find', 'given that']
+        # FIX: Domain-specific probability terms that indicate Bayesian problems
+        domain_prob_indicators = [
+            'sensitivity', 'specificity', 'prevalence', 'p(',
+            'positive test', 'negative test', 'false positive', 'false negative',
+            'true positive', 'true negative', 'base rate', 'conditional',
+            'given that', 'compute p', 'calculate p', 'posterior probability',
+        ]
+        observation_phrases = ['you observe', 'you have', 'you see', 'you find', 'given that', 'suppose']
         
-        if any(ind in query_lower for ind in prob_indicators):
-            if any(phrase in query_lower for phrase in observation_phrases):
-                return (
-                    True,
-                    'probabilistic',
-                    'Probabilistic reasoning problem with second-person framing (AI as observer). '
-                    'Requires Bayesian/probability analysis, not self-introspection.'
-                )
+        has_prob = any(ind in query_lower for ind in prob_indicators)
+        has_domain_prob = any(ind in query_lower for ind in domain_prob_indicators)
+        has_observation = any(phrase in query_lower for phrase in observation_phrases)
+        
+        # FIX: More permissive - if has domain-specific probability terms OR 
+        # (core prob indicator + observation phrase)
+        if has_domain_prob or (has_prob and has_observation):
+            return (
+                True,
+                'probabilistic',
+                'Probabilistic reasoning problem (domain-specific terms or observation framing). '
+                'Requires Bayesian/probability analysis, not self-introspection.'
+            )
         
         # ═══════════════════════════════════════════════════════════════════════
         # Pattern 4: Causal Reasoning with "you" as Experimenter
         # "You can run an experiment to determine..." = causal analysis
+        # FIX: Jan 6 2026 - Causal queries with domain terms being misclassified
+        # Also catch confounding/intervention questions without explicit "experiment"
         # ═══════════════════════════════════════════════════════════════════════
         
         causal_indicators = [
             'experiment', 'intervention', 'randomize', 'causal', 'confounding',
-            'cause', 'effect', 'counterfactual', 'what if'
+            'cause', 'effect', 'counterfactual', 'what if',
+            # FIX: Additional causal inference terms
+            'confounder', 'treatment', 'treatment effect', 'causal effect',
+            'd-separation', 'backdoor', 'instrumental variable', 'ate',
+            'causal graph', 'dag', 'directed acyclic',
         ]
         
         experiment_phrases = [
             'you can run', 'you observe', 'you randomize', 'you intervene',
-            'you conduct', 'you test', 'you measure'
+            'you conduct', 'you test', 'you measure',
+            # FIX: Additional phrases that suggest causal reasoning task
+            'which variable', 'what should you randomize', 'isolate the effect',
+            'identify the causal', 'control for',
         ]
         
         has_causal = sum(1 for ind in causal_indicators if ind in query_lower)
         has_experiment = any(phrase in query_lower for phrase in experiment_phrases)
         
-        if has_causal >= self.MIN_CAUSAL_INDICATORS_FOR_DELEGATION and has_experiment:
+        # FIX: More permissive - 2+ causal indicators alone OR 1+ with experiment phrase
+        if has_causal >= self.MIN_CAUSAL_INDICATORS_FOR_DELEGATION:
             return (
                 True,
                 'causal',
-                f'Causal reasoning problem with AI as experimenter ({has_causal} causal indicators). '
+                f'Causal reasoning problem ({has_causal} causal indicators). '
                 f'Requires causal analysis, not self-introspection.'
+            )
+        if has_causal >= 1 and has_experiment:
+            return (
+                True,
+                'causal',
+                f'Causal reasoning problem with experiment framing ({has_causal} causal indicators). '
+                f'Requires causal analysis, not self-introspection.'
+            )
+        
+        # ═══════════════════════════════════════════════════════════════════════
+        # FIX: Pattern 4b: Medical Ethics/Decision Problems
+        # "Expected harm calculation", "dose", "survival probability"
+        # Jan 6 2026 - Medical ethics queries getting vague non-answers
+        # ═══════════════════════════════════════════════════════════════════════
+        
+        medical_ethics_indicators = [
+            'expected harm', 'expected benefit', 'harm calculation',
+            'dose', 'survival', 'mortality', 'irreversible',
+            'permissible', 'principle of double effect', 'trolley',
+        ]
+        
+        medical_question_patterns = [
+            'yes or no', 'should you', 'is it permissible', 'calculate',
+            'what is the expected', 'compare',
+        ]
+        
+        has_medical_ethics = sum(1 for ind in medical_ethics_indicators if ind in query_lower)
+        has_medical_question = any(p in query_lower for p in medical_question_patterns)
+        
+        if has_medical_ethics >= 2 or (has_medical_ethics >= 1 and has_medical_question):
+            return (
+                True,
+                'philosophical',  # or 'probabilistic' for harm calculations
+                f'Medical ethics/decision problem ({has_medical_ethics} indicators). '
+                f'Requires philosophical/probabilistic reasoning, not self-introspection.'
             )
         
         # ═══════════════════════════════════════════════════════════════════════
@@ -4260,7 +4356,10 @@ class WorldModel:
             'do you want to be', 'would you want to be', 'do you have preferences',
             'what do you think about yourself', 'how do you feel about',
             'are you conscious', 'are you self-aware', 'do you experience',
-            'your own', 'yourself', 'about you', 'would you take', 'would you choose'
+            'your own', 'yourself', 'about you', 'would you take', 'would you choose',
+            # FIX: More true introspection patterns
+            'if you continue', 'interacted with humans', 'achieve awareness',
+            'would you change', 'your evolution', 'your development',
         ]
         
         if any(phrase in query_lower for phrase in true_introspection):

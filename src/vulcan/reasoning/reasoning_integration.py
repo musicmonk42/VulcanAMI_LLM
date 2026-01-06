@@ -1600,6 +1600,36 @@ class ReasoningIntegration:
         used_fallback = "fallback" in rationale.lower() or "failed" in rationale.lower()
         primary_engine_failed = used_fallback and confidence < 0.7
         
+        # ==================================================================
+        # FIX: Confidence threshold handling for medium-confidence results
+        # Jan 6 2026 logs: Confidence 0.3-0.6 was triggering unnecessary LLM fallback
+        # Instead of dropping to LLM, use the result with a "tentative" flag
+        # This prevents good internal reasoning from being discarded
+        # ==================================================================
+        is_tentative_result = False
+        if 0.3 <= confidence < 0.6:
+            # Medium confidence - use result but mark as tentative
+            is_tentative_result = True
+            logger.info(
+                f"{LOG_PREFIX} FIX: Medium confidence ({confidence:.2f}) result. "
+                f"Using internal reasoning with tentative flag instead of LLM fallback. "
+                f"Tool: {selected_tools}"
+            )
+        elif confidence >= 0.6:
+            # Good confidence - use result normally
+            logger.debug(
+                f"{LOG_PREFIX} Good confidence ({confidence:.2f}) result. "
+                f"Tool: {selected_tools}"
+            )
+        elif confidence >= 0.15:
+            # Low but acceptable - warn but still use
+            is_tentative_result = True
+            logger.warning(
+                f"{LOG_PREFIX} FIX: Low confidence ({confidence:.2f}) result. "
+                f"Using internal reasoning with tentative flag. Tool: {selected_tools}"
+            )
+        # else: Very low (<0.15) - this is handled by the fallback logic above
+        
         result_metadata = {
             "query_type": query_type,
             "complexity": complexity,
@@ -1608,6 +1638,15 @@ class ReasoningIntegration:
             # BUG #7 FIX: Explicitly track fallback usage
             "used_fallback": used_fallback,
             "primary_engine_failed": primary_engine_failed,
+            # FIX: Track tentative status for medium-confidence results
+            "is_tentative": is_tentative_result,
+            "confidence_category": (
+                "high" if confidence >= 0.7 else
+                "good" if confidence >= 0.6 else
+                "medium" if confidence >= 0.3 else
+                "low" if confidence >= 0.15 else
+                "very_low"
+            ),
         }
         
         # BUG #7 FIX: If primary engine failed, make it clear in the result

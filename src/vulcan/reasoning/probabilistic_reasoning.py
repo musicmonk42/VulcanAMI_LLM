@@ -1849,6 +1849,18 @@ class ProbabilisticReasoner(EnhancedProbabilisticReasoner):
             'compute posterior', 'calculate probability',
             'find the probability', 'what is the probability',
             'what are the odds', 'what is the chance',
+            # FIX: Causal inference keywords (Jan 6 2026 logs - causal queries skipped)
+            'causal effect', 'randomize', 'intervention', 'confounder',
+            'treatment effect', 'causal graph', 'confounding',
+            'd-separation', 'backdoor', 'instrumental',
+            'average treatment effect', 'ate', 'counterfactual',
+            # FIX: Medical/ethics calculation keywords (Jan 6 2026 logs)
+            'expected harm', 'expected benefit', 'harm calculation',
+            'survival probability', 'mortality rate', 'dose',
+            # FIX: Additional Bayes-related terms
+            'compute p(', 'calculate p(',
+            'positive predictive', 'negative predictive',
+            'base rate', 'test result', 'diagnostic',
         ]
         
         # Check for keywords (case-insensitive)
