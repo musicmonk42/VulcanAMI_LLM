@@ -362,6 +362,14 @@ services:
       - SEMANTIC_BRIDGE_ENABLED=${SEMANTIC_BRIDGE_ENABLED:-true}
       - CROSS_DOMAIN_TRANSFER_ENABLED=${CROSS_DOMAIN_TRANSFER_ENABLED:-true}
       - PATTERN_LEARNING_ENABLED=${PATTERN_LEARNING_ENABLED:-true}
+      # REASONING SYSTEM FIX: Direct reasoning result usage
+      # When specialized reasoning engines produce high-confidence results,
+      # use them directly without OpenAI synthesis (prevents "OpenAI always wins" problem)
+      - VULCAN_USE_REASONING_DIRECTLY=${VULCAN_USE_REASONING_DIRECTLY:-true}
+      - VULCAN_MIN_REASONING_CONFIDENCE=${VULCAN_MIN_REASONING_CONFIDENCE:-0.5}
+      # Self-introspection configuration (world model queries)
+      - VULCAN_SELF_INTROSPECTION_ENABLED=${VULCAN_SELF_INTROSPECTION_ENABLED:-true}
+      - VULCAN_SELF_INTROSPECTION_SAFETY_BYPASS=${VULCAN_SELF_INTROSPECTION_SAFETY_BYPASS:-true}
       # Semantic matching configuration (Performance Optimized)
       # Now safe to enable (default: 0 = enabled) due to Issue #2 and #3 caching fixes
       # Set to 1 to disable for keyword-only routing (faster but less accurate)

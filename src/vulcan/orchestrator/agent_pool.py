@@ -2585,10 +2585,13 @@ class AgentPoolManager:
             # FIX TASK 2: Include philosophical and general with selected tools
             # Production logs showed philosophical queries completing in 0.000s with
             # reasoning_invoked=False because "philosophical" wasn't in reasoning_task_types
+            # TASK 6 FIX: Added self_introspection and world_model for self-awareness queries
             reasoning_task_types = {
                 "reasoning", "causal", "symbolic", "analogical", "probabilistic",
                 "counterfactual", "multimodal", "deductive", "inductive", "abductive",
                 "philosophical", "mathematical", "hybrid",  # FIX: Added missing types
+                "self_introspection", "meta_reasoning", "world_model",  # TASK 6 FIX: Self-awareness queries
+                "language",  # TASK 6 FIX: NLP/language reasoning
             }
             is_reasoning_task = normalized_task_type in reasoning_task_types
             
@@ -2606,6 +2609,25 @@ class AgentPoolManager:
             # Also check capability - REASONING capability agents should invoke reasoning
             if metadata.capability == AgentCapability.REASONING:
                 is_reasoning_task = True
+            
+            # TASK 6 FIX: Check if query is self-introspection and force reasoning
+            query_text = parameters.get("query") or parameters.get("prompt") or ""
+            if isinstance(query_text, str) and not is_reasoning_task:
+                query_lower = query_text.lower()
+                # Self-introspection keywords that should always invoke reasoning
+                self_introspection_keywords = [
+                    "would you", "do you", "are you", "can you",
+                    "self-aware", "self aware", "consciousness", "sentient",
+                    "would vulcan", "your capabilities", "your limitations",
+                ]
+                if any(kw in query_lower for kw in self_introspection_keywords):
+                    is_reasoning_task = True
+                    if not selected_tools or selected_tools == ["general"]:
+                        selected_tools = ["world_model"]
+                    logger.info(
+                        f"[AgentPool] Task {task_id}: Self-introspection query detected, "
+                        f"forcing reasoning with tools={selected_tools}"
+                    )
 
             # ==================================================================
             # FIX TASK 2: Invoke reasoning for complex queries even when tools=["general"]

@@ -44,6 +44,28 @@ query routing degradation (469ms → 152,048ms) by caching ML model instances.
 | SEMANTIC_BRIDGE_ENABLED | No | Enable cross-domain knowledge transfer | "true" |
 | CROSS_DOMAIN_TRANSFER_ENABLED | No | Enable concept transfer between domains | "true" |
 | PATTERN_LEARNING_ENABLED | No | Learn patterns from successful outcomes | "true" |
+| VULCAN_USE_REASONING_DIRECTLY | No | Use reasoning results directly when confidence high | "true" |
+| VULCAN_MIN_REASONING_CONFIDENCE | No | Min confidence to use reasoning directly (0.0-1.0) | "0.5" |
+| VULCAN_SELF_INTROSPECTION_ENABLED | No | Enable world model for self-awareness queries | "true" |
+| VULCAN_SELF_INTROSPECTION_SAFETY_BYPASS | No | Bypass safety checks for self-introspection | "true" |
+
+**Reasoning System Fix Notes:**
+
+- **VULCAN_USE_REASONING_DIRECTLY**: When true, high-confidence results from specialized
+  reasoning engines (probabilistic, causal, symbolic, etc.) are returned directly to the
+  user without being overridden by OpenAI. This fixes the "OpenAI always wins" problem
+  where correct reasoning results were discarded because OpenAI finished first.
+
+- **VULCAN_MIN_REASONING_CONFIDENCE**: The minimum confidence threshold (0.0-1.0) for
+  using reasoning results directly. Results with confidence >= this threshold bypass
+  LLM synthesis. Default 0.5 balances accuracy with direct response usage.
+
+- **VULCAN_SELF_INTROSPECTION_ENABLED**: Enables the world model for self-awareness
+  questions like "would you become self-aware?". These queries are routed to VULCAN's
+  world model introspection system instead of general reasoning.
+
+- **VULCAN_SELF_INTROSPECTION_SAFETY_BYPASS**: Bypasses safety checks for self-introspection
+  queries. This allows authentic self-reflection responses without content filtering.
 
 ### 2.2 CuriosityDriver Configuration (Active Learning)
 

@@ -368,6 +368,21 @@ reasoning:
     crossDomainTransfer: true
     # Enable pattern learning from successful outcomes
     patternLearning: true
+  # REASONING SYSTEM FIX: Direct reasoning result usage
+  # When specialized reasoning engines produce high-confidence results,
+  # use them directly without OpenAI synthesis (prevents "OpenAI always wins" problem)
+  directReasoningResults:
+    # Enable using reasoning results directly when confidence is high
+    enabled: true
+    # Minimum confidence threshold to use reasoning results directly (0.0 to 1.0)
+    # Below this threshold, falls back to LLM synthesis
+    minConfidenceThreshold: 0.5
+  # Self-introspection configuration (world model queries)
+  selfIntrospection:
+    # Enable world model for self-awareness questions
+    enabled: true
+    # Bypass safety checks for self-introspection queries
+    safetyBypass: true
 
 # Performance Tuning Configuration (PR Fixes)
 # These settings were added as part of critical performance fixes

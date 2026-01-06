@@ -641,6 +641,66 @@ except ImportError as e:
 
 
 # ============================================================================
+# REASONING_ENGINES Registry - Maps engine names to classes
+# ============================================================================
+# This registry provides a central mapping of reasoning engine names to their
+# implementation classes. It's used by the ToolSelector and PortfolioExecutor
+# to instantiate the appropriate reasoning engine for a given query type.
+#
+# FIX TASK 3: Register all available reasoning engines including previously
+# missing ones (analogical, language, multimodal, world_model).
+
+def _build_reasoning_engines_registry():
+    """Build the REASONING_ENGINES registry dynamically based on availability."""
+    engines = {}
+    
+    # Core reasoning engines
+    if PROBABILISTIC_AVAILABLE and ProbabilisticReasoner is not None:
+        engines['probabilistic'] = ProbabilisticReasoner
+        
+    if CAUSAL_AVAILABLE and CausalReasoner is not None:
+        engines['causal'] = CausalReasoner
+        
+    if SYMBOLIC_AVAILABLE and SymbolicReasoner is not None:
+        engines['symbolic'] = SymbolicReasoner
+        
+    # FIX TASK 3: Register previously missing engines
+    if ANALOGICAL_AVAILABLE and AnalogicalReasoningEngine is not None:
+        engines['analogical'] = AnalogicalReasoningEngine
+        
+    if MULTIMODAL_AVAILABLE and MultiModalReasoningEngine is not None:
+        engines['multimodal'] = MultiModalReasoningEngine
+        
+    if LANGUAGE_AVAILABLE and LanguageReasoner is not None:
+        engines['language'] = LanguageReasoner
+        
+    if PHILOSOPHICAL_AVAILABLE and PhilosophicalReasoner is not None:
+        engines['philosophical'] = PhilosophicalReasoner
+        
+    if MATHEMATICAL_COMPUTATION_AVAILABLE and MathematicalComputationTool is not None:
+        engines['mathematical'] = MathematicalComputationTool
+        
+    if CRYPTOGRAPHIC_AVAILABLE and CryptographicEngine is not None:
+        engines['cryptographic'] = CryptographicEngine
+    
+    # World model will be added as an adapter when available
+    # (world_model is imported separately from vulcan.world_model)
+    
+    return engines
+
+# Build the registry
+REASONING_ENGINES = _build_reasoning_engines_registry()
+
+# Export the registry
+__all__.extend(["REASONING_ENGINES"])
+
+# Log registered engines
+logger.info(
+    f"REASONING_ENGINES registry: {len(REASONING_ENGINES)} engines registered: "
+    f"{list(REASONING_ENGINES.keys())}"
+)
+
+# ============================================================================
 # Version Info
 # ============================================================================
 __version__ = "1.0.0"
