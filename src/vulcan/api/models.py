@@ -121,6 +121,18 @@ class ChatResponse(BaseModel):
     metadata: Optional[Dict[str, Any]] = None
 
 
+class VulcanResponse(BaseModel):
+    """Response model for VULCAN reasoning system direct responses.
+    
+    Used when reasoning engines provide high-confidence results
+    that can be returned directly without LLM synthesis.
+    """
+    response: str
+    systems_used: List[str] = []
+    confidence: float = 0.0
+    metadata: Optional[Dict[str, Any]] = None
+
+
 class StatusResponse(BaseModel):
     """Response model for status endpoints."""
     status: str
@@ -208,6 +220,7 @@ __all__ = [
     "StepResponse",
     "ChatMessage",
     "ChatResponse",
+    "VulcanResponse",
     "StatusResponse",
     "ConfigResponse",
     "ImprovementApproval",
