@@ -93,6 +93,18 @@ except ImportError:
     get_query_preprocessor = None  # type: ignore
 
 # =============================================================================
+# SystemObserver Import for World Model Integration
+# =============================================================================
+# The SystemObserver connects query processing to the WorldModel's learning system.
+# Events are converted to observations that feed the causal graph and pattern learning.
+try:
+    from vulcan.world_model.system_observer import get_system_observer
+    SYSTEM_OBSERVER_AVAILABLE = True
+except ImportError:
+    SYSTEM_OBSERVER_AVAILABLE = False
+    get_system_observer = None  # type: ignore
+
+# =============================================================================
 # Configuration Constants
 # =============================================================================
 
@@ -2949,3 +2961,153 @@ def shutdown_reasoning(timeout: float = 5.0) -> None:
             _reasoning_integration = None
 
         logger.info(f"{LOG_PREFIX} Global singleton cleared")
+
+
+# =============================================================================
+# SystemObserver Integration Functions
+# =============================================================================
+
+
+def observe_query_start(
+    query_id: str,
+    query: str,
+    classification: Dict[str, Any]
+) -> None:
+    """
+    Notify SystemObserver of query start event.
+    
+    This should be called when a query enters the processing pipeline.
+    The observation feeds the WorldModel's causal learning system.
+    
+    Args:
+        query_id: Unique identifier for the query
+        query: The query text
+        classification: Query classification dict with category, complexity, tools
+    """
+    if not SYSTEM_OBSERVER_AVAILABLE:
+        return
+    
+    try:
+        observer = get_system_observer()
+        if observer:
+            observer.observe_query_start(query_id, query, classification)
+    except Exception as e:
+        logger.debug(f"{LOG_PREFIX} Query start observation failed: {e}")
+
+
+def observe_engine_result(
+    query_id: str,
+    engine_name: str,
+    result: Dict[str, Any],
+    success: bool,
+    execution_time_ms: float
+) -> None:
+    """
+    Notify SystemObserver of engine execution result.
+    
+    This should be called after a reasoning engine produces a result.
+    Helps WorldModel learn which engines succeed on which query types.
+    
+    Args:
+        query_id: Query identifier
+        engine_name: Name of the reasoning engine
+        result: Result dictionary from the engine
+        success: Whether the engine execution was successful
+        execution_time_ms: Execution time in milliseconds
+    """
+    if not SYSTEM_OBSERVER_AVAILABLE:
+        return
+    
+    try:
+        observer = get_system_observer()
+        if observer:
+            observer.observe_engine_result(
+                query_id, engine_name, result, success, execution_time_ms
+            )
+    except Exception as e:
+        logger.debug(f"{LOG_PREFIX} Engine result observation failed: {e}")
+
+
+def observe_validation_failure(
+    query_id: str,
+    engine_name: str,
+    reason: str,
+    query: str,
+    result: Dict[str, Any]
+) -> None:
+    """
+    Notify SystemObserver of answer validation failure.
+    
+    This is critical for learning which engines produce invalid outputs
+    for which query types. Enables WorldModel routing improvements.
+    
+    Args:
+        query_id: Query identifier
+        engine_name: Engine that produced invalid result
+        reason: Why validation failed
+        query: Original query
+        result: The invalid result
+    """
+    if not SYSTEM_OBSERVER_AVAILABLE:
+        return
+    
+    try:
+        observer = get_system_observer()
+        if observer:
+            observer.observe_validation_failure(
+                query_id, engine_name, reason, query, result
+            )
+    except Exception as e:
+        logger.debug(f"{LOG_PREFIX} Validation failure observation failed: {e}")
+
+
+def observe_outcome(
+    query_id: str,
+    response: Dict[str, Any],
+    user_feedback: Optional[Dict[str, Any]] = None
+) -> None:
+    """
+    Notify SystemObserver of final query outcome.
+    
+    This should be called when query processing completes.
+    
+    Args:
+        query_id: Query identifier
+        response: Final response dict
+        user_feedback: Optional user feedback
+    """
+    if not SYSTEM_OBSERVER_AVAILABLE:
+        return
+    
+    try:
+        observer = get_system_observer()
+        if observer:
+            observer.observe_outcome(query_id, response, user_feedback)
+    except Exception as e:
+        logger.debug(f"{LOG_PREFIX} Outcome observation failed: {e}")
+
+
+def observe_error(
+    query_id: str,
+    error_type: str,
+    error_message: str,
+    component: str
+) -> None:
+    """
+    Notify SystemObserver of system error.
+    
+    Args:
+        query_id: Query identifier
+        error_type: Type of error
+        error_message: Error message
+        component: Component where error occurred
+    """
+    if not SYSTEM_OBSERVER_AVAILABLE:
+        return
+    
+    try:
+        observer = get_system_observer()
+        if observer:
+            observer.observe_error(query_id, error_type, error_message, component)
+    except Exception as e:
+        logger.debug(f"{LOG_PREFIX} Error observation failed: {e}")

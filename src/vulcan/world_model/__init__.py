@@ -252,6 +252,25 @@ from .world_model_router import (
     WorldModelRouter,
 )
 
+# Import system observer for event tracking
+try:
+    from .system_observer import (
+        SystemObserver,
+        SystemEvent,
+        EventType,
+        get_system_observer,
+        initialize_system_observer,
+    )
+    _system_observer_available = True
+except ImportError as e:
+    # Logger not yet defined, will use module-level logger later
+    SystemObserver = None
+    SystemEvent = None
+    EventType = None
+    get_system_observer = None
+    initialize_system_observer = None
+    _system_observer_available = False
+
 # Try to import additional components if they exist
 _optional_imports_success = {}
 _optional_imports_success["prediction_engine"] = True
@@ -361,6 +380,12 @@ __all__ = [
     "UpdateDependencyGraph",
     "PatternLearner",
     "CostModel",
+    # System Observer Classes (for event tracking)
+    "SystemObserver",
+    "SystemEvent",
+    "EventType",
+    "get_system_observer",
+    "initialize_system_observer",
 ]
 
 
