@@ -289,10 +289,10 @@ class ParameterHistoryManager:
     def load_checkpoint(
         self, checkpoint_path: str, model: nn.Module, strict: bool = True
     ) -> Dict[str, Any]:
-        """Load checkpoint into model with validation
-        SECURITY NOTE: weights_only is set to False to support full checkpoint loading
-        including metadata and optimizer state. For production use with untrusted sources,
-        consider using weights_only=True and loading metadata separately."""
+        """Load checkpoint into model with validation.
+
+        SECURITY NOTE: weights_only=True is used to prevent arbitrary code execution
+        from untrusted checkpoint files. This is the recommended secure approach."""
         # FIXED: Convert to Path object and resolve
         path = Path(checkpoint_path).resolve()
 
@@ -337,10 +337,10 @@ class ParameterHistoryManager:
             raise
 
     def validate_checkpoint(self, checkpoint_path: str) -> bool:
-        """Validate checkpoint integrity using checksum
-        SECURITY NOTE: weights_only is set to False to support full checkpoint validation
-        including metadata. For production use with untrusted sources, consider using
-        weights_only=True and validating metadata separately."""
+        """Validate checkpoint integrity using checksum.
+
+        SECURITY NOTE: weights_only=True is used to prevent arbitrary code execution
+        from untrusted checkpoint files. This is the recommended secure approach."""
         try:
             # FIXED: Convert to Path object and resolve
             path = Path(checkpoint_path).resolve()

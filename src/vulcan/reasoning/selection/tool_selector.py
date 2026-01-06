@@ -3236,6 +3236,84 @@ class ToolSelector:
             logger.warning(f"Failed to initialize math verifier: {e}")
             return None
 
+    def _detect_formal_logic(self, query: str) -> bool:
+        """
+        TASK 3 FIX: Detect formal logic notation to route to symbolic engine.
+        
+        This prevents SAT/FOL problems from being misrouted to probabilistic
+        engine by the LLM classifier.
+        
+        Detects:
+        - Logic symbols: →, ∧, ∨, ¬, ∀, ∃, ⊢, ⊨
+        - SAT problem keywords: satisfiable, SAT, CNF, prove, theorem
+        - Propositional variables with constraints (A, B, C)
+        - First-order logic patterns
+        
+        Args:
+            query: The query text
+            
+        Returns:
+            True if query appears to be a formal logic problem
+        """
+        if not query or not isinstance(query, str):
+            return False
+        
+        query_lower = query.lower()
+        
+        # Check for Unicode logic symbols (optimized using any())
+        logic_symbols = ['→', '∧', '∨', '¬', '∀', '∃', '⊢', '⊨', '↔', '⇒', '⇔']
+        if any(symbol in query for symbol in logic_symbols):
+            logger.debug("[ToolSelector] TASK 3: Detected Unicode logic symbol")
+            return True
+        
+        # Check for ASCII logic notation
+        ascii_logic = ['->', '<->', '&&', '||', '~', '!', 'not ', 'and ', 'or ']
+        has_proposition = re.search(r'\b[A-Z]\b', query) is not None  # Cache this check
+        if has_proposition and any(pattern in query_lower for pattern in ascii_logic):
+            logger.debug("[ToolSelector] TASK 3: Detected ASCII logic with propositions")
+            return True
+        
+        # Check for SAT-style keywords (optimized using any())
+        sat_keywords = [
+            'satisfiable', 'satisfiability', 'sat', 'cnf', 'dnf',
+            'prove', 'theorem', 'proof', 'valid', 'tautology', 
+            'contradiction', 'unsatisfiable', 'entailment', 'entails',
+            'contrapositive', 'modus ponens', 'modus tollens',
+        ]
+        if any(keyword in query_lower for keyword in sat_keywords):
+            logger.debug("[ToolSelector] TASK 3: Detected SAT keyword")
+            return True
+        
+        # Check for "Propositions: A, B, C" or "Variables: A, B, C" pattern
+        if re.search(r'(?:propositions?|variables?)\s*:?\s*[A-Z](?:\s*,\s*[A-Z])+', query, re.IGNORECASE):
+            logger.debug("[ToolSelector] TASK 3: Detected proposition list")
+            return True
+        
+        # Check for constraint patterns: "A → B", "B → C", "¬C"
+        # This catches: "Constraints: A→B, B→C, ¬C"
+        if 'constraint' in query_lower and re.search(r'[A-Z]\s*[→\-−>]+\s*[A-Z]', query):
+            logger.debug("[ToolSelector] TASK 3: Detected constraint pattern")
+            return True
+        
+        # Check for first-order logic quantifiers in natural language
+        fol_patterns = [
+            r'\bfor\s+all\b',
+            r'\bthere\s+exists?\b',
+            r'\bfor\s+every\b',
+            r'\bfor\s+some\b',
+            r'\bfor\s+any\b',
+        ]
+        logical_structure_words = ['if', 'then', 'implies', 'therefore', 'conclude']
+        has_logical_structure = any(w in query_lower for w in logical_structure_words)
+        
+        if has_logical_structure:
+            for pattern in fol_patterns:
+                if re.search(pattern, query_lower):
+                    logger.debug(f"[ToolSelector] TASK 3: Detected FOL pattern '{pattern}'")
+                    return True
+        
+        return False
+
     def _initialize_tools(self):
         """
         Initialize reasoning tools with ACTUAL reasoning engines.
@@ -3538,6 +3616,41 @@ class ToolSelector:
 
         try:
             start_time = time.time()
+
+            # ================================================================
+            # TASK 3 FIX: Early detection of formal logic queries
+            # Route SAT/FOL/theorem proving queries to symbolic engine BEFORE
+            # the LLM classifier, which often misroutes them to probabilistic.
+            # ================================================================
+            if hasattr(request, 'problem') and request.problem:
+                problem_text = str(request.problem)
+                if self._detect_formal_logic(problem_text):
+                    logger.info(
+                        f"[ToolSelector] TASK 3 FIX: Formal logic detected - routing to symbolic engine "
+                        f"(bypassing LLM classifier to prevent misrouting to probabilistic)"
+                    )
+                    # Execute with symbolic engine directly
+                    candidates = [
+                        {'tool': 'symbolic', 'utility': 0.95, 'source': 'formal_logic_detection'},
+                    ]
+                    
+                    features = self._extract_features(request)
+                    request.features = features
+                    
+                    strategy = self._select_strategy(request, candidates)
+                    execution_result = self._execute_portfolio(request, candidates, strategy)
+                    final_result = self._postprocess_result(request, execution_result, start_time)
+                    
+                    if self.config.get("learning_enabled"):
+                        self._update_learning(request, final_result)
+                    
+                    if self.config.get("cache_enabled"):
+                        self._cache_result(request, final_result)
+                    
+                    self._update_statistics(final_result)
+                    
+                    logger.info(f"[ToolSelector] TASK 3 FIX: Executed formal logic query with symbolic engine")
+                    return final_result
 
             # ================================================================
             # BUG #0 FIX: Check if QueryClassifier already suggested tools
