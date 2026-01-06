@@ -48,6 +48,7 @@ try:
         StepResponse,
         ChatMessage,
         ChatResponse,
+        VulcanResponse,
         StatusResponse,
         ConfigResponse,
         ImprovementApproval,
@@ -65,6 +66,7 @@ except ImportError as e:
     StepResponse = None
     ChatMessage = None
     ChatResponse = None
+    VulcanResponse = None
     StatusResponse = None
     ConfigResponse = None
     ImprovementApproval = None
@@ -110,6 +112,7 @@ __all__ = [
     "StepResponse",
     "ChatMessage",
     "ChatResponse",
+    "VulcanResponse",
     "StatusResponse",
     "ConfigResponse",
     "ImprovementApproval",
@@ -148,8 +151,8 @@ def get_module_info() -> Dict[str, Any]:
             name for name in [
                 "HealthStatus", "ErrorType",
                 "StepRequest", "StepResponse", "ChatMessage", "ChatRequest",
-                "ChatResponse", "StatusResponse", "ConfigResponse", "ImprovementApproval",
-                "HealthResponse", "MetricsResponse", "ErrorResponse"
+                "ChatResponse", "VulcanResponse", "StatusResponse", "ConfigResponse", 
+                "ImprovementApproval", "HealthResponse", "MetricsResponse", "ErrorResponse"
             ] if globals().get(name) is not None
         ],
     }

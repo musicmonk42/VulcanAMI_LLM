@@ -230,6 +230,7 @@ from vulcan.api.models import (
     ChatRequest,
     ReasonRequest,
     ExplainRequest,
+    VulcanResponse,
 )
 from vulcan.api.rate_limiting import (
     rate_limit_storage,
