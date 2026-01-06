@@ -603,7 +603,8 @@ class HybridLLMExecutor:
     # Maximum length for local response in ensemble mode
     ENSEMBLE_LOCAL_RESPONSE_MAX_LENGTH = 500
     # Valid execution modes
-    VALID_MODES = ("local_first", "openai_first", "parallel", "ensemble")
+    # TASK 2 FIX: Added 'reasoning_first' mode that prioritizes reasoning results
+    VALID_MODES = ("local_first", "openai_first", "parallel", "ensemble", "reasoning_first")
     
     # Default system prompt - OpenAI is ONLY for language generation, NOT reasoning
     # ARCHITECTURE: VULCAN does ALL reasoning. OpenAI only expresses VULCAN's reasoning in fluent prose.
@@ -651,6 +652,8 @@ class HybridLLMExecutor:
         enable_openai_cache: bool = True,
         openai_cache_max_size: int = 1000,
         openai_cache_ttl_seconds: int = 3600,  # 1 hour default
+        prefer_reasoning: bool = True,  # TASK 2 FIX: Prefer reasoning engine results
+        reasoning_confidence_threshold: float = 0.5,  # TASK 2 FIX: Min confidence for reasoning
     ):
         """
         Initialize the hybrid executor.
@@ -658,7 +661,7 @@ class HybridLLMExecutor:
         Args:
             local_llm: Vulcan's local LLM instance
             openai_client_getter: Function to get OpenAI client (lazy loading)
-            mode: Execution mode (local_first, openai_first, parallel, ensemble)
+            mode: Execution mode (local_first, openai_first, parallel, ensemble, reasoning_first)
             timeout: Timeout for parallel/ensemble execution in seconds.
                      If None, uses HYBRID_EXECUTOR_TIMEOUT env var or default 30.0
             ensemble_min_confidence: Minimum confidence for ensemble selection
@@ -666,9 +669,15 @@ class HybridLLMExecutor:
             enable_openai_cache: Enable caching of OpenAI responses (default: True)
             openai_cache_max_size: Maximum cache entries (default: 1000)
             openai_cache_ttl_seconds: Cache TTL in seconds (default: 3600 = 1 hour)
+            prefer_reasoning: If True, skip LLM when reasoning results have high confidence
+            reasoning_confidence_threshold: Minimum confidence for reasoning results to bypass LLM
         """
         self.local_llm = local_llm
         self.openai_client_getter = openai_client_getter or get_openai_client
+        
+        # TASK 2 FIX: Reasoning preference configuration
+        self.prefer_reasoning = prefer_reasoning
+        self.reasoning_confidence_threshold = reasoning_confidence_threshold
         
         # Validate and set mode
         mode_lower = mode.lower()
@@ -715,6 +724,13 @@ class HybridLLMExecutor:
             self.vulcan_timeout = VULCAN_HARD_TIMEOUT
         self.logger.info(f"[HybridExecutor] VULCAN hard timeout set to {self.vulcan_timeout}s")
         
+        # TASK 2 FIX: Log reasoning preference settings
+        if self.prefer_reasoning:
+            self.logger.info(
+                f"[HybridExecutor] Reasoning preference ENABLED "
+                f"(threshold={self.reasoning_confidence_threshold})"
+            )
+        
         # OpenAI response cache for reducing API costs and latency
         self._enable_openai_cache = enable_openai_cache
         self._openai_cache: Optional[OpenAIResponseCache] = None
@@ -733,6 +749,7 @@ class HybridLLMExecutor:
         self._local_successes = 0
         self._openai_successes = 0
         self._failures = 0
+        self._reasoning_direct_count = 0  # TASK 2 FIX: Track reasoning direct uses
         
         # Distillation queue for capturing polish training examples
         # When OpenAI polishes Internal LLM output, we capture the pair for training

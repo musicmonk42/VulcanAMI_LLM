@@ -5965,6 +5965,8 @@ async def unified_chat(request: UnifiedChatRequest):
         # Check if we should use reasoning results directly
         use_reasoning_directly = False
         direct_reasoning_response = None
+        best_confidence = 0.0  # Initialize to avoid NameError in warning message
+        best_reasoning_type = None
         
         if reasoning_results:
             # Check unified reasoning first (highest priority)
