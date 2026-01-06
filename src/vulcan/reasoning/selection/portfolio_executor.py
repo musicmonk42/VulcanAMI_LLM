@@ -20,6 +20,66 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
+# ============================================================================
+# Reasoning Engine Imports
+# ============================================================================
+# Import all reasoning engines for default initialization.
+# Note: These imports use explicit module paths to avoid ambiguity:
+# - ProbabilisticReasoner: probabilistic_reasoning.py (GP-based), NOT symbolic/reasoner.py (Bayesian network)
+# - MathematicalComputationTool: mathematical_computation.py (SOTA tool), NOT mathematical_verification.py
+# - SymbolicReasoner: symbolic/reasoner.py (FOL theorem prover)
+
+# Tracking which engines are available (graceful degradation if imports fail)
+_AVAILABLE_ENGINES: Dict[str, type] = {}
+
+try:
+    from vulcan.reasoning.probabilistic_reasoning import ProbabilisticReasoner
+    _AVAILABLE_ENGINES['probabilistic'] = ProbabilisticReasoner
+except ImportError as e:
+    logger.warning(f"[PortfolioExecutor] ProbabilisticReasoner not available: {e}")
+
+try:
+    from vulcan.reasoning.symbolic.reasoner import SymbolicReasoner
+    _AVAILABLE_ENGINES['symbolic'] = SymbolicReasoner
+except ImportError as e:
+    logger.warning(f"[PortfolioExecutor] SymbolicReasoner not available: {e}")
+
+try:
+    from vulcan.reasoning.causal_reasoning import CausalReasoner
+    _AVAILABLE_ENGINES['causal'] = CausalReasoner
+except ImportError as e:
+    logger.warning(f"[PortfolioExecutor] CausalReasoner not available: {e}")
+
+try:
+    from vulcan.reasoning.mathematical_computation import MathematicalComputationTool
+    _AVAILABLE_ENGINES['mathematical'] = MathematicalComputationTool
+except ImportError as e:
+    logger.warning(f"[PortfolioExecutor] MathematicalComputationTool not available: {e}")
+
+try:
+    from vulcan.reasoning.philosophical_reasoning import PhilosophicalReasoner
+    _AVAILABLE_ENGINES['philosophical'] = PhilosophicalReasoner
+except ImportError as e:
+    logger.warning(f"[PortfolioExecutor] PhilosophicalReasoner not available: {e}")
+
+try:
+    from vulcan.reasoning.analogical_reasoning import AnalogicalReasoningEngine
+    _AVAILABLE_ENGINES['analogical'] = AnalogicalReasoningEngine
+except ImportError as e:
+    logger.warning(f"[PortfolioExecutor] AnalogicalReasoningEngine not available: {e}")
+
+try:
+    from vulcan.reasoning.multimodal_reasoning import MultimodalReasoner
+    _AVAILABLE_ENGINES['multimodal'] = MultimodalReasoner
+except ImportError as e:
+    logger.warning(f"[PortfolioExecutor] MultimodalReasoner not available: {e}")
+
+try:
+    from vulcan.reasoning.language_reasoning import LanguageReasoner
+    _AVAILABLE_ENGINES['language'] = LanguageReasoner
+except ImportError as e:
+    logger.warning(f"[PortfolioExecutor] LanguageReasoner not available: {e}")
+
 
 class ExecutionStrategy(Enum):
     """Portfolio execution strategies"""
@@ -143,12 +203,17 @@ class PortfolioExecutor:
     Executes multiple tools with various strategies
     """
 
-    def __init__(self, tools: Dict[str, Any], max_workers: int = 4):
+    def __init__(self, tools: Optional[Dict[str, Any]] = None, max_workers: int = 4):
         """
         Args:
-            tools: Dictionary of tool_name -> tool_instance
+            tools: Optional dictionary of tool_name -> tool_instance
+                   If not provided, will initialize all default reasoning engines
             max_workers: Maximum parallel executions
         """
+        # Initialize reasoning engines if not provided
+        if tools is None:
+            tools = self._initialize_default_engines()
+        
         self.tools = tools
         self.max_workers = max_workers
         self.executor = ThreadPoolExecutor(max_workers=max_workers)
@@ -174,6 +239,38 @@ class PortfolioExecutor:
             ExecutionStrategy.TOURNAMENT: self._execute_tournament,
             ExecutionStrategy.ADAPTIVE_MIX: self._execute_adaptive_mix,
         }
+
+    def _initialize_default_engines(self) -> Dict[str, Any]:
+        """
+        Initialize all available reasoning engines.
+        
+        Uses the _AVAILABLE_ENGINES module-level dict which contains only
+        engines that were successfully imported. Each engine is instantiated
+        with its default (parameter-less) constructor.
+        
+        Note: All reasoning engines in this codebase support parameter-less
+        initialization with sensible defaults. If an engine requires configuration,
+        users should pass a pre-configured tools dict to __init__ instead.
+
+        Returns:
+            Dictionary mapping tool names to initialized engine instances
+        """
+        engines = {}
+        total_engines = len(_AVAILABLE_ENGINES)
+
+        for name, engine_class in _AVAILABLE_ENGINES.items():
+            try:
+                engines[name] = engine_class()
+                logger.info(f"[PortfolioExecutor] ✓ Initialized {name} engine")
+            except Exception as e:
+                logger.warning(f"[PortfolioExecutor] ✗ Failed to initialize {name}: {e}")
+
+        logger.info(
+            f"[PortfolioExecutor] Successfully registered {len(engines)}/{total_engines} "
+            f"reasoning engines: {list(engines.keys())}"
+        )
+
+        return engines
 
     def execute(
         self,
@@ -214,7 +311,9 @@ class PortfolioExecutor:
             # Validate tools exist
             valid_tools = [t for t in tool_names if t in self.tools]
             if not valid_tools:
-                raise ValueError(f"No valid tools found in {tool_names}")
+                available = list(self.tools.keys())
+                logger.error(f"No valid tools found. Requested: {tool_names}, Available: {available}")
+                raise ValueError(f"No valid tools found in {tool_names}. Available tools: {available}")
 
             # Execute strategy
             strategy_func = self.strategies.get(strategy, self._execute_single)

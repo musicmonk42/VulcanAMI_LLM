@@ -1786,123 +1786,233 @@ class ProbabilisticReasoner(EnhancedProbabilisticReasoner):
     
     def _is_probability_query(self, query: str) -> bool:
         """
-        TASK 1 FIX: Much more permissive gate check to accept probability queries.
+        Detect if query involves probability/statistics using multi-tier approach.
         
-        Check if query involves probability concepts.
-        
-        Returns True if query mentions:
-        - Probability notation: P(X), P(X|Y)
-        - Bayes theorem keywords
-        - Statistical concepts
-        - Uncertainty quantification
-        - Percentage or rate patterns
-        - Decision under uncertainty ("should you switch", "should I choose")
-        - Explicit probability values ("with probability 0.6")
-        - Classic probability problems (Monty Hall, coin flip, dice, cards)
-        
-        CRITICAL FIX: This gate check was too strict and rejecting valid
-        probabilistic queries like "Monty Hall... with probability 0.6... 
-        compute posterior". Now it's much more permissive.
+        Detection tiers (in priority order):
+        1. Formal notation: P(X), P(A|B), E[X], Var(X), Pr(X)
+        2. Core keywords: probability, random, bayesian, etc.
+        3. Common scenarios: coin flips, dice, cards, Monte Carlo
+        4. Statistical terms: expected value, distribution, etc.
+        5. Percentage/fraction patterns
+        6. Conditional reasoning patterns
         
         Args:
-            query: The input query string
+            query: The user's query string
             
         Returns:
-            True if query appears to involve probability concepts
+            True if query appears to involve probability/statistics, False otherwise
+            
+        Examples that should return True:
+            - "P(Disease|Test+)" → Formal notation
+            - "Given P(A) = 0.3, what is P(not A)?" → Formal notation
+            - "flip a fair coin 3 times" → Common scenario
+            - "What's P(at least 2 heads)?" → Formal notation + pattern
+            - "Monte Carlo probability estimate" → Statistical term + keyword
+            - "expected value of rolling a die" → Statistical term + scenario
+            - "What are the odds of drawing an ace?" → Keyword (odds) + scenario
+            - "Bayesian inference problem" → Keyword (Bayesian)
+            - "What percent of people prefer X?" → Percentage pattern
+            - "Binomial distribution with n=10" → Statistical term
+            
+        Examples that should return False:
+            - "What is the weather?" → No probability indicators
+            - "How do I cook pasta?" → No probability indicators
+            - "Explain quantum mechanics" → Not a probability question
         """
         if not isinstance(query, str):
             return False
         
         query_lower = query.lower()
         
-        # TASK 1 FIX: Expanded probability keywords for MUCH more permissive matching
-        # Added: monty hall, doors, switch, goat, car (classic probability problems)
-        # Added: compute posterior (explicit Bayesian request)
-        # Added: given that, if ... then (conditional reasoning)
-        prob_keywords = [
-            # Core probability terms
-            'probability', 'P(', 'p(',
-            'bayes', 'bayesian',
-            'prior', 'posterior', 'likelihood',
+        # =====================================================================
+        # TIER 1: FORMAL MATHEMATICAL NOTATION (highest priority)
+        # =====================================================================
+        # Detect P(...), P(...|...), E[...], Var(...), Pr(...), etc.
+        formal_patterns = [
+            r'P\s*\(',                          # P( or P (
+            r'P\s*\([^)]+\)',                   # P(X), P(Disease)
+            r'P\s*\([^)]+\s*\|\s*[^)]+\)',     # P(A|B), P(Disease|Test+)
+            r'Pr\s*\(',                         # Pr( - alternative notation
+            r'E\s*\[',                          # E[ - expected value
+            r'E\s*\[[^\]]+\]',                  # E[X]
+            r'Var\s*\(',                        # Var( - variance
+            r'Cov\s*\(',                        # Cov( - covariance
+            r'P_\w+',                           # P_survive, P_success, etc.
+        ]
+        
+        for pattern in formal_patterns:
+            if re.search(pattern, query):
+                logger.debug(f"[ProbabilisticReasoner] Gate check PASS: Matched formal pattern '{pattern}'")
+                return True
+        
+        # =====================================================================
+        # TIER 2: CORE PROBABILITY KEYWORDS
+        # =====================================================================
+        core_keywords = [
+            # Fundamental probability terms
+            'probability', 'probable', 'probabilities',
+            'chance', 'chances',
+            'likely', 'likelihood', 'unlikely',
+            'odds',
+            'random', 'randomly', 'randomness',
+            'stochastic',
+            # Bayesian terms
+            'bayesian', 'bayes', "bayes'", "bayes's",
+            'posterior', 'prior',
+            'conditional probability',
             # Medical/statistical testing
             'sensitivity', 'specificity', 'prevalence',
-            'conditional', 'joint probability',
             'false positive', 'false negative',
             'true positive', 'true negative',
+            'positive predictive', 'negative predictive',
+            'base rate', 'test result', 'diagnostic',
             # Decision under uncertainty
-            'odds', 'chance', 'likely', 'unlikely',
-            'random', 'stochastic', 'uncertain',
-            # Statistics
-            'distribution', 'expected value', 'expectation',
-            'variance', 'deviation', 'mean', 'median',
-            'confidence interval', 'p-value', 'significance',
-            'frequency', 'sample', 'proportion',
+            'uncertain', 'uncertainty',
+            # Risk-related
             'risk', 'predictive',
-            # Classic probability problems
-            'monty hall', 'doors', 'goat', 'switch',  # Monty Hall problem
-            'coin flip', 'dice', 'die', 'cards', 'deck',  # Classic gambling
-            'lottery', 'raffle', 'drawing',
-            # Decision keywords
-            'should you', 'should i', 'optimal choice', 'best strategy',
-            'expected payoff', 'expected utility',
             # Computation requests
             'compute posterior', 'calculate probability',
             'find the probability', 'what is the probability',
             'what are the odds', 'what is the chance',
-            # FIX: Causal inference keywords (Jan 6 2026 logs - causal queries skipped)
-            'causal effect', 'randomize', 'intervention', 'confounder',
-            'treatment effect', 'causal graph', 'confounding',
-            'd-separation', 'backdoor', 'instrumental',
-            'average treatment effect', 'ate', 'counterfactual',
-            # FIX: Medical/ethics calculation keywords (Jan 6 2026 logs)
-            'expected harm', 'expected benefit', 'harm calculation',
-            'survival probability', 'mortality rate', 'dose',
-            # FIX: Additional Bayes-related terms
-            'compute p(', 'calculate p(',
-            'positive predictive', 'negative predictive',
-            'base rate', 'test result', 'diagnostic',
+            "what's the probability", "what's the chance",
+            # Causal inference keywords
+            'causal effect', 'intervention', 'confounder',
+            'treatment effect', 'confounding',
+            'average treatment effect', 'counterfactual',
+            # Medical/ethics calculation keywords
+            'expected harm', 'expected benefit',
+            'survival probability', 'mortality rate',
         ]
         
-        # Check for keywords (case-insensitive)
-        for keyword in prob_keywords:
+        for keyword in core_keywords:
             if keyword in query_lower:
-                logger.debug(f"[ProbabilisticReasoner] Gate check PASSED: keyword '{keyword}' found")
+                logger.debug(f"[ProbabilisticReasoner] Gate check PASS: Matched core keyword '{keyword}'")
                 return True
         
-        # Check for probability notation in original query (case-sensitive)
-        # Matches P(X), P(X|Y), P(A ∧ B), P_survive, etc.
-        prob_notation = r'P\s*[\(_]'  # P( or P_ 
-        if re.search(prob_notation, query):
-            logger.debug(f"[ProbabilisticReasoner] Gate check PASSED: probability notation found")
-            return True
+        # =====================================================================
+        # TIER 3: COMMON PROBABILITY SCENARIOS
+        # =====================================================================
+        scenario_patterns = [
+            # Coin scenarios
+            (r'\bcoin\b', 'coin'),
+            (r'\bcoins\b', 'coins'),
+            (r'\bflip\b', 'flip'),
+            (r'\bflipping\b', 'flipping'),
+            (r'\bflipped\b', 'flipped'),
+            (r'\bheads\b', 'heads'),
+            (r'\btails\b', 'tails'),
+            (r'\bhead\b', 'head'),
+            (r'\btail\b', 'tail'),
+            # Dice scenarios
+            (r'\bdie\b', 'die'),
+            (r'\bdice\b', 'dice'),
+            (r'\broll\b', 'roll'),
+            (r'\brolling\b', 'rolling'),
+            (r'\brolled\b', 'rolled'),
+            # Card scenarios
+            (r'\bcard\b', 'card'),
+            (r'\bcards\b', 'cards'),
+            (r'\bdeck\b', 'deck'),
+            (r'\bdraw\b', 'draw'),
+            (r'\bdrawing\b', 'drawing'),
+            (r'\bdrawn\b', 'drawn'),
+            (r'\bace\b', 'ace'),
+            (r'\bspade\b', 'spade'),
+            (r'\bheart\b', 'heart'),
+            (r'\bdiamond\b', 'diamond'),
+            (r'\bclub\b', 'club'),
+            # Classic problems
+            (r'\bmonty\s+hall\b', 'monty hall'),
+            (r'\blottery\b', 'lottery'),
+            (r'\braffle\b', 'raffle'),
+            (r'\bgoat\b', 'goat'),  # Monty Hall
+            # Probability quantity patterns
+            (r'\bat\s+least\s+\d+\b', 'at least N'),
+            (r'\bexactly\s+\d+\b', 'exactly N'),
+            (r'\bno\s+more\s+than\s+\d+\b', 'no more than N'),
+            (r'\bfewer\s+than\s+\d+\b', 'fewer than N'),
+            (r'\bmore\s+than\s+\d+\b', 'more than N'),
+            (r'\bat\s+most\s+\d+\b', 'at most N'),
+        ]
         
-        # Check for percentage patterns (e.g., "50%", "0.5%", ".5%")
-        if re.search(r'(?:\d+\.?\d*|\.\d+)\s*%', query):
-            logger.debug(f"[ProbabilisticReasoner] Gate check PASSED: percentage found")
-            return True
+        for pattern, description in scenario_patterns:
+            if re.search(pattern, query_lower):
+                logger.debug(f"[ProbabilisticReasoner] Gate check PASS: Matched scenario pattern '{description}'")
+                return True
         
-        # TASK 1 FIX: Check for explicit probability values like "with probability 0.6"
-        # This pattern catches phrases like:
-        # - "with probability 0.6"
-        # - "probability 0.4"
-        # - "prob = 0.5"
+        # =====================================================================
+        # TIER 4: STATISTICAL TERMS
+        # =====================================================================
+        statistical_terms = [
+            # Monte Carlo
+            'monte carlo', 'monte-carlo',
+            # Simulation
+            'simulation', 'simulate',
+            'sampling', 'sample',
+            # Distributions
+            'distribution', 'distributions',
+            'bernoulli', 'binomial', 'poisson', 'normal', 'gaussian',
+            'uniform distribution', 'exponential distribution',
+            'geometric distribution', 'hypergeometric',
+            # Central tendency and dispersion
+            'expected value', 'expectation',
+            'variance', 'standard deviation',
+            'mean', 'median', 'mode',
+            'correlation', 'covariance',
+            # Inference
+            'hypothesis test', 'hypothesis testing',
+            'confidence interval',
+            'p-value', 'p value',
+            'significance', 'significant',
+            'null hypothesis', 'alternative hypothesis',
+            # Stochastic processes
+            'markov', 'markov chain',
+            'random walk', 'random process',
+            # Regression
+            'regression',
+            'frequency', 'proportion',
+            # Decision theory
+            'expected payoff', 'expected utility',
+            'optimal choice', 'best strategy',
+        ]
+        
+        for term in statistical_terms:
+            if term in query_lower:
+                logger.debug(f"[ProbabilisticReasoner] Gate check PASS: Matched statistical term '{term}'")
+                return True
+        
+        # =====================================================================
+        # TIER 5: PERCENTAGE/FRACTION PATTERNS
+        # =====================================================================
+        percentage_patterns = [
+            r'\bwhat\s+percent\b',
+            r'\bwhat\s+percentage\b',
+            r'\bhow\s+.*percent\b',
+            r'\d+\s*%',                        # 50%, 0.5%
+            r'\b\d+\s+out\s+of\s+\d+\b',       # 3 out of 10
+            r'\b\d+/\d+\b',                    # 3/10
+        ]
+        
+        for pattern in percentage_patterns:
+            if re.search(pattern, query_lower):
+                logger.debug(f"[ProbabilisticReasoner] Gate check PASS: Matched percentage pattern")
+                return True
+        
+        # Check for explicit probability values like "with probability 0.6"
         if re.search(r'(?:probability|prob)[:\s=]+(?:0?\.\d+|\d+(?:\.\d+)?)', query_lower):
-            logger.debug(f"[ProbabilisticReasoner] Gate check PASSED: explicit probability value found")
+            logger.debug(f"[ProbabilisticReasoner] Gate check PASS: explicit probability value found")
             return True
         
-        # TASK 1 FIX: Check for decimal probability values WITHOUT requiring context
+        # =====================================================================
+        # TIER 6: DECIMAL VALUES WITH PROBABILITY CONTEXT
+        # =====================================================================
         # Values between 0 and 1 (exclusive) are very likely probabilities
-        # Pattern: standalone decimals like 0.6, 0.4, 0.99, .95
-        # Optimization: Count matches up to 2 instead of collecting all
         decimal_pattern = re.compile(r'\b0?\.\d+\b')
         decimal_count = 0
-        first_match = None
         for match in decimal_pattern.finditer(query):
             decimal_count += 1
-            if first_match is None:
-                first_match = match.group(0)
             if decimal_count >= 2:
-                logger.debug(f"[ProbabilisticReasoner] Gate check PASSED: multiple decimal values found")
+                logger.debug(f"[ProbabilisticReasoner] Gate check PASS: multiple decimal values found (likely probabilities)")
                 return True
         
         if decimal_count >= 1:
@@ -1912,26 +2022,31 @@ class ProbabilisticReasoner(EnhancedProbabilisticReasoner):
                 'positive', 'negative', 'host', 'opens', 'reveals',
                 'door', 'pick', 'choose', 'selected', 'outcome',
                 'event', 'occurs', 'happens', 'wins', 'loses',
+                'calculate', 'compute', 'find', 'determine',
             ]
             if any(word in query_lower for word in probability_context_words):
-                logger.debug(f"[ProbabilisticReasoner] Gate check PASSED: decimal with probability context")
+                logger.debug(f"[ProbabilisticReasoner] Gate check PASS: decimal with probability context")
                 return True
         
-        # TASK 1 FIX: Check for conditional reasoning patterns
-        # "If X then Y", "Given that X", "Assuming X"
+        # =====================================================================
+        # TIER 7: CONDITIONAL REASONING PATTERNS
+        # =====================================================================
         conditional_patterns = [
             r'\bgiven\s+that\b',
             r'\bassuming\s+that\b',
             r'\bif\s+.+?\s+then\b',
             r'\bwhat\s+is\s+the\s+(?:probability|chance|likelihood)\b',
+            r"\bwhat's\s+the\s+(?:probability|chance|likelihood)\b",
+            r'\bwhat\s+are\s+the\s+(?:odds|chances)\b',
+            r"\bwhat's\s+p\s*\(",  # What's P(
         ]
         for pattern in conditional_patterns:
             if re.search(pattern, query_lower):
-                logger.debug(f"[ProbabilisticReasoner] Gate check PASSED: conditional pattern '{pattern}'")
+                logger.debug(f"[ProbabilisticReasoner] Gate check PASS: conditional pattern '{pattern}'")
                 return True
         
-        # Default: not a probability query
-        logger.debug(f"[ProbabilisticReasoner] Gate check FAILED: no probability indicators found")
+        # No matches found
+        logger.debug(f"[ProbabilisticReasoner] Gate check FAIL: no probability indicators detected in query")
         return False
 
     def _is_simple_probability_query(self, query: str) -> bool:
