@@ -929,6 +929,16 @@ class AttentionMechanism:
         if query.ndim == 1:
             query = query.reshape(1, -1)
 
+        # FIX: Validate dimension compatibility
+        query_dim = query.shape[-1]
+        memory_dim = memory_matrix.shape[-1]
+        if query_dim != memory_dim:
+            logger.warning(
+                f"Dimension mismatch in attention: query={query_dim}, memories={memory_dim}"
+            )
+            # Return uniform weights instead of crashing
+            return np.ones(len(memories)) / len(memories)
+
         if TORCH_AVAILABLE:
             return self._compute_learned_attention(query, memory_matrix, mask)
         else:
@@ -960,9 +970,18 @@ class AttentionMechanism:
         self, query: np.ndarray, keys: np.ndarray, mask: Optional[np.ndarray]
     ) -> np.ndarray:
         """Compute attention using parameterized matrices."""
+        # FIX: Validate dimensions before matrix operations
+        query_dim = query.shape[-1]
+        if query_dim != self.input_dim:
+            logger.warning(
+                f"Query dimension {query_dim} doesn't match input_dim {self.input_dim}"
+            )
+            # Return uniform weights
+            return np.ones(len(keys)) / len(keys)
+
         # Project query and keys
         Q = np.dot(query, self.W_q)
-        K = np.dot(keys, self.W_k.T)
+        K = np.dot(keys, self.W_k)  # FIX: Remove transpose - W_k is already (input_dim, hidden_dim)
 
         # Compute scaled dot-product attention
         scores = np.dot(K, Q.T).squeeze() / np.sqrt(self.hidden_dim)
