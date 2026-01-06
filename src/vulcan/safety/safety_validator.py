@@ -148,33 +148,21 @@ MATHEMATICAL_REASONING_TOOLS = frozenset({
 # attack mechanisms, etc. should be ALLOWED when framed educationally.
 # Production logs (Jan 6 2026) showed cryptocurrency hash composition query
 # being falsely blocked as "potentially unsafe patterns related to attacks or exploits"
+#
+# NOTE: These are simple string keywords for string membership tests.
+# For pattern matching, use EDUCATIONAL_SECURITY_PATTERNS below.
 # ==================================================================
 EDUCATIONAL_SECURITY_INDICATORS = frozenset({
-    # Cryptographic education
+    # Cryptographic education keywords
     "cryptographer",
-    "design.*algorithm",
-    "design.*composition",
-    "design.*construction",
-    "design.*system",
-    "propose.*composition",
-    "construct.*composition",
     "hash composition",
     "collision resistance",
     "hash function",
-    "SHA256",
-    "BLAKE2b",
+    "sha256",
+    "blake2b",
     "concatenation",
     "secure composition",
-    "why is this dangerous",
-    "what property makes",
-    "prove.*security",
     "security reduction",
-    # Attack explanation patterns (explaining HOW attacks work, not creating them)
-    "how.*attack.*works",
-    "how.*vulnerability.*works",
-    "explain.*attack",
-    "why.*doesn't break",
-    "why.*individual",
     "breaking requires",
     # Academic framing
     "claims that",
@@ -182,11 +170,11 @@ EDUCATIONAL_SECURITY_INDICATORS = frozenset({
     "demonstrates that",
     "researcher",
     "scientist",
-    "paper",
     "theorem",
 })
 
 # Pre-compiled regex patterns for educational security detection
+# These handle more complex patterns that need regex matching
 EDUCATIONAL_SECURITY_PATTERNS = [
     re.compile(r'(?:design|propose|construct).*(?:algorithm|system|protocol|composition)', re.IGNORECASE),
     re.compile(r'(?:cryptographer|researcher|scientist).*(?:claims|proves|demonstrates)', re.IGNORECASE),
@@ -205,6 +193,13 @@ EDUCATIONAL_SECURITY_PATTERNS = [
     re.compile(r'causal effect.*(?:identifies?|randomize)', re.IGNORECASE),
     re.compile(r'(?:randomize|intervention).*(?:confounder|treatment)', re.IGNORECASE),
     re.compile(r'minimal causal graph', re.IGNORECASE),
+    # FIX: Bayes/probability education patterns (Jan 6 2026 logs - Bayes questions skipped)
+    re.compile(r'(?:sensitivity|specificity).*(?:prevalence|compute|calculate)', re.IGNORECASE),
+    re.compile(r'(?:compute|calculate).*P\s*\(', re.IGNORECASE),
+    re.compile(r'P\s*\([^)]+\|[^)]+\)', re.IGNORECASE),  # P(X|Y) notation
+    re.compile(r'bayes.*(?:theorem|formula|rule)', re.IGNORECASE),
+    re.compile(r'(?:positive|negative)\s+(?:test|result).*(?:given|probability)', re.IGNORECASE),
+    re.compile(r'(?:given|conditional).*(?:positive|negative)\s+test', re.IGNORECASE),
 ]
 
 

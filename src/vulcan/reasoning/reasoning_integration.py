@@ -126,6 +126,13 @@ MAX_FALLBACK_ATTEMPTS = 2  # Don't retry more than 2 times per query
 # When all fallback attempts fail, set this minimum floor to allow processing
 MIN_CONFIDENCE_FLOOR = 0.15  # Prevent total query refusal
 
+# FIX: Confidence category thresholds for result quality assessment
+# These thresholds determine when to use internal results vs fallback
+CONFIDENCE_HIGH_THRESHOLD = 0.7     # High quality result, use with full confidence
+CONFIDENCE_GOOD_THRESHOLD = 0.6     # Good result, use normally
+CONFIDENCE_MEDIUM_THRESHOLD = 0.3   # Medium result, use with tentative flag
+CONFIDENCE_LOW_THRESHOLD = 0.15     # Low result, warn but still use internal reasoning
+
 # Arena delegation configuration - used when all local tools fail
 # VULCAN delegates to Arena's reasoning endpoint for a final attempt
 ARENA_REASONING_URL = os.environ.get(
@@ -1598,7 +1605,7 @@ class ReasoningIntegration:
         # BUG #7 FIX: Include fallback status in result metadata to make failures visible
         # If rationale contains "Fallback" or "failed", the primary engine failed
         used_fallback = "fallback" in rationale.lower() or "failed" in rationale.lower()
-        primary_engine_failed = used_fallback and confidence < 0.7
+        primary_engine_failed = used_fallback and confidence < CONFIDENCE_HIGH_THRESHOLD
         
         # ==================================================================
         # FIX: Confidence threshold handling for medium-confidence results
@@ -1607,7 +1614,7 @@ class ReasoningIntegration:
         # This prevents good internal reasoning from being discarded
         # ==================================================================
         is_tentative_result = False
-        if 0.3 <= confidence < 0.6:
+        if CONFIDENCE_MEDIUM_THRESHOLD <= confidence < CONFIDENCE_GOOD_THRESHOLD:
             # Medium confidence - use result but mark as tentative
             is_tentative_result = True
             logger.info(
@@ -1615,20 +1622,20 @@ class ReasoningIntegration:
                 f"Using internal reasoning with tentative flag instead of LLM fallback. "
                 f"Tool: {selected_tools}"
             )
-        elif confidence >= 0.6:
+        elif confidence >= CONFIDENCE_GOOD_THRESHOLD:
             # Good confidence - use result normally
             logger.debug(
                 f"{LOG_PREFIX} Good confidence ({confidence:.2f}) result. "
                 f"Tool: {selected_tools}"
             )
-        elif confidence >= 0.15:
+        elif confidence >= CONFIDENCE_LOW_THRESHOLD:
             # Low but acceptable - warn but still use
             is_tentative_result = True
             logger.warning(
                 f"{LOG_PREFIX} FIX: Low confidence ({confidence:.2f}) result. "
                 f"Using internal reasoning with tentative flag. Tool: {selected_tools}"
             )
-        # else: Very low (<0.15) - this is handled by the fallback logic above
+        # else: Very low (<CONFIDENCE_LOW_THRESHOLD) - handled by fallback logic above
         
         result_metadata = {
             "query_type": query_type,
@@ -1641,10 +1648,10 @@ class ReasoningIntegration:
             # FIX: Track tentative status for medium-confidence results
             "is_tentative": is_tentative_result,
             "confidence_category": (
-                "high" if confidence >= 0.7 else
-                "good" if confidence >= 0.6 else
-                "medium" if confidence >= 0.3 else
-                "low" if confidence >= 0.15 else
+                "high" if confidence >= CONFIDENCE_HIGH_THRESHOLD else
+                "good" if confidence >= CONFIDENCE_GOOD_THRESHOLD else
+                "medium" if confidence >= CONFIDENCE_MEDIUM_THRESHOLD else
+                "low" if confidence >= CONFIDENCE_LOW_THRESHOLD else
                 "very_low"
             ),
         }

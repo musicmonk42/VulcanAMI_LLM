@@ -4199,7 +4199,7 @@ class WorldModel:
             'cryptocurrency', 'incentive', 'game', 'optimization', 'network',
             'token', 'blockchain', 'consensus',
             # FIX: Add cryptographic context keywords
-            'hash', 'collision', 'sha256', 'blake2b', 'concatenation', 
+            'hash', 'collision', 'sha256', 'blake2b', 'concatenation',
             'secure composition', 'security reduction', 'proof', 'attack',
         ]
         

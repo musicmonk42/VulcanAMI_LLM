@@ -150,8 +150,9 @@ class Lexer:
         
         # Step 2: BUG #5/8 FIX: Handle function notation (SHA256, BLAKE2b, etc.)
         # Replace cryptographic function calls with placeholders to avoid parse errors
-        # Pattern: UPPERCASE_WITH_NUMBERS(anything) → FUNC
-        func_pattern = re.compile(r'[A-Z][A-Z0-9]+\([^)]*\)')
+        # Pattern matches: SHA256(x), BLAKE2b(y), H(x), etc.
+        # Note: [A-Z][A-Z0-9]* allows single letter functions (H) or multi-char (SHA256)
+        func_pattern = re.compile(r'[A-Z][A-Z0-9]*\([^)]*\)')
         func_matches = func_pattern.findall(result)
         if func_matches:
             logger.debug(f"Lexer: Found function notation, replacing: {func_matches[:3]}")
