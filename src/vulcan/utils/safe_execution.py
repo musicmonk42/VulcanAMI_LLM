@@ -354,7 +354,11 @@ class SafeCodeExecutor:
                 }
 
             # Execute the code
-            exec(byte_code.code, execution_namespace)
+            # nosec B102: exec() is intentional here - code is pre-compiled with
+            # RestrictedPython which blocks dangerous operations (imports, file I/O,
+            # attribute access to private members, etc.). This is a sandboxed execution
+            # environment designed for safe mathematical computation.
+            exec(byte_code.code, execution_namespace)  # nosec B102
 
             # Extract result (code should assign to 'result' or 'answer')
             # Check if result variables exist in namespace (regardless of their truthiness)

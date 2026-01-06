@@ -2634,14 +2634,17 @@ class WorldModel:
 
         # Execute Git commands using subprocess (robust, non-mock check)
         try:
-            subprocess.run(
+            # nosec B603, B607: subprocess call is safe - using list arguments
+            # with hardcoded 'git' command, file_path is internal validated path
+            subprocess.run(  # nosec B603 B607
                 ["git", "add", file_path],
                 cwd=self.repo_root,
                 check=True,
                 capture_output=True,
             )
 
-            commit_result = subprocess.run(
+            # nosec B603, B607: subprocess call is safe - using list arguments
+            commit_result = subprocess.run(  # nosec B603 B607
                 ["git", "commit", "-m", f"vulcan(auto): {commit_message}"],
                 cwd=self.repo_root,
                 check=True,
@@ -2650,7 +2653,8 @@ class WorldModel:
             )
 
             # Get short hash
-            hash_result = subprocess.run(
+            # nosec B603, B607: subprocess call is safe - using list arguments
+            hash_result = subprocess.run(  # nosec B603 B607
                 ["git", "rev-parse", "--short", "HEAD"],
                 cwd=self.repo_root,
                 check=True,

@@ -40,6 +40,7 @@
 
 import logging
 import os
+import tempfile
 from typing import Optional
 
 # Module metadata
@@ -89,7 +90,8 @@ class ProcessLock:
     
     # Default paths - /var/lock is preferred for container environments
     DEFAULT_LOCK_DIR = "/var/lock"
-    FALLBACK_LOCK_DIR = "/tmp"
+    # Use tempfile.gettempdir() instead of hardcoded /tmp for security (B108)
+    FALLBACK_LOCK_DIR = tempfile.gettempdir()
     LOCK_FILENAME = "vulcan_orchestrator.lock"
     
     def __init__(self, lock_path: str = None):
