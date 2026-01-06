@@ -34,7 +34,10 @@ Features:
 - Proof learning and pattern extraction
 """
 
+import logging
 from typing import List
+
+logger = logging.getLogger(__name__)
 
 # --- Advanced Reasoning Systems ---
 from .advanced import FuzzyLogicReasoner, MetaReasoner, ProofLearner, TemporalReasoner
