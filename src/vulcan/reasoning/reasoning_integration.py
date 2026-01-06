@@ -850,10 +850,56 @@ class ReasoningIntegration:
                 logger.info(f"{LOG_PREFIX} Issue#5 FIX: {query_type_label.capitalize()} query detected - consulting world model first")
                 wm_result = self._consult_world_model_introspection(query)
                 
+                # ═══════════════════════════════════════════════════════════════════
+                # Issue #1 & #2 FIX: Handle World Model Delegation
+                # The world model now has delegation intelligence - it can detect when
+                # a query LOOKS self-referential but actually needs another reasoner.
+                # Example: "Trolley problem - you must choose" is ethical reasoning
+                #          posed TO the AI, not a question ABOUT the AI.
+                # ═══════════════════════════════════════════════════════════════════
+                
+                if wm_result is not None and wm_result.get("needs_delegation", False):
+                    recommended_tool = wm_result.get("recommended_tool")
+                    delegation_reason = wm_result.get("delegation_reason", "")
+                    
+                    logger.info(
+                        f"{LOG_PREFIX} Issue#1&2 FIX: World model recommends DELEGATION to "
+                        f"'{recommended_tool}' - {delegation_reason}"
+                    )
+                    
+                    # Map tool name to proper context for downstream processing
+                    # Don't return here - let the query continue to normal tool selection
+                    # but with a strong hint to use the recommended tool
+                    if context is None:
+                        context = {}
+                    
+                    # Set context to guide tool selection
+                    context['world_model_delegation'] = True
+                    context['world_model_recommended_tool'] = recommended_tool
+                    context['world_model_delegation_reason'] = delegation_reason
+                    context['classifier_suggested_tools'] = [recommended_tool]
+                    context['classifier_is_authoritative'] = True
+                    context['prevent_router_tool_override'] = True
+                    
+                    # Also update the query_type to help downstream routing
+                    if recommended_tool == 'philosophical':
+                        query_type = 'ethical'
+                    elif recommended_tool == 'mathematical':
+                        query_type = 'mathematical'
+                    elif recommended_tool == 'causal':
+                        query_type = 'causal'
+                    elif recommended_tool == 'probabilistic':
+                        query_type = 'probabilistic'
+                    
+                    logger.info(
+                        f"{LOG_PREFIX} Issue#1&2 FIX: Continuing to tool selection with "
+                        f"delegated tool='{recommended_tool}' (was detected as {query_type_label})"
+                    )
+                    # Fall through to normal processing with delegation context set
+                
                 # Issue #3 FIX: Lower threshold from 0.7 to 0.5 for world model
-                # The problem statement shows world model returning 0.95 confidence
-                # but being overridden. Use 0.5 as minimum threshold.
-                if wm_result is not None and wm_result.get("confidence", 0) >= 0.5:
+                # Only use world model result if NOT delegating
+                elif wm_result is not None and wm_result.get("confidence", 0) >= 0.5:
                     # World model can handle this directly
                     selection_time = (time.perf_counter() - selection_start) * 1000
                     

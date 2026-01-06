@@ -3236,6 +3236,71 @@ class ToolSelector:
             logger.warning(f"Failed to initialize math verifier: {e}")
             return None
 
+    def _detect_math_symbols(self, query: str) -> bool:
+        """
+        Issue #4 FIX: Detect MATHEMATICAL symbols (NOT logic symbols).
+        
+        This is separate from formal logic detection because symbols like ∑ (summation),
+        ∫ (integral), ∂ (partial derivative) are MATH symbols, not logic symbols.
+        
+        Previously, ∑ was incorrectly grouped with logic symbols, causing math
+        queries like "Compute ∑(k=1 to n) k" to be routed to the symbolic reasoner,
+        which correctly rejected them, but then math engine never got a chance.
+        
+        Math symbols: ∑ ∫ ∂ ∇ ∏ √ ≤ ≥ ≠ ≈ ± × ÷ ∞
+        Logic symbols: → ∧ ∨ ¬ ∀ ∃ ⊢ ⊨ ↔ ⇒ ⇔
+        
+        Args:
+            query: The query text
+            
+        Returns:
+            True if query contains math symbols (not logic symbols)
+        """
+        if not query or not isinstance(query, str):
+            return False
+        
+        query_lower = query.lower()
+        
+        # Pure math operators (NOT logic)
+        math_symbols = ['∑', '∫', '∂', '∇', '∏', '√', '≤', '≥', '≠', '≈', '±', '×', '÷', '∞']
+        if any(symbol in query for symbol in math_symbols):
+            logger.debug("[ToolSelector] Issue#4 FIX: Detected Unicode math symbol")
+            return True
+        
+        # Math-specific keywords (not shared with logic)
+        math_keywords = [
+            'summation', 'integral', 'derivative', 'differential', 'limit',
+            'compute exactly', 'calculate', 'evaluate the sum', 'closed form',
+            'by induction', 'sigma', 'sigma notation', 'series', 'convergent',
+            'arithmetic progression', 'geometric series'
+        ]
+        if any(keyword in query_lower for keyword in math_keywords):
+            logger.debug("[ToolSelector] Issue#4 FIX: Detected math keyword")
+            return True
+        
+        # Summation notation patterns: ∑(k=1 to n) or sum from k=1 to n
+        sum_patterns = [
+            r'∑.*=.*\d+',  # ∑...=...n
+            r'sum\s+(?:from|for)\s+\w+\s*=\s*\d+',  # sum from k=1
+            r'\bsum\s+\w+\s*=\s*\d+\s+to\b',  # sum k=1 to
+        ]
+        for pattern in sum_patterns:
+            if re.search(pattern, query_lower):
+                logger.debug(f"[ToolSelector] Issue#4 FIX: Detected summation pattern")
+                return True
+        
+        # Integral notation patterns
+        if re.search(r'∫.*d[xyz]', query):
+            logger.debug("[ToolSelector] Issue#4 FIX: Detected integral pattern")
+            return True
+        
+        # Limit notation patterns
+        if re.search(r'lim.*→|limit.*as.*→', query_lower):
+            logger.debug("[ToolSelector] Issue#4 FIX: Detected limit pattern")
+            return True
+        
+        return False
+    
     def _detect_formal_logic(self, query: str) -> bool:
         """
         TASK 3 FIX: Detect formal logic notation to route to symbolic engine.
@@ -3243,8 +3308,11 @@ class ToolSelector:
         This prevents SAT/FOL problems from being misrouted to probabilistic
         engine by the LLM classifier.
         
+        Issue #4 FIX: NO LONGER detects math symbols (∑, ∫, etc.). Those are
+        handled separately by _detect_math_symbols() for mathematical routing.
+        
         Detects:
-        - Logic symbols: →, ∧, ∨, ¬, ∀, ∃, ⊢, ⊨
+        - Logic symbols: →, ∧, ∨, ¬, ∀, ∃, ⊢, ⊨ (NOT ∑, ∫, ∂ - those are math!)
         - SAT problem keywords: satisfiable, SAT, CNF, prove, theorem
         - Propositional variables with constraints (A, B, C)
         - First-order logic patterns
@@ -3258,9 +3326,16 @@ class ToolSelector:
         if not query or not isinstance(query, str):
             return False
         
+        # Issue #4 FIX: First check if this is a math query - math takes priority
+        # over logic symbol detection because math queries may contain both
+        if self._detect_math_symbols(query):
+            logger.debug("[ToolSelector] Issue#4 FIX: Query is mathematical, not formal logic")
+            return False
+        
         query_lower = query.lower()
         
         # Check for Unicode logic symbols (optimized using any())
+        # Issue #4 FIX: REMOVED ∑, ∫, ∂, ∇ from this list - they are MATH symbols!
         logic_symbols = ['→', '∧', '∨', '¬', '∀', '∃', '⊢', '⊨', '↔', '⇒', '⇔']
         if any(symbol in query for symbol in logic_symbols):
             logger.debug("[ToolSelector] TASK 3: Detected Unicode logic symbol")
@@ -3650,6 +3725,39 @@ class ToolSelector:
                     self._update_statistics(final_result)
                     
                     logger.info(f"[ToolSelector] TASK 3 FIX: Executed formal logic query with symbolic engine")
+                    return final_result
+                
+                # ================================================================
+                # Issue #4 FIX: Early detection of mathematical symbols
+                # Route math queries with ∑, ∫, etc. to mathematical engine BEFORE
+                # the LLM classifier, which might misroute them to symbolic.
+                # ================================================================
+                if self._detect_math_symbols(problem_text):
+                    logger.info(
+                        f"[ToolSelector] Issue#4 FIX: Mathematical symbols detected - routing to mathematical engine "
+                        f"(bypassing LLM classifier to prevent misrouting to symbolic)"
+                    )
+                    # Execute with mathematical engine directly
+                    candidates = [
+                        {'tool': 'mathematical', 'utility': 0.95, 'source': 'math_symbol_detection'},
+                    ]
+                    
+                    features = self._extract_features(request)
+                    request.features = features
+                    
+                    strategy = self._select_strategy(request, candidates)
+                    execution_result = self._execute_portfolio(request, candidates, strategy)
+                    final_result = self._postprocess_result(request, execution_result, start_time)
+                    
+                    if self.config.get("learning_enabled"):
+                        self._update_learning(request, final_result)
+                    
+                    if self.config.get("cache_enabled"):
+                        self._cache_result(request, final_result)
+                    
+                    self._update_statistics(final_result)
+                    
+                    logger.info(f"[ToolSelector] Issue#4 FIX: Executed math query with mathematical engine")
                     return final_result
 
             # ================================================================

@@ -2418,7 +2418,24 @@ class UnifiedReasoner:
                 logger.error(f"Sequential task execution failed: {e}")
 
         if results:
-            final_result = results[-1]
+            # Issue #5 FIX: Select BEST result (highest confidence), NOT last result
+            # Previously: final_result = results[-1] (last tool wins bug)
+            # Now: Use max() to select the result with highest confidence
+            final_result = max(results, key=lambda r: getattr(r, 'confidence', 0))
+            
+            # Log what we selected vs what would have been selected before
+            last_result = results[-1]
+            if final_result != last_result:
+                logger.info(
+                    f"[UnifiedReasoner] Issue#5 FIX: Selected BEST result "
+                    f"(confidence={final_result.confidence:.2f}) instead of LAST result "
+                    f"(confidence={last_result.confidence:.2f})"
+                )
+            else:
+                logger.debug(
+                    f"[UnifiedReasoner] Issue#5 FIX: Best result == last result "
+                    f"(confidence={final_result.confidence:.2f})"
+                )
 
             # Update the provided reasoning chain with aggregated info
             reasoning_chain.final_conclusion = final_result.conclusion

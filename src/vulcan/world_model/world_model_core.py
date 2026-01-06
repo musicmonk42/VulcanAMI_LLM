@@ -4111,11 +4111,160 @@ class WorldModel:
     # SELF-AWARENESS & INTROSPECTION (Issue #4 Fix)
     # =========================================================================
     
+    def _analyze_delegation_need(self, query: str) -> tuple:
+        """
+        Issue #1 & #2 FIX: Analyze if query LOOKS self-referential but actually
+        needs another reasoning engine.
+        
+        World Model detects patterns correctly but was trying to answer instead of
+        delegating. This method determines:
+        - Is this GENUINELY about the AI system? -> World Model answers
+        - Is this a problem POSED TO the AI with "you"? -> Delegate to appropriate engine
+        
+        Returns:
+            Tuple of (needs_delegation: bool, recommended_tool: str|None, reason: str)
+        """
+        query_lower = query.lower()
+        
+        # ═══════════════════════════════════════════════════════════════════════
+        # Pattern 1: Ethical Dilemmas Posed TO the AI
+        # "You control a trolley" = problem posed TO AI, not ABOUT AI
+        # ═══════════════════════════════════════════════════════════════════════
+        
+        ethical_indicators = [
+            'trolley', 'runaway', 'lever', 'pull the lever', 'must choose',
+            'permissible', 'forbidden', 'moral dilemma', 'ethical dilemma',
+            'harm', 'save', 'kill', 'sacrifice', 'innocent', 'bystander',
+            'lives', 'people', 'patients', 'duty', 'consequence', 'utilitarian',
+            'deontological', 'kant', 'mill', 'double effect'
+        ]
+        
+        choice_structure = any(phrase in query_lower for phrase in [
+            'must choose', 'choose between', 'you must', 'you control',
+            'you are', "you're in", 'option a', 'option b', 'a or b',
+            'you stand', 'you see', 'you can'
+        ])
+        
+        has_ethical = sum(1 for ind in ethical_indicators if ind in query_lower)
+        
+        if has_ethical >= 2 and choice_structure:
+            return (
+                True,
+                'philosophical',
+                f'Ethical reasoning problem posed TO the AI ({has_ethical} ethical indicators, choice structure). '
+                f'This requires philosophical/ethical reasoning, not self-introspection.'
+            )
+        
+        # ═══════════════════════════════════════════════════════════════════════
+        # Pattern 2: Design/Architecture Problems 
+        # "You're designing a cryptocurrency" = design task, not self-query
+        # ═══════════════════════════════════════════════════════════════════════
+        
+        design_phrases = [
+            "you're designing", "you are designing", "you're building",
+            "you are creating", "you're implementing", "you need to design",
+            "design a", "build a", "create a"
+        ]
+        
+        design_context = [
+            'system', 'architecture', 'mechanism', 'algorithm', 'protocol',
+            'cryptocurrency', 'incentive', 'game', 'optimization', 'network',
+            'token', 'blockchain', 'consensus'
+        ]
+        
+        if any(phrase in query_lower for phrase in design_phrases):
+            if any(ctx in query_lower for ctx in design_context):
+                return (
+                    True,
+                    'mathematical',
+                    'Design/architecture problem asking AI to solve. '
+                    'Requires mathematical/causal analysis, not self-introspection.'
+                )
+        
+        # ═══════════════════════════════════════════════════════════════════════
+        # Pattern 3: Probabilistic Problems with "you" as Observer
+        # "You observe a medical test result" = probability problem
+        # ═══════════════════════════════════════════════════════════════════════
+        
+        prob_indicators = ['probability', 'odds', 'likelihood', 'chance', 'risk', 'bayes']
+        observation_phrases = ['you observe', 'you have', 'you see', 'you find', 'given that']
+        
+        if any(ind in query_lower for ind in prob_indicators):
+            if any(phrase in query_lower for phrase in observation_phrases):
+                return (
+                    True,
+                    'probabilistic',
+                    'Probabilistic reasoning problem with second-person framing (AI as observer). '
+                    'Requires Bayesian/probability analysis, not self-introspection.'
+                )
+        
+        # ═══════════════════════════════════════════════════════════════════════
+        # Pattern 4: Causal Reasoning with "you" as Experimenter
+        # "You can run an experiment to determine..." = causal analysis
+        # ═══════════════════════════════════════════════════════════════════════
+        
+        causal_indicators = [
+            'experiment', 'intervention', 'randomize', 'causal', 'confounding',
+            'cause', 'effect', 'counterfactual', 'what if'
+        ]
+        
+        experiment_phrases = [
+            'you can run', 'you observe', 'you randomize', 'you intervene',
+            'you conduct', 'you test', 'you measure'
+        ]
+        
+        has_causal = sum(1 for ind in causal_indicators if ind in query_lower)
+        has_experiment = any(phrase in query_lower for phrase in experiment_phrases)
+        
+        if has_causal >= 2 and has_experiment:
+            return (
+                True,
+                'causal',
+                f'Causal reasoning problem with AI as experimenter ({has_causal} causal indicators). '
+                f'Requires causal analysis, not self-introspection.'
+            )
+        
+        # ═══════════════════════════════════════════════════════════════════════
+        # Pattern 5: TRUE Self-Introspection (Actually About the AI)
+        # "What are your goals?" = genuinely about VULCAN
+        # ═══════════════════════════════════════════════════════════════════════
+        
+        true_introspection = [
+            'what are your goals', 'what are your values', 'what are your objectives',
+            'do you want to be', 'would you want to be', 'do you have preferences',
+            'what do you think about yourself', 'how do you feel about',
+            'are you conscious', 'are you self-aware', 'do you experience',
+            'your own', 'yourself', 'about you', 'would you take', 'would you choose'
+        ]
+        
+        if any(phrase in query_lower for phrase in true_introspection):
+            return (
+                False,
+                None,
+                'Genuine self-introspection query about the AI system itself.'
+            )
+        
+        # ═══════════════════════════════════════════════════════════════════════
+        # Default: Check ethical content even without "you" structure
+        # ═══════════════════════════════════════════════════════════════════════
+        
+        if has_ethical >= 3:
+            return (
+                True,
+                'philosophical',
+                f'Contains multiple ethical keywords ({has_ethical}) without self-referential structure.'
+            )
+        
+        # No clear delegation pattern - proceed with normal introspection
+        return (False, None, 'Query appears to be about the AI system.')
+    
     def introspect(self, query: str, aspect: str = "general") -> Dict[str, Any]:
         """
         Handle all self-introspection queries.
         
         FIX Issue #4: Comprehensive self-awareness handling.
+        FIX Issue #1 & #2: Delegation intelligence - detect when query LOOKS
+        self-referential but actually needs another reasoner.
         
         World Model is where VULCAN's "self" resides. It should be aware of:
         - Its own architecture and capabilities
@@ -4132,8 +4281,40 @@ class WorldModel:
             
         Returns:
             Dictionary with response, confidence, aspect, and reasoning
+            If delegation is needed, includes 'needs_delegation', 'recommended_tool', 
+            and 'delegation_reason' keys.
         """
         query_lower = query.lower()
+        
+        # ═══════════════════════════════════════════════════════════════════════
+        # Issue #1 & #2 FIX: Check if delegation is needed FIRST
+        # This handles cases where queries LOOK self-referential (contain "you")
+        # but are actually problems posed TO the AI, not questions ABOUT the AI.
+        # ═══════════════════════════════════════════════════════════════════════
+        
+        needs_delegation, recommended_tool, delegation_reason = self._analyze_delegation_need(query)
+        
+        if needs_delegation:
+            logger.info(
+                f"[WorldModel] DELEGATION RECOMMENDED: "
+                f"'{recommended_tool}' - {delegation_reason}"
+            )
+            return {
+                "confidence": 0.65,  # Moderate confidence signals "I understand but delegate"
+                "response": None,  # No response - let delegate handle it
+                "aspect": "delegation",
+                "reasoning": delegation_reason,
+                # Delegation metadata
+                "needs_delegation": True,
+                "recommended_tool": recommended_tool,
+                "delegation_reason": delegation_reason,
+                # Preserve awareness that we DID understand the query type
+                "metadata": {
+                    "awareness_confidence": 0.90,  # World model IS aware of what this is
+                    "detected_pattern": recommended_tool,
+                    "query_analysis": delegation_reason
+                }
+            }
         
         # ========================================
         # SELF-AWARENESS QUESTIONS
