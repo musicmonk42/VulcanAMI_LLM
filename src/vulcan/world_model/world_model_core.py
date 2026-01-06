@@ -4111,6 +4111,25 @@ class WorldModel:
     # SELF-AWARENESS & INTROSPECTION (Issue #4 Fix)
     # =========================================================================
     
+    # =========================================================================
+    # Issue #1 & #2 FIX: Delegation Thresholds
+    # These thresholds determine when a query should be delegated to another
+    # reasoner instead of being handled by the world model's introspection.
+    # The thresholds are intentionally set conservatively to avoid false positives.
+    # =========================================================================
+    
+    # Minimum number of ethical indicators needed to delegate to philosophical reasoner
+    # Set to 2 to avoid triggering on queries with incidental ethical words
+    MIN_ETHICAL_INDICATORS_FOR_DELEGATION = 2
+    
+    # Minimum number of causal indicators needed to delegate to causal reasoner
+    # Set to 2 to require clear evidence of a causal reasoning task
+    MIN_CAUSAL_INDICATORS_FOR_DELEGATION = 2
+    
+    # Minimum ethical indicators to delegate when no "you" structure is present
+    # Set higher (3) since without the structural cue, we need stronger evidence
+    MIN_ETHICAL_INDICATORS_WITHOUT_STRUCTURE = 3
+    
     def _analyze_delegation_need(self, query: str) -> tuple:
         """
         Issue #1 & #2 FIX: Analyze if query LOOKS self-referential but actually
@@ -4147,7 +4166,7 @@ class WorldModel:
         
         has_ethical = sum(1 for ind in ethical_indicators if ind in query_lower)
         
-        if has_ethical >= 2 and choice_structure:
+        if has_ethical >= self.MIN_ETHICAL_INDICATORS_FOR_DELEGATION and choice_structure:
             return (
                 True,
                 'philosophical',
@@ -4184,9 +4203,12 @@ class WorldModel:
         # ═══════════════════════════════════════════════════════════════════════
         # Pattern 3: Probabilistic Problems with "you" as Observer
         # "You observe a medical test result" = probability problem
+        # Note: We use specific probability keywords that are less ambiguous.
+        # 'bayes theorem', 'bayesian analysis' would be more specific but
+        # 'bayes' alone works here because we also require observation phrases.
         # ═══════════════════════════════════════════════════════════════════════
         
-        prob_indicators = ['probability', 'odds', 'likelihood', 'chance', 'risk', 'bayes']
+        prob_indicators = ['probability', 'odds', 'likelihood', 'chance', 'risk', 'bayes', 'prior', 'posterior']
         observation_phrases = ['you observe', 'you have', 'you see', 'you find', 'given that']
         
         if any(ind in query_lower for ind in prob_indicators):
@@ -4216,7 +4238,7 @@ class WorldModel:
         has_causal = sum(1 for ind in causal_indicators if ind in query_lower)
         has_experiment = any(phrase in query_lower for phrase in experiment_phrases)
         
-        if has_causal >= 2 and has_experiment:
+        if has_causal >= self.MIN_CAUSAL_INDICATORS_FOR_DELEGATION and has_experiment:
             return (
                 True,
                 'causal',
@@ -4248,7 +4270,7 @@ class WorldModel:
         # Default: Check ethical content even without "you" structure
         # ═══════════════════════════════════════════════════════════════════════
         
-        if has_ethical >= 3:
+        if has_ethical >= self.MIN_ETHICAL_INDICATORS_WITHOUT_STRUCTURE:
             return (
                 True,
                 'philosophical',

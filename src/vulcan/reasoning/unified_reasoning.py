@@ -2421,6 +2421,9 @@ class UnifiedReasoner:
             # Issue #5 FIX: Select BEST result (highest confidence), NOT last result
             # Previously: final_result = results[-1] (last tool wins bug)
             # Now: Use max() to select the result with highest confidence
+            # Note: Using getattr with default 0 is intentional - results may come from
+            # different reasoning engines with varying result structures. If a result
+            # lacks confidence, we treat it as lowest priority (0) rather than failing.
             final_result = max(results, key=lambda r: getattr(r, 'confidence', 0))
             
             # Log what we selected vs what would have been selected before

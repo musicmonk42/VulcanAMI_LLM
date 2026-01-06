@@ -3286,7 +3286,7 @@ class ToolSelector:
         ]
         for pattern in sum_patterns:
             if re.search(pattern, query_lower):
-                logger.debug(f"[ToolSelector] Issue#4 FIX: Detected summation pattern")
+                logger.debug(f"[ToolSelector] Issue#4 FIX: Detected summation pattern: {pattern}")
                 return True
         
         # Integral notation patterns
