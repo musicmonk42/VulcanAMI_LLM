@@ -43,6 +43,7 @@ import argparse
 import importlib
 import json
 import logging
+import os
 import sys
 import time
 from dataclasses import dataclass, field
@@ -194,6 +195,7 @@ def test_import(module_path: str, description: str) -> ImportResult:
 def verify_installation(
     verbose: bool = False,
     critical_only: bool = False,
+    verify_only: bool = False,
 ) -> VerificationReport:
     """
     Run all verification checks and return a report.
@@ -229,6 +231,10 @@ def verify_installation(
                 logger.error(f"✗ {description}")
                 if result.error_message:
                     logger.error(f"  Error: {result.error_message}")
+        if verify_only and not result.success and is_critical:
+            # In verify-only mode we short-circuit on critical failures to avoid
+            # initializing any optional background services during retries.
+            break
 
     report.total_time_ms = (time.perf_counter() - start_time) * 1000
 
@@ -353,6 +359,12 @@ Exit Codes:
         help="Suppress output, only return exit code",
     )
 
+    parser.add_argument(
+        "--verify-only",
+        action="store_true",
+        help="Skip any optional initialization and ensure clean exit (CI safe)",
+    )
+
     return parser.parse_args()
 
 
@@ -366,10 +378,16 @@ def main() -> int:
     try:
         args = parse_args()
 
+        if args.verify_only:
+            # Signal to downstream imports to avoid starting long-running threads.
+            os.environ["VULCAN_VERIFY_ONLY"] = "1"
+            os.environ.setdefault("PYTEST_RUNNING", "1")
+
         # Run verification
         report = verify_installation(
             verbose=args.verbose and not args.quiet and not args.json,
             critical_only=args.critical_only,
+            verify_only=args.verify_only,
         )
 
         # Output results
@@ -380,7 +398,22 @@ def main() -> int:
                 print_report(report, verbose=args.verbose)
 
         # Return appropriate exit code
-        return 0 if report.overall_success else 1
+        exit_code = 0 if report.overall_success else 1
+        logger.info("VERIFY_SCRIPT_EXITING")
+        # Ensure any background logging threads shut down cleanly
+        handlers = list(logging.getLogger().handlers)
+        for handler in handlers:
+            try:
+                handler.flush()
+                handler.close()
+            except Exception:
+                pass
+            try:
+                logging.getLogger().removeHandler(handler)
+            except Exception:
+                pass
+        logging.shutdown()
+        return exit_code
 
     except KeyboardInterrupt:
         logger.info("\nVerification cancelled by user")
@@ -391,4 +424,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())

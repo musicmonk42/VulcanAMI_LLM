@@ -154,6 +154,12 @@ Provenance edges track node output consumption lineage; graph-level analytic que
 Single-process intended targets: 10k nodes / 100k edges (assuming moderate param complexity).
 Distributed evolution (future): Sharded execution graphs, remote trace correlation, multi-instance governance consensus.
 
+### 14.1 Demo-stage horizontal scaling story
+- A single container image can be replicated behind a load balancer; horizontal scale = **multiple replicas of the same image** with externalized state (DB/object store/vector index).
+- Current demo topology: one container (API + workers) as a single instance. This supports Railway-style deployments and quick iteration.
+- Phase 2 decomposition: split into API gateway, worker/agent pool, memory/vector service, and queue/object store so pools can scale independently.
+- Portability evidence: the platform is deployed on Railway in two regions today; this is deployment portability, not global HA.
+
 ## 15. Future Research Vectors
 - Formal invariant spec (temporal logic).
 - ML-based dynamic timeout predictors.
