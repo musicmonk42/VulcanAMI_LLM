@@ -46,6 +46,27 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+# Shared constants for query pattern detection (from system_observer)
+# These are used by both WorldModel and SystemObserver for consistent classification
+try:
+    from .system_observer import (
+        FORMAL_LOGIC_SYMBOLS,
+        FORMAL_LOGIC_KEYWORDS,
+        PROBABILITY_KEYWORDS,
+        SELF_REFERENTIAL_KEYWORDS,
+    )
+    SHARED_CONSTANTS_AVAILABLE = True
+except ImportError:
+    # Fallback definitions if system_observer not available
+    FORMAL_LOGIC_SYMBOLS = frozenset(['→', '∧', '∨', '¬', '∀', '∃', '⊢', '⊨', '↔', '⇒', '⇔'])
+    FORMAL_LOGIC_KEYWORDS = frozenset(['forall', 'exists', 'implies', 'entails', 'satisfiable', 'valid'])
+    PROBABILITY_KEYWORDS = frozenset(['probability', 'likelihood', 'bayes', 'bayesian', 'posterior', 'prior', 'p(', 'conditional', 'expectation', 'marginal'])
+    SELF_REFERENTIAL_KEYWORDS = frozenset(['you want', 'your goal', 'self-aware', 'you have', 'do you', 'are you', 'your capabilities', 'yourself', 'your purpose', 'your objectives'])
+    SHARED_CONSTANTS_AVAILABLE = False
+
+# Minimum observations needed for routing recommendations
+MIN_OBSERVATIONS_FOR_RECOMMENDATIONS = 5
+
 # Lazy import placeholders
 EnhancedSafetyValidator = None
 SafetyConfig = None
@@ -3780,7 +3801,7 @@ class WorldModel:
     # Configuration constants for routing recommendations
     PATH_STRENGTH_THRESHOLD = 0.7  # Minimum causal path strength to predict failure
     
-    def has_sufficient_history(self, min_observations: int = 5) -> bool:
+    def has_sufficient_history(self, min_observations: int = MIN_OBSERVATIONS_FOR_RECOMMENDATIONS) -> bool:
         """
         Check if world model has enough data to make recommendations.
         
@@ -3788,7 +3809,8 @@ class WorldModel:
         routing recommendations based on learned patterns.
         
         Args:
-            min_observations: Minimum number of observations needed (default 5)
+            min_observations: Minimum number of observations needed 
+                              (default MIN_OBSERVATIONS_FOR_RECOMMENDATIONS = 5)
             
         Returns:
             True if sufficient history exists for recommendations
@@ -3864,21 +3886,21 @@ class WorldModel:
         
         return {
             'type': self._infer_query_type(query_lower),
-            'has_formal_logic': any(sym in query for sym in ['→', '∧', '∨', '¬', '∀', '∃']),
-            'has_probability': any(kw in query_lower for kw in ['probability', 'bayes', 'p(']),
-            'is_self_referential': any(kw in query_lower for kw in ['you want', 'your goal', 'yourself']),
+            'has_formal_logic': any(sym in query for sym in FORMAL_LOGIC_SYMBOLS),
+            'has_probability': any(kw in query_lower for kw in PROBABILITY_KEYWORDS),
+            'is_self_referential': any(kw in query_lower for kw in SELF_REFERENTIAL_KEYWORDS),
             'complexity': len(query) / 100.0  # Simple complexity proxy
         }
     
     def _infer_query_type(self, query_lower: str) -> str:
-        """Infer query type from content."""
-        if any(sym in query_lower for sym in ['→', '∧', '∨', '¬', '∀', '∃', 'forall']):
+        """Infer query type from content using shared constants."""
+        if any(sym in query_lower for sym in FORMAL_LOGIC_SYMBOLS) or any(kw in query_lower for kw in FORMAL_LOGIC_KEYWORDS):
             return 'formal_logic'
-        elif any(kw in query_lower for kw in ['probability', 'bayes', 'likelihood']):
+        elif any(kw in query_lower for kw in PROBABILITY_KEYWORDS):
             return 'probabilistic'
         elif any(kw in query_lower for kw in ['compute', 'calculate', 'integral']):
             return 'mathematical'
-        elif any(kw in query_lower for kw in ['you want', 'yourself', 'your goal']):
+        elif any(kw in query_lower for kw in SELF_REFERENTIAL_KEYWORDS):
             return 'self_referential'
         elif any(kw in query_lower for kw in ['cause', 'effect', 'intervention']):
             return 'causal'
@@ -3949,7 +3971,7 @@ class WorldModel:
         Returns:
             Dict with performance metrics and known issues
         """
-        if self.observation_count < 5:
+        if self.observation_count < MIN_OBSERVATIONS_FOR_RECOMMENDATIONS:
             return {
                 'status': 'insufficient_data',
                 'message': 'Need more observations for meaningful performance analysis',
