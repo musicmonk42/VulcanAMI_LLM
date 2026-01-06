@@ -18,6 +18,16 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
+# Import all reasoning engines
+from vulcan.reasoning.probabilistic_reasoning import ProbabilisticReasoner
+from vulcan.reasoning.symbolic.reasoner import SymbolicReasoner
+from vulcan.reasoning.causal_reasoning import CausalReasoner
+from vulcan.reasoning.mathematical_computation import MathematicalComputationTool
+from vulcan.reasoning.philosophical_reasoning import PhilosophicalReasoner
+from vulcan.reasoning.analogical_reasoning import AnalogicalReasoningEngine
+from vulcan.reasoning.multimodal_reasoning import MultimodalReasoner
+from vulcan.reasoning.language_reasoning import LanguageReasoner
+
 logger = logging.getLogger(__name__)
 
 
@@ -143,12 +153,17 @@ class PortfolioExecutor:
     Executes multiple tools with various strategies
     """
 
-    def __init__(self, tools: Dict[str, Any], max_workers: int = 4):
+    def __init__(self, tools: Optional[Dict[str, Any]] = None, max_workers: int = 4):
         """
         Args:
-            tools: Dictionary of tool_name -> tool_instance
+            tools: Optional dictionary of tool_name -> tool_instance
+                   If not provided, will initialize all default reasoning engines
             max_workers: Maximum parallel executions
         """
+        # Initialize reasoning engines if not provided
+        if tools is None:
+            tools = self._initialize_default_engines()
+        
         self.tools = tools
         self.max_workers = max_workers
         self.executor = ThreadPoolExecutor(max_workers=max_workers)
@@ -174,6 +189,38 @@ class PortfolioExecutor:
             ExecutionStrategy.TOURNAMENT: self._execute_tournament,
             ExecutionStrategy.ADAPTIVE_MIX: self._execute_adaptive_mix,
         }
+
+    def _initialize_default_engines(self) -> Dict[str, Any]:
+        """
+        Initialize all available reasoning engines
+
+        Returns:
+            Dictionary mapping tool names to initialized engine instances
+        """
+        engines = {}
+
+        # Initialize each engine with error handling
+        engine_classes = {
+            'probabilistic': ProbabilisticReasoner,
+            'symbolic': SymbolicReasoner,
+            'causal': CausalReasoner,
+            'mathematical': MathematicalComputationTool,
+            'philosophical': PhilosophicalReasoner,
+            'analogical': AnalogicalReasoningEngine,
+            'multimodal': MultimodalReasoner,
+            'language': LanguageReasoner,
+        }
+
+        for name, engine_class in engine_classes.items():
+            try:
+                engines[name] = engine_class()
+                logger.info(f"[PortfolioExecutor] ✓ Initialized {name} engine")
+            except Exception as e:
+                logger.warning(f"[PortfolioExecutor] ✗ Failed to initialize {name}: {e}")
+
+        logger.info(f"[PortfolioExecutor] Successfully registered {len(engines)}/8 reasoning engines: {list(engines.keys())}")
+
+        return engines
 
     def execute(
         self,
@@ -214,7 +261,9 @@ class PortfolioExecutor:
             # Validate tools exist
             valid_tools = [t for t in tool_names if t in self.tools]
             if not valid_tools:
-                raise ValueError(f"No valid tools found in {tool_names}")
+                available = list(self.tools.keys())
+                logger.error(f"No valid tools found. Requested: {tool_names}, Available: {available}")
+                raise ValueError(f"No valid tools found in {tool_names}. Available tools: {available}")
 
             # Execute strategy
             strategy_func = self.strategies.get(strategy, self._execute_single)
