@@ -45,12 +45,12 @@ on:
         required: false
         default: 'progressive'
         type: choice
-       options:
-         - progressive
-         - baseline
-         - light_load
-         - medium_load
-         - heavy_load
+        options:
+          - progressive
+          - baseline
+          - light_load
+          - medium_load
+          - heavy_load
       no_openai:
         description: 'Run in no-openai mode (preflight will be skipped)'
         required: false
@@ -159,16 +159,16 @@ jobs:
             exit 1
           fi
           python - <<'PY'
-import sys
-try:
-    import openai  # noqa: F401
-    from openai import OpenAI  # noqa: F401
-except Exception as exc:
-    print(f"::error::OpenAI package import failed: {exc}")
-    print("Install dependencies: pip install -r requirements-hashed.txt")
-    sys.exit(1)
-print("OpenAI import preflight passed")
-PY
+          import sys
+          try:
+              import openai  # noqa: F401
+              from openai import OpenAI  # noqa: F401
+          except Exception as exc:
+              print(f"::error::OpenAI package import failed: {exc}")
+              print("Install dependencies: pip install -r requirements-hashed.txt")
+              sys.exit(1)
+          print("OpenAI import preflight passed")
+          PY
 
       - name: Verify VULCAN installation
         run: |
@@ -177,7 +177,8 @@ PY
           echo "=================================================="
           
           # Run the verification script with verbose output
-          python scripts/verify_installation.py --verbose --critical-only
+          # Use --verify-only to prevent background services from starting in CI
+          python scripts/verify_installation.py --verbose --critical-only --verify-only
           
           VERIFY_EXIT=$?
           if [ $VERIFY_EXIT -ne 0 ]; then
