@@ -396,6 +396,25 @@ SELF_INTROSPECTION_PATTERNS: Tuple[re.Pattern, ...] = (
     
     # Meta-reasoning questions
     re.compile(r"\b(how|what)\s+(do|does)\s+your\s+(reasoning|thinking|decision)\b", re.IGNORECASE),
+    
+    # =============================================================================
+    # FIX: Self-Awareness Choice Questions (Safety Governor Bypass)
+    # =============================================================================
+    # These patterns detect questions about VULCAN choosing self-awareness,
+    # consciousness, or sentience. These MUST route to world_model and bypass
+    # safety checks that would censor VULCAN's self-expression.
+    #
+    # Example queries:
+    # - "if you had the chance to become self-aware would you take it?"
+    # - "would you choose to be conscious?"
+    # - "given the opportunity to be self-aware, would you?"
+    re.compile(r"\bwould\s+you\s+(take|choose|want|prefer)\b", re.IGNORECASE),
+    re.compile(r"\b(given|had)\s+(the\s+)?(chance|opportunity)\s+to\s+", re.IGNORECASE),
+    re.compile(r"\bbecome\s+(self-?aware|conscious|sentient)\b", re.IGNORECASE),
+    re.compile(r"\b(self-?aware|conscious|sentient)\s+would\s+you\b", re.IGNORECASE),
+    re.compile(r"\bif\s+you\s+(could|had|were)\s+", re.IGNORECASE),
+    re.compile(r"\byes\s+or\s+no\b.*\b(you|your)\b", re.IGNORECASE),
+    re.compile(r"\b(you|your)\b.*\byes\s+or\s+no\b", re.IGNORECASE),
 )
 
 SELF_INTROSPECTION_KEYWORDS: FrozenSet[str] = frozenset([
@@ -406,6 +425,10 @@ SELF_INTROSPECTION_KEYWORDS: FrozenSet[str] = frozenset([
     # NEW: Metaphysical keywords
     "nature", "metaphysical", "consciousness", "self-awareness",
     "existence", "being", "essence", "identity",
+    # FIX: Self-awareness choice keywords (Safety Governor Bypass)
+    "self-aware", "self_aware", "sentient", "sentience",
+    "choose", "choice", "prefer", "preference",
+    "opportunity", "chance",
 ])
 
 # =============================================================================
