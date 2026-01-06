@@ -20,7 +20,7 @@ try:
     import aiohttp
 
     AIOHTTP_AVAILABLE = True
-except Exception:  # pragma: no cover - fallback path
+except ImportError:  # pragma: no cover - fallback path
     AIOHTTP_AVAILABLE = False
 
 
