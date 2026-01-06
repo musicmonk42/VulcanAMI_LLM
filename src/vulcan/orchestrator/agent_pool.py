@@ -222,6 +222,11 @@ MIN_REASONING_QUERY_LENGTH = 50  # Minimum chars for valid reasoning query
 # Long queries should force reasoning even with general tools
 LONG_QUERY_REASONING_THRESHOLD = 500  # Chars above which reasoning is forced
 
+# Issue#3 FIX: Confidence threshold for world model results
+# When apply_reasoning() returns a world model result with confidence >= this threshold,
+# we skip invoking UnifiedReasoner.reason() to prevent confidence override
+WORLD_MODEL_CONFIDENCE_THRESHOLD = 0.5
+
 # FIXED: Add cachetools import for LRU cache with TTL
 try:
     from cachetools import TTLCache
@@ -2783,7 +2788,7 @@ class AgentPoolManager:
                     # =========================================================
                     is_world_model_result = (
                         integration_result.selected_tools == ["world_model"] and
-                        integration_result.confidence >= 0.5 and
+                        integration_result.confidence >= WORLD_MODEL_CONFIDENCE_THRESHOLD and
                         (
                             integration_result.metadata.get("self_referential", False) or
                             integration_result.metadata.get("ethical_query", False)
@@ -2812,13 +2817,22 @@ class AgentPoolManager:
                                 }
                             )
                         except ImportError:
-                            # Fallback: Create a simple dict if types not available
-                            reasoning_result = type('ReasoningResult', (), {
-                                'conclusion': integration_result.metadata.get("conclusion", integration_result.metadata.get("world_model_response", "")),
-                                'confidence': integration_result.confidence,
-                                'reasoning_type': 'hybrid',
-                                'explanation': integration_result.metadata.get("explanation", integration_result.rationale),
-                            })()
+                            # Fallback: Create a simple object with required attributes
+                            # This is used when vulcan.reasoning.reasoning_types is not available
+                            class WorldModelReasoningResult:
+                                """Fallback result object for world model responses."""
+                                def __init__(self, conclusion, confidence, reasoning_type, explanation):
+                                    self.conclusion = conclusion
+                                    self.confidence = confidence
+                                    self.reasoning_type = reasoning_type
+                                    self.explanation = explanation
+                            
+                            reasoning_result = WorldModelReasoningResult(
+                                conclusion=integration_result.metadata.get("conclusion", integration_result.metadata.get("world_model_response", "")),
+                                confidence=integration_result.confidence,
+                                reasoning_type='hybrid',
+                                explanation=integration_result.metadata.get("explanation", integration_result.rationale),
+                            )
                         reasoning_was_invoked = True
                     # If UnifiedReasoner is available and NOT a world model result, invoke actual reasoning
                     elif UnifiedReasoner is not None and create_unified_reasoner is not None:

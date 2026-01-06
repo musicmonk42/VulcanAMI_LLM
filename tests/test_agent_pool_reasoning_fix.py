@@ -320,8 +320,8 @@ class TestWorldModelConfidenceOverrideFix(unittest.TestCase):
         # Verify the condition variable is defined
         self.assertIn('is_world_model_result', source_code)
         
-        # Verify it checks confidence threshold
-        self.assertIn('confidence >= 0.5', source_code)
+        # Verify it uses the named constant for confidence threshold
+        self.assertIn('WORLD_MODEL_CONFIDENCE_THRESHOLD', source_code)
 
     def test_world_model_logging_exists(self):
         """
