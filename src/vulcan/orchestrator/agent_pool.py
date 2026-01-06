@@ -2772,8 +2772,56 @@ class AgentPoolManager:
                             f"This may indicate a configuration issue."
                         )
                     
-                    # If UnifiedReasoner is available, invoke actual reasoning
-                    if UnifiedReasoner is not None and create_unified_reasoner is not None:
+                    # =========================================================
+                    # CRITICAL FIX (Issue#3): Skip UnifiedReasoner for world model results
+                    # =========================================================
+                    # When apply_reasoning() returns a world model result with sufficient
+                    # confidence (>= 0.5), we MUST use it directly without invoking
+                    # other reasoning engines. Previously, the code would always
+                    # call UnifiedReasoner.reason() which would run probabilistic
+                    # reasoner and override the world model confidence (0.85 → 0.1).
+                    # =========================================================
+                    is_world_model_result = (
+                        integration_result.selected_tools == ["world_model"] and
+                        integration_result.confidence >= 0.5 and
+                        (
+                            integration_result.metadata.get("self_referential", False) or
+                            integration_result.metadata.get("ethical_query", False)
+                        )
+                    )
+                    
+                    if is_world_model_result:
+                        logger.info(
+                            f"[AgentPool] Issue#3 FIX: World model returned confidence "
+                            f"{integration_result.confidence:.2f}. Using this result directly "
+                            f"without invoking other reasoning engines."
+                        )
+                        # Create a reasoning_result from the integration result
+                        # to maintain consistency with downstream code
+                        try:
+                            from vulcan.reasoning.reasoning_types import ReasoningResult as UR_ReasoningResult, ReasoningType
+                            reasoning_result = UR_ReasoningResult(
+                                conclusion=integration_result.metadata.get("conclusion", integration_result.metadata.get("world_model_response", "")),
+                                confidence=integration_result.confidence,
+                                reasoning_type=ReasoningType.HYBRID,  # World model uses hybrid reasoning
+                                explanation=integration_result.metadata.get("explanation", integration_result.rationale),
+                                metadata={
+                                    "source": "world_model",
+                                    "self_referential": integration_result.metadata.get("self_referential", False),
+                                    "ethical_query": integration_result.metadata.get("ethical_query", False),
+                                }
+                            )
+                        except ImportError:
+                            # Fallback: Create a simple dict if types not available
+                            reasoning_result = type('ReasoningResult', (), {
+                                'conclusion': integration_result.metadata.get("conclusion", integration_result.metadata.get("world_model_response", "")),
+                                'confidence': integration_result.confidence,
+                                'reasoning_type': 'hybrid',
+                                'explanation': integration_result.metadata.get("explanation", integration_result.rationale),
+                            })()
+                        reasoning_was_invoked = True
+                    # If UnifiedReasoner is available and NOT a world model result, invoke actual reasoning
+                    elif UnifiedReasoner is not None and create_unified_reasoner is not None:
                         try:
                             # Get or create unified reasoner with learning and safety enabled
                             reasoner = create_unified_reasoner(
