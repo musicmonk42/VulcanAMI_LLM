@@ -512,6 +512,104 @@ def _reasoning_result_to_dict(result: Any) -> Dict[str, Any]:
     return result_dict if result_dict else {"value": str(result)}
 
 
+def _format_direct_reasoning_response(
+    conclusion: Any,
+    confidence: float,
+    reasoning_type: str,
+    explanation: str,
+    reasoning_results: Dict[str, Any],
+) -> str:
+    """
+    Format reasoning engine result as final user response.
+    
+    TASK 1 FIX: This function formats high-confidence reasoning results
+    directly for user output WITHOUT passing through OpenAI, ensuring
+    that specialized reasoning engine outputs are preserved.
+    
+    The formatted response includes:
+    - The main conclusion from the reasoning engine
+    - Supporting explanation if available
+    - Reasoning steps/chain if detailed analysis was performed
+    - Confidence indicator for transparency
+    
+    Args:
+        conclusion: The main result/answer from the reasoning engine
+        confidence: Confidence score (0.0 to 1.0)
+        reasoning_type: Type of reasoning used (e.g., "probabilistic", "causal")
+        explanation: Additional explanation from the engine
+        reasoning_results: Full reasoning results dict for additional context
+        
+    Returns:
+        Formatted string response suitable for direct user output
+        
+    Example:
+        >>> response = _format_direct_reasoning_response(
+        ...     conclusion="P(D|+) = 0.166667",
+        ...     confidence=0.95,
+        ...     reasoning_type="probabilistic",
+        ...     explanation="Applied Bayes' theorem with given parameters",
+        ...     reasoning_results={"unified": {...}}
+        ... )
+        >>> print(response)
+        P(D|+) = 0.166667
+        
+        Applied Bayes' theorem with given parameters
+        
+        Reasoning type: Probabilistic | Confidence: 95%
+    """
+    response_parts = []
+    
+    # Main conclusion (the answer)
+    if conclusion:
+        # Handle different conclusion types
+        if isinstance(conclusion, (int, float)):
+            response_parts.append(str(conclusion))
+        elif isinstance(conclusion, dict):
+            # Format dict conclusions nicely
+            if "answer" in conclusion:
+                response_parts.append(str(conclusion["answer"]))
+            elif "result" in conclusion:
+                response_parts.append(str(conclusion["result"]))
+            else:
+                # Format as key-value pairs
+                formatted_items = []
+                for key, value in conclusion.items():
+                    formatted_items.append(f"{key}: {value}")
+                response_parts.append("\n".join(formatted_items))
+        elif isinstance(conclusion, (list, tuple)):
+            # Format list conclusions
+            response_parts.append("\n".join(str(item) for item in conclusion))
+        else:
+            response_parts.append(str(conclusion))
+    
+    # Add explanation if available and meaningful
+    if explanation and explanation.strip() and explanation != conclusion:
+        response_parts.append(f"\n{explanation}")
+    
+    # Add reasoning chain/steps if available
+    unified = reasoning_results.get("unified", {})
+    if isinstance(unified, dict):
+        reasoning_steps = unified.get("reasoning_steps", [])
+        if reasoning_steps and len(reasoning_steps) > 0:
+            response_parts.append("\n**Reasoning steps:**")
+            for i, step in enumerate(reasoning_steps[:10], 1):  # Limit to 10 steps
+                if isinstance(step, dict):
+                    step_explanation = step.get("explanation", "")
+                    if step_explanation:
+                        response_parts.append(f"{i}. {step_explanation}")
+                elif isinstance(step, str):
+                    response_parts.append(f"{i}. {step}")
+    
+    # Add transparency footer with reasoning type and confidence
+    confidence_pct = int(confidence * 100)
+    reasoning_type_display = reasoning_type.replace("_", " ").title() if reasoning_type else "Hybrid"
+    response_parts.append(
+        f"\n---\n*Reasoning type: {reasoning_type_display} | Confidence: {confidence_pct}%*"
+    )
+    
+    return "\n".join(response_parts)
+
+
 # ============================================================
 # LIFESPAN MANAGER
 # ============================================================
@@ -5854,10 +5952,121 @@ async def unified_chat(request: UnifiedChatRequest):
                     logger.warning(f"[VULCAN/v1/chat] Direct reasoning invocation failed: {e}")
 
         # ================================================================
+        # TASK 1 FIX: USE REASONING RESULTS DIRECTLY WHEN CONFIDENCE IS HIGH
+        # ================================================================
+        # CRITICAL: When specialized reasoning engines produce high-confidence
+        # results, use them DIRECTLY instead of passing to OpenAI which may
+        # ignore or override them. This prevents the "OpenAI always wins" problem.
+        #
+        # Confidence threshold: 0.5 (configurable via MIN_REASONING_CONFIDENCE_THRESHOLD)
+        # When reasoning confidence >= threshold, format and return directly.
+        MIN_REASONING_CONFIDENCE_THRESHOLD = float(os.environ.get("VULCAN_MIN_REASONING_CONFIDENCE", "0.5"))
+        
+        # Check if we should use reasoning results directly
+        use_reasoning_directly = False
+        direct_reasoning_response = None
+        
+        if reasoning_results:
+            # Check unified reasoning first (highest priority)
+            unified = reasoning_results.get("unified", {})
+            unified_confidence = unified.get("confidence", 0.0) if isinstance(unified, dict) else 0.0
+            unified_conclusion = unified.get("conclusion") if isinstance(unified, dict) else None
+            
+            # Check agent reasoning 
+            agent = reasoning_results.get("agent_reasoning", {})
+            agent_confidence = agent.get("confidence", 0.0) if isinstance(agent, dict) else 0.0
+            agent_conclusion = agent.get("conclusion") if isinstance(agent, dict) else None
+            
+            # Check direct reasoning
+            direct = reasoning_results.get("direct_reasoning", {})
+            direct_confidence = direct.get("confidence", 0.0) if isinstance(direct, dict) else 0.0
+            direct_conclusion = direct.get("conclusion") if isinstance(direct, dict) else None
+            
+            # Find best reasoning result
+            best_confidence = max(unified_confidence, agent_confidence, direct_confidence)
+            best_conclusion = None
+            best_source = None
+            best_reasoning_type = None
+            best_explanation = None
+            
+            if unified_confidence >= MIN_REASONING_CONFIDENCE_THRESHOLD and unified_confidence == best_confidence:
+                best_conclusion = unified_conclusion
+                best_source = "unified"
+                best_reasoning_type = unified.get("reasoning_type", "unknown")
+                best_explanation = unified.get("explanation", "")
+            elif agent_confidence >= MIN_REASONING_CONFIDENCE_THRESHOLD and agent_confidence == best_confidence:
+                best_conclusion = agent_conclusion
+                best_source = "agent"
+                best_reasoning_type = agent.get("reasoning_type", "unknown")
+                best_explanation = agent.get("explanation", "")
+            elif direct_confidence >= MIN_REASONING_CONFIDENCE_THRESHOLD and direct_confidence == best_confidence:
+                best_conclusion = direct_conclusion
+                best_source = "direct"
+                best_reasoning_type = direct.get("reasoning_type", "unknown")
+                best_explanation = direct.get("explanation", "")
+            
+            if best_conclusion is not None and best_confidence >= MIN_REASONING_CONFIDENCE_THRESHOLD:
+                use_reasoning_directly = True
+                
+                # Format the reasoning result as the final response
+                direct_reasoning_response = _format_direct_reasoning_response(
+                    conclusion=best_conclusion,
+                    confidence=best_confidence,
+                    reasoning_type=best_reasoning_type,
+                    explanation=best_explanation,
+                    reasoning_results=reasoning_results,
+                )
+                
+                logger.info(
+                    f"[VULCAN] ✓ USING REASONING ENGINE RESULT DIRECTLY "
+                    f"(source={best_source}, type={best_reasoning_type}, "
+                    f"confidence={best_confidence:.2f}, NO OPENAI)"
+                )
+        
+        # If we can use reasoning directly, return immediately
+        if use_reasoning_directly and direct_reasoning_response:
+            # Build final response without LLM
+            latency_ms = int((time.time() - start_time) * 1000)
+            timing_breakdown["total_ms"] = latency_ms
+            
+            # Add reasoning-specific systems to systems_used
+            systems_used.append("direct_reasoning_output")
+            
+            final_response = VulcanResponse(
+                response=direct_reasoning_response,
+                systems_used=list(set(systems_used)),
+                confidence=best_confidence,
+                metadata={
+                    "reasoning_direct": True,
+                    "reasoning_type": best_reasoning_type,
+                    "reasoning_confidence": best_confidence,
+                    "skip_llm_synthesis": True,
+                    "conversation_id": request.conversation_id,
+                    "routing": routing_stats,
+                    **metadata,
+                },
+            )
+            
+            logger.info(
+                f"[VULCAN] Direct reasoning response returned in {latency_ms}ms "
+                f"(confidence={best_confidence:.2f})"
+            )
+            
+            return final_response
+        
+        # ================================================================
         # STEP 7: Generate Response using LLM with full context
         # ================================================================
+        # Only reached if reasoning confidence is below threshold or no results
         # TIMING: Start measuring context building
         _context_start = time.perf_counter()
+        
+        if reasoning_results and not use_reasoning_directly:
+            logger.warning(
+                f"[VULCAN] ⚠ Reasoning available but confidence too low "
+                f"({best_confidence:.2f} < {MIN_REASONING_CONFIDENCE_THRESHOLD}), "
+                f"falling back to LLM synthesis"
+            )
         
         # Build comprehensive context for LLM
         llm_context = {

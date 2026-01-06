@@ -1,0 +1,97 @@
+# VULCAN Reasoning Configuration
+# ================================
+# Configuration for the VULCAN reasoning system orchestration
+# This file controls how reasoning results are prioritized over LLM fallbacks
+
+reasoning:
+  # Mode selection
+  # - 'reasoning_first': Use reasoning results directly when confidence >= threshold
+  # - 'openai_only': Always use OpenAI for response generation (fallback mode)
+  # - 'parallel': Race OpenAI against local LLM (old behavior, not recommended)
+  # - 'local_only': Only use local LLM for response generation
+  mode: reasoning_first
+  
+  # Use reasoning results directly without LLM rewriting when confidence is high
+  # When true, high-confidence reasoning results are returned as-is
+  use_reasoning_directly: true
+  
+  # Minimum confidence to trust reasoning results
+  # Below this threshold, falls back to LLM generation
+  min_confidence_threshold: 0.5
+  
+  # OpenAI configuration
+  openai:
+    enabled: true
+    use_as_fallback_only: true  # Only use if reasoning fails or confidence is low
+    never_override_reasoning: true  # Never override successful reasoning results
+    max_tokens: 4096
+  
+  # Local LLM configuration  
+  local_llm:
+    enabled: true
+    timeout_seconds: 60  # Local LLM timeout before fallback
+  
+  # Engine configuration
+  # Each engine can be enabled/disabled independently
+  engines:
+    analogical:
+      enabled: true
+      priority: 5
+    causal:
+      enabled: true
+      priority: 4
+    language:
+      enabled: true
+      priority: 6
+    mathematical:
+      enabled: true
+      priority: 2
+    multimodal:
+      enabled: true
+      priority: 7
+    philosophical:
+      enabled: true
+      priority: 3
+    probabilistic:
+      enabled: true
+      priority: 1  # Highest priority for Bayesian queries
+    symbolic:
+      enabled: true
+      priority: 2
+    world_model:
+      enabled: true
+      priority: 0  # Highest priority for self-introspection
+  
+  # Selection configuration
+  selection:
+    strategy: specialized  # Use specialized engines, not generic
+    enable_semantic_matching: true
+    enable_portfolio: true
+    
+    # Sequential execution configuration
+    sequential:
+      stop_on_success: true  # CRITICAL: Stop when confidence threshold is met
+      min_confidence: 0.7  # Minimum confidence to stop sequential execution
+      max_tools: 3  # Maximum number of tools to try before giving up
+  
+  # Safety configuration
+  safety:
+    level: normal  # 'permissive' | 'normal' | 'strict'
+    enable_bypass: true  # Allow safety_bypass flag for self-introspection
+    whitelist_self_introspection: true  # Don't block self-awareness queries
+
+# Performance configuration
+performance:
+  cache_enabled: true
+  warm_pool_size: 3
+  max_concurrent: 10
+  
+  # Adaptive timeout settings
+  base_timeout_seconds: 5.0
+  timeout_per_token_seconds: 2.0
+
+# Logging configuration for debugging
+logging:
+  log_reasoning_results: true
+  log_tool_selection: true
+  log_confidence_scores: true

@@ -832,16 +832,25 @@ class ReasoningIntegration:
                 if wm_result is not None and wm_result.get("confidence", 0) > 0.7:
                     # World model can handle this directly
                     selection_time = (time.perf_counter() - selection_start) * 1000
+                    
+                    # TASK 11 FIX: Include conclusion in metadata for proper extraction
+                    # The world model's response IS the conclusion for self-introspection queries
+                    world_model_response = wm_result.get("response", "")
+                    
                     return ReasoningResult(
                         selected_tools=["world_model"],
-                        reasoning_strategy=ReasoningStrategyType.PHILOSOPHICAL_REASONING.value,
+                        reasoning_strategy=ReasoningStrategyType.META_REASONING.value,  # Use META_REASONING for introspection
                         confidence=wm_result["confidence"],
                         rationale=wm_result.get("reasoning", "World model introspection"),
                         metadata={
                             "query_type": query_type,
                             "complexity": complexity,
                             "self_referential": True,
-                            "world_model_response": wm_result.get("response", ""),
+                            "world_model_response": world_model_response,
+                            # TASK 11 FIX: Add conclusion field so main.py can extract it
+                            "conclusion": world_model_response,
+                            "explanation": wm_result.get("reasoning", ""),
+                            "reasoning_type": "meta_reasoning",
                             "aspect": wm_result.get("aspect", "general"),
                             "selection_time_ms": selection_time,
                         },
