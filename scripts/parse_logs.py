@@ -10,7 +10,8 @@ import json
 import os
 import re
 from collections import Counter
-from typing import Dict, List
+from pathlib import Path
+from typing import Dict, List, Tuple
 
 
 DEFAULT_PATTERNS = [
@@ -27,7 +28,7 @@ def load_metrics(metrics_path: str) -> Dict:
         return json.load(f)
 
 
-def parse_log_file(path: str) -> Dict[str, any]:
+def parse_log_file(path: str) -> Dict[str, object]:
     errors = []
     warns = 0
     total_errors = 0
@@ -65,9 +66,14 @@ def main() -> int:
     args = parser.parse_args()
 
     patterns = DEFAULT_PATTERNS + args.pattern
-    data = parse_log_file(args.log_path)
+    log_path = Path(args.log_path)
+    if not log_path.exists():
+        print(f"::error::log file not found at {log_path}")
+        return 1
+
+    data = parse_log_file(str(log_path))
     matches: Dict[str, int] = {}
-    with open(args.log_path, "r", encoding="utf-8", errors="ignore") as f:
+    with open(log_path, "r", encoding="utf-8", errors="ignore") as f:
         for line in f:
             for pat in patterns:
                 if re.search(pat, line):
@@ -75,11 +81,14 @@ def main() -> int:
 
     metrics = load_metrics(args.metrics_json)
 
+    top_errors_serialized: List[Dict[str, object]] = [
+        {"message": msg, "count": count} for msg, count in data["top_errors"]
+    ]
     summary = {
-        "log_path": args.log_path,
+        "log_path": str(log_path),
         "total_errors": data["total_errors"],
         "total_warns": data["total_warns"],
-        "top_errors": data["top_errors"],
+        "top_errors": top_errors_serialized,
         "pattern_matches": matches,
         "metrics": metrics,
     }
