@@ -223,6 +223,9 @@ The VulcanAMI platform integrates multiple sophisticated components:
 
 **Subsystems:**
 - **World Model**: Causal reasoning, state prediction, intervention management
+  - **SystemObserver**: Converts system events (queries, engine results, validation failures) into observations that feed the causal learning system
+  - **Routing Recommendations**: Provides learned routing suggestions based on historical patterns
+  - **Performance Introspection**: Self-awareness of system capabilities and known issues
 - **Meta-Reasoning**: Self-improvement, motivational introspection, CSIU framework
 - **Reasoning Systems**: Symbolic, causal, analogical, multimodal, probabilistic
 - **Memory Systems**: Hierarchical, distributed, episodic, semantic, working
@@ -276,12 +279,43 @@ The VulcanAMI platform integrates multiple sophisticated components:
 |------|-----|-----------|---------|
 | Bridge → Graph RAG | Query + embeddings | Context retrieval |
 | Bridge → World Model | Observations | State update and causal inference |
+| SystemObserver → World Model | System events | Convert queries, results, errors to observations |
+| World Model → Routing | Recommendations | Suggest tool selection based on learned patterns |
 | World Model → Reasoning | Current state | Generate candidate actions |
 | Reasoning → Meta-Reasoning | Candidates + predictions | Filter and select |
 | Meta-Reasoning → Safety | Selected action | Validate before execution |
 | Bridge → Compiler | Graph definition | Optimize and compile |
 | Bridge → LLM Core | Context + constraints | Generate text response |
 | Bridge → Persistent Memory | Action + result | Store for future retrieval |
+
+### 17.2.1 SystemObserver Event Flow
+
+The **SystemObserver** (located in `vulcan/world_model/system_observer.py`) creates a "nervous system" that connects the query processing pipeline to the World Model's causal learning system:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Query Processing Pipeline                 │
+│  QueryRouter → ReasoningIntegration → Engines → Response    │
+└───┬─────────────────────────────────────────────────────────┘
+    │ Events: query_start, engine_result, validation_failure,
+    │         outcome, error
+    ↓
+┌───▼─────────────────────────────────────────────────────────┐
+│                      SystemObserver                          │
+│  - Converts system events to Observation objects            │
+│  - Tracks query, engine, and outcome history                │
+│  - Detects patterns (formal logic, probability, etc.)       │
+└───┬─────────────────────────────────────────────────────────┘
+    │ Observations
+    ↓
+┌───▼─────────────────────────────────────────────────────────┐
+│                      World Model                             │
+│  - Updates causal graph with observations                   │
+│  - Learns which engines succeed on which query types        │
+│  - Provides routing recommendations                         │
+│  - Enables performance introspection                        │
+└─────────────────────────────────────────────────────────────┘
+```
 
 ### 17.3 Platform Architecture Diagram
 

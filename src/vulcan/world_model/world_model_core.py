@@ -3777,6 +3777,9 @@ class WorldModel:
     # SYSTEM OBSERVATION & ROUTING RECOMMENDATIONS
     # =========================================================================
     
+    # Configuration constants for routing recommendations
+    PATH_STRENGTH_THRESHOLD = 0.7  # Minimum causal path strength to predict failure
+    
     def has_sufficient_history(self, min_observations: int = 5) -> bool:
         """
         Check if world model has enough data to make recommendations.
@@ -3898,7 +3901,7 @@ class WorldModel:
                     paths = self.causal_graph.find_all_paths(pattern_node, 'validation_failure')
                     if paths:
                         for path in paths:
-                            if hasattr(path, 'total_strength') and path.total_strength > 0.7:
+                            if hasattr(path, 'total_strength') and path.total_strength > self.PATH_STRENGTH_THRESHOLD:
                                 return True
             except Exception:
                 pass

@@ -38,6 +38,46 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+# =============================================================================
+# Shared Constants for Query Pattern Detection
+# =============================================================================
+# These constants are used by both SystemObserver and WorldModel for consistent
+# query classification. They detect formal logic, probability, and self-referential
+# queries to support proper routing and observation categorization.
+
+# Formal logic symbols and keywords
+FORMAL_LOGIC_SYMBOLS = frozenset([
+    '→', '∧', '∨', '¬', '∀', '∃', '⊢', '⊨', '↔', '⇒', '⇔'
+])
+FORMAL_LOGIC_KEYWORDS = frozenset([
+    'forall', 'exists', 'implies', 'entails', 'satisfiable', 'valid'
+])
+
+# Probability-related keywords
+PROBABILITY_KEYWORDS = frozenset([
+    'probability', 'likelihood', 'bayes', 'bayesian', 'posterior',
+    'prior', 'p(', 'conditional', 'expectation', 'marginal'
+])
+
+# Self-referential query keywords
+SELF_REFERENTIAL_KEYWORDS = frozenset([
+    'you want', 'your goal', 'self-aware', 'you have',
+    'do you', 'are you', 'your capabilities', 'yourself',
+    'your purpose', 'your objectives'
+])
+
+# =============================================================================
+# Configuration Constants
+# =============================================================================
+# Limits for history storage and truncation
+
+QUERY_TRUNCATION_LIMIT = 200  # Max chars to store from query text
+ERROR_MESSAGE_TRUNCATION_LIMIT = 500  # Max chars for error messages
+QUERY_HISTORY_MAX_SIZE = 1000  # Max query events to retain
+ENGINE_HISTORY_MAX_SIZE = 5000  # Max engine events to retain  
+OUTCOME_HISTORY_MAX_SIZE = 1000  # Max outcome events to retain
+
+
 class EventType(Enum):
     """Types of system events to observe"""
     QUERY_START = "query_start"
@@ -90,10 +130,10 @@ class SystemObserver:
         self.world_model = world_model
         self.enabled = True
         
-        # History tracking with bounded queues
-        self.query_history: deque = deque(maxlen=1000)
-        self.engine_history: deque = deque(maxlen=5000)
-        self.outcome_history: deque = deque(maxlen=1000)
+        # History tracking with bounded queues using configured limits
+        self.query_history: deque = deque(maxlen=QUERY_HISTORY_MAX_SIZE)
+        self.engine_history: deque = deque(maxlen=ENGINE_HISTORY_MAX_SIZE)
+        self.outcome_history: deque = deque(maxlen=OUTCOME_HISTORY_MAX_SIZE)
         
         # Statistics
         self.stats = {
@@ -131,7 +171,7 @@ class SystemObserver:
             timestamp=time.time(),
             query_id=query_id,
             data={
-                'query': query[:200] if query else "",  # Truncate for storage
+                'query': query[:QUERY_TRUNCATION_LIMIT] if query else "",
                 'query_type': classification.get('category'),
                 'complexity': classification.get('complexity'),
                 'tools_selected': classification.get('tools', []),
@@ -454,7 +494,7 @@ class SystemObserver:
             query_id=query_id,
             data={
                 'error_type': error_type,
-                'error_message': error_message[:500],  # Truncate
+                'error_message': error_message[:ERROR_MESSAGE_TRUNCATION_LIMIT],
                 'component': component
             }
         )
@@ -559,33 +599,32 @@ class SystemObserver:
         
         return list(patterns.values())
     
-    # Helper methods for feature detection
+    # Helper methods for feature detection using shared constants
     
     def _check_formal_logic(self, query: str) -> bool:
-        """Check if query contains formal logic notation"""
+        """Check if query contains formal logic notation using shared constants."""
         if not query:
             return False
-        logic_symbols = ['→', '∧', '∨', '¬', '∀', '∃', 'forall', 'exists', 
-                        '⊢', '⊨', '↔', '⇒', '⇔']
-        return any(sym in query for sym in logic_symbols)
+        # Check for symbols
+        if any(sym in query for sym in FORMAL_LOGIC_SYMBOLS):
+            return True
+        # Check for keywords
+        query_lower = query.lower()
+        return any(kw in query_lower for kw in FORMAL_LOGIC_KEYWORDS)
     
     def _check_probability(self, query: str) -> bool:
-        """Check if query involves probability"""
+        """Check if query involves probability using shared constants."""
         if not query:
             return False
         query_lower = query.lower()
-        prob_keywords = ['probability', 'likelihood', 'bayes', 'posterior', 
-                        'prior', 'p(', 'conditional', 'expectation']
-        return any(kw in query_lower for kw in prob_keywords)
+        return any(kw in query_lower for kw in PROBABILITY_KEYWORDS)
     
     def _check_self_referential(self, query: str) -> bool:
-        """Check if query is self-referential"""
+        """Check if query is self-referential using shared constants."""
         if not query:
             return False
         query_lower = query.lower()
-        self_keywords = ['you want', 'your goal', 'self-aware', 'you have',
-                        'do you', 'are you', 'your capabilities', 'yourself']
-        return any(kw in query_lower for kw in self_keywords)
+        return any(kw in query_lower for kw in SELF_REFERENTIAL_KEYWORDS)
     
     def _infer_query_type(self, query: str) -> str:
         """Infer query type from content"""
