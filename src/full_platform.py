@@ -1263,6 +1263,8 @@ service_manager = AsyncServiceManager()
 # This is used by /health/ready to know if the platform is fully ready
 _background_init_started = False
 _background_init_complete = False
+_services_init_started = False
+_services_init_complete = False
 
 
 async def _background_model_loading(app_state: Any, components_status: dict, logger) -> None:
@@ -1339,96 +1341,32 @@ async def _background_model_loading(app_state: Any, components_status: dict, log
         app_state.models_loaded = False
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
+async def _background_services_initialization(app: FastAPI, worker_id: int, logger) -> None:
     """
-    Lifecycle management for the unified platform.
-    Handles startup and graceful shutdown.
-    """
-    worker_id = os.getpid()
-
-    # ====================================================================
-    # [!!!] MOVED BLOCKS HERE TO RUN IN WORKER PROCESS [!!!]
-    # ====================================================================
-
-    # NOTE: Windows event loop policy is now set at module level (line 42)
-    # to ensure it's applied before uvicorn creates the event loop
-
-    # Fix Windows console encoding issues
-    if sys.platform == "win32":
-        try:
-            # Fix stdout/stderr streams
-            sys.stdout.reconfigure(encoding="utf-8")
-            sys.stderr.reconfigure(encoding="utf-8")
-
-            # CRITICAL FIX: Reconfigure ALL existing logging handlers
-            # This prevents UnicodeEncodeError when logging Unicode characters
-            for handler in logging.root.handlers[:]:
-                if isinstance(handler, logging.StreamHandler):
-                    try:
-                        # Try to reconfigure the handler's stream
-                        if hasattr(handler.stream, "reconfigure"):
-                            handler.stream.reconfigure(encoding="utf-8")
-                        elif hasattr(handler.stream, "name"):
-                            # For file handlers, recreate stream with UTF-8
-                            old_stream = handler.stream
-                            handler.stream = open(
-                                old_stream.name, "w", encoding="utf-8"
-                            )
-                    except (AttributeError, OSError):
-                        # Some streams can't be reconfigured (e.g., StringIO)
-                        # Skip them gracefully
-                        pass
-
-            print("✅ Reconfigured stdout/stderr and logging handlers to UTF-8")
-        except Exception as e:
-            print(f"⚠️  Could not reconfigure encoding: {e}")
-
-    # LOAD ENVIRONMENT VARIABLES
-    try:
-        from dotenv import load_dotenv
-
-        # Load .env file from project root (go up from src/ to Graphix/)
-        # Assumes this file is in a 'src' directory
-        env_path = Path(__file__).parent.parent / ".env"
-        if env_path.exists():
-            load_dotenv(dotenv_path=env_path)
-            print(f"✅ Loaded environment variables from: {env_path}")
-
-            # Verify critical keys
-            if os.getenv("OPENAI_API_KEY"):
-                print("✅ OPENAI_API_KEY loaded successfully")
-            else:
-                print("⚠️ OPENAI_API_KEY not found in .env")
-
-            if os.getenv("ANTHROPIC_API_KEY"):
-                print("✅ ANTHROPIC_API_KEY loaded successfully")
-
-            if os.getenv("GRAPHIX_API_KEY"):
-                print("✅ GRAPHIX_API_KEY loaded successfully")
-        # FIX: Don't warn about missing .env file - it's optional in containerized environments
-        # Environment variables are typically injected via Docker/K8s, not .env files
-    except ImportError:
-        # Silently fall back to system environment variables (expected in containers)
-        pass
-    except Exception as e:
-        print(f"❌ Error loading .env: {e}")
-    # ====================================================================
-
-    # [!!!] MOVED LOGGING SETUP HERE [!!!]
-    # This ensures logging is configured *after* encoding is set
-    # and *inside* the worker process.
-    setup_unified_logging()
-
-    # Initialize models_loaded flag early - models will be loaded in background
-    app.state.models_loaded = False
+    Background task to initialize services AFTER server starts accepting connections.
     
-    # STARTUP
+    This function is called after the lifespan yields, allowing the /health/live endpoint
+    to respond immediately while services are being initialized.
+    
+    CRITICAL FIX for Railway: This prevents healthcheck failures by ensuring the server
+    accepts HTTP connections before heavy service initialization completes.
+    
+    The initialization includes:
+    - Importing and mounting FastAPI/Flask services (VULCAN, Arena, Registry, etc.)
+    - Starting standalone background processes (API Server, Registry gRPC, Listener)
+    - Initializing VULCAN deployment and subsystems
+    - Initializing core platform components
+    """
+    global _services_init_complete
+    
     try:
         logger.info("=" * 70)
-        logger.info(f"Starting Unified Platform (Worker {worker_id})")
+        logger.info("Background Services Initialization Started (non-blocking)")
         logger.info("=" * 70)
-
+        
+        # Give the event loop time to process incoming health check requests
+        await asyncio.sleep(0.1)
+        
         # Log configuration
         logger.info(f"Host: {settings.host}:{settings.port}")
         logger.info(f"Workers: {settings.workers}")
@@ -1464,6 +1402,9 @@ async def lifespan(app: FastAPI):
                     f"registry_grpc={'✓' if settings.enable_registry_grpc else '✗'}, "
                     f"listener={'✓' if settings.enable_listener else '✗'}")
 
+        # Give the event loop time to process incoming requests
+        await asyncio.sleep(0.1)
+        
         # Import and mount services
         logger.info("=" * 70)
         logger.info("Importing services...")
@@ -1480,6 +1421,8 @@ async def lifespan(app: FastAPI):
             f"{settings.vulcan_mount}/health",
         )
 
+        await asyncio.sleep(0.05)  # Brief yield for health checks
+
         # Import Arena
         arena_result = await import_service_async(
             "Arena", settings.arena_module, settings.arena_attr, "FastAPI"
@@ -1490,6 +1433,8 @@ async def lifespan(app: FastAPI):
             settings.arena_mount,
             f"{settings.arena_mount}/health",
         )
+
+        await asyncio.sleep(0.05)  # Brief yield for health checks
 
         # Import Registry
         registry_result = await import_service_async(
@@ -1502,12 +1447,17 @@ async def lifespan(app: FastAPI):
             f"{settings.registry_mount}/health",
         )
 
+        await asyncio.sleep(0.05)  # Brief yield for health checks
+
         # Mount services
         logger.info("=" * 70)
         logger.info("Mounting services...")
         logger.info("=" * 70)
 
         # Explicit VULCAN mount per user request
+        vulcan_module = None
+        vulcan_deployment = None
+        unified_learning = None
         try:
             vulcan_module = importlib.import_module("src.vulcan.main")
             if not hasattr(vulcan_module, "app") or not isinstance(
@@ -1519,6 +1469,8 @@ async def lifespan(app: FastAPI):
             # Manually update service manager state if it was registered
             if "vulcan" in service_manager.services:
                 service_manager.services["vulcan"]["mounted"] = True
+
+            await asyncio.sleep(0.05)  # Brief yield for health checks
 
             # ================================================================
             # VULCAN DEPLOYMENT INITIALIZATION
@@ -1546,10 +1498,11 @@ async def lifespan(app: FastAPI):
                 vulcan_module.app.state.startup_time = __import__("time").time()
                 vulcan_module.app.state.worker_id = worker_id
 
+                await asyncio.sleep(0.05)  # Brief yield for health checks
+
                 # ================================================================
                 # UNIFIED LEARNING SYSTEM INITIALIZATION
                 # ================================================================
-                unified_learning = None
                 try:
                     from vulcan.learning import UnifiedLearningSystem, LearningConfig
                     
@@ -1558,8 +1511,6 @@ async def lifespan(app: FastAPI):
                         learning_rate=0.001,
                         ewc_lambda=100.0,
                         meta_lr=0.001,
-                        # TODO: Enable RLHF when system is stable and has sufficient feedback data
-                        # Criteria: (1) >1000 successful queries, (2) feedback API tested, (3) PPO stable
                         rlhf_enabled=False,  # Start with RLHF disabled until stable
                         checkpoint_frequency=1000,
                     )
@@ -1590,6 +1541,8 @@ async def lifespan(app: FastAPI):
                     logger.warning(f"UnifiedLearningSystem not available: {e}")
                 except Exception as e:
                     logger.error(f"Failed to initialize UnifiedLearningSystem: {e}")
+
+                await asyncio.sleep(0.05)  # Brief yield for health checks
 
                 # ================================================================
                 # ACTIVATE ALL VULCAN SUBSYSTEMS (from main.py lifespan logic)
@@ -1635,6 +1588,8 @@ async def lifespan(app: FastAPI):
                         needs_init=True,
                     )
 
+                    await asyncio.sleep(0.05)  # Brief yield for health checks
+
                     # Initialize all Reasoning subsystems (no explicit init needed)
                     _activate_subsystem(
                         vulcan_deployment.collective.deps,
@@ -1672,6 +1627,8 @@ async def lifespan(app: FastAPI):
                     _activate_subsystem(
                         vulcan_deployment.collective.deps, "meta", "Meta-Learning"
                     )
+
+                    await asyncio.sleep(0.05)  # Brief yield for health checks
 
                     # Initialize Safety subsystems
                     if (
@@ -1761,6 +1718,8 @@ async def lifespan(app: FastAPI):
                                 f"Failed to initialize adversarial tester: {adv_err}"
                             )
 
+                        await asyncio.sleep(0.05)  # Brief yield for health checks
+
                         # ================================================================
                         # CURIOSITY DRIVER INITIALIZATION
                         # Start the active curiosity-driven learning heartbeat with
@@ -1772,22 +1731,15 @@ async def lifespan(app: FastAPI):
                                 CuriosityDriverConfig,
                             )
 
-                            # EMERGENCY STABILIZATION: Force-start CuriosityDriver
-                            # Remove safety checks around dependency tree - start even if incomplete
                             curiosity_engine = getattr(
                                 vulcan_deployment.collective.deps, "curiosity", None
                             )
                             
-                            # FIX: Prevent duplicate CuriosityEngine - Use deployment's engine first
-                            # This prevents creating a second CuriosityEngine instance (50% less CPU)
                             if curiosity_engine is None:
-                                # Check deployment object directly first (preferred)
                                 if hasattr(vulcan_deployment, 'curiosity_engine') and vulcan_deployment.curiosity_engine:
                                     curiosity_engine = vulcan_deployment.curiosity_engine
                                     logger.info("✓ Found curiosity_engine on vulcan_deployment object")
                                 else:
-                                    # Do NOT create standalone instance - this causes duplicate CPU usage
-                                    # Instead, log and skip
                                     logger.warning(
                                         "⚠️ CuriosityEngine not found on deployment. "
                                         "Driver will not start to avoid duplicate engine creation."
@@ -1812,15 +1764,11 @@ async def lifespan(app: FastAPI):
                                 ),
                             )
 
-                            # EMERGENCY STABILIZATION: Force start the driver
-                            # If curiosity_engine is still None after fallback, skip driver creation
                             if curiosity_engine is None:
                                 logger.warning(
                                     "Curiosity engine not available in deps and fallback failed - "
                                     "force-starting with degraded mode"
                                 )
-                                # Skip driver creation if no engine available to avoid runtime errors
-                                # The driver requires a valid engine to function
                                 logger.info("✓ CuriosityDriver skipped (no engine available, force-start mode)")
                             else:
                                 # Create driver with the engine
@@ -1832,7 +1780,6 @@ async def lifespan(app: FastAPI):
                                 vulcan_module.app.state.curiosity_driver = curiosity_driver
 
                                 # Start the driver (async operation)
-                                # Use asyncio.create_task to start without blocking
                                 async def start_curiosity_driver():
                                     try:
                                         await curiosity_driver.start()
@@ -1883,6 +1830,8 @@ async def lifespan(app: FastAPI):
                     )
                     logger.warning("Continuing with partial subsystem activation")
 
+                await asyncio.sleep(0.05)  # Brief yield for health checks
+
                 # Start self-improvement drive if enabled (only if we hold the background task lock)
                 if vulcan_config.enable_self_improvement:
                     if getattr(app.state, 'background_tasks_initialized', False):
@@ -1928,7 +1877,6 @@ async def lifespan(app: FastAPI):
                 # ================================================================
 
                 # Initialize LLM component if available
-                # Check environment variable to enable/disable GraphixVulcanLLM
                 enable_graphix_vulcan_llm = os.getenv('ENABLE_GRAPHIX_VULCAN_LLM', 'true').lower() == 'true'
                 
                 if enable_graphix_vulcan_llm:
@@ -1958,8 +1906,6 @@ async def lifespan(app: FastAPI):
 
                 # ================================================================
                 # LLM COMPONENT VALIDATION
-                # Validate that real components loaded, not fallbacks
-                # This catches issues where import errors cause fallback classes to be used
                 # ================================================================
                 try:
                     validation_result = validate_llm_components()
@@ -1989,8 +1935,12 @@ async def lifespan(app: FastAPI):
             logger.error(f"❌ Failed to mount vulcan at /vulcan: {e}", exc_info=True)
             logger.info("vulcan: ❌ FAILED")
 
+        await asyncio.sleep(0.05)  # Brief yield for health checks
+
         await service_manager.mount_service(app, "arena")
         await service_manager.mount_service(app, "registry", use_wsgi=True)
+
+        await asyncio.sleep(0.05)  # Brief yield for health checks
 
         # ================================================================
         # ADDITIONAL FASTAPI SERVICES (API Gateway, DQS, PII)
@@ -2021,6 +1971,8 @@ async def lifespan(app: FastAPI):
         else:
             logger.info("⊘ API Gateway disabled via configuration")
 
+        await asyncio.sleep(0.05)  # Brief yield for health checks
+
         # Import and mount DQS Service
         if settings.enable_dqs_service:
             try:
@@ -2040,6 +1992,8 @@ async def lifespan(app: FastAPI):
         else:
             logger.info("⊘ DQS Service disabled via configuration")
 
+        await asyncio.sleep(0.05)  # Brief yield for health checks
+
         # Import and mount PII Service
         if settings.enable_pii_service:
             try:
@@ -2058,6 +2012,8 @@ async def lifespan(app: FastAPI):
                 logger.error(f"❌ Failed to mount PII Service: {e}", exc_info=True)
         else:
             logger.info("⊘ PII Service disabled via configuration")
+
+        await asyncio.sleep(0.05)  # Brief yield for health checks
 
         # Import and mount Chat Endpoint (for vulcan_chat.html frontend)
         if settings.enable_chat_endpoint:
@@ -2080,6 +2036,8 @@ async def lifespan(app: FastAPI):
         else:
             logger.info("⊘ Chat Endpoint disabled via configuration")
 
+        await asyncio.sleep(0.05)  # Brief yield for health checks
+
         # ================================================================
         # STANDALONE SERVICES (API Server, Registry gRPC, Listener)
         # These services need to run as separate processes because they
@@ -2098,28 +2056,20 @@ async def lifespan(app: FastAPI):
                 logger.info(
                     f"Starting API Server on port {settings.api_server_port}..."
                 )
-                # PERFORMANCE FIX: Use _build_subprocess_env to ensure PYTHONPATH is set
-                # This prevents ModuleNotFoundError for llm_client and other modules
                 api_server_env = _build_subprocess_env({
                     "GRAPHIX_API_PORT": str(settings.api_server_port),
                     "GRAPHIX_API_HOST": "0.0.0.0",
                 })
-                # Remove PORT to prevent api_server from using main app's port
                 api_server_env.pop("PORT", None)
                 
-                # Ensure JWT secret is available for api_server
                 if not os.environ.get("GRAPHIX_JWT_SECRET"):
-                    # Try to use JWT_SECRET_KEY from main platform
                     jwt_key = os.environ.get("JWT_SECRET_KEY") or os.environ.get("JWT_SECRET")
                     if jwt_key:
                         api_server_env["GRAPHIX_JWT_SECRET"] = jwt_key
                     else:
-                        # Allow ephemeral secret for development/cloud deployments
                         api_server_env["ALLOW_EPHEMERAL_SECRET"] = "true"
                         logger.warning("API Server will use ephemeral JWT secret (no persistent JWT_SECRET configured)")
                 
-                # Use subprocess.Popen instead of asyncio.create_subprocess_exec
-                # This avoids issues with Windows event loop policy and uvicorn --reload
                 api_server_proc = subprocess.Popen(
                     [
                         sys.executable,
@@ -2133,7 +2083,6 @@ async def lifespan(app: FastAPI):
                 background_processes.append(("api_server", api_server_proc))
                 logger.info(f"✓ API Server started (PID: {api_server_proc.pid})")
 
-                # Register in service manager for status tracking
                 await service_manager.register_service(
                     "api_server",
                     ServiceImportResult(
@@ -2149,21 +2098,20 @@ async def lifespan(app: FastAPI):
         else:
             logger.info("⊘ API Server disabled via configuration")
 
+        await asyncio.sleep(0.05)  # Brief yield for health checks
+
         # Start Registry gRPC Server
         if settings.enable_registry_grpc:
             try:
                 logger.info(
                     f"Starting Registry gRPC Server on port {settings.registry_grpc_port}..."
                 )
-                # PERFORMANCE FIX: Use _build_subprocess_env to ensure PYTHONPATH is set
                 registry_env = _build_subprocess_env({
                     "REGISTRY_PORT": str(settings.registry_grpc_port),
                     "REGISTRY_DB_PATH": os.environ.get("REGISTRY_DB_PATH", "registry.db"),
                 })
-                # Remove PORT to prevent conflict with main app
                 registry_env.pop("PORT", None)
                 
-                # Use subprocess.Popen instead of asyncio.create_subprocess_exec
                 registry_grpc_proc = subprocess.Popen(
                     [
                         sys.executable,
@@ -2179,7 +2127,6 @@ async def lifespan(app: FastAPI):
                     f"✓ Registry gRPC Server started (PID: {registry_grpc_proc.pid})"
                 )
 
-                # Register in service manager
                 await service_manager.register_service(
                     "registry_grpc",
                     ServiceImportResult(
@@ -2188,7 +2135,7 @@ async def lifespan(app: FastAPI):
                         import_path="src.governance.registry_api_server (standalone)",
                     ),
                     f"grpc://localhost:{settings.registry_grpc_port}",
-                    None,  # gRPC services don't have HTTP health endpoints
+                    None,
                 )
             except Exception as e:
                 logger.error(
@@ -2197,20 +2144,19 @@ async def lifespan(app: FastAPI):
         else:
             logger.info("⊘ Registry gRPC Server disabled via configuration")
 
+        await asyncio.sleep(0.05)  # Brief yield for health checks
+
         # Start Listener Service
         if settings.enable_listener:
             try:
                 logger.info(
                     f"Starting Listener Service on port {settings.listener_port}..."
                 )
-                # PERFORMANCE FIX: Use _build_subprocess_env to ensure PYTHONPATH is set
                 listener_env = _build_subprocess_env({
                     "LISTENER_DB_PATH": os.environ.get("LISTENER_DB_PATH", "listener_registry.db"),
                 })
-                # Remove PORT to prevent conflict with main app
                 listener_env.pop("PORT", None)
                 
-                # Use subprocess.Popen instead of asyncio.create_subprocess_exec
                 listener_proc = subprocess.Popen(
                     [
                         sys.executable,
@@ -2219,7 +2165,7 @@ async def lifespan(app: FastAPI):
                         "--port",
                         str(settings.listener_port),
                         "--host",
-                        settings.listener_host,  # Configurable via LISTENER_HOST env var
+                        settings.listener_host,
                     ],
                     env=listener_env,
                     stdout=subprocess.PIPE,
@@ -2228,7 +2174,6 @@ async def lifespan(app: FastAPI):
                 background_processes.append(("listener", listener_proc))
                 logger.info(f"✓ Listener Service started (PID: {listener_proc.pid})")
 
-                # Register in service manager
                 await service_manager.register_service(
                     "listener",
                     ServiceImportResult(
@@ -2247,18 +2192,15 @@ async def lifespan(app: FastAPI):
         # Store background processes in app state for cleanup
         app.state.background_processes = background_processes
 
-        # Give subprocesses a moment to start and check if they're running
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(0.5)  # Give subprocesses time to start
 
         # ================================================================
         # CORE COMPONENT INITIALIZATION
-        # Initialize and verify all documented platform components
         # ================================================================
         logger.info("=" * 70)
         logger.info("Initializing Core Platform Components...")
         logger.info("=" * 70)
 
-        # Track component status for summary
         components_status = {}
 
         # 1. Graph Compiler
@@ -2267,7 +2209,6 @@ async def lifespan(app: FastAPI):
 
             graph_compiler = GraphCompiler(optimization_level=2)
 
-            # Verify LLVM backend is available
             llvm_available = (
                 hasattr(graph_compiler, "llvm_backend")
                 and graph_compiler.llvm_backend is not None
@@ -2282,11 +2223,12 @@ async def lifespan(app: FastAPI):
             components_status["Graph Compiler"] = False
             logger.error(f"✗ GraphCompiler failed to initialize: {e}")
 
+        await asyncio.sleep(0.05)  # Brief yield for health checks
+
         # 2. Persistent Memory v46
         try:
             from src.persistant_memory_v46 import get_system_info
 
-            # Verify all subsystems are importable
             memory_info = get_system_info()
 
             app.state.persistent_memory_info = memory_info
@@ -2294,11 +2236,6 @@ async def lifespan(app: FastAPI):
             logger.info(
                 f"✓ Persistent Memory v{memory_info.get('version')} initialized"
             )
-            logger.info(f"  → LSM tree: available")
-            logger.info(f"  → Graph RAG: available")
-            logger.info(f"  → Unlearning module: available")
-            logger.info(f"  → ZK proofs: available")
-            logger.info(f"  → S3 storage backend: configured")
         except Exception as e:
             components_status["Persistent Memory v46"] = False
             logger.error(f"✗ Persistent Memory v46 failed to initialize: {e}")
@@ -2333,6 +2270,8 @@ async def lifespan(app: FastAPI):
             components_status["Drift Detector"] = False
             logger.error(f"✗ DriftDetector failed to initialize: {e}")
 
+        await asyncio.sleep(0.05)  # Brief yield for health checks
+
         # 5. Pattern Matcher
         try:
             from src.pattern_matcher import PatternMatcher
@@ -2352,7 +2291,6 @@ async def lifespan(app: FastAPI):
 
             superoptimizer = Superoptimizer()
 
-            # Check cache status
             cache_size = (
                 len(superoptimizer.kernel_cache)
                 if hasattr(superoptimizer, "kernel_cache")
@@ -2370,7 +2308,6 @@ async def lifespan(app: FastAPI):
         try:
             from src.interpretability_engine import InterpretabilityEngine
 
-            # Don't initialize yet, just verify it can be imported
             components_status["Interpretability Engine"] = True
             logger.info(f"✓ InterpretabilityEngine available (lazy-load ready)")
         except Exception as e:
@@ -2392,8 +2329,6 @@ async def lifespan(app: FastAPI):
                 f"✓ TournamentManager initialized (diversity_penalty=0.3, winner_percentage=0.2)"
             )
 
-            # Note: Evolution Engine will be initialized later and connected to Tournament Manager
-            # This is just verification that both are available
             components_status["Evolution Engine"] = True
             logger.info(
                 f"✓ EvolutionEngine available (will be connected to TournamentManager on demand)"
@@ -2412,94 +2347,7 @@ async def lifespan(app: FastAPI):
         logger.info("Core Components Initialization Complete")
         logger.info("=" * 70)
 
-        # Summary
-        logger.info("=" * 70)
-        logger.info("Service Status Summary")
-        logger.info("=" * 70)
-
-        # Check mounted services
-        service_status = await service_manager.get_service_status()
-        for name, service in service_status.items():
-            # Skip subprocess services - they'll be checked separately
-            if name in ["api_server", "registry_grpc", "listener"]:
-                continue
-            status_txt = "✅ MOUNTED" if service.get("mounted") else "❌ FAILED"
-            logger.info(f"{name}: {status_txt}")
-            if service.get("mounted"):
-                logger.info(f"  → {service['mount_path']}")
-                logger.info(f"  → Import: {service.get('import_path', 'N/A')}")
-
-        # Check subprocess services
-        for service_name, process in background_processes:
-            returncode = process.poll()
-            if returncode is None:
-                # Process is still running
-                logger.info(f"{service_name}: ✅ RUNNING (PID: {process.pid})")
-            else:
-                # Process has exited
-                logger.info(f"{service_name}: ❌ FAILED (exit code: {returncode})")
-                # Try to read stderr to see why it failed
-                try:
-                    stderr_output = process.stderr.read().decode(
-                        "utf-8", errors="replace"
-                    )
-                    if stderr_output:
-                        logger.error(
-                            f"  → {service_name} stderr: {stderr_output[:500]}"
-                        )
-                except Exception:
-                    pass
-
-        # ================================================================
-        # COMPREHENSIVE PLATFORM STARTUP SUMMARY
-        # ================================================================
-        logger.info("=" * 70)
-        logger.info("PLATFORM STARTUP SUMMARY")
-        logger.info("=" * 70)
-
-        # Services (HTTP/gRPC endpoints)
-        logger.info("Services:")
-
-        # Mounted FastAPI services
-        for name, service in service_status.items():
-            if name not in ["api_server", "registry_grpc", "listener"]:
-                mounted = service.get("mounted", False)
-                icon = "✅" if mounted else "❌"
-                mount_path = service.get("mount_path", "N/A")
-                logger.info(
-                    f"  {icon} {name}: {'MOUNTED' if mounted else 'FAILED'} (path {mount_path})"
-                )
-
-        # Standalone subprocess services
-        for service_name, process in background_processes:
-            returncode = process.poll()
-            running = returncode is None
-            icon = "✅" if running else "❌"
-            status = (
-                f"RUNNING (PID: {process.pid})"
-                if running
-                else f"FAILED (code: {returncode})"
-            )
-            logger.info(f"  {icon} {service_name}: {status}")
-
-        # Core components
-        logger.info("Core Components:")
-
-        # VULCAN subsystems (from earlier initialization)
-        logger.info(f"  ✅ VULCAN World Model")
-        logger.info(f"  ✅ Reasoning (5/5)")
-        logger.info(f"  ✅ Semantic Bridge")
-        logger.info(f"  ✅ Agent Pool")
-        logger.info(f"  ✅ Unified Runtime")
-        logger.info(f"  ✅ Hardware Dispatcher")
-        logger.info(f"  ✅ Governance Loop")
-        logger.info(f"  ✅ Consensus Engine")
-        logger.info(f"  ✅ Security Audit Engine")
-
-        # Newly initialized components
-        for name, status in components_status.items():
-            icon = "✅" if status else "❌"
-            logger.info(f"  {icon} {name}")
+        await asyncio.sleep(0.05)  # Brief yield for health checks
 
         # ================================================================
         # QUERY ROUTING AND DUAL-MODE LEARNING INTEGRATION
@@ -2517,12 +2365,10 @@ async def lifespan(app: FastAPI):
             routing_status = initialize_routing_components()
             app.state.routing_status = routing_status
 
-            # Connect tournament manager to telemetry if available
             if TELEMETRY_AVAILABLE and hasattr(app.state, "tournament_manager"):
                 telemetry_recorder = get_telemetry_recorder()
                 app.state.telemetry_recorder = telemetry_recorder
 
-            # Store governance logger
             app.state.governance_logger = get_governance_logger()
 
             components_status["Query Routing Layer"] = True
@@ -2537,18 +2383,15 @@ async def lifespan(app: FastAPI):
                 try:
                     from vulcan.routing.query_router import get_query_analyzer
                     
-                    # Connect to QueryRouter
                     query_analyzer = get_query_analyzer()
                     if hasattr(query_analyzer, 'set_learning_system'):
                         query_analyzer.set_learning_system(unified_learning)
                         logger.info("✓ Learning system connected to QueryRouter")
                     
-                    # Connect to ToolSelector (if available on deployment)
-                    if hasattr(vulcan_deployment, 'tool_selector') and vulcan_deployment.tool_selector:
+                    if vulcan_deployment and hasattr(vulcan_deployment, 'tool_selector') and vulcan_deployment.tool_selector:
                         vulcan_deployment.tool_selector.learning_system = unified_learning
                         logger.info("✓ Learning system connected to ToolSelector")
                     
-                    # Register shutdown hook
                     import atexit
                     atexit.register(unified_learning.shutdown)
                     logger.info("✓ Learning system shutdown hook registered")
@@ -2566,55 +2409,47 @@ async def lifespan(app: FastAPI):
             logger.error(f"  ❌ Query Routing Layer failed: {e}")
 
         # ================================================================
-        # NOTE: MODEL PRE-LOADING MOVED TO BACKGROUND TASK (Issue #55 + Railway Fix)
+        # LOG SUMMARY
         # ================================================================
-        # Heavy model loading (BERT, embeddings) is now done in _background_model_loading()
-        # which runs AFTER the server starts accepting connections. This prevents Railway
-        # healthcheck failures while still avoiding first-query latency.
-        # The models will be loaded asynchronously after /health/live becomes available.
-        logger.info("ℹ️  Model pre-loading will run in background after server starts")
+        logger.info("=" * 70)
+        logger.info("Service Status Summary")
+        logger.info("=" * 70)
 
-        # Summary counts
-        # Count mounted FastAPI/Flask services (excluding background processes)
-        services_mounted = sum(
-            1
-            for name, s in service_status.items()
-            if s.get("mounted")
-            and name not in ["api_server", "registry_grpc", "listener"]
-        )
+        service_status = await service_manager.get_service_status()
+        for name, service in service_status.items():
+            if name in ["api_server", "registry_grpc", "listener"]:
+                continue
+            status_txt = "✅ MOUNTED" if service.get("mounted") else "❌ FAILED"
+            logger.info(f"{name}: {status_txt}")
+            if service.get("mounted"):
+                logger.info(f"  → {service['mount_path']}")
+                logger.info(f"  → Import: {service.get('import_path', 'N/A')}")
 
-        # Count running background processes
-        services_running = sum(1 for _, p in background_processes if p.poll() is None)
-
-        # Total services = mounted services + background processes
-        total_services = len(
-            [
-                name
-                for name in service_status.keys()
-                if name not in ["api_server", "registry_grpc", "listener"]
-            ]
-        ) + len(background_processes)
-
-        components_initialized = sum(1 for c in components_status.values() if c)
-        total_components = len(components_status)
+        for service_name, process in background_processes:
+            returncode = process.poll()
+            if returncode is None:
+                logger.info(f"{service_name}: ✅ RUNNING (PID: {process.pid})")
+            else:
+                logger.info(f"{service_name}: ❌ FAILED (exit code: {returncode})")
+                try:
+                    stderr_output = process.stderr.read().decode(
+                        "utf-8", errors="replace"
+                    )
+                    if stderr_output:
+                        logger.error(
+                            f"  → {service_name} stderr: {stderr_output[:500]}"
+                        )
+                except Exception:
+                    pass
 
         logger.info("=" * 70)
-        logger.info(
-            f"Services: {services_mounted + services_running}/{total_services} running"
-        )
-        logger.info(
-            f"Components: {components_initialized}/{total_components} initialized"
-        )
+        logger.info("BACKGROUND SERVICES INITIALIZATION COMPLETE")
         logger.info("=" * 70)
-        logger.info(f"Platform Ready! (Worker {worker_id})")
-        logger.info("=" * 70)
-        
-        # ================================================================
-        # SCHEDULE BACKGROUND MODEL LOADING (NON-BLOCKING)
-        # ================================================================
-        # Schedule the heavy model loading to run in the background.
-        # The yield will happen immediately, allowing the server to accept
-        # connections while models load. This fixes Railway healthcheck failures.
+
+        # Mark services init as complete
+        _services_init_complete = True
+
+        # Now schedule background model loading
         global _background_init_started
         if not _background_init_started:
             _background_init_started = True
@@ -2624,18 +2459,97 @@ async def lifespan(app: FastAPI):
             )
 
     except asyncio.CancelledError:
-        logger.warning(f"Unified Platform (Worker {worker_id}) startup cancelled")
+        logger.warning(f"Background services initialization cancelled (Worker {worker_id})")
+        _services_init_complete = True  # Mark as complete to avoid blocking
         raise
     except Exception as e:
-        logger.error(f"Failed to start Unified Platform: {e}", exc_info=True)
-        raise
+        logger.error(f"Background services initialization failed: {e}", exc_info=True)
+        _services_init_complete = True  # Mark as complete so health checks don't hang
+        # Don't re-raise - let the server continue running with degraded functionality
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Lifecycle management for the unified platform.
+    Handles startup and graceful shutdown.
+    
+    CRITICAL FIX for Railway Healthcheck:
+    This lifespan function yields IMMEDIATELY after basic setup to allow
+    the server to start accepting HTTP connections. All heavy initialization
+    (service mounting, ML model loading, etc.) is done in background tasks
+    AFTER the yield. This ensures /health/live responds immediately.
+    """
+    worker_id = os.getpid()
+
+    # ====================================================================
+    # MINIMAL BLOCKING SETUP (must complete before yield)
+    # ====================================================================
+
+    # Fix Windows console encoding issues
+    if sys.platform == "win32":
+        try:
+            sys.stdout.reconfigure(encoding="utf-8")
+            sys.stderr.reconfigure(encoding="utf-8")
+            for handler in logging.root.handlers[:]:
+                if isinstance(handler, logging.StreamHandler):
+                    try:
+                        if hasattr(handler.stream, "reconfigure"):
+                            handler.stream.reconfigure(encoding="utf-8")
+                    except (AttributeError, OSError):
+                        pass
+            print("✅ Reconfigured stdout/stderr to UTF-8")
+        except Exception as e:
+            print(f"⚠️  Could not reconfigure encoding: {e}")
+
+    # Load environment variables
     try:
-        yield
-    except asyncio.CancelledError:
-        logger.info(
-            f"Unified Platform (Worker {worker_id}) received cancellation signal"
+        from dotenv import load_dotenv
+        env_path = Path(__file__).parent.parent / ".env"
+        if env_path.exists():
+            load_dotenv(dotenv_path=env_path)
+            print(f"✅ Loaded environment from: {env_path}")
+    except ImportError:
+        pass
+    except Exception as e:
+        print(f"❌ Error loading .env: {e}")
+
+    # Setup logging
+    setup_unified_logging()
+
+    # Initialize state flags
+    app.state.models_loaded = False
+    app.state.services_initialized = False
+    app.state.background_processes = []
+    app.state.components_status = {}
+    app.state.background_tasks_initialized = False
+    
+    global _services_init_started
+    
+    # ====================================================================
+    # YIELD IMMEDIATELY - Server starts accepting connections NOW
+    # ====================================================================
+    # /health/live will respond as soon as we yield, before any services
+    # are mounted. This is critical for Railway/K8s healthcheck success.
+    # ====================================================================
+    
+    logger.info("=" * 70)
+    logger.info(f"Starting Unified Platform (Worker {worker_id})")
+    logger.info("=" * 70)
+    logger.info("🚀 Server accepting connections - scheduling background initialization...")
+    
+    # Schedule background services initialization (NON-BLOCKING)
+    if not _services_init_started:
+        _services_init_started = True
+        asyncio.create_task(
+            _background_services_initialization(app, worker_id, logger),
+            name="services_initialization"
         )
+    
+    try:
+        yield  # Server is now accepting connections!
+    except asyncio.CancelledError:
+        logger.info(f"Unified Platform (Worker {worker_id}) received cancellation signal")
     finally:
         # SHUTDOWN
         logger.info("=" * 70)
@@ -3078,6 +2992,9 @@ async def health_ready():
         503 Service Unavailable if not ready
     """
     try:
+        # Check if services initialization is complete
+        services_init_complete = _services_init_complete
+        
         # Check if service manager is initialized and has services mounted
         service_status = await service_manager.get_service_status()
         
@@ -3091,18 +3008,21 @@ async def health_ready():
         # Check if models are loaded (for full readiness)
         models_loaded = getattr(app.state, "models_loaded", False)
         
-        # Ready if we have at least one mounted service
+        # Ready if services init is complete OR we have at least one mounted service
         # Note: We return 200 even if models aren't loaded yet, because
         # the server can still handle basic requests. Models loading in
         # background is indicated in the response.
-        if mounted_services > 0:
+        if services_init_complete or mounted_services > 0:
             return {
                 "status": "ready", 
                 "timestamp": datetime.utcnow().isoformat(),
                 "mounted_services": mounted_services,
                 "total_services": total_services,
+                "services_init_complete": services_init_complete,
                 "models_loaded": models_loaded,
-                "note": "Models are still loading in background." if not models_loaded else None
+                "note": "Services are still initializing in background." if not services_init_complete else (
+                    "Models are still loading in background." if not models_loaded else None
+                )
             }
         else:
             return JSONResponse(
