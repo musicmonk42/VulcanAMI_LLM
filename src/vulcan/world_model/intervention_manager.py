@@ -822,7 +822,7 @@ class ConfounderDetector:
         import hashlib
 
         # Deterministic based on variable names
-        var_hash = int(hashlib.md5(f"{var_a}{var_b}".encode()).hexdigest()[:8], 16)
+        var_hash = int(hashlib.md5(f"{var_a}{var_b}".encode(), usedforsecurity=False).hexdigest()[:8], 16)
 
         # 30% chance of confounders (deterministic)
         if (var_hash % 100) < 30:
@@ -842,7 +842,8 @@ class ConfounderDetector:
         # Deterministic test based on confounder name and correlation
         test_hash = int(
             hashlib.md5(
-                f"{confounder}{correlation.var_a}{correlation.var_b}".encode()
+                f"{confounder}{correlation.var_a}{correlation.var_b}".encode(),
+                usedforsecurity=False
             ).hexdigest()[:8],
             16,
         )
@@ -902,7 +903,7 @@ class InterventionSimulator:
         import hashlib
 
         corr_hash = int(
-            hashlib.md5(f"{correlation.var_a}{correlation.var_b}".encode()).hexdigest()[
+            hashlib.md5(f"{correlation.var_a}{correlation.var_b}".encode(), usedforsecurity=False).hexdigest()[
                 :8
             ],
             16,
