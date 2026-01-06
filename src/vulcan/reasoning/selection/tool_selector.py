@@ -224,9 +224,10 @@ FALLBACK_QUALITY_PENALTY = 0.3  # Reduce to 30% of quality
 # The world_model tool routes queries about Vulcan's capabilities, goals, and
 # identity to the WorldModel's meta-reasoning components instead of filtering
 # them out and falling back to probabilistic reasoning.
+# CRITICAL #1 FIX: Added 'language' for NLP tasks (quantifier scope, parsing, etc.)
 DEFAULT_AVAILABLE_TOOLS = (
     'symbolic', 'probabilistic', 'causal', 'analogical', 'multimodal',
-    'mathematical', 'philosophical', 'world_model'
+    'mathematical', 'philosophical', 'language', 'world_model'
 )
 
 # ==============================================================================

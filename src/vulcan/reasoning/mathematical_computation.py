@@ -508,6 +508,32 @@ expr = {expression}
 result = expand(expr)
 """
 
+    @staticmethod
+    def summation(expression: str = "k", index: str = "k", 
+                  lower: str = "1", upper: str = "n") -> str:
+        """Generate summation code.
+        
+        Computes ∑_{index=lower}^{upper} expression
+        
+        Args:
+            expression: The expression to sum (in terms of index variable)
+            index: The summation index variable (e.g., "k")
+            lower: Lower bound of summation
+            upper: Upper bound of summation
+            
+        Returns:
+            SymPy code to compute the summation
+        """
+        # Avoid tuple unpacking as RestrictedPython doesn't support it
+        return f"""# Summation: Sum of {expression} from {index}={lower} to {upper}
+{index} = Symbol('{index}')
+n = Symbol('n')
+expr = {expression}
+result = summation(expr, ({index}, {lower}, {upper}))
+# Simplify the result
+result = simplify(result)
+"""
+
 
 # ============================================================================
 # MATHEMATICAL COMPUTATION TOOL
@@ -834,27 +860,60 @@ result = simplify(integral)
                 operation = "trace"
             return self._templates.matrix_operation("[[1, 2], [3, 4]]", operation)
         
-        # PRIORITY 3: Limits (check before integration since both are calculus)
+        # PRIORITY 3: Summation (check before limits)
+        # FIX Issue #13: Add summation template for ∑ expressions
+        if any(kw in query_lower for kw in ["sum", "summation", "∑"]) or "∑" in query:
+            # Parse summation expression from query
+            # Pattern: ∑_{k=1}^n (2k-1) or sum from k=1 to n of (2k-1)
+            import re
+            
+            # Try to extract expression and bounds
+            # Pattern 1: ∑_{k=lower}^{upper} (expression)
+            sum_match = re.search(r'[∑]\s*_?\{?(\w+)\s*=\s*(\d+)\s*\}?\s*\^?\{?(\w+)\}?\s*\(?([^)]+)\)?', query)
+            if sum_match:
+                index = sum_match.group(1)  # e.g., "k"
+                lower = sum_match.group(2)  # e.g., "1"
+                upper = sum_match.group(3)  # e.g., "n"
+                expr = sum_match.group(4).strip()  # e.g., "2k-1"
+                # Convert to SymPy format (k → k, − → -)
+                expr = expr.replace('−', '-')
+                expr = re.sub(r'(\d)([a-z])', r'\1*\2', expr)  # 2k → 2*k
+                return self._templates.summation(expr, index, lower, upper)
+            
+            # Pattern 2: sum from k=lower to upper of expression
+            sum_match2 = re.search(r'sum(?:mation)?\s+(?:from\s+)?(\w+)\s*=\s*(\d+)\s+to\s+(\w+)\s+(?:of\s+)?(.+)', query_lower)
+            if sum_match2:
+                index = sum_match2.group(1)
+                lower = sum_match2.group(2)
+                upper = sum_match2.group(3)
+                expr = sum_match2.group(4).strip()
+                expr = re.sub(r'(\d)([a-z])', r'\1*\2', expr)
+                return self._templates.summation(expr, index, lower, upper)
+            
+            # Default summation
+            return self._templates.summation("k", "k", "1", "n")
+        
+        # PRIORITY 4: Limits (check before integration since both are calculus)
         if "limit" in query_lower:
             direction = "+" if "right" in query_lower else ("-" if "left" in query_lower else "")
             return self._templates.limit("sin(x)/x", var, "0", direction)
         
-        # PRIORITY 4: Series expansion
+        # PRIORITY 5: Series expansion
         if any(kw in query_lower for kw in ["series", "taylor", "maclaurin", "expansion", "expand around"]):
             return self._templates.series_expansion("exp(x)", var, "0", 5)
         
-        # PRIORITY 5: Integration
+        # PRIORITY 6: Integration
         if any(kw in query_lower for kw in ["integrate", "integral", "antiderivative", "∫"]):
             if "definite" in query_lower or "from" in query_lower:
                 return self._templates.integration("x**2", var, ("0", "1"))
             return self._templates.integration("x**2", var)
         
-        # PRIORITY 6: Differentiation
+        # PRIORITY 7: Differentiation
         if any(kw in query_lower for kw in ["differentiate", "derivative", "diff", "d/dx"]):
             order = 2 if "second" in query_lower else (3 if "third" in query_lower else 1)
             return self._templates.differentiation("x**3 + x**2", var, order)
         
-        # PRIORITY 7: Specific algebraic operations
+        # PRIORITY 8: Specific algebraic operations
         if "factor" in query_lower and "expand" not in query_lower:
             return self._templates.factor_expression("x**2 + 2*x + 1")
         
@@ -864,13 +923,13 @@ result = simplify(integral)
         if "simplify" in query_lower:
             return self._templates.simplify_expression("(x**2 - 1)/(x - 1)")
         
-        # PRIORITY 8: Equation solving (general - checked last among operations)
+        # PRIORITY 9: Equation solving (general - checked last among operations)
         if any(kw in query_lower for kw in ["solve", "equation", "find x", "find the value", "roots"]):
             if "system" in query_lower:
                 return self._templates.solve_system(["x + y - 2", "x - y"], ["x", "y"])
             return self._templates.solve_equation("x**2 - 4", var)
         
-        # PRIORITY 9: Classification-based fallback
+        # PRIORITY 10: Classification-based fallback
         # Use the classifier's detected type to choose appropriate template
         if classification.problem_type == ProblemType.CALCULUS:
             return self._templates.differentiation("x**3", var)
