@@ -6066,12 +6066,65 @@ async def unified_chat(request: UnifiedChatRequest):
         # TIMING: Start measuring context building
         _context_start = time.perf_counter()
         
+        # TASK 6 FIX: Configuration flag to disable OpenAI reasoning fallback
+        DISABLE_OPENAI_REASONING_FALLBACK = os.environ.get(
+            "VULCAN_DISABLE_OPENAI_REASONING_FALLBACK", "false"
+        ).lower() == "true"
+        
         if reasoning_results and not use_reasoning_directly:
             logger.warning(
                 f"[VULCAN] ⚠ Reasoning available but confidence too low "
                 f"({best_confidence:.2f} < {MIN_REASONING_CONFIDENCE_THRESHOLD}), "
                 f"falling back to LLM synthesis"
             )
+            
+            # TASK 6 FIX: If fallback is disabled, return low-confidence result with explanation
+            if DISABLE_OPENAI_REASONING_FALLBACK:
+                logger.info(
+                    f"[VULCAN] TASK 6 FIX: OpenAI fallback disabled, returning low-confidence "
+                    f"reasoning result (confidence={best_confidence:.2f})"
+                )
+                
+                # Find the best available reasoning result even if below threshold
+                best_result = None
+                for source_key in ["unified", "agent_reasoning", "direct_reasoning"]:
+                    source_result = reasoning_results.get(source_key, {})
+                    if isinstance(source_result, dict) and source_result.get("conclusion"):
+                        source_conf = source_result.get("confidence", 0.0)
+                        if best_result is None or source_conf > best_result.get("confidence", 0.0):
+                            best_result = source_result
+                
+                if best_result:
+                    # Format and return the low-confidence result
+                    response_text = _format_direct_reasoning_response(
+                        conclusion=best_result.get("conclusion"),
+                        confidence=best_result.get("confidence", 0.0),
+                        reasoning_type=best_result.get("reasoning_type", "unknown"),
+                        explanation=best_result.get("explanation", ""),
+                    )
+                    
+                    # Add warning about low confidence
+                    confidence_warning = (
+                        f"\n\n⚠️ **Low Confidence Notice**: This response was generated with "
+                        f"confidence {best_result.get('confidence', 0.0):.2f} (threshold: "
+                        f"{MIN_REASONING_CONFIDENCE_THRESHOLD}). Consider rephrasing your query "
+                        f"for better results."
+                    )
+                    response_text += confidence_warning
+                    
+                    latency_ms = (time.perf_counter() - timing["request_start"]) * 1000
+                    return VulcanResponse(
+                        response=response_text,
+                        metadata={
+                            "source": "vulcan_reasoning_low_confidence",
+                            "confidence": best_result.get("confidence", 0.0),
+                            "confidence_below_threshold": True,
+                            "threshold": MIN_REASONING_CONFIDENCE_THRESHOLD,
+                            "reasoning_type": best_result.get("reasoning_type", "unknown"),
+                            "openai_fallback_disabled": True,
+                            "latency_ms": round(latency_ms, 2),
+                        },
+                    )
         
         # Build comprehensive context for LLM
         llm_context = {
@@ -6595,6 +6648,38 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
         except Exception as e:
             logger.debug(f"[VULCAN/v1/chat] Knowledge crystallization skipped: {e}")
 
+        # ================================================================
+        # TASK 7 FIX: Add Transparency About Source
+        # Include detailed metadata about where the answer came from
+        # ================================================================
+        
+        # Determine the primary source of the response
+        response_source = "unknown"
+        if use_reasoning_directly:
+            response_source = "vulcan_reasoning"
+        elif "parallel_openai" in systems_used or "openai" in systems_used:
+            response_source = "openai_llm"
+        elif "local_llm" in systems_used or "vulcan_llm" in systems_used:
+            response_source = "local_llm"
+        elif reasoning_results and best_confidence > 0:
+            response_source = "llm_with_reasoning_context"
+        else:
+            response_source = "llm_only"
+        
+        # Build transparency metadata
+        transparency = {
+            "source": response_source,
+            "reasoning_confidence": best_confidence,
+            "reasoning_type": metadata.get("reasoning_type", "none"),
+            "engines_used": list(set([s for s in systems_used if "reasoning" in s or "model" in s])),
+            "used_openai_fallback": response_source in ["openai_llm", "llm_with_reasoning_context"],
+            "reasoning_available": bool(reasoning_results),
+            "confidence_threshold": MIN_REASONING_CONFIDENCE_THRESHOLD,
+        }
+        
+        # Add transparency to metadata
+        metadata["transparency"] = transparency
+
         return {
             "response": response_text,
             "metadata": metadata,
@@ -6611,6 +6696,8 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
             # RLHF INTEGRATION: Include IDs for feedback (Task 4 - UI thumbs buttons)
             "query_id": query_id,
             "response_id": response_id,
+            # TASK 7 FIX: Include transparency about response source
+            "transparency": transparency,
         }
 
     except Exception as e:

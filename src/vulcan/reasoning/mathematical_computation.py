@@ -114,13 +114,15 @@ def extract_math_expression(query: str) -> Optional[str]:
     """
     Extract mathematical expressions from query text.
     
-    FIX Issue #2: Handles Unicode math symbols that were previously not extracted.
+    TASK 4 FIX: Enhanced to handle more mathematical notation patterns.
     
     Handles:
-    - Unicode math: ∑, ∏, ∫, √, π
-    - LaTeX-style: \\sum_{k=1}^n
+    - Unicode math: ∑, ∏, ∫, √, π, α, β, γ, δ, ε, λ, μ, σ
+    - LaTeX-style: \\sum_{k=1}^n, \\frac{a}{b}
     - Probability: P(X|Y)
     - Standard algebraic: x^2 + 2x + 1
+    - Natural language math: "sum from k=1 to n"
+    - Greek letters: α, β, γ
     
     Args:
         query: Input query text
@@ -131,21 +133,49 @@ def extract_math_expression(query: str) -> Optional[str]:
     if not query or not query.strip():
         return None
     
-    # Pattern 1: Unicode math symbols (∑, ∏, ∫, √, π)
-    # Matches: "∑_{k=1}^n (2k-1)" or "∫_0^1 x dx"
-    # Note: Hyphen at end of character class to avoid ambiguity
-    unicode_pattern = r'[∑∏∫√π][\w\d\s+*/()^._{}|,<>=\-]+'
+    # TASK 4 FIX: Pattern 0 - Check for "Compute exactly:" pattern first
+    # This catches: "Compute exactly: ∑(k=1 to n)(2k−1)"
+    compute_exact_pattern = r'(?:Compute|Calculate|Evaluate|Find|Solve)\s+(?:exactly|precisely)?\s*:?\s*(.+?)(?:\.|$|Then|Task|Verify)'
+    match = re.search(compute_exact_pattern, query, re.IGNORECASE | re.DOTALL)
+    if match:
+        candidate = match.group(1).strip()
+        # Check if it contains math symbols
+        math_indicators = ['∑', '∏', '∫', '√', 'π', '+', '-', '*', '/', '^', '=', '(', ')']
+        if any(ind in candidate for ind in math_indicators):
+            logger.debug(f"[MathTool] TASK 4 FIX: Extracted via 'Compute exactly' pattern: {candidate}")
+            return candidate
+    
+    # TASK 4 FIX: Pattern 1 - Unicode math symbols with improved character set
+    # Added: Greek letters (α, β, γ, δ, ε, λ, μ, σ, θ, φ, ψ, ω)
+    # Added: minus sign variants (−, –)
+    # Matches: "∑_{k=1}^n (2k-1)" or "∫_0^1 x dx" or "∑(k=1 to n)(2k−1)"
+    unicode_pattern = r'[∑∏∫√πα-ωΑ-Ω][\w\d\s+*/()^._{}|,<>=−–\-]+'
     match = re.search(unicode_pattern, query)
     if match:
-        # Get from symbol to end of line or period
+        # Get from symbol to end of line or natural boundary
         start = match.start()
         rest = query[start:]
-        # Find natural boundary (newline, period, "Task:", "Then")
-        for boundary in ['\n', '.', 'Task:', 'Then', 'and verify']:
+        # Find natural boundary (newline, period, "Task:", "Then", "Verify")
+        boundaries = ['\n', '. ', 'Task:', 'Then', 'and verify', 'Verify', 'Prove']
+        for boundary in boundaries:
             if boundary in rest:
                 rest = rest.split(boundary)[0]
                 break
-        return rest.strip()
+        extracted = rest.strip()
+        if extracted:
+            logger.debug(f"[MathTool] TASK 4 FIX: Extracted via Unicode pattern: {extracted}")
+            return extracted
+    
+    # TASK 4 FIX: Pattern 1b - Natural language sum/product
+    # Matches: "sum from k=1 to n of (2k-1)"
+    natural_sum_pattern = r'(?:sum(?:mation)?|product)\s+(?:from\s+)?(\w+)\s*=\s*(\d+)\s+to\s+(\w+)\s+(?:of\s+)?(.+?)(?:\.|$|Then|Task)'
+    match = re.search(natural_sum_pattern, query, re.IGNORECASE)
+    if match:
+        index, lower, upper, expr = match.groups()
+        # Convert to summation notation for SymPy
+        result = f"summation({expr.strip()}, ({index}, {lower}, {upper}))"
+        logger.debug(f"[MathTool] TASK 4 FIX: Converted natural sum to: {result}")
+        return result
     
     # Pattern 2: Probability notation P(X|Y), P(A ∧ B)
     prob_pattern = r'P\s*\([^)]+\)'
@@ -154,13 +184,13 @@ def extract_math_expression(query: str) -> Optional[str]:
         return match.group(0)
     
     # Pattern 3: LaTeX-style \sum_{k=1}^{n}, \frac{a}{b}
-    latex_pattern = r'\\[a-z]+(\{[^}]*\})*'
+    latex_pattern = r'\\[a-z]+(?:_\{[^}]*\})?(?:\^\{[^}]*\})?(?:\{[^}]*\})*'
     match = re.search(latex_pattern, query)
     if match:
         return match.group(0)
     
-    # Pattern 4: "Compute:" or "Calculate:" followed by expression
-    compute_pattern = r'(?:Compute|Calculate|Evaluate|Solve|Verify)[\s:]+([^\n]+)'
+    # Pattern 4: "Compute:" or "Calculate:" followed by expression (general case)
+    compute_pattern = r'(?:Compute|Calculate|Evaluate|Solve|Find)[\s:]+([^\n]+)'
     match = re.search(compute_pattern, query, re.IGNORECASE)
     if match:
         candidate = match.group(1).strip()
@@ -168,9 +198,18 @@ def extract_math_expression(query: str) -> Optional[str]:
         recursive_result = extract_math_expression(candidate)
         if recursive_result:
             return recursive_result
-        return candidate
+        # Check if candidate has math content
+        math_indicators = ['+', '-', '*', '/', '^', '=', '(', '∑', '∫']
+        if any(ind in candidate for ind in math_indicators):
+            return candidate
     
-    # Pattern 5: Standard algebraic (fallback)
+    # Pattern 5: Equations with equals sign
+    equation_pattern = r'([a-zA-Z_]\w*)\s*=\s*([^,\n]+)'
+    match = re.search(equation_pattern, query)
+    if match:
+        return f"{match.group(1)} = {match.group(2).strip()}"
+    
+    # Pattern 6: Standard algebraic (fallback)
     # Note: Hyphen at end of character class to avoid ambiguity
     algebra_pattern = r'[a-zA-Z0-9+*/()^._\s\-]+'
     match = re.search(algebra_pattern, query)
