@@ -880,6 +880,49 @@ result = simplify(integral)
         variables = classification.variables or ['x']
         var = variables[0] if variables else 'x'
         
+        # =================================================================
+        # BUG #12 FIX (CRITICAL): PRIORITY 0 - Reject non-mathematical queries
+        # =================================================================
+        # These patterns indicate queries that should NOT be processed by the
+        # math engine, even if they contain math-related words like "proof"
+        # or "function". Return None early to prevent nonsensical output.
+        #
+        # Examples:
+        # - "Is {A→B, B→C, ¬C, A∨B} satisfiable?" -> Logic query, not math
+        # - "Verify proof about differentiable functions" -> Proof verification, not computation
+        # - "Formalize in FOL" -> First-order logic, not math
+        # =================================================================
+        logic_patterns = [
+            # Propositional logic
+            '→', '∧', '∨', '¬', '⊢', '⊨',
+            'satisfiable', 'unsatisfiable', 'tautology', 'contradiction',
+            'propositional', 'boolean',
+            # First-order logic
+            '∀', '∃', 'forall', 'exists',
+            'formalize', 'fol', 'first-order logic', 'first order logic',
+            'predicate', 'quantifier',
+            # Proof verification (not computation)
+            'verify proof', 'check proof', 'is the proof valid',
+            'proof is valid', 'proof is invalid',
+            # SAT/Model checking
+            'sat problem', 'model', 'assignment',
+        ]
+        
+        if any(pattern in query_lower for pattern in logic_patterns):
+            logger.info(
+                f"[MathTool] BUG#12 FIX: Query contains logic patterns, not mathematical. "
+                f"Declining to compute. Query: {query[:80]}..."
+            )
+            return None
+        
+        # Also check for logic symbols in original query (case-sensitive)
+        if any(sym in query for sym in ['→', '∧', '∨', '¬', '∀', '∃', '⊢', '⊨']):
+            logger.info(
+                f"[MathTool] BUG#12 FIX: Query contains logic symbols. "
+                f"Declining to compute. Query: {query[:80]}..."
+            )
+            return None
+        
         # PRIORITY 1: Differential equations (must check BEFORE "solve"/"equation")
         # These patterns are very specific and should take precedence
         if any(kw in query_lower for kw in [
@@ -959,7 +1002,20 @@ result = simplify(integral)
             return self._templates.integration("x**2", var)
         
         # PRIORITY 7: Differentiation
-        if any(kw in query_lower for kw in ["differentiate", "derivative", "diff", "d/dx"]):
+        # BUG #12 FIX: Use word-boundary matching for short keywords like "diff"
+        # to avoid matching "differentiable" or "difference"
+        # - "differentiate" and "derivative" are long enough to be safe
+        # - "diff" needs word boundary check
+        # - "d/dx" is specific notation and safe
+        differentiation_keywords = ["differentiate", "derivative", "d/dx"]
+        has_diff_keyword = any(kw in query_lower for kw in differentiation_keywords)
+        
+        # Check for "diff" as a standalone word (not part of "differentiable", "difference", etc.)
+        if not has_diff_keyword:
+            import re
+            has_diff_keyword = bool(re.search(r'\bdiff\b', query_lower))
+        
+        if has_diff_keyword:
             order = 2 if "second" in query_lower else (3 if "third" in query_lower else 1)
             return self._templates.differentiation("x**3 + x**2", var, order)
         
