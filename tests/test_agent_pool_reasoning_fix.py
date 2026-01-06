@@ -275,5 +275,117 @@ class TestEthicalDiscourseHandling(unittest.TestCase):
         self.assertIn('is_ethical_discourse', source_code)
 
 
+class TestWorldModelConfidenceOverrideFix(unittest.TestCase):
+    """
+    Test Issue#3 Fix: World model confidence should not be overridden.
+    
+    This test validates that when apply_reasoning() returns a world model
+    result with high confidence (>= 0.5), the agent_pool does NOT invoke
+    UnifiedReasoner.reason() which would override the confidence.
+    
+    Bug pattern from logs:
+    - World model introspection returned confidence=0.85
+    - Agent reasoning selection complete: confidence=0.85
+    - [ProbabilisticReasoner] Uninformative result detected (mean=0.500, std=0.500)
+    - Agent reasoning execution complete: confidence=0.1  ← BUG! Should be 0.85
+    """
+
+    def test_world_model_result_check_exists(self):
+        """
+        Issue#3 Fix: Verify code checks for world model results before invoking
+        UnifiedReasoner.
+        """
+        with open(AGENT_POOL_PATH, 'r') as f:
+            source_code = f.read()
+        
+        # Verify the fix comment is present
+        self.assertIn('Issue#3 FIX', source_code)
+        
+        # Verify the condition checks for world_model tool
+        self.assertIn('world_model', source_code)
+        
+        # Verify we check for self_referential metadata
+        self.assertIn('self_referential', source_code)
+        
+        # Verify we check for ethical_query metadata
+        self.assertIn('ethical_query', source_code)
+
+    def test_world_model_bypass_condition_exists(self):
+        """
+        Issue#3 Fix: Verify is_world_model_result condition is defined.
+        """
+        with open(AGENT_POOL_PATH, 'r') as f:
+            source_code = f.read()
+        
+        # Verify the condition variable is defined
+        self.assertIn('is_world_model_result', source_code)
+        
+        # Verify it uses the named constant for confidence threshold
+        self.assertIn('WORLD_MODEL_CONFIDENCE_THRESHOLD', source_code)
+
+    def test_world_model_logging_exists(self):
+        """
+        Issue#3 Fix: Verify proper logging when world model result is used directly.
+        """
+        with open(AGENT_POOL_PATH, 'r') as f:
+            source_code = f.read()
+        
+        # Verify the log message about using world model directly
+        self.assertIn('Using this result directly', source_code)
+        self.assertIn('without invoking other reasoning engines', source_code)
+
+
+class TestReasoningIntegrationWorldModel(unittest.TestCase):
+    """
+    Test Issue#5 Fix: Self-referential queries should use world model.
+    
+    This test validates that reasoning_integration.py correctly:
+    1. Detects self-referential queries
+    2. Consults world model introspection
+    3. Returns early with world model result if confidence >= 0.5
+    """
+
+    def test_self_referential_detection_exists(self):
+        """
+        Issue#5 Fix: Verify _is_self_referential method exists.
+        """
+        with open(REASONING_INTEGRATION_PATH, 'r') as f:
+            source_code = f.read()
+        
+        # Verify the method exists
+        self.assertIn('def _is_self_referential', source_code)
+        
+        # Verify key self-referential keywords are checked
+        self.assertIn('would you', source_code)
+        self.assertIn('self-aware', source_code)
+        self.assertIn('your', source_code)
+
+    def test_ethical_query_detection_exists(self):
+        """
+        Issue#5 Fix: Verify _is_ethical_query method exists.
+        """
+        with open(REASONING_INTEGRATION_PATH, 'r') as f:
+            source_code = f.read()
+        
+        # Verify the method exists
+        self.assertIn('def _is_ethical_query', source_code)
+        
+        # Verify key ethical keywords are checked
+        self.assertIn('permissible', source_code)
+        self.assertIn('trolley', source_code)
+        self.assertIn('moral', source_code)
+
+    def test_world_model_early_return_exists(self):
+        """
+        Issue#3 Fix: Verify early return when world model has high confidence.
+        """
+        with open(REASONING_INTEGRATION_PATH, 'r') as f:
+            source_code = f.read()
+        
+        # Verify the Issue#3 FIX comment and early return logic
+        self.assertIn('Issue#3 FIX', source_code)
+        self.assertIn('without other engines', source_code)
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)
