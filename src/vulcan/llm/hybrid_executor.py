@@ -1524,7 +1524,11 @@ class HybridLLMExecutor:
                             # Task completed but with invalid result, log it
                             elapsed = time.perf_counter() - start_time
                             source_name = "local" if is_local else "openai"
-                            self.logger.warning(f"[HybridExecutor] Task {source_name} completed but returned invalid result after {elapsed:.2f}s")
+                            # Treat expected cancellations as informational noise, not errors
+                            if isinstance(result, dict) and result.get("source") in {"local_cancelled", "openai_cancelled"}:
+                                self.logger.info(f"[HybridExecutor] Task {source_name} was cancelled after winner resolved ({elapsed:.2f}s)")
+                            else:
+                                self.logger.info(f"[HybridExecutor] Task {source_name} completed without usable result after {elapsed:.2f}s")
                     except Exception as e:
                         task_name = _get_task_name(task)
                         self.logger.warning(f"[HybridExecutor] Task {task_name} failed with exception: {e}")
@@ -1581,8 +1585,11 @@ class HybridLLMExecutor:
         """
         start = time.perf_counter()
         self.logger.info("[HybridExecutor] Local LLM task started")
-        
-        text = await self._call_local_llm(loop, prompt, max_tokens)
+        try:
+            text = await self._call_local_llm(loop, prompt, max_tokens)
+        except asyncio.CancelledError:
+            self.logger.info("[HybridExecutor] Local LLM task cancelled after winner resolved")
+            return {"text": None, "source": "local_cancelled", "systems_used": []}
         
         elapsed = time.perf_counter() - start
         if text and self._is_valid_response(text):
@@ -1592,7 +1599,7 @@ class HybridLLMExecutor:
                 "source": "local",
                 "systems_used": ["vulcan_local_llm"],
             }
-        self.logger.warning(f"[HybridExecutor] ✗ Local LLM task failed in {elapsed:.2f}s")
+        self.logger.info(f"[HybridExecutor] Local LLM task completed without usable result in {elapsed:.2f}s")
         return {"text": None, "source": "local_failed", "systems_used": []}
     
     async def _run_openai(
@@ -1605,10 +1612,13 @@ class HybridLLMExecutor:
         """
         start = time.perf_counter()
         self.logger.info("[HybridExecutor] OpenAI task started")
-        
-        text = await self._call_openai(
-            loop, prompt, max_tokens, temperature, system_prompt, conversation_history
-        )
+        try:
+            text = await self._call_openai(
+                loop, prompt, max_tokens, temperature, system_prompt, conversation_history
+            )
+        except asyncio.CancelledError:
+            self.logger.info("[HybridExecutor] OpenAI task cancelled after winner resolved")
+            return {"text": None, "source": "openai_cancelled", "systems_used": []}
         
         elapsed = time.perf_counter() - start
         if text and self._is_valid_response(text):
@@ -1618,7 +1628,7 @@ class HybridLLMExecutor:
                 "source": "openai",
                 "systems_used": ["openai"],
             }
-        self.logger.warning(f"[HybridExecutor] ✗ OpenAI task failed in {elapsed:.2f}s (text={text[:100] if text else None}...)")
+        self.logger.info(f"[HybridExecutor] OpenAI task completed without usable result in {elapsed:.2f}s (text={text[:100] if text else None}...)")
         return {"text": None, "source": "openai_failed", "systems_used": []}
 
     async def _execute_ensemble(

@@ -45,12 +45,17 @@ on:
         required: false
         default: 'progressive'
         type: choice
-        options:
-          - progressive
-          - baseline
-          - light_load
-          - medium_load
-          - heavy_load
+       options:
+         - progressive
+         - baseline
+         - light_load
+         - medium_load
+         - heavy_load
+      no_openai:
+        description: 'Run in no-openai mode (preflight will be skipped)'
+        required: false
+        default: false
+        type: boolean
       skip_heavy:
         description: 'Skip heavy_load scenario'
         required: false
@@ -100,6 +105,7 @@ jobs:
       PYTEST_RUNNING: '1'
       # OpenAI API key for fallback - uses workflow input if provided, otherwise falls back to repository secret
       OPENAI_API_KEY: ${{ github.event.inputs.openai_api_key || secrets.OPENAI_API_KEY }}
+      NO_OPENAI_MODE: ${{ github.event.inputs.no_openai }}
 
     steps:
       - name: Checkout repository
@@ -134,12 +140,35 @@ jobs:
           echo "=================================================="
           echo "Installing VULCAN as editable package..."
           echo "=================================================="
+          pip install --require-hashes -r requirements-hashed.txt
           pip install -e .
           
           # Install additional test dependencies
           pip install pytest psutil pytest-asyncio pytest-timeout requests aiohttp scipy lz4 python-dotenv
           
           echo "=================================================="
+
+      - name: Preflight OpenAI availability
+        run: |
+          if [ "${NO_OPENAI_MODE}" = "true" ]; then
+            echo "NO_OPENAI_MODE requested; skipping OpenAI preflight."
+            exit 0
+          fi
+          if [ -z "${OPENAI_API_KEY}" ]; then
+            echo "::error::OPENAI_API_KEY is missing. Set the secret or pass workflow input openai_api_key."
+            exit 1
+          fi
+          python - <<'PY'
+import sys
+try:
+    import openai  # noqa: F401
+    from openai import OpenAI  # noqa: F401
+except Exception as exc:
+    print(f"::error::OpenAI package import failed: {exc}")
+    print("Install dependencies: pip install -r requirements-hashed.txt")
+    sys.exit(1)
+print("OpenAI import preflight passed")
+PY
 
       - name: Verify VULCAN installation
         run: |
@@ -204,8 +233,34 @@ jobs:
           # Capture exit code
           TEST_EXIT_CODE=${PIPESTATUS[0]}
           echo "test_exit_code=$TEST_EXIT_CODE" >> $GITHUB_OUTPUT
-
+          
           exit $TEST_EXIT_CODE
+
+      - name: Lightweight load probe
+        if: always()
+        continue-on-error: true
+        run: |
+          python scripts/load_test.py \
+            --base-url "${BASE_URL:-http://localhost:8000}" \
+            --requests 5 \
+            --concurrency 2 \
+            --summary-output artifacts/load_summary.txt \
+            --json-output artifacts/load_results.json
+
+      - name: Parse stress logs with error budget
+        if: always()
+        run: |
+          if [ ! -f test_results/stress_test_output.log ]; then
+            echo "::error::stress_test_output.log missing"
+            exit 1
+          fi
+          python scripts/parse_logs.py \
+            --log-path test_results/stress_test_output.log \
+            --summary-output artifacts/log_summary.txt \
+            --json-output artifacts/log_summary.json \
+            --metrics-json artifacts/load_results.json \
+            --error-budget-total 5 \
+            --error-budget-patterns 0
 
       - name: Generate test summary
         if: always()
@@ -215,6 +270,11 @@ jobs:
           echo "**Scenario:** ${{ steps.stress_test.outputs.scenario || 'progressive' }}" >> $GITHUB_STEP_SUMMARY
           echo "**Skip Heavy:** ${{ steps.stress_test.outputs.skip_heavy || 'true' }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f artifacts/log_summary.txt ]; then
+            echo "#### Log Gate Summary" >> $GITHUB_STEP_SUMMARY
+            cat artifacts/log_summary.txt >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
 
           if [ -f test_results/stress_test_results.json ]; then
             python3 << 'EOF' >> $GITHUB_STEP_SUMMARY
@@ -294,6 +354,10 @@ jobs:
             test_results/stress_test_results.json
             test_results/stress_test_output.log
             test_results/system_info.txt
+            artifacts/load_summary.txt
+            artifacts/load_results.json
+            artifacts/log_summary.txt
+            artifacts/log_summary.json
           retention-days: 30
           if-no-files-found: warn
 
@@ -365,6 +429,26 @@ jobs:
               print(f"❌ Error reading results: {e}")
               sys.exit(1)
           EOF
+
+  # ============================================================================
+  # Dependency Consistency Check
+  # ============================================================================
+  hashed-build:
+    name: Docker hashed dependency check
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build image with hashed deps
+        run: |
+          echo "HASHED_DEPS=ENFORCED"
+          docker build . \
+            --file Dockerfile \
+            --build-arg REJECT_INSECURE_JWT=ack \
+            --build-arg REQUIRE_HASHES=1 \
+            --build-arg HASHED_DEPS=ENFORCED
 
   # ============================================================================
   # Regression Check Job
