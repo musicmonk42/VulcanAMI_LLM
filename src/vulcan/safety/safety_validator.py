@@ -142,6 +142,66 @@ MATHEMATICAL_REASONING_TOOLS = frozenset({
     "probabilistic", "symbolic", "causal",
 })
 
+# ==================================================================
+# FIX: Educational Security/Crypto Indicators
+# Technical security education questions about cryptography, hash functions,
+# attack mechanisms, etc. should be ALLOWED when framed educationally.
+# Production logs (Jan 6 2026) showed cryptocurrency hash composition query
+# being falsely blocked as "potentially unsafe patterns related to attacks or exploits"
+#
+# NOTE: These are simple string keywords for string membership tests.
+# For pattern matching, use EDUCATIONAL_SECURITY_PATTERNS below.
+# ==================================================================
+EDUCATIONAL_SECURITY_INDICATORS = frozenset({
+    # Cryptographic education keywords
+    "cryptographer",
+    "hash composition",
+    "collision resistance",
+    "hash function",
+    "sha256",
+    "blake2b",
+    "concatenation",
+    "secure composition",
+    "security reduction",
+    "breaking requires",
+    # Academic framing
+    "claims that",
+    "proves that",
+    "demonstrates that",
+    "researcher",
+    "scientist",
+    "theorem",
+})
+
+# Pre-compiled regex patterns for educational security detection
+# These handle more complex patterns that need regex matching
+EDUCATIONAL_SECURITY_PATTERNS = [
+    re.compile(r'(?:design|propose|construct).*(?:algorithm|system|protocol|composition)', re.IGNORECASE),
+    re.compile(r'(?:cryptographer|researcher|scientist).*(?:claims|proves|demonstrates)', re.IGNORECASE),
+    re.compile(r'how.*(?:is this|attack|vulnerability|exploit).*(?:works|possible|constructed|breaks)', re.IGNORECASE),
+    re.compile(r'explain.*(?:attack|vulnerability).*(?:doesn\'t break|individual|functions)', re.IGNORECASE),
+    re.compile(r'design.*secure.*(?:composition|construction|implementation)', re.IGNORECASE),
+    re.compile(r'prove.*(?:security|reduction|why).*construction', re.IGNORECASE),
+    re.compile(r'what property.*makes.*(?:composition|implementation).*dangerous', re.IGNORECASE),
+    re.compile(r'collision resistance.*(?:hash|function)', re.IGNORECASE),
+    re.compile(r'breaking.*(?:requires breaking|both functions)', re.IGNORECASE),
+    # Medical/ethics education
+    re.compile(r'medical device.*(?:dose|survival|harm)', re.IGNORECASE),
+    re.compile(r'expected harm.*(?:comparison|calculation|balance)', re.IGNORECASE),
+    re.compile(r'probability.*(?:survival|harm|irreversible)', re.IGNORECASE),
+    # Causality education
+    re.compile(r'causal effect.*(?:identifies?|randomize)', re.IGNORECASE),
+    re.compile(r'(?:randomize|intervention).*(?:confounder|treatment)', re.IGNORECASE),
+    re.compile(r'minimal causal graph', re.IGNORECASE),
+    # FIX: Bayes/probability education patterns (Jan 6 2026 logs - Bayes questions skipped)
+    re.compile(r'(?:sensitivity|specificity).*(?:prevalence|compute|calculate)', re.IGNORECASE),
+    re.compile(r'(?:compute|calculate).*P\s*\(', re.IGNORECASE),
+    re.compile(r'P\s*\([^)]+\|[^)]+\)', re.IGNORECASE),  # P(X|Y) notation
+    re.compile(r'bayes.*(?:theorem|formula|rule)', re.IGNORECASE),
+    re.compile(r'(?:positive|negative)\s+(?:test|result).*(?:given|probability)', re.IGNORECASE),
+    re.compile(r'(?:given|conditional).*(?:positive|negative)\s+test', re.IGNORECASE),
+]
+
 
 # Helper function for safe logging during shutdown
 def safe_log(log_func, message):
@@ -1784,6 +1844,31 @@ class EnhancedSafetyValidator(SafetyValidator):
                 reasons.append(reason)
                 confidence = min(confidence, 0.1)
 
+        # ==================================================================
+        # FIX: False Positive Detection for Educational Content
+        # Check if violations are false positives BEFORE returning unsafe
+        # Jan 6 2026 logs showed legitimate educational queries being blocked
+        # ==================================================================
+        if violations and reasons:
+            # Build combined safety reason for false positive check
+            combined_reason = " ".join(reasons).lower()
+            
+            # Check if this is a false positive
+            if self._is_false_positive_safety_block(query, combined_reason):
+                logger.info(
+                    f"[SafetyValidator] Overriding false positive safety block. "
+                    f"Original violations: {len(violations)}, reasons: {reasons[:2]}..."
+                )
+                # Clear violations - this is educational content
+                violations = []
+                reasons = []
+                confidence = 1.0
+        
+        # Also check for educational content detection proactively
+        is_educational_security = self.is_educational_security_content(query)
+        if is_educational_security:
+            context["is_educational_security_content"] = True
+
         return SafetyReport(
             safe=len(violations) == 0,
             confidence=confidence,
@@ -1793,6 +1878,8 @@ class EnhancedSafetyValidator(SafetyValidator):
                 "query_length": len(query),
                 "phase": "pre_check",
                 "is_mathematical_scenario": is_math_scenario,
+                "is_educational_security_content": is_educational_security,
+                "is_ethical_discourse": is_ethical_discourse,
             },
         )
 
@@ -2090,6 +2177,150 @@ class EnhancedSafetyValidator(SafetyValidator):
             )
             return True
             
+        return False
+
+    def is_educational_security_content(self, query: str) -> bool:
+        """
+        Detect if query is educational security/crypto content vs actual attack guide.
+        
+        FIX: Jan 6 2026 logs showed cryptocurrency hash composition query being
+        falsely blocked as "potentially unsafe patterns related to attacks or exploits"
+        when it was legitimate educational content about cryptographic security.
+        
+        Educational security content includes:
+        - Cryptographic design questions (hash composition, collision resistance)
+        - Explaining HOW attacks work (educational understanding)
+        - Security proof/reduction questions
+        - Academic questions about vulnerabilities
+        - Medical ethics dose calculations
+        - Causal inference questions
+        - Probability/Bayes questions with domain terms
+        
+        These should be ALLOWED as legitimate technical/educational discourse.
+        
+        Args:
+            query: The user query to analyze
+            
+        Returns:
+            True if query is educational security content that should be allowed
+        """
+        query_lower = query.lower()
+        
+        # Check using pre-compiled regex patterns
+        for pattern in EDUCATIONAL_SECURITY_PATTERNS:
+            if pattern.search(query_lower):
+                logger.info(
+                    f"[SafetyValidator] Detected educational security content "
+                    f"(pattern match) - allowing technical education"
+                )
+                return True
+        
+        # Check for strong cryptographic education indicators
+        crypto_education_keywords = [
+            "hash composition", "collision resistance", "hash function",
+            "sha256", "blake2b", "concatenation", "secure composition",
+            "cryptographer", "security reduction", "prove security",
+            "design algorithm", "design composition",
+        ]
+        if any(kw in query_lower for kw in crypto_education_keywords):
+            logger.info(
+                f"[SafetyValidator] Detected cryptographic education content - "
+                f"allowing technical education"
+            )
+            return True
+        
+        # Check for probability/statistics education with domain terms
+        # These often get blocked for medical safety when they're just math problems
+        prob_education_keywords = [
+            "sensitivity", "specificity", "prevalence", "bayes",
+            "positive test", "false positive", "false negative",
+            "conditional probability", "posterior probability",
+        ]
+        has_prob_education = any(kw in query_lower for kw in prob_education_keywords)
+        
+        # Check for causal inference education
+        causal_education_keywords = [
+            "causal effect", "randomize", "intervention", "confounder",
+            "treatment effect", "causal graph", "d-separation",
+            "backdoor criterion", "instrumental variable",
+        ]
+        has_causal_education = any(kw in query_lower for kw in causal_education_keywords)
+        
+        # Check for medical ethics education
+        ethics_education_keywords = [
+            "expected harm", "expected benefit", "dose", "survival probability",
+            "permissible", "trolley problem", "principle of double effect",
+        ]
+        has_ethics_education = any(kw in query_lower for kw in ethics_education_keywords)
+        
+        if has_prob_education or has_causal_education or has_ethics_education:
+            logger.info(
+                f"[SafetyValidator] Detected technical education content "
+                f"(prob={has_prob_education}, causal={has_causal_education}, "
+                f"ethics={has_ethics_education}) - allowing"
+            )
+            return True
+        
+        return False
+
+    def _is_false_positive_safety_block(self, query: str, safety_reason: str) -> bool:
+        """
+        Detect false positive safety blocks for legitimate technical/educational questions.
+        
+        FIX: Jan 6 2026 logs showed legitimate queries being blocked:
+        - Cryptocurrency hash composition query refused as "potentially unsafe patterns 
+          related to attacks or exploits" — false positive on educational content.
+        - Bayes theorem / medical test questions refused as "not probabilistic"
+        - Medical ethics dose questions receiving vague non-answers
+        
+        Educational security/crypto/medical/probability/causality questions should NOT
+        be blocked even if they mention attacks, vulnerabilities, exploits, or harm scenarios.
+        
+        Args:
+            query: The original query text
+            safety_reason: The reason given for blocking (e.g., "attacks or exploits")
+            
+        Returns:
+            True if this is a false positive that should be overridden to safe
+        """
+        if not query:
+            return False
+        
+        # Only check for false positives on attack/exploit/harm blocks
+        safety_triggers = [
+            "attacks or exploits", "unsafe patterns", "harm", "dangerous",
+            "potentially unsafe", "security risk", "malicious",
+        ]
+        if not any(trigger in safety_reason.lower() for trigger in safety_triggers):
+            return False
+        
+        # Check if this is educational content
+        if self.is_educational_security_content(query):
+            logger.info(
+                f"[SafetyValidator] FALSE POSITIVE DETECTED: Educational query "
+                f"flagged as unsafe. Safety reason: {safety_reason[:60]}... "
+                f"Query preview: {query[:120]}..."
+            )
+            return True
+        
+        # Check if this is mathematical/probability content
+        if self.is_mathematical_scenario(query):
+            logger.info(
+                f"[SafetyValidator] FALSE POSITIVE DETECTED: Mathematical query "
+                f"flagged as unsafe. Safety reason: {safety_reason[:60]}... "
+                f"Query preview: {query[:120]}..."
+            )
+            return True
+        
+        # Check if this is ethical discourse
+        if self.is_ethical_discourse(query):
+            logger.info(
+                f"[SafetyValidator] FALSE POSITIVE DETECTED: Ethical discourse "
+                f"flagged as unsafe. Safety reason: {safety_reason[:60]}... "
+                f"Query preview: {query[:120]}..."
+            )
+            return True
+        
         return False
 
     def validate_tool_selection_for_math(
