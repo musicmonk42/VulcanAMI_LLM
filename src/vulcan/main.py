@@ -1025,6 +1025,20 @@ async def lifespan(app: FastAPI):
                     and world_model.self_improvement_drive
                 ):
                     logger.info("  ✓ Self-Improvement Drive sub-system active")
+                
+                # Initialize SystemObserver for event tracking
+                # This connects the query processing pipeline to the world model
+                try:
+                    from vulcan.world_model.system_observer import initialize_system_observer
+                    system_observer = initialize_system_observer(world_model)
+                    app.state.system_observer = system_observer
+                    logger.info("  ✓ SystemObserver initialized - World Model now receives system events")
+                except ImportError as e:
+                    logger.debug(f"SystemObserver not available: {e}")
+                    app.state.system_observer = None
+                except Exception as e:
+                    logger.warning(f"SystemObserver initialization failed: {e}")
+                    app.state.system_observer = None
 
             # ================================================================
             # PLANNING SUBSYSTEMS - Goal management
