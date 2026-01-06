@@ -3734,13 +3734,20 @@ class ToolSelector:
             #
             # FIX: Check if delegation is active BEFORE applying TASK 3 FIX.
             # If delegation context is set, skip the early detection overrides.
+            # 
+            # Note: delegation_active and skip_task3 are used in the conditional below
+            # to determine whether to skip TASK 3 FIX routing.
             # ================================================================
             delegation_active = False
             if hasattr(request, 'context') and isinstance(request.context, dict):
                 delegation_active = request.context.get('world_model_delegation', False)
                 skip_task3 = request.context.get('skip_task3_fix', False)
                 
-                if delegation_active or skip_task3:
+                # Update delegation_active to include skip_task3 flag
+                if skip_task3:
+                    delegation_active = True
+                
+                if delegation_active:
                     delegated_tool = request.context.get('world_model_recommended_tool', 'unknown')
                     logger.info(
                         f"[ToolSelector] TASK 3 FIX CHECK: Delegation active to '{delegated_tool}' - "

@@ -1006,7 +1006,9 @@ class ReasoningIntegration:
                     )
                     selection_time = (time.perf_counter() - selection_time_start) * 1000
                     
-                    # Add delegation metadata to result
+                    # Add delegation metadata to result (with safety check)
+                    if result.metadata is None:
+                        result.metadata = {}
                     result.metadata["world_model_delegation"] = True
                     result.metadata["delegated_tool"] = recommended_tool
                     result.metadata["delegation_reason"] = delegation_reason
