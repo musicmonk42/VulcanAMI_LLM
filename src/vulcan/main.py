@@ -4252,6 +4252,8 @@ class UnifiedChatRequest(BaseModel):
     message: str
     max_tokens: int = 2000  # Increased for diagnostic purposes (was 1024)
     history: List[Dict[str, str]] = []
+    # Conversation tracking - optional with auto-generation support
+    conversation_id: Optional[str] = None
     # These are handled automatically but can be overridden
     enable_reasoning: bool = True
     enable_memory: bool = True
