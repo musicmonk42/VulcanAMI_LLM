@@ -953,21 +953,42 @@ class ReasoningIntegration:
                         f"'{recommended_tool}' - {delegation_reason}"
                     )
                     
-                    # Map tool name to proper context for downstream processing
-                    # Don't return here - let the query continue to normal tool selection
-                    # but with a strong hint to use the recommended tool
+                    # ═══════════════════════════════════════════════════════════════════
+                    # CRITICAL FIX (Jan 6 2026): EXECUTE DELEGATION IMMEDIATELY
+                    # ═══════════════════════════════════════════════════════════════════
+                    # PROBLEM: Previous code set context flags and continued to normal
+                    # processing, but TASK 3 FIX in tool_selector.py was overriding
+                    # the delegation because it checks for formal logic BEFORE checking
+                    # delegation context.
+                    #
+                    # FIX: Execute the delegated tool HERE and return immediately.
+                    # This prevents any downstream code from overriding the delegation.
+                    #
+                    # Evidence from logs:
+                    #   Line 2853: [ReasoningIntegration] LLM Classification: category=SELF_INTROSPECTION
+                    #   Line 2854: [WorldModel] DELEGATION RECOMMENDED: 'mathematical'
+                    #   Line 2855: [ReasoningIntegration] SELF_INTROSPECTION detected - using world_model tool
+                    #   ^ CONTRADICTION: Says delegation active but uses world_model
+                    # ═══════════════════════════════════════════════════════════════════
+                    
+                    logger.info(
+                        f"{LOG_PREFIX} BUG#2 FIX: World model delegation ACTIVE - "
+                        f"executing '{recommended_tool}' immediately (NOT falling through)"
+                    )
+                    
+                    # Set up context with delegation info
                     if context is None:
                         context = {}
                     
-                    # Set context to guide tool selection
                     context['world_model_delegation'] = True
                     context['world_model_recommended_tool'] = recommended_tool
                     context['world_model_delegation_reason'] = delegation_reason
                     context['classifier_suggested_tools'] = [recommended_tool]
                     context['classifier_is_authoritative'] = True
                     context['prevent_router_tool_override'] = True
+                    context['skip_task3_fix'] = True  # Tell tool_selector to skip formal logic check
                     
-                    # Also update the query_type to help downstream routing
+                    # Map tool name to query_type for proper routing
                     if recommended_tool == 'philosophical':
                         query_type = 'ethical'
                     elif recommended_tool == 'mathematical':
@@ -977,11 +998,27 @@ class ReasoningIntegration:
                     elif recommended_tool == 'probabilistic':
                         query_type = 'probabilistic'
                     
-                    logger.info(
-                        f"{LOG_PREFIX} Issue#1&2 FIX: Continuing to tool selection with "
-                        f"delegated tool='{recommended_tool}' (was detected as {query_type_label})"
+                    # Execute with the delegated tool directly via _select_with_tool_selector
+                    # This is the EARLY RETURN that was missing
+                    selection_time_start = time.perf_counter()
+                    result = self._select_with_tool_selector(
+                        query, query_type, complexity, context
                     )
-                    # Fall through to normal processing with delegation context set
+                    selection_time = (time.perf_counter() - selection_time_start) * 1000
+                    
+                    # Add delegation metadata to result
+                    result.metadata["world_model_delegation"] = True
+                    result.metadata["delegated_tool"] = recommended_tool
+                    result.metadata["delegation_reason"] = delegation_reason
+                    result.metadata["selection_time_ms"] = selection_time
+                    
+                    logger.info(
+                        f"{LOG_PREFIX} BUG#2 FIX: Delegation complete - executed '{recommended_tool}' "
+                        f"with confidence={result.confidence:.2f} (EARLY RETURN)"
+                    )
+                    
+                    # EARLY RETURN - Do NOT fall through to normal processing
+                    return result
                 
                 # Issue #3 FIX: Lower threshold from 0.7 to 0.5 for world model
                 # Only use world model result if NOT delegating

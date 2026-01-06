@@ -3722,11 +3722,39 @@ class ToolSelector:
             start_time = time.time()
 
             # ================================================================
+            # CRITICAL FIX (Jan 6 2026): Check for world model delegation FIRST
+            # ================================================================
+            # PROBLEM: TASK 3 FIX was overriding world model delegation because
+            # it detected "formal logic" keywords in cryptocurrency questions.
+            #
+            # Evidence from diagnostic report:
+            #   Line 2854: [WorldModel] DELEGATION RECOMMENDED: 'mathematical'
+            #   Line 2855: [ToolSelector] TASK 3 FIX: Formal logic detected - routing to symbolic
+            #   ^ CONTRADICTION: Delegation ignored, symbolic used instead
+            #
+            # FIX: Check if delegation is active BEFORE applying TASK 3 FIX.
+            # If delegation context is set, skip the early detection overrides.
+            # ================================================================
+            delegation_active = False
+            if hasattr(request, 'context') and isinstance(request.context, dict):
+                delegation_active = request.context.get('world_model_delegation', False)
+                skip_task3 = request.context.get('skip_task3_fix', False)
+                
+                if delegation_active or skip_task3:
+                    delegated_tool = request.context.get('world_model_recommended_tool', 'unknown')
+                    logger.info(
+                        f"[ToolSelector] TASK 3 FIX CHECK: Delegation active to '{delegated_tool}' - "
+                        f"NOT overriding with formal logic detection"
+                    )
+
+            # ================================================================
             # TASK 3 FIX: Early detection of formal logic queries
             # Route SAT/FOL/theorem proving queries to symbolic engine BEFORE
             # the LLM classifier, which often misroutes them to probabilistic.
+            #
+            # CRITICAL: Skip this if delegation is active (world model already decided)
             # ================================================================
-            if hasattr(request, 'problem') and request.problem:
+            if hasattr(request, 'problem') and request.problem and not delegation_active:
                 problem_text = str(request.problem)
                 if self._detect_formal_logic(problem_text):
                     logger.info(

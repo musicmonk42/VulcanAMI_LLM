@@ -53,6 +53,7 @@ class QueryCategory(Enum):
     CAUSAL = "CAUSAL"
     ANALOGICAL = "ANALOGICAL"
     PHILOSOPHICAL = "PHILOSOPHICAL"
+    CRYPTOGRAPHIC = "CRYPTOGRAPHIC"  # FIX (Jan 6 2026): Cryptocurrency/hash/security technical queries
     COMPLEX_RESEARCH = "COMPLEX_RESEARCH"
     UNKNOWN = "UNKNOWN"
 
@@ -171,6 +172,56 @@ ANALOGICAL_KEYWORDS: FrozenSet[str] = frozenset([
     "mapping", "structure mapping",
     "corresponds to", "similar to",
 ])
+
+# =============================================================================
+# FIX (Jan 6 2026): Cryptographic/Technical Security Domain Detection
+# =============================================================================
+# Problem: Cryptocurrency/hash composition questions were being classified as
+# SELF_INTROSPECTION because they contain "you" (e.g., "You're designing...")
+#
+# Evidence from diagnostic report:
+#   Line 2853: [ReasoningIntegration] LLM Classification: category=SELF_INTROSPECTION
+#   ^ WRONG: "You're designing a cryptocurrency" is NOT about Vulcan itself!
+#
+# Solution: Check for technical/cryptographic keywords BEFORE self-introspection.
+# Technical domain takes priority over the "you" pronoun.
+CRYPTOGRAPHIC_KEYWORDS: FrozenSet[str] = frozenset([
+    # Cryptocurrency concepts
+    "cryptocurrency", "crypto", "bitcoin", "ethereum", "blockchain",
+    "token", "wallet", "mining", "consensus",
+    # Hash functions
+    "hash", "hashing", "sha256", "sha-256", "sha512", "sha-512",
+    "blake2b", "blake2s", "md5", "keccak", "ripemd",
+    "hash function", "hash composition", "hash concatenation",
+    # Collision and security
+    "collision", "collision resistance", "preimage", "second preimage",
+    "birthday attack", "birthday paradox", "brute force",
+    # Cryptographic primitives
+    "encryption", "decryption", "cipher", "aes", "rsa",
+    "signature", "signing", "verification", "merkle",
+    "hmac", "mac", "authentication",
+    # Security concepts
+    "security reduction", "security proof", "provable security",
+    "security assumption", "hardness assumption",
+])
+
+# Cryptographic patterns - catch technical crypto queries
+CRYPTOGRAPHIC_PATTERNS: Tuple[re.Pattern, ...] = (
+    # Hash composition patterns
+    re.compile(r"hash\s*\([^)]*\)", re.IGNORECASE),  # hash(...)
+    re.compile(r"h\s*\([^)]*\)", re.IGNORECASE),  # H(...)
+    re.compile(r"\|\|", re.IGNORECASE),  # || concatenation
+    re.compile(r"collision\s+resistance", re.IGNORECASE),
+    re.compile(r"hash\s+function", re.IGNORECASE),
+    re.compile(r"hash\s+composition", re.IGNORECASE),
+    # Cryptocurrency design patterns
+    re.compile(r"design(?:ing)?\s+(?:a\s+)?crypto", re.IGNORECASE),
+    re.compile(r"(?:you'?re?|i'?m?)\s+design(?:ing)?\s+(?:a\s+)?crypto", re.IGNORECASE),
+    re.compile(r"crypto(?:currency|graphic)\s+(?:design|implementation|system)", re.IGNORECASE),
+    # Security reduction patterns
+    re.compile(r"security\s+(?:of|reduction|proof)", re.IGNORECASE),
+    re.compile(r"breaking\s+(?:requires|both)", re.IGNORECASE),
+)
 
 # ============================================================
 # BUG #10 FIX: Explicit Mathematical Intent Detection
@@ -743,6 +794,48 @@ class QueryClassifier:
                     confidence=0.85,
                     source="keyword",
                 )
+        
+        # =============================================================================
+        # FIX (Jan 6 2026): Check CRYPTOGRAPHIC/TECHNICAL patterns BEFORE self-introspection
+        # =============================================================================
+        # Problem: "You're designing a cryptocurrency..." was being classified as
+        # SELF_INTROSPECTION because it contains "you", but it's actually a technical
+        # cryptography question, not a question about Vulcan's identity.
+        #
+        # Solution: Technical domain keywords take PRIORITY over the "you" pronoun.
+        # Check for cryptographic indicators first, before self-introspection.
+        
+        # Check cryptographic patterns first (highest priority for technical queries)
+        for pattern in CRYPTOGRAPHIC_PATTERNS:
+            if pattern.search(query_original):
+                logger.info(
+                    f"[QueryClassifier] FIX: Detected CRYPTOGRAPHIC pattern - "
+                    f"routing to mathematical (NOT self-introspection)"
+                )
+                return QueryClassification(
+                    category=QueryCategory.CRYPTOGRAPHIC.value,
+                    complexity=0.6,  # Technical complexity
+                    suggested_tools=["mathematical", "cryptographic"],  # Route to math/crypto reasoners
+                    skip_reasoning=False,  # Needs reasoning
+                    confidence=0.95,
+                    source="keyword",
+                )
+        
+        # Check cryptographic keywords
+        crypto_count = sum(1 for kw in CRYPTOGRAPHIC_KEYWORDS if kw in query_lower)
+        if crypto_count >= 2:  # Require at least 2 crypto keywords
+            logger.info(
+                f"[QueryClassifier] FIX: Detected {crypto_count} CRYPTOGRAPHIC keywords - "
+                f"routing to mathematical (NOT self-introspection)"
+            )
+            return QueryClassification(
+                category=QueryCategory.CRYPTOGRAPHIC.value,
+                complexity=0.6 + min(0.2, crypto_count * 0.03),
+                suggested_tools=["mathematical", "cryptographic"],
+                skip_reasoning=False,
+                confidence=0.85,
+                source="keyword",
+            )
         
         # =============================================================================
         # BUG S FIX: Check self-introspection patterns BEFORE reasoning patterns
