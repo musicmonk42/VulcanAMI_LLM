@@ -3594,6 +3594,12 @@ class AgentPoolManager:
             "perception_task": ReasoningType.ANALOGICAL,  # Perception uses pattern matching
             "planning_task": ReasoningType.HYBRID,  # Planning uses hybrid reasoning
             "learning_task": ReasoningType.HYBRID,  # Learning uses hybrid
+            # FIX: Add self-introspection and meta-reasoning task types
+            # These task types are generated for queries about the system's own state/objectives
+            # and should route to HYBRID reasoning which can access world_model/meta-reasoning
+            "self_introspection_task": ReasoningType.HYBRID,  # Self-introspection -> world_model/meta-reasoning
+            "meta_reasoning_task": ReasoningType.HYBRID,  # Meta-reasoning about objectives -> HYBRID
+            "introspection_task": ReasoningType.HYBRID,  # Introspection shorthand -> HYBRID
         }
         
         # FIX: Default to SYMBOLIC instead of UNKNOWN for unrecognized task types
