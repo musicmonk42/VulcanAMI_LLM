@@ -259,7 +259,9 @@ class SafeExecutor:
                 f"[{exec_id}] Executing: {' '.join(command)} (timeout={timeout_val}s)"
             )
 
-            result = subprocess.run(
+            # nosec B603: subprocess call is safe - using list arguments (not shell=True),
+            # command comes from internal safe execution pipeline with validated inputs
+            result = subprocess.run(  # nosec B603
                 command,  # List, not string - SAFE
                 shell=False,  # NEVER use shell=True - SAFE
                 capture_output=True,

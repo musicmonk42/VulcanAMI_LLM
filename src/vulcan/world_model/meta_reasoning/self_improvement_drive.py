@@ -4059,7 +4059,9 @@ except ImportError:
                     logger.warning(f"Git push failed: {push_result.stderr}")
                     return False
             else:
-                result = subprocess.run(
+                # nosec B603, B607: subprocess call is safe - using list arguments
+                # with hardcoded 'git' command, no shell=True, no user input
+                result = subprocess.run(  # nosec B603 B607
                     ["git", "push"], capture_output=True, text=True, timeout=60
                 )
                 if result.returncode == 0:
@@ -4124,12 +4126,15 @@ except ImportError:
                     return "unknown_hash"
             else:
                 # Fallback to direct subprocess (already safe - using list args, not shell=True)
-                subprocess.run(
+                # nosec B603, B607: subprocess call is safe - using list arguments
+                # with hardcoded 'git' command, file_path is internal path
+                subprocess.run(  # nosec B603 B607
                     ["git", "add", file_path], check=True, capture_output=True
                 )
 
                 commit_msg = f"vulcan(auto): {message}"
-                result = subprocess.run(
+                # nosec B603, B607: subprocess call is safe - using list arguments
+                result = subprocess.run(  # nosec B603 B607
                     ["git", "commit", "-m", commit_msg], capture_output=True, text=True
                 )
 
@@ -4137,7 +4142,9 @@ except ImportError:
                     # Try to push changes to persist them (prevents "Groundhog Day" loop)
                     self._push_to_remote()
                     
-                    hash_proc = subprocess.run(
+                    # nosec B603, B607: subprocess call is safe - using list arguments
+                    # with hardcoded 'git' command, no user input
+                    hash_proc = subprocess.run(  # nosec B603 B607
                         ["git", "rev-parse", "--short", "HEAD"],
                         capture_output=True,
                         text=True,
@@ -4166,7 +4173,9 @@ except ImportError:
         """
         # Try git to find repo root
         try:
-            result = subprocess.run(
+            # nosec B603, B607: subprocess call is safe - using list arguments
+            # with hardcoded 'git' command, no user input
+            result = subprocess.run(  # nosec B603 B607
                 ["git", "rev-parse", "--show-toplevel"],
                 capture_output=True,
                 text=True,

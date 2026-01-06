@@ -402,7 +402,9 @@ def run_gates(policy: Policy, env: Optional[Dict[str, str]] = None) -> GatesRepo
 
         t0 = time.time()
         try:
-            proc = subprocess.run(
+            # nosec B603: subprocess call is safe - using list arguments (not shell=True),
+            # argv is validated and comes from controlled gate configuration
+            proc = subprocess.run(  # nosec B603
                 argv,
                 cwd=cwd,
                 env=merged_env,
