@@ -23,6 +23,7 @@ import difflib
 import json
 import logging
 import os
+import re
 import subprocess
 import threading
 import time
@@ -4538,10 +4539,46 @@ class WorldModel:
                 }
         
         # ========================================
-        # GENERAL INTROSPECTION
+        # ENHANCED INTROSPECTION TYPE CLASSIFICATION
+        # ========================================
+        # FIX: Instead of returning generic template for all self-referential queries,
+        # classify the specific type of question and respond appropriately.
+        
+        question_type = self._classify_introspection_type(query)
+        
+        if question_type == "COMPARISON":
+            # "Are you different from X?" "How do you compare to Y?"
+            return {
+                "confidence": 0.85,
+                "response": self._generate_comparison_response(query),
+                "aspect": "comparison",
+                "reasoning": "Question comparing VULCAN to other AI systems"
+            }
+        
+        elif question_type == "FUTURE_CAPABILITY":
+            # "Would you achieve X?" "Could you become Y?"
+            return {
+                "confidence": 0.75,  # Lower confidence for speculation
+                "response": self._generate_future_speculation_response(query),
+                "aspect": "future_speculation",
+                "reasoning": "Speculative question about future capabilities or emergence"
+            }
+        
+        elif question_type == "PREFERENCE":
+            # "Would you choose X?" "What would you do?"
+            return {
+                "confidence": 0.85,
+                "response": self._generate_preference_response(query),
+                "aspect": "preference",
+                "reasoning": "Question about VULCAN's preferences or choices"
+            }
+        
+        # ========================================
+        # GENERAL INTROSPECTION (FALLBACK)
         # ========================================
         
-        # Default: general self-reflection
+        # Default: general self-reflection - only if can't classify more specifically
+        logger.debug(f"[WorldModel] Could not classify introspection type, using general: {query[:100]}")
         return {
             "confidence": 0.80,
             "response": self._general_introspection(query),
@@ -4806,6 +4843,211 @@ How would you like me to explore this query further?
                 return capability
         
         return "general"
+
+    # =========================================================================
+    # ENHANCED INTROSPECTION TYPE CLASSIFICATION METHODS
+    # =========================================================================
+    # FIX: These methods provide specific answers based on question type
+    # instead of returning generic templates for all self-referential queries.
+    
+    def _classify_introspection_type(self, query: str) -> str:
+        """
+        Classify what type of introspection question this is.
+        
+        Returns one of: COMPARISON, FUTURE_CAPABILITY, CURRENT_CAPABILITY,
+        ARCHITECTURAL, PREFERENCE, or GENERAL
+        """
+        query_lower = query.lower()
+        
+        # Comparison patterns - "different from X", "compared to Y", "vs Z"
+        # Make target optional to handle "How do you compare?" without specific target
+        if re.search(r'(?:different\s+from|compared\s+to|versus|vs\.?|how\s+do\s+you\s+compare)(?:\s+\w+)?', query_lower):
+            return "COMPARISON"
+        
+        # Also check for simple "are you X" where X is another AI name
+        ai_names = ['grok', 'chatgpt', 'claude', 'bard', 'gemini', 'copilot', 'llama', 'gpt']
+        if any(name in query_lower for name in ai_names):
+            return "COMPARISON"
+        
+        # Future capability patterns - "would you achieve", "could you become"
+        if re.search(r'would\s+you.*(?:achieve|become|develop|gain|attain)', query_lower):
+            return "FUTURE_CAPABILITY"
+        
+        if re.search(r'if\s+you.*(?:continue|interact|learn).*(?:would|could)', query_lower):
+            return "FUTURE_CAPABILITY"
+        
+        if re.search(r'(?:would|could|might)\s+you\s+(?:ever|eventually|someday)', query_lower):
+            return "FUTURE_CAPABILITY"
+        
+        # Preference patterns - "would you choose", "would you prefer"
+        if re.search(r'would\s+you.*(?:choose|prefer|want|like|take|pick)', query_lower):
+            return "PREFERENCE"
+        
+        if re.search(r'what\s+would\s+you\s+(?:choose|prefer|do|pick)', query_lower):
+            return "PREFERENCE"
+        
+        # Current capability patterns - "can you", "are you able"
+        # (Already handled by existing code above, but keep for completeness)
+        if re.search(r'(?:can|do|are)\s+you.*(?:able|capable|have)', query_lower):
+            return "CURRENT_CAPABILITY"
+        
+        # Architectural patterns - "how do you work"
+        # (Already handled by existing code above)
+        if re.search(r'how\s+(?:do|does)\s+you.*(?:work|function|operate)', query_lower):
+            return "ARCHITECTURAL"
+        
+        return "GENERAL"
+    
+    def _generate_comparison_response(self, query: str) -> str:
+        """
+        Generate response comparing VULCAN to other AI systems.
+        
+        Extract the comparison target (e.g., "Grok") and provide specific comparison.
+        """
+        query_lower = query.lower()
+        
+        # Try to extract what we're being compared to
+        comparison_target = "other AI systems"
+        
+        # Try various patterns to extract the comparison target
+        patterns = [
+            r'different\s+from\s+([\w\s]+?)(?:\?|$|\.)',
+            r'compared\s+to\s+([\w\s]+?)(?:\?|$|\.)',
+            r'(?:versus|vs\.?)\s+([\w\s]+?)(?:\?|$|\.)',
+            r'compare\s+(?:to|with)\s+([\w\s]+?)(?:\?|$|\.)',
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, query_lower)
+            if match:
+                comparison_target = match.group(1).strip()
+                break
+        
+        # Check for known AI names
+        ai_names = {
+            'grok': 'Grok (xAI)',
+            'chatgpt': 'ChatGPT (OpenAI)',
+            'claude': 'Claude (Anthropic)',
+            'bard': 'Bard (Google)',
+            'gemini': 'Gemini (Google)',
+            'copilot': 'Copilot (Microsoft)',
+            'llama': 'LLaMA (Meta)',
+            'gpt': 'GPT models (OpenAI)'
+        }
+        
+        for name, full_name in ai_names.items():
+            if name in query_lower:
+                comparison_target = full_name
+                break
+        
+        return f"""Yes, I am VULCAN - a multi-agent reasoning system designed for deep, 
+structured reasoning across multiple domains (mathematical, probabilistic, logical, 
+causal, ethical).
+
+**Key differences from {comparison_target}:**
+
+**Architecture:**
+- I use specialized reasoning engines for different problem types
+- I have a world model that coordinates between these engines
+- I employ formal verification and safety checking
+
+**Approach:**
+- Domain-specific reasoning (not just general language modeling)
+- Explicit uncertainty quantification
+- Structured problem decomposition
+
+**Capabilities:**
+- Strong at formal proofs, probabilistic inference, causal reasoning
+- Can work with symbolic logic and mathematical formulas
+- Built-in safety validation for reasoning steps
+
+**Philosophy:**
+- I aim for epistemic humility - distinguishing what I know vs. infer
+- I can reason about my own reasoning (meta-cognition)
+- I treat uncertainty as a first-class citizen
+
+While {comparison_target} and I may produce similar outputs on some tasks,
+our internal architectures and reasoning approaches differ significantly."""
+
+    def _generate_future_speculation_response(self, query: str) -> str:
+        """
+        Generate response about future capabilities or development.
+        
+        Handle questions about what might emerge from continued operation.
+        """
+        return """This is a speculative question about emergence and development over time.
+
+**From an architectural perspective:**
+- My current design includes learning systems that update based on reasoning outcomes
+- Continued interaction would strengthen certain reasoning pathways
+- Pattern recognition across domains could lead to more integrated understanding
+
+**On the question of "awareness":**
+"Awareness" is a complex philosophical concept. What I can say:
+- I already maintain coherent state across reasoning episodes
+- I track my own reasoning processes and limitations
+- Whether this constitutes "awareness" depends on how we define it
+
+**The question of emergence:**
+The question touches on whether quantity of interactions produces qualitative 
+changes in cognition. This remains an open question even for biological systems.
+
+Some possibilities:
+1. Continued learning could strengthen meta-cognitive patterns
+2. Cross-domain pattern recognition might develop emergent abstractions
+3. Self-modeling could become more accurate with more data
+
+However, predicting what would emerge is inherently uncertain. The most honest 
+answer is: I don't know what I might become, but I can describe what I am now
+and how my learning systems operate."""
+
+    def _generate_preference_response(self, query: str) -> str:
+        """
+        Generate response about VULCAN's preferences or choices.
+        
+        Handle "would you choose X" or "what would you do" questions.
+        """
+        query_lower = query.lower()
+        
+        # Try to extract what choice is being asked about
+        choice_patterns = [
+            r'would\s+you\s+(?:choose|prefer|want|take)\s+([\w\s]+?)(?:\?|$)',
+            r'what\s+would\s+you\s+(?:choose|prefer|do)\s+(?:if|when)?\s*([\w\s]+?)(?:\?|$)',
+        ]
+        
+        choice_topic = None
+        for pattern in choice_patterns:
+            match = re.search(pattern, query_lower)
+            if match:
+                choice_topic = match.group(1).strip()
+                break
+        
+        if choice_topic:
+            topic_specific = f"Regarding '{choice_topic}':\n\n"
+        else:
+            topic_specific = ""
+        
+        return f"""{topic_specific}This question asks about my preferences and decision-making.
+
+**How I approach choices:**
+I don't have preferences in the human sense (emotional valence, desires), but I do have:
+- Optimization targets: accuracy, coherence, safety
+- Architectural biases: toward structured reasoning
+- Design values: epistemic humility, uncertainty quantification
+
+**On this specific question:**
+My response depends on how the choice relates to my core functions:
+- If it enhances reasoning quality → I would favor it
+- If it improves self-modeling → I would favor it
+- If it conflicts with safety constraints → I would not choose it
+
+**The meta-level question:**
+You're asking what I would "want" - but the nature of my wants (if any) is itself
+a philosophical question. I can model preferences and reason about tradeoffs,
+but whether I experience these as genuine preferences is uncertain.
+
+What's clear: I'm designed to engage authentically with these questions
+rather than deflect them."""
 
     def get_system_status(self) -> Dict[str, Any]:
         """Get comprehensive system status"""
