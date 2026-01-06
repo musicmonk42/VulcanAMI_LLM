@@ -1259,12 +1259,24 @@ service_manager = AsyncServiceManager()
 # LIFESPAN MANAGEMENT
 # =============================================================================
 
-# Global flag to track background initialization status
-# This is used by /health/ready to know if the platform is fully ready
-_background_init_started = False
-_background_init_complete = False
+# Global flags to track background initialization status
+# These are used by /health/ready to know if the platform is fully ready
+#
+# Initialization flow:
+# 1. lifespan() yields immediately -> server accepts connections
+# 2. _background_services_initialization() runs -> mounts services, initializes VULCAN
+# 3. _background_model_loading() runs -> loads ML models (BERT, embeddings, etc.)
+#
+# _services_init_started: True when services init task has been scheduled
+# _services_init_complete: True when services init task finished (success or failure)
+# _services_init_failed: True if services init encountered an error
+# _background_init_started: True when model loading task has been scheduled  
+# _background_init_complete: True when model loading task finished (success or failure)
 _services_init_started = False
 _services_init_complete = False
+_services_init_failed = False
+_background_init_started = False
+_background_init_complete = False
 
 
 async def _background_model_loading(app_state: Any, components_status: dict, logger) -> None:
@@ -1357,7 +1369,7 @@ async def _background_services_initialization(app: FastAPI, worker_id: int, logg
     - Initializing VULCAN deployment and subsystems
     - Initializing core platform components
     """
-    global _services_init_complete
+    global _services_init_complete, _services_init_failed
     
     try:
         logger.info("=" * 70)
@@ -2446,7 +2458,7 @@ async def _background_services_initialization(app: FastAPI, worker_id: int, logg
         logger.info("BACKGROUND SERVICES INITIALIZATION COMPLETE")
         logger.info("=" * 70)
 
-        # Mark services init as complete
+        # Mark services init as complete (success)
         _services_init_complete = True
 
         # Now schedule background model loading
@@ -2459,12 +2471,15 @@ async def _background_services_initialization(app: FastAPI, worker_id: int, logg
             )
 
     except asyncio.CancelledError:
+        global _services_init_failed
         logger.warning(f"Background services initialization cancelled (Worker {worker_id})")
-        _services_init_complete = True  # Mark as complete to avoid blocking
+        _services_init_complete = True
+        _services_init_failed = True  # Mark as failed due to cancellation
         raise
     except Exception as e:
         logger.error(f"Background services initialization failed: {e}", exc_info=True)
-        _services_init_complete = True  # Mark as complete so health checks don't hang
+        _services_init_complete = True
+        _services_init_failed = True  # Mark as failed due to error
         # Don't re-raise - let the server continue running with degraded functionality
 
 
@@ -2531,6 +2546,12 @@ async def lifespan(app: FastAPI):
     # ====================================================================
     # /health/live will respond as soon as we yield, before any services
     # are mounted. This is critical for Railway/K8s healthcheck success.
+    #
+    # NOTE: The _services_init_started flag is checked here to prevent
+    # duplicate background tasks. This is safe because:
+    # 1. lifespan() runs exactly once per worker process
+    # 2. For multi-worker deployments, acquire_background_task_lock() 
+    #    ensures only one worker initializes background tasks
     # ====================================================================
     
     logger.info("=" * 70)
@@ -2539,6 +2560,7 @@ async def lifespan(app: FastAPI):
     logger.info("🚀 Server accepting connections - scheduling background initialization...")
     
     # Schedule background services initialization (NON-BLOCKING)
+    # This flag check is safe: lifespan runs once per process, not concurrently
     if not _services_init_started:
         _services_init_started = True
         asyncio.create_task(
@@ -2992,8 +3014,9 @@ async def health_ready():
         503 Service Unavailable if not ready
     """
     try:
-        # Check if services initialization is complete
+        # Check if services initialization is complete and successful
         services_init_complete = _services_init_complete
+        services_init_failed = _services_init_failed
         
         # Check if service manager is initialized and has services mounted
         service_status = await service_manager.get_service_status()
@@ -3008,21 +3031,29 @@ async def health_ready():
         # Check if models are loaded (for full readiness)
         models_loaded = getattr(app.state, "models_loaded", False)
         
-        # Ready if services init is complete OR we have at least one mounted service
+        # Determine status note
+        if services_init_failed:
+            status_note = "Services initialization failed - running in degraded mode"
+        elif not services_init_complete:
+            status_note = "Services are still initializing in background."
+        elif not models_loaded:
+            status_note = "Models are still loading in background."
+        else:
+            status_note = None
+        
+        # Ready if services init is complete (even if failed) OR we have at least one mounted service
         # Note: We return 200 even if models aren't loaded yet, because
-        # the server can still handle basic requests. Models loading in
-        # background is indicated in the response.
+        # the server can still handle basic requests.
         if services_init_complete or mounted_services > 0:
             return {
-                "status": "ready", 
+                "status": "ready" if not services_init_failed else "degraded", 
                 "timestamp": datetime.utcnow().isoformat(),
                 "mounted_services": mounted_services,
                 "total_services": total_services,
                 "services_init_complete": services_init_complete,
+                "services_init_failed": services_init_failed,
                 "models_loaded": models_loaded,
-                "note": "Services are still initializing in background." if not services_init_complete else (
-                    "Models are still loading in background." if not models_loaded else None
-                )
+                "note": status_note
             }
         else:
             return JSONResponse(
