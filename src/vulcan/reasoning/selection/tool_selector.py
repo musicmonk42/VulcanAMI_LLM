@@ -3311,6 +3311,9 @@ class ToolSelector:
         Issue #4 FIX: NO LONGER detects math symbols (∑, ∫, etc.). Those are
         handled separately by _detect_math_symbols() for mathematical routing.
         
+        BUG #3 FIX: NO LONGER triggers on ethical/philosophical queries that
+        contain natural language choice structures like "option A or B".
+        
         Detects:
         - Logic symbols: →, ∧, ∨, ¬, ∀, ∃, ⊢, ⊨ (NOT ∑, ∫, ∂ - those are math!)
         - SAT problem keywords: satisfiable, SAT, CNF, prove, theorem
@@ -3334,6 +3337,27 @@ class ToolSelector:
         
         query_lower = query.lower()
         
+        # BUG #3 FIX: Check if this is an ethical/philosophical query FIRST
+        # Ethical queries contain natural language choice structures ("A or B",
+        # "not pulling the lever") that should NOT trigger formal logic routing.
+        # The symbolic engine cannot parse natural language ethical dilemmas.
+        ethical_indicators = [
+            'trolley', 'dilemma', 'ethical', 'moral', 'ethics', 'morality',
+            'should you', 'must choose', 'lives', 'death', 'kill', 'save',
+            'sacrifice', 'utilitarian', 'deontological', 'virtue', 'duty',
+            'right thing', 'wrong to', 'permissible', 'obligation',
+            'conscience', 'harm', 'benefit', 'consequent', 'rights',
+        ]
+        ethical_count = sum(1 for ind in ethical_indicators if ind in query_lower)
+        
+        if ethical_count >= 2:
+            # Multiple ethical indicators = likely philosophical query
+            logger.debug(
+                f"[ToolSelector] BUG#3 FIX: Detected {ethical_count} ethical indicators - "
+                f"NOT routing to symbolic engine (ethical queries need philosophical reasoning)"
+            )
+            return False
+        
         # Check for Unicode logic symbols (optimized using any())
         # Issue #4 FIX: REMOVED ∑, ∫, ∂, ∇ from this list - they are MATH symbols!
         logic_symbols = ['→', '∧', '∨', '¬', '∀', '∃', '⊢', '⊨', '↔', '⇒', '⇔']
@@ -3341,10 +3365,13 @@ class ToolSelector:
             logger.debug("[ToolSelector] TASK 3: Detected Unicode logic symbol")
             return True
         
-        # Check for ASCII logic notation
-        ascii_logic = ['->', '<->', '&&', '||', '~', '!', 'not ', 'and ', 'or ']
+        # BUG #3 FIX: More restrictive ASCII logic detection
+        # Don't match natural language patterns like "option A or B" or "not pulling"
+        # Only match patterns that look like actual formal logic: "A -> B", "P && Q"
+        # The check for 'not ', 'and ', 'or ' is too aggressive for natural language.
+        ascii_logic_strict = ['->', '<->', '&&', '||']  # Removed 'not ', 'and ', 'or '
         has_proposition = re.search(r'\b[A-Z]\b', query) is not None  # Cache this check
-        if has_proposition and any(pattern in query_lower for pattern in ascii_logic):
+        if has_proposition and any(pattern in query_lower for pattern in ascii_logic_strict):
             logger.debug("[ToolSelector] TASK 3: Detected ASCII logic with propositions")
             return True
         
@@ -3371,6 +3398,7 @@ class ToolSelector:
             return True
         
         # Check for first-order logic quantifiers in natural language
+        # BUG #3 FIX: Only trigger if BOTH quantifier AND logic keywords present
         fol_patterns = [
             r'\bfor\s+all\b',
             r'\bthere\s+exists?\b',
@@ -3378,10 +3406,11 @@ class ToolSelector:
             r'\bfor\s+some\b',
             r'\bfor\s+any\b',
         ]
-        logical_structure_words = ['if', 'then', 'implies', 'therefore', 'conclude']
-        has_logical_structure = any(w in query_lower for w in logical_structure_words)
+        # More restrictive: require logic-specific words, not just 'if/then'
+        logic_keywords = ['implies', 'therefore', 'conclude', 'entails', 'logically']
+        has_logic_keyword = any(w in query_lower for w in logic_keywords)
         
-        if has_logical_structure:
+        if has_logic_keyword:
             for pattern in fol_patterns:
                 if re.search(pattern, query_lower):
                     logger.debug(f"[ToolSelector] TASK 3: Detected FOL pattern '{pattern}'")

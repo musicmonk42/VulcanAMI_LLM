@@ -3300,6 +3300,13 @@ class QueryAnalyzer:
                 plan.safety_passed = True
                 plan.detected_patterns.append(f"classifier_{classification.category.lower()}")
                 
+                # FIX: Override tools for PHILOSOPHICAL category to use proper reasoning tools
+                # instead of just ["general"]. Philosophical queries need symbolic and causal reasoning.
+                if classification.category == "PHILOSOPHICAL":
+                    tools_to_use = ["philosophical", "symbolic", "causal"]
+                else:
+                    tools_to_use = classification.suggested_tools or ["general"]
+                
                 plan.agent_tasks = [
                     AgentTask(
                         task_id=f"task_{uuid.uuid4().hex[:8]}_{classification.category.lower()}",
@@ -3312,13 +3319,13 @@ class QueryAnalyzer:
                             "is_simple": True,
                             "skip_heavy_analysis": True,
                             "skip_arena": True,
-                            "tools": classification.suggested_tools or ["general"],
+                            "tools": tools_to_use,
                             "response_type": "conversational",
                         },
                     )
                 ]
                 
-                plan.telemetry_data["selected_tools"] = classification.suggested_tools or ["general"]
+                plan.telemetry_data["selected_tools"] = tools_to_use
                 plan.telemetry_data["reasoning_strategy"] = f"classifier_{classification.category.lower()}"
                 
                 logger.info(

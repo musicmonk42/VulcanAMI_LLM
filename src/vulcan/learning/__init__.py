@@ -509,6 +509,27 @@ class UnifiedLearningSystem:
                 metadata.get('error', False)
             )
             
+            # BUG #6 FIX: Detect parse errors that return with misleading high confidence
+            # The symbolic engine can fail with "Parse error: Unexpected token..." but still
+            # return confidence=0.6. This should be treated as a FAILURE, not a success.
+            # Check for parse errors in various possible locations.
+            error_string = str(outcome.get('error', '')) + ' ' + str(metadata.get('error', ''))
+            has_parse_error = (
+                'parse error' in error_string.lower() or
+                'unexpected token' in error_string.lower() or
+                'syntax error' in error_string.lower() or
+                'lexer error' in error_string.lower()
+            )
+            
+            if has_parse_error:
+                logger.warning(
+                    f"[Learning] BUG#6 FIX: Detected parse error in result. "
+                    f"Error: {error_string[:100]}... "
+                    f"This indicates the tool FAILED to process the query. "
+                    f"Treating as failure regardless of reported confidence."
+                )
+                is_explicit_error = True  # Ensure parse errors are treated as failures
+            
             # BUG #3 FIX: Detect general uninformative results (wrong tool selection)
             # This prevents tools from accumulating positive weights when they were
             # selected incorrectly (e.g., "analogical" for SAT problems).

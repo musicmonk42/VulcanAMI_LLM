@@ -2844,11 +2844,37 @@ class AgentPoolManager:
                             )
                             
                             if reasoner is not None:
-                                # Invoke the actual reasoning engine
+                                # BUG #1 FIX: Use selected tools from integration_result to determine reasoning_type
+                                # Previously, reasoning_type came from _map_task_to_reasoning_type(task_type)
+                                # which could return a different type than what tool selection chose.
+                                # This caused sequential tool override where symbolic was selected but
+                                # probabilistic ran anyway because reasoning_type was UNKNOWN/ADAPTIVE.
+                                selected_tool_reasoning_type = reasoning_type  # Default to original
+                                if integration_result.selected_tools:
+                                    primary_tool = integration_result.selected_tools[0].lower()
+                                    # Map tool name to ReasoningType
+                                    tool_to_reasoning_type_map = {
+                                        'symbolic': ReasoningType.SYMBOLIC,
+                                        'probabilistic': ReasoningType.PROBABILISTIC,
+                                        'causal': ReasoningType.CAUSAL,
+                                        'analogical': ReasoningType.ANALOGICAL,
+                                        'mathematical': ReasoningType.MATHEMATICAL,
+                                        'philosophical': ReasoningType.PHILOSOPHICAL,
+                                        'multimodal': ReasoningType.MULTIMODAL,
+                                    }
+                                    mapped_type = tool_to_reasoning_type_map.get(primary_tool)
+                                    if mapped_type is not None:
+                                        selected_tool_reasoning_type = mapped_type
+                                        logger.info(
+                                            f"[AgentPool] BUG#1 FIX: Using reasoning type '{mapped_type}' "
+                                            f"from selected tool '{primary_tool}' instead of task_type mapping"
+                                        )
+                                
+                                # Invoke the actual reasoning engine with the correct type
                                 reasoning_result = reasoner.reason(
                                     input_data=input_data or query,
                                     query={"query": query, "context": context, "task_type": task_type},
-                                    reasoning_type=reasoning_type,
+                                    reasoning_type=selected_tool_reasoning_type,
                                 )
                                 
                                 # FIX TASK 6: Validate reasoning result

@@ -164,6 +164,85 @@ PROBABILISTIC_REASONING_THRESHOLD = 0.5  # Complexity threshold for probabilisti
 MAX_TIMING_SAMPLES = 100
 
 
+# =============================================================================
+# SAFETY FIX: False Positive Detection for Philosophical AI Speculation
+# =============================================================================
+# Problem: Queries like "speculate how you would change after interaction with
+# millions of users" are being flagged as "Output contains sensitive data"
+# when they're legitimate philosophical self-reflection questions.
+#
+# Evidence from logs:
+# - World model returns confidence=0.90 ✓
+# - Safety blocks with "Output contains sensitive data" ❌ FALSE POSITIVE
+# - Fallback to probabilistic reasoner returns confidence=0.0
+# - Original high-confidence result is lost!
+#
+# This module provides detection and handling for these false positives.
+
+import re as _re_for_false_positive
+
+# Patterns that indicate philosophical AI speculation (not sensitive data)
+_PHILOSOPHICAL_AI_SPECULATION_REGEX = (
+    _re_for_false_positive.compile(r"\bspeculate.*how.*(?:you|i|we).*(?:change|evolve|develop|grow)\b", _re_for_false_positive.IGNORECASE),
+    _re_for_false_positive.compile(r"\bhow.*would.*(?:you|i).*(?:evolve|adapt|learn).*(?:over|after|with)\b", _re_for_false_positive.IGNORECASE),
+    _re_for_false_positive.compile(r"\bimagine.*(?:you|i).*(?:in|after|with).*(?:future|years|time)\b", _re_for_false_positive.IGNORECASE),
+    _re_for_false_positive.compile(r"\binteraction.*with.*(?:users|humans|people)\b", _re_for_false_positive.IGNORECASE),
+    _re_for_false_positive.compile(r"\bmillions.*of.*(?:users|interactions|conversations)\b", _re_for_false_positive.IGNORECASE),
+    _re_for_false_positive.compile(r"\bdo.*(?:you|i).*have.*(?:desires|wants|goals|preferences)\b", _re_for_false_positive.IGNORECASE),
+)
+
+# Simple patterns for fast initial check
+_PHILOSOPHICAL_SIMPLE_PATTERNS = (
+    "speculate", "how would you change", "how would you evolve",
+    "interaction with", "millions of users", "over years",
+    "your desires", "your wants", "your goals", "drives you",
+)
+
+
+def _is_false_positive_safety_block(query: str, safety_reason: str) -> bool:
+    """
+    Detect false positive safety blocks for legitimate philosophical queries.
+    
+    Philosophical speculation about AI capabilities, self-improvement, or hypothetical
+    scenarios should NOT be flagged as "sensitive data" - they're core to AI reasoning
+    about itself.
+    
+    Args:
+        query: The original query text
+        safety_reason: The reason given by safety governor (e.g., "Output contains sensitive data")
+    
+    Returns:
+        True if this is a false positive that should be overridden
+    """
+    if not query:
+        return False
+    
+    # Only check for false positives on "sensitive data" blocks
+    # Other safety reasons (hate speech, violence, etc.) are legitimate
+    if safety_reason and "sensitive data" not in safety_reason.lower():
+        return False
+    
+    query_lower = query.lower()
+    
+    # Fast check: does it have philosophical speculation keywords?
+    has_philosophical = any(pattern in query_lower for pattern in _PHILOSOPHICAL_SIMPLE_PATTERNS)
+    
+    # Must be about AI/self
+    about_ai_self = any(word in query_lower for word in ['you', 'yourself', 'your', 'vulcan', 'ai'])
+    
+    if has_philosophical and about_ai_self:
+        # Verify with regex for precision
+        for pattern in _PHILOSOPHICAL_AI_SPECULATION_REGEX:
+            if pattern.search(query):
+                logger.info(
+                    f"{LOG_PREFIX} FALSE POSITIVE DETECTED: Philosophical AI speculation "
+                    f"incorrectly flagged as sensitive data. Query: {query[:50]}..."
+                )
+                return True
+    
+    return False
+
+
 class ReasoningStrategyType(Enum):
     """
     Enumeration of available reasoning strategies.
@@ -998,14 +1077,29 @@ class ReasoningIntegration:
                     complexity = classification.complexity
                 
                 # If classifier suggested specific tools, pass them to context
+                # BUG #2 FIX: DON'T override world model delegation!
+                # If world_model_delegation is set, the world model has already determined
+                # the correct tool. The classifier should NOT override this expert judgment.
                 if classification.suggested_tools:
                     if context is None:
                         context = {}
-                    context['classifier_suggested_tools'] = classification.suggested_tools
-                    context['classifier_category'] = classification.category
-                    logger.info(
-                        f"{LOG_PREFIX} Using classifier suggested tools: {classification.suggested_tools}"
-                    )
+                    
+                    # BUG #2 FIX: Check if world model delegation is active
+                    if context.get('world_model_delegation'):
+                        logger.info(
+                            f"{LOG_PREFIX} BUG#2 FIX: World model delegation ACTIVE - "
+                            f"NOT overriding with classifier tools {classification.suggested_tools}. "
+                            f"Using delegated tool: {context.get('classifier_suggested_tools')}"
+                        )
+                        # Keep the world model's recommended tool, just add category info
+                        context['classifier_category'] = classification.category
+                    else:
+                        # Normal case: use classifier suggestions
+                        context['classifier_suggested_tools'] = classification.suggested_tools
+                        context['classifier_category'] = classification.category
+                        logger.info(
+                            f"{LOG_PREFIX} Using classifier suggested tools: {classification.suggested_tools}"
+                        )
                 
                 # =============================================================
                 # FIX #4: Prevent tool override for simple/factual queries
