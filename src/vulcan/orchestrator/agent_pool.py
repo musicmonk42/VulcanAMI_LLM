@@ -2185,6 +2185,8 @@ class AgentPoolManager:
 
         Returns:
             Agent ID if available, None otherwise
+        
+        AGENT POOL FIX: Enhanced logging to help diagnose routing failures.
         """
         available_agents = [
             agent_id
@@ -2194,6 +2196,36 @@ class AgentPoolManager:
         ]
 
         if not available_agents:
+            # AGENT POOL FIX: Enhanced logging for debugging capability mismatches
+            all_caps = [m.capability.value for m in self.agents.values()]
+            idle_agents = [
+                (aid, m.capability.value) 
+                for aid, m in self.agents.items() 
+                if m.state.can_accept_work()
+            ]
+            
+            # Check if any agent exists with the requested capability
+            has_capability = any(
+                m.capability == capability or m.capability.can_handle_capability(capability)
+                for m in self.agents.values()
+            )
+            
+            if not has_capability:
+                logger.warning(
+                    f"[AgentPool] CAPABILITY MISMATCH: No agent has capability "
+                    f"'{capability.value}'. Pool capabilities: {set(all_caps)}. "
+                    f"Consider updating agent pool configuration to include this capability."
+                )
+            elif idle_agents:
+                logger.debug(
+                    f"[AgentPool] No available agent for capability '{capability.value}'. "
+                    f"Idle agents: {idle_agents}"
+                )
+            else:
+                logger.debug(
+                    f"[AgentPool] All agents busy. No agent available for capability "
+                    f"'{capability.value}'."
+                )
             return None
 
         # RESOURCE-AWARE JOB DISTRIBUTION
@@ -2294,6 +2326,36 @@ class AgentPoolManager:
             )
             
             return available_agents[:max_agents]
+
+    def get_capability_distribution(self) -> Dict[str, int]:
+        """
+        Get the current capability distribution in the agent pool.
+        
+        AGENT POOL CONFIGURATION FIX: This method provides observability into
+        which capabilities are available in the pool. Use this to verify that
+        reasoning engine capabilities are properly represented.
+        
+        Returns:
+            Dictionary mapping capability names to agent counts.
+            
+        Example:
+            >>> pool.get_capability_distribution()
+            {
+                'probabilistic': 1,
+                'symbolic': 1,
+                'philosophical': 1,
+                'mathematical': 1,
+                'causal': 1,
+                'world_model': 1,
+                'general': 2
+            }
+        """
+        with self.lock:
+            capability_counts: Dict[str, int] = {}
+            for metadata in self.agents.values():
+                cap_name = metadata.capability.value
+                capability_counts[cap_name] = capability_counts.get(cap_name, 0) + 1
+            return capability_counts
 
     def _embed_result(self, result: Dict[str, Any]) -> Any:
         """
