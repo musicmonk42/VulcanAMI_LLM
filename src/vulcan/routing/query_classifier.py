@@ -184,7 +184,7 @@ MATH_SYMBOL_PATTERN = re.compile(r"[∫∑∏∂∇∈∀∃∅∞≠≤≥≈±
 
 # Summation notation patterns: ∑(k=1 to n), sum from k=1, etc.
 SUMMATION_PATTERNS: Tuple[re.Pattern, ...] = (
-    re.compile(r"∑", re.UNICODE),  # Unicode summation symbol
+    re.compile(r"∑"),  # Unicode summation symbol (re.UNICODE is default in Python 3)
     re.compile(r"sum\s+(?:from|for)\s+\w+\s*=\s*\d+", re.IGNORECASE),  # sum from k=1
     re.compile(r"\bsum\s+\w+\s*=\s*\d+\s+to\b", re.IGNORECASE),  # sum k=1 to
     re.compile(r"\\sum\s*[_^]?", re.IGNORECASE),  # LaTeX \sum
