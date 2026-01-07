@@ -604,7 +604,8 @@ class HybridLLMExecutor:
     ENSEMBLE_LOCAL_RESPONSE_MAX_LENGTH = 500
     # Valid execution modes
     # TASK 2 FIX: Added 'reasoning_first' mode that prioritizes reasoning results
-    VALID_MODES = ("local_first", "openai_first", "parallel", "ensemble", "reasoning_first")
+    # FIX: Added 'openai_only' and 'local_only' modes for explicit single-backend operation
+    VALID_MODES = ("local_first", "openai_first", "parallel", "ensemble", "reasoning_first", "openai_only", "local_only")
     
     # Default system prompt - OpenAI is ONLY for language generation, NOT reasoning
     # ARCHITECTURE: VULCAN does ALL reasoning. OpenAI only expresses VULCAN's reasoning in fluent prose.
@@ -679,6 +680,11 @@ class HybridLLMExecutor:
         self.prefer_reasoning = prefer_reasoning
         self.reasoning_confidence_threshold = reasoning_confidence_threshold
         
+        # FIX: Check if OpenAI client is available for mode override
+        # Local LLM (GraphixVulcanLLM) times out (~120s) on CPU - use OpenAI only for language generation
+        # Reasoning engines in src/vulcan/reasoning/* are unaffected - they still do all the thinking
+        self.openai_client = self.openai_client_getter()
+        
         # Validate and set mode
         mode_lower = mode.lower()
         if mode_lower not in self.VALID_MODES:
@@ -687,6 +693,27 @@ class HybridLLMExecutor:
                 f"Invalid mode '{mode}', defaulting to 'parallel'. Valid modes: {self.VALID_MODES}"
             )
             mode_lower = "parallel"
+        
+        # FIX: Override mode based on backend availability for language generation
+        # Local LLM is too slow (~120s timeout) - use OpenAI only for language output
+        # Note: Reasoning systems (symbolic, causal, probabilistic) are UNAFFECTED - they still run
+        if mode_lower == "parallel":
+            # Auto-select best mode for language generation
+            if self.openai_client:
+                mode_lower = "openai_only"
+                # Initialize logger early for this message
+                self.logger = logging.getLogger("HybridLLMExecutor")
+                self.logger.info(
+                    "[HybridExecutor] Using OpenAI-only mode for language generation (fast: ~3s). "
+                    "Reasoning engines still handle all thinking."
+                )
+            else:
+                mode_lower = "local_only"
+                self.logger = logging.getLogger("HybridLLMExecutor")
+                self.logger.info(
+                    "[HybridExecutor] Using local-only mode for language generation (OpenAI unavailable)."
+                )
+        
         self.mode = mode_lower
         
         # Allow environment variable override for timeout (Issue #5 fix)
@@ -810,9 +837,20 @@ class HybridLLMExecutor:
             result = await self._execute_ensemble(
                 loop, prompt, max_tokens, temperature, effective_system_prompt, conversation_history
             )
+        elif self.mode == "openai_only":
+            # FIX: OpenAI-only mode for fast language generation (~3s instead of 120s timeout)
+            # Reasoning engines still handle all thinking - this is just for language output
+            result = await self._execute_openai_only(
+                loop, prompt, max_tokens, temperature, effective_system_prompt, conversation_history
+            )
+        elif self.mode == "local_only":
+            # Local-only mode when OpenAI is unavailable
+            result = await self._execute_local_only(
+                loop, prompt, max_tokens, temperature, effective_system_prompt, conversation_history
+            )
         else:
-            self.logger.warning(f"Unknown mode '{self.mode}', defaulting to parallel")
-            result = await self._execute_parallel(
+            self.logger.warning(f"Unknown mode '{self.mode}', defaulting to openai_first")
+            result = await self._execute_openai_first(
                 loop, prompt, max_tokens, temperature, effective_system_prompt, conversation_history
             )
 
@@ -1662,6 +1700,132 @@ class HybridLLMExecutor:
         return await self._execute_local_first(
             loop, prompt, max_tokens, temperature, system_prompt, conversation_history
         )
+
+    async def _execute_openai_only(
+        self, loop, prompt: str, max_tokens: int, temperature: float, system_prompt: str,
+        conversation_history: Optional[List[Dict[str, str]]] = None
+    ) -> Dict[str, Any]:
+        """
+        OpenAI-only mode for fast language generation.
+        
+        FIX: Local LLM (GraphixVulcanLLM) times out (~120s) on CPU - this mode
+        uses OpenAI only for language generation (~3s response time).
+        
+        IMPORTANT: This does NOT affect reasoning engines!
+        - Symbolic reasoning: Still works (src/vulcan/reasoning/symbolic/*)
+        - Causal reasoning: Still works (src/vulcan/reasoning/causal/*)
+        - Probabilistic reasoning: Still works (src/vulcan/reasoning/probabilistic/*)
+        - Mathematical reasoning: Still works (src/vulcan/reasoning/mathematical/*)
+        
+        Only the LANGUAGE OUTPUT step is affected - OpenAI formats the reasoning
+        results into natural language for the user.
+        """
+        systems_used = []
+        
+        try:
+            openai_result = await self._call_openai(
+                loop, prompt, max_tokens, temperature, system_prompt, conversation_history
+            )
+            if self._is_valid_response(openai_result):
+                systems_used.append("openai")
+                self.logger.info("[HybridExecutor] ✓ OpenAI language generation succeeded (~3s)")
+                return {
+                    "text": openai_result,
+                    "source": "openai",
+                    "systems_used": systems_used,
+                    "metadata": {
+                        "mode": "openai_only",
+                        "reason": "Fast language generation (local LLM disabled for performance)",
+                    },
+                }
+            else:
+                self.logger.warning("[HybridExecutor] ⚠ OpenAI returned invalid response")
+        except Exception as openai_err:
+            self.logger.warning(f"[HybridExecutor] ⚠ OpenAI failed: {openai_err}")
+        
+        systems_used.append("openai_failed")
+        
+        # Generate error reference
+        error_ref = hashlib.sha256(
+            f"{time.time_ns()}:{prompt[:50]}".encode()
+        ).hexdigest()[:12].upper()
+        
+        error_text = (
+            "I encountered an issue generating a response.\n\n"
+            "The language generation service is temporarily unavailable.\n\n"
+            "**Suggestions:**\n"
+            "• Please try again in a moment\n"
+            "• Try rephrasing your question\n\n"
+            f"If this issue persists, reference: **{error_ref}**"
+        )
+        
+        return {
+            "text": error_text,
+            "source": "error_openai_unavailable",
+            "systems_used": systems_used,
+            "error": True,
+            "metadata": {
+                "mode": "openai_only",
+                "reason": "OpenAI language generation failed",
+                "can_retry": True,
+                "error_reference": error_ref,
+            },
+        }
+
+    async def _execute_local_only(
+        self, loop, prompt: str, max_tokens: int, temperature: float, system_prompt: str,
+        conversation_history: Optional[List[Dict[str, str]]] = None
+    ) -> Dict[str, Any]:
+        """
+        Local-only mode when OpenAI is unavailable.
+        
+        Falls back to local LLM for language generation.
+        """
+        systems_used = []
+        
+        local_result = await self._call_local_llm(loop, prompt, max_tokens)
+        
+        if self._is_valid_response(local_result):
+            systems_used.append("vulcan_local_llm")
+            self.logger.info("[HybridExecutor] ✓ Local LLM language generation succeeded")
+            return {
+                "text": local_result,
+                "source": "local",
+                "systems_used": systems_used,
+                "metadata": {
+                    "mode": "local_only",
+                    "reason": "OpenAI unavailable - using local LLM",
+                },
+            }
+        
+        systems_used.append("vulcan_local_llm_failed")
+        
+        # Generate error reference
+        error_ref = hashlib.sha256(
+            f"{time.time_ns()}:{prompt[:50]}".encode()
+        ).hexdigest()[:12].upper()
+        
+        error_text = (
+            "I encountered an issue generating a response.\n\n"
+            "The language generation system is temporarily unavailable.\n\n"
+            "**Suggestions:**\n"
+            "• Please try again in a moment\n"
+            "• Try rephrasing your question\n\n"
+            f"If this issue persists, reference: **{error_ref}**"
+        )
+        
+        return {
+            "text": error_text,
+            "source": "error_local_unavailable",
+            "systems_used": systems_used,
+            "error": True,
+            "metadata": {
+                "mode": "local_only",
+                "reason": "Local LLM language generation failed",
+                "can_retry": True,
+                "error_reference": error_ref,
+            },
+        }
 
     # ============================================================
     # LLM CALL METHODS
