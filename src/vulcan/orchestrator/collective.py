@@ -874,23 +874,93 @@ class VULCANAGICollective:
 
         Returns:
             Required AgentCapability
+        
+        AGENT POOL CONFIGURATION FIX: Updated to include specialized reasoning 
+        capabilities that map to specific reasoning engines. This ensures proper
+        routing of queries to agents with the appropriate capability.
         """
         action = plan.get("action", {})
         action_type = str(action.get("type", "")).lower()
-
+        
+        # Also check task_type in parameters if present
+        task_type = str(plan.get("parameters", {}).get("task_type", "")).lower()
+        
+        # AGENT POOL FIX: Extended capability mapping for reasoning engines
+        # Maps action/task types to the appropriate AgentCapability
         capability_map = {
+            # Basic capabilities
             "perceive": AgentCapability.PERCEPTION,
+            "perception": AgentCapability.PERCEPTION,
             "reason": AgentCapability.REASONING,
+            "reasoning": AgentCapability.REASONING,
             "learn": AgentCapability.LEARNING,
+            "learning": AgentCapability.LEARNING,
             "plan": AgentCapability.PLANNING,
+            "planning": AgentCapability.PLANNING,
             "execute": AgentCapability.EXECUTION,
+            "execution": AgentCapability.EXECUTION,
             "memory": AgentCapability.MEMORY,
             "safety": AgentCapability.SAFETY,
             "self_improvement": AgentCapability.GENERAL,
+            
+            # AGENT POOL FIX: Specialized reasoning capabilities
+            # These map to reasoning engines stored in _AVAILABLE_ENGINES in portfolio_executor.py
+            "probabilistic": AgentCapability.PROBABILISTIC,
+            "probability": AgentCapability.PROBABILISTIC,
+            "bayesian": AgentCapability.PROBABILISTIC,
+            "bayes": AgentCapability.PROBABILISTIC,
+            
+            "symbolic": AgentCapability.SYMBOLIC,
+            "logic": AgentCapability.SYMBOLIC,
+            "sat": AgentCapability.SYMBOLIC,
+            "formal": AgentCapability.SYMBOLIC,
+            
+            "philosophical": AgentCapability.PHILOSOPHICAL,
+            "ethical": AgentCapability.PHILOSOPHICAL,
+            "moral": AgentCapability.PHILOSOPHICAL,
+            "deontic": AgentCapability.PHILOSOPHICAL,
+            "ethics": AgentCapability.PHILOSOPHICAL,
+            
+            "mathematical": AgentCapability.MATHEMATICAL,
+            "math": AgentCapability.MATHEMATICAL,
+            "proof": AgentCapability.MATHEMATICAL,
+            "induction": AgentCapability.MATHEMATICAL,
+            "calculus": AgentCapability.MATHEMATICAL,
+            
+            "causal": AgentCapability.CAUSAL,
+            "causality": AgentCapability.CAUSAL,
+            "intervention": AgentCapability.CAUSAL,
+            
+            "analogical": AgentCapability.ANALOGICAL,
+            "analogy": AgentCapability.ANALOGICAL,
+            "structure_map": AgentCapability.ANALOGICAL,
+            
+            "cryptographic": AgentCapability.CRYPTOGRAPHIC,
+            "crypto": AgentCapability.CRYPTOGRAPHIC,
+            "hash": AgentCapability.CRYPTOGRAPHIC,
+            "encrypt": AgentCapability.CRYPTOGRAPHIC,
+            
+            "world_model": AgentCapability.WORLD_MODEL,
+            "introspection": AgentCapability.WORLD_MODEL,
+            "counterfactual": AgentCapability.WORLD_MODEL,
+            "meta": AgentCapability.WORLD_MODEL,
+            "self_aware": AgentCapability.WORLD_MODEL,
+            
+            "multimodal": AgentCapability.MULTIMODAL,
+            "multi_modal": AgentCapability.MULTIMODAL,
+            
+            "language": AgentCapability.LANGUAGE,
+            "text": AgentCapability.LANGUAGE,
         }
 
+        # Check action_type first
         for key, cap in capability_map.items():
             if key in action_type:
+                return cap
+        
+        # AGENT POOL FIX: Also check task_type
+        for key, cap in capability_map.items():
+            if key in task_type:
                 return cap
 
         return AgentCapability.GENERAL
