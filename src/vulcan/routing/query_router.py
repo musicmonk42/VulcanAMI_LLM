@@ -2588,6 +2588,11 @@ class QueryAnalyzer:
         # These patterns indicate thought experiments, logic puzzles, ethical scenarios,
         # or creative requests - NOT actual self-introspection about Vulcan.
         # The "you" in these queries refers to a hypothetical decision-maker, NOT Vulcan.
+        # 
+        # CODE REVIEW FIX: Made patterns more specific to avoid false exclusions:
+        # - 'what is the' -> 'what is the probability', 'what is the answer'
+        # - 'write' -> 'write a poem', 'write a story', etc.
+        # - 'if...then' -> 'if then' (without dots)
         # =================================================================
         exclusion_patterns = (
             # Ethical dilemmas and trolley problems
@@ -2601,18 +2606,21 @@ class QueryAnalyzer:
             'prisoner', 'hat puzzle', 'knights and knaves', 'liar paradox',
             
             # Syllogisms and logic problems  
-            'birds fly', 'penguins', 'rules:', 'given:', 'if...then',
+            'birds fly', 'penguins', 'rules:', 'given:', 'if then',
             'all men are', 'socrates is', 'therefore', 'syllogism',
-            'conclusion', 'premise', 'inference',
+            'premise', 'inference',
             
-            # Mathematical/probability problems
-            'probability', 'calculate', 'what is the', 'compute', 'solve',
-            'how many', 'find the', 'evaluate', 'bayes', 'expected value',
+            # Mathematical/probability problems (more specific patterns)
+            'probability of', 'calculate the', 'compute the', 'solve for',
+            'how many', 'find the value', 'evaluate the', 'bayes theorem', 'expected value',
+            'what is the probability', 'what is the answer', 'what is the result',
             
-            # Creative requests (about AI as subject matter, not Vulcan itself)
-            'write', 'create', 'compose', 'poem', 'story', 'essay',
-            'tell me a', 'make me', 'give me', 'generate',
-            'write about ai', 'poem about', 'story about',
+            # Creative requests (specific phrases to avoid false positives)
+            # CODE REVIEW FIX: Made patterns more specific
+            'write a poem', 'write a story', 'write an essay', 'write about',
+            'create a poem', 'create a story', 'compose a',
+            'tell me a story', 'tell me a joke',
+            'poem about', 'story about',
         )
         
         # If any exclusion pattern is found, this is NOT self-introspection
