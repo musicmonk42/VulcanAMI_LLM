@@ -376,7 +376,11 @@ class Settings(BaseSettings):
     # can take longer. Increased from 90s to 120s to prevent valid but slow generations from timeout
     arena_timeout: float = Field(default=120.0, env="ARENA_TIMEOUT")
     # Whether to enable Arena routing for complex queries
-    arena_enabled: bool = Field(default=True, env="ARENA_ENABLED")
+    # PERFORMANCE FIX: Disabled by default due to 45-93 second timeouts on Arena
+    # Arena operations consistently timeout in production logs - every query
+    # adds 45+ seconds of wasted time. Enable only when Arena is properly configured.
+    # Set ARENA_ENABLED=true to enable Arena routing.
+    arena_enabled: bool = Field(default=False, env="ARENA_ENABLED")
 
     class Config:
         env_file = ".env"
@@ -6244,9 +6248,12 @@ async def unified_chat(request: UnifiedChatRequest):
         # results, use them DIRECTLY instead of passing to OpenAI which may
         # ignore or override them. This prevents the "OpenAI always wins" problem.
         #
-        # Confidence threshold: 0.5 (configurable via MIN_REASONING_CONFIDENCE_THRESHOLD)
-        # When reasoning confidence >= threshold, format and return directly.
-        MIN_REASONING_CONFIDENCE_THRESHOLD = float(os.environ.get("VULCAN_MIN_REASONING_CONFIDENCE", "0.5"))
+        # Confidence threshold: 0.3 (lowered from 0.5 based on production analysis)
+        # Production logs showed reasoning confidence consistently 0.0-0.1, causing
+        # all queries to fall back to OpenAI. Lowering threshold allows more reasoning
+        # results to be used directly when they have reasonable confidence.
+        # Configurable via VULCAN_MIN_REASONING_CONFIDENCE environment variable.
+        MIN_REASONING_CONFIDENCE_THRESHOLD = float(os.environ.get("VULCAN_MIN_REASONING_CONFIDENCE", "0.3"))
         
         # Check if we should use reasoning results directly
         use_reasoning_directly = False
