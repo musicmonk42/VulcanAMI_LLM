@@ -64,6 +64,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from threading import Thread
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
+import ast
 import threading
 import time
 import socket
@@ -720,7 +721,6 @@ def _format_conclusion_for_user(conclusion: Any, reasoning_type: str = "") -> st
                 
                 try:
                     # Try to parse as Python dict literal using ast.literal_eval (safer than eval)
-                    import ast
                     embedded_dict = ast.literal_eval(dict_str)
                     if isinstance(embedded_dict, dict):
                         # Check if this is a known analysis type we can format nicely
@@ -5328,8 +5328,25 @@ def _format_object_result(reasoning_type: str, result: Any) -> str:
     if hasattr(result, "__str__") and result.__str__ != object.__str__:
         result_str = str(result)
         # Sanity check: if str() produces something that looks like Python repr, truncate it
-        if result_str.startswith("ReasoningResult(") or "evidence=[" in result_str:
-            # This is a raw Python repr - truncate and explain
+        # Detection criteria for Python repr/dataclass output:
+        # 1. Starts with class name followed by parenthesis: "ClassName("
+        # 2. Contains list attributes with brackets: "field=[..." 
+        # 3. Contains nested objects: "ClassName(field=ClassName("
+        is_python_repr = False
+        
+        # Check for common dataclass/object repr patterns
+        if re.match(r'^[A-Z][a-zA-Z0-9_]*\(', result_str):
+            # Starts with capitalized class name and parenthesis
+            is_python_repr = True
+        elif re.search(r'\w+=\[.{50,}', result_str):
+            # Has attribute with long list value
+            is_python_repr = True
+        elif len(result_str) > 1000 and result_str.count('=') > 5:
+            # Very long string with many assignments (likely complex object dump)
+            is_python_repr = True
+        
+        if is_python_repr:
+            # This is a raw Python repr - provide user-friendly message
             return "Analysis completed. See metadata for details."
         return result_str
     
