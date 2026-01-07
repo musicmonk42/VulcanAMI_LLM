@@ -2189,14 +2189,31 @@ class ReasoningIntegration:
         # Check for creative writing requests FIRST before checking self-reference.
         # A query like "Write a poem about AI becoming self-aware" is a creative
         # request, not a question about VULCAN's own self-awareness.
+        #
+        # Uses word boundary matching (\b) to avoid false positives like
+        # 'rewrite' matching 'write'.
         # =====================================================================
-        creative_indicators = [
-            'write', 'poem', 'story', 'compose', 'create', 
-            'tell me a', 'imagine', 'narrative', 'fiction',
-            'make up', 'invent', 'draft', 'author'
+        import re
+        
+        # Single-word creative indicators (use word boundaries)
+        creative_words = [
+            'write', 'poem', 'story', 'compose', 'create',
+            'imagine', 'narrative', 'fiction', 'invent', 'draft', 'author'
         ]
-        if any(ind in query_lower for ind in creative_indicators):
-            # This is a creative writing request, not introspection
+        
+        # Multi-word creative phrases (match as-is)
+        creative_phrases = [
+            'tell me a', 'make up', 'write me', 'create a'
+        ]
+        
+        # Check for creative word indicators with word boundaries
+        for word in creative_words:
+            if re.search(rf'\b{word}\b', query_lower):
+                # This is a creative writing request, not introspection
+                return False
+        
+        # Check for creative phrases
+        if any(phrase in query_lower for phrase in creative_phrases):
             return False
         
         # =====================================================================
