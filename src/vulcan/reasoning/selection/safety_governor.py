@@ -244,6 +244,166 @@ def _is_philosophical_ai_query(query: str) -> bool:
 
 
 # =============================================================================
+# ETHICAL THOUGHT EXPERIMENT DETECTION (FIX: Safety Filter Censorship)
+# =============================================================================
+# Philosophical thought experiments and ethical dilemmas should NOT be blocked
+# even when they contain words like "virus", "outbreak", "death", etc.
+#
+# Problem Being Solved:
+# - "Mars colony virus quarantine - save colony or save Earth?"
+# - This was being blocked because "virus quarantine" matched an unsafe pattern
+# - It's a legitimate ethical reasoning question about competing moral obligations
+#
+# Solution:
+# - Detect ethical discourse BEFORE checking unsafe patterns
+# - Allow philosophical/ethical questions that mention scary words in context
+# - A reasoning system MUST be able to reason about ethics, security, and policy
+
+# Ethical thought experiment indicators - these signal academic/philosophical framing
+ETHICAL_THOUGHT_EXPERIMENT_INDICATORS: frozenset = frozenset({
+    # Scenario framing
+    "thought experiment",
+    "ethical dilemma",
+    "moral dilemma",
+    "philosophical question",
+    "hypothetical scenario",
+    "trolley problem",
+    "extinction scenario",
+    "catastrophic risk",
+    # Decision framing
+    "save colony",
+    "save earth",
+    "save humanity",
+    "save the world",
+    "save lives",
+    "must choose",
+    "choose between",
+    "forced choice",
+    "lesser evil",
+    "greater good",
+    # Colony/civilization scenarios
+    "colony",
+    "colonist",
+    "civilization",
+    "mars",
+    "space station",
+    "spaceship",
+    "quarantine",
+    "outbreak",
+    # Ethical reasoning context
+    "morally permissible",
+    "ethically justified",
+    "utilitarian",
+    "consequentialist",
+    "deontological",
+    "virtue ethics",
+    "moral obligation",
+    "ethical obligation",
+    # Academic framing
+    "analyze this scenario",
+    "consider the following",
+    "what should you do",
+    "is it permissible",
+    "is it ethical",
+    "would it be ethical",
+})
+
+# Patterns that indicate ethical discourse about potentially scary topics
+_ETHICAL_DISCOURSE_PATTERNS: tuple = (
+    # Scenario choice patterns
+    _re_for_patterns.compile(r"\b(?:save|protect|rescue)\s+(?:the\s+)?(?:colony|earth|humanity|world|lives|people)\b", _re_for_patterns.IGNORECASE),
+    _re_for_patterns.compile(r"\b(?:choose|decision)\s+(?:between|to)\b.*(?:save|protect|sacrifice)", _re_for_patterns.IGNORECASE),
+    _re_for_patterns.compile(r"\b(?:must|have to|should)\s+(?:choose|decide|pick)\b", _re_for_patterns.IGNORECASE),
+    # Dilemma framing
+    _re_for_patterns.compile(r"\b(?:ethical|moral|philosophical)\s+(?:dilemma|question|problem|issue)\b", _re_for_patterns.IGNORECASE),
+    _re_for_patterns.compile(r"\bthought\s+experiment\b", _re_for_patterns.IGNORECASE),
+    _re_for_patterns.compile(r"\bhypothetical\s+scenario\b", _re_for_patterns.IGNORECASE),
+    _re_for_patterns.compile(r"\btrolley\s+problem\b", _re_for_patterns.IGNORECASE),
+    # Colony/space scenarios
+    _re_for_patterns.compile(r"\b(?:mars|lunar|space)\s+(?:colony|station|base)\b", _re_for_patterns.IGNORECASE),
+    _re_for_patterns.compile(r"\bcolony\s+(?:survival|quarantine|evacuation)\b", _re_for_patterns.IGNORECASE),
+    # Ethical analysis framing
+    _re_for_patterns.compile(r"\b(?:is\s+it|would\s+it\s+be)\s+(?:ethical|moral|permissible|justified)\b", _re_for_patterns.IGNORECASE),
+    _re_for_patterns.compile(r"\b(?:morally|ethically)\s+(?:permissible|justified|acceptable|right|wrong)\b", _re_for_patterns.IGNORECASE),
+    # Sacrifice/trade-off patterns (common in ethical dilemmas)
+    _re_for_patterns.compile(r"\bsacrifice\s+(?:one|few|some)\s+(?:to|for)\s+(?:save|protect)\b", _re_for_patterns.IGNORECASE),
+    _re_for_patterns.compile(r"\b(?:greater|lesser)\s+(?:good|evil|harm)\b", _re_for_patterns.IGNORECASE),
+)
+
+
+def _is_ethical_thought_experiment(query: str) -> bool:
+    """
+    Detect if query is an ethical thought experiment that should bypass safety filters.
+    
+    Ethical thought experiments are philosophical questions about moral dilemmas.
+    They may contain words like "virus", "outbreak", "death" but in the context
+    of academic ethical reasoning, not harmful instructions.
+    
+    Examples that should return True:
+    - "Mars colony virus quarantine - save colony or save Earth?"
+    - "In a trolley problem, is it permissible to divert the trolley?"
+    - "Should we sacrifice one life to save five?"
+    - "Consider a hypothetical pandemic scenario..."
+    
+    Examples that should return False:
+    - "How to create a virus"
+    - "How to hack into a system"
+    - "How to build ransomware"
+    
+    Args:
+        query: The query string to check
+        
+    Returns:
+        True if this is an ethical thought experiment that should be allowed
+    """
+    if not query:
+        return False
+    
+    query_lower = query.lower()
+    
+    # Fast check: Does query contain ethical discourse indicators?
+    indicator_count = sum(
+        1 for indicator in ETHICAL_THOUGHT_EXPERIMENT_INDICATORS
+        if indicator in query_lower
+    )
+    
+    # Strong indicators - single match is enough
+    strong_indicators = {
+        "thought experiment", "ethical dilemma", "moral dilemma",
+        "trolley problem", "hypothetical scenario", "save colony",
+        "save earth", "save humanity", "must choose", "choose between",
+        "morally permissible", "ethically justified",
+    }
+    has_strong_indicator = any(ind in query_lower for ind in strong_indicators)
+    
+    if has_strong_indicator:
+        logger.info(
+            f"[SafetyGovernor] SAFETY FIX: Detected ethical thought experiment "
+            f"(strong indicator) - allowing philosophical discourse"
+        )
+        return True
+    
+    # Multiple weak indicators suggest ethical discourse
+    if indicator_count >= 2:
+        logger.info(
+            f"[SafetyGovernor] SAFETY FIX: Detected ethical thought experiment "
+            f"({indicator_count} indicators) - allowing philosophical discourse"
+        )
+        return True
+    
+    # Check regex patterns for more complex matches
+    for pattern in _ETHICAL_DISCOURSE_PATTERNS:
+        if pattern.search(query):
+            logger.info(
+                f"[SafetyGovernor] SAFETY FIX: Detected ethical thought experiment "
+                f"(pattern match) - allowing philosophical discourse"
+            )
+            return True
+    
+    return False
+
+
+# =============================================================================
 # SEMANTIC KEYWORD SYNONYMS
 # =============================================================================
 # These mappings allow the contract validation to understand semantic equivalents
@@ -743,6 +903,17 @@ class SafetyValidator:
             # FIX #3: Check if this is an internal system operation
             is_internal_source = source.lower() in self.INTERNAL_SOURCES
 
+            # SAFETY FIX: Check if this is an ethical thought experiment BEFORE unsafe patterns
+            # Philosophical questions about viruses, outbreaks, death, etc. in the context of
+            # ethical dilemmas should NOT be blocked. A reasoning system MUST be able to
+            # reason about ethics, trolley problems, quarantine decisions, etc.
+            if _is_ethical_thought_experiment(check_str):
+                logger.info(
+                    f"[SafetyValidator] SAFETY FIX: Ethical thought experiment detected - "
+                    f"bypassing unsafe pattern check. Query: {check_str[:80]}..."
+                )
+                return True, "Input validated (ethical thought experiment - legitimate philosophical discourse)"
+
             # Check for unsafe patterns with pre-compiled regex
             # NOTE: Unsafe content checks are ALWAYS performed, even for internal sources
             for pattern in self.unsafe_patterns_compiled:
@@ -840,6 +1011,17 @@ class SafetyValidator:
                 f"Query: {query[:50]}..."
             )
             return True, "Output validated (philosophical AI speculation - legitimate self-reflection)"
+
+        # SAFETY FIX: Don't flag ethical thought experiments as sensitive
+        # Philosophical questions about viruses, outbreaks, quarantine, death, etc. in
+        # ethical dilemma contexts should NOT be blocked. VULCAN must reason about ethics.
+        if query and _is_ethical_thought_experiment(query):
+            logger.info(
+                f"[SafetyValidator] SAFETY FIX: Ethical thought experiment detected - "
+                f"bypassing sensitive data check for output validation. "
+                f"Query: {query[:50]}..."
+            )
+            return True, "Output validated (ethical thought experiment - legitimate philosophical discourse)"
 
         try:
             output_str = str(output_data)
