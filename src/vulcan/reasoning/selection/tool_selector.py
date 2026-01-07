@@ -2004,17 +2004,25 @@ class ProbabilisticToolWrapper:
         else:
             problem_text = problem
         
-        # Check if this looks like a Bayesian calculation query
-        if not self._BAYES_PATTERN.search(problem_text):
-            return None
-        
-        # Try to extract parameters
+        # Try to extract parameters first
         sens_match = self._SENSITIVITY_PATTERN.search(problem_text)
         spec_match = self._SPECIFICITY_PATTERN.search(problem_text)
         prev_match = self._PREVALENCE_PATTERN.search(problem_text)
         
-        if not (sens_match and spec_match and prev_match):
-            # Not enough parameters for Bayes calculation
+        # =========================================================================
+        # BUG #1 FIX (Jan 7 2026): Recognize Bayes problems by parameters alone
+        # =========================================================================
+        # If ALL THREE parameters (sensitivity, specificity, prevalence) are present,
+        # this is clearly a Bayes theorem problem even without explicit "bayes" keyword.
+        has_all_bayes_params = sens_match and spec_match and prev_match
+        has_bayes_indicator = self._BAYES_PATTERN.search(problem_text)
+        
+        # Check if this looks like a Bayesian calculation query
+        if not (has_bayes_indicator or has_all_bayes_params):
+            return None
+        
+        if not has_all_bayes_params:
+            # Found Bayes indicator but missing parameters
             logger.debug(
                 f"[ProbabilisticEngine] Found Bayes keywords but missing parameters: "
                 f"sens={sens_match is not None}, spec={spec_match is not None}, prev={prev_match is not None}"

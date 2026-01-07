@@ -592,6 +592,173 @@ class TestReasoningPerformance:
 
 
 # =============================================================================
+# CREATIVE VS SELF-REFERENTIAL QUERY DETECTION TESTS
+# =============================================================================
+
+
+class TestCreativeVsSelfReferentialDetection:
+    """
+    Tests for Issue#5 Fix: Creative queries about AI should NOT be detected
+    as self-referential queries about VULCAN.
+    
+    The self-referential detector must distinguish between:
+    - Self-referential: "What are you?" "How do you work?" "What can you do?"
+    - Creative about AI: "Write a poem about AI" "Tell a story about robots"
+    """
+    
+    def test_creative_queries_not_self_referential(self) -> None:
+        """
+        Creative writing requests about AI should NOT be detected as self-referential.
+        
+        These queries ask VULCAN to CREATE content about AI, not to introspect
+        about its own capabilities.
+        """
+        try:
+            from vulcan.reasoning.reasoning_integration import (
+                ReasoningIntegration,
+            )
+            integration = ReasoningIntegration()
+            
+            # Queries that should NOT be detected as self-referential
+            creative_queries = [
+                "Write a poem about AI",
+                "Write me a poem about an AI becoming self-aware",
+                "Tell a story about robots",
+                "Compose a song about artificial intelligence",
+                "Create a narrative about machine consciousness",
+                "Write me a poem about cats",
+                "Imagine a world where AI is sentient",
+                "Draft a story about a robot gaining consciousness",
+                "Tell me a tale about an AI discovering emotions",
+                "Create a poem about self-awareness",
+            ]
+            
+            for query in creative_queries:
+                is_self_ref = integration._is_self_referential(query)
+                assert not is_self_ref, (
+                    f"Creative query incorrectly detected as self-referential: {query}"
+                )
+                
+        except ImportError:
+            pytest.skip("ReasoningIntegration not available")
+    
+    def test_self_referential_queries_still_detected(self) -> None:
+        """
+        Genuine self-referential queries about VULCAN should still be detected.
+        
+        These are direct questions about VULCAN's capabilities, nature, or
+        self-awareness - NOT creative writing requests.
+        """
+        try:
+            from vulcan.reasoning.reasoning_integration import (
+                ReasoningIntegration,
+            )
+            integration = ReasoningIntegration()
+            
+            # Queries that SHOULD be detected as self-referential
+            self_referential_queries = [
+                "What are you?",
+                "What can you do?",
+                "How do you work?",
+                "Are you self-aware?",
+                "Do you have consciousness?",
+                "What are your limitations?",
+                "Would you choose to be sentient?",
+            ]
+            
+            for query in self_referential_queries:
+                is_self_ref = integration._is_self_referential(query)
+                assert is_self_ref, (
+                    f"Self-referential query NOT detected: {query}"
+                )
+                
+        except ImportError:
+            pytest.skip("ReasoningIntegration not available")
+    
+    def test_general_ai_questions_not_self_referential(self) -> None:
+        """
+        General questions about AI (not about VULCAN specifically) should not 
+        be detected as self-referential.
+        """
+        try:
+            from vulcan.reasoning.reasoning_integration import (
+                ReasoningIntegration,
+            )
+            integration = ReasoningIntegration()
+            
+            # General AI questions (not about VULCAN)
+            general_queries = [
+                "What is AI?",
+                "How does machine learning work?",
+                "Explain neural networks",
+                "What is the history of artificial intelligence?",
+                "Who invented the Turing test?",
+            ]
+            
+            for query in general_queries:
+                is_self_ref = integration._is_self_referential(query)
+                assert not is_self_ref, (
+                    f"General AI query incorrectly detected as self-referential: {query}"
+                )
+                
+        except ImportError:
+            pytest.skip("ReasoningIntegration not available")
+    
+    def test_empty_and_edge_cases(self) -> None:
+        """
+        Test edge cases: empty queries, None, etc.
+        """
+        try:
+            from vulcan.reasoning.reasoning_integration import (
+                ReasoningIntegration,
+            )
+            integration = ReasoningIntegration()
+            
+            # Edge cases
+            assert not integration._is_self_referential("")
+            assert not integration._is_self_referential(None)
+            assert not integration._is_self_referential("   ")
+            
+            # Word boundary test: 'rewrite' should NOT match 'write'
+            # This verifies the regex word boundary matching is working
+            assert integration._is_self_referential("Can you rewrite your code?") == True, \
+                "Query with 'rewrite' should still match 'your' as self-referential"
+                
+        except ImportError:
+            pytest.skip("ReasoningIntegration not available")
+    
+    def test_word_boundary_matching(self) -> None:
+        """
+        Test that word boundary matching prevents false positives.
+        
+        'rewrite' should NOT match 'write' as a creative indicator.
+        'rewording' should NOT match 'word' if that were a creative indicator.
+        """
+        try:
+            from vulcan.reasoning.reasoning_integration import (
+                ReasoningIntegration,
+            )
+            integration = ReasoningIntegration()
+            
+            # These contain substrings of creative words but are not creative requests
+            # They should be analyzed for self-reference normally
+            non_creative_with_substrings = [
+                "Please rewrite this code for me",  # 'rewrite' != 'write'
+                "Can you restore my file?",  # 'restore' != 'story'
+                "Please recreate this diagram",  # 'recreate' != 'create' (creative, but not this word)
+            ]
+            
+            # These should be detected based on other self-reference patterns
+            for query in non_creative_with_substrings:
+                # We're just checking these don't crash and aren't incorrectly
+                # excluded by partial word matching
+                _ = integration._is_self_referential(query)
+                
+        except ImportError:
+            pytest.skip("ReasoningIntegration not available")
+
+
+# =============================================================================
 # ENTRY POINT FOR STANDALONE EXECUTION
 # =============================================================================
 

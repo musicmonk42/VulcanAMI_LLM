@@ -2207,18 +2207,33 @@ class ProbabilisticReasoner(EnhancedProbabilisticReasoner):
         """
         if not isinstance(input_data, str):
             return None
-            
-        # Check if this looks like a Bayesian calculation query
-        if not self._bayes_pattern.search(input_data):
-            return None
-            
-        # Try to extract parameters
+        
+        # Try to extract parameters first
         sens_match = self._sensitivity_pattern.search(input_data)
         spec_match = self._specificity_pattern.search(input_data)
         prev_match = self._prevalence_pattern.search(input_data)
         
-        if not (sens_match and spec_match and prev_match):
-            # Not enough parameters for Bayes calculation
+        # =========================================================================
+        # BUG #1 FIX (Jan 7 2026): Recognize Bayes problems by parameters alone
+        # =========================================================================
+        # If ALL THREE parameters (sensitivity, specificity, prevalence) are present,
+        # this is clearly a Bayes theorem problem even without explicit "bayes" keyword.
+        # Previously required: bayes/bayesian/posterior/P(A|B) pattern
+        # Now: Also recognize when all three diagnostic test parameters are provided
+        has_all_bayes_params = sens_match and spec_match and prev_match
+        has_bayes_indicator = self._bayes_pattern.search(input_data)
+        
+        # Check if this looks like a Bayesian calculation query
+        if not (has_bayes_indicator or has_all_bayes_params):
+            return None
+            
+        if not has_all_bayes_params:
+            # Found Bayes indicator but missing parameters - log and return None
+            # (This is not a regression - original code also returned None here)
+            logger.debug(
+                f"[ProbabilisticReasoner] Found Bayes indicator but missing parameters: "
+                f"sens={sens_match is not None}, spec={spec_match is not None}, prev={prev_match is not None}"
+            )
             return None
             
         try:
