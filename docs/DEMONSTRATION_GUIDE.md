@@ -11,6 +11,7 @@ This document provides an honest assessment of what capabilities exist in the Vu
 | Claim | Provable? | Evidence Location | Demo Difficulty |
 |-------|-----------|-------------------|-----------------|
 | Small local LLM (6 layers) | ✅ YES | `src/llm_core/graphix_transformer.py` | Easy |
+| **Trained Local GPT Model** | ✅ YES | `src/local_llm/` + `exp_probe_1p34m/` | Easy |
 | Air-gappable / offline capable | ✅ YES | No external API dependencies in core | Easy |
 | Explicit execution graphs | ✅ YES | `src/llm_core/*.py` IR system | Medium |
 | Audit trail logging | ✅ YES | `src/audit_log.py` | Easy |
@@ -70,6 +71,87 @@ print(f'Generated: {output}')
 **What to claim:** "Vulcan uses a small, configurable transformer (default 6 layers, ~10M parameters) that runs locally."
 
 **What NOT to claim:** Don't claim "50k token context" - the default is 1024. The architecture supports longer contexts but would need configuration changes and memory.
+
+---
+
+### Claim: "Trained Local GPT Model" (Production-Ready)
+
+**STATUS: ✅ FULLY PROVABLE - INCLUDES TRAINED WEIGHTS**
+
+**Evidence Files:**
+- `src/local_llm/provider/local_gpt_provider.py` - Production GPT provider
+- `src/local_llm/tokenizer/simple_tokenizer.py` - Tokenizer implementation
+- `src/local_llm/tokenizer/vocab.json` - 31,717 token vocabulary
+- `src/training/gpt_model.py` - PyTorch GPT model implementation
+- `exp_probe_1p34m/llm_best_model.pt` - **Trained model weights (~91MB)**
+- `exp_probe_1p34m/llm_meta_state.json` - Training history with 299 steps
+
+**This is the PRIMARY local LLM** - a production-ready PyTorch GPT model with:
+- Trained weights (not just architecture)
+- 31,717 token vocabulary
+- Temperature, top-k, top-p, repetition penalty controls
+- Streaming generation support
+- Perplexity/scoring utilities
+- Confidence calibration
+
+**Configuration (from code):**
+```python
+# From local_gpt_provider.py
+@dataclass
+class ProviderInitConfig:
+    model_path: str           # Path to trained .pt file
+    vocab_path: str           # Path to vocabulary
+    device: str = "cpu"       # CPU or CUDA
+    seq_len: int = 256        # Sequence length
+    dim: int = 384            # Model dimension
+    n_layers: int = 6         # 6 transformer layers
+    n_heads: int = 8          # 8 attention heads
+    ff_mult: int = 4          # Feed-forward multiplier
+    temperature: float = 0.9  # Generation temperature
+    top_k: int = 64           # Top-k sampling
+    top_p: float = 0.95       # Nucleus sampling
+```
+
+**Demonstration:**
+```bash
+# Show the trained model exists
+python -c "
+import os
+model_path = 'exp_probe_1p34m/llm_best_model.pt'
+vocab_path = 'src/local_llm/tokenizer/vocab.json'
+
+print('=== TRAINED LOCAL GPT MODEL ===')
+print(f'Model file: {model_path}')
+print(f'Model size: {os.path.getsize(model_path) / 1024 / 1024:.1f} MB')
+print(f'Vocab file: {vocab_path}')
+
+import json
+with open(vocab_path) as f:
+    vocab = json.load(f)
+print(f'Vocabulary size: {len(vocab[\"vocab\"]):,} tokens')
+"
+
+# Load and use the model (requires torch)
+python -c "
+from src.local_llm.provider.local_gpt_provider import LocalGPTProvider, ProviderInitConfig
+
+cfg = ProviderInitConfig(
+    model_path='exp_probe_1p34m/llm_best_model.pt',
+    vocab_path='src/local_llm/tokenizer/vocab.json',
+    device='cpu',
+    n_layers=6,
+    dim=384,
+    n_heads=8
+)
+provider = LocalGPTProvider(cfg)
+text, meta = provider.generate('Once upon a time', max_new_tokens=50)
+print(f'Generated: {text}')
+"
+```
+
+**What to claim:** "Vulcan includes a trained local GPT model with 31,717 token vocabulary and production-ready inference."
+
+**This is stronger proof than GraphixTransformer** because it includes actual trained weights, not just the architecture.
 
 ---
 
