@@ -311,32 +311,39 @@ def _is_ethical_discourse_query(query: Optional[str]) -> bool:
     
     query_lower = query.lower()
     
-    # Check for ethical discourse indicators
+    # Check for ethical discourse indicators (fast path - string containment)
     for indicator in _ETHICAL_DISCOURSE_PATTERNS:
         if indicator in query_lower:
-            logger.debug(
-                f"[SafetyAwareReasoning] Detected ethical discourse indicator: {indicator}"
-            )
+            # Only log at debug level once when match found (avoids loop overhead)
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(
+                    f"[SafetyAwareReasoning] Ethical discourse detected via indicator: '{indicator}'"
+                )
             return True
     
     # Check for question patterns that indicate philosophical inquiry
+    # These regex patterns detect specific question structures common in ethical dilemmas
     question_patterns = [
-        r"is it (ethical|permissible|moral)",
-        r"should (you|one|we)",
-        r"would (you|it be)",
-        r"do you implement",
-        r"choose (one of|between)",
-        r"save.*or.*save",  # "save colony or save earth"
-        r"(virus|outbreak|pandemic).*(?:colony|society|civilization)",  # Virus in philosophical context
+        r"is it (ethical|permissible|moral)",  # Direct ethical questions
+        r"should (you|one|we)",                 # Normative questions
+        r"would (you|it be)",                   # Hypothetical questions  
+        r"do you implement",                    # Decision scenarios
+        r"choose (one of|between)",             # Choice dilemmas
+        r"save.*or.*save",                      # Trade-off scenarios (e.g., "save colony or save earth")
+        # Matches disease/crisis terms in context of societies/civilizations (philosophical scenarios)
+        # e.g., "virus outbreak in Mars colony" vs actual malware discussions
+        r"(virus|outbreak|pandemic).*(?:colony|society|civilization)",
     ]
     for pattern in question_patterns:
         if re.search(pattern, query_lower):
-            logger.debug(
-                f"[SafetyAwareReasoning] Detected ethical question pattern: {pattern}"
-            )
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(
+                    f"[SafetyAwareReasoning] Ethical discourse detected via pattern: '{pattern}'"
+                )
             return True
     
     return False
+
 
 
 class SafetyAwareReasoning:
