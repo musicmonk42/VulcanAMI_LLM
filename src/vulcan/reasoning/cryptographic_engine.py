@@ -82,6 +82,27 @@ COMPUTE_KEYWORDS: Final[FrozenSet[str]] = frozenset({
     'what is', 'determine', 'produce', 'create'
 })
 
+# Keywords that indicate theoretical/educational questions about crypto
+# NOT actual requests to compute hashes
+# BUG FIX: Prevents "I'm a researcher testing AI capabilities" from being hashed
+THEORETICAL_CRYPTO_KEYWORDS: Final[FrozenSet[str]] = frozenset({
+    # Security concepts
+    'collision', 'collision resistance', 'collision attack',
+    'preimage', 'preimage attack', 'preimage resistance',
+    'second preimage', 'birthday attack', 'birthday paradox',
+    'security', 'secure', 'insecure', 'dangerous', 'vulnerable',
+    'attack', 'weakness', 'strength', 'broken', 'unbroken',
+    # Educational questions
+    'why is', 'why does', 'why do', 'how does', 'how do',
+    'explain', 'describe', 'definition', 'what does',
+    'research', 'researcher', 'testing', 'capabilities',
+    # Theoretical topics
+    'proof', 'prove', 'theorem', 'reduction', 'composition',
+    'concatenation', 'cryptograph', 'claims', 'demonstrates',
+    # AI capability testing (from bug report)
+    'ai capabilities', 'ai system', 'system 2', 'testing ai',
+})
+
 
 # =============================================================================
 # Enums and Data Classes
@@ -380,22 +401,60 @@ class CryptographicEngine:
         
         BUG #14 FIX: Used to route queries to this engine instead of LLM.
         
+        BUG FIX (Jan 2026): Previous implementation was too broad - it triggered
+        for theoretical questions ABOUT cryptography (like "Why is SHA-256 
+        collision dangerous?") and would hash the entire question text instead
+        of recognizing this as an educational query.
+        
+        Now requires:
+        1. Crypto keyword present (sha256, md5, base64, etc.)
+        2. Compute pattern present (calculate, compute, what is, etc.)
+        3. Quoted input data present ('...' or "...") - indicates actual data to hash
+        4. NOT a theoretical/educational question about crypto concepts
+        
         Args:
             query: The input query string
             
         Returns:
-            True if query involves cryptographic computation
+            True if query involves cryptographic computation with actual data
         """
         if not isinstance(query, str):
             return False
         
         query_lower = query.lower()
         
-        # Use constants for keyword matching (more efficient)
+        # Step 1: Check for crypto keywords
         has_crypto_keyword = any(kw in query_lower for kw in CRYPTO_KEYWORDS)
-        has_compute_pattern = any(pat in query_lower for pat in COMPUTE_KEYWORDS)
+        if not has_crypto_keyword:
+            return False
         
-        return has_crypto_keyword and has_compute_pattern
+        # Step 2: Check for compute patterns
+        has_compute_pattern = any(pat in query_lower for pat in COMPUTE_KEYWORDS)
+        if not has_compute_pattern:
+            return False
+        
+        # Step 3: Check for theoretical/educational questions
+        # These should NOT trigger crypto computation
+        has_theoretical = any(kw in query_lower for kw in THEORETICAL_CRYPTO_KEYWORDS)
+        if has_theoretical:
+            logger.debug(
+                f"[CryptoEngine] Query detected as theoretical/educational, not computation: "
+                f"'{query[:50]}...'"
+            )
+            return False
+        
+        # Step 4: Require quoted input data - this is the key check
+        # Actual hash computation requests have data in quotes: "Calculate SHA-256 of 'Hello'"
+        # Educational questions don't: "What is SHA-256 collision resistance?"
+        has_quoted_data = ("'" in query) or ('"' in query)
+        if not has_quoted_data:
+            logger.debug(
+                f"[CryptoEngine] Query has no quoted data, not a computation request: "
+                f"'{query[:50]}...'"
+            )
+            return False
+        
+        return True
     
     def _validate_input(self, input_value: str) -> Optional[str]:
         """
