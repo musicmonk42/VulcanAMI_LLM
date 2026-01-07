@@ -45,6 +45,37 @@ from .reasoning_types import (
 logger = logging.getLogger(__name__)
 
 # ==============================================================================
+# CACHE CONFIGURATION
+# ==============================================================================
+# These constants control the unified reasoning cache behavior.
+# BUG FIX (Jan 7 2026): Cache key was using only 8 chars, causing collisions.
+
+# Number of hex characters to use from SHA-256 hash for cache keys
+# 16 hex chars = 64 bits = very low collision probability
+CACHE_HASH_LENGTH = 16
+
+# Maximum cache entry age in seconds (5 minutes)
+CACHE_MAX_AGE_SECONDS = 300.0
+
+
+def _compute_query_hash(query_data: Any) -> str:
+    """
+    Compute a consistent hash for query data.
+    
+    BUG FIX (Jan 7 2026): Extracted into helper function to ensure consistent
+    hash computation across cache key generation and cache validation.
+    
+    Args:
+        query_data: The query data to hash (string, dict, or other)
+        
+    Returns:
+        First CACHE_HASH_LENGTH chars of SHA-256 hex digest
+    """
+    query_str = str(query_data) if not isinstance(query_data, str) else query_data
+    return hashlib.sha256(query_str.encode('utf-8')).hexdigest()[:CACHE_HASH_LENGTH]
+
+
+# ==============================================================================
 # MATHEMATICAL VERIFICATION CONSTANTS
 # ==============================================================================
 # These constants control the mathematical verification and learning integration.
@@ -1308,15 +1339,15 @@ class UnifiedReasoner:
                         cached_time = cached_result.metadata.get('cache_timestamp', 0)
                         if cached_time > 0:
                             cache_age = time.time() - cached_time
-                            if cache_age > 300:  # 5 minutes
+                            if cache_age > CACHE_MAX_AGE_SECONDS:
                                 cache_valid = False
-                                validation_reason = f"Cache expired: age={cache_age:.1f}s > 300s"
+                                validation_reason = f"Cache expired: age={cache_age:.1f}s > {CACHE_MAX_AGE_SECONDS}s"
                     
                     # Check 3: Original query match (if stored)
                     if cache_valid and hasattr(cached_result, 'metadata') and isinstance(cached_result.metadata, dict):
                         cached_query = cached_result.metadata.get('original_query_hash')
                         if cached_query:
-                            current_query_hash = hashlib.sha256(str(task.query).encode()).hexdigest()[:16]
+                            current_query_hash = _compute_query_hash(task.query)
                             if cached_query != current_query_hash:
                                 cache_valid = False
                                 validation_reason = f"Query hash mismatch: cache collision detected"
@@ -1465,7 +1496,7 @@ class UnifiedReasoner:
                     if result.metadata is None:
                         result.metadata = {}
                     result.metadata['cache_timestamp'] = time.time()
-                    result.metadata['original_query_hash'] = hashlib.sha256(str(task.query).encode()).hexdigest()[:16]
+                    result.metadata['original_query_hash'] = _compute_query_hash(task.query)
                     result.metadata['cached_task_type'] = task.task_type.value if isinstance(task.task_type, ReasoningType) else str(task.task_type)
                 
                 self.result_cache[cache_key] = result
@@ -3818,9 +3849,9 @@ class UnifiedReasoner:
                 if relevant_constraints:
                     content_parts.append(f"constraints:{str(sorted(relevant_constraints.items()))}")
             
-            # Compute SHA-256 hash of combined content
+            # Compute SHA-256 hash of combined content using helper function
             content_str = "|".join(content_parts)
-            content_hash = hashlib.sha256(content_str.encode('utf-8')).hexdigest()[:16]
+            content_hash = hashlib.sha256(content_str.encode('utf-8')).hexdigest()[:CACHE_HASH_LENGTH]
             
             # Build final cache key
             key_parts = [

@@ -5159,7 +5159,6 @@ Which one would you like me to demonstrate? Just ask a specific question and I'l
         
         Uses the CounterfactualObjectiveReasoner to analyze a real trade-off.
         """
-        import time
         start_time = time.time()
         
         # Check if we have the counterfactual reasoner available

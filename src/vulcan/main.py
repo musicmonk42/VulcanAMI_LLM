@@ -719,8 +719,17 @@ def _format_conclusion_for_user(conclusion: Any, reasoning_type: str = "") -> st
                 preamble = conclusion[:dict_start].strip()
                 dict_str = conclusion[dict_start:]
                 
+                # Security: Limit size of string to parse to prevent DoS
+                # ast.literal_eval is safe for code injection but can be slow on large inputs
+                MAX_LITERAL_EVAL_SIZE = 10000  # 10KB limit
+                if len(dict_str) > MAX_LITERAL_EVAL_SIZE:
+                    logger.debug(f"[Format] Dict string too large ({len(dict_str)} chars), skipping parse")
+                    return conclusion
+                
                 try:
                     # Try to parse as Python dict literal using ast.literal_eval (safer than eval)
+                    # Note: ast.literal_eval only evaluates literal structures (strings, numbers,
+                    # tuples, lists, dicts, booleans, None) - it cannot execute arbitrary code
                     embedded_dict = ast.literal_eval(dict_str)
                     if isinstance(embedded_dict, dict):
                         # Check if this is a known analysis type we can format nicely
