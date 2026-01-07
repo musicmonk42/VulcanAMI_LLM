@@ -2228,7 +2228,12 @@ class ProbabilisticReasoner(EnhancedProbabilisticReasoner):
             return None
             
         if not has_all_bayes_params:
-            # Not enough parameters for Bayes calculation
+            # Found Bayes indicator but missing parameters - log and return None
+            # (This is not a regression - original code also returned None here)
+            logger.debug(
+                f"[ProbabilisticReasoner] Found Bayes indicator but missing parameters: "
+                f"sens={sens_match is not None}, spec={spec_match is not None}, prev={prev_match is not None}"
+            )
             return None
             
         try:

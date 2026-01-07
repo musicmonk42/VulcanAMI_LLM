@@ -4786,14 +4786,10 @@ def _format_dict_result(reasoning_type: str, result: Dict[str, Any]) -> str:
                 lines.append(f"Error: {result['error']}")
             lines.append(f"Method: {method}")
         
-        # Add confidence if present
+        # Add confidence if present (handled below to avoid duplication)
         conf = result.get("confidence")
         if conf is not None and isinstance(conf, (int, float)):
             lines.append(f"Confidence: {conf:.1%}")
-        
-        # Return early if we formatted symbolic output
-        if lines:
-            return "\n".join(lines)
     
     # BUG FIX: Add explanation if present (from ReasoningResult)
     if "explanation" in result and result["explanation"]:
