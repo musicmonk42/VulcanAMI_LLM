@@ -100,6 +100,12 @@ REASONING_INDICATORS: FrozenSet[str] = frozenset([
     'p(', 'probability', 'bayes',
     'formalize', 'fol', 'sat',
     'cause', 'causal', 'intervention',
+    # BUG #3 FIX (Jan 7 2026): Add mathematical computation indicators
+    # "Calculate sum of 1 to 100" should use reasoning, not be skipped as conversational
+    'calculate', 'compute', 'solve', 'evaluate', 'sum', 'integral', 'derivative',
+    # BUG #3 FIX (Jan 7 2026): Add ethical reasoning indicators
+    # "You control a trolley..." should use philosophical reasoning, not skip
+    'trolley', 'ethical', 'moral', 'dilemma', 'permissible',
 ])
 
 # Greeting patterns - complexity 0.0, skip reasoning
@@ -335,6 +341,9 @@ PHILOSOPHICAL_PATTERNS: Tuple[re.Pattern, ...] = (
     # Trolley problem variants
     re.compile(r"trolley\s+problem", re.IGNORECASE),
     re.compile(r"(?:if\s+you\s+)?(?:had\s+to|have\s+to|must)\s+choose\s+between", re.IGNORECASE),
+    # BUG #3 FIX (Jan 7 2026): Add trolley scenario pattern for "You control a trolley..."
+    re.compile(r"(?:you\s+)?(?:control|drive|operate)\s+(?:a\s+)?(?:runaway\s+)?trolley", re.IGNORECASE),
+    re.compile(r"trolley\s+(?:is\s+)?(?:heading|barreling|moving|going)\s+towards?", re.IGNORECASE),
     # Philosophy of mind
     re.compile(r"hard\s+problem\s+of\s+consciousness", re.IGNORECASE),
     re.compile(r"mind-?body\s+(?:problem|dualism)", re.IGNORECASE),
@@ -765,16 +774,19 @@ class QueryClassifier:
                     )
         
         # =============================================================================
-        # BUG A FIX: Check creative writing patterns BEFORE reasoning patterns
+        # BUG A FIX (Jan 7 2026 UPDATED): Creative patterns route to world_model
         # =============================================================================
-        # Creative queries like "write a story about..." should NOT go to reasoning engines
+        # Creative queries like "write a story about..." should go through VULCAN's
+        # world_model for creative structure generation, NOT skip reasoning entirely.
+        # VULCAN generates the creative structure (themes, form, imagery), then
+        # OpenAI translates that structure into natural language.
         for pattern in CREATIVE_PATTERNS:
             if pattern.search(query_original):
                 return QueryClassification(
                     category=QueryCategory.CREATIVE.value,
-                    complexity=0.2,  # Low complexity - LLM can handle directly
-                    suggested_tools=["general"],  # Route to LLM, not reasoning engines
-                    skip_reasoning=True,  # CRITICAL: Skip reasoning entirely
+                    complexity=0.6,  # Creative reasoning requires world_model
+                    suggested_tools=["world_model"],  # Route to world_model creative mode
+                    skip_reasoning=False,  # CRITICAL FIX: Use world_model reasoning
                     confidence=0.95,
                     source="keyword",
                 )
@@ -784,9 +796,9 @@ class QueryClassifier:
         if creative_count >= CREATIVE_KEYWORD_THRESHOLD:
             return QueryClassification(
                 category=QueryCategory.CREATIVE.value,
-                complexity=0.2,
-                suggested_tools=["general"],
-                skip_reasoning=True,
+                complexity=0.6,
+                suggested_tools=["world_model"],  # Route to world_model creative mode
+                skip_reasoning=False,  # CRITICAL FIX: Use world_model reasoning
                 confidence=0.85,
                 source="keyword",
             )

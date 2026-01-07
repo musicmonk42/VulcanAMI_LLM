@@ -4113,6 +4113,379 @@ class WorldModel:
         return capabilities
 
     # =========================================================================
+    # BUG #4 FIX (Jan 7 2026): World Model reason() method with mode support
+    # =========================================================================
+    # This method allows WorldModel to be used as a reasoning tool via
+    # portfolio_executor, supporting 'creative' and 'philosophical' modes.
+    # =========================================================================
+    
+    def reason(self, query: str, mode: str = None, **kwargs) -> Dict[str, Any]:
+        """
+        Main reasoning method with mode support for creative and philosophical reasoning.
+        
+        This allows WorldModel to be invoked as a reasoning tool, enabling:
+        - Creative composition (poems, stories) with VULCAN-generated structure
+        - Philosophical/ethical analysis using multiple frameworks
+        - General introspection queries about the AI system
+        
+        Args:
+            query: The query or problem to reason about
+            mode: Reasoning mode - 'philosophical', 'creative', or None for general
+            **kwargs: Additional arguments passed to specific reasoning methods
+        
+        Returns:
+            Dict with 'response', 'confidence', 'reasoning_trace', and 'mode'
+        """
+        logger.info(f"[WorldModel] reason() called with mode={mode}")
+        
+        # Extract mode from query if it's a dict with a 'mode' key
+        if isinstance(query, dict):
+            mode = query.get('mode', mode)
+            actual_query = query.get('query', query.get('text', str(query)))
+        else:
+            actual_query = str(query)
+        
+        # Route to appropriate reasoning method based on mode
+        if mode == 'philosophical':
+            return self._philosophical_reasoning(actual_query, **kwargs)
+        elif mode == 'creative':
+            return self._creative_reasoning(actual_query, **kwargs)
+        else:
+            # Default: use introspection for self-referential queries,
+            # or return a general analysis
+            return self._general_reasoning(actual_query, **kwargs)
+    
+    def _philosophical_reasoning(self, query: str, **kwargs) -> Dict[str, Any]:
+        """
+        Handle ethical and philosophical queries.
+        
+        Process:
+        1. Detect ethical framework needed (deontological, utilitarian, etc.)
+        2. Identify constraints and options
+        3. Apply framework to evaluate options
+        4. Provide reasoned conclusion
+        """
+        logger.info("[WorldModel] Philosophical reasoning engaged")
+        query_lower = query.lower()
+        
+        # Detect ethical indicators
+        ethical_keywords = ['should', 'permissible', 'ethical', 'moral', 'right', 'wrong']
+        has_ethical = any(kw in query_lower for kw in ethical_keywords)
+        
+        # Extract the dilemma structure
+        choice_indicators = ['a.', 'b.', 'option', 'pull', 'do not', 'action', 'inaction']
+        has_choice = any(indicator in query_lower for indicator in choice_indicators)
+        
+        if has_choice:
+            analysis_type = 'ethical_decision'
+        else:
+            analysis_type = 'philosophical_analysis'
+        
+        # Build response based on analysis
+        response_parts = []
+        
+        if analysis_type == 'ethical_decision':
+            response_parts.append("This presents an ethical dilemma requiring careful consideration of competing moral principles.")
+            
+            # Identify frameworks
+            response_parts.append("\n**Relevant ethical frameworks:**")
+            response_parts.append("- **Deontological**: Focuses on duties and rules (e.g., 'do not use people as mere means')")
+            response_parts.append("- **Utilitarian**: Focuses on outcomes and maximizing welfare")
+            response_parts.append("- **Virtue ethics**: Focuses on character and what a virtuous person would do")
+            
+            # Present the tension
+            response_parts.append("\n**The core tension:**")
+            if 'trolley' in query_lower or ('pull' in query_lower and 'lever' in query_lower):
+                response_parts.append("- Acting kills one person but saves five (utilitarian calculus)")
+                response_parts.append("- Not acting allows five to die but doesn't make you directly responsible")
+                response_parts.append("- The doctrine of double effect: Intended vs. foreseen consequences")
+            
+            # Provide reasoning
+            response_parts.append("\n**Reasoning:**")
+            response_parts.append("From a utilitarian perspective, the action that saves more lives has greater utility.")
+            response_parts.append("From a deontological perspective, using someone as a mere means (sacrificing one to save others) may violate their dignity.")
+            response_parts.append("The answer depends on which moral framework you find most compelling in this specific case.")
+        else:
+            # General philosophical analysis
+            response_parts.append("This is a philosophical question requiring reasoned analysis.")
+            response_parts.append("\nI'll analyze this using multiple ethical frameworks:")
+            response_parts.append("- Consequentialist: What outcomes matter?")
+            response_parts.append("- Deontological: What duties or rules apply?")
+            response_parts.append("- Virtue ethics: What would a person of good character do?")
+        
+        response = "\n".join(response_parts)
+        
+        return {
+            'response': response,
+            'confidence': 0.80,
+            'reasoning_trace': {
+                'analysis_type': analysis_type,
+                'frameworks_considered': ['deontological', 'utilitarian', 'virtue_ethics'],
+                'query_type': 'philosophical'
+            },
+            'mode': 'philosophical'
+        }
+    
+    def _creative_reasoning(self, query: str, **kwargs) -> Dict[str, Any]:
+        """
+        Handle creative composition queries.
+        
+        Process:
+        1. Identify creative task type (poem, story, essay)
+        2. Analyze subject and requirements
+        3. Generate creative structure (themes, form, imagery)
+        4. Return structured output for OpenAI to translate into natural language
+        """
+        logger.info("[WorldModel] Creative reasoning engaged")
+        query_lower = query.lower()
+        
+        # Detect creative task type
+        if 'poem' in query_lower:
+            task_type = 'poem'
+        elif 'story' in query_lower:
+            task_type = 'story'
+        elif 'essay' in query_lower:
+            task_type = 'essay'
+        else:
+            task_type = 'creative_writing'
+        
+        # Extract subject
+        subject = self._extract_creative_subject(query)
+        
+        if task_type == 'poem':
+            return self._generate_poem_structure(subject, query)
+        elif task_type == 'story':
+            return self._generate_story_structure(subject, query)
+        else:
+            return self._generate_creative_structure(subject, query)
+    
+    def _extract_creative_subject(self, query: str) -> str:
+        """Extract the creative subject from query."""
+        query_lower = query.lower()
+        
+        # Remove common prefixes
+        prefixes = ['write a poem about', 'write a story about', 'write about', 
+                   'poem about', 'story about', 'compose a poem about', 'create a']
+        for prefix in prefixes:
+            if prefix in query_lower:
+                subject = query_lower.split(prefix)[1].strip()
+                # Take first few words as subject
+                words = subject.split()
+                if words:
+                    return ' '.join(words[:3])
+        
+        # Fallback: look for common subjects
+        subjects = ['cat', 'dog', 'ocean', 'mountain', 'love', 'time', 'nature', 'moon', 'sun']
+        for subject in subjects:
+            if subject in query_lower:
+                return subject
+        
+        return 'the subject'
+    
+    def _analyze_themes(self, subject: str) -> list:
+        """Analyze subject to determine appropriate themes."""
+        subject_lower = subject.lower()
+        
+        theme_mappings = {
+            'cat': ['independence', 'mystery', 'grace', 'nocturnal'],
+            'dog': ['loyalty', 'companionship', 'joy', 'unconditional love'],
+            'ocean': ['vastness', 'mystery', 'power', 'tranquility'],
+            'mountain': ['strength', 'permanence', 'challenge', 'majesty'],
+            'time': ['passage', 'change', 'memory', 'inevitability'],
+            'love': ['connection', 'vulnerability', 'joy', 'loss'],
+            'moon': ['mystery', 'cycles', 'reflection', 'solitude'],
+            'sun': ['warmth', 'life', 'energy', 'hope'],
+        }
+        
+        # Find matching themes
+        for key, themes in theme_mappings.items():
+            if key in subject_lower:
+                return themes[:3]
+        
+        # Default themes
+        return ['beauty', 'nature', 'observation']
+    
+    def _determine_tone(self, subject: str) -> str:
+        """Determine appropriate tone for subject."""
+        subject_lower = subject.lower()
+        
+        if any(word in subject_lower for word in ['cat', 'mystery', 'night', 'moon']):
+            return 'mysterious_playful'
+        elif any(word in subject_lower for word in ['dog', 'friend', 'joy', 'sun']):
+            return 'warm_affectionate'
+        elif any(word in subject_lower for word in ['ocean', 'mountain', 'sky']):
+            return 'majestic_contemplative'
+        else:
+            return 'thoughtful_elegant'
+    
+    def _select_imagery(self, subject: str) -> list:
+        """Select appropriate imagery categories."""
+        subject_lower = subject.lower()
+        
+        imagery_maps = {
+            'cat': ['shadows', 'moonlight', 'whiskers', 'velvet', 'silence'],
+            'ocean': ['waves', 'foam', 'depths', 'horizon', 'salt'],
+            'mountain': ['peaks', 'snow', 'stone', 'wind', 'majesty'],
+            'moon': ['silver', 'glow', 'night', 'tides', 'phases'],
+        }
+        
+        for key, imagery in imagery_maps.items():
+            if key in subject_lower:
+                return imagery
+        
+        return ['visual', 'tactile', 'movement']
+    
+    def _generate_poem_structure(self, subject: str, query: str) -> Dict[str, Any]:
+        """Generate structured poem composition."""
+        logger.info(f"[WorldModel] Generating poem structure for subject: {subject}")
+        
+        themes = self._analyze_themes(subject)
+        tone = self._determine_tone(subject)
+        imagery = self._select_imagery(subject)
+        
+        structure = {
+            'type': 'poem',
+            'subject': subject,
+            'themes': themes,
+            'form': {
+                'stanzas': 4,
+                'lines_per_stanza': 4,
+                'rhyme_scheme': 'ABAB',
+                'meter': 'flexible'
+            },
+            'literary_devices': ['metaphor', 'imagery', 'personification'],
+            'tone': tone,
+            'imagery_categories': imagery
+        }
+        
+        # Build composition outline
+        outline = []
+        outline.append(f"Stanza 1: Introduce {subject} with primary imagery")
+        if themes:
+            outline.append(f"Stanza 2: Develop theme of {themes[0]}")
+            if len(themes) > 1:
+                outline.append(f"Stanza 3: Explore {themes[1]} through metaphor")
+            if len(themes) > 2:
+                outline.append(f"Stanza 4: Conclude with {themes[2]} and emotional resonance")
+        
+        response = f"""**VULCAN Creative Structure for Poem about {subject}:**
+
+**Themes:** {', '.join(themes)}
+**Form:** {structure['form']['stanzas']} stanzas, {structure['form']['rhyme_scheme']} rhyme scheme
+**Tone:** {tone.replace('_', ' ')}
+**Imagery:** {', '.join(imagery)}
+
+**Composition Outline:**
+{chr(10).join(outline)}
+
+[This creative structure should be translated into flowing verse with the specified form and themes.]
+"""
+        
+        return {
+            'response': response,
+            'confidence': 0.90,
+            'reasoning_trace': structure,
+            'mode': 'creative',
+            'requires_llm_translation': True
+        }
+    
+    def _generate_story_structure(self, subject: str, query: str) -> Dict[str, Any]:
+        """Generate structured story composition."""
+        logger.info(f"[WorldModel] Generating story structure for subject: {subject}")
+        
+        themes = self._analyze_themes(subject)
+        
+        structure = {
+            'type': 'story',
+            'subject': subject,
+            'themes': themes,
+            'structure': {
+                'setting': f'A world where {subject} plays a central role',
+                'protagonist': f'A character whose life intersects with {subject}',
+                'conflict': f'A challenge or discovery related to {subject}',
+                'resolution': f'Wisdom or transformation through {subject}'
+            }
+        }
+        
+        response = f"""**VULCAN Creative Structure for Story about {subject}:**
+
+**Themes:** {', '.join(themes)}
+**Setting:** {structure['structure']['setting']}
+**Protagonist:** {structure['structure']['protagonist']}
+**Conflict:** {structure['structure']['conflict']}
+**Resolution:** {structure['structure']['resolution']}
+
+**Story Arc:**
+1. Introduction: Establish the world and protagonist
+2. Rising Action: Introduce the central conflict
+3. Climax: The pivotal moment of change
+4. Resolution: The transformation and new understanding
+
+[This creative structure should be translated into a compelling narrative.]
+"""
+        
+        return {
+            'response': response,
+            'confidence': 0.85,
+            'reasoning_trace': structure,
+            'mode': 'creative',
+            'requires_llm_translation': True
+        }
+    
+    def _generate_creative_structure(self, subject: str, query: str) -> Dict[str, Any]:
+        """Generate generic creative writing structure."""
+        logger.info(f"[WorldModel] Generating creative structure for subject: {subject}")
+        
+        themes = self._analyze_themes(subject)
+        
+        response = f"""**VULCAN Creative Structure for writing about {subject}:**
+
+**Themes:** {', '.join(themes)}
+**Approach:** Thoughtful exploration of the subject
+**Elements:** Description, reflection, insight
+
+**Structure:**
+1. Opening: Capture attention with vivid imagery
+2. Development: Explore different aspects of {subject}
+3. Reflection: Connect {subject} to broader themes
+4. Conclusion: Leave the reader with lasting impression
+
+[This creative structure should be translated into engaging prose.]
+"""
+        
+        return {
+            'response': response,
+            'confidence': 0.80,
+            'reasoning_trace': {
+                'type': 'creative_writing',
+                'subject': subject,
+                'themes': themes
+            },
+            'mode': 'creative',
+            'requires_llm_translation': True
+        }
+    
+    def _general_reasoning(self, query: str, **kwargs) -> Dict[str, Any]:
+        """Handle general reasoning queries via introspection."""
+        # Use existing introspection method for general queries
+        introspection_result = self.introspect(query)
+        
+        # Convert to standard reason() output format
+        return {
+            'response': introspection_result.get('response', ''),
+            'confidence': introspection_result.get('confidence', 0.7),
+            'reasoning_trace': {
+                'aspect': introspection_result.get('aspect', 'general'),
+                'reasoning': introspection_result.get('reasoning', '')
+            },
+            'mode': 'general',
+            # Pass through delegation info if present
+            'needs_delegation': introspection_result.get('needs_delegation', False),
+            'recommended_tool': introspection_result.get('recommended_tool'),
+            'delegation_reason': introspection_result.get('delegation_reason')
+        }
+
+    # =========================================================================
     # SELF-AWARENESS & INTROSPECTION (Issue #4 Fix)
     # =========================================================================
     
