@@ -192,11 +192,22 @@ SUMMATION_PATTERNS: Tuple[re.Pattern, ...] = (
 )
 
 # Analogical reasoning indicators - complexity 0.5+, tools=['analogical']
+# FIX (Jan 7 2026): Added more keywords for better analogical query detection
+# Problem: Analogical reasoning queries like "Map the deep structure S→T" were not
+# being routed to the analogical reasoner because they lacked explicit keywords.
 ANALOGICAL_KEYWORDS: FrozenSet[str] = frozenset([
     "analogy", "analogous", "analogies",
     "is like", "is to", "as a",
-    "mapping", "structure mapping",
+    "mapping", "structure mapping", "map the",
     "corresponds to", "similar to",
+    # FIX: Added domain mapping keywords for structure mapping problems
+    "domain s", "domain t", "domain a", "domain b",
+    "source domain", "target domain",
+    "s→t", "a→b",  # Arrow notation for domain mapping
+    "identify the analogs", "identify analogs",
+    "deep structure", "surface similarity",
+    "transfer", "transfer learning",
+    "metaphor", "metaphorical",
 ])
 
 # =============================================================================

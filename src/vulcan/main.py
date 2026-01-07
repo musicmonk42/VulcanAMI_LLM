@@ -6248,12 +6248,14 @@ async def unified_chat(request: UnifiedChatRequest):
         # results, use them DIRECTLY instead of passing to OpenAI which may
         # ignore or override them. This prevents the "OpenAI always wins" problem.
         #
-        # Confidence threshold: 0.3 (lowered from 0.5 based on production analysis)
-        # Production logs showed reasoning confidence consistently 0.0-0.1, causing
-        # all queries to fall back to OpenAI. Lowering threshold allows more reasoning
+        # Confidence threshold: 0.15 (lowered from 0.3 based on production analysis)
+        # Production logs showed reasoning confidence consistently 0.0-0.2, causing
+        # all queries to fall back to OpenAI. Lowering threshold to 0.15 allows more reasoning
         # results to be used directly when they have reasonable confidence.
+        # FIX (Jan 7 2026): Lowered from 0.3 to 0.15 to prevent unnecessary OpenAI fallbacks
+        # for queries that reasoning engines handle correctly but with moderate confidence.
         # Configurable via VULCAN_MIN_REASONING_CONFIDENCE environment variable.
-        MIN_REASONING_CONFIDENCE_THRESHOLD = float(os.environ.get("VULCAN_MIN_REASONING_CONFIDENCE", "0.3"))
+        MIN_REASONING_CONFIDENCE_THRESHOLD = float(os.environ.get("VULCAN_MIN_REASONING_CONFIDENCE", "0.15"))
         
         # Check if we should use reasoning results directly
         use_reasoning_directly = False
