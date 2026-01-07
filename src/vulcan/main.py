@@ -3744,21 +3744,70 @@ async def chat(request: ChatRequest):
         except Exception:
             pass
 
+    # BUG #1 FIX (Jan 7 2026): Extract actual answers from reasoning insights, not raw JSON
+    # Reasoning engines return dicts with 'answer', 'explanation', 'response' fields
+    # that contain the actual reasoning output - don't truncate these!
     if reasoning_insights:
         try:
+            reasoning_parts = []
+            for engine_name, result in reasoning_insights.items():
+                if isinstance(result, dict):
+                    # Extract the most relevant fields from reasoning result
+                    answer = result.get('answer') or result.get('response') or result.get('explanation')
+                    if answer:
+                        reasoning_parts.append(f"[{engine_name.upper()}]: {answer}")
+                    elif 'conclusion' in result:
+                        reasoning_parts.append(f"[{engine_name.upper()}]: {result['conclusion']}")
+                    elif 'entity_mapping' in result:
+                        # Analogical reasoning
+                        explanation = result.get('explanation', '')
+                        reasoning_parts.append(f"[{engine_name.upper()} ANALOGY]: {explanation}")
+                    elif 'best_experiment' in result:
+                        # Causal reasoning
+                        explanation = result.get('explanation', '')
+                        best_exp = result.get('best_experiment')
+                        reasoning_parts.append(f"[{engine_name.upper()} CAUSAL]: Experiment {best_exp}. {explanation}")
+                    else:
+                        # Fallback to truncated JSON but increase limit
+                        reasoning_parts.append(f"[{engine_name.upper()}]: {json.dumps(result, default=str)[:800]}")
+                elif result:
+                    reasoning_parts.append(f"[{engine_name.upper()}]: {str(result)[:500]}")
+            
+            if reasoning_parts:
+                reasoning_str = "VULCAN Reasoning Analysis:\n" + "\n".join(reasoning_parts)
+                context_parts.append(reasoning_str)
+                logger.info(f"[VULCAN] BUG#1 FIX: Extracted {len(reasoning_parts)} reasoning answers")
+        except Exception as e:
+            logger.warning(f"[VULCAN] Failed to format reasoning insights: {e}")
+            # Fallback to original behavior
             reasoning_str = f"Reasoning analysis: {json.dumps(reasoning_insights, default=str)[:CONTEXT_TRUNCATION_LIMITS['reasoning']]}"
             context_parts.append(reasoning_str)
-        except Exception:
-            pass
 
     if world_model_insights:
         try:
-            # BUG #4 FIX: For creative/philosophical, include the structured reasoning
-            # but extract the response for direct use
+            # BUG #4 FIX: For creative/philosophical, extract the actual response
+            world_parts = []
+            for insight_name, result in world_model_insights.items():
+                if isinstance(result, dict):
+                    # Check for response/answer fields
+                    response = result.get('response') or result.get('answer')
+                    if response:
+                        world_parts.append(f"[{insight_name.upper()}]: {response}")
+                    elif 'prediction' in result:
+                        world_parts.append(f"[{insight_name.upper()} PREDICTION]: {result['prediction']}")
+                    else:
+                        # Truncated JSON for other fields
+                        world_parts.append(f"[{insight_name.upper()}]: {json.dumps(result, default=str)[:400]}")
+                elif result:
+                    world_parts.append(f"[{insight_name.upper()}]: {str(result)[:300]}")
+            
+            if world_parts:
+                world_str = "World Model Insights:\n" + "\n".join(world_parts)
+                context_parts.append(world_str)
+        except Exception as e:
+            logger.warning(f"[VULCAN] Failed to format world model insights: {e}")
             world_str = f"World model insights: {json.dumps(world_model_insights, default=str)[:CONTEXT_TRUNCATION_LIMITS['world_model']]}"
             context_parts.append(world_str)
-        except Exception:
-            pass
 
     if meta_reasoning_insights:
         try:
@@ -3919,20 +3968,27 @@ Based on your analysis through memory retrieval, multi-modal reasoning, causal m
     # FALLBACK: Generate response from reasoning if hybrid execution failed
     if not response_text and (reasoning_insights or world_model_insights):
         response_text = "Based on VULCAN's cognitive analysis:\n\n"
-        if "symbolic" in reasoning_insights:
-            response_text += f"Logical analysis: {reasoning_insights['symbolic']}\n"
-        if "probabilistic" in reasoning_insights:
-            response_text += (
-                f"Probabilistic assessment: {reasoning_insights['probabilistic']}\n"
-            )
-        if "causal" in reasoning_insights:
-            response_text += f"Causal relationships: {reasoning_insights['causal']}\n"
-        if "prediction" in world_model_insights:
-            response_text += f"Prediction: {world_model_insights['prediction']}\n"
-        if "counterfactual" in world_model_insights:
-            response_text += (
-                f"Counterfactual analysis: {world_model_insights['counterfactual']}\n"
-            )
+        
+        # BUG #1 FIX: Extract actual answers from reasoning insights, not raw dicts
+        for engine_name, result in reasoning_insights.items():
+            if isinstance(result, dict):
+                answer = result.get('answer') or result.get('response') or result.get('explanation')
+                if answer:
+                    response_text += f"**{engine_name.title()} Analysis**: {answer}\n\n"
+                elif 'conclusion' in result:
+                    response_text += f"**{engine_name.title()} Conclusion**: {result['conclusion']}\n\n"
+            elif result:
+                response_text += f"**{engine_name.title()}**: {str(result)[:500]}\n\n"
+        
+        # Extract world model insights
+        for insight_name, result in world_model_insights.items():
+            if isinstance(result, dict):
+                response = result.get('response') or result.get('answer') or result.get('prediction')
+                if response:
+                    response_text += f"**{insight_name.title()}**: {response}\n\n"
+            elif result:
+                response_text += f"**{insight_name.title()}**: {str(result)[:300]}\n\n"
+        
         systems_used.append("vulcan_reasoning_synthesis")
         logger.info("[VULCAN] Response synthesized from reasoning systems")
         
