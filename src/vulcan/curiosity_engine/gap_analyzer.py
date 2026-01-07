@@ -1272,7 +1272,9 @@ class GapAnalyzer:
                 f"[GapAnalyzer] Loaded {len(outcomes)} outcomes from bridge, "
                 f"avg_routing={stats.avg_routing_ms:.0f}ms, "
                 f"slow_count={stats.slow_routing_count}, "
-                f"success_rate={stats.success_rate:.1%}"
+                f"success_rate={stats.success_rate:.1%}, "
+                f"quality_success_rate={stats.quality_success_rate:.1%} "
+                f"({stats.quality_good_count} good, {stats.quality_failed_count} failed)"
             )
             
             # Track if we have new data

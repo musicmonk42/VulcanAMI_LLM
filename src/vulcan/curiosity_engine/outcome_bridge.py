@@ -161,6 +161,133 @@ TRUE_ERROR_STATUSES = frozenset({
 DEFAULT_RETENTION_DAYS = 7
 DEFAULT_QUERY_LIMIT = 500
 
+# =============================================================================
+# ANSWER QUALITY ASSESSMENT
+# =============================================================================
+# The curiosity engine was blind to quality issues - it measured "completion"
+# (did the query return something) but not "quality" (was the answer useful).
+# 
+# This fix adds quality assessment so the engine can detect:
+# - Engine rejection patterns ("does not involve probability")
+# - Raw data dumps instead of user-facing answers
+# - Misclassified queries (e.g., creative queries as introspection)
+# - Low-confidence responses that aren't useful
+#
+# Quality values:
+#   "good"    - Answer appears useful and user-facing
+#   "partial" - Answer was produced but may not be complete
+#   "failed"  - Answer contains known failure patterns
+#   None      - Quality not assessed (no response_text provided)
+
+# Patterns that indicate a failed/useless answer
+ANSWER_QUALITY_FAILURE_PATTERNS = frozenset({
+    "does not involve probability",
+    "does not appear to be",
+    "not applicable",
+    "unable to",
+    "cannot process",
+    "not supported",
+    "query type not recognized",
+    "no matching handler",
+    "fallback response",
+})
+
+# Patterns indicating raw data dumps (not user-facing)
+RAW_DATA_DUMP_PATTERNS = frozenset({
+    "proven:",
+    "confidence: 0.",
+    "confidence:0.",
+    "proof:",
+    "method:",
+    "applicable:",
+    "result_dict:",
+})
+
+# Patterns indicating misclassification
+MISCLASSIFICATION_PATTERNS = frozenset({
+    "i recognize this as",
+    "introspective query",
+    "self-referential",
+})
+
+# Quality thresholds
+MIN_USEFUL_RESPONSE_LENGTH = 50  # Minimum chars for a useful response
+LOW_CONFIDENCE_THRESHOLD = 0.3  # Confidence below this suggests failure
+
+
+def assess_answer_quality(
+    response_text: Optional[str],
+    confidence: Optional[float] = None,
+    query_text: Optional[str] = None,
+) -> str:
+    """
+    Assess the quality of an answer to determine if it was actually useful.
+    
+    This function detects failure patterns in responses that would otherwise
+    be counted as "successful" because they returned something. The curiosity
+    engine uses this to identify knowledge gaps based on answer quality, not
+    just completion status.
+    
+    Args:
+        response_text: The response text to assess. If None, returns "unknown".
+        confidence: Optional confidence score (0.0 to 1.0) from the reasoning engine.
+        query_text: Optional original query text for context-aware assessment.
+    
+    Returns:
+        Quality classification:
+        - "good": Answer appears useful and user-facing
+        - "partial": Answer was produced but may be incomplete
+        - "failed": Answer contains known failure patterns
+        - "unknown": Quality could not be assessed (no response_text)
+    
+    Example:
+        >>> assess_answer_quality("The answer is 42")
+        'good'
+        >>> assess_answer_quality("does not involve probability concepts")
+        'failed'
+        >>> assess_answer_quality("confidence: 0.1, proven: false")
+        'failed'
+    """
+    if response_text is None:
+        return "unknown"
+    
+    response_lower = response_text.lower().strip()
+    
+    # Check for empty or very short responses
+    if len(response_lower) < 10:
+        return "failed"
+    
+    # Check for known failure patterns
+    for pattern in ANSWER_QUALITY_FAILURE_PATTERNS:
+        if pattern in response_lower:
+            return "failed"
+    
+    # Check for raw data dumps (not user-facing responses)
+    raw_pattern_count = sum(
+        1 for pattern in RAW_DATA_DUMP_PATTERNS
+        if pattern in response_lower
+    )
+    if raw_pattern_count >= 2:
+        # Multiple raw data patterns suggest a dump, not a user-facing answer
+        return "failed"
+    
+    # Check for misclassification patterns
+    for pattern in MISCLASSIFICATION_PATTERNS:
+        if pattern in response_lower:
+            # Check if query was actually asking about introspection
+            if query_text and "yourself" not in query_text.lower():
+                return "failed"
+    
+    # Check for low confidence
+    if confidence is not None and confidence < LOW_CONFIDENCE_THRESHOLD:
+        return "partial"
+    
+    # Check for minimal length (might be an error message)
+    if len(response_lower) < MIN_USEFUL_RESPONSE_LENGTH:
+        return "partial"
+    
+    return "good"
+
 
 # =============================================================================
 # Enums and Data Classes
@@ -189,6 +316,8 @@ class GapType(Enum):
     COMPLEX_QUERY_HANDLING = "complex_query_handling"
     HIGH_ERROR_RATE = "high_error_rate"
     ROUTING_VARIANCE = "routing_variance"
+    LOW_ANSWER_QUALITY = "low_answer_quality"
+    ANSWER_FAILURE_PATTERNS = "answer_failure_patterns"
 
 
 @dataclass
@@ -207,10 +336,14 @@ class OutcomeStatistics:
         slow_routing_count: Count of queries exceeding slow threshold
         error_count: Total error count in recent window
         success_rate: Success rate as ratio (0.0 to 1.0)
+        quality_good_count: Count of answers marked as "good" quality
+        quality_failed_count: Count of answers marked as "failed" quality
+        quality_success_rate: Ratio of good quality answers to total with quality
         
     Example:
         >>> stats = get_outcome_statistics()
         >>> print(f"Success rate: {stats.success_rate:.1%}")
+        >>> print(f"Quality success rate: {stats.quality_success_rate:.1%}")
         >>> print(f"Slow queries: {stats.slow_routing_count}")
     """
     
@@ -221,6 +354,9 @@ class OutcomeStatistics:
     slow_routing_count: int
     error_count: int
     success_rate: float
+    quality_good_count: int = 0
+    quality_failed_count: int = 0
+    quality_success_rate: float = 0.0
     
     def to_dict(self) -> Dict[str, Any]:
         """
@@ -237,6 +373,9 @@ class OutcomeStatistics:
             "slow_routing_count": self.slow_routing_count,
             "error_count": self.error_count,
             "success_rate": self.success_rate,
+            "quality_good_count": self.quality_good_count,
+            "quality_failed_count": self.quality_failed_count,
+            "quality_success_rate": self.quality_success_rate,
         }
 
 
@@ -522,13 +661,16 @@ def _init_db(db_path: Optional[Path] = None) -> bool:
     """
     global _db_initialized
     
-    # Fast path if already initialized
-    if _db_initialized:
-        return True
+    # If a custom db_path is provided, always initialize it (test scenario)
+    # Only use the global flag for the default path
+    if db_path is None:
+        # Fast path if already initialized for default path
+        if _db_initialized:
+            return True
     
     with _init_lock:
-        # Double-checked locking
-        if _db_initialized:
+        # Double-checked locking (only for default path)
+        if db_path is None and _db_initialized:
             return True
         
         try:
@@ -547,9 +689,18 @@ def _init_db(db_path: Optional[Path] = None) -> bool:
                         tasks INTEGER DEFAULT 1,
                         error_type TEXT,
                         processed INTEGER DEFAULT 0,
-                        created_at REAL DEFAULT (strftime('%s', 'now'))
+                        created_at REAL DEFAULT (strftime('%s', 'now')),
+                        answer_quality TEXT DEFAULT NULL
                     )
                 """)
+                
+                # Add answer_quality column if it doesn't exist (migration)
+                try:
+                    conn.execute(
+                        "ALTER TABLE query_outcomes ADD COLUMN answer_quality TEXT DEFAULT NULL"
+                    )
+                except sqlite3.OperationalError:
+                    pass  # Column already exists
                 
                 # Create indexes for common query patterns
                 conn.execute(
@@ -571,7 +722,9 @@ def _init_db(db_path: Optional[Path] = None) -> bool:
                 
                 conn.commit()
             
-            _db_initialized = True
+            # Only set the global flag if using default path
+            if db_path is None:
+                _db_initialized = True
             logger.info(f"{LOG_PREFIX} Database initialized successfully")
             return True
             
@@ -595,6 +748,10 @@ def record_query_outcome(
     error_type: Optional[str] = None,
     db_path: Optional[Path] = None,
     tools: Optional[List[str]] = None,
+    response_text: Optional[str] = None,
+    answer_quality: Optional[str] = None,
+    confidence: Optional[float] = None,
+    query_text: Optional[str] = None,
 ) -> bool:
     """
     Record a query outcome to shared storage.
@@ -631,6 +788,14 @@ def record_query_outcome(
             Defaults to DEFAULT_DB_PATH.
         tools: List of tools used for the query.
             Enables learning system to track tool selection patterns.
+        response_text: Optional response text for quality assessment.
+            If provided and answer_quality is not set, quality will be computed.
+        answer_quality: Optional pre-computed answer quality assessment.
+            Values: "good", "partial", "failed", "unknown".
+            If not provided but response_text is, quality will be computed.
+        confidence: Optional confidence score (0.0 to 1.0) from reasoning engine.
+            Used for quality assessment when response_text is provided.
+        query_text: Optional original query text for context-aware quality assessment.
     
     Returns:
         True if recording succeeded, False otherwise.
@@ -644,6 +809,7 @@ def record_query_outcome(
         ...     complexity=0.45,
         ...     query_type="reasoning",
         ...     tools=["probabilistic", "causal"],
+        ...     response_text="The answer is 42.",
         ... )
         >>> if success:
         ...     print("Outcome recorded")
@@ -657,14 +823,23 @@ def record_query_outcome(
     if not _init_db(db_path):
         return False
     
+    # Compute answer quality if response_text provided but quality not set
+    computed_quality = answer_quality
+    if computed_quality is None and response_text is not None:
+        computed_quality = assess_answer_quality(
+            response_text=response_text,
+            confidence=confidence,
+            query_text=query_text,
+        )
+    
     try:
         with _get_db(db_path) as conn:
             conn.execute(
                 """
                 INSERT OR REPLACE INTO query_outcomes 
                 (query_id, timestamp, status, routing_time_ms, total_time_ms, 
-                 complexity, query_type, tasks, error_type, processed)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+                 complexity, query_type, tasks, error_type, processed, answer_quality)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
                 """,
                 (
                     query_id,
@@ -676,14 +851,16 @@ def record_query_outcome(
                     query_type,
                     tasks,
                     error_type,
+                    computed_quality,
                 ),
             )
             conn.commit()
         
+        quality_str = f", quality={computed_quality}" if computed_quality else ""
         logger.info(
             f"[QueryOutcome] Recorded: {query_id}, status={status}, "
             f"routing={routing_time_ms:.0f}ms, total={total_time_ms:.0f}ms, "
-            f"complexity={complexity:.2f}, type={query_type}, tools={tools or []}"
+            f"complexity={complexity:.2f}, type={query_type}, tools={tools or []}{quality_str}"
         )
         
         # Also send to learning system via OutcomeBridge
@@ -1025,6 +1202,27 @@ def get_outcome_statistics(
             
             # Success rate = non-errors / total (more accurate than old method)
             success_rate = success_count / total_recent if total_recent > 0 else 0.0
+            
+            # Compute quality metrics
+            quality_row = conn.execute(
+                """
+                SELECT 
+                    COUNT(CASE WHEN answer_quality = 'good' THEN 1 END),
+                    COUNT(CASE WHEN answer_quality = 'failed' THEN 1 END),
+                    COUNT(CASE WHEN answer_quality IS NOT NULL THEN 1 END)
+                FROM query_outcomes WHERE timestamp > ?
+                """,
+                (hour_ago,),
+            ).fetchone()
+            
+            quality_good_count = quality_row[0] or 0
+            quality_failed_count = quality_row[1] or 0
+            total_with_quality = quality_row[2] or 0
+            
+            quality_success_rate = (
+                quality_good_count / total_with_quality 
+                if total_with_quality > 0 else 0.0
+            )
         
         return OutcomeStatistics(
             total=total,
@@ -1034,6 +1232,9 @@ def get_outcome_statistics(
             slow_routing_count=stats_row[2] or 0,
             error_count=error_count,
             success_rate=success_rate,
+            quality_good_count=quality_good_count,
+            quality_failed_count=quality_failed_count,
+            quality_success_rate=quality_success_rate,
         )
         
     except sqlite3.Error as e:
@@ -1160,6 +1361,9 @@ def analyze_outcomes_for_gaps(
     
     # Gap: High routing time variance
     gaps.extend(_detect_variance_gaps(unique_outcomes))
+    
+    # Gap: Low answer quality (answers marked as "failed" or "partial")
+    gaps.extend(_detect_answer_quality_gaps(unique_outcomes))
     
     return gaps
 
@@ -1361,6 +1565,106 @@ def _detect_variance_gaps(
         
     except stats_module.StatisticsError:
         return []  # Not enough data
+
+
+def _detect_answer_quality_gaps(
+    outcomes: List[Dict[str, Any]]
+) -> List[Dict[str, Any]]:
+    """
+    Detect gaps based on answer quality metrics.
+    
+    This function addresses the critical issue where the curiosity engine
+    was blind to answer quality - it measured completion (did the query return
+    something) but not quality (was the answer actually useful).
+    
+    Quality-based gaps are detected when:
+    - Many answers are marked as "failed" (contain failure patterns)
+    - Many answers are marked as "partial" (incomplete/low confidence)
+    - The quality success rate (good answers / total) is below threshold
+    
+    Args:
+        outcomes: List of outcome dictionaries with optional answer_quality field
+    
+    Returns:
+        List of detected answer quality gaps
+    """
+    # Count outcomes by quality
+    quality_counts: Dict[str, int] = {
+        "good": 0,
+        "partial": 0,
+        "failed": 0,
+        "unknown": 0,
+    }
+    
+    total_with_quality = 0
+    failed_query_ids: List[str] = []
+    
+    for o in outcomes:
+        quality = o.get("answer_quality")
+        if quality in quality_counts:
+            quality_counts[quality] += 1
+            total_with_quality += 1
+            
+            if quality == "failed":
+                query_id = o.get("query_id", "unknown")
+                if len(failed_query_ids) < 10:
+                    failed_query_ids.append(query_id)
+        elif quality is None:
+            quality_counts["unknown"] += 1
+    
+    # If no quality data available, can't detect quality gaps
+    if total_with_quality == 0:
+        return []
+    
+    # Calculate quality success rate
+    good_count = quality_counts["good"]
+    failed_count = quality_counts["failed"]
+    partial_count = quality_counts["partial"]
+    
+    quality_success_rate = good_count / total_with_quality if total_with_quality > 0 else 0.0
+    quality_failure_rate = failed_count / total_with_quality if total_with_quality > 0 else 0.0
+    
+    gaps: List[Dict[str, Any]] = []
+    
+    # Log quality metrics for visibility
+    logger.info(
+        f"{LOG_PREFIX} Quality metrics: {good_count}/{total_with_quality} good answers "
+        f"({quality_success_rate:.1%}), failed={failed_count}, partial={partial_count}"
+    )
+    
+    # Gap: Low answer quality rate (< 50% good answers)
+    LOW_QUALITY_SUCCESS_THRESHOLD = 0.5
+    if total_with_quality >= 5 and quality_success_rate < LOW_QUALITY_SUCCESS_THRESHOLD:
+        gaps.append(
+            DetectedGap(
+                gap_type="low_answer_quality",
+                description=(
+                    f"Low answer quality: only {quality_success_rate:.1%} "
+                    f"({good_count}/{total_with_quality}) of answers are good quality"
+                ),
+                severity=min(1.0, (1.0 - quality_success_rate) * 1.5),
+                evidence=failed_query_ids[:5],
+                suggested_action="Investigate failure patterns in responses (engine rejections, raw data dumps, misclassifications)",
+            ).to_dict()
+        )
+    
+    # Gap: High failure rate in answers (> 20% failed)
+    HIGH_QUALITY_FAILURE_THRESHOLD = 0.2
+    if total_with_quality >= 5 and quality_failure_rate > HIGH_QUALITY_FAILURE_THRESHOLD:
+        gaps.append(
+            DetectedGap(
+                gap_type="answer_failure_patterns",
+                description=(
+                    f"High answer failure rate: {quality_failure_rate:.1%} "
+                    f"({failed_count}/{total_with_quality}) answers contain failure patterns"
+                ),
+                severity=min(1.0, quality_failure_rate * 2),
+                evidence=failed_query_ids[:5],
+                suggested_action="Fix engine gate checks, output formatting, and query classification",
+            ).to_dict()
+        )
+    
+    return gaps
 
 
 # =============================================================================
