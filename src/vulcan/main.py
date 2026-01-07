@@ -3312,10 +3312,72 @@ async def chat(request: ChatRequest):
                         logger.debug(f"[VULCAN] Dynamics model failed: {e}")
                 return None
 
+            # =================================================================
+            # BUG #4 FIX (Jan 7 2026): Add creative/philosophical reasoning via world_model
+            # =================================================================
+            # Creative and philosophical queries should invoke world_model.reason()
+            # with the appropriate mode to generate VULCAN's structured reasoning.
+            async def _creative_philosophical_reasoning():
+                """Invoke world_model.reason() for creative/philosophical queries."""
+                # Determine if this query needs creative/philosophical reasoning
+                query_type_value = routing_plan.query_type.value.lower() if routing_plan else ""
+                
+                # Check routing plan or query content for creative/philosophical indicators
+                is_creative = query_type_value == 'creative' or any(
+                    kw in query_lower for kw in ['poem', 'story', 'write', 'compose', 'creative']
+                )
+                is_philosophical = query_type_value == 'philosophical' or any(
+                    kw in query_lower for kw in ['ethical', 'moral', 'trolley', 'dilemma', 'should']
+                )
+                
+                if not (is_creative or is_philosophical):
+                    return None
+                
+                # Invoke world_model.reason() with appropriate mode
+                if hasattr(deps.world_model, "reason"):
+                    try:
+                        mode = 'creative' if is_creative else 'philosophical'
+                        logger.info(f"[VULCAN] BUG#4 FIX: Invoking world_model.reason(mode={mode})")
+                        
+                        result = await loop.run_in_executor(
+                            None,
+                            deps.world_model.reason,
+                            processed_prompt,
+                            mode,
+                        )
+                        
+                        if result:
+                            # Extract the response from the reasoning result
+                            response = result.get('response', '')
+                            confidence = result.get('confidence', 0.7)
+                            reasoning_trace = result.get('reasoning_trace', {})
+                            
+                            logger.info(
+                                f"[VULCAN] BUG#4 FIX: world_model.reason() returned response "
+                                f"(len={len(response)}, confidence={confidence}, mode={mode})"
+                            )
+                            
+                            # Return full result for proper formatting
+                            return (
+                                f"world_model_{mode}",
+                                {
+                                    'response': response,
+                                    'confidence': confidence,
+                                    'mode': mode,
+                                    'reasoning_trace': reasoning_trace,
+                                },
+                                f"world_model_{mode}_reasoning"
+                            )
+                    except Exception as e:
+                        logger.warning(f"[VULCAN] BUG#4 FIX: world_model.reason() failed: {e}")
+                return None
+
             # Run all world model subtasks in parallel
+            # BUG #4 FIX: Added _creative_philosophical_reasoning for creative/philosophical queries
             results = await asyncio.gather(
                 _get_state(), _prediction(), _causal_graph(),
                 _counterfactual(), _invariants(), _dynamics(),
+                _creative_philosophical_reasoning(),
                 return_exceptions=True
             )
 
@@ -3647,6 +3709,32 @@ async def chat(request: ChatRequest):
     # ================================================================
     # STEP 6: Build Context from ALL Vulcan's Cognitive Systems
     # ================================================================
+    # BUG #4 FIX (Jan 7 2026): Check for world_model creative/philosophical reasoning
+    # These responses should be properly extracted and presented, not dumped as JSON
+    vulcan_direct_response = None  # Response from VULCAN's reasoning that can be returned directly
+    
+    # Check for creative/philosophical reasoning output in world_model_insights
+    if world_model_insights:
+        # Check for creative reasoning output
+        if 'world_model_creative' in world_model_insights:
+            creative_result = world_model_insights['world_model_creative']
+            if isinstance(creative_result, dict) and 'response' in creative_result:
+                vulcan_direct_response = creative_result['response']
+                logger.info(
+                    f"[VULCAN] BUG#4 FIX: Found creative reasoning response "
+                    f"(len={len(vulcan_direct_response)}, confidence={creative_result.get('confidence', 0.7)})"
+                )
+        
+        # Check for philosophical reasoning output
+        if 'world_model_philosophical' in world_model_insights:
+            phil_result = world_model_insights['world_model_philosophical']
+            if isinstance(phil_result, dict) and 'response' in phil_result:
+                vulcan_direct_response = phil_result['response']
+                logger.info(
+                    f"[VULCAN] BUG#4 FIX: Found philosophical reasoning response "
+                    f"(len={len(vulcan_direct_response)}, confidence={phil_result.get('confidence', 0.7)})"
+                )
+    
     context_parts = []
 
     if memory_context:
@@ -3665,6 +3753,8 @@ async def chat(request: ChatRequest):
 
     if world_model_insights:
         try:
+            # BUG #4 FIX: For creative/philosophical, include the structured reasoning
+            # but extract the response for direct use
             world_str = f"World model insights: {json.dumps(world_model_insights, default=str)[:CONTEXT_TRUNCATION_LIMITS['world_model']]}"
             context_parts.append(world_str)
         except Exception:
@@ -3679,8 +3769,23 @@ async def chat(request: ChatRequest):
 
     vulcan_context = "\n".join(context_parts) if context_parts else ""
 
-    # Build the prompt with Vulcan's cognitive context
-    enhanced_prompt = f"""You are VULCAN, an advanced AI system with comprehensive cognitive architecture.
+    # BUG #4 FIX: If we have a direct VULCAN response from creative/philosophical reasoning,
+    # use a different prompt that instructs OpenAI to translate/present it naturally
+    if vulcan_direct_response:
+        enhanced_prompt = f"""You are VULCAN, an advanced AI system with comprehensive cognitive architecture.
+
+User Query: {processed_prompt}
+
+VULCAN's Reasoning Output:
+{vulcan_direct_response}
+
+Your task: Present VULCAN's reasoning output in clear, natural language. For creative content (poems, stories), 
+translate the creative structure into actual literary content. For philosophical analysis, present the 
+ethical frameworks and reasoning clearly. Do NOT say you cannot answer - VULCAN has already reasoned about this.
+Maintain VULCAN's conclusions and reasoning structure while making it readable and engaging."""
+    else:
+        # Standard prompt for other query types
+        enhanced_prompt = f"""You are VULCAN, an advanced AI system with comprehensive cognitive architecture.
 
 User Query: {processed_prompt}
 
