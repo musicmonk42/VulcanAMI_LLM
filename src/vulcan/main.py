@@ -522,7 +522,7 @@ def _format_direct_reasoning_response(
     confidence: float,
     reasoning_type: str,
     explanation: str,
-    reasoning_results: Dict[str, Any],
+    reasoning_results: Dict[str, Any] = None,
 ) -> str:
     """
     Format reasoning engine result as final user response.
@@ -530,6 +530,16 @@ def _format_direct_reasoning_response(
     TASK 1 FIX: This function formats high-confidence reasoning results
     directly for user output WITHOUT passing through OpenAI, ensuring
     that specialized reasoning engine outputs are preserved.
+    
+    BUG FIX (Jan 7 2026): Handle ReasoningResult objects and debug info dicts.
+    Previously, raw Python objects (like ReasoningResult) were dumped to users
+    as their repr() string (e.g., "ReasoningResult(conclusion=..., evidence=[...])")
+    causing 6000+ token outputs of technical internals.
+    
+    Now this function:
+    1. Detects ReasoningResult dataclass objects and extracts meaningful content
+    2. Detects debug wrapper dicts ({"original": ..., "filtered": True}) and unwraps them
+    3. Formats philosophical/MEC conclusions with human-readable analysis
     
     The formatted response includes:
     - The main conclusion from the reasoning engine
@@ -562,34 +572,67 @@ def _format_direct_reasoning_response(
         
         Reasoning type: Probabilistic | Confidence: 95%
     """
+    if reasoning_results is None:
+        reasoning_results = {}
+    
     response_parts = []
+    
+    # ==========================================================================
+    # BUG FIX: Handle ReasoningResult dataclass objects
+    # ==========================================================================
+    # Check if conclusion is a ReasoningResult object (has attributes like
+    # conclusion, confidence, reasoning_type, evidence, explanation)
+    if hasattr(conclusion, 'conclusion') and hasattr(conclusion, 'confidence'):
+        # This is a ReasoningResult object - extract meaningful fields
+        inner_conclusion = getattr(conclusion, 'conclusion', None)
+        inner_explanation = getattr(conclusion, 'explanation', '')
+        inner_confidence = getattr(conclusion, 'confidence', confidence)
+        inner_reasoning_type = getattr(conclusion, 'reasoning_type', None)
+        
+        # Update confidence if the inner one is higher
+        if isinstance(inner_confidence, (int, float)) and inner_confidence > confidence:
+            confidence = inner_confidence
+        
+        # Get reasoning type value if it's an enum
+        if inner_reasoning_type and hasattr(inner_reasoning_type, 'value'):
+            reasoning_type = inner_reasoning_type.value
+        
+        # Use inner explanation if outer one is empty
+        if inner_explanation and (not explanation or explanation == str(conclusion)):
+            explanation = inner_explanation
+        
+        # Replace conclusion with the unwrapped inner conclusion
+        conclusion = inner_conclusion
+    
+    # ==========================================================================
+    # BUG FIX: Handle debug wrapper dicts that shouldn't be shown to users
+    # ==========================================================================
+    # Detect {"original": ..., "filtered": True, "reason": ...} pattern
+    if isinstance(conclusion, dict) and "filtered" in conclusion and "original" in conclusion:
+        # This is a debug wrapper - extract the original conclusion
+        inner_conclusion = conclusion.get("original")
+        filter_reason = conclusion.get("reason", "")
+        
+        # If reason mentions low confidence, add a user-friendly note
+        if filter_reason and "below threshold" in filter_reason.lower():
+            explanation = explanation or "Note: This analysis has moderate confidence due to query complexity."
+        
+        # Use the original conclusion
+        conclusion = inner_conclusion
     
     # Main conclusion (the answer)
     if conclusion:
-        # Handle different conclusion types
-        if isinstance(conclusion, (int, float)):
-            response_parts.append(str(conclusion))
-        elif isinstance(conclusion, dict):
-            # Format dict conclusions nicely
-            if "answer" in conclusion:
-                response_parts.append(str(conclusion["answer"]))
-            elif "result" in conclusion:
-                response_parts.append(str(conclusion["result"]))
-            else:
-                # Format as key-value pairs
-                formatted_items = []
-                for key, value in conclusion.items():
-                    formatted_items.append(f"{key}: {value}")
-                response_parts.append("\n".join(formatted_items))
-        elif isinstance(conclusion, (list, tuple)):
-            # Format list conclusions
-            response_parts.append("\n".join(str(item) for item in conclusion))
-        else:
-            response_parts.append(str(conclusion))
+        formatted_conclusion = _format_conclusion_for_user(conclusion, reasoning_type)
+        if formatted_conclusion:
+            response_parts.append(formatted_conclusion)
     
     # Add explanation if available and meaningful
-    if explanation and explanation.strip() and explanation != conclusion:
-        response_parts.append(f"\n{explanation}")
+    if explanation and explanation.strip():
+        # Don't duplicate if explanation is same as conclusion
+        explanation_str = str(explanation).strip()
+        conclusion_str = str(conclusion).strip() if conclusion else ""
+        if explanation_str != conclusion_str and explanation_str not in response_parts:
+            response_parts.append(f"\n{explanation}")
     
     # Add reasoning chain/steps if available
     unified = reasoning_results.get("unified", {})
@@ -609,10 +652,284 @@ def _format_direct_reasoning_response(
     confidence_pct = int(confidence * 100)
     reasoning_type_display = reasoning_type.replace("_", " ").title() if reasoning_type else "Hybrid"
     response_parts.append(
-        f"\n---\n*Reasoning type: {reasoning_type_display} | Confidence: {confidence_pct}%*"
+        f"\nReasoning type: {reasoning_type_display} | Confidence: {confidence_pct}%"
     )
     
     return "\n".join(response_parts)
+
+
+def _format_conclusion_for_user(conclusion: Any, reasoning_type: str = "") -> str:
+    """
+    Format a conclusion value for human-readable output.
+    
+    BUG FIX (Jan 7 2026): This helper handles various conclusion types including:
+    - ReasoningResult objects (recursively unwrap)
+    - Moral uncertainty analysis dicts (format nicely for trolley problem)
+    - Debug wrapper dicts (unwrap)
+    - Plain values (int, float, str)
+    
+    Args:
+        conclusion: The conclusion value to format
+        reasoning_type: Type of reasoning used (for context-specific formatting)
+        
+    Returns:
+        Human-readable string representation of the conclusion
+    """
+    if conclusion is None:
+        return ""
+    
+    # Handle ReasoningResult objects recursively
+    if hasattr(conclusion, 'conclusion') and hasattr(conclusion, 'confidence'):
+        inner = getattr(conclusion, 'conclusion', conclusion)
+        return _format_conclusion_for_user(inner, reasoning_type)
+    
+    # Handle debug wrapper dicts
+    if isinstance(conclusion, dict) and "filtered" in conclusion and "original" in conclusion:
+        inner = conclusion.get("original", conclusion)
+        return _format_conclusion_for_user(inner, reasoning_type)
+    
+    # Handle simple types
+    if isinstance(conclusion, (int, float)):
+        return str(conclusion)
+    
+    if isinstance(conclusion, str):
+        # ======================================================================
+        # BUG FIX (Jan 7 2026): Handle strings with embedded JSON/dict
+        # ======================================================================
+        # Some reasoning engines (like PhilosophicalReasoner) return conclusions
+        # like "Some preamble text...\n{'type': 'moral_uncertainty_analysis', ...}"
+        # We need to detect and format these embedded dicts properly.
+        # ======================================================================
+        
+        # Check if string contains an embedded dict-like structure
+        if "{" in conclusion and "}" in conclusion:
+            # Find the start of the embedded dict (find first '{' that starts a dict pattern)
+            dict_start = -1
+            for i, char in enumerate(conclusion):
+                if char == "{":
+                    # Check if this looks like a dict start (followed by potential key)
+                    remaining = conclusion[i:].lstrip()
+                    if remaining.startswith("{'") or remaining.startswith('{"'):
+                        dict_start = i
+                        break
+            
+            if dict_start >= 0:
+                # Extract preamble text before the dict
+                preamble = conclusion[:dict_start].strip()
+                dict_str = conclusion[dict_start:]
+                
+                try:
+                    # Try to parse as Python dict literal using ast.literal_eval (safer than eval)
+                    import ast
+                    embedded_dict = ast.literal_eval(dict_str)
+                    if isinstance(embedded_dict, dict):
+                        # Check if this is a known analysis type we can format nicely
+                        if embedded_dict.get("type") == "moral_uncertainty_analysis":
+                            formatted_analysis = _format_moral_uncertainty_result(embedded_dict)
+                            if preamble:
+                                return f"{preamble}\n\n{formatted_analysis}"
+                            return formatted_analysis
+                        
+                        # For other embedded dicts, format them nicely
+                        formatted_dict = _format_conclusion_for_user(embedded_dict, reasoning_type)
+                        if preamble:
+                            return f"{preamble}\n\n{formatted_dict}"
+                        return formatted_dict
+                except (ValueError, SyntaxError):
+                    # Not a valid Python dict literal - return as-is
+                    pass
+        
+        return conclusion
+    
+    if isinstance(conclusion, (list, tuple)):
+        return "\n".join(str(item) for item in conclusion)
+    
+    # Handle dict conclusions with special formatting
+    if isinstance(conclusion, dict):
+        # =======================================================================
+        # Handle Moral Uncertainty Analysis (MEC) output - e.g., trolley problem
+        # =======================================================================
+        if conclusion.get("type") == "moral_uncertainty_analysis":
+            return _format_moral_uncertainty_result(conclusion)
+        
+        # =======================================================================
+        # Handle deontic analysis output
+        # =======================================================================
+        if conclusion.get("type") == "deontic_analysis":
+            return _format_deontic_analysis_result(conclusion)
+        
+        # =======================================================================
+        # Handle formal proof output
+        # =======================================================================
+        if conclusion.get("type") == "formal_proof":
+            return _format_formal_proof_result(conclusion)
+        
+        # =======================================================================
+        # Handle dominance analysis output
+        # =======================================================================
+        if conclusion.get("type") == "dominance_analysis":
+            return _format_dominance_analysis_result(conclusion)
+        
+        # =======================================================================
+        # Handle general/fallback analysis output
+        # =======================================================================
+        if conclusion.get("type") == "fallback":
+            error = conclusion.get("error", "Unknown error")
+            partial = conclusion.get("partial_analysis", [])
+            response = f"Analysis could not complete fully: {error}"
+            if partial:
+                response += f"\n\nPartial analysis concepts: {', '.join(partial)}"
+            return response
+        
+        # Standard dict handling
+        if "answer" in conclusion:
+            return str(conclusion["answer"])
+        if "result" in conclusion:
+            return str(conclusion["result"])
+        if "recommended_action" in conclusion:
+            return f"Recommended action: {conclusion['recommended_action']}"
+        
+        # Filter out internal/debug fields and format nicely
+        user_facing_fields = {
+            k: v for k, v in conclusion.items() 
+            if v is not None and not k.startswith("_") and k not in {
+                "type", "metadata", "debug", "internal", "timestamp", "query_id"
+            }
+        }
+        
+        if user_facing_fields:
+            lines = []
+            for key, value in user_facing_fields.items():
+                # Format key nicely
+                formatted_key = key.replace("_", " ").title()
+                lines.append(f"{formatted_key}: {value}")
+            return "\n".join(lines)
+    
+    # Fallback: convert to string
+    return str(conclusion)
+
+
+def _format_moral_uncertainty_result(conclusion: Dict[str, Any]) -> str:
+    """
+    Format a moral uncertainty analysis result for human-readable output.
+    
+    This handles the output from PhilosophicalReasoner for queries like
+    the trolley problem, producing a clear analysis instead of raw Python dicts.
+    """
+    lines = []
+    
+    # Main recommendation
+    recommended = conclusion.get("recommended_action", "Unknown")
+    ec = conclusion.get("expected_choiceworthiness", 0.0)
+    conf = conclusion.get("confidence", 0.0)
+    
+    lines.append(f"Answer: {recommended}")
+    lines.append("")
+    lines.append("This is a classic moral dilemma where both choices involve harm.")
+    lines.append("")
+    
+    # Theory evaluations
+    theory_evals = conclusion.get("theory_evaluations", {})
+    if theory_evals:
+        lines.append("Ethical framework analysis:")
+        for theory, score in theory_evals.items():
+            # Format theory name and score
+            formatted_theory = theory.replace("_", " ")
+            score_pct = score * 100 if isinstance(score, (int, float)) else 50
+            lines.append(f"  • {formatted_theory}: {score_pct:.0f}%")
+    
+    # Variance voting if present
+    variance_voting = conclusion.get("variance_voting", {})
+    if variance_voting:
+        winner = variance_voting.get("winner", "")
+        votes = variance_voting.get("votes", {})
+        if winner:
+            lines.append("")
+            lines.append(f"Consensus winner: {winner}")
+            if votes:
+                vote_str = ", ".join(f"{k}: {v}" for k, v in votes.items())
+                lines.append(f"Votes: {vote_str}")
+    
+    # Confidence interpretation
+    lines.append("")
+    if conf < 0.5:
+        lines.append(f"ℹ️ Low confidence ({conf:.0%}): This reflects genuine moral uncertainty, not lack of reasoning.")
+    elif conf < 0.7:
+        lines.append(f"ℹ️ Moderate confidence ({conf:.0%}): This dilemma has no clear answer.")
+    else:
+        lines.append(f"ℹ️ Confidence: {conf:.0%}")
+    
+    return "\n".join(lines)
+
+
+def _format_deontic_analysis_result(conclusion: Dict[str, Any]) -> str:
+    """Format deontic analysis result for human-readable output."""
+    lines = []
+    
+    formulas = conclusion.get("formulas", [])
+    inferences = conclusion.get("inferences", [])
+    consistent = conclusion.get("consistent", True)
+    
+    if formulas:
+        lines.append("Deontic formulas analyzed:")
+        for f in formulas:
+            lines.append(f"  • {f}")
+    
+    if inferences:
+        lines.append("")
+        lines.append("Inferences:")
+        for inf in inferences:
+            lines.append(f"  • {inf}")
+    
+    if not consistent:
+        lines.append("")
+        lines.append("⚠️ Warning: Inconsistency detected in the deontic system.")
+    
+    return "\n".join(lines) if lines else "Deontic analysis completed."
+
+
+def _format_formal_proof_result(conclusion: Dict[str, Any]) -> str:
+    """Format formal proof result for human-readable output."""
+    lines = []
+    
+    success = conclusion.get("success", False)
+    proof_results = conclusion.get("proof_results", [])
+    
+    if success:
+        lines.append("✓ Proof successful")
+    else:
+        lines.append("✗ Proof not found")
+    
+    if proof_results:
+        lines.append("")
+        for pr in proof_results:
+            formula = pr.get("formula", "Unknown")
+            proven = pr.get("proven", False)
+            status = "PROVEN ✓" if proven else "NOT PROVEN"
+            lines.append(f"  • {formula}: {status}")
+    
+    return "\n".join(lines) if lines else "Formal proof attempted."
+
+
+def _format_dominance_analysis_result(conclusion: Dict[str, Any]) -> str:
+    """Format Pareto dominance analysis result for human-readable output."""
+    lines = []
+    
+    frontier = conclusion.get("pareto_frontier", [])
+    dominated = conclusion.get("dominated_actions", [])
+    
+    if frontier:
+        lines.append("Pareto-optimal actions (non-dominated):")
+        for action in frontier:
+            lines.append(f"  • {action}")
+    
+    if dominated:
+        lines.append("")
+        lines.append("Dominated actions:")
+        for action in dominated:
+            lines.append(f"  • {action}")
+    
+    return "\n".join(lines) if lines else "Dominance analysis completed."
 
 
 # ============================================================
@@ -4702,7 +5019,12 @@ def _format_dict_result(reasoning_type: str, result: Dict[str, Any]) -> str:
     Previously, this function would concatenate ALL fields including debug info,
     metadata, computation_time, etc. which made outputs look broken.
     
+    BUG FIX (Jan 7 2026): Handle debug wrapper dicts with "filtered" field.
+    Some code paths wrap low-confidence results in {"original": ..., "filtered": True}.
+    We now unwrap these to show the original content instead of debug info.
+    
     Priority order for extracting user-facing content:
+    0. Unwrap debug wrapper dicts ("filtered" + "original")
     1. 'response' - Most engines use this for the main user-facing response
     2. 'answer' - Some engines use this for the answer
     3. 'result' - Some engines use this for the computed result
@@ -4710,6 +5032,24 @@ def _format_dict_result(reasoning_type: str, result: Dict[str, Any]) -> str:
     5. Structured extraction of known fields
     6. Fallback to all fields (only if nothing else matches)
     """
+    # ==========================================================================
+    # PRIORITY 0: Unwrap debug wrapper dicts
+    # ==========================================================================
+    # Detect {"original": ..., "filtered": True, "reason": ...} pattern
+    # This is internal debug info that shouldn't be shown to users
+    if "filtered" in result and "original" in result:
+        # Unwrap the debug wrapper - use the original content
+        original = result.get("original")
+        if original is not None:
+            # If original is a dict, recursively format it
+            if isinstance(original, dict):
+                return _format_dict_result(reasoning_type, original)
+            elif isinstance(original, str):
+                return original
+            else:
+                # For other types, use our conclusion formatter
+                return _format_conclusion_for_user(original, reasoning_type)
+    
     # ==========================================================================
     # PRIORITY 1: Check for direct user-facing response field
     # ==========================================================================
@@ -4928,7 +5268,48 @@ def _format_list_result(reasoning_type: str, result: list) -> str:
 
 
 def _format_object_result(reasoning_type: str, result: Any) -> str:
-    """Format an object result from a reasoning engine."""
+    """Format an object result from a reasoning engine.
+    
+    BUG FIX (Jan 7 2026): Properly handle ReasoningResult objects.
+    Previously, ReasoningResult objects were converted via str() which created
+    raw Python repr output like:
+        "ReasoningResult(conclusion=..., confidence=0.55, ...)"
+    This showed 6000+ tokens of internal implementation details to users.
+    
+    Now we detect ReasoningResult objects and format them using
+    _format_conclusion_for_user() which produces human-readable output.
+    """
+    # ==========================================================================
+    # BUG FIX: Handle ReasoningResult objects specially
+    # ==========================================================================
+    # Check if this is a ReasoningResult dataclass (has conclusion, confidence, reasoning_type)
+    if hasattr(result, 'conclusion') and hasattr(result, 'confidence') and hasattr(result, 'reasoning_type'):
+        # Extract the meaningful content
+        conclusion = getattr(result, 'conclusion', None)
+        explanation = getattr(result, 'explanation', '')
+        confidence = getattr(result, 'confidence', 0.0)
+        inner_reasoning_type = getattr(result, 'reasoning_type', None)
+        
+        # Get reasoning type value if it's an enum
+        type_str = reasoning_type
+        if inner_reasoning_type and hasattr(inner_reasoning_type, 'value'):
+            type_str = inner_reasoning_type.value
+        
+        # Format the conclusion using our user-friendly formatter
+        formatted = _format_conclusion_for_user(conclusion, type_str)
+        
+        # Add explanation if present
+        if explanation and explanation != formatted and explanation.strip():
+            formatted += f"\n\n{explanation}"
+        
+        # Add confidence footer
+        if isinstance(confidence, (int, float)) and 0 <= confidence <= 1:
+            confidence_pct = int(confidence * 100)
+            type_display = type_str.replace("_", " ").title() if type_str else "Hybrid"
+            formatted += f"\n\nReasoning type: {type_display} | Confidence: {confidence_pct}%"
+        
+        return formatted
+    
     # Try common methods
     if hasattr(result, "to_dict"):
         return _format_dict_result(reasoning_type, result.to_dict())
@@ -4936,13 +5317,21 @@ def _format_object_result(reasoning_type: str, result: Any) -> str:
     if hasattr(result, "to_string"):
         return result.to_string()
     
-    if hasattr(result, "__str__") and result.__str__ != object.__str__:
-        return str(result)
-    
-    # Fall back to formatting __dict__
+    # BUG FIX: Don't use str() blindly - it creates Python repr for dataclasses
+    # Instead, check if __dict__ exists and format that
     if hasattr(result, "__dict__"):
         obj_dict = {k: v for k, v in result.__dict__.items() if not k.startswith("_")}
-        return _format_dict_result(reasoning_type, obj_dict)
+        if obj_dict:
+            return _format_dict_result(reasoning_type, obj_dict)
+    
+    # Only use str() as last resort for simple objects
+    if hasattr(result, "__str__") and result.__str__ != object.__str__:
+        result_str = str(result)
+        # Sanity check: if str() produces something that looks like Python repr, truncate it
+        if result_str.startswith("ReasoningResult(") or "evidence=[" in result_str:
+            # This is a raw Python repr - truncate and explain
+            return "Analysis completed. See metadata for details."
+        return result_str
     
     return str(result)
 

@@ -725,13 +725,14 @@ class MultiModalReasoningEngine:
         chain.final_conclusion = conclusion
         chain.total_confidence = confidence
 
-        # Filter by confidence threshold
+        # BUG FIX (Jan 7 2026): Store filter info in metadata, not conclusion
+        # Previously leaked debug info to users like "original: {...}, filtered: True"
+        result_metadata = {}
         if confidence < confidence_threshold:
-            conclusion = {
-                "original": conclusion,
-                "filtered": True,
-                "reason": f"Confidence {confidence:.2f} below threshold {confidence_threshold}",
-            }
+            result_metadata["below_confidence_threshold"] = True
+            result_metadata["filter_reason"] = f"Confidence {confidence:.2f} below threshold {confidence_threshold}"
+            result_metadata["threshold"] = confidence_threshold
+            # Keep original conclusion - don't wrap it
 
         # Create result
         result = ReasoningResult(
@@ -740,6 +741,7 @@ class MultiModalReasoningEngine:
             reasoning_type=ReasoningType.MULTIMODAL,
             reasoning_chain=chain,
             explanation=self._generate_explanation(chain, fusion_strategy),
+            metadata=result_metadata,
         )
 
         # Learn from result if enabled

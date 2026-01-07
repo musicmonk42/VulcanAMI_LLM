@@ -3159,11 +3159,28 @@ class UnifiedReasoner:
                                     explanation=str(query_result.get("proof", "No proof found")),
                                 )
                             else:
+                                # =========================================================
+                                # BUG FIX (Jan 7 2026): Provide user-friendly output
+                                # =========================================================
+                                # Previously returned debug info like:
+                                #   {"constraints_added": 1, "extracted": {...}}
+                                # Now returns user-friendly message with debug in metadata
+                                # =========================================================
+                                constraints_count = len(extracted["constraints"])
                                 result = ReasoningResult(
-                                    conclusion={"constraints_added": len(extracted["constraints"]), "extracted": extracted},
+                                    conclusion=f"Extracted {constraints_count} logical constraint(s) from the query, but no specific hypothesis was provided to evaluate.",
                                     confidence=CONFIDENCE_FLOOR_SYMBOLIC_DEFAULT,
                                     reasoning_type=task.task_type,
-                                    explanation="Constraints extracted but no specific query to evaluate",
+                                    explanation=(
+                                        "The symbolic reasoner successfully parsed the logical structure, "
+                                        "but needs a specific question or hypothesis to prove. "
+                                        "Try rephrasing with a clear yes/no question."
+                                    ),
+                                    metadata={
+                                        "constraints_added": constraints_count,
+                                        "extracted_constraints": extracted.get("constraints", []),
+                                        "parsed_successfully": True,
+                                    },
                                 )
                     else:
                         # No constraints could be extracted - try direct query
@@ -3700,11 +3717,29 @@ class UnifiedReasoner:
                 "confidence_threshold", self.confidence_threshold
             )
             if result.confidence < threshold:
-                result.conclusion = {
-                    "original": result.conclusion,
-                    "filtered": True,
-                    "reason": f"Confidence {result.confidence:.2f} below threshold {threshold}",
-                }
+                # =========================================================================
+                # BUG FIX (Jan 7 2026): Store debug info in metadata, NOT conclusion
+                # =========================================================================
+                # Previously, debug info was stored in conclusion like:
+                #   {"original": ..., "filtered": True, "reason": "Confidence 0.20 below threshold 0.5"}
+                # This leaked internal debug information to users, making output look like:
+                #   "original: {'constraints_added': 1, ...}"
+                # 
+                # Now we:
+                # 1. Keep the original conclusion (user-facing data)
+                # 2. Store filter info in metadata (for internal use only)
+                # 3. Add a user-friendly explanation if missing
+                # =========================================================================
+                result.metadata["below_confidence_threshold"] = True
+                result.metadata["filter_reason"] = f"Confidence {result.confidence:.2f} below threshold {threshold}"
+                result.metadata["threshold"] = threshold
+                
+                # Add user-friendly explanation if one doesn't exist
+                if not result.explanation or result.explanation.strip() == "":
+                    result.explanation = (
+                        "Analysis completed with moderate confidence. "
+                        "Results may benefit from additional context or verification."
+                    )
             
             # PRIORITY 2 FIX: Apply mathematical verification to calculation results
             # Check if this is a mathematical task that needs verification
