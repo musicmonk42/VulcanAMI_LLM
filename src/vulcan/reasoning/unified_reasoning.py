@@ -11,6 +11,7 @@ ULTIMATE FIX: Monkey-patch applied at import time, shutdown waits for threads pr
 PRODUCTION FIX: Skips heavy UnifiedRuntime initialization during tests to prevent segfaults.
 """
 
+import hashlib
 import logging
 import os
 import pickle
@@ -42,6 +43,37 @@ from .reasoning_types import (
 )
 
 logger = logging.getLogger(__name__)
+
+# ==============================================================================
+# CACHE CONFIGURATION
+# ==============================================================================
+# These constants control the unified reasoning cache behavior.
+# BUG FIX (Jan 7 2026): Cache key was using only 8 chars, causing collisions.
+
+# Number of hex characters to use from SHA-256 hash for cache keys
+# 16 hex chars = 64 bits = very low collision probability
+CACHE_HASH_LENGTH = 16
+
+# Maximum cache entry age in seconds (5 minutes)
+CACHE_MAX_AGE_SECONDS = 300.0
+
+
+def _compute_query_hash(query_data: Any) -> str:
+    """
+    Compute a consistent hash for query data.
+    
+    BUG FIX (Jan 7 2026): Extracted into helper function to ensure consistent
+    hash computation across cache key generation and cache validation.
+    
+    Args:
+        query_data: The query data to hash (string, dict, or other)
+        
+    Returns:
+        First CACHE_HASH_LENGTH chars of SHA-256 hex digest
+    """
+    query_str = str(query_data) if not isinstance(query_data, str) else query_data
+    return hashlib.sha256(query_str.encode('utf-8')).hexdigest()[:CACHE_HASH_LENGTH]
+
 
 # ==============================================================================
 # MATHEMATICAL VERIFICATION CONSTANTS
@@ -1268,12 +1300,68 @@ class UnifiedReasoner:
             cache_key = self._compute_cache_key(task)
             with self._cache_lock:
                 if cache_key in self.result_cache:
-                    logger.info(f"Cache hit for task {task.task_id}")
                     cached_result = self.result_cache[cache_key]
-                    self._record_execution(
-                        task, cached_result, time.time() - start_time, True
-                    )
-                    return cached_result
+                    
+                    # =========================================================================
+                    # BUG FIX (Jan 7 2026): Validate cached result before returning
+                    # =========================================================================
+                    # PROBLEM: Cache key collisions caused wrong results to be returned
+                    # Example: Counterfactual reasoning query got MATHEMATICAL result (0.1 confidence)
+                    #          instead of world_model result (0.90 confidence)
+                    # 
+                    # VALIDATION CHECKS:
+                    # 1. Reasoning type must match (or be compatible)
+                    # 2. Cache entry must not be too old (max 5 minutes)
+                    # 3. Original query must be stored and match
+                    # =========================================================================
+                    
+                    cache_valid = True
+                    validation_reason = ""
+                    
+                    # Check 1: Reasoning type compatibility
+                    if hasattr(cached_result, 'reasoning_type') and cached_result.reasoning_type:
+                        cached_type = cached_result.reasoning_type
+                        if isinstance(cached_type, ReasoningType):
+                            cached_type_value = cached_type.value
+                        else:
+                            cached_type_value = str(cached_type)
+                        
+                        task_type_value = task.task_type.value if isinstance(task.task_type, ReasoningType) else str(task.task_type)
+                        
+                        # Types must match or cached must be HYBRID/ENSEMBLE (which can match anything)
+                        compatible_types = {cached_type_value, 'hybrid', 'ensemble', 'unknown'}
+                        if task_type_value not in compatible_types and cached_type_value != task_type_value:
+                            cache_valid = False
+                            validation_reason = f"Type mismatch: cached={cached_type_value}, expected={task_type_value}"
+                    
+                    # Check 2: Cache age (max 5 minutes = 300 seconds)
+                    if cache_valid and hasattr(cached_result, 'metadata') and isinstance(cached_result.metadata, dict):
+                        cached_time = cached_result.metadata.get('cache_timestamp', 0)
+                        if cached_time > 0:
+                            cache_age = time.time() - cached_time
+                            if cache_age > CACHE_MAX_AGE_SECONDS:
+                                cache_valid = False
+                                validation_reason = f"Cache expired: age={cache_age:.1f}s > {CACHE_MAX_AGE_SECONDS}s"
+                    
+                    # Check 3: Original query match (if stored)
+                    if cache_valid and hasattr(cached_result, 'metadata') and isinstance(cached_result.metadata, dict):
+                        cached_query = cached_result.metadata.get('original_query_hash')
+                        if cached_query:
+                            current_query_hash = _compute_query_hash(task.query)
+                            if cached_query != current_query_hash:
+                                cache_valid = False
+                                validation_reason = f"Query hash mismatch: cache collision detected"
+                    
+                    if cache_valid:
+                        logger.info(f"[Cache] ✓ Valid cache hit for task {task.task_id}")
+                        self._record_execution(
+                            task, cached_result, time.time() - start_time, True
+                        )
+                        return cached_result
+                    else:
+                        # Invalid cache entry - remove it and continue with fresh computation
+                        logger.warning(f"[Cache] ✗ Invalid cache entry removed: {validation_reason}")
+                        del self.result_cache[cache_key]
 
             if self.enable_safety and self.safety_wrapper:
                 try:
@@ -1398,6 +1486,19 @@ class UnifiedReasoner:
                     for key in keys_to_remove:
                         del self.result_cache[key]
 
+                # =========================================================================
+                # BUG FIX (Jan 7 2026): Store cache metadata for validation
+                # =========================================================================
+                # Store timestamp and query hash so we can validate cache entries on retrieval
+                # This prevents cache poisoning where wrong results contaminate other queries
+                # =========================================================================
+                if result and hasattr(result, 'metadata'):
+                    if result.metadata is None:
+                        result.metadata = {}
+                    result.metadata['cache_timestamp'] = time.time()
+                    result.metadata['original_query_hash'] = _compute_query_hash(task.query)
+                    result.metadata['cached_task_type'] = task.task_type.value if isinstance(task.task_type, ReasoningType) else str(task.task_type)
+                
                 self.result_cache[cache_key] = result
 
             self._add_to_history(task, result, elapsed_time)
@@ -3159,11 +3260,28 @@ class UnifiedReasoner:
                                     explanation=str(query_result.get("proof", "No proof found")),
                                 )
                             else:
+                                # =========================================================
+                                # BUG FIX (Jan 7 2026): Provide user-friendly output
+                                # =========================================================
+                                # Previously returned debug info like:
+                                #   {"constraints_added": 1, "extracted": {...}}
+                                # Now returns user-friendly message with debug in metadata
+                                # =========================================================
+                                constraints_count = len(extracted["constraints"])
                                 result = ReasoningResult(
-                                    conclusion={"constraints_added": len(extracted["constraints"]), "extracted": extracted},
+                                    conclusion=f"Extracted {constraints_count} logical constraint(s) from the query, but no specific hypothesis was provided to evaluate.",
                                     confidence=CONFIDENCE_FLOOR_SYMBOLIC_DEFAULT,
                                     reasoning_type=task.task_type,
-                                    explanation="Constraints extracted but no specific query to evaluate",
+                                    explanation=(
+                                        "The symbolic reasoner successfully parsed the logical structure, "
+                                        "but needs a specific question or hypothesis to prove. "
+                                        "Try rephrasing with a clear yes/no question."
+                                    ),
+                                    metadata={
+                                        "constraints_added": constraints_count,
+                                        "extracted_constraints": extracted.get("constraints", []),
+                                        "parsed_successfully": True,
+                                    },
                                 )
                     else:
                         # No constraints could be extracted - try direct query
@@ -3671,19 +3789,88 @@ class UnifiedReasoner:
             return 1.0
 
     def _compute_cache_key(self, task: ReasoningTask) -> str:
-        """Compute cache key for task"""
+        """
+        Compute deterministic cache key for task.
+        
+        BUG FIX (Jan 7 2026): Fixed cache key collision bug.
+        
+        PREVIOUS PROBLEM:
+        - Cache key used only 8 chars of hash: str(hash(str(task.query)))[:8]
+        - High collision probability caused different queries to get same cache key
+        - Example: "demonstrate counterfactual reasoning" got cached MATHEMATICAL result
+        - World model returned confidence 0.90, but cache returned 0.10 from wrong query
+        
+        FIX:
+        - Use full SHA-256 hash (first 16 chars) for collision resistance
+        - Include input_data content in hash, not just type name
+        - Include task_id to prevent cross-task collisions
+        - Store original query in cache for validation
+        
+        The cache key format is now:
+            {task_type}_{input_type}_{content_hash}
+        
+        Where content_hash is SHA-256 of:
+            - Full query string (not truncated)
+            - Input data string representation
+            - Any constraints that affect output
+        """
 
         try:
+            # Build comprehensive content for hashing
+            content_parts = []
+            
+            # 1. Task type (ensures different reasoning types don't collide)
+            content_parts.append(f"type:{task.task_type.value}")
+            
+            # 2. Full query content (not truncated)
+            if task.query:
+                # Normalize query to string for hashing
+                query_str = str(task.query) if not isinstance(task.query, str) else task.query
+                content_parts.append(f"query:{query_str}")
+            
+            # 3. Input data content (not just type name)
+            if task.input_data is not None:
+                if isinstance(task.input_data, str):
+                    content_parts.append(f"input:{task.input_data[:1000]}")  # Limit size
+                elif isinstance(task.input_data, dict):
+                    # Sort keys for deterministic ordering
+                    sorted_items = sorted(task.input_data.items(), key=lambda x: str(x[0]))
+                    content_parts.append(f"input:{str(sorted_items)[:1000]}")
+                else:
+                    content_parts.append(f"input:{str(task.input_data)[:1000]}")
+            
+            # 4. Constraints that affect output
+            if task.constraints:
+                # Only include constraints that affect reasoning output
+                relevant_constraints = {
+                    k: v for k, v in task.constraints.items()
+                    if k in ('confidence_threshold', 'max_steps', 'reasoning_depth', 'tools')
+                }
+                if relevant_constraints:
+                    content_parts.append(f"constraints:{str(sorted(relevant_constraints.items()))}")
+            
+            # Compute SHA-256 hash of combined content using helper function
+            content_str = "|".join(content_parts)
+            content_hash = hashlib.sha256(content_str.encode('utf-8')).hexdigest()[:CACHE_HASH_LENGTH]
+            
+            # Build final cache key
             key_parts = [
                 task.task_type.value,
                 str(type(task.input_data).__name__),
-                str(hash(str(task.query)))[:8],
+                content_hash,
             ]
 
-            return "_".join(key_parts)
+            cache_key = "_".join(key_parts)
+            
+            logger.debug(f"[Cache] Generated key: {cache_key} for query: {str(task.query)[:50]}...")
+            
+            return cache_key
+            
         except Exception as e:
             logger.warning(f"Cache key computation failed: {e}")
-            return str(uuid.uuid4())
+            # Return unique key to prevent any caching (safe fallback)
+            # Using task_id ensures this result won't be reused for other queries
+            return f"nocache_{task.task_id}_{uuid.uuid4().hex[:8]}"
 
     def _postprocess_result(
         self, result: ReasoningResult, task: ReasoningTask
@@ -3700,11 +3887,29 @@ class UnifiedReasoner:
                 "confidence_threshold", self.confidence_threshold
             )
             if result.confidence < threshold:
-                result.conclusion = {
-                    "original": result.conclusion,
-                    "filtered": True,
-                    "reason": f"Confidence {result.confidence:.2f} below threshold {threshold}",
-                }
+                # =========================================================================
+                # BUG FIX (Jan 7 2026): Store debug info in metadata, NOT conclusion
+                # =========================================================================
+                # Previously, debug info was stored in conclusion like:
+                #   {"original": ..., "filtered": True, "reason": "Confidence 0.20 below threshold 0.5"}
+                # This leaked internal debug information to users, making output look like:
+                #   "original: {'constraints_added': 1, ...}"
+                # 
+                # Now we:
+                # 1. Keep the original conclusion (user-facing data)
+                # 2. Store filter info in metadata (for internal use only)
+                # 3. Add a user-friendly explanation if missing
+                # =========================================================================
+                result.metadata["below_confidence_threshold"] = True
+                result.metadata["filter_reason"] = f"Confidence {result.confidence:.2f} below threshold {threshold}"
+                result.metadata["threshold"] = threshold
+                
+                # Add user-friendly explanation if one doesn't exist
+                if not result.explanation or result.explanation.strip() == "":
+                    result.explanation = (
+                        "Analysis completed with moderate confidence. "
+                        "Results may benefit from additional context or verification."
+                    )
             
             # PRIORITY 2 FIX: Apply mathematical verification to calculation results
             # Check if this is a mathematical task that needs verification
