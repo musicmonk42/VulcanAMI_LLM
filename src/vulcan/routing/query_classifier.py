@@ -171,6 +171,26 @@ MATHEMATICAL_KEYWORDS: FrozenSet[str] = frozenset([
     "limit", "converge", "series",
 ])
 
+# =============================================================================
+# BUG #3 FIX (Jan 7 2026): Mathematical Symbol Detection
+# =============================================================================
+# Query "Compute ∑(2k-1) from k=1 to n" was routing to probabilistic because:
+# - Only 1 keyword match ("compute") vs MATH_KEYWORD_THRESHOLD = 2
+# - Math symbols like ∑ were not being detected
+#
+# Fix: Add pattern matching for mathematical symbols that should immediately
+# route to mathematical/symbolic engine regardless of keyword count.
+MATH_SYMBOL_PATTERN = re.compile(r"[∫∑∏∂∇∈∀∃∅∞≠≤≥≈±×÷√∝]")
+
+# Summation notation patterns: ∑(k=1 to n), sum from k=1, etc.
+SUMMATION_PATTERNS: Tuple[re.Pattern, ...] = (
+    re.compile(r"∑", re.UNICODE),  # Unicode summation symbol
+    re.compile(r"sum\s+(?:from|for)\s+\w+\s*=\s*\d+", re.IGNORECASE),  # sum from k=1
+    re.compile(r"\bsum\s+\w+\s*=\s*\d+\s+to\b", re.IGNORECASE),  # sum k=1 to
+    re.compile(r"\\sum\s*[_^]?", re.IGNORECASE),  # LaTeX \sum
+    re.compile(r"k\s*=\s*\d+\s+to\s+n", re.IGNORECASE),  # k=1 to n pattern
+)
+
 # Analogical reasoning indicators - complexity 0.5+, tools=['analogical']
 ANALOGICAL_KEYWORDS: FrozenSet[str] = frozenset([
     "analogy", "analogous", "analogies",
@@ -981,13 +1001,38 @@ class QueryClassifier:
         
         # Check mathematical indicators
         math_count = sum(1 for kw in MATHEMATICAL_KEYWORDS if kw in query_lower)
-        if math_count >= MATH_KEYWORD_THRESHOLD:
+        
+        # =====================================================================
+        # BUG #3 FIX (Jan 7 2026): Check for mathematical SYMBOLS first
+        # =====================================================================
+        # Query "Compute ∑(2k-1) from k=1 to n" has math symbol (∑) and keyword
+        # (compute), but only 1 keyword match < MATH_KEYWORD_THRESHOLD (2).
+        # Fix: If query contains math symbols like ∑, ∫, ∂, etc., classify as
+        # MATHEMATICAL even with fewer keyword matches.
+        has_math_symbols = MATH_SYMBOL_PATTERN.search(query_original) is not None
+        has_summation_pattern = any(p.search(query_original) for p in SUMMATION_PATTERNS)
+        
+        # Route to mathematical if:
+        # 1. Has enough keyword matches (original behavior), OR
+        # 2. Has math symbols AND at least 1 keyword match, OR
+        # 3. Has summation patterns
+        if (math_count >= MATH_KEYWORD_THRESHOLD or
+            (has_math_symbols and math_count >= 1) or
+            has_summation_pattern):
+            
+            # Calculate effective count for complexity
+            effective_count = math_count + (2 if has_math_symbols else 0) + (1 if has_summation_pattern else 0)
+            
+            logger.info(
+                f"[QueryClassifier] BUG#3 FIX: MATHEMATICAL classification - "
+                f"keywords={math_count}, has_symbols={has_math_symbols}, has_summation={has_summation_pattern}"
+            )
             return QueryClassification(
                 category=QueryCategory.MATHEMATICAL.value,
-                complexity=0.4 + min(0.4, math_count * 0.05),
+                complexity=0.4 + min(0.4, effective_count * 0.05),
                 suggested_tools=["mathematical", "symbolic"],
                 skip_reasoning=False,
-                confidence=0.8,
+                confidence=0.9 if has_math_symbols else 0.8,
                 source="keyword",
             )
         
