@@ -38,6 +38,7 @@ class TestLLMModuleImports:
 
         assert GraphixVulcanLLM is not None
         assert build_llm is not None
+        assert callable(build_llm), "build_llm should be callable"
 
     def test_src_llm_core_imports(self):
         """Test LLM core module imports."""
@@ -223,7 +224,10 @@ class TestLLMFunctionality:
         from graphix_vulcan_llm import GraphixVulcanLLM
 
         llm = GraphixVulcanLLM()
-        result = llm.generate("Hello", max_tokens=8, explain=False)
+        # Use 8 tokens as minimal output to verify generation works
+        # This is enough to test the pipeline without excessive runtime
+        min_tokens_for_test = 8
+        result = llm.generate("Hello", max_tokens=min_tokens_for_test, explain=False)
 
         assert result is not None
         assert hasattr(result, "tokens")
