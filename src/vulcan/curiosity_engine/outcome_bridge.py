@@ -723,8 +723,10 @@ def _init_db(db_path: Optional[Path] = None) -> bool:
                     conn.execute(
                         "ALTER TABLE query_outcomes ADD COLUMN answer_quality TEXT DEFAULT NULL"
                     )
-                except sqlite3.OperationalError:
-                    pass  # Column already exists
+                except sqlite3.OperationalError as e:
+                    # Only ignore duplicate column error, re-raise other schema issues
+                    if "duplicate column name" not in str(e).lower():
+                        raise
                 
                 # Create indexes for common query patterns
                 conn.execute(
