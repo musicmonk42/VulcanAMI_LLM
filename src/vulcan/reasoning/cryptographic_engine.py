@@ -103,6 +103,14 @@ THEORETICAL_CRYPTO_KEYWORDS: Final[FrozenSet[str]] = frozenset({
     'ai capabilities', 'ai system', 'system 2', 'testing ai',
 })
 
+# CODE REVIEW FIX: Pre-compiled regex pattern for quoted data detection
+# Match quoted strings that are likely data (not contractions like don't, can't)
+# Single-quoted with 2+ chars (excludes 't, 's, etc.) OR double-quoted with 2+ chars
+QUOTED_DATA_PATTERN: Pattern = re.compile(
+    r"'[^']{2,}'|"  # Single-quoted with 2+ chars
+    r'"[^"]{2,}"'   # Double-quoted with 2+ chars
+)
+
 
 # =============================================================================
 # Enums and Data Classes
@@ -447,16 +455,9 @@ class CryptographicEngine:
         # Actual hash computation requests have data in quotes: "Calculate SHA-256 of 'Hello'"
         # Educational questions don't: "What is SHA-256 collision resistance?"
         # 
-        # CODE REVIEW FIX: Use regex to avoid false positives from contractions (don't, can't)
-        # Look for: 'text' or "text" where text is at least 1 char and not a contraction
-        import re
-        # Match quoted strings that are likely data (not contractions)
-        # Contractions: don't, can't, won't, etc. - short with apostrophe before last 1-2 chars
-        quoted_data_pattern = re.compile(
-            r"'[^']{2,}'|"  # Single-quoted with 2+ chars (excludes 't, 's, etc.)
-            r'"[^"]{2,}"'   # Double-quoted with 2+ chars
-        )
-        has_quoted_data = bool(quoted_data_pattern.search(query))
+        # CODE REVIEW FIX: Use pre-compiled regex to avoid false positives from contractions
+        # and improve performance (QUOTED_DATA_PATTERN defined at module level)
+        has_quoted_data = bool(QUOTED_DATA_PATTERN.search(query))
         
         if not has_quoted_data:
             logger.debug(
