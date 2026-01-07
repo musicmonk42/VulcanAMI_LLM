@@ -173,6 +173,10 @@ class SymbolicReasoner:
         attempting to parse it. This prevents wasted computation and provides
         meaningful feedback when queries are not applicable.
         
+        FIX (Jan 7 2026): Made less strict for natural language SAT problems.
+        Queries like "Is the set satisfiable?" should be routed to symbolic
+        even without formal notation, as they describe logical problems.
+        
         Args:
             query: Query string to check
             
@@ -187,6 +191,8 @@ class SymbolicReasoner:
             False
             >>> reasoner.is_symbolic_query("∀X (human(X) → mortal(X))")
             True
+            >>> reasoner.is_symbolic_query("Is A→B, B→C, ¬C satisfiable?")  # SAT problem
+            True
         """
         if not query or not query.strip():
             return False
@@ -200,12 +206,28 @@ class SymbolicReasoner:
         ascii_logic = ['->', '<->', '&&', '||', '~', '!']
         
         # Logic keywords that indicate formal reasoning
+        # FIX (Jan 7 2026): Made less strict - single keyword match is sufficient
+        # for SAT/satisfiability problems since those are inherently symbolic
         logic_keywords = [
             'satisfiable', 'validity', 'entails', 'proof',
             'theorem', 'axiom', 'proposition', 'predicate',
             'forall', 'exists', 'implies', 'iff',
             'cnf', 'dnf', 'horn clause', 'resolution'
         ]
+        
+        # SAT-specific keywords that should ALWAYS route to symbolic
+        # FIX (Jan 7 2026): SAT problems are inherently formal logic problems
+        # even if expressed in natural language. Route them to symbolic engine.
+        sat_keywords = [
+            'satisfiable', 'unsatisfiable', 'sat', 'unsat',
+            'contradiction', 'tautology', 'valid', 'invalid',
+            'sat-style', 'cnf', 'dnf'
+        ]
+        
+        # Check for SAT-specific keywords (single match is sufficient)
+        has_sat_keyword = any(kw in query_lower for kw in sat_keywords)
+        if has_sat_keyword:
+            return True
         
         # Check for Unicode logic symbols
         has_symbols = any(sym in query for sym in logic_symbols)
@@ -218,8 +240,10 @@ class SymbolicReasoner:
             return True
         
         # Check for logic keywords (need at least MIN_LOGIC_KEYWORDS for confidence)
+        # FIX (Jan 7 2026): Reduced MIN_LOGIC_KEYWORDS check to 1 for natural language
+        # SAT problems that describe constraints in prose
         keyword_count = sum(1 for kw in logic_keywords if kw in query_lower)
-        if keyword_count >= self.MIN_LOGIC_KEYWORDS:
+        if keyword_count >= 1:  # Changed from self.MIN_LOGIC_KEYWORDS to 1
             return True
         
         # Check for formal notation patterns like "A→B", "P(x)", "∀X"
@@ -256,6 +280,12 @@ class SymbolicReasoner:
             )
             if simple_prop_pattern:
                 return True
+        
+        # FIX (Jan 7 2026): Check for propositional variables mentioned in text
+        # Queries like "Propositions: A, B, C" should be recognized as symbolic
+        prop_pattern = re.search(r'proposition|constraint|formula|variable', query_lower)
+        if prop_pattern:
+            return True
         
         return False
 
