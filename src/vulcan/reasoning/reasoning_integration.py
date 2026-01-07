@@ -2166,6 +2166,13 @@ class ReasoningIntegration:
         Issue #5 FIX: Self-referential queries should be routed to the world model's
         introspection system rather than domain-specific reasoners.
         
+        CRITICAL: Must distinguish between:
+        - Self-referential: "What are you?" "How do you work?" "What can you do?"
+        - Creative about AI: "Write a poem about AI" "Tell a story about robots"
+        
+        Creative writing requests about AI are NOT self-referential queries about
+        VULCAN itself - they should be routed to the creative reasoning path.
+        
         Args:
             query: The query string to analyze
             
@@ -2177,7 +2184,24 @@ class ReasoningIntegration:
             
         query_lower = query.lower()
         
-        # Keywords indicating self-referential queries
+        # =====================================================================
+        # CREATIVE INDICATORS - These are NOT self-referential!
+        # Check for creative writing requests FIRST before checking self-reference.
+        # A query like "Write a poem about AI becoming self-aware" is a creative
+        # request, not a question about VULCAN's own self-awareness.
+        # =====================================================================
+        creative_indicators = [
+            'write', 'poem', 'story', 'compose', 'create', 
+            'tell me a', 'imagine', 'narrative', 'fiction',
+            'make up', 'invent', 'draft', 'author'
+        ]
+        if any(ind in query_lower for ind in creative_indicators):
+            # This is a creative writing request, not introspection
+            return False
+        
+        # =====================================================================
+        # SELF-REFERENTIAL PATTERNS (only match these after ruling out creative)
+        # =====================================================================
         self_keywords = [
             # Direct self-reference
             "would you", "do you", "are you", "can you",
