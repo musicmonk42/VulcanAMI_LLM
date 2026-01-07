@@ -288,6 +288,35 @@ class PortfolioExecutor:
 
         return engines
 
+    # =============================================================================
+    # BUG #2 FIX (Jan 7 2026): Tool Fallback Mapping
+    # =============================================================================
+    # If a requested tool isn't available, map it to an equivalent tool.
+    # This prevents "No valid tools found in ['philosophical']" errors when
+    # PhilosophicalReasoner fails to import but world_model is available.
+    TOOL_FALLBACKS: Dict[str, List[str]] = {
+        'philosophical': ['world_model', 'symbolic', 'language'],  # Philosophical falls back to world_model
+        'cryptographic': ['symbolic', 'mathematical'],  # Crypto falls back to symbolic
+        'analogical': ['symbolic', 'probabilistic'],  # Analogical falls back to symbolic
+        'causal': ['probabilistic', 'symbolic'],  # Causal falls back to probabilistic
+        'mathematical': ['symbolic'],  # Mathematical falls back to symbolic
+        'multimodal': ['language', 'symbolic'],  # Multimodal falls back to language
+    }
+
+    def _get_fallback_tools(self, tool_name: str) -> List[str]:
+        """
+        Get fallback tools for an unavailable tool.
+        
+        Args:
+            tool_name: The requested tool that isn't available
+            
+        Returns:
+            List of fallback tool names that could substitute
+        """
+        fallbacks = self.TOOL_FALLBACKS.get(tool_name, [])
+        available_fallbacks = [t for t in fallbacks if t in self.tools]
+        return available_fallbacks
+
     def execute(
         self,
         strategy: ExecutionStrategy,
@@ -324,8 +353,22 @@ class PortfolioExecutor:
                     constraints.get("min_confidence", 0.5),
                 )
 
-            # Validate tools exist
+            # Validate tools exist, with fallback support
             valid_tools = [t for t in tool_names if t in self.tools]
+            
+            # BUG #2 FIX (Jan 7 2026): Try fallbacks for unavailable tools
+            if not valid_tools:
+                for requested_tool in tool_names:
+                    if requested_tool not in self.tools:
+                        fallbacks = self._get_fallback_tools(requested_tool)
+                        if fallbacks:
+                            logger.warning(
+                                f"[PortfolioExecutor] BUG#2 FIX: Tool '{requested_tool}' not available, "
+                                f"using fallback: {fallbacks[0]}"
+                            )
+                            valid_tools.append(fallbacks[0])
+                            break
+            
             if not valid_tools:
                 available = list(self.tools.keys())
                 logger.error(f"No valid tools found. Requested: {tool_names}, Available: {available}")

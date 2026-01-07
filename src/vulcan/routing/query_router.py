@@ -3240,6 +3240,53 @@ class QueryAnalyzer:
                     source="keyword_override"
                 )
             
+            # =================================================================
+            # BUG FIX (Jan 7 2026): Safety net for CRYPTOGRAPHIC queries misclassified as FACTUAL
+            # =================================================================
+            # Problem: Even with crypto priority in query_classifier.py, some queries like
+            # "What is the SHA-256 hash of..." could still hit the FACTUAL fast-path because:
+            # 1. The classifier might have skip_reasoning=True for FACTUAL
+            # 2. The complexity is < 0.3
+            #
+            # Solution: Before taking the fast-path, double-check for computational keywords.
+            # If found, re-enable reasoning and route to cryptographic/mathematical.
+            # =================================================================
+            crypto_keywords = (
+                'sha-', 'sha256', 'sha-256', 'sha512', 'sha-512', 'md5', 'hash',
+                'encrypt', 'decrypt', 'encode', 'decode', 'base64', 'hex',
+            )
+            math_keywords = (
+                'calculate', 'compute', 'integral', 'derivative', 'equation',
+            )
+            computational_keywords = crypto_keywords + math_keywords
+            
+            if classification.skip_reasoning and classification.category == "FACTUAL":
+                query_has_computational = any(kw in query_lower for kw in computational_keywords)
+                if query_has_computational:
+                    logger.info(
+                        f"[QueryRouter] {query_id}: SAFETY NET - FACTUAL query contains "
+                        f"computational keywords, re-enabling reasoning"
+                    )
+                    # Determine if it's cryptographic or mathematical
+                    if any(kw in query_lower for kw in crypto_keywords):
+                        classification = type(classification)(
+                            category="CRYPTOGRAPHIC",
+                            complexity=0.6,
+                            confidence=classification.confidence,
+                            skip_reasoning=False,  # Re-enable reasoning
+                            suggested_tools=["cryptographic"],
+                            source="safety_net_crypto_override"
+                        )
+                    else:
+                        classification = type(classification)(
+                            category="MATHEMATICAL",
+                            complexity=0.5,
+                            confidence=classification.confidence,
+                            skip_reasoning=False,  # Re-enable reasoning
+                            suggested_tools=["mathematical", "symbolic"],
+                            source="safety_net_math_override"
+                        )
+            
             # If classifier says skip reasoning (greetings, chitchat, simple factual)
             # return a fast-path plan immediately
             if classification.skip_reasoning and classification.complexity < 0.3:
