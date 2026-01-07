@@ -910,12 +910,25 @@ class AgentPoolManager:
         # Redis client for state persistence
         self.redis_client = redis_client
         
-        # EMERGENCY STABILIZATION: Hardcode agent limits to reduce thread thrashing
-        # CPU CLOUD FIX: Reduced min_agents from 5 to 2 to reduce context-switching
-        # overhead on CPU-only instances. The 5 agents were competing for the same
-        # CPU resources, causing forward() pass times to fluctuate significantly.
-        self.max_agents = 10
-        self.min_agents = 2
+        # AGENT POOL CONFIGURATION FIX: Updated min_agents to support reasoning capabilities
+        # Previously: min_agents=2 which only allowed 2 agent types (perception, general)
+        # Now: min_agents=8 to ensure priority reasoning capabilities get dedicated agents
+        # This is critical because ~45% of queries were failing due to capability mismatches
+        #
+        # Priority reasoning capabilities (from _initialize_agent_pool):
+        # 1. PROBABILISTIC - ProbabilisticReasoner
+        # 2. SYMBOLIC - SymbolicReasoner
+        # 3. PHILOSOPHICAL - PhilosophicalReasoner
+        # 4. MATHEMATICAL - MathematicalComputationTool
+        # 5. CAUSAL - CausalReasoner
+        # 6. ANALOGICAL - AnalogicalReasoningEngine
+        # 7. WORLD_MODEL - WorldModel
+        # + 1 GENERAL for fallback
+        #
+        # Note: Actual reasoning execution uses singletons from reasoning_integration.py
+        # so there's no memory overhead from having more agents - each just has capability metadata
+        self.max_agents = 15  # Increased from 10 to accommodate more capabilities
+        self.min_agents = 8   # Increased from 2 to cover priority reasoning capabilities
         self.task_timeout_seconds = task_timeout_seconds
 
         # Agent tracking
@@ -1406,8 +1419,8 @@ class AgentPoolManager:
         logger.info(f"Initializing agent pool with {self.min_agents} agents")
         
         # AGENT POOL FIX: Define priority capabilities for reasoning engines
-        # These are the capabilities that map to existing, tested reasoning engines
-        # in portfolio_executor.py (see _AVAILABLE_ENGINES)
+        # These capabilities map to reasoning engines stored in _AVAILABLE_ENGINES
+        # in portfolio_executor.py
         priority_reasoning_capabilities = [
             AgentCapability.PROBABILISTIC,   # ProbabilisticReasoner - WORKING
             AgentCapability.SYMBOLIC,         # SymbolicReasoner - WORKING

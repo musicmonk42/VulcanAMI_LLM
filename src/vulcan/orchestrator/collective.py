@@ -904,7 +904,7 @@ class VULCANAGICollective:
             "self_improvement": AgentCapability.GENERAL,
             
             # AGENT POOL FIX: Specialized reasoning capabilities
-            # These map to specific reasoning engines in portfolio_executor.py
+            # These map to reasoning engines stored in _AVAILABLE_ENGINES in portfolio_executor.py
             "probabilistic": AgentCapability.PROBABILISTIC,
             "probability": AgentCapability.PROBABILISTIC,
             "bayesian": AgentCapability.PROBABILISTIC,

@@ -81,6 +81,9 @@ class AgentCapability(Enum):
     - ANALOGICAL: Structure mapping, analogical inference
     - CRYPTOGRAPHIC: Hash computation, encryption operations
     - WORLD_MODEL: Self-introspection, counterfactual reasoning
+    
+    Note: These capabilities map to reasoning engines stored in _AVAILABLE_ENGINES
+    in portfolio_executor.py.
     """
 
     # Basic capabilities
