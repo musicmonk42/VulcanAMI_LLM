@@ -3050,10 +3050,20 @@ class AgentPoolManager:
                     # Previously, this early return bypassed stats update, causing
                     # "6 jobs submitted, 0 completed" - jobs would "disappear"
                     duration = time.time() - start_time
+                    
+                    # FIX: Extract attributes from ReasoningResult to dict
+                    # to prevent raw object repr being returned to users
+                    reasoning_output_dict = {
+                        "conclusion": getattr(reasoning_result, "conclusion", None),
+                        "confidence": getattr(reasoning_result, "confidence", None),
+                        "reasoning_type": str(getattr(reasoning_result, "reasoning_type", "unknown")),
+                        "explanation": getattr(reasoning_result, "explanation", None),
+                    }
+                    
                     result = {
                         "status": "completed",
                         "reasoning_invoked": True,
-                        "reasoning_output": reasoning_result,
+                        "reasoning_output": reasoning_output_dict,
                         "tools_used": selected_tools,
                         "execution_time": duration,
                         "agent_id": agent_id,
