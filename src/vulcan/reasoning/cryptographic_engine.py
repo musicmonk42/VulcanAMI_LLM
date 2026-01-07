@@ -446,7 +446,18 @@ class CryptographicEngine:
         # Step 4: Require quoted input data - this is the key check
         # Actual hash computation requests have data in quotes: "Calculate SHA-256 of 'Hello'"
         # Educational questions don't: "What is SHA-256 collision resistance?"
-        has_quoted_data = ("'" in query) or ('"' in query)
+        # 
+        # CODE REVIEW FIX: Use regex to avoid false positives from contractions (don't, can't)
+        # Look for: 'text' or "text" where text is at least 1 char and not a contraction
+        import re
+        # Match quoted strings that are likely data (not contractions)
+        # Contractions: don't, can't, won't, etc. - short with apostrophe before last 1-2 chars
+        quoted_data_pattern = re.compile(
+            r"'[^']{2,}'|"  # Single-quoted with 2+ chars (excludes 't, 's, etc.)
+            r'"[^"]{2,}"'   # Double-quoted with 2+ chars
+        )
+        has_quoted_data = bool(quoted_data_pattern.search(query))
+        
         if not has_quoted_data:
             logger.debug(
                 f"[CryptoEngine] Query has no quoted data, not a computation request: "
