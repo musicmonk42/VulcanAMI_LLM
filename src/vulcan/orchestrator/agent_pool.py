@@ -2804,11 +2804,16 @@ class AgentPoolManager:
                         # Create a reasoning_result from the integration result
                         # to maintain consistency with downstream code
                         try:
-                            from vulcan.reasoning.reasoning_types import ReasoningResult as UR_ReasoningResult, ReasoningType
+                            # BUG #1 FIX (Jan 7 2026): Use different variable name to avoid Python scoping issue
+                            # Previously: from vulcan.reasoning.reasoning_types import ReasoningResult as UR_ReasoningResult, ReasoningType
+                            # This caused "cannot access local variable 'ReasoningType'" error because
+                            # Python treats ALL references to ReasoningType as local when there's a
+                            # local import, even if the import is in a different conditional branch.
+                            from vulcan.reasoning.reasoning_types import ReasoningResult as UR_ReasoningResult, ReasoningType as RT_Local
                             reasoning_result = UR_ReasoningResult(
                                 conclusion=integration_result.metadata.get("conclusion", integration_result.metadata.get("world_model_response", "")),
                                 confidence=integration_result.confidence,
-                                reasoning_type=ReasoningType.HYBRID,  # World model uses hybrid reasoning
+                                reasoning_type=RT_Local.HYBRID,  # World model uses hybrid reasoning
                                 explanation=integration_result.metadata.get("explanation", integration_result.rationale),
                                 metadata={
                                     "source": "world_model",

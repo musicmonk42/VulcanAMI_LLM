@@ -702,13 +702,57 @@ class QueryClassifier:
                     source="keyword",
                 )
         
+        # =============================================================================
+        # BUG FIX (Jan 7 2026): Check CRYPTOGRAPHIC keywords FIRST before factual patterns
+        # =============================================================================
+        # Problem: "What is the SHA-256 hash of..." was being classified as FACTUAL
+        # because "What is" pattern matched before cryptographic keywords were checked.
+        # This caused skip_reasoning=True and bypassed the cryptographic engine entirely.
+        #
+        # Solution: Check cryptographic keywords BEFORE factual patterns.
+        # Priority order: CRYPTOGRAPHIC > FACTUAL for queries containing hash/crypto keywords
+        query_has_cryptographic = any(kw in query_lower for kw in CRYPTOGRAPHIC_KEYWORDS)
+        if query_has_cryptographic:
+            # Check cryptographic patterns first
+            for pattern in CRYPTOGRAPHIC_PATTERNS:
+                if pattern.search(query_original):
+                    logger.info(
+                        f"[QueryClassifier] PRIORITY FIX: Detected CRYPTOGRAPHIC pattern - "
+                        f"routing to cryptographic (NOT factual)"
+                    )
+                    return QueryClassification(
+                        category=QueryCategory.CRYPTOGRAPHIC.value,
+                        complexity=0.6,
+                        suggested_tools=["cryptographic"],
+                        skip_reasoning=False,  # CRITICAL: Do NOT skip reasoning
+                        confidence=0.95,
+                        source="keyword",
+                    )
+            
+            # Check cryptographic keyword count (at least 1 keyword is enough for crypto)
+            crypto_count = sum(1 for kw in CRYPTOGRAPHIC_KEYWORDS if kw in query_lower)
+            if crypto_count >= 1:
+                logger.info(
+                    f"[QueryClassifier] PRIORITY FIX: Detected {crypto_count} CRYPTOGRAPHIC keywords - "
+                    f"routing to cryptographic (NOT factual)"
+                )
+                return QueryClassification(
+                    category=QueryCategory.CRYPTOGRAPHIC.value,
+                    complexity=0.5 + min(0.2, crypto_count * 0.05),
+                    suggested_tools=["cryptographic"],
+                    skip_reasoning=False,  # CRITICAL: Do NOT skip reasoning
+                    confidence=0.85,
+                    source="keyword",
+                )
+        
         # Check factual patterns (simple questions)
         # BUT: Skip factual classification if query is about "you" - 
         # those should go to self-introspection first
         # BUG FIX: Also skip if query contains philosophical keywords
+        # BUG FIX (Jan 7 2026): Also skip if query contains cryptographic keywords
         query_about_self = any(word in query_lower for word in ['you', 'your', 'yourself'])
         query_has_philosophical = any(kw in query_lower for kw in PHILOSOPHICAL_KEYWORDS)
-        if not query_about_self and not query_has_philosophical:
+        if not query_about_self and not query_has_philosophical and not query_has_cryptographic:
             for pattern in FACTUAL_PATTERNS:
                 if pattern.search(query_original):
                     return QueryClassification(
@@ -804,18 +848,21 @@ class QueryClassifier:
         #
         # Solution: Technical domain keywords take PRIORITY over the "you" pronoun.
         # Check for cryptographic indicators first, before self-introspection.
+        # NOTE (Jan 7 2026): This is a secondary check - primary crypto check is earlier,
+        # before FACTUAL patterns. This block handles the case where crypto wasn't caught
+        # earlier and we need to prioritize it over self-introspection.
         
         # Check cryptographic patterns first (highest priority for technical queries)
         for pattern in CRYPTOGRAPHIC_PATTERNS:
             if pattern.search(query_original):
                 logger.info(
                     f"[QueryClassifier] FIX: Detected CRYPTOGRAPHIC pattern - "
-                    f"routing to mathematical (NOT self-introspection)"
+                    f"routing to cryptographic (NOT self-introspection)"
                 )
                 return QueryClassification(
                     category=QueryCategory.CRYPTOGRAPHIC.value,
                     complexity=0.6,  # Technical complexity
-                    suggested_tools=["mathematical", "cryptographic"],  # Route to math/crypto reasoners
+                    suggested_tools=["cryptographic"],  # Route to crypto reasoner
                     skip_reasoning=False,  # Needs reasoning
                     confidence=0.95,
                     source="keyword",
@@ -826,12 +873,12 @@ class QueryClassifier:
         if crypto_count >= 2:  # Require at least 2 crypto keywords
             logger.info(
                 f"[QueryClassifier] FIX: Detected {crypto_count} CRYPTOGRAPHIC keywords - "
-                f"routing to mathematical (NOT self-introspection)"
+                f"routing to cryptographic (NOT self-introspection)"
             )
             return QueryClassification(
                 category=QueryCategory.CRYPTOGRAPHIC.value,
                 complexity=0.6 + min(0.2, crypto_count * 0.03),
-                suggested_tools=["mathematical", "cryptographic"],
+                suggested_tools=["cryptographic"],
                 skip_reasoning=False,
                 confidence=0.85,
                 source="keyword",

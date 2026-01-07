@@ -4531,9 +4531,57 @@ Do NOT generate generic answers - USE the specific analysis below.
 def _format_dict_result(reasoning_type: str, result: Dict[str, Any]) -> str:
     """Format a dictionary result from a reasoning engine.
     
-    BUG FIX: Enhanced to handle ReasoningResult-structured dicts with
-    conclusion, confidence, explanation, reasoning_type, and reasoning_steps.
+    BUG FIX (Jan 7 2026): CRITICAL - Extract user-facing content from 'response'
+    or 'answer' fields FIRST, instead of concatenating all dictionary fields.
+    
+    Previously, this function would concatenate ALL fields including debug info,
+    metadata, computation_time, etc. which made outputs look broken.
+    
+    Priority order for extracting user-facing content:
+    1. 'response' - Most engines use this for the main user-facing response
+    2. 'answer' - Some engines use this for the answer
+    3. 'result' - Some engines use this for the computed result
+    4. 'conclusion' - Reasoning engines use this for conclusions
+    5. Structured extraction of known fields
+    6. Fallback to all fields (only if nothing else matches)
     """
+    # ==========================================================================
+    # PRIORITY 1: Check for direct user-facing response field
+    # ==========================================================================
+    # Most engines (world_model, cryptographic, etc.) put the main response here
+    if "response" in result and result["response"]:
+        response = result["response"]
+        if isinstance(response, str):
+            # If there's also a confidence, append it
+            if "confidence" in result:
+                conf = result["confidence"]
+                if isinstance(conf, float) and 0 <= conf <= 1:
+                    return f"{response}\n\n[Confidence: {conf:.1%}]"
+            return response
+    
+    # ==========================================================================
+    # PRIORITY 2: Check for 'answer' field (used by some computation engines)
+    # ==========================================================================
+    if "answer" in result and result["answer"]:
+        answer = result["answer"]
+        if isinstance(answer, str):
+            return answer
+        return str(answer)
+    
+    # ==========================================================================
+    # PRIORITY 3: Check for 'result' field (used by crypto/math engines)
+    # ==========================================================================
+    if "result" in result and result["result"]:
+        res = result["result"]
+        # For cryptographic operations, format nicely
+        if "operation" in result or "algorithm" in result:
+            operation = result.get("operation", result.get("algorithm", "computation"))
+            return f"{operation}: {res}"
+        return str(res)
+    
+    # ==========================================================================
+    # PRIORITY 4: Structured extraction for known reasoning result types
+    # ==========================================================================
     lines = []
     
     # Handle common result keys
@@ -4587,7 +4635,8 @@ def _format_dict_result(reasoning_type: str, result: Dict[str, Any]) -> str:
     if "probability" in result:
         lines.append(f"Probability: {result['probability']}")
     
-    if "confidence" in result:
+    if "confidence" in result and not lines:
+        # Only show confidence if we haven't added other content
         conf_val = result['confidence']
         # Format confidence as percentage if it's a float between 0 and 1
         if isinstance(conf_val, float) and 0 <= conf_val <= 1:
@@ -4616,18 +4665,43 @@ def _format_dict_result(reasoning_type: str, result: Dict[str, Any]) -> str:
     if "source_domain" in result and "target_domain" in result:
         lines.append(f"Mapping: {result['source_domain']} → {result['target_domain']}")
     
-    # If no specific keys matched, format all key-value pairs
-    # Use module-level constant for handled keys
-    if not lines:
-        for key, value in result.items():
-            if value is not None and key not in _HANDLED_DICT_RESULT_KEYS:
-                if isinstance(value, (list, tuple)) and len(value) > MAX_ANALOGIES_TO_SHOW:
-                    value_str = str(value[:MAX_ANALOGIES_TO_SHOW]) + f"... ({len(value)} total)"
-                else:
-                    value_str = str(value)
-                lines.append(f"{key}: {value_str}")
+    # If we extracted meaningful content, return it
+    if lines:
+        return "\n".join(lines)
     
-    return "\n".join(lines) if lines else str(result)
+    # ==========================================================================
+    # PRIORITY 5: Fallback - but only include user-facing fields, NOT metadata
+    # ==========================================================================
+    # Only include fields that are likely user-facing content
+    # Exclude internal/debug fields like metadata, timing, computation_time, etc.
+    INTERNAL_FIELDS = frozenset({
+        'metadata', 'computation_time', 'timing', 'debug', 'internal',
+        'selection_time_ms', 'timestamp', 'query_id', 'session_id',
+        'aspect', 'reasoning', 'rationale', 'needs_delegation',
+        'recommended_tool', 'delegation_reason', 'awareness_confidence',
+        'detected_pattern', 'query_analysis', 'domain_awareness',
+        'world_model_response', 'world_model_delegation', 'delegated_tool',
+        'self_referential', 'ethical_query', 'fallback', 'query_type',
+        'complexity', 'strategy', 'selected_tools', 'skip_reasoning',
+    })
+    
+    fallback_lines = []
+    for key, value in result.items():
+        if value is not None and key not in _HANDLED_DICT_RESULT_KEYS and key not in INTERNAL_FIELDS:
+            if isinstance(value, (list, tuple)) and len(value) > MAX_ANALOGIES_TO_SHOW:
+                value_str = str(value[:MAX_ANALOGIES_TO_SHOW]) + f"... ({len(value)} total)"
+            elif isinstance(value, str) and len(value) > 500:
+                # Don't include very long strings in fallback
+                value_str = value[:500] + "..."
+            else:
+                value_str = str(value)
+            fallback_lines.append(f"{key}: {value_str}")
+    
+    if fallback_lines:
+        return "\n".join(fallback_lines)
+    
+    # Ultimate fallback - shouldn't reach here
+    return str(result)
 
 
 def _format_list_result(reasoning_type: str, result: list) -> str:
