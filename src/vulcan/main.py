@@ -4757,6 +4757,44 @@ def _format_dict_result(reasoning_type: str, result: Dict[str, Any]) -> str:
         else:
             lines.append(f"Conclusion: {conclusion}")
     
+    # =========================================================================
+    # BUG #2 FIX (Jan 7 2026): Handle Symbolic Reasoning Output Format
+    # =========================================================================
+    # Symbolic reasoner returns {proven, confidence, proof, method, applicable}
+    # Previously this was falling through to fallback and dumping all fields.
+    # Now we format it as a user-friendly proof result.
+    if "proven" in result:
+        proven = result["proven"]
+        method = result.get("method", "unknown")
+        proof = result.get("proof")
+        applicable = result.get("applicable", True)
+        
+        if not applicable:
+            # Not applicable to symbolic reasoning
+            reason = result.get("reason", "Query not suitable for symbolic reasoning")
+            lines.append(f"Not Applicable: {reason}")
+        elif proven:
+            lines.append("Result: PROVEN ✓")
+            if proof:
+                lines.append(f"Proof: {proof}")
+            lines.append(f"Method: {method}")
+        else:
+            lines.append("Result: NOT PROVEN")
+            if proof:
+                lines.append(f"Attempted Proof: {proof}")
+            if result.get("error"):
+                lines.append(f"Error: {result['error']}")
+            lines.append(f"Method: {method}")
+        
+        # Add confidence if present
+        conf = result.get("confidence")
+        if conf is not None and isinstance(conf, (int, float)):
+            lines.append(f"Confidence: {conf:.1%}")
+        
+        # Return early if we formatted symbolic output
+        if lines:
+            return "\n".join(lines)
+    
     # BUG FIX: Add explanation if present (from ReasoningResult)
     if "explanation" in result and result["explanation"]:
         lines.append(f"Explanation: {result['explanation']}")
