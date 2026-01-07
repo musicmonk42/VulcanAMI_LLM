@@ -1389,29 +1389,84 @@ class AgentPoolManager:
             self.task_queue = None
 
     def _initialize_agent_pool(self):
-        """Initialize minimum number of agents with diverse capabilities"""
+        """Initialize minimum number of agents with diverse capabilities
+        
+        AGENT POOL CONFIGURATION FIX: Updated to ensure specialized agents are
+        spawned for existing reasoning engines. This ensures proper routing of
+        queries to the correct reasoning capabilities.
+        
+        Priority Order for Agent Spawning:
+        1. Core reasoning capabilities (probabilistic, symbolic, philosophical, etc.)
+        2. General capability for fallback
+        3. Basic capabilities (perception, learning, etc.)
+        
+        This order ensures that reasoning queries are properly routed to specialized
+        agents instead of falling back to general agents that cannot handle them.
+        """
         logger.info(f"Initializing agent pool with {self.min_agents} agents")
-
-        capabilities = list(AgentCapability)
-        num_capabilities = len(capabilities)
-
-        for i in range(self.min_agents):
-            # Distribute capabilities evenly
-            if i < self.min_agents // 2:
-                capability = capabilities[i % num_capabilities]
-            else:
-                capability = AgentCapability.GENERAL
-
+        
+        # AGENT POOL FIX: Define priority capabilities for reasoning engines
+        # These are the capabilities that map to existing, tested reasoning engines
+        # in portfolio_executor.py (see _AVAILABLE_ENGINES)
+        priority_reasoning_capabilities = [
+            AgentCapability.PROBABILISTIC,   # ProbabilisticReasoner - WORKING
+            AgentCapability.SYMBOLIC,         # SymbolicReasoner - WORKING
+            AgentCapability.PHILOSOPHICAL,    # PhilosophicalReasoner - WORKING
+            AgentCapability.MATHEMATICAL,     # MathematicalComputationTool
+            AgentCapability.CAUSAL,           # CausalReasoner
+            AgentCapability.ANALOGICAL,       # AnalogicalReasoningEngine
+            AgentCapability.WORLD_MODEL,      # WorldModel - WORKING
+        ]
+        
+        # Track which capabilities we've spawned
+        spawned_capabilities = set()
+        agents_spawned = 0
+        
+        # STEP 1: Spawn agents for priority reasoning capabilities first
+        # This ensures at least one agent exists for each working reasoning engine
+        for capability in priority_reasoning_capabilities:
+            if agents_spawned >= self.min_agents:
+                break
             try:
                 agent_id = self.spawn_agent(capability)
                 if agent_id:
-                    logger.debug(
-                        f"Initialized agent {agent_id} with capability {capability.value}"
+                    spawned_capabilities.add(capability)
+                    agents_spawned += 1
+                    logger.info(
+                        f"[AgentPool] Spawned reasoning agent {agent_id} with "
+                        f"capability {capability.value}"
                     )
             except Exception as e:
-                logger.error(f"Failed to spawn agent during initialization: {e}")
+                logger.error(
+                    f"[AgentPool] Failed to spawn {capability.value} agent: {e}"
+                )
+        
+        # STEP 2: Fill remaining slots with general agents
+        # General agents serve as fallback for capabilities not yet spawned
+        while agents_spawned < self.min_agents:
+            try:
+                agent_id = self.spawn_agent(AgentCapability.GENERAL)
+                if agent_id:
+                    spawned_capabilities.add(AgentCapability.GENERAL)
+                    agents_spawned += 1
+                    logger.debug(
+                        f"[AgentPool] Spawned general agent {agent_id}"
+                    )
+            except Exception as e:
+                logger.error(f"[AgentPool] Failed to spawn general agent: {e}")
+                break  # Prevent infinite loop on persistent errors
+        
+        # Log capability distribution for observability
+        capability_distribution = {}
+        for agent_metadata in self.agents.values():
+            cap_name = agent_metadata.capability.value
+            capability_distribution[cap_name] = capability_distribution.get(cap_name, 0) + 1
+        
+        logger.info(
+            f"[AgentPool] Agent pool initialized with {len(self.agents)} agents. "
+            f"Capability distribution: {capability_distribution}"
+        )
 
-        logger.info(f"Agent pool initialized with {len(self.agents)} agents")
 
     def _start_monitor(self):
         """Start background monitoring thread"""

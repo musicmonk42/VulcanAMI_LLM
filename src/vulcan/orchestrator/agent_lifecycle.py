@@ -66,8 +66,24 @@ class AgentState(Enum):
 
 
 class AgentCapability(Enum):
-    """Agent capability types with hierarchical relationships"""
+    """Agent capability types with hierarchical relationships
+    
+    AGENT POOL CONFIGURATION FIX: Added specialized reasoning engine capabilities
+    to enable proper routing of queries to the correct reasoning engines.
+    
+    Previously, only PERCEPTION and GENERAL were effectively used, causing ~45%
+    of queries to fail due to missing agent capabilities. This update adds:
+    - PROBABILISTIC: Bayesian inference, probability calculations
+    - SYMBOLIC: SAT solving, logical inference, proof verification
+    - PHILOSOPHICAL: Ethical dilemmas, MEC analysis, deontic logic
+    - MATHEMATICAL: Symbolic math, calculus, induction proofs
+    - CAUSAL: Causal graphs, intervention analysis
+    - ANALOGICAL: Structure mapping, analogical inference
+    - CRYPTOGRAPHIC: Hash computation, encryption operations
+    - WORLD_MODEL: Self-introspection, counterfactual reasoning
+    """
 
+    # Basic capabilities
     PERCEPTION = "perception"
     REASONING = "reasoning"
     LEARNING = "learning"
@@ -76,6 +92,19 @@ class AgentCapability(Enum):
     MEMORY = "memory"
     SAFETY = "safety"
     GENERAL = "general"
+    
+    # AGENT POOL FIX: Specialized reasoning engine capabilities
+    # These map directly to reasoning engines registered in portfolio_executor.py
+    PROBABILISTIC = "probabilistic"      # Maps to ProbabilisticReasoner
+    SYMBOLIC = "symbolic"                # Maps to SymbolicReasoner
+    PHILOSOPHICAL = "philosophical"      # Maps to PhilosophicalReasoner
+    MATHEMATICAL = "mathematical"        # Maps to MathematicalComputationTool
+    CAUSAL = "causal"                    # Maps to CausalReasoner
+    ANALOGICAL = "analogical"            # Maps to AnalogicalReasoningEngine
+    CRYPTOGRAPHIC = "cryptographic"      # Maps to CryptographicEngine
+    WORLD_MODEL = "world_model"          # Maps to WorldModel
+    MULTIMODAL = "multimodal"            # Maps to MultimodalReasoner
+    LANGUAGE = "language"                # Maps to LanguageReasoner
 
     def __str__(self):
         return self.value
@@ -87,10 +116,31 @@ class AgentCapability(Enum):
         """Check if this is a specialized capability"""
         return self != AgentCapability.GENERAL
 
+    def is_reasoning_capability(self) -> bool:
+        """Check if this is a specialized reasoning capability.
+        
+        AGENT POOL FIX: Identifies capabilities that map to specific reasoning engines.
+        """
+        return self in {
+            AgentCapability.PROBABILISTIC,
+            AgentCapability.SYMBOLIC,
+            AgentCapability.PHILOSOPHICAL,
+            AgentCapability.MATHEMATICAL,
+            AgentCapability.CAUSAL,
+            AgentCapability.ANALOGICAL,
+            AgentCapability.CRYPTOGRAPHIC,
+            AgentCapability.WORLD_MODEL,
+            AgentCapability.MULTIMODAL,
+            AgentCapability.LANGUAGE,
+        }
+
     def can_handle_capability(self, required: "AgentCapability") -> bool:
         """Check if this agent can handle the required capability"""
         # GENERAL agents can handle any capability
         if self == AgentCapability.GENERAL:
+            return True
+        # REASONING agents can handle any reasoning capability
+        if self == AgentCapability.REASONING and required.is_reasoning_capability():
             return True
         # Otherwise, must match exactly
         return self == required
