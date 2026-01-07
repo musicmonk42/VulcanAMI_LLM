@@ -2567,6 +2567,13 @@ class QueryAnalyzer:
         - "Explain the hard problem of consciousness"
         - "What did Socrates say about self-knowledge?"
         
+        BUG #16 FINAL FIX: Must NOT match thought experiments, logic puzzles, or ethical scenarios
+        Examples (should return False - thought experiments/puzzles):
+        - "A runaway trolley is heading... You must choose"
+        - "Three doors. Host opens a goat. You pick door 1"
+        - "Birds fly. Penguins are birds. Do penguins fly?"
+        - "Write a poem about AI"
+        
         Args:
             query: The query string (not lowercased)
             
@@ -2574,6 +2581,50 @@ class QueryAnalyzer:
             True if query asks about Vulcan's own perspective on self-awareness
         """
         query_lower = query.lower()
+        
+        # =================================================================
+        # BUG #16 FINAL FIX: EXCLUSION CHECK (MUST BE FIRST!)
+        # =================================================================
+        # These patterns indicate thought experiments, logic puzzles, ethical scenarios,
+        # or creative requests - NOT actual self-introspection about Vulcan.
+        # The "you" in these queries refers to a hypothetical decision-maker, NOT Vulcan.
+        # =================================================================
+        exclusion_patterns = (
+            # Ethical dilemmas and trolley problems
+            'trolley', 'runaway', 'must choose', 'you control', 'you are bound',
+            'given a scenario', 'suppose you', 'imagine you', 'hypothetical',
+            'thought experiment', 'ethical dilemma', 'moral dilemma',
+            'save five', 'save one', 'pull the lever', 'push the',
+            
+            # Logic puzzles and probability problems
+            'doors', 'monty hall', 'three doors', 'host opens', 'goat',
+            'prisoner', 'hat puzzle', 'knights and knaves', 'liar paradox',
+            
+            # Syllogisms and logic problems  
+            'birds fly', 'penguins', 'rules:', 'given:', 'if...then',
+            'all men are', 'socrates is', 'therefore', 'syllogism',
+            'conclusion', 'premise', 'inference',
+            
+            # Mathematical/probability problems
+            'probability', 'calculate', 'what is the', 'compute', 'solve',
+            'how many', 'find the', 'evaluate', 'bayes', 'expected value',
+            
+            # Creative requests (about AI as subject matter, not Vulcan itself)
+            'write', 'create', 'compose', 'poem', 'story', 'essay',
+            'tell me a', 'make me', 'give me', 'generate',
+            'write about ai', 'poem about', 'story about',
+        )
+        
+        # If any exclusion pattern is found, this is NOT self-introspection
+        if any(exc in query_lower for exc in exclusion_patterns):
+            logger.debug(
+                f"[QueryRouter] BUG#16 FIX - NOT self-introspection (matches exclusion pattern)"
+            )
+            return False
+        
+        # =================================================================
+        # POSITIVE MATCH PHASE: Now check for actual self-introspection
+        # =================================================================
         
         # Self-reference indicators (indicates asking about Vulcan specifically)
         self_reference_markers = (
@@ -2586,6 +2637,8 @@ class QueryAnalyzer:
         )
         
         # Self-awareness/consciousness topic indicators
+        # BUG #16 FIX: Removed overly broad patterns like 'choose', 'want', 'become'
+        # which were matching thought experiments. Now requires consciousness-specific topics.
         introspection_topics = (
             'self-aware', 'self aware', 'self_aware',
             'consciousness', 'conscious', 
@@ -2593,9 +2646,9 @@ class QueryAnalyzer:
             'feelings', 'emotions',
             'preferences', 'prefer', 'want to be', 'choose to be',
             'would rather', 'like to have', 'desire',
-            # FIX: Additional topics for self-awareness questions
-            'take it', 'choose', 'want', 'become',
-            'yes or no',
+            # Only match AI/Vulcan-specific introspection (not hypothetical scenarios)
+            'your thoughts', 'your opinion', 'your view', 'your perspective',
+            'what you think', 'how you feel',
         )
         
         # Check for BOTH self-reference AND introspection topic
