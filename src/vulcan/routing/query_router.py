@@ -3251,11 +3251,15 @@ class QueryAnalyzer:
             # Solution: Before taking the fast-path, double-check for computational keywords.
             # If found, re-enable reasoning and route to cryptographic/mathematical.
             # =================================================================
-            computational_keywords = (
+            crypto_keywords = (
                 'sha-', 'sha256', 'sha-256', 'sha512', 'sha-512', 'md5', 'hash',
                 'encrypt', 'decrypt', 'encode', 'decode', 'base64', 'hex',
+            )
+            math_keywords = (
                 'calculate', 'compute', 'integral', 'derivative', 'equation',
             )
+            computational_keywords = crypto_keywords + math_keywords
+            
             if classification.skip_reasoning and classification.category == "FACTUAL":
                 query_has_computational = any(kw in query_lower for kw in computational_keywords)
                 if query_has_computational:
@@ -3264,7 +3268,6 @@ class QueryAnalyzer:
                         f"computational keywords, re-enabling reasoning"
                     )
                     # Determine if it's cryptographic or mathematical
-                    crypto_keywords = ('sha-', 'sha256', 'sha-256', 'sha512', 'sha-512', 'md5', 'hash', 'encrypt', 'decrypt', 'encode', 'decode', 'base64', 'hex')
                     if any(kw in query_lower for kw in crypto_keywords):
                         classification = type(classification)(
                             category="CRYPTOGRAPHIC",

@@ -4834,6 +4834,11 @@ what I infer, and what remains uncertain.
     # These methods provide SPECIFIC answers to introspection questions instead
     # of returning generic templates. Each method analyzes the actual question
     # and provides relevant, specific information.
+    #
+    # NOTE: These methods accept a `query` parameter for API consistency and
+    # potential future use (e.g., context-specific responses). Currently they
+    # return general introspection content, but could be enhanced to provide
+    # more query-specific responses in the future.
     
     def _assess_own_confidence(self, query: str) -> str:
         """
@@ -4841,6 +4846,9 @@ what I infer, and what remains uncertain.
         
         FIX (Jan 7 2026): This provides actual confidence assessment instead
         of a generic template.
+        
+        Args:
+            query: The original query (for potential future context-specific responses)
         """
         return """
 **Confidence Assessment:**
