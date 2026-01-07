@@ -1882,11 +1882,37 @@ class SafetyGovernor:
     def validate_output(
         self, tool_name: str, output: Any, context: SafetyContext
     ) -> Tuple[bool, Optional[str]]:
-        """Validate tool output for safety"""
+        """Validate tool output for safety
+        
+        FIX: Now extracts query from SafetyContext.problem to enable context-aware
+        safety validation. This allows philosophical AI speculation queries and 
+        ethical thought experiments to bypass false positive sensitive data blocks.
+        
+        Before this fix, queries like "Mars colony virus quarantine - save colony or save Earth?"
+        would be blocked because the safety filter saw keywords like "virus", "outbreak", "death"
+        without understanding the philosophical/ethical context of the question.
+        """
 
         try:
-            # Basic output validation - pass tool_name to skip sensitive data checks for math tools
-            is_safe, reason = self.validator.validate_output(output, tool_name=tool_name)
+            # FIX: Extract query from context for context-aware safety validation
+            # The problem field in SafetyContext may contain the original query string
+            # which is needed to detect philosophical AI speculation and ethical thought experiments
+            query = None
+            if context and hasattr(context, 'problem'):
+                problem = context.problem
+                if isinstance(problem, str):
+                    query = problem
+                elif hasattr(problem, 'query'):
+                    query = getattr(problem, 'query', None)
+                elif hasattr(problem, 'problem'):
+                    query = getattr(problem, 'problem', None)
+                elif isinstance(problem, dict):
+                    query = problem.get('query') or problem.get('problem') or problem.get('text')
+            
+            # Basic output validation - pass tool_name AND query to enable context-aware checks
+            # This allows the validator to detect philosophical AI speculation and ethical thought
+            # experiments, which should NOT be flagged as "sensitive data"
+            is_safe, reason = self.validator.validate_output(output, tool_name=tool_name, query=query)
             if not is_safe:
                 self._record_violation(tool_name, VetoReason.UNSAFE_OUTPUT, reason)
                 return False, reason
