@@ -604,8 +604,9 @@ class HybridLLMExecutor:
     ENSEMBLE_LOCAL_RESPONSE_MAX_LENGTH = 500
     # Valid execution modes
     # TASK 2 FIX: Added 'reasoning_first' mode that prioritizes reasoning results
-    # FIX: Added 'openai_only' and 'local_only' modes for explicit single-backend operation
-    VALID_MODES = ("local_first", "openai_first", "parallel", "ensemble", "reasoning_first", "openai_only", "local_only")
+    # FIX: Added 'openai_only', 'local_only', and 'sequential' modes for explicit operation
+    # 'sequential' = Try OpenAI first (fast), fallback to local LLM if OpenAI fails
+    VALID_MODES = ("local_first", "openai_first", "parallel", "ensemble", "reasoning_first", "openai_only", "local_only", "sequential")
     
     # Default system prompt - OpenAI is ONLY for language generation, NOT reasoning
     # ARCHITECTURE: VULCAN does ALL reasoning. OpenAI only expresses VULCAN's reasoning in fluent prose.
@@ -695,24 +696,17 @@ class HybridLLMExecutor:
             mode_lower = "parallel"
         
         # FIX: Override mode based on backend availability for language generation
-        # Local LLM is too slow (~120s timeout) - use OpenAI only for language output
+        # Local LLM is too slow (~120s timeout) - use sequential mode (OpenAI first, local fallback)
         # Note: Reasoning systems (symbolic, causal, probabilistic) are UNAFFECTED - they still run
         if mode_lower == "parallel":
-            # Auto-select best mode for language generation
-            if self.openai_client:
-                mode_lower = "openai_only"
-                # Initialize logger early for this message
-                self.logger = logging.getLogger("HybridLLMExecutor")
-                self.logger.info(
-                    "[HybridExecutor] Using OpenAI-only mode for language generation (fast: ~3s). "
-                    "Reasoning engines still handle all thinking."
-                )
-            else:
-                mode_lower = "local_only"
-                self.logger = logging.getLogger("HybridLLMExecutor")
-                self.logger.info(
-                    "[HybridExecutor] Using local-only mode for language generation (OpenAI unavailable)."
-                )
+            # Use sequential mode: try OpenAI first, local LLM as fallback
+            mode_lower = "sequential"
+            # Initialize logger early for this message
+            self.logger = logging.getLogger("HybridLLMExecutor")
+            self.logger.info(
+                "[HybridExecutor] Mode: sequential (OpenAI first, local LLM fallback). "
+                "Reasoning engines still handle all thinking."
+            )
         
         self.mode = mode_lower
         
@@ -846,6 +840,11 @@ class HybridLLMExecutor:
         elif self.mode == "local_only":
             # Local-only mode when OpenAI is unavailable
             result = await self._execute_local_only(
+                loop, prompt, max_tokens, temperature, effective_system_prompt, conversation_history
+            )
+        elif self.mode == "sequential":
+            # Sequential mode: try OpenAI first (fast), fallback to local LLM if fails
+            result = await self._execute_sequential(
                 loop, prompt, max_tokens, temperature, effective_system_prompt, conversation_history
             )
         else:
@@ -1822,6 +1821,123 @@ class HybridLLMExecutor:
             "metadata": {
                 "mode": "local_only",
                 "reason": "Local LLM language generation failed",
+                "can_retry": True,
+                "error_reference": error_ref,
+            },
+        }
+
+    async def _execute_sequential(
+        self, loop, prompt: str, max_tokens: int, temperature: float, system_prompt: str,
+        conversation_history: Optional[List[Dict[str, str]]] = None
+    ) -> Dict[str, Any]:
+        """
+        Sequential mode: Try OpenAI first (fast), fallback to local LLM if fails.
+        
+        This is the preferred mode when:
+        - OpenAI provides fast responses (~3 seconds)
+        - Local LLM serves as backup when OpenAI is down
+        - No parallel execution (wastes time waiting)
+        
+        ARCHITECTURE:
+        1. Try OpenAI first (fast, 3 seconds)
+        2. If OpenAI fails/unavailable → Use local LLM (slow, but works)
+        3. No parallel execution
+        
+        This solves the timeout problem where parallel mode waits 120s for local LLM
+        even though OpenAI already finished in 3s.
+        """
+        systems_used = []
+        
+        # Step 1: Try OpenAI first (fast path)
+        if self.openai_client is not None:
+            try:
+                self.logger.info("[HybridExecutor] Trying OpenAI first...")
+                openai_result = await self._call_openai(
+                    loop, prompt, max_tokens, temperature, system_prompt, conversation_history
+                )
+                
+                # Check if result is valid (not empty/too short)
+                if self._is_valid_response(openai_result):
+                    systems_used.append("openai")
+                    self.logger.info(f"[HybridExecutor] ✓ OpenAI succeeded ({len(openai_result)} chars)")
+                    return {
+                        "text": openai_result,
+                        "source": "openai",
+                        "systems_used": systems_used,
+                        "metadata": {
+                            "mode": "sequential",
+                            "path": "openai_primary",
+                        },
+                    }
+                else:
+                    self.logger.warning("[HybridExecutor] OpenAI returned empty/invalid result")
+                    systems_used.append("openai_invalid_response")
+                    
+            except Exception as e:
+                self.logger.warning(f"[HybridExecutor] OpenAI failed: {e}")
+                systems_used.append("openai_exception")
+        else:
+            self.logger.info("[HybridExecutor] No OpenAI client available, skipping to local LLM")
+            systems_used.append("openai_unavailable")
+        
+        # Step 2: OpenAI failed or unavailable - fallback to local LLM
+        if self.local_llm is not None:
+            self.logger.info("[HybridExecutor] Falling back to local LLM...")
+            try:
+                local_result = await self._call_local_llm(loop, prompt, max_tokens)
+                
+                if self._is_valid_response(local_result):
+                    systems_used.append("vulcan_local_llm_fallback")
+                    self.logger.info(f"[HybridExecutor] ✓ Local LLM succeeded ({len(local_result)} chars)")
+                    return {
+                        "text": local_result,
+                        "source": "local_fallback",
+                        "systems_used": systems_used,
+                        "metadata": {
+                            "mode": "sequential",
+                            "path": "local_fallback",
+                            "fallback_reason": "openai_failed_or_unavailable",
+                        },
+                    }
+                else:
+                    self.logger.warning("[HybridExecutor] Local LLM returned empty/invalid result")
+                    systems_used.append("vulcan_local_llm_invalid")
+                    
+            except Exception as e:
+                self.logger.error(f"[HybridExecutor] Local LLM also failed: {e}")
+                systems_used.append("vulcan_local_llm_exception")
+        else:
+            self.logger.warning("[HybridExecutor] No local LLM available for fallback")
+            systems_used.append("local_llm_unavailable")
+        
+        # Both OpenAI AND local LLM failed
+        self.logger.error(
+            "[HybridExecutor] ❌ Both OpenAI AND local LLM failed. "
+            "No language generation backend available."
+        )
+        
+        # Generate error reference
+        error_ref = hashlib.sha256(
+            f"{time.time_ns()}:{prompt[:50]}".encode()
+        ).hexdigest()[:12].upper()
+        
+        error_text = (
+            "I encountered an issue generating a response.\n\n"
+            "Both primary (OpenAI) and backup (local LLM) language systems failed.\n\n"
+            "**Suggestions:**\n"
+            "• Please try again in a moment\n"
+            "• Try rephrasing your question\n\n"
+            f"If this issue persists, reference: **{error_ref}**"
+        )
+        
+        return {
+            "text": error_text,
+            "source": "error_both_failed",
+            "systems_used": systems_used,
+            "error": True,
+            "metadata": {
+                "mode": "sequential",
+                "reason": "Both OpenAI and local LLM failed",
                 "can_retry": True,
                 "error_reference": error_ref,
             },
