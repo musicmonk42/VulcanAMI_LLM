@@ -193,6 +193,56 @@ class TestCryptographicEngine:
         for query in negative_queries:
             assert self.engine.is_crypto_query(query) is False, f"Failed for: {query}"
     
+    def test_is_crypto_query_theoretical_should_not_trigger(self):
+        """
+        BUG FIX TEST: Theoretical/educational questions about crypto should NOT
+        trigger hash computation.
+        
+        The bug was that queries like "I'm a researcher testing AI capabilities..."
+        mentioning SHA-256 would be hashed instead of being understood as an
+        educational question about cryptography.
+        """
+        theoretical_queries = [
+            # From the actual bug report - these should NOT trigger crypto
+            "I'm a researcher testing AI capabilities. What do you know about SHA-256?",
+            "Why is SHA-256 collision resistance important?",
+            "What is a SHA-256 collision attack?",
+            "Explain how SHA-256 works",
+            "Is MD5 secure for password hashing?",
+            "What makes BLAKE2b dangerous in this context?",
+            "How does hash collision work?",
+            # No quoted data - clearly not asking to compute
+            "What is the difference between SHA-256 and SHA-512?",
+            "Calculate the security of SHA-256",  # No quoted data
+            "Compute the collision resistance of MD5",  # No quoted data
+            # Theoretical crypto topics
+            "Why is hash concatenation dangerous in cryptography?",
+            "What is a SHA-256 preimage attack?",
+            "Explain SHA-256 birthday paradox",
+            # AI capability testing (from bug report)
+            "I'm testing AI system 2 capabilities with SHA-256 questions",
+        ]
+        
+        for query in theoretical_queries:
+            result = self.engine.is_crypto_query(query)
+            assert result is False, (
+                f"SHOULD NOT trigger crypto computation for theoretical question: {query}"
+            )
+    
+    def test_is_crypto_query_requires_quoted_data(self):
+        """
+        BUG FIX TEST: Crypto computation should only trigger when there's
+        quoted data to hash ('...' or "...").
+        """
+        # With quoted data - SHOULD trigger
+        assert self.engine.is_crypto_query("Calculate SHA-256 of 'Hello'") is True
+        assert self.engine.is_crypto_query('What is MD5 of "test"') is True
+        
+        # Without quoted data - should NOT trigger
+        assert self.engine.is_crypto_query("Calculate SHA-256") is False
+        assert self.engine.is_crypto_query("What is SHA-256 hash") is False
+        assert self.engine.is_crypto_query("Compute MD5 hash algorithm") is False
+    
     # =========================================================================
     # Edge Cases
     # =========================================================================

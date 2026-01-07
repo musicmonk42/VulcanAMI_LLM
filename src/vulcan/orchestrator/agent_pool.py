@@ -2850,7 +2850,10 @@ class AgentPoolManager:
                                 # This caused sequential tool override where symbolic was selected but
                                 # probabilistic ran anyway because reasoning_type was UNKNOWN/ADAPTIVE.
                                 selected_tool_reasoning_type = reasoning_type  # Default to original
-                                if integration_result.selected_tools:
+                                
+                                # Pattern 2 FIX: Check if ReasoningType is available before building map
+                                # The global ReasoningType may be None if lazy import failed
+                                if integration_result.selected_tools and ReasoningType is not None:
                                     primary_tool = integration_result.selected_tools[0].lower()
                                     # Map tool name to ReasoningType
                                     tool_to_reasoning_type_map = {
@@ -2861,6 +2864,8 @@ class AgentPoolManager:
                                         'mathematical': ReasoningType.MATHEMATICAL,
                                         'philosophical': ReasoningType.PHILOSOPHICAL,
                                         'multimodal': ReasoningType.MULTIMODAL,
+                                        # Pattern 9 FIX: Add cryptographic mapping
+                                        'cryptographic': ReasoningType.SYMBOLIC,  # Crypto uses deterministic symbolic reasoning
                                     }
                                     mapped_type = tool_to_reasoning_type_map.get(primary_tool)
                                     if mapped_type is not None:
@@ -2869,6 +2874,11 @@ class AgentPoolManager:
                                             f"[AgentPool] BUG#1 FIX: Using reasoning type '{mapped_type}' "
                                             f"from selected tool '{primary_tool}' instead of task_type mapping"
                                         )
+                                elif integration_result.selected_tools and ReasoningType is None:
+                                    logger.warning(
+                                        f"[AgentPool] Pattern#2 FIX: ReasoningType not available, "
+                                        f"cannot map tool '{integration_result.selected_tools[0]}' to reasoning type"
+                                    )
                                 
                                 # Invoke the actual reasoning engine with the correct type
                                 reasoning_result = reasoner.reason(
@@ -3688,6 +3698,12 @@ class AgentPoolManager:
             "self_introspection_task": ReasoningType.HYBRID,  # Self-introspection -> world_model/meta-reasoning
             "meta_reasoning_task": ReasoningType.HYBRID,  # Meta-reasoning about objectives -> HYBRID
             "introspection_task": ReasoningType.HYBRID,  # Introspection shorthand -> HYBRID
+            # Pattern 9 FIX: Add cryptographic task types
+            # The cryptographic tool exists in available_tools but 'cryptographic_task' was not mapped
+            # Cryptographic operations use deterministic SYMBOLIC reasoning (not probabilistic)
+            "cryptographic": ReasoningType.SYMBOLIC,
+            "cryptographic_task": ReasoningType.SYMBOLIC,
+            "crypto": ReasoningType.SYMBOLIC,  # Shorthand
         }
         
         # FIX: Default to SYMBOLIC instead of UNKNOWN for unrecognized task types

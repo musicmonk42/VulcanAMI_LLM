@@ -430,10 +430,36 @@ class UnifiedLearningSystem:
                 "unexpected keyword argument", "missing required"
             ]
             
+            # Pattern 6 FIX: Add "No valid tools found" to system error patterns
+            # When PortfolioExecutor can't find the requested tool, this is a configuration
+            # issue (tool not registered), not a tool performance issue. Should NOT adjust
+            # weights because the tool never executed.
+            tool_not_found_patterns = [
+                'No valid tools found',
+                'Tool not found',
+                'Unknown tool',
+                'not in available tools',
+            ]
+            
             is_system_error = any(
                 pattern in error_type or pattern in error_message 
                 for pattern in system_error_patterns
             )
+            
+            # Pattern 6 FIX: Check if this was a tool-not-found error
+            is_tool_not_found = any(
+                pattern in error_message 
+                for pattern in tool_not_found_patterns
+            )
+            
+            if is_tool_not_found:
+                logger.info(
+                    f"[Learning] Pattern#6 FIX: Tool-not-found error detected: "
+                    f"'{error_message[:100]}'. SKIPPING weight adjustment - "
+                    f"tool never executed, configuration issue not performance."
+                )
+                # Treat as system error - don't adjust weights
+                is_system_error = True
             
             # ISSUE P0.1 FIX: Check if this was an LLM fallback (not a tool failure)
             # When the internal LLM fails and falls back to OpenAI, we should NOT penalize

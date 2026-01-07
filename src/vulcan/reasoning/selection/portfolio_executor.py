@@ -80,6 +80,22 @@ try:
 except ImportError as e:
     logger.warning(f"[PortfolioExecutor] LanguageReasoner not available: {e}")
 
+# Pattern 1 FIX: Add CryptographicEngine to available engines
+# The 'cryptographic' tool was in the tools list but not imported/initialized
+try:
+    from vulcan.reasoning.cryptographic_engine import CryptographicEngine
+    _AVAILABLE_ENGINES['cryptographic'] = CryptographicEngine
+except ImportError as e:
+    logger.warning(f"[PortfolioExecutor] CryptographicEngine not available: {e}")
+
+# Pattern 1 FIX: Add WorldModel adapter to available engines
+# This allows world_model to be used as a reasoning tool
+try:
+    from vulcan.world_model.world_model_core import WorldModel
+    _AVAILABLE_ENGINES['world_model'] = WorldModel
+except ImportError as e:
+    logger.warning(f"[PortfolioExecutor] WorldModel not available: {e}")
+
 
 class ExecutionStrategy(Enum):
     """Portfolio execution strategies"""
