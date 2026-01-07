@@ -1879,6 +1879,37 @@ class SafetyGovernor:
         # Check if violation type matches any critical violation pattern
         return any(crit in violation_type for crit in CRITICAL_VIOLATION_TYPES)
 
+    def _extract_query_from_context(self, context: SafetyContext) -> Optional[str]:
+        """
+        Extract the original query string from SafetyContext.
+        
+        The problem field may contain the query in various formats:
+        - Direct string
+        - Object with 'query' or 'problem' attribute  
+        - Dict with 'query', 'problem', or 'text' key
+        
+        Args:
+            context: SafetyContext containing the problem/query
+            
+        Returns:
+            The extracted query string, or None if not found
+        """
+        if not context or not hasattr(context, 'problem'):
+            return None
+            
+        problem = context.problem
+        
+        if isinstance(problem, str):
+            return problem
+        elif hasattr(problem, 'query'):
+            return getattr(problem, 'query', None)
+        elif hasattr(problem, 'problem'):
+            return getattr(problem, 'problem', None)
+        elif isinstance(problem, dict):
+            return problem.get('query') or problem.get('problem') or problem.get('text')
+        
+        return None
+
     def validate_output(
         self, tool_name: str, output: Any, context: SafetyContext
     ) -> Tuple[bool, Optional[str]]:
@@ -1895,19 +1926,8 @@ class SafetyGovernor:
 
         try:
             # FIX: Extract query from context for context-aware safety validation
-            # The problem field in SafetyContext may contain the original query string
-            # which is needed to detect philosophical AI speculation and ethical thought experiments
-            query = None
-            if context and hasattr(context, 'problem'):
-                problem = context.problem
-                if isinstance(problem, str):
-                    query = problem
-                elif hasattr(problem, 'query'):
-                    query = getattr(problem, 'query', None)
-                elif hasattr(problem, 'problem'):
-                    query = getattr(problem, 'problem', None)
-                elif isinstance(problem, dict):
-                    query = problem.get('query') or problem.get('problem') or problem.get('text')
+            # This is needed to detect philosophical AI speculation and ethical thought experiments
+            query = self._extract_query_from_context(context)
             
             # Basic output validation - pass tool_name AND query to enable context-aware checks
             # This allows the validator to detect philosophical AI speculation and ethical thought
