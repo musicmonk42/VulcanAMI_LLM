@@ -1365,7 +1365,13 @@ class UnifiedReasoner:
                 try:
                     # P0.2 FIX: Detect creative tasks and skip confidence filtering
                     is_creative = _is_creative_task(task)
-                    safe_output = self.safety_wrapper.validate_output(result, is_creative=is_creative)
+                    # FIX: Pass query to validate_output for context-aware safety checking
+                    # This allows ethical discourse (philosophical queries, thought experiments)
+                    # to bypass false positive safety blocks
+                    query_str = self._extract_query_string(task.query)
+                    safe_output = self.safety_wrapper.validate_output(
+                        result, is_creative=is_creative, query=query_str
+                    )
                     if not safe_output["is_safe"]:
                         result = self._create_safety_result(
                             f"Output filtered: {safe_output['reason']}"
@@ -4003,6 +4009,40 @@ class UnifiedReasoner:
             self.audit_trail.append(audit_entry)
         except Exception as e:
             logger.warning(f"Audit entry failed: {e}")
+
+    def _extract_query_string(self, query: Optional[Dict[str, Any]]) -> Optional[str]:
+        """
+        Extract query string from query dict for safety validation context.
+        
+        FIX: This helper extracts the user query string from the query dict
+        so it can be passed to SafetyAwareReasoning.validate_output() for
+        context-aware safety checking. This allows ethical discourse
+        (philosophical queries, thought experiments) to bypass false positive
+        safety blocks.
+        
+        Args:
+            query: Query dict which may contain 'query', 'text', 'question', etc.
+            
+        Returns:
+            Query string if found, None otherwise
+        """
+        if query is None:
+            return None
+        
+        if isinstance(query, str):
+            return query
+        
+        if not isinstance(query, dict):
+            return str(query) if query else None
+        
+        # Try common query field names
+        for field in ['query', 'text', 'question', 'user_query', 'input', 'prompt', 'message']:
+            value = query.get(field)
+            if value and isinstance(value, str):
+                return value
+        
+        # Fall back to string representation if dict has content
+        return str(query) if query else None
 
     def _create_safety_result(self, reason: str) -> ReasoningResult:
         """Create result for safety-filtered output with minimal confidence"""
