@@ -4151,6 +4151,28 @@ class WorldModel:
         query_lower = query.lower()
         
         # ═══════════════════════════════════════════════════════════════════════
+        # Pattern 3 FIX: Self-introspection override protection
+        # Queries that are GENUINELY about AI capabilities should NOT be delegated
+        # even if they contain technical keywords like "SHA-256"
+        # Example: "I'm a researcher testing AI capabilities" → self-introspection
+        # ═══════════════════════════════════════════════════════════════════════
+        
+        self_introspection_indicators = [
+            'ai capabilities', 'ai system', 'testing ai', 'researcher testing',
+            'your capabilities', 'your ability', 'your limitations', 
+            'can you', 'are you able', 'what can you do',
+            'how do you work', 'how are you designed', 'your architecture',
+            'tell me about yourself', 'describe yourself', 'who are you',
+            'your purpose', 'your function', 'your design',
+        ]
+        
+        is_genuine_self_introspection = any(ind in query_lower for ind in self_introspection_indicators)
+        
+        if is_genuine_self_introspection:
+            # Don't delegate - this is a genuine self-introspection query
+            return (False, None, 'Genuine self-introspection query about AI capabilities')
+        
+        # ═══════════════════════════════════════════════════════════════════════
         # Pattern 1: Ethical Dilemmas Posed TO the AI
         # "You control a trolley" = problem posed TO AI, not ABOUT AI
         # ═══════════════════════════════════════════════════════════════════════
