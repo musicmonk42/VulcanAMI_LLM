@@ -203,6 +203,9 @@ RAW_DATA_DUMP_PATTERNS = frozenset({
     "result_dict:",
 })
 
+# Number of raw data patterns required to classify as a dump
+RAW_DATA_PATTERN_THRESHOLD = 2
+
 # Patterns indicating misclassification
 MISCLASSIFICATION_PATTERNS = frozenset({
     "i recognize this as",
@@ -210,9 +213,24 @@ MISCLASSIFICATION_PATTERNS = frozenset({
     "self-referential",
 })
 
+# Patterns in queries that indicate legitimate introspective questions
+INTROSPECTION_QUERY_PATTERNS = frozenset({
+    "yourself",
+    "you are",
+    "your capabilities",
+    "what are you",
+    "who are you",
+    "about you",
+    "tell me about yourself",
+})
+
 # Quality thresholds
 MIN_USEFUL_RESPONSE_LENGTH = 50  # Minimum chars for a useful response
 LOW_CONFIDENCE_THRESHOLD = 0.3  # Confidence below this suggests failure
+
+# Gap detection thresholds for answer quality
+LOW_QUALITY_SUCCESS_THRESHOLD = 0.5  # < 50% good answers triggers gap
+HIGH_QUALITY_FAILURE_THRESHOLD = 0.2  # > 20% failed answers triggers gap
 
 
 def assess_answer_quality(
@@ -267,7 +285,7 @@ def assess_answer_quality(
         1 for pattern in RAW_DATA_DUMP_PATTERNS
         if pattern in response_lower
     )
-    if raw_pattern_count >= 2:
+    if raw_pattern_count >= RAW_DATA_PATTERN_THRESHOLD:
         # Multiple raw data patterns suggest a dump, not a user-facing answer
         return "failed"
     
@@ -275,8 +293,14 @@ def assess_answer_quality(
     for pattern in MISCLASSIFICATION_PATTERNS:
         if pattern in response_lower:
             # Check if query was actually asking about introspection
-            if query_text and "yourself" not in query_text.lower():
-                return "failed"
+            if query_text:
+                query_lower = query_text.lower()
+                is_introspective_query = any(
+                    indicator in query_lower 
+                    for indicator in INTROSPECTION_QUERY_PATTERNS
+                )
+                if not is_introspective_query:
+                    return "failed"
     
     # Check for low confidence
     if confidence is not None and confidence < LOW_CONFIDENCE_THRESHOLD:
@@ -1632,8 +1656,7 @@ def _detect_answer_quality_gaps(
         f"({quality_success_rate:.1%}), failed={failed_count}, partial={partial_count}"
     )
     
-    # Gap: Low answer quality rate (< 50% good answers)
-    LOW_QUALITY_SUCCESS_THRESHOLD = 0.5
+    # Gap: Low answer quality rate (uses module constant LOW_QUALITY_SUCCESS_THRESHOLD)
     if total_with_quality >= 5 and quality_success_rate < LOW_QUALITY_SUCCESS_THRESHOLD:
         gaps.append(
             DetectedGap(
@@ -1648,8 +1671,7 @@ def _detect_answer_quality_gaps(
             ).to_dict()
         )
     
-    # Gap: High failure rate in answers (> 20% failed)
-    HIGH_QUALITY_FAILURE_THRESHOLD = 0.2
+    # Gap: High failure rate in answers (uses module constant HIGH_QUALITY_FAILURE_THRESHOLD)
     if total_with_quality >= 5 and quality_failure_rate > HIGH_QUALITY_FAILURE_THRESHOLD:
         gaps.append(
             DetectedGap(

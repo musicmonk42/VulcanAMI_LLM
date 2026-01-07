@@ -120,6 +120,34 @@ class TestAssessAnswerQuality:
             quality = assess_answer_quality(response)
             assert quality == "failed", f"Pattern '{pattern}' was not detected"
 
+    def test_introspection_with_various_query_patterns(self):
+        """Test that various introspective query patterns are detected correctly."""
+        response = "I recognize this as an introspective query about my capabilities."
+        
+        # These queries should NOT be flagged as misclassification
+        introspective_queries = [
+            "Tell me about yourself",
+            "What are you?",
+            "Who are you?",
+            "Describe your capabilities",
+            "Tell me about you",
+        ]
+        
+        for query in introspective_queries:
+            quality = assess_answer_quality(response, query_text=query)
+            assert quality in ("good", "partial"), f"Query '{query}' was incorrectly marked as failed"
+        
+        # These queries SHOULD be flagged as misclassification
+        non_introspective_queries = [
+            "Write me a poem",
+            "Compute 2+2",
+            "What is the capital of France?",
+        ]
+        
+        for query in non_introspective_queries:
+            quality = assess_answer_quality(response, query_text=query)
+            assert quality == "failed", f"Non-introspective query '{query}' was not flagged as misclassified"
+
 
 class TestRecordQueryOutcomeWithQuality:
     """Test recording query outcomes with quality metrics."""
