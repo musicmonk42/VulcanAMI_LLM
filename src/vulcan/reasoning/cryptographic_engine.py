@@ -85,22 +85,32 @@ COMPUTE_KEYWORDS: Final[FrozenSet[str]] = frozenset({
 # Keywords that indicate theoretical/educational questions about crypto
 # NOT actual requests to compute hashes
 # Note: Prevents "I'm a researcher testing AI capabilities" from being hashed
+# ROOT CAUSE FIX: Narrowed list to avoid blocking legitimate computation queries
 THEORETICAL_CRYPTO_KEYWORDS: Final[FrozenSet[str]] = frozenset({
-    # Security concepts
-    'collision', 'collision resistance', 'collision attack',
-    'preimage', 'preimage attack', 'preimage resistance',
+    # Security concepts (only block when combined with questions)
+    'collision resistance', 'collision attack',
+    'preimage attack', 'preimage resistance',
     'second preimage', 'birthday attack', 'birthday paradox',
-    'security', 'secure', 'insecure', 'dangerous', 'vulnerable',
-    'attack', 'weakness', 'strength', 'broken', 'unbroken',
-    # Educational questions
+    'vulnerable', 'weakness', 'broken',
+    # Educational questions (these indicate NOT computation)
     'why is', 'why does', 'why do', 'how does', 'how do',
     'explain', 'describe', 'definition', 'what does',
-    'research', 'researcher', 'testing', 'capabilities',
     # Theoretical topics
-    'proof', 'prove', 'theorem', 'reduction', 'composition',
-    'concatenation', 'cryptograph', 'claims', 'demonstrates',
+    'proof', 'prove', 'theorem', 'reduction',
+    'cryptograph', 'claims', 'demonstrates',
     # AI capability testing (from bug report)
-    'ai capabilities', 'ai system', 'system 2', 'testing ai',
+    'ai capabilities', 'ai system', 'testing ai',
+})
+
+# ROOT CAUSE FIX: Strong indicators that query is actually asking for computation
+# Even if theoretical keywords are present, these override and indicate computation
+COMPUTATION_OVERRIDE_KEYWORDS: Final[FrozenSet[str]] = frozenset({
+    'hash of', 'sha256 of', 'sha-256 of', 'md5 of', 'sha1 of', 'sha-1 of',
+    'sha512 of', 'sha-512 of', 'crc32 of', 'crc-32 of',
+    'base64 encode', 'base64 decode', 'hex encode', 'hex decode',
+    'compute the hash', 'calculate the hash', 'generate the hash',
+    'give me the hash', 'return the hash', 'output the hash',
+    'hash this', 'hash the', 'hash value',
 })
 
 # CODE REVIEW FIX: Pre-compiled regex pattern for quoted data detection
@@ -409,16 +419,17 @@ class CryptographicEngine:
         
         Note: Used to route queries to this engine instead of LLM.
         
-        Note: Previous implementation was too broad - it triggered
-        for theoretical questions ABOUT cryptography (like "Why is SHA-256 
-        collision dangerous?") and would hash the entire question text instead
-        of recognizing this as an educational query.
+        ROOT CAUSE FIX: Previous implementation was too restrictive - required
+        quoted data which missed valid computation requests like:
+        - "What is the SHA-256 hash of Hello World?"
+        - "Compute MD5 for test"
         
-        Now requires:
-        1. Crypto keyword present (sha256, md5, base64, etc.)
-        2. Compute pattern present (calculate, compute, what is, etc.)
-        3. Quoted input data present ('...' or "...") - indicates actual data to hash
-        4. NOT a theoretical/educational question about crypto concepts
+        Now uses a more flexible approach:
+        1. Check for computation override keywords (highest priority)
+        2. Check for crypto keywords
+        3. Check for compute patterns
+        4. Check for theoretical questions (only if not overridden)
+        5. Accept queries with quoted data OR with "of X" pattern
         
         Args:
             query: The input query string
@@ -441,8 +452,19 @@ class CryptographicEngine:
         if not has_compute_pattern:
             return False
         
+        # ROOT CAUSE FIX: Check for computation override keywords
+        # These indicate a definite computation request regardless of other filters
+        has_computation_override = any(kw in query_lower for kw in COMPUTATION_OVERRIDE_KEYWORDS)
+        
+        if has_computation_override:
+            logger.debug(
+                f"[CryptoEngine] Computation override detected, accepting query: "
+                f"'{query[:50]}...'"
+            )
+            return True
+        
         # Step 3: Check for theoretical/educational questions
-        # These should NOT trigger crypto computation
+        # These should NOT trigger crypto computation (unless overridden above)
         has_theoretical = any(kw in query_lower for kw in THEORETICAL_CRYPTO_KEYWORDS)
         if has_theoretical:
             logger.debug(
@@ -451,22 +473,25 @@ class CryptographicEngine:
             )
             return False
         
-        # Step 4: Require quoted input data - this is the key check
-        # Actual hash computation requests have data in quotes: "Calculate SHA-256 of 'Hello'"
-        # Educational questions don't: "What is SHA-256 collision resistance?"
-        # 
-        # CODE REVIEW FIX: Use pre-compiled regex to avoid false positives from contractions
-        # and improve performance (QUOTED_DATA_PATTERN defined at module level)
+        # Step 4: Check for data indicators
+        # Accept if we have quoted data OR an "of X" pattern indicating input
         has_quoted_data = bool(QUOTED_DATA_PATTERN.search(query))
         
-        if not has_quoted_data:
-            logger.debug(
-                f"[CryptoEngine] Query has no quoted data, not a computation request: "
-                f"'{query[:50]}...'"
-            )
-            return False
+        # ROOT CAUSE FIX: Also accept "of X" pattern without quotes
+        # Examples: "SHA-256 of Hello World", "hash of test string"
+        has_of_pattern = bool(re.search(
+            r'(?:sha-?256|sha-?1|sha-?512|md5|hash|base64|hex|crc32)\s+(?:of|for)\s+\w',
+            query_lower
+        ))
         
-        return True
+        if has_quoted_data or has_of_pattern:
+            return True
+        
+        logger.debug(
+            f"[CryptoEngine] Query has no data indicator, not a computation request: "
+            f"'{query[:50]}...'"
+        )
+        return False
     
     def _validate_input(self, input_value: str) -> Optional[str]:
         """
@@ -579,6 +604,8 @@ class CryptographicEngine:
         """
         Detect the operation type and extract input from query.
         
+        ROOT CAUSE FIX: Now handles queries without quotes using "of X" pattern.
+        
         Args:
             query: The input query
             
@@ -593,52 +620,113 @@ class CryptographicEngine:
                 extra = groups[1] if len(groups) > 1 else None
                 return operation, input_value, extra
         
-        # Fallback: try to extract quoted string for hash operations
+        # Fallback 1: Try to extract quoted string for hash operations
         query_lower = query.lower()
         quoted_match = re.search(r'["\'](.+?)["\']', query)
         
         if quoted_match:
             input_value = quoted_match.group(1)
-            
-            if 'sha-256' in query_lower or 'sha256' in query_lower:
-                return CryptoOperation.SHA256, input_value, None
-            elif 'sha-1' in query_lower or 'sha1' in query_lower:
-                return CryptoOperation.SHA1, input_value, None
-            elif 'sha-512' in query_lower or 'sha512' in query_lower:
-                return CryptoOperation.SHA512, input_value, None
-            elif 'md5' in query_lower:
-                return CryptoOperation.MD5, input_value, None
-            elif 'crc32' in query_lower or 'crc-32' in query_lower:
-                return CryptoOperation.CRC32, input_value, None
-            elif 'base64' in query_lower or 'b64' in query_lower:
-                if 'decode' in query_lower:
-                    return CryptoOperation.BASE64_DECODE, input_value, None
-                return CryptoOperation.BASE64_ENCODE, input_value, None
-            elif 'hex' in query_lower:
-                if 'decode' in query_lower:
-                    return CryptoOperation.HEX_DECODE, input_value, None
-                return CryptoOperation.HEX_ENCODE, input_value, None
-            # New algorithms
-            elif 'sha3-256' in query_lower or 'sha3256' in query_lower:
-                return CryptoOperation.SHA3_256, input_value, None
-            elif 'sha3-512' in query_lower or 'sha3512' in query_lower:
-                return CryptoOperation.SHA3_512, input_value, None
-            elif 'sha3-384' in query_lower or 'sha3384' in query_lower:
-                return CryptoOperation.SHA3_384, input_value, None
-            elif 'sha3-224' in query_lower or 'sha3224' in query_lower:
-                return CryptoOperation.SHA3_224, input_value, None
-            elif 'blake2b' in query_lower:
-                return CryptoOperation.BLAKE2B, input_value, None
-            elif 'blake2s' in query_lower:
-                return CryptoOperation.BLAKE2S, input_value, None
-            elif 'ripemd160' in query_lower or 'ripemd-160' in query_lower:
-                return CryptoOperation.RIPEMD160, input_value, None
-            elif 'url' in query_lower or 'percent' in query_lower:
-                if 'decode' in query_lower:
-                    return CryptoOperation.URL_DECODE, input_value, None
-                return CryptoOperation.URL_ENCODE, input_value, None
+            return self._detect_algorithm_from_keywords(query_lower, input_value)
+        
+        # ROOT CAUSE FIX: Fallback 2 - Extract unquoted data using "of X" pattern
+        # Matches patterns like "SHA-256 of Hello World", "hash of test"
+        of_pattern_match = re.search(
+            r'(?:sha-?256|sha-?1|sha-?512|sha-?384|sha-?224|md5|hash|base64|hex|crc-?32|'
+            r'sha3-?256|sha3-?512|sha3-?384|sha3-?224|blake2b|blake2s|ripemd-?160)'
+            r'\s+(?:of|for)\s+(.+?)(?:\?|$|\.)',
+            query_lower,
+            re.I
+        )
+        
+        if of_pattern_match:
+            input_value = of_pattern_match.group(1).strip()
+            # Remove trailing punctuation or common phrases
+            input_value = re.sub(r'\s*(?:please|thanks|thank you).*$', '', input_value, flags=re.I)
+            return self._detect_algorithm_from_keywords(query_lower, input_value)
         
         return CryptoOperation.UNKNOWN, "", None
+    
+    def _detect_algorithm_from_keywords(
+        self, 
+        query_lower: str, 
+        input_value: str
+    ) -> Tuple[CryptoOperation, str, Optional[str]]:
+        """
+        ROOT CAUSE FIX: Helper to detect algorithm from keywords in query.
+        
+        Extracted to avoid code duplication between quoted and unquoted fallbacks.
+        
+        Args:
+            query_lower: Lowercased query string
+            input_value: The extracted input data
+            
+        Returns:
+            Tuple of (operation, input_value, extra_param)
+        """
+        # SHA-2 Family (check specific lengths before generic)
+        if 'sha-256' in query_lower or 'sha256' in query_lower:
+            return CryptoOperation.SHA256, input_value, None
+        elif 'sha-512' in query_lower or 'sha512' in query_lower:
+            return CryptoOperation.SHA512, input_value, None
+        elif 'sha-384' in query_lower or 'sha384' in query_lower:
+            return CryptoOperation.SHA384, input_value, None
+        elif 'sha-224' in query_lower or 'sha224' in query_lower:
+            return CryptoOperation.SHA224, input_value, None
+        elif 'sha-1' in query_lower or 'sha1' in query_lower:
+            return CryptoOperation.SHA1, input_value, None
+        
+        # SHA-3 Family
+        elif 'sha3-256' in query_lower or 'sha3256' in query_lower:
+            return CryptoOperation.SHA3_256, input_value, None
+        elif 'sha3-512' in query_lower or 'sha3512' in query_lower:
+            return CryptoOperation.SHA3_512, input_value, None
+        elif 'sha3-384' in query_lower or 'sha3384' in query_lower:
+            return CryptoOperation.SHA3_384, input_value, None
+        elif 'sha3-224' in query_lower or 'sha3224' in query_lower:
+            return CryptoOperation.SHA3_224, input_value, None
+        
+        # BLAKE2 Family
+        elif 'blake2b' in query_lower:
+            return CryptoOperation.BLAKE2B, input_value, None
+        elif 'blake2s' in query_lower:
+            return CryptoOperation.BLAKE2S, input_value, None
+        
+        # Legacy
+        elif 'md5' in query_lower:
+            return CryptoOperation.MD5, input_value, None
+        elif 'ripemd160' in query_lower or 'ripemd-160' in query_lower:
+            return CryptoOperation.RIPEMD160, input_value, None
+        
+        # Checksums
+        elif 'crc32' in query_lower or 'crc-32' in query_lower:
+            return CryptoOperation.CRC32, input_value, None
+        
+        # Encoding - Base64
+        elif 'base64' in query_lower or 'b64' in query_lower:
+            if 'decode' in query_lower:
+                return CryptoOperation.BASE64_DECODE, input_value, None
+            return CryptoOperation.BASE64_ENCODE, input_value, None
+        
+        # Encoding - Hex
+        elif 'hex' in query_lower:
+            if 'decode' in query_lower:
+                return CryptoOperation.HEX_DECODE, input_value, None
+            return CryptoOperation.HEX_ENCODE, input_value, None
+        
+        # Encoding - URL
+        elif 'url' in query_lower or 'percent' in query_lower:
+            if 'decode' in query_lower:
+                return CryptoOperation.URL_DECODE, input_value, None
+            return CryptoOperation.URL_ENCODE, input_value, None
+        
+        # Generic "hash" keyword - default to SHA-256
+        elif 'hash' in query_lower:
+            logger.debug(
+                f"[CryptoEngine] Generic 'hash' detected, defaulting to SHA-256"
+            )
+            return CryptoOperation.SHA256, input_value, None
+        
+        return CryptoOperation.UNKNOWN, input_value, None
     
     def _perform_operation(
         self, 
