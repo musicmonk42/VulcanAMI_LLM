@@ -1360,14 +1360,18 @@ class ReasoningIntegration:
             # ================================================================
             if ANSWER_VALIDATOR_AVAILABLE and validate_reasoning_result is not None:
                 try:
-                    # Get the conclusion from metadata or reasoning output
+                    # Extract conclusion from metadata using ordered key preference
                     conclusion = ""
                     if result.metadata:
-                        conclusion = result.metadata.get("conclusion", "")
+                        # Keys to check in priority order
+                        conclusion_keys = ["conclusion", "world_model_response"]
+                        for key in conclusion_keys:
+                            conclusion = result.metadata.get(key, "")
+                            if conclusion:
+                                break
+                        
+                        # Also check nested reasoning_output if not found
                         if not conclusion:
-                            conclusion = result.metadata.get("world_model_response", "")
-                        if not conclusion:
-                            # Check for reasoning_output in metadata
                             reasoning_output = result.metadata.get("reasoning_output", {})
                             if isinstance(reasoning_output, dict):
                                 conclusion = reasoning_output.get("conclusion", "")
