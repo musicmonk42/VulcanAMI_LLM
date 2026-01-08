@@ -439,6 +439,120 @@ def get_reasoning_type_from_route(query_type: str, route: Optional[str] = None) 
     return "hybrid"
 
 
+# =============================================================================
+# GAP 5 FIX: Routing Decision Audit Trail
+# =============================================================================
+# Problem: Tool selection decisions are made at three layers:
+#   1. QueryRouter: Classifies query and selects initial tools
+#   2. ReasoningIntegration: May override tools based on self-reference/ethical detection
+#   3. AgentPool: May override again based on task type detection
+#
+# These layers don't communicate - they just override each other, causing
+# contradictions like:
+#   Router selects: ['probabilistic', 'symbolic', 'mathematical']
+#   Reasoning integration overrides to: ['world_model']
+#   Actual execution uses: Meta-reasoning only
+#
+# Solution: Add RoutingDecision to track all routing decisions with audit trail.
+# This provides a single source of truth and transparency into overrides.
+# =============================================================================
+
+@dataclass
+class RoutingDecision:
+    """
+    GAP 5 FIX: Audit trail for tool selection decisions.
+    
+    Tracks the full history of tool selection decisions across all layers,
+    providing transparency and debugging capability for routing issues.
+    
+    Attributes:
+        original_query: The original query string
+        router_tools: Tools selected by QueryRouter (Layer 1)
+        integration_tools: Tools after ReasoningIntegration (Layer 2)
+        final_tools: Final tools after all overrides (Layer 3)
+        override_applied: Whether any layer overrode a previous decision
+        override_reasons: List of reasons for each override
+        decision_history: Full history of decisions at each layer
+        timestamp: When the decision was made
+    """
+    
+    original_query: str
+    router_tools: List[str]
+    integration_tools: List[str]
+    final_tools: List[str]
+    override_applied: bool = False
+    override_reasons: List[str] = field(default_factory=list)
+    decision_history: List[Dict[str, Any]] = field(default_factory=list)
+    timestamp: float = field(default_factory=time.time)
+    
+    def __post_init__(self):
+        """Initialize and detect overrides."""
+        # Detect if overrides occurred
+        if self.router_tools != self.integration_tools:
+            self.override_applied = True
+            self.decision_history.append({
+                "layer": "reasoning_integration",
+                "from": self.router_tools,
+                "to": self.integration_tools,
+                "timestamp": time.time()
+            })
+        
+        if self.integration_tools != self.final_tools:
+            self.override_applied = True
+            self.decision_history.append({
+                "layer": "execution",
+                "from": self.integration_tools,
+                "to": self.final_tools,
+                "timestamp": time.time()
+            })
+    
+    def add_override(self, layer: str, from_tools: List[str], to_tools: List[str], reason: str):
+        """Record an override decision."""
+        self.override_applied = True
+        self.override_reasons.append(f"[{layer}] {reason}")
+        self.decision_history.append({
+            "layer": layer,
+            "from": from_tools,
+            "to": to_tools,
+            "reason": reason,
+            "timestamp": time.time()
+        })
+        
+        # Update appropriate tools field
+        if layer == "reasoning_integration":
+            self.integration_tools = to_tools
+        elif layer in ["execution", "agent_pool"]:
+            self.final_tools = to_tools
+    
+    def get_routing_integrity(self) -> float:
+        """
+        Calculate routing integrity score.
+        
+        Returns:
+            1.0 if no overrides, decreasing with each override
+        """
+        if not self.override_applied:
+            return 1.0
+        
+        # Penalize each override
+        num_overrides = len(self.decision_history)
+        return max(0.0, 1.0 - (num_overrides * 0.25))
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for logging/serialization."""
+        return {
+            "original_query": self.original_query[:100] + "..." if len(self.original_query) > 100 else self.original_query,
+            "router_tools": self.router_tools,
+            "integration_tools": self.integration_tools,
+            "final_tools": self.final_tools,
+            "override_applied": self.override_applied,
+            "override_reasons": self.override_reasons,
+            "decision_history": self.decision_history,
+            "routing_integrity": self.get_routing_integrity(),
+            "timestamp": self.timestamp
+        }
+
+
 @dataclass
 class ReasoningResult:
     """
@@ -459,6 +573,8 @@ class ReasoningResult:
             Useful for debugging and transparency.
         metadata: Additional context information about the selection.
             Contains timing, complexity, and component availability info.
+        routing_decision: GAP 5 FIX - Optional audit trail for tool selection.
+            Tracks all routing decisions across layers for debugging.
 
     Example:
         >>> result = ReasoningResult(
@@ -475,6 +591,7 @@ class ReasoningResult:
     confidence: float
     rationale: str
     metadata: Dict[str, Any] = field(default_factory=dict)
+    routing_decision: Optional[RoutingDecision] = None  # GAP 5 FIX
 
     def __post_init__(self) -> None:
         """Validate result data after initialization."""
@@ -492,13 +609,17 @@ class ReasoningResult:
         Returns:
             Dictionary representation of the reasoning result.
         """
-        return {
+        result = {
             "selected_tools": self.selected_tools,
             "reasoning_strategy": self.reasoning_strategy,
             "confidence": self.confidence,
             "rationale": self.rationale,
             "metadata": self.metadata,
         }
+        # GAP 5 FIX: Include routing decision if present
+        if self.routing_decision:
+            result["routing_decision"] = self.routing_decision.to_dict()
+        return result
 
 
 @dataclass
