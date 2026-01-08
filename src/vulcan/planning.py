@@ -1934,7 +1934,7 @@ class EnhancedHierarchicalPlanner(HierarchicalGoalSystem):
             }
 
         try:
-            # ISSUE #5 FIX: Use get_or_create_unified_runtime to prevent repeated init/shutdown
+            # Note: Use get_or_create_unified_runtime to prevent repeated init/shutdown
             set_runtime_func = None
             try:
                 from vulcan.reasoning.singletons import get_or_create_unified_runtime, set_unified_runtime
@@ -1942,7 +1942,7 @@ class EnhancedHierarchicalPlanner(HierarchicalGoalSystem):
                 runtime = get_or_create_unified_runtime()
             except ImportError:
                 runtime = UnifiedRuntime()
-                # BUG FIX Issue #1: Register fallback instance with singleton
+                # Note Issue #1: Register fallback instance with singleton
                 if set_runtime_func is not None:
                     try:
                         set_runtime_func(runtime)

@@ -628,7 +628,7 @@ class WarmStartPool:
                     # It's an instance - create a factory that produces new instances
                     tool_class = tool_instance.__class__
                     
-                    # FIX: Check if the class actually accepts 'name' as a constructor parameter
+                    # Note: Check if the class actually accepts 'name' as a constructor parameter
                     # Some classes (like MathematicalComputationTool) have self.name but don't
                     # accept it as a constructor argument - they set it internally
                     class_accepts_name = _class_accepts_name_parameter(tool_class)

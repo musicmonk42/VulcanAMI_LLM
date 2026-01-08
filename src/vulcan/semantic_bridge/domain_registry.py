@@ -531,7 +531,7 @@ class DomainRegistry:
         """
         Register a new domain - FIXED: Added characteristics parameter for semantic_bridge compatibility
         
-        Bug #7 Fix: Prevents duplicate registration unless allow_update=True.
+        Note: Prevents duplicate registration unless allow_update=True.
 
         Args:
             name: Domain name
@@ -543,7 +543,7 @@ class DomainRegistry:
             True if registered/updated, False if rejected (duplicate)
         """
         with self._lock:
-            # Bug #7 Fix: Check for existing domain to prevent duplicates with different values
+            # Note: Check for existing domain to prevent duplicates with different values
             if name in self.domains and not allow_update:
                 existing = self.domains[name]
                 # Check if this is a duplicate with different criticality
@@ -560,7 +560,7 @@ class DomainRegistry:
                         DomainCriticality.MEDIUM.value,
                     )
                 
-                # BUG #8 FIX: Only warn if new_criticality is explicitly provided and differs
+                # Note: Only warn if new_criticality is explicitly provided and differs
                 # If no criticality is specified (new_criticality is None), skip the warning
                 # This prevents noisy logs when semantic_bridge registers domains without criticality
                 if new_criticality is not None and abs(existing.criticality_score - new_criticality) > 0.01:

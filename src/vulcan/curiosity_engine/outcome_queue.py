@@ -5,7 +5,7 @@ Part of the VULCAN-AGI system
 This module provides a shared buffer for query outcomes that enables data flow
 from the main request handling pipeline to the curiosity engine's learning loop.
 
-BUG #3 FIX: This solves the problem of the curiosity engine finding 0 knowledge
+Note: This solves the problem of the curiosity engine finding 0 knowledge
 gaps because it had no data. The OutcomeBuffer collects query outcomes from the
 main process and makes them available for the curiosity engine to analyze.
 

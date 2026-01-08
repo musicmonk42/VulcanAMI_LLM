@@ -292,14 +292,11 @@ class TestWorldModelConfidenceOverrideFix(unittest.TestCase):
 
     def test_world_model_result_check_exists(self):
         """
-        Issue#3 Fix: Verify code checks for world model results before invoking
+        Note: Verify code checks for world model results before invoking
         UnifiedReasoner.
         """
         with open(AGENT_POOL_PATH, 'r') as f:
             source_code = f.read()
-        
-        # Verify the fix comment is present
-        self.assertIn('Issue#3 FIX', source_code)
         
         # Verify the condition checks for world_model tool
         self.assertIn('world_model', source_code)
@@ -312,7 +309,7 @@ class TestWorldModelConfidenceOverrideFix(unittest.TestCase):
 
     def test_world_model_bypass_condition_exists(self):
         """
-        Issue#3 Fix: Verify is_world_model_result condition is defined.
+        Note: Verify is_world_model_result condition is defined.
         """
         with open(AGENT_POOL_PATH, 'r') as f:
             source_code = f.read()
@@ -325,7 +322,7 @@ class TestWorldModelConfidenceOverrideFix(unittest.TestCase):
 
     def test_world_model_logging_exists(self):
         """
-        Issue#3 Fix: Verify proper logging when world model result is used directly.
+        Note: Verify proper logging when world model result is used directly.
         """
         with open(AGENT_POOL_PATH, 'r') as f:
             source_code = f.read()
@@ -377,13 +374,12 @@ class TestReasoningIntegrationWorldModel(unittest.TestCase):
 
     def test_world_model_early_return_exists(self):
         """
-        Issue#3 Fix: Verify early return when world model has high confidence.
+        Note: Verify early return when world model has high confidence.
         """
         with open(REASONING_INTEGRATION_PATH, 'r') as f:
             source_code = f.read()
         
-        # Verify the Issue#3 FIX comment and early return logic
-        self.assertIn('Issue#3 FIX', source_code)
+        # Verify the early return logic exists
         self.assertIn('without other engines', source_code)
 
 

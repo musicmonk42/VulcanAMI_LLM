@@ -183,11 +183,11 @@ def _lazy_import_reasoning():
 DEFAULT_FALLBACK_MEMORY_GB = 4.0  # Conservative memory estimate
 DEFAULT_FALLBACK_STORAGE_GB = 100.0  # Conservative storage estimate
 
-# FIX: Import path prefixes for reasoning modules
+# Note: Import path prefixes for reasoning modules
 # Used by both lazy import and fallback reasoning invocation
 REASONING_IMPORT_PATHS = ['vulcan', 'src.vulcan']
 
-# FIX: Set of reasoning tool names for detecting reasoning tasks
+# Note: Set of reasoning tool names for detecting reasoning tasks
 # Used to determine if fallback reasoning should be invoked
 REASONING_TOOL_NAMES = frozenset({
     'causal', 'symbolic', 'analogical', 'probabilistic', 'counterfactual',
@@ -205,7 +205,7 @@ TOURNAMENT_DIVERSITY_PENALTY = 0.3
 TOURNAMENT_WINNER_PERCENTAGE = 0.2
 
 # Agent selection timeout configuration
-# FIX: Optimize agent selection timeout to prevent 50s delays
+# Note: Optimize agent selection timeout to prevent 50s delays
 # This constant controls how long to wait when selecting an agent for a task
 AGENT_SELECTION_TIMEOUT_SECONDS: float = 10.0  # 10 seconds max for agent selection
 
@@ -222,7 +222,7 @@ MIN_REASONING_QUERY_LENGTH = 50  # Minimum chars for valid reasoning query
 # Long queries should force reasoning even with general tools
 LONG_QUERY_REASONING_THRESHOLD = 500  # Chars above which reasoning is forced
 
-# Issue#3 FIX: Confidence threshold for world model results
+# Note: Confidence threshold for world model results
 # When apply_reasoning() returns a world model result with confidence >= this threshold,
 # we skip invoking UnifiedReasoner.reason() to prevent confidence override
 WORLD_MODEL_CONFIDENCE_THRESHOLD = 0.5
@@ -1490,7 +1490,7 @@ class AgentPoolManager:
             self.monitor_thread.start()
             logger.info("Agent pool monitor started")
 
-    # ========== BUG #1 FIX: Agent Pool Death Spiral Prevention ==========
+    # ========== Note: Agent Pool Death Spiral Prevention ==========
 
     def _get_live_agent_count_unsafe(self) -> int:
         """
@@ -1515,7 +1515,7 @@ class AgentPoolManager:
         """
         Get count of agents that are not in terminated or error state.
         
-        BUG #1 FIX: This method counts only LIVE agents, excluding terminated
+        Note: This method counts only LIVE agents, excluding terminated
         and error-state agents that should not count toward max_agents capacity.
         
         Returns:
@@ -1528,7 +1528,7 @@ class AgentPoolManager:
         """
         Check if a new agent can be spawned based on LIVE agent count.
         
-        BUG #1 FIX: Uses live agent count instead of total agent count
+        Note: Uses live agent count instead of total agent count
         to prevent the death spiral where terminated agents block new spawns.
         
         Returns:
@@ -1540,7 +1540,7 @@ class AgentPoolManager:
         """
         Remove terminated agents from the pool and respawn to minimum.
         
-        BUG #1 FIX: This method removes agents in TERMINATED state from
+        Note: This method removes agents in TERMINATED state from
         the agents dictionary to free up capacity for new agents.
         
         Returns:
@@ -1594,7 +1594,7 @@ class AgentPoolManager:
         """
         Ensure we have at least min_agents live agents.
         
-        BUG #1 FIX: This method spawns new agents if the live count
+        Note: This method spawns new agents if the live count
         drops below the minimum threshold.
         
         Returns:
@@ -1633,7 +1633,7 @@ class AgentPoolManager:
             Agent ID if successful, None otherwise
         """
         with self.lock:
-            # BUG #1 FIX: Check capacity using LIVE agent count, not total count
+            # Note: Check capacity using LIVE agent count, not total count
             # This prevents the death spiral where terminated agents block new spawns
             live_count = self._get_live_agent_count_unsafe()
             if live_count >= self.max_agents:
@@ -1807,7 +1807,7 @@ class AgentPoolManager:
 
                 logger.info(f"Agent {agent_id} terminated")
         
-        # FIX: Agent Retirement Without Replacement
+        # Note: Agent Retirement Without Replacement
         # Immediately ensure minimum agents after retirement to prevent pool shrinkage
         # Previously cleanup only happened periodically, allowing pool to shrink
         self._ensure_minimum_agents()
@@ -1932,7 +1932,7 @@ class AgentPoolManager:
             RuntimeError: If job queue is full or pool is shutting down
         """
         job_id = f"job_{uuid.uuid4().hex[:8]}"
-        # FIX: Use AGENT_SELECTION_TIMEOUT_SECONDS constant instead of hardcoded value
+        # Note: Use AGENT_SELECTION_TIMEOUT_SECONDS constant instead of hardcoded value
         # Previously hardcoded to 5.0, now configurable via constant (default 10s)
         timeout_seconds = timeout_seconds if timeout_seconds is not None else AGENT_SELECTION_TIMEOUT_SECONDS
 
@@ -2091,8 +2091,8 @@ class AgentPoolManager:
         """
         Assign agent with timeout and proper locking to prevent race conditions
         FIXED: Won't hang if no agents available
-        BUG #1 FIX: Triggers cleanup and respawn if all agents are terminated
-        ISSUE #4 FIX: Fixed early return bug that caused agents to remain idle
+        Note: Triggers cleanup and respawn if all agents are terminated
+        Note: Fixed early return bug that caused agents to remain idle
 
         Args:
             capability: Required capability
@@ -2108,7 +2108,7 @@ class AgentPoolManager:
         retry_count = 0
         last_cleanup_time = 0.0  # Track when last cleanup was attempted
         cleanup_cooldown = 1.0  # Minimum seconds between cleanup attempts
-        at_max_capacity = False  # ISSUE #4 FIX: Track capacity state for early return decision
+        at_max_capacity = False  # Note: Track capacity state for early return decision
 
         while time.time() - start_time < timeout_seconds and retry_count < max_retries:
             # FIXED: Check shutdown event
@@ -2122,11 +2122,11 @@ class AgentPoolManager:
                 if agent_id:
                     return agent_id
 
-                # BUG #1 FIX: Check LIVE agent count using internal method (no re-locking)
+                # Note: Check LIVE agent count using internal method (no re-locking)
                 live_count = self._get_live_agent_count_unsafe()
                 at_max_capacity = live_count >= self.max_agents
                 
-                # ISSUE #4 FIX: Log state for debugging agent pool underutilization
+                # Note: Log state for debugging agent pool underutilization
                 idle_count = sum(1 for m in self.agents.values() if m.state == AgentState.IDLE)
                 if retry_count == 0:
                     logger.debug(
@@ -2145,7 +2145,7 @@ class AgentPoolManager:
                         if agent_id:
                             return agent_id
                 else:
-                    # BUG #1 FIX: At max live capacity - try cleanup with cooldown
+                    # Note: At max live capacity - try cleanup with cooldown
                     current_time = time.time()
                     if current_time - last_cleanup_time >= cleanup_cooldown:
                         logger.info(
@@ -2153,7 +2153,7 @@ class AgentPoolManager:
                             f"for capability {capability.value}. Attempting cleanup..."
                         )
             
-            # BUG #1 FIX: Attempt cleanup outside lock to avoid deadlock (with cooldown)
+            # Note: Attempt cleanup outside lock to avoid deadlock (with cooldown)
             current_time = time.time()
             if current_time - last_cleanup_time >= cleanup_cooldown:
                 last_cleanup_time = current_time
@@ -2161,7 +2161,7 @@ class AgentPoolManager:
                 if cleaned > 0:
                     logger.info(f"Cleaned up {cleaned} terminated agents, retrying assignment")
                     continue  # Retry immediately after cleanup
-                # ISSUE #4 FIX: Only return early if we're ACTUALLY at max capacity
+                # Note: Only return early if we're ACTUALLY at max capacity
                 # Previously this returned None even when not at capacity, causing
                 # agents to remain idle while jobs were rejected
                 elif retry_count == 0 and at_max_capacity:
@@ -2707,7 +2707,7 @@ class AgentPoolManager:
             edges = graph.get("edges", [])
             task_type = graph.get("type", "general").lower()
             
-            # FIX: Normalize task_type by stripping common suffixes like "_task", "_support"
+            # Note: Normalize task_type by stripping common suffixes like "_task", "_support"
             # QueryRouter creates tasks with types like "reasoning_task", "perception_support"
             # but the reasoning check expects base types like "reasoning", "perception"
             normalized_task_type = task_type
@@ -2724,13 +2724,13 @@ class AgentPoolManager:
             reasoning_task_types = {
                 "reasoning", "causal", "symbolic", "analogical", "probabilistic",
                 "counterfactual", "multimodal", "deductive", "inductive", "abductive",
-                "philosophical", "mathematical", "hybrid",  # FIX: Added missing types
+                "philosophical", "mathematical", "hybrid",  # Note: Added missing types
                 "self_introspection", "meta_reasoning", "world_model",  # TASK 6 FIX: Self-awareness queries
                 "language",  # TASK 6 FIX: NLP/language reasoning
             }
             is_reasoning_task = normalized_task_type in reasoning_task_types
             
-            # FIX: Also check selected_tools passed from QueryRouter
+            # Note: Also check selected_tools passed from QueryRouter
             # selected_tools contains reasoning engine names like ['causal', 'probabilistic']
             selected_tools = parameters.get("selected_tools", []) or parameters.get("tools", []) or []
             if not is_reasoning_task and selected_tools:
@@ -2840,7 +2840,7 @@ class AgentPoolManager:
             # ============================================================
             reasoning_result = None
             node_results = {}
-            reasoning_was_invoked = False  # FIX: Track actual reasoning invocation
+            reasoning_was_invoked = False  # Note: Track actual reasoning invocation
 
             # ==================================================================
             # FIX TASK 6: Add validation and logging for diagnostic purposes
@@ -2927,14 +2927,14 @@ class AgentPoolManager:
                     
                     if is_world_model_result:
                         logger.info(
-                            f"[AgentPool] Issue#3 FIX: World model returned confidence "
+                            f"[AgentPool] World model returned confidence "
                             f"{integration_result.confidence:.2f}. Using this result directly "
                             f"without invoking other reasoning engines."
                         )
                         # Create a reasoning_result from the integration result
                         # to maintain consistency with downstream code
                         try:
-                            # BUG #1 FIX (Jan 7 2026): Use different variable name to avoid Python scoping issue
+                            # Note: Use different variable name to avoid Python scoping issue
                             # Previously: from vulcan.reasoning.reasoning_types import ReasoningResult as UR_ReasoningResult, ReasoningType
                             # This caused "cannot access local variable 'ReasoningType'" error because
                             # Python treats ALL references to ReasoningType as local when there's a
@@ -2979,7 +2979,7 @@ class AgentPoolManager:
                             )
                             
                             if reasoner is not None:
-                                # BUG #1 FIX: Use selected tools from integration_result to determine reasoning_type
+                                # Note: Use selected tools from integration_result to determine reasoning_type
                                 # Previously, reasoning_type came from _map_task_to_reasoning_type(task_type)
                                 # which could return a different type than what tool selection chose.
                                 # This caused sequential tool override where symbolic was selected but
@@ -3006,7 +3006,7 @@ class AgentPoolManager:
                                     if mapped_type is not None:
                                         selected_tool_reasoning_type = mapped_type
                                         logger.info(
-                                            f"[AgentPool] BUG#1 FIX: Using reasoning type '{mapped_type}' "
+                                            f"[AgentPool] Note: Using reasoning type '{mapped_type}' "
                                             f"from selected tool '{primary_tool}' instead of task_type mapping"
                                         )
                                 elif integration_result.selected_tools and ReasoningType is None:
@@ -3056,7 +3056,7 @@ class AgentPoolManager:
                             "reasoning_strategy": integration_result.reasoning_strategy,
                         }
                     
-                    # FIX: Mark that reasoning was actually invoked
+                    # Note: Mark that reasoning was actually invoked
                     reasoning_was_invoked = True
                         
                 except Exception as reasoning_error:
@@ -3068,7 +3068,7 @@ class AgentPoolManager:
                     is_reasoning_task = False
 
             # ============================================================
-            # FIX: EXPLICIT REASONING INVOCATION when selected_tools present
+            # Note: EXPLICIT REASONING INVOCATION when selected_tools present
             # This handles cases where:
             # 1. REASONING_AVAILABLE=False but we still have reasoning tools selected
             # 2. REASONING_AVAILABLE=True but first path didn't execute (e.g., is_reasoning_task was initially False)
@@ -3084,7 +3084,7 @@ class AgentPoolManager:
             if should_invoke_fallback_reasoning:
                 logger.info(f"[REASONING] INVOKING engines for task {task_id}, tools={selected_tools}")
                 try:
-                    # FIX: Try multiple import paths for ReasoningType and ReasoningStrategy
+                    # Note: Try multiple import paths for ReasoningType and ReasoningStrategy
                     ReasoningType_local = None
                     ReasoningStrategy_local = None
                     
@@ -3113,7 +3113,7 @@ class AgentPoolManager:
                                 continue
                         raise ImportError(f"Could not import UnifiedReasoner from any of: {REASONING_IMPORT_PATHS}")
                     
-                    # ISSUE #2 FIX: Use singleton UnifiedReasoner to prevent re-initialization per query
+                    # Note: Use singleton UnifiedReasoner to prevent re-initialization per query
                     # Previously: reasoning = DirectUnifiedReasoner()
                     # This was causing UnifiedRuntime and other components to be re-initialized on every query
                     reasoning = None
@@ -3181,7 +3181,7 @@ class AgentPoolManager:
                     # "6 jobs submitted, 0 completed" - jobs would "disappear"
                     duration = time.time() - start_time
                     
-                    # FIX: Extract attributes from ReasoningResult to dict
+                    # Note: Extract attributes from ReasoningResult to dict
                     # to prevent raw object repr being returned to users
                     reasoning_output_dict = {
                         "conclusion": getattr(reasoning_result, "conclusion", None),
@@ -3272,8 +3272,8 @@ class AgentPoolManager:
                 "node_results": node_results,
                 "parameters_used": list(parameters.keys()) if parameters else [],
                 "capability": metadata.capability.value,
-                "reasoning_invoked": reasoning_was_invoked,  # FIX: Use actual tracking variable
-                "selected_tools": selected_tools if selected_tools else [],  # FIX: Include selected tools in result
+                "reasoning_invoked": reasoning_was_invoked,  # Note: Use actual tracking variable
+                "selected_tools": selected_tools if selected_tools else [],  # Note: Include selected tools in result
             }
             
             # Add reasoning-specific results if available
@@ -3793,10 +3793,10 @@ class AgentPoolManager:
             return None
             
         # Mapping from task type strings to ReasoningType enum values
-        # FIX: Map "general" to SYMBOLIC instead of UNKNOWN to leverage the LanguageReasoner
+        # Note: Map "general" to SYMBOLIC instead of UNKNOWN to leverage the LanguageReasoner
         # for general language/text queries. This prevents the 10% confidence issue.
         #
-        # BUG #1 FIX: Added "_task" suffix variants for task types coming from query_router.py
+        # Note: Added "_task" suffix variants for task types coming from query_router.py
         # The router creates tasks with types like "mathematical_task", "philosophical_task", etc.
         # Without these mappings, the system falls back to SYMBOLIC for all math/philosophical queries.
         task_to_reasoning_map = {
@@ -3810,15 +3810,15 @@ class AgentPoolManager:
             "inductive": ReasoningType.INDUCTIVE,
             "abductive": ReasoningType.ABDUCTIVE,
             "reasoning": ReasoningType.HYBRID,  # Generic reasoning -> hybrid
-            "general": ReasoningType.SYMBOLIC,  # FIX: General queries -> SYMBOLIC (language reasoning)
+            "general": ReasoningType.SYMBOLIC,  # Note: General queries -> SYMBOLIC (language reasoning)
             "language": ReasoningType.SYMBOLIC,  # Language tasks -> SYMBOLIC
             "text": ReasoningType.SYMBOLIC,  # Text tasks -> SYMBOLIC
             "mathematical": ReasoningType.MATHEMATICAL,  # Mathematical tasks
             "math": ReasoningType.MATHEMATICAL,  # Math shorthand
-            "philosophical": ReasoningType.PHILOSOPHICAL,  # FIX: Philosophical/ethical tasks
-            "ethical": ReasoningType.PHILOSOPHICAL,  # FIX: Ethical queries
-            "deontic": ReasoningType.PHILOSOPHICAL,  # FIX: Deontic logic queries
-            # BUG #1 FIX: Add "_task" suffix variants for task types from query_router.py
+            "philosophical": ReasoningType.PHILOSOPHICAL,  # Note: Philosophical/ethical tasks
+            "ethical": ReasoningType.PHILOSOPHICAL,  # Note: Ethical queries
+            "deontic": ReasoningType.PHILOSOPHICAL,  # Note: Deontic logic queries
+            # Note: Add "_task" suffix variants for task types from query_router.py
             # The router systematically generates task types using `f'{query_type.value}_task'` pattern.
             # Explicit task types (mathematical_task, philosophical_task) are created in fast-path handlers.
             # These mappings prevent "Unrecognized task type" warnings and incorrect SYMBOLIC fallback.
@@ -3837,7 +3837,7 @@ class AgentPoolManager:
             "perception_task": ReasoningType.ANALOGICAL,  # Perception uses pattern matching
             "planning_task": ReasoningType.HYBRID,  # Planning uses hybrid reasoning
             "learning_task": ReasoningType.HYBRID,  # Learning uses hybrid
-            # FIX: Add self-introspection and meta-reasoning task types
+            # Note: Add self-introspection and meta-reasoning task types
             # These task types are generated for queries about the system's own state/objectives
             # and should route to HYBRID reasoning which can access world_model/meta-reasoning
             "self_introspection_task": ReasoningType.HYBRID,  # Self-introspection -> world_model/meta-reasoning
@@ -3851,7 +3851,7 @@ class AgentPoolManager:
             "crypto": ReasoningType.SYMBOLIC,  # Shorthand
         }
         
-        # FIX: Default to SYMBOLIC instead of UNKNOWN for unrecognized task types
+        # Note: Default to SYMBOLIC instead of UNKNOWN for unrecognized task types
         # SYMBOLIC includes language reasoning which can handle most general queries
         result = task_to_reasoning_map.get(task_type.lower())
         if result is None:
@@ -4082,14 +4082,14 @@ class AgentPoolManager:
                     self.retire_agent(agent_id)
                 
                 # PERFORMANCE FIX: Periodic statistics reset to prevent unbounded growth
-                # BUG #1 & #5 FIX: Also trigger cleanup and ensure minimum agents
+                # Note: Also trigger cleanup and ensure minimum agents
                 if monitor_iterations % STATS_RESET_INTERVAL == 0:
                     logger.info(f"Performing periodic statistics reset (iteration {monitor_iterations})")
                     self.reset_statistics(preserve_totals=True)
-                    # BUG #1 FIX: Cleanup terminated agents and ensure minimum
+                    # Note: Cleanup terminated agents and ensure minimum
                     self.cleanup_terminated_agents()
                 
-                # BUG #1 FIX: Check for terminated agent cleanup every 3 iterations (~30 seconds)
+                # Note: Check for terminated agent cleanup every 3 iterations (~30 seconds)
                 # This ensures dead agents don't accumulate between stat resets
                 elif monitor_iterations % 3 == 0:
                     live_count = self.get_live_agent_count()
@@ -4162,7 +4162,7 @@ class AgentPoolManager:
     def get_pool_status(self) -> Dict[str, Any]:
         """Get pool status with throttled status checks.
         
-        BUG #1 FIX: Also reports live_agents count to distinguish from terminated.
+        Note: Also reports live_agents count to distinguish from terminated.
         """
         current_time = time.time()
         if current_time - self.last_status_check < self.status_check_interval:
@@ -4173,7 +4173,7 @@ class AgentPoolManager:
 
         self.last_status_check = current_time
         
-        # BUG #1 FIX: Trigger cleanup when reporting status
+        # Note: Trigger cleanup when reporting status
         self.cleanup_terminated_agents()
 
         with self.lock:
@@ -4186,7 +4186,7 @@ class AgentPoolManager:
                 state_counts[metadata.state.value] += 1
                 capability_counts[metadata.capability.value] += 1
                 health_scores.append(metadata.get_health_score())
-                # BUG #1 FIX: Track live agents
+                # Note: Track live agents
                 if metadata.state not in (AgentState.TERMINATED, AgentState.ERROR):
                     live_count += 1
 
@@ -4217,7 +4217,7 @@ class AgentPoolManager:
 
             status = {
                 "total_agents": len(self.agents),
-                "live_agents": live_count,  # BUG #1 FIX: Report live count
+                "live_agents": live_count,  # Note: Report live count
                 "state_distribution": dict(state_counts),
                 "capability_distribution": dict(capability_counts),
                 "pending_tasks": len(self.task_assignments),
@@ -4316,7 +4316,7 @@ class AgentPoolManager:
         PERFORMANCE FIX: Called periodically to prevent statistics dictionaries
         from growing unboundedly over long-running sessions.
         
-        BUG #5 FIX: Also triggers agent pool recovery after reset.
+        Note: Also triggers agent pool recovery after reset.
         
         Args:
             preserve_totals: If True, keeps cumulative totals but resets windows.
@@ -4343,7 +4343,7 @@ class AgentPoolManager:
         if hasattr(self, 'priority_queue'):
             self.priority_queue.reset_priority_distribution()
         
-        # BUG #5 FIX: Trigger pool recovery after stats reset
+        # Note: Trigger pool recovery after stats reset
         # Clean up terminated agents and ensure minimum agent count
         cleaned = self.cleanup_terminated_agents()
         live_count = self.get_live_agent_count()

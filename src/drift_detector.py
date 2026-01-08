@@ -147,7 +147,7 @@ class _MetricsRegistry:
                 else:
                     raise
         elif not PROMETHEUS_AVAILABLE and not _MetricsRegistry._initialized:
-            # FIX: Use _NoOpMetric instances instead of None when Prometheus is not available
+            # Note: Use _NoOpMetric instances instead of None when Prometheus is not available
             # This prevents AttributeError when using @drift_latency.time() decorator
             _MetricsRegistry._drift_value_gauge = _NoOpMetric()
             _MetricsRegistry._drift_events = _NoOpMetric()

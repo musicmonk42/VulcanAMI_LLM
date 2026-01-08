@@ -449,7 +449,7 @@ async def execute_via_arena(
     else:
         base_url = base_url or "http://localhost:8080/arena"
 
-    # FIX: Improved Arena threshold logic
+    # Note: Improved Arena threshold logic
     # Previously defaulted complexity to 0.0 which always skipped Arena
     # Now: If complexity_score is explicitly set AND below threshold, skip
     #      If complexity_score is not set, proceed with Arena (let it decide)
@@ -535,7 +535,7 @@ async def execute_via_arena(
     # FIX #2: Use semaphore to limit concurrent Arena requests
     semaphore = _get_arena_semaphore()
 
-    # Issue #52: Two-layer timeout strategy with FIX #2 improvements:
+    # Note: Two-layer timeout strategy:
     # 1. Inner: aiohttp.ClientTimeout handles HTTP transport-level timeout
     # 2. Outer: asyncio.wait_for provides hard cutoff for entire async operation
     # The outer timeout is slightly longer to allow clean aiohttp timeout handling

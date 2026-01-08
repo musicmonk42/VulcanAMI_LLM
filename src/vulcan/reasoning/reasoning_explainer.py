@@ -246,7 +246,7 @@ class ReasoningExplainer:
 
 
 # ==================================================================
-# FIX: Ethical Discourse Detection for SafetyAwareReasoning
+# Note: Ethical Discourse Detection for SafetyAwareReasoning
 # Philosophical thought experiments, ethical dilemmas, and hypothetical
 # scenarios should NOT be blocked by safety filters.
 # This mirrors the ETHICAL_DISCOURSE_INDICATORS in safety_validator.py
@@ -583,7 +583,7 @@ class SafetyAwareReasoning:
             Dictionary with is_safe and reason
         """
         # ==================================================================
-        # FIX: Check for ethical discourse FIRST before pattern matching
+        # Note: Check for ethical discourse FIRST before pattern matching
         # This prevents philosophical queries like "Mars colony virus quarantine"
         # from being blocked due to keywords like "virus", "outbreak", "death"
         # ==================================================================
@@ -607,7 +607,7 @@ class SafetyAwareReasoning:
             # Now we show all results so root causes can be identified and fixed.
 
             # Check for error indicators in conclusion
-            # FIX: Skip unsafe pattern checks for ethical discourse queries
+            # Note: Skip unsafe pattern checks for ethical discourse queries
             if hasattr(result, "conclusion") and not is_ethical_discourse:
                 conclusion_str = str(result.conclusion).lower()
                 for pattern in self._unsafe_patterns:
@@ -629,7 +629,7 @@ class SafetyAwareReasoning:
                 }
 
             # Check for unsafe content in dict values
-            # FIX: Skip unsafe pattern checks for ethical discourse queries
+            # Note: Skip unsafe pattern checks for ethical discourse queries
             if not is_ethical_discourse:
                 try:
                     result_str = json.dumps(result)[:10000]

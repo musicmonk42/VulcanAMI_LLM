@@ -205,7 +205,7 @@ class MemoryIndex:
                 self.features = None
 
             # Stack features
-            # FIX: Cast to float32 at creation time for faiss compatibility
+            # Note: Cast to float32 at creation time for faiss compatibility
             self.features = np.vstack(
                 [e.problem_features for e in self.entries]
             ).astype(np.float32)
@@ -246,7 +246,7 @@ class MemoryIndex:
             if self.use_faiss and self.faiss_index:
                 import faiss
 
-                # FIX: Create a float32 copy for normalization to avoid modifying input
+                # Note: Create a float32 copy for normalization to avoid modifying input
                 query_copy = query.copy().astype(np.float32)
 
                 if self.metric == SimilarityMetric.COSINE:
@@ -276,7 +276,7 @@ class MemoryIndex:
                 return results
             else:
                 # Numpy fallback
-                # FIX: Implement a more robust numpy-based cosine similarity
+                # Note: Implement a more robust numpy-based cosine similarity
                 if self.metric == SimilarityMetric.COSINE:
                     # Normalize query and feature vectors for cosine similarity
                     query_norm = query / (np.linalg.norm(query) + 1e-10)

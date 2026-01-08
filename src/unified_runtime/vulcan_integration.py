@@ -170,7 +170,7 @@ class VulcanGraphixBridge:
         self.vulcan_available = VULCAN_AVAILABLE
         self.world_model = None
         
-        # BUG FIX Issue #48: Use singleton SemanticBridge to prevent per-query reinitialization.
+        # Note Issue #48: Use singleton SemanticBridge to prevent per-query reinitialization.
         try:
             from vulcan.reasoning.singletons import get_semantic_bridge
             self.semantic_bridge = get_semantic_bridge()
@@ -200,7 +200,7 @@ class VulcanGraphixBridge:
                 global WorldModel
                 WorldModel = _lazy_import_world_model()
                 # WorldModel import now raises error instead of returning mock
-                # FIX: Pass explicit config including enable_self_improvement
+                # Note: Pass explicit config including enable_self_improvement
                 world_model_config = {
                     # Honor environment and integration config toggle
                     "enable_self_improvement": bool(
@@ -215,7 +215,7 @@ class VulcanGraphixBridge:
                     "self_improvement_state": "data/agent_state.json",
                     "meta_reasoning_config": "configs/intrinsic_drives.json",
                 }
-                # BUG FIX Issues #1-4, #45-46: Use singleton WorldModel to prevent
+                # Note Issues #1-4, #45-46: Use singleton WorldModel to prevent
                 # per-query reinitialization that causes ~10-15 second overhead.
                 try:
                     from vulcan.reasoning.singletons import get_world_model
@@ -234,7 +234,7 @@ class VulcanGraphixBridge:
                         self.world_model.initialize()
                 logger.info("✓ VULCAN World Model initialized")
 
-                # BUG FIX Issues #9, #49: Use existing motivational_introspection from WorldModel
+                # Note Issues #9, #49: Use existing motivational_introspection from WorldModel
                 # instead of creating a new one to prevent multiple initialization.
                 # The WorldModel already creates MotivationalIntrospection during init.
                 if VULCAN_AVAILABLE:

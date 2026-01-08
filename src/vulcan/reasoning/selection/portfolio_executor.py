@@ -977,7 +977,7 @@ class PortfolioExecutor:
                 # Complex problem: committee consensus
                 result = self._execute_committee_consensus(tool_names, problem, monitor)
 
-            # FIX: Ensure the final result's strategy is correctly reported as ADAPTIVE_MIX
+            # Note: Ensure the final result's strategy is correctly reported as ADAPTIVE_MIX
             result.strategy = ExecutionStrategy.ADAPTIVE_MIX
             return result
         except Exception as e:
@@ -1293,7 +1293,7 @@ class PortfolioExecutor:
         logger.info("Shutting down portfolio executor")
 
         try:
-            # FIX: The 'timeout' parameter for shutdown was added in Python 3.9.
+            # Note: The 'timeout' parameter for shutdown was added in Python 3.9.
             # Removing it ensures compatibility with older versions and fixes the logged error.
             self.executor.shutdown(wait=True)
         except Exception as e:

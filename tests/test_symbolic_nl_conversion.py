@@ -1,7 +1,7 @@
 """
 Tests for Natural Language to Logic Converter.
 
-BUG #5 FIX: Tests to verify that natural language sentences are correctly
+Note: Tests to verify that natural language sentences are correctly
 converted to first-order logic notation.
 
 Test cases:
@@ -246,7 +246,7 @@ class TestIntegrationWithSymbolicReasoner:
     """
     Test that the NL converter integrates correctly with SymbolicReasoner.
     
-    BUG #5 FIX: These tests verify that natural language queries can be
+    Note: These tests verify that natural language queries can be
     processed by the symbolic reasoner without parse errors.
     """
     

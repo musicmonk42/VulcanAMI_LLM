@@ -1389,7 +1389,7 @@ class EnhancedProbabilisticReasoner:
         if not self.ensemble and not self.gp_ensemble:
             self._initialize_ensemble()
             if not self.ensemble:
-                # FIX: Return moderate uncertainty (0.5) instead of 1.0 to give non-zero confidence
+                # Note: Return moderate uncertainty (0.5) instead of 1.0 to give non-zero confidence
                 return {
                     "mean": 0.5,
                     "std": 0.5,  # Changed from 1.0 to 0.5 for 50% confidence
@@ -1400,7 +1400,7 @@ class EnhancedProbabilisticReasoner:
                 }
 
         if not self.trained:
-            # FIX: Return moderate uncertainty (0.5) instead of 1.0 to give non-zero confidence
+            # Note: Return moderate uncertainty (0.5) instead of 1.0 to give non-zero confidence
             # An untrained model should still provide baseline reasoning with moderate confidence
             # Confidence interval: mean ± 1.96*std = 0.5 ± 1.96*0.5 ≈ (-0.48, 1.48), rounded to (-0.5, 1.5)
             return {
@@ -2473,7 +2473,7 @@ class ProbabilisticReasoner(EnhancedProbabilisticReasoner):
                 f"domain_boost={domain_boost:.2f}, final={confidence:.2f}"
             )
 
-            # ISSUE P1.1 FIX: Changed > to >= so exactly 0.5 counts as meeting threshold
+            # Note: Changed > to >= so exactly 0.5 counts as meeting threshold
             # Previously: mean_val > threshold would fail when mean_val == threshold
             # This caused "not above the threshold of 0.5" when value IS 0.5
             conclusion_bool = bool(mean_val >= threshold)
@@ -2481,7 +2481,7 @@ class ProbabilisticReasoner(EnhancedProbabilisticReasoner):
             # The core reasoning result
             conclusion = {
                 "is_above_threshold": conclusion_bool,
-                # ISSUE P1.1 FIX: Updated message to match >= threshold logic
+                # Note: Updated message to match >= threshold logic
                 "details": f"Mean value {mean_val:.3f} {'meets' if conclusion_bool else 'is below'} threshold {threshold}",
             }
 

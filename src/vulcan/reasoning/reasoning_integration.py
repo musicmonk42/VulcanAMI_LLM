@@ -127,7 +127,7 @@ MAX_FALLBACK_ATTEMPTS = 2  # Don't retry more than 2 times per query
 # When all fallback attempts fail, set this minimum floor to allow processing
 MIN_CONFIDENCE_FLOOR = 0.15  # Prevent total query refusal
 
-# FIX: Confidence category thresholds for result quality assessment
+# Note: Confidence category thresholds for result quality assessment
 # These thresholds determine when to use internal results vs fallback
 CONFIDENCE_HIGH_THRESHOLD = 0.7     # High quality result, use with full confidence
 CONFIDENCE_GOOD_THRESHOLD = 0.6     # Good result, use normally
@@ -146,7 +146,7 @@ ARENA_DELEGATION_TIMEOUT = 60.0  # Timeout for Arena delegation requests
 FAST_PATH_COMPLEXITY_THRESHOLD = 0.3  # Below this, use fast path
 LOW_COMPLEXITY_THRESHOLD = 0.4  # Below this, use FAST mode
 HIGH_COMPLEXITY_THRESHOLD = 0.7  # Above this, use ACCURATE mode
-# FIX: Lowered from 0.90 to 0.70 to enable problem decomposition
+# Note: Lowered from 0.90 to 0.70 to enable problem decomposition
 # The 0.90 threshold was preventing decomposition from ever being triggered,
 # causing "ProblemDecomposer boots up then silence" behavior.
 # Decomposition is essential for complex problem solving.
@@ -266,7 +266,7 @@ class ReasoningStrategyType(Enum):
     PLANNING = "planning"
     DELIBERATIVE = "deliberative"
     META_REASONING = "meta_reasoning"
-    PHILOSOPHICAL_REASONING = "philosophical_reasoning"  # FIX: Strategy for ethical/deontic reasoning
+    PHILOSOPHICAL_REASONING = "philosophical_reasoning"  # Note: Strategy for ethical/deontic reasoning
     DEFAULT = "default"
 
 
@@ -278,8 +278,8 @@ QUERY_TYPE_STRATEGY_MAP: Dict[str, str] = {
     "planning": "deliberative",
     "learning": "meta_reasoning",
     "general": "direct",
-    "philosophical": "philosophical_reasoning",  # FIX: Map philosophical queries to philosophical reasoning
-    "ethical": "philosophical_reasoning",        # FIX: Map ethical queries to philosophical reasoning
+    "philosophical": "philosophical_reasoning",  # Note: Map philosophical queries to philosophical reasoning
+    "ethical": "philosophical_reasoning",        # Note: Map ethical queries to philosophical reasoning
 }
 
 # ==================================================================
@@ -962,7 +962,7 @@ class ReasoningIntegration:
                     # the delegation because it checks for formal logic BEFORE checking
                     # delegation context.
                     #
-                    # FIX: Execute the delegated tool HERE and return immediately.
+                    # Note: Execute the delegated tool HERE and return immediately.
                     # This prevents any downstream code from overriding the delegation.
                     #
                     # Evidence from logs:
@@ -1648,7 +1648,7 @@ class ReasoningIntegration:
         primary_engine_failed = used_fallback and confidence < CONFIDENCE_HIGH_THRESHOLD
         
         # ==================================================================
-        # FIX: Confidence threshold handling for medium-confidence results
+        # Note: Confidence threshold handling for medium-confidence results
         # Jan 6 2026 logs: Confidence 0.3-0.6 was triggering unnecessary LLM fallback
         # Instead of dropping to LLM, use the result with a "tentative" flag
         # This prevents good internal reasoning from being discarded
@@ -1685,7 +1685,7 @@ class ReasoningIntegration:
             # Note: Explicitly track fallback usage
             "used_fallback": used_fallback,
             "primary_engine_failed": primary_engine_failed,
-            # FIX: Track tentative status for medium-confidence results
+            # Note: Track tentative status for medium-confidence results
             "is_tentative": is_tentative_result,
             "confidence_category": (
                 "high" if confidence >= CONFIDENCE_HIGH_THRESHOLD else

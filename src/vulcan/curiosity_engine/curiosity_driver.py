@@ -398,11 +398,11 @@ def _run_cycle_wrapper(engine_state: Dict[str, Any]) -> Dict[str, Any]:
 
     subprocess_logger = logging.getLogger(__name__)
     
-    # FIX: Subprocess Logging Duplication - prevent propagation to parent loggers
+    # Note: Subprocess Logging Duplication - prevent propagation to parent loggers
     # This prevents the same log from appearing twice (once from subprocess handler, once from root)
     subprocess_logger.propagate = False
 
-    # ISSUE #11 FIX: Configure subprocess logging to use stdout instead of stderr
+    # Note: Configure subprocess logging to use stdout instead of stderr
     # Previously using default StreamHandler (stderr) caused subprocess logs to appear as errors
     handler = logging.StreamHandler(sys.stdout)  # Explicitly use stdout
     handler.setLevel(logging.INFO)
@@ -411,7 +411,7 @@ def _run_cycle_wrapper(engine_state: Dict[str, Any]) -> Dict[str, Any]:
     )
     handler.setFormatter(formatter)
 
-    # FIX: Clear existing handlers and add fresh one to avoid duplication
+    # Note: Clear existing handlers and add fresh one to avoid duplication
     subprocess_logger.handlers.clear()
     subprocess_logger.addHandler(handler)
     subprocess_logger.setLevel(logging.INFO)
@@ -550,7 +550,7 @@ class CuriosityDriver:
         self._stats_cache: Optional[Dict[str, Any]] = None
         self._stats_cache_time = 0.0
 
-        # FIX: Keep reference to process pool for backward compatibility
+        # Note: Keep reference to process pool for backward compatibility
         self.process_pool: Optional[ProcessPoolExecutor] = None
 
         logger.info(
@@ -628,7 +628,7 @@ class CuriosityDriver:
             if not self._pool_manager.initialize():
                 raise RuntimeError("Failed to initialize process pool")
 
-            # FIX: Keep reference for backward compatibility
+            # Note: Keep reference for backward compatibility
             self.process_pool = self._pool_manager.get_pool()
 
             # Mark as running before spawning task
@@ -885,7 +885,7 @@ class CuriosityDriver:
                 logger.error("Error in heartbeat loop: %s", e, exc_info=True)
                 self._consecutive_failures += 1
 
-                # FIX: Increase sleep time on consecutive failures
+                # Note: Increase sleep time on consecutive failures
                 sleep_time = min(
                     self.config.heartbeat_interval * (1 + self._consecutive_failures),
                     self.config.cycle_timeout,

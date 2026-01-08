@@ -9,10 +9,8 @@ import time
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
-# ====================================================================
-# BUG #7 FIX: Disable TQDM progress bars that clutter logs
+# Note: Disable TQDM progress bars that clutter logs
 # This must be set before any library imports that use tqdm
-# ====================================================================
 os.environ.setdefault("TQDM_DISABLE", "1")
 
 from cryptography.exceptions import InvalidSignature

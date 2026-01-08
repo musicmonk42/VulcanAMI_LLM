@@ -569,16 +569,16 @@ class MultiModalReasoningEngine:
     def register_modality_reasoner(self, modality: ModalityType, reasoner: Any) -> bool:
         """Register a reasoner for a specific modality.
         
-        Bug #5 Fix: Prevents duplicate registration of reasoners for the same modality.
-        Bug #9 Fix: Downgraded duplicate warning to DEBUG to reduce log noise when
+        Note: Prevents duplicate registration of reasoners for the same modality.
+        Note: Downgraded duplicate warning to DEBUG to reduce log noise when
         UnifiedReasoner is re-initialized multiple times.
         
         Returns:
             True if registered, False if modality already has a reasoner (duplicate prevented)
         """
-        # Bug #5 Fix: Check for existing registration to prevent memory leak
+        # Note: Check for existing registration to prevent memory leak
         if modality in self.modality_reasoners:
-            # Bug #9 Fix: Downgrade to DEBUG - duplicate registration is expected
+            # Note: Downgrade to DEBUG - duplicate registration is expected
             # when UnifiedReasoner is re-instantiated (which happens per-query currently)
             logger.debug(
                 f"Reasoner for modality '{modality.value}' already registered - "
@@ -644,7 +644,7 @@ class MultiModalReasoningEngine:
         # Create reasoning chain
         chain_id = str(uuid.uuid4())
 
-        # FIX: Create an initial step to satisfy the ReasoningChain validation
+        # Note: Create an initial step to satisfy the ReasoningChain validation
         initial_step = ReasoningStep(
             step_id=f"start_{chain_id}",
             step_type=ReasoningType.MULTIMODAL,
@@ -669,7 +669,7 @@ class MultiModalReasoningEngine:
         # Handle empty inputs gracefully
         if not inputs:
             conclusion = {"error": "empty_inputs"}
-            # FIX: Use minimum confidence floor instead of 0.0
+            # Note: Use minimum confidence floor instead of 0.0
             confidence = 0.1
             chain.final_conclusion = conclusion
             chain.total_confidence = confidence
@@ -686,7 +686,7 @@ class MultiModalReasoningEngine:
             processed_inputs = self._preprocess_inputs(inputs)
         except Exception as e:
             logger.error(f"Input preprocessing failed: {e}")
-            # FIX: Use minimum confidence floor instead of 0.0
+            # Note: Use minimum confidence floor instead of 0.0
             return ReasoningResult(
                 conclusion={"error": "preprocessing_failed"},
                 confidence=0.1,
@@ -716,12 +716,12 @@ class MultiModalReasoningEngine:
         except Exception as e:
             logger.error(f"Fusion failed: {e}")
             conclusion = {"error": "fusion_failed"}
-            # FIX: Use minimum confidence floor instead of 0.0
+            # Note: Use minimum confidence floor instead of 0.0
             confidence = 0.1
             fusion_steps = []
 
         # Add steps to chain
-        chain.steps.extend(fusion_steps)  # FIX: Use extend instead of assignment
+        chain.steps.extend(fusion_steps)  # Note: Use extend instead of assignment
         chain.final_conclusion = conclusion
         chain.total_confidence = confidence
 
@@ -835,7 +835,7 @@ class MultiModalReasoningEngine:
         except Exception as e:
             logger.error(f"Unified reasoning failed: {e}")
             conclusion = {"error": str(e)}
-            # FIX: Use minimum confidence floor instead of 0.0
+            # Note: Use minimum confidence floor instead of 0.0
             confidence = 0.1
 
         # Create reasoning step
@@ -1051,7 +1051,7 @@ class MultiModalReasoningEngine:
         except Exception as e:
             logger.error(f"Hierarchical fusion failed: {e}")
             conclusion = {"error": str(e)}
-            # FIX: Use minimum confidence floor instead of 0.0
+            # Note: Use minimum confidence floor instead of 0.0
             confidence = 0.1
 
         # Create step for hierarchical process
@@ -1112,7 +1112,7 @@ class MultiModalReasoningEngine:
         except Exception as e:
             logger.error(f"Attention fusion failed: {e}")
             conclusion = {"error": str(e)}
-            # FIX: Use minimum confidence floor instead of 0.0
+            # Note: Use minimum confidence floor instead of 0.0
             confidence = 0.1
 
         attention_step = ReasoningStep(
@@ -1210,7 +1210,7 @@ class MultiModalReasoningEngine:
         except Exception as e:
             logger.error(f"Gated fusion failed: {e}")
             conclusion = {"error": str(e)}
-            # FIX: Use minimum confidence floor instead of 0.0
+            # Note: Use minimum confidence floor instead of 0.0
             confidence = 0.1
 
         gated_step = ReasoningStep(
@@ -1326,7 +1326,7 @@ class MultiModalReasoningEngine:
         except Exception as e:
             logger.error(f"Advanced numpy gated fusion failed: {e}")
             conclusion = {"error": str(e)}
-            # FIX: Use minimum confidence floor instead of 0.0
+            # Note: Use minimum confidence floor instead of 0.0
             confidence = 0.1
 
         return conclusion, confidence, steps
@@ -1794,7 +1794,7 @@ class MultiModalReasoningEngine:
             # Calculate similarity based on feature overlap and values
             common_keys = set(features1.keys()) & set(features2.keys())
             if not common_keys:
-                # FIX: Use minimum confidence floor instead of 0.0
+                # Note: Use minimum confidence floor instead of 0.0
                 return {"score": 0.0, "mapping": {}, "confidence": 0.1}
             
             # Compute alignment score based on feature similarity
@@ -1829,7 +1829,7 @@ class MultiModalReasoningEngine:
 
             return {"score": float(score), "mapping": mapping, "confidence": float(confidence)}
         except Exception:
-            # FIX: Use minimum confidence floor instead of 0.0
+            # Note: Use minimum confidence floor instead of 0.0
             return {"score": 0.0, "mapping": {}, "confidence": 0.1}
 
     def _apply_alignments(
@@ -2718,12 +2718,12 @@ class CrossModalReasoner:
             return {
                 "success": False,
                 "reason": "No transfer function available",
-                # FIX: Use minimum confidence floor instead of 0.0
+                # Note: Use minimum confidence floor instead of 0.0
                 "confidence": 0.1,
             }
         except Exception as e:
             logger.error(f"Knowledge transfer failed: {e}")
-            # FIX: Use minimum confidence floor instead of 0.0
+            # Note: Use minimum confidence floor instead of 0.0
             return {"success": False, "reason": str(e), "confidence": 0.1}
 
     def compute_cross_modal_attention(

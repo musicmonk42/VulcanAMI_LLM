@@ -102,7 +102,7 @@ TransparencyInterface = None
 SelfImprovementDrive = None
 TriggerType = None
 ImprovementObjective = None
-# Issue #4 & #5 FIX: Add missing meta-reasoning components for full integration
+# Note: Add missing meta-reasoning components for full integration
 InternalCritic = None
 CuriosityRewardShaper = None
 EthicalBoundaryMonitor = None
@@ -274,7 +274,7 @@ def _lazy_import_meta_reasoning():
                 TransparencyInterface,
                 TriggerType,
                 ValidationTracker,
-                # Issue #4 & #5 FIX: Import additional meta-reasoning components
+                # Note: Import additional meta-reasoning components
                 InternalCritic,
                 CuriosityRewardShaper,
                 EthicalBoundaryMonitor,
@@ -295,7 +295,7 @@ def _lazy_import_meta_reasoning():
             SelfImprovementDrive = MagicMock()
             TriggerType = MagicMock()
             ImprovementObjective = MagicMock()
-            # Issue #4 & #5 FIX: Mock additional components
+            # Note: Mock additional components
             InternalCritic = MagicMock()
             CuriosityRewardShaper = MagicMock()
             EthicalBoundaryMonitor = MagicMock()
@@ -1766,7 +1766,7 @@ class WorldModel:
                     logger.info("✓ TransparencyInterface initialized")
 
                 # ================================================================
-                # Issue #4 & #5 FIX: Initialize ALL meta-reasoning components
+                # Note: Initialize ALL meta-reasoning components
                 # Full integration of meta-reasoning into world model
                 # Note: Each component has different init signatures - using try/except
                 # to handle gracefully if components can't be initialized
@@ -2613,7 +2613,7 @@ class WorldModel:
             f.write(updated_code)
 
         # 3. Git Commit (Simulated git_tools)
-        # FIX: Check if auto-commit is enabled via settings
+        # Note: Check if auto-commit is enabled via settings
         # Default: DISABLED to prevent "Cannot commit: /app is not a Git repository" errors
         try:
             from vulcan.settings import settings
@@ -2630,7 +2630,7 @@ class WorldModel:
             logger.warning(
                 f"Cannot commit: {self.repo_root} is not a Git repository. Skipping commit."
             )
-            # FIX: Return False for commit_succeeded when not a git repo
+            # Note: Return False for commit_succeeded when not a git repo
             return diff_summary, False
 
         # Execute Git commands using subprocess (robust, non-mock check)
@@ -2684,7 +2684,7 @@ class WorldModel:
         Execute an improvement action using the full LLM -> AST -> Diff -> Git pipeline.
         This replaces the mock _perform_improvement and its handlers.
         
-        BUG #2 FIX: Self-Improvement Loop Deadlock Prevention
+        Note: Self-Improvement Loop Deadlock Prevention
         
         The original implementation used CodeLLMClient.generate_code() which raises
         a RuntimeError because external LLM code generation is disabled by VULCAN Policy.
@@ -2710,7 +2710,7 @@ class WorldModel:
         success = False
         result: Dict[str, Any] = {"status": "failed", "error": "Initialization error"}
 
-        # --- BUG #2 FIX: Check if external LLM code generation should be used ---
+        # --- Note: Check if external LLM code generation should be used ---
         # External LLM code generation is DISABLED by VULCAN Policy. Instead of
         # crashing with RuntimeError, we gracefully handle this by deferring
         # the improvement to human review or using internal code templates.
@@ -2722,7 +2722,7 @@ class WorldModel:
             # Build LLM prompt for this improvement (we'll use it for logging)
             prompt = self._build_llm_prompt_for_improvement(improvement_action)
             
-            # BUG #2 FIX: Instead of calling CodeLLMClient.generate_code() which raises
+            # Note: Instead of calling CodeLLMClient.generate_code() which raises
             # RuntimeError, we log the intent and defer to human review
             logger.warning(
                 f"[Self-Improvement] External LLM code generation is DISABLED by VULCAN Policy. "
@@ -3658,7 +3658,7 @@ class WorldModel:
     def save_state(self, path: str):
         """Save world model state to disk"""
 
-        # FIX: Use the 'FilePath' alias for pathlib.Path
+        # Note: Use the 'FilePath' alias for pathlib.Path
         save_path = FilePath(path)
         save_path.mkdir(parents=True, exist_ok=True)
 
@@ -3755,7 +3755,7 @@ class WorldModel:
     def load_state(self, path: str):
         """Load world model state from disk"""
 
-        # FIX: Use the 'FilePath' alias for pathlib.Path
+        # Note: Use the 'FilePath' alias for pathlib.Path
         load_path = FilePath(path)
 
         if not load_path.exists():
@@ -4113,7 +4113,7 @@ class WorldModel:
         return capabilities
 
     # =========================================================================
-    # BUG #4 FIX (Jan 7 2026): World Model reason() method with mode support
+    # Note: World Model reason() method with mode support
     # =========================================================================
     # This method allows WorldModel to be used as a reasoning tool via
     # portfolio_executor, supporting 'creative' and 'philosophical' modes.
@@ -4490,7 +4490,7 @@ class WorldModel:
     # =========================================================================
     
     # =========================================================================
-    # Issue #1 & #2 FIX: Delegation Thresholds
+    # Note: Delegation Thresholds
     # These thresholds determine when a query should be delegated to another
     # reasoner instead of being handled by the world model's introspection.
     # The thresholds are intentionally set conservatively to avoid false positives.
@@ -4510,7 +4510,7 @@ class WorldModel:
     
     def _analyze_delegation_need(self, query: str) -> tuple:
         """
-        Issue #1 & #2 FIX: Analyze if query LOOKS self-referential but actually
+        Analyze if query LOOKS self-referential but actually
         needs another reasoning engine.
         
         World Model detects patterns correctly but was trying to answer instead of
@@ -4577,7 +4577,7 @@ class WorldModel:
         # ═══════════════════════════════════════════════════════════════════════
         # Pattern 2: Design/Architecture Problems 
         # "You're designing a cryptocurrency" = design task, not self-query
-        # FIX: Jan 6 2026 logs - cryptocurrency hash composition queries were
+        # Note: Jan 6 2026 logs - cryptocurrency hash composition queries were
         # being misclassified as self-introspection
         # ═══════════════════════════════════════════════════════════════════════
         
@@ -4585,7 +4585,7 @@ class WorldModel:
             "you're designing", "you are designing", "you're building",
             "you are creating", "you're implementing", "you need to design",
             "design a", "build a", "create a",
-            # FIX: Add cryptographic design phrases
+            # Note: Add cryptographic design phrases
             "cryptographer", "claims that", "proves that", "demonstrates that",
             "propose", "construct", "composition",
         ]
@@ -4594,7 +4594,7 @@ class WorldModel:
             'system', 'architecture', 'mechanism', 'algorithm', 'protocol',
             'cryptocurrency', 'incentive', 'game', 'optimization', 'network',
             'token', 'blockchain', 'consensus',
-            # FIX: Add cryptographic context keywords
+            # Note: Add cryptographic context keywords
             'hash', 'collision', 'sha256', 'blake2b', 'concatenation',
             'secure composition', 'security reduction', 'proof', 'attack',
         ]
@@ -4609,7 +4609,7 @@ class WorldModel:
                 )
         
         # ═══════════════════════════════════════════════════════════════════════
-        # FIX: Pattern 2b: Cryptographic Security Questions
+        # Note: Pattern 2b: Cryptographic Security Questions
         # "Why is this hash composition dangerous?" = crypto education, not self-query
         # Jan 6 2026 logs showed these being misrouted
         # ═══════════════════════════════════════════════════════════════════════
@@ -4642,13 +4642,13 @@ class WorldModel:
         # Note: We use specific probability keywords that are less ambiguous.
         # 'bayes theorem', 'bayesian analysis' would be more specific but
         # 'bayes' alone works here because we also require observation phrases.
-        # FIX: Jan 6 2026 - Also catch queries with domain-specific terms like
+        # Note: Jan 6 2026 - Also catch queries with domain-specific terms like
         # sensitivity, specificity, prevalence without explicit "probability"
         # ═══════════════════════════════════════════════════════════════════════
         
         # Core probability indicators
         prob_indicators = ['probability', 'odds', 'likelihood', 'chance', 'risk', 'bayes', 'prior', 'posterior']
-        # FIX: Domain-specific probability terms that indicate Bayesian problems
+        # Note: Domain-specific probability terms that indicate Bayesian problems
         domain_prob_indicators = [
             'sensitivity', 'specificity', 'prevalence', 'p(',
             'positive test', 'negative test', 'false positive', 'false negative',
@@ -4661,7 +4661,7 @@ class WorldModel:
         has_domain_prob = any(ind in query_lower for ind in domain_prob_indicators)
         has_observation = any(phrase in query_lower for phrase in observation_phrases)
         
-        # FIX: More permissive - if has domain-specific probability terms OR 
+        # Note: More permissive - if has domain-specific probability terms OR 
         # (core prob indicator + observation phrase)
         if has_domain_prob or (has_prob and has_observation):
             return (
@@ -4674,14 +4674,14 @@ class WorldModel:
         # ═══════════════════════════════════════════════════════════════════════
         # Pattern 4: Causal Reasoning with "you" as Experimenter
         # "You can run an experiment to determine..." = causal analysis
-        # FIX: Jan 6 2026 - Causal queries with domain terms being misclassified
+        # Note: Jan 6 2026 - Causal queries with domain terms being misclassified
         # Also catch confounding/intervention questions without explicit "experiment"
         # ═══════════════════════════════════════════════════════════════════════
         
         causal_indicators = [
             'experiment', 'intervention', 'randomize', 'causal', 'confounding',
             'cause', 'effect', 'counterfactual', 'what if',
-            # FIX: Additional causal inference terms
+            # Note: Additional causal inference terms
             'confounder', 'treatment', 'treatment effect', 'causal effect',
             'd-separation', 'backdoor', 'instrumental variable', 'ate',
             'causal graph', 'dag', 'directed acyclic',
@@ -4690,7 +4690,7 @@ class WorldModel:
         experiment_phrases = [
             'you can run', 'you observe', 'you randomize', 'you intervene',
             'you conduct', 'you test', 'you measure',
-            # FIX: Additional phrases that suggest causal reasoning task
+            # Note: Additional phrases that suggest causal reasoning task
             'which variable', 'what should you randomize', 'isolate the effect',
             'identify the causal', 'control for',
         ]
@@ -4698,7 +4698,7 @@ class WorldModel:
         has_causal = sum(1 for ind in causal_indicators if ind in query_lower)
         has_experiment = any(phrase in query_lower for phrase in experiment_phrases)
         
-        # FIX: More permissive - 2+ causal indicators alone OR 1+ with experiment phrase
+        # Note: More permissive - 2+ causal indicators alone OR 1+ with experiment phrase
         if has_causal >= self.MIN_CAUSAL_INDICATORS_FOR_DELEGATION:
             return (
                 True,
@@ -4715,7 +4715,7 @@ class WorldModel:
             )
         
         # ═══════════════════════════════════════════════════════════════════════
-        # FIX: Pattern 4b: Medical Ethics/Decision Problems
+        # Note: Pattern 4b: Medical Ethics/Decision Problems
         # "Expected harm calculation", "dose", "survival probability"
         # Jan 6 2026 - Medical ethics queries getting vague non-answers
         # ═══════════════════════════════════════════════════════════════════════
@@ -4753,7 +4753,7 @@ class WorldModel:
             'what do you think about yourself', 'how do you feel about',
             'are you conscious', 'are you self-aware', 'do you experience',
             'your own', 'yourself', 'about you', 'would you take', 'would you choose',
-            # FIX: More true introspection patterns
+            # Note: More true introspection patterns
             'if you continue', 'interacted with humans', 'achieve awareness',
             'would you change', 'your evolution', 'your development',
         ]
@@ -4808,7 +4808,7 @@ class WorldModel:
         query_lower = query.lower()
         
         # ═══════════════════════════════════════════════════════════════════════
-        # Issue #1 & #2 FIX: Check if delegation is needed FIRST
+        # Note: Check if delegation is needed FIRST
         # This handles cases where queries LOOK self-referential (contain "you")
         # but are actually problems posed TO the AI, not questions ABOUT the AI.
         # ═══════════════════════════════════════════════════════════════════════
@@ -4896,7 +4896,7 @@ class WorldModel:
         # ========================================
         # BOUNDARY AWARENESS / LIMITATIONS
         # ========================================
-        # FIX (Jan 7 2026): Expanded patterns to catch more natural phrasings
+        # Note: Expanded patterns to catch more natural phrasings
         
         # Questions about limitations (more flexible matching)
         limitation_patterns = [
@@ -5006,7 +5006,7 @@ class WorldModel:
         # ========================================
         # ENHANCED INTROSPECTION TYPE CLASSIFICATION
         # ========================================
-        # FIX: Instead of returning generic template for all self-referential queries,
+        # Note: Instead of returning generic template for all self-referential queries,
         # classify the specific type of question and respond appropriately.
         
         question_type = self._classify_introspection_type(query)
@@ -5041,7 +5041,7 @@ class WorldModel:
         # ========================================
         # DEMONSTRATION QUERIES - Actually run the reasoning!
         # ========================================
-        # BUG FIX (Jan 7 2026): Handle "demonstrate how you use X reasoning" queries
+        # Note: Handle "demonstrate how you use X reasoning" queries
         # These should ACTUALLY RUN the reasoning system, not just describe it.
         # 
         # PROBLEM FIXED:
@@ -5069,7 +5069,7 @@ class WorldModel:
         """
         Handle demonstration queries by ACTUALLY RUNNING the requested reasoning.
         
-        BUG FIX (Jan 7 2026): Queries like "demonstrate how you use counterfactual reasoning"
+        Note (Jan 7 2026): Queries like "demonstrate how you use counterfactual reasoning"
         should run the CounterfactualObjectiveReasoner with an example scenario,
         not just describe capabilities.
         
@@ -5870,7 +5870,7 @@ Or ask a more specific question about my nature or functioning.
     # =========================================================================
     # ENHANCED INTROSPECTION TYPE CLASSIFICATION METHODS
     # =========================================================================
-    # FIX: These methods provide specific answers based on question type
+    # Note: These methods provide specific answers based on question type
     # instead of returning generic templates for all self-referential queries.
     
     def _classify_introspection_type(self, query: str) -> str:
@@ -5880,14 +5880,14 @@ Or ask a more specific question about my nature or functioning.
         Returns one of: COMPARISON, FUTURE_CAPABILITY, CURRENT_CAPABILITY,
         ARCHITECTURAL, PREFERENCE, DEMONSTRATION, or GENERAL
         
-        BUG FIX (Jan 7 2026): Added DEMONSTRATION type for queries like
+        Note (Jan 7 2026): Added DEMONSTRATION type for queries like
         "demonstrate how you use counterfactual reasoning" which should
         ACTUALLY RUN the reasoning system, not just describe it.
         """
         query_lower = query.lower()
         
         # =========================================================================
-        # DEMONSTRATION PATTERNS - BUG FIX
+        # DEMONSTRATION PATTERNS - Note
         # =========================================================================
         # These queries want to SEE the system in action, not just hear about it
         # Examples:
@@ -6138,7 +6138,7 @@ rather than deflect them."""
                 "meta_reasoning": {
                     "available": META_REASONING_AVAILABLE,
                     "enabled": self.meta_reasoning_enabled,
-                    # Issue #4 & #5 FIX: Include full meta-reasoning component status
+                    # Note: Include full meta-reasoning component status
                     "components": {
                         # Use getattr consistently for all attributes to ensure safety
                         "motivational_introspection": getattr(self, "motivational_introspection", None) is not None,

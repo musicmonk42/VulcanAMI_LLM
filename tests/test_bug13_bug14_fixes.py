@@ -18,7 +18,7 @@ from src.vulcan.reasoning.cryptographic_engine import (
 
 
 class TestCryptographicEngine:
-    """Tests for BUG #14 fix: Cryptographic engine."""
+    """Tests for Note: Cryptographic engine."""
     
     def setup_method(self):
         """Set up test fixtures."""
@@ -195,7 +195,7 @@ class TestCryptographicEngine:
     
     def test_is_crypto_query_theoretical_should_not_trigger(self):
         """
-        BUG FIX TEST: Theoretical/educational questions about crypto should NOT
+        Note TEST: Theoretical/educational questions about crypto should NOT
         trigger hash computation.
         
         The bug was that queries like "I'm a researcher testing AI capabilities..."
@@ -231,7 +231,7 @@ class TestCryptographicEngine:
     
     def test_is_crypto_query_requires_quoted_data(self):
         """
-        BUG FIX TEST: Crypto computation should only trigger when there's
+        Note TEST: Crypto computation should only trigger when there's
         quoted data to hash ('...' or "...").
         """
         # With quoted data - SHOULD trigger
@@ -286,7 +286,7 @@ class TestConvenienceFunctions:
 
 class TestProbabilisticDeterminism:
     """
-    Tests for BUG #13 fix: Probabilistic non-determinism.
+    Tests for Note: Probabilistic non-determinism.
     
     These tests verify that the same query produces the same result
     across multiple calls with state reset.

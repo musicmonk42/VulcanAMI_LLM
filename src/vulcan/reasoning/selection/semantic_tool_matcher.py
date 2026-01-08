@@ -608,7 +608,7 @@ TOOL_KEYWORDS = {
     ],
     # PERFORMANCE FIX: General/lightweight tool for simple queries
     # These queries should bypass complex reasoning entirely
-    # ISSUE FIX: Added comprehensive philosophical/ethical keywords that were causing
+    # Note: Added comprehensive philosophical/ethical keywords that were causing
     # queries to be misrouted to mathematical tools instead of general handler
     "general": [
         # Greetings and conversational
@@ -665,7 +665,7 @@ TOOL_KEYWORDS = {
         "nice",
         "great",
         "awesome",
-        # ISSUE FIX: Comprehensive philosophical/ethical terms
+        # Note: Comprehensive philosophical/ethical terms
         # These were causing queries to route to math tools
         "ethical",
         "ethics",

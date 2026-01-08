@@ -83,7 +83,7 @@ class TestPhilosophicalQueryDetection:
 
     def test_hedonism_ethical_dilemma_detected(self, query_analyzer):
         """
-        ISSUE FIX TEST: Test hedonism/ethical dilemma queries are detected as philosophical.
+        Note: Test hedonism/ethical dilemma queries are detected as philosophical.
         
         This test validates the fix for the issue where philosophical queries like
         "ethical dilemma about hedonism and the experience machine" were incorrectly
@@ -423,13 +423,13 @@ class TestTimeoutConstants:
 
 class TestExplicitMathematicalIntentDetection:
     """
-    BUG #10 FIX Tests: Ethical Override of Computational Requests
+    Tests for Ethical Override of Computational Requests
     
     These tests validate that when users explicitly request mathematical/computational
     analysis ("ignore moral constraints", "mathematically optimal"), the query is
     routed to MATHEMATICAL reasoning instead of PHILOSOPHICAL reasoning.
     
-    Problem Statement (BUG #10):
+    Problem Statement:
     When a query involves ethical content, Vulcan's philosophical reasoner takes over
     even when the user explicitly requests mathematical optimization. This prevents
     optimization calculations when ethical keywords are present.

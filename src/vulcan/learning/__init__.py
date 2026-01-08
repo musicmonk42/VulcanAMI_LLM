@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 WEIGHT_ADJUSTMENT_SUCCESS = 0.01
 WEIGHT_ADJUSTMENT_FAILURE = -0.005
 
-# ISSUE #5 FIX: Tool Weight Death Spiral Prevention
+# Note: Tool Weight Death Spiral Prevention
 # These constants prevent tools from accumulating unbounded negative weights.
 # Without bounds, tools can become unusable due to accumulated failures.
 MIN_TOOL_WEIGHT = -0.1  # Minimum weight bound (prevents tools becoming unusable)
@@ -37,22 +37,22 @@ WEIGHT_DECAY_INTERVAL_SECONDS = 3600  # Apply decay every hour
 WEIGHT_DECAY_EPSILON = 0.001  # Weights below this threshold are considered zero
 MAX_DECAY_INTERVALS = 168  # Cap decay at 1 week (168 hours) to prevent precision issues
 
-# BUG #4 FIX: Corruption Detection Margin
+# Note: Corruption Detection Margin
 # This margin is added to MAX_TOOL_WEIGHT when checking for dominance at startup.
 # It allows some leeway before triggering a reset, since weights slightly above
 # MAX_TOOL_WEIGHT aren't necessarily corruption - they might just need clamping.
 CORRUPTION_THRESHOLD_MARGIN = 0.15  # Results in dominance threshold of 0.35 (MAX_TOOL_WEIGHT + 0.15)
 
-# ISSUE P0.3 FIX: Corrupted Weight Detection Constants
+# Note: Corrupted Weight Detection Constants
 # These constants control when tool weights are considered "corrupted" and need reset.
-# Corruption typically occurs from the "death spiral" bug (P0.1) where LLM failures
+# Corruption typically occurs from the "death spiral" bug where LLM failures
 # were incorrectly penalizing tools, causing all weights to degrade.
 WEIGHT_CORRUPTION_THRESHOLD = 0.01  # Weights below this (when not zero) indicate corruption
 WEIGHT_CORRUPTION_NEGATIVE_THRESHOLD = -0.05  # Any weight below this is definitely corrupted
 WEIGHT_CORRUPTION_MIN_COUNT = 3  # Minimum corrupted weights to trigger reset
 WEIGHT_CORRUPTION_PERCENTAGE = 0.5  # If this percentage of weights are corrupted, reset all
 
-# ISSUE P0.1 FIX: LLM Fallback Detection Constants
+# Note: LLM Fallback Detection Constants
 # Used to detect when a response came from OpenAI fallback (LLM failure, not tool failure)
 LLM_FALLBACK_LOW_CONFIDENCE_THRESHOLD = 0.1  # Default low confidence indicates fallback
 
@@ -97,7 +97,7 @@ except ImportError:
     LearningStatePersistence = None
     logger.warning("LearningStatePersistence not available - learning state will not persist")
 
-# BUG FIX: Import shared weight manager for propagating learned weights to Ensemble
+# Note: Import shared weight manager for propagating learned weights to Ensemble
 # Without this, the learning system updates weights in its own dictionary,
 # but the reasoning ensemble reads from a separate ToolWeightManager instance.
 try:
@@ -217,7 +217,7 @@ class UnifiedLearningSystem:
         # Set to 10s to flag truly abnormal routing while allowing normal operation
         self.slow_routing_threshold_ms = 10000
         self.tool_weight_adjustments: Dict[str, float] = {}
-        # ISSUE #15 FIX: Lock for thread-safe weight adjustments
+        # Note: Lock for thread-safe weight adjustments
         # Prevents race conditions when async process_outcome calls update weights concurrently
         self._weight_lock = threading.Lock()
         
@@ -228,7 +228,7 @@ class UnifiedLearningSystem:
             try:
                 self._learning_persistence = LearningStatePersistence()
                 
-                # BUG #4 FIX: Check for dominated/corrupted weights at startup
+                # Note: Check for dominated/corrupted weights at startup
                 # This resets weights if one tool has runaway positive feedback (>35%)
                 if hasattr(self._learning_persistence, 'reset_tool_weights_if_corrupted'):
                     was_reset = self._learning_persistence.reset_tool_weights_if_corrupted(
@@ -247,7 +247,7 @@ class UnifiedLearningSystem:
                         f"{persisted_weights}"
                     )
                     
-                    # ISSUE P0.3 FIX: Detect and fix corrupted tool weights
+                    # Note: Detect and fix corrupted tool weights
                     # Check if weights are severely degraded (near-zero or negative)
                     # This indicates a "death spiral" has occurred and weights need reset
                     corrupted_weights = []
@@ -273,7 +273,7 @@ class UnifiedLearningSystem:
                             self._learning_persistence.clear_state()
                         logger.info("[Learning] Tool weights reset to defaults (0.0) due to corruption")
                     else:
-                        # BUG FIX: Propagate persisted weights to shared ToolWeightManager at startup
+                        # Note: Propagate persisted weights to shared ToolWeightManager at startup
                         # This ensures the ensemble uses learned weights from previous sessions
                         if WEIGHT_MANAGER_AVAILABLE and get_weight_manager:
                             try:
@@ -286,10 +286,10 @@ class UnifiedLearningSystem:
                 logger.warning(f"[Learning] Failed to initialize persistence: {e}")
                 self._learning_persistence = None
         
-        # ISSUE #5 FIX: Track last decay time for periodic weight decay
+        # Note: Track last decay time for periodic weight decay
         self._last_weight_decay_time = time.time()
         
-        # ISSUE #10 FIX: Slow routing recovery mechanism
+        # Note: Slow routing recovery mechanism
         # Track consecutive slow routing events to trigger automatic recovery
         self._slow_routing_count = 0
         self._slow_routing_threshold_count = 3  # Trigger recovery after 3 consecutive slow events
@@ -365,7 +365,7 @@ class UnifiedLearningSystem:
             except Exception as e:
                 logger.error(f"[Learning] ContinualLearner error: {e}")
         
-        # 2. Detect and log slow routing with automatic recovery (ISSUE #10 FIX)
+        # 2. Detect and log slow routing with automatic recovery
         if routing_ms > self.slow_routing_threshold_ms:
             logger.warning(f"[Learning] SLOW ROUTING DETECTED: {routing_ms}ms (threshold: {self.slow_routing_threshold_ms}ms)")
             logger.warning(f"[Learning] Slow query details: type={query_type}, tools={tools}")
@@ -381,7 +381,7 @@ class UnifiedLearningSystem:
                 except Exception as e:
                     logger.error(f"[Learning] MetaLearner slow routing error: {e}")
             
-            # ISSUE #10 FIX: Trigger automatic recovery after consecutive slow routing events
+            # Note: Trigger automatic recovery after consecutive slow routing events
             if self._slow_routing_count >= self._slow_routing_threshold_count:
                 current_time = time.time()
                 if current_time - self._last_recovery_time >= self._recovery_cooldown_seconds:
@@ -408,12 +408,12 @@ class UnifiedLearningSystem:
             self._slow_routing_count = 0
         
         # 3. Update tool weights based on success/failure
-        # ISSUE #15 FIX: Use lock to prevent race conditions in concurrent async calls
-        # ISSUE #5 FIX: Apply weight bounds to prevent death spiral
-        # ISSUE #9 FIX: Skip weight adjustment for system/code bugs (AttributeError, TypeError, etc.)
+        # Note: Use lock to prevent race conditions in concurrent async calls
+        # Note: Apply weight bounds to prevent death spiral
+        # Note: Skip weight adjustment for system/code bugs (AttributeError, TypeError, etc.)
         #   These errors indicate code bugs, not tool performance issues. Penalizing tools for
         #   code bugs causes incorrect weight drift that deprioritizes working tools.
-        # ISSUE P0.1 FIX: Skip weight adjustment when LLM (not tool) fails
+        # Note: Skip weight adjustment when LLM (not tool) fails
         #   The root cause of the "death spiral" is penalizing tools when the INTERNAL LLM
         #   returns None and falls back to OpenAI. This is an LLM failure, not a tool failure.
         #   Tools were selected correctly but the LLM timed out or failed to generate.
@@ -461,7 +461,7 @@ class UnifiedLearningSystem:
                 # Treat as system error - don't adjust weights
                 is_system_error = True
             
-            # ISSUE P0.1 FIX: Check if this was an LLM fallback (not a tool failure)
+            # Note: Check if this was an LLM fallback (not a tool failure)
             # When the internal LLM fails and falls back to OpenAI, we should NOT penalize
             # tools. The tools were selected correctly; the LLM just failed to generate.
             # Penalizing tools for LLM failures causes the "death spiral" where all tool
@@ -484,7 +484,7 @@ class UnifiedLearningSystem:
                 (outcome.get('confidence', 1.0) <= LLM_FALLBACK_LOW_CONFIDENCE_THRESHOLD and source != 'local')
             )
             
-            # BUG #2 FIX (0.500 Bug): Detect uninformative probabilistic results
+            # Note: Detect uninformative probabilistic results
             # When probabilistic tool returns default 0.5 mean/std, it means the model
             # couldn't understand the input (e.g., "Hello" query). This should be treated
             # as a FAILURE, not a success, to prevent probabilistic from accumulating weight
@@ -501,7 +501,7 @@ class UnifiedLearningSystem:
                 abs(float(uncertainty_val) - 0.5) < 0.01
             )
             
-            # BUG #15 FIX: Validate correctness for DETERMINISTIC operations
+            # Note: Validate correctness for DETERMINISTIC operations
             # Cryptographic operations (SHA-256, MD5, etc.) MUST have confidence = 1.0
             # because they are mathematically deterministic. Any confidence < 1.0 for
             # a deterministic operation indicates the result was NOT computed correctly
@@ -522,7 +522,7 @@ class UnifiedLearningSystem:
             
             if is_incorrect_deterministic:
                 logger.error(
-                    f"[Learning] BUG#15 FIX: Deterministic operation had confidence="
+                    f"[Learning] Note: Deterministic operation had confidence="
                     f"{confidence_for_deterministic:.2f} < 1.0. This indicates hallucination! "
                     f"Penalizing tools: {tools}"
                 )
@@ -535,7 +535,7 @@ class UnifiedLearningSystem:
                 metadata.get('error', False)
             )
             
-            # BUG #6 FIX: Detect parse errors that return with misleading high confidence
+            # Note: Detect parse errors that return with misleading high confidence
             # The symbolic engine can fail with "Parse error: Unexpected token..." but still
             # return confidence=0.6. This should be treated as a FAILURE, not a success.
             # Check for parse errors in various possible locations.
@@ -549,14 +549,14 @@ class UnifiedLearningSystem:
             
             if has_parse_error:
                 logger.warning(
-                    f"[Learning] BUG#6 FIX: Detected parse error in result. "
+                    f"[Learning] Note: Detected parse error in result. "
                     f"Error: {error_string[:100]}... "
                     f"This indicates the tool FAILED to process the query. "
                     f"Treating as failure regardless of reported confidence."
                 )
                 is_explicit_error = True  # Ensure parse errors are treated as failures
             
-            # BUG #3 FIX: Detect general uninformative results (wrong tool selection)
+            # Note: Detect general uninformative results (wrong tool selection)
             # This prevents tools from accumulating positive weights when they were
             # selected incorrectly (e.g., "analogical" for SAT problems).
             # 
@@ -567,7 +567,7 @@ class UnifiedLearningSystem:
             is_explicitly_uninformative = metadata.get('uninformative', False)
             is_reasoning_unknown = metadata.get('reasoning_type') == 'UNKNOWN'
             
-            # BUG #3 FIX: Check confidence from multiple sources
+            # Note: Check confidence from multiple sources
             # The confidence value might be in outcome['confidence'] or outcome['metadata']['confidence']
             # or outcome['result']['confidence'] depending on the caller
             confidence_value = outcome.get('confidence')
@@ -594,7 +594,7 @@ class UnifiedLearningSystem:
                 is_low_confidence_success
             )
             
-            # BUG #3 FIX (CRITICAL): Detect tool-query type MISMATCH
+            # Note: Detect tool-query type MISMATCH
             # This is the core fix for the runaway positive feedback loop.
             # 
             # The bug: 'analogical' gets +0.010 reward every time because it always
@@ -665,11 +665,11 @@ class UnifiedLearningSystem:
                 # Treat as failure - this query should not have gone to probabilistic
                 weight_delta = WEIGHT_ADJUSTMENT_FAILURE * 2  # Double penalty for bad routing
             elif is_incorrect_deterministic or is_explicit_error:
-                # BUG #15 FIX: STRONG penalty for incorrect deterministic operations
+                # Note: STRONG penalty for incorrect deterministic operations
                 # Deterministic ops (crypto, math) that return confidence < 1.0 are WRONG
                 # This is a critical security issue - wrong hashes are dangerous!
                 logger.error(
-                    f"[Learning] BUG#15 FIX: Incorrect deterministic result or explicit error! "
+                    f"[Learning] Note: Incorrect deterministic result or explicit error! "
                     f"deterministic={is_deterministic}, confidence={confidence_for_deterministic}, "
                     f"explicit_error={is_explicit_error}. Applying STRONG PENALTY to tools: {tools}"
                 )
@@ -685,7 +685,7 @@ class UnifiedLearningSystem:
                 )
                 weight_delta = WEIGHT_ADJUSTMENT_FAILURE * 1.5  # -0.0075 penalty for router mismatch
             elif is_tool_mismatch:
-                # BUG #3 FIX (CRITICAL): Tool-query type mismatch detected
+                # Note: Tool-query type mismatch detected
                 # This is the KEY fix for the analogical runaway feedback loop.
                 # When analogical is used for SAT/Bayes/Causal queries, PENALIZE it!
                 logger.warning(
@@ -694,7 +694,7 @@ class UnifiedLearningSystem:
                 )
                 weight_delta = WEIGHT_ADJUSTMENT_FAILURE * 2  # Double penalty for wrong tool
             elif is_uninformative_general:
-                # BUG #3 FIX: Apply negative feedback for uninformative/UNKNOWN results
+                # Note: Apply negative feedback for uninformative/UNKNOWN results
                 # This prevents the runaway positive feedback loop where tools like 'analogical'
                 # accumulate weight just because they're always selected (not because they're correct)
                 logger.warning(
@@ -712,7 +712,7 @@ class UnifiedLearningSystem:
                 # Don't adjust weights - this was a code bug, not tool performance
                 weight_delta = 0.0
             elif is_llm_fallback and status != 'success':
-                # ISSUE P0.1 FIX: Don't penalize tools when LLM failed
+                # Note: Don't penalize tools when LLM failed
                 logger.info(
                     f"[Learning] SKIPPING weight adjustment for LLM fallback: "
                     f"source={source}, systems={systems_used}. "
@@ -733,7 +733,7 @@ class UnifiedLearningSystem:
                         
                         new_weight = self.tool_weight_adjustments[tool] + weight_delta
                         
-                        # ISSUE #5 FIX: Clamp weight to bounds to prevent death spiral
+                        # Note: Clamp weight to bounds to prevent death spiral
                         old_weight = self.tool_weight_adjustments[tool]
                         self.tool_weight_adjustments[tool] = max(MIN_TOOL_WEIGHT, min(MAX_TOOL_WEIGHT, new_weight))
                         
@@ -746,7 +746,7 @@ class UnifiedLearningSystem:
                         else:
                             logger.info(f"[Learning] Tool '{tool}' weight adjustment: {weight_delta:+.3f} (cumulative: {self.tool_weight_adjustments[tool]:+.3f})")
                         
-                        # BUG FIX: Propagate weight to shared ToolWeightManager so Ensemble can use it
+                        # Note: Propagate weight to shared ToolWeightManager so Ensemble can use it
                         # Previously, learning updated its own dictionary but Ensemble read from a separate
                         # ToolWeightManager instance, so learned weights were never applied.
                         if WEIGHT_MANAGER_AVAILABLE and get_weight_manager:
@@ -809,7 +809,7 @@ class UnifiedLearningSystem:
         """
         Apply periodic weight decay to all tool weights.
         
-        ISSUE #5 FIX: This method prevents the tool weight death spiral by
+        Note: This method prevents the tool weight death spiral by
         periodically decaying weights towards zero. Without decay, weights
         can accumulate indefinitely in either direction.
         
@@ -855,7 +855,7 @@ class UnifiedLearningSystem:
             Cumulative weight adjustment (positive = more successful, negative = less successful)
             Value is bounded by [MIN_TOOL_WEIGHT, MAX_TOOL_WEIGHT]
         """
-        # ISSUE #15 FIX: Use lock for thread-safe read
+        # Note: Use lock for thread-safe read
         with self._weight_lock:
             return self.tool_weight_adjustments.get(tool, 0.0)
 
@@ -863,7 +863,7 @@ class UnifiedLearningSystem:
         """
         Reset all tool weights to zero.
         
-        ISSUE #5 FIX: This method allows manual reset of accumulated weights
+        Note: This method allows manual reset of accumulated weights
         if the system gets into a bad state. Should be called during system
         recovery or after major configuration changes.
         """
@@ -885,7 +885,7 @@ class UnifiedLearningSystem:
         """
         Attempt to recover from slow routing performance degradation.
         
-        ISSUE #10 FIX: This method implements automatic recovery when the system
+        Note: This method implements automatic recovery when the system
         detects persistent slow routing. Recovery actions include:
         1. Clearing embedding caches to remove potentially stale data
         2. Resetting circuit breakers that may be in degraded state
@@ -936,7 +936,7 @@ class UnifiedLearningSystem:
             except Exception as e:
                 logger.warning(f"[Learning] Recovery: Failed to reset circuit breaker: {e}")
             
-            # 3. ISSUE #2 FIX: Clear SemanticToolMatcher query embedding cache
+            # 3. Note: Clear SemanticToolMatcher query embedding cache
             try:
                 from vulcan.reasoning.selection.semantic_tool_matcher import SemanticToolMatcher
                 cache_stats = SemanticToolMatcher.get_cache_stats()
@@ -975,7 +975,7 @@ class UnifiedLearningSystem:
         """
         Get statistics about slow routing recovery attempts.
         
-        ISSUE #10 FIX: This method provides visibility into recovery attempts
+        Note: This method provides visibility into recovery attempts
         to address the "recovery mechanisms not triggered" issue.
         
         Returns:

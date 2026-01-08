@@ -111,12 +111,12 @@ PROBLEM_TYPE_BAYESIAN = 'bayesian'
 # When task type cannot be determined, fall back to these reasoning types in order.
 # SYMBOLIC (language reasoning) is first as it can handle most general queries.
 # PROBABILISTIC handles uncertainty well, CAUSAL handles cause-effect questions.
-# FIX: Added PHILOSOPHICAL for ethical/normative reasoning questions
+# Note: Added PHILOSOPHICAL for ethical/normative reasoning questions
 UNKNOWN_TYPE_FALLBACK_ORDER = (
     'SYMBOLIC',       # Best for general language/text queries
     'PROBABILISTIC',  # Good for uncertainty handling
     'CAUSAL',         # Good for cause-effect questions
-    'PHILOSOPHICAL',  # FIX: Added for ethical/deontic reasoning (permissibility, obligation, etc.)
+    'PHILOSOPHICAL',  # Note: Added for ethical/deontic reasoning (permissibility, obligation, etc.)
 )
 
 # ==============================================================================
@@ -218,7 +218,7 @@ def _is_test_environment() -> bool:
     """
     Determine if running in test environment.
     
-    Bug #3 Fix: Default to PRODUCTION for safety.
+    Note: Default to PRODUCTION for safety.
     Only return True if explicitly in test mode via environment or explicit test framework.
     
     PRINCIPLE: Safety-first - default to production mode when uncertain.
@@ -257,7 +257,7 @@ def _is_test_environment() -> bool:
         logger.debug("Production environment detected via explicit indicator")
         return False
     
-    # DEFAULT TO PRODUCTION (fail safe) - Bug #3 fix
+    # DEFAULT TO PRODUCTION (fail safe) - Note
     # If no explicit indicator is found, assume production for safety
     logger.debug(
         "No explicit environment indicator found. "
@@ -517,7 +517,7 @@ def _load_reasoning_components():
     except ImportError as e:
         logger.warning(f"ProbabilisticReasoner not available: {e}")
 
-    # FIX: Safer, resilient imports for symbolic reasoning components
+    # Note: Safer, resilient imports for symbolic reasoning components
     try:
         from vulcan.reasoning.symbolic import SymbolicReasoner
 
@@ -527,7 +527,7 @@ def _load_reasoning_components():
 
     # REMOVED: BayesianReasoner import block - does not exist in symbolic/__init__.py
 
-    # FIX: Import CausalReasoner (wrapper class with reason() method) instead of EnhancedCausalReasoning
+    # Note: Import CausalReasoner (wrapper class with reason() method) instead of EnhancedCausalReasoning
     try:
         from vulcan.reasoning.causal_reasoning import CausalReasoner
 
@@ -542,7 +542,7 @@ def _load_reasoning_components():
     except ImportError as e:
         logger.warning(f"CounterfactualReasoner not available: {e}")
 
-    # FIX: Import AnalogicalReasoningEngine (which has the reason() method with semantic processing)
+    # Note: Import AnalogicalReasoningEngine (which has the reason() method with semantic processing)
     try:
         from vulcan.reasoning.analogical_reasoning import AnalogicalReasoningEngine
 
@@ -796,7 +796,7 @@ class UnifiedReasoner:
             logger.warning(f"Error initializing specialized reasoners: {e}")
 
         # Initialize mathematical computation tool
-        # FIX: Pass the actual LLM client to MathematicalComputationTool instead of None
+        # Note: Pass the actual LLM client to MathematicalComputationTool instead of None
         # This fixes the LLM Interface Bug where tools received strings instead of LLM objects
         try:
             from .mathematical_computation import MathematicalComputationTool
@@ -852,7 +852,7 @@ class UnifiedReasoner:
             logger.warning(f"Error initializing mathematical computation tool: {e}")
 
         # Initialize philosophical reasoner for ethical/deontic queries
-        # FIX: Add PHILOSOPHICAL reasoning type to handle ethical queries that were returning UNKNOWN
+        # Note: Add PHILOSOPHICAL reasoning type to handle ethical queries that were returning UNKNOWN
         try:
             from .philosophical_reasoning import PhilosophicalReasoner
             
@@ -867,7 +867,7 @@ class UnifiedReasoner:
         except Exception as e:
             logger.warning(f"Error initializing philosophical reasoner: {e}")
         
-        # FIX: Normalize enum keys to string keys for portfolio executor and warm pool
+        # Note: Normalize enum keys to string keys for portfolio executor and warm pool
         tools_by_name = {k.value: v for k, v in self.reasoners.items()}
 
         # MEGA FIX: Create cache config with ultra-short cleanup interval at TOP LEVEL
@@ -999,11 +999,11 @@ class UnifiedReasoner:
 
         # Runtime integration - PRODUCTION FIX: Skip heavy runtime in test environments
         # unless VULCAN_FORCE_PRODUCTION_REASONING is set to 'true'
-        # Bug #3 Fix: Default to PRODUCTION mode unless explicitly in test
+        # Note: Default to PRODUCTION mode unless explicitly in test
         # Note: Use singleton to prevent re-initialization per query
         self.runtime = None
         if "UnifiedRuntime" in optional_components:
-            # Use improved environment detection (Bug #3 fix)
+            # Use improved environment detection (Note)
             in_test = _is_test_environment()
             skip_via_config = config.get("skip_runtime", False)
             
@@ -1255,7 +1255,7 @@ class UnifiedReasoner:
             self.performance_metrics["total_reasonings"] += 1
 
         try:
-            # FIX: Create reasoning chain with initial step FIRST
+            # Note: Create reasoning chain with initial step FIRST
             initial_step = ReasoningStep(
                 step_id=f"initial_{uuid.uuid4().hex[:8]}",
                 step_type=ReasoningType.UNKNOWN,
@@ -1453,7 +1453,7 @@ class UnifiedReasoner:
                 try:
                     # P0.2 FIX: Detect creative tasks and skip confidence filtering
                     is_creative = _is_creative_task(task)
-                    # FIX: Pass query to validate_output for context-aware safety checking
+                    # Note: Pass query to validate_output for context-aware safety checking
                     # This allows ethical discourse (philosophical queries, thought experiments)
                     # to bypass false positive safety blocks
                     query_str = self._extract_query_string(task.query)
@@ -2266,7 +2266,7 @@ class UnifiedReasoner:
         # Combined string for keyword matching - check BOTH sources
         combined_str = query_str + " " + input_str
 
-        # FIX: Stronger preference for PROBABILISTIC with numeric arrays
+        # Note: Stronger preference for PROBABILISTIC with numeric arrays
         if isinstance(input_data, (list, tuple, np.ndarray)):
             try:
                 arr = np.array(input_data)
@@ -2275,12 +2275,12 @@ class UnifiedReasoner:
             except Exception as e:
                 logger.debug(f"Failed to check numeric data type: {e}")
 
-        # FIX: Reduced symbolic preference for plain strings
+        # Note: Reduced symbolic preference for plain strings
         if isinstance(input_data, str):
             scores[ReasoningType.SYMBOLIC] += 0.2  # Reduced from 0.3
             if any(op in input_data for op in [" AND ", " OR ", " NOT ", "=>"]):
                 scores[ReasoningType.SYMBOLIC] += 0.4
-            # FIX: Detect mathematical expressions in string input (e.g., "2+2", "3*4")
+            # Note: Detect mathematical expressions in string input (e.g., "2+2", "3*4")
             # Uses pre-compiled module-level patterns for performance
             if MATH_EXPRESSION_PATTERN.search(input_data):
                 scores[ReasoningType.MATHEMATICAL] += 0.8  # Strong preference for math expressions
@@ -2333,7 +2333,7 @@ class UnifiedReasoner:
             ],
             ReasoningType.COUNTERFACTUAL: ["what if", "counterfactual", "had not"],
             ReasoningType.MULTIMODAL: ["image", "video", "audio", "multimodal"],
-            # FIX: Add MATHEMATICAL reasoning type detection for math computation queries
+            # Note: Add MATHEMATICAL reasoning type detection for math computation queries
             ReasoningType.MATHEMATICAL: [
                 "calculate",
                 "compute",
@@ -2385,7 +2385,7 @@ class UnifiedReasoner:
                 "linear",
                 "numerical",
             ],
-            # FIX: Add PHILOSOPHICAL reasoning type detection for ethical/deontic queries
+            # Note: Add PHILOSOPHICAL reasoning type detection for ethical/deontic queries
             ReasoningType.PHILOSOPHICAL: [
                 "ethical",
                 "moral",
@@ -2507,7 +2507,7 @@ class UnifiedReasoner:
 
                     results.append(result)
 
-                    # FIX: Properly merge reasoning chains - add ALL steps from result
+                    # Note: Properly merge reasoning chains - add ALL steps from result
                     if (
                         hasattr(result, "reasoning_chain")
                         and result.reasoning_chain
@@ -3108,7 +3108,7 @@ class UnifiedReasoner:
                     )
                     return self._create_empty_result()
             elif task.task_type == ReasoningType.UNKNOWN:
-                # FIX: Handle UNKNOWN reasoning type by falling back to available reasoners
+                # Note: Handle UNKNOWN reasoning type by falling back to available reasoners
                 # This prevents the "No reasoner for type UNKNOWN" error that causes 10% confidence
                 # UNKNOWN type indicates the classification couldn't determine a specific type,
                 # so we try multiple reasoners in priority order defined in UNKNOWN_TYPE_FALLBACK_ORDER
@@ -3174,7 +3174,7 @@ class UnifiedReasoner:
 
                 if isinstance(raw_result, ReasoningResult):
                     result = raw_result
-                    # FIX: Improve probabilistic conclusion to be more user-friendly
+                    # Note: Improve probabilistic conclusion to be more user-friendly
                     # The raw conclusion contains ML metrics like "is_above_threshold"
                     # Convert to a more meaningful response for end users
                     if isinstance(result.conclusion, dict):
@@ -3188,7 +3188,7 @@ class UnifiedReasoner:
                             threshold_met = conclusion_dict.get('is_above_threshold', False)
                             result.conclusion = f"Probabilistic analysis indicates: {'positive' if threshold_met else 'negative'} outcome (confidence: {result.confidence:.2f})"
                 else:
-                    # FIX: Better formatting for dict results
+                    # Note: Better formatting for dict results
                     raw_conclusion = raw_result.get("conclusion")
                     if isinstance(raw_conclusion, dict) and 'details' in raw_conclusion:
                         formatted_conclusion = f"Analysis result: {raw_conclusion['details']}"
@@ -3312,7 +3312,7 @@ class UnifiedReasoner:
 
                     query_result = reasoner.query(hypothesis)
 
-                    # FIX: Ensure minimum confidence floor for symbolic reasoning
+                    # Note: Ensure minimum confidence floor for symbolic reasoning
                     raw_confidence = (
                         query_result.get("confidence", 0.0)
                         if isinstance(query_result, dict)
@@ -3340,7 +3340,7 @@ class UnifiedReasoner:
                 if hasattr(reasoner, "reason"):
                     result_dict = reasoner.reason(task.input_data, task.query)
 
-                    # FIX: Ensure minimum confidence floor for causal reasoning
+                    # Note: Ensure minimum confidence floor for causal reasoning
                     raw_confidence = (
                         result_dict.get("confidence", CONFIDENCE_FLOOR_CAUSAL_WITH_RESULT)
                         if isinstance(result_dict, dict)
@@ -3362,7 +3362,7 @@ class UnifiedReasoner:
                     result = self._create_empty_result()
 
             elif task.task_type == ReasoningType.PHILOSOPHICAL:
-                # FIX: Handle PHILOSOPHICAL reasoning type for ethical/deontic queries
+                # Note: Handle PHILOSOPHICAL reasoning type for ethical/deontic queries
                 # PhilosophicalReasoner.reason() expects (problem, context) signature
                 # where problem can be a string query or dict with 'query' key
                 if hasattr(reasoner, "reason"):
@@ -3399,7 +3399,7 @@ class UnifiedReasoner:
                     result = self._create_empty_result()
 
             elif task.task_type == ReasoningType.MATHEMATICAL:
-                # FIX: Handle MATHEMATICAL reasoning type for math computations
+                # Note: Handle MATHEMATICAL reasoning type for math computations
                 # MathematicalComputationTool.reason() returns a dict with 'conclusion', 'confidence', etc.
                 # The conclusion contains the actual computed result in 'result' field
                 if hasattr(reasoner, "reason"):
@@ -3480,11 +3480,11 @@ class UnifiedReasoner:
                     raw_result = reasoner.reason(task.input_data, task.query)
                     if isinstance(raw_result, ReasoningResult):
                         result = raw_result
-                        # FIX: Ensure minimum confidence floor
+                        # Note: Ensure minimum confidence floor
                         if result.confidence == 0.0 and result.conclusion is not None:
                             result.confidence = CONFIDENCE_FLOOR_DEFAULT
                     else:  # Assume dict
-                        # FIX: Ensure minimum confidence floor for dict results
+                        # Note: Ensure minimum confidence floor for dict results
                         raw_confidence = (
                             raw_result.get("confidence", CONFIDENCE_FLOOR_DEFAULT)
                             if isinstance(raw_result, dict)
@@ -3517,7 +3517,7 @@ class UnifiedReasoner:
                     result.metadata = {}
                 result.metadata["execution_time_ms"] = elapsed_time_ms
 
-                # FIX: Always create a reasoning chain if one doesn't exist
+                # Note: Always create a reasoning chain if one doesn't exist
                 if not result.reasoning_chain or not result.reasoning_chain.steps:
                     try:
                         is_error = (

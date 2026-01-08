@@ -221,8 +221,8 @@ class ProductionDeployment:
                 self.unified_runtime = None
                 logger.info("UnifiedRuntime explicitly disabled by config")
             else:
-                # BUG FIX Issue #27: Use singleton to prevent per-query manifest reloading
-                # ISSUE #5 FIX: Use get_or_create_unified_runtime to prevent repeated init/shutdown
+                # Note Issue #27: Use singleton to prevent per-query manifest reloading
+                # Note: Use get_or_create_unified_runtime to prevent repeated init/shutdown
                 try:
                     from vulcan.reasoning.singletons import get_or_create_unified_runtime
                     self.unified_runtime = get_or_create_unified_runtime()
@@ -502,7 +502,7 @@ class ProductionDeployment:
                     "self_improvement_state": state_file,
                 }
 
-                # BUG FIX Issues #1-4: Use singleton WorldModel to prevent per-query reinitialization
+                # Note Issues #1-4: Use singleton WorldModel to prevent per-query reinitialization
                 try:
                     from vulcan.reasoning.singletons import get_world_model
                     components["world_model"] = get_world_model(config=wm_config)
@@ -668,7 +668,7 @@ class ProductionDeployment:
             # EnhancedSafetyValidator will create its own SafetyConfig with defaults
             components["safety_validator"] = EnhancedSafetyValidator(config=None)
             components["governance"] = GovernanceOrchestrator()
-            # FIX: Use singleton pattern to prevent model reloading on every request
+            # Note: Use singleton pattern to prevent model reloading on every request
             components["nso_aligner"] = get_nso_aligner() if get_nso_aligner is not None else NSOAligner()
             components["explainer"] = ExplainabilityNode()
 
@@ -777,7 +777,7 @@ class ProductionDeployment:
 
         # Semantic Bridge (Core) - Initialize before components that need it
         try:
-            # BUG FIX Issue #48: Use singleton SemanticBridge to prevent per-query reinitialization.
+            # Note Issue #48: Use singleton SemanticBridge to prevent per-query reinitialization.
             try:
                 from vulcan.reasoning.singletons import get_semantic_bridge
                 components["semantic_bridge"] = get_semantic_bridge()
@@ -1107,7 +1107,7 @@ class ProductionDeployment:
             orchestrator_type = "basic"
 
         # Create appropriate orchestrator
-        # BUG FIX: Pass redis_client to all orchestrators for state persistence
+        # Note: Pass redis_client to all orchestrators for state persistence
         if orchestrator_type == "parallel":
             logger.info("Creating ParallelOrchestrator")
             return ParallelOrchestrator(self.config, system_state, deps, redis_client=self.redis_client)

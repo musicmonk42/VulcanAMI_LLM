@@ -1105,9 +1105,9 @@ async def lifespan(app: FastAPI):
             lambda: ProductionDeployment(config, checkpoint_path=checkpoint_to_load, redis_client=redis_client),
         )
 
-        # Note Issue #27: Use singleton UnifiedRuntime to prevent manifest reload per-query
+        # Note: Use singleton UnifiedRuntime to prevent manifest reload per-query
         if UNIFIED_RUNTIME_AVAILABLE:
-            # ISSUE #5 FIX: Use get_or_create_unified_runtime to prevent repeated init/shutdown
+            # Note: Use get_or_create_unified_runtime to prevent repeated init/shutdown
             set_runtime_func = None
             try:
                 from vulcan.reasoning.singletons import get_or_create_unified_runtime, set_unified_runtime
@@ -4783,7 +4783,7 @@ SLOW_REQUEST_THRESHOLD_MS = 5000  # Include timing breakdown for requests slower
 # Note: Threshold for marking query outcomes as "slow" (matches COMPLEX_QUERY_TIME_THRESHOLD_MS)
 SLOW_QUERY_OUTCOME_THRESHOLD_MS = 30000  # 30 seconds - queries slower than this are marked as "slow"
 
-# ISSUE #35 FIX: Outcome status thresholds
+# Note: Outcome status thresholds
 # Used to determine if a successful query should be marked as "slow" for learning
 SLOW_ROUTING_OUTCOME_THRESHOLD_MS = 10000  # 10 seconds - flag slow routing
 SLOW_TOTAL_OUTCOME_THRESHOLD_MS = 30000  # 30 seconds - flag slow total time

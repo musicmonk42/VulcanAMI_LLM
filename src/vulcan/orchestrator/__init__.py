@@ -339,7 +339,7 @@ __all__ = [
     "AgentPoolManager",
     "AutoScaler",
     "RecoveryManager",
-    "AGENT_SELECTION_TIMEOUT_SECONDS",  # FIX: Agent selection timeout constant
+    "AGENT_SELECTION_TIMEOUT_SECONDS",  # Note: Agent selection timeout constant
     # Metrics
     "EnhancedMetricsCollector",
     "MetricType",

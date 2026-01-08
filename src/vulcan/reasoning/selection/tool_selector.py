@@ -4831,7 +4831,7 @@ class ToolSelector:
                             "explanation": verification_result.explanation,
                         }
                     
-                    # FIX: Apply correction to execution result
+                    # Note: Apply correction to execution result
                     # If verification detected an error and we have a correct value,
                     # update the result to use the corrected value instead of the wrong one.
                     # This ensures downstream consumers get the mathematically correct answer.

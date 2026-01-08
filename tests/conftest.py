@@ -204,7 +204,7 @@ _alias_all_src_modules()
 #     print("\n[conftest] Aliases created for short imports:\n  " + "\n  ".join(created) + "\n")
 
 # ============================================================
-# FIX: Test Isolation - Reset State Between Tests
+# Note: Test Isolation - Reset State Between Tests
 # ============================================================
 
 
@@ -366,7 +366,7 @@ def reset_pytorch_state():
 
 
 # ============================================================
-# FIX: Prevent atexit handlers from blocking test suite exit
+# Note: Prevent atexit handlers from blocking test suite exit
 # ============================================================
 
 

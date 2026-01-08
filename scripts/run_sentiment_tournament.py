@@ -17,7 +17,7 @@ run_sentiment_tournament.py — Graphix GA/Tournament driver (offline/online)
 Offline mode: uses LanguageEvolutionRegistry for proposals/votes/validation and
 simulates runtime metrics. Online mode: uses GraphixClient to submit/execute.
 
-Version: 2.0.0 - Production-ready with all bug fixes
+Version: 2.0.0 - Production-ready with all Notees
 """
 
 import argparse

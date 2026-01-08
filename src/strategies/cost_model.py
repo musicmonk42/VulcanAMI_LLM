@@ -238,7 +238,7 @@ class StochasticCostModel:
     def _initialize_defaults(self):
         """Initialize default cost distributions
         
-        Bug #6 Fix: Added Arena agent defaults with realistic cold-start priors.
+        Note: Added Arena agent defaults with realistic cold-start priors.
         Production logs show visualizer taking 30-60s under CPU load,
         so defaults should reflect actual performance, not optimistic estimates.
         """
@@ -269,7 +269,7 @@ class StochasticCostModel:
                 CostComponent.ENERGY_MJ: (300, 60),
                 CostComponent.MEMORY_MB: (500, 100),
             },
-            # Bug #6 Fix: Add Arena agent defaults with realistic values
+            # Note: Add Arena agent defaults with realistic values
             # Production logs show these agents take 30-60s under CPU load
             "visualizer": {
                 CostComponent.TIME_MS: (45000, 20000),  # 45s mean, high variance
@@ -780,7 +780,7 @@ class ComplexityEstimator:
         magnitude = np.linalg.norm(features)
 
         # Feature sparsity
-        # FIX: Check for zero length before division to prevent RuntimeWarning
+        # Note: Check for zero length before division to prevent RuntimeWarning
         if len(features) > 0:
             sparsity = np.sum(features != 0) / len(features)
         else:

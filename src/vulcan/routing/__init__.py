@@ -83,14 +83,14 @@ try:
         route_query_async,
         get_query_analyzer,
         shutdown_blocking_executor,
-        # FIX 2: Query Router Timeout constant
+        # Query Router Timeout constant
         QUERY_ROUTING_TIMEOUT_SECONDS,
-        # Complex Physics Detection constants (ISSUE FIX)
+        # Complex Physics Detection constants
         COMPLEX_PHYSICS_KEYWORDS,
         FORCE_FULL_MATH_PATTERNS,
         COMPLEX_PHYSICS_TIMEOUT_SECONDS,
         COMPLEX_PHYSICS_MIN_COMPLEXITY,
-        # Query Intent Classification constants (PERFORMANCE FIX)
+        # Query Intent Classification constants
         PHILOSOPHICAL_KEYWORDS,
         PHILOSOPHICAL_PATTERNS,
         IDENTITY_KEYWORDS,
@@ -203,7 +203,7 @@ try:
         log_to_governance_async,
         log_to_governance_fire_and_forget,
         get_governance_logger,
-        # PERFORMANCE FIX: Non-blocking buffered logging
+        # Non-blocking buffered logging
         BufferedGovernanceLogger,
         get_buffered_governance_logger,
         log_routing_result,
@@ -414,13 +414,13 @@ __all__ = [
     "route_query_async",
     "get_query_analyzer",
     "shutdown_blocking_executor",
-    "QUERY_ROUTING_TIMEOUT_SECONDS",  # FIX 2: Query Router Timeout constant
-    # Complex Physics Detection constants (ISSUE FIX)
+    "QUERY_ROUTING_TIMEOUT_SECONDS",  # Query Router Timeout constant
+    # Complex Physics Detection constants
     "COMPLEX_PHYSICS_KEYWORDS",
     "FORCE_FULL_MATH_PATTERNS",
     "COMPLEX_PHYSICS_TIMEOUT_SECONDS",
     "COMPLEX_PHYSICS_MIN_COMPLEXITY",
-    # Query Intent Classification constants (PERFORMANCE FIX)
+    # Query Intent Classification constants
     "PHILOSOPHICAL_KEYWORDS",
     "PHILOSOPHICAL_PATTERNS",
     "IDENTITY_KEYWORDS",
@@ -459,7 +459,7 @@ __all__ = [
     "log_to_governance_async",
     "log_to_governance_fire_and_forget",
     "get_governance_logger",
-    # PERFORMANCE FIX: Non-blocking buffered logging
+    # Non-blocking buffered logging
     "BufferedGovernanceLogger",
     "get_buffered_governance_logger",
     "log_routing_result",
