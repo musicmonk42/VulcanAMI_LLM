@@ -27,6 +27,21 @@ logger = logging.getLogger(__name__)
 WEIGHT_ADJUSTMENT_SUCCESS = 0.01
 WEIGHT_ADJUSTMENT_FAILURE = -0.005
 
+# =============================================================================
+# GAP 10 FIX: Override and Fallback Penalty Constants
+# =============================================================================
+# Problem: The learning system was rewarding "success" (task completion) without
+# considering whether the correct tools were used. This caused:
+# - World_model to accumulate high rewards (fast completion, high confidence)
+# - Specialized tools to accumulate negative weights (slower, lower confidence)
+# - System to learn to prefer the broken fallback
+#
+# Solution: Penalize overrides and fallbacks, even when they "succeed"
+# This ensures the learning system optimizes for correctness, not just speed.
+WEIGHT_PENALTY_OVERRIDE = 0.5      # Multiply reward by 0.5 if tools were overridden
+WEIGHT_PENALTY_FALLBACK = 0.3      # Multiply reward by 0.3 if fallback was used
+WEIGHT_PENALTY_UNVERIFIED = 0.7    # Multiply reward by 0.7 if high confidence but unverified
+
 # Note: Tool Weight Death Spiral Prevention
 # These constants prevent tools from accumulating unbounded negative weights.
 # Without bounds, tools can become unusable due to accumulated failures.
@@ -721,6 +736,52 @@ class UnifiedLearningSystem:
                 weight_delta = 0.0
             else:
                 weight_delta = WEIGHT_ADJUSTMENT_SUCCESS if status == 'success' else WEIGHT_ADJUSTMENT_FAILURE
+            
+            # =====================================================================
+            # GAP 10 FIX: Apply penalties for overrides and fallbacks
+            # =====================================================================
+            # Even if task "succeeded", penalize if:
+            # 1. Tools were overridden from router's original selection
+            # 2. Fallback tools (world_model, general) were used
+            # 3. High confidence but unverified result
+            # This prevents the system from learning to prefer broken fallbacks.
+            
+            if weight_delta > 0:  # Only apply penalties to positive rewards
+                # Check for tool override
+                was_override = outcome.get('was_override', False) or outcome.get('routing_override', False)
+                router_tools = outcome.get('router_tools', []) or outcome.get('intended_tools', [])
+                if router_tools and set(tools) != set(router_tools):
+                    was_override = True
+                
+                if was_override:
+                    original_delta = weight_delta
+                    weight_delta *= WEIGHT_PENALTY_OVERRIDE
+                    logger.info(
+                        f"[Learning] GAP 10 FIX: Override penalty applied: "
+                        f"{original_delta:+.4f} * {WEIGHT_PENALTY_OVERRIDE} = {weight_delta:+.4f}"
+                    )
+                
+                # Check for fallback tools
+                fallback_tools = {'world_model', 'general', 'meta_reasoning', 'openai_fallback'}
+                used_fallback = any(t.lower() in fallback_tools for t in tools)
+                if used_fallback:
+                    original_delta = weight_delta
+                    weight_delta *= WEIGHT_PENALTY_FALLBACK
+                    logger.info(
+                        f"[Learning] GAP 10 FIX: Fallback penalty applied: "
+                        f"{original_delta:+.4f} * {WEIGHT_PENALTY_FALLBACK} = {weight_delta:+.4f}"
+                    )
+                
+                # Check for unverified high confidence
+                confidence = outcome.get('confidence', 0)
+                verified = outcome.get('verified', False) or outcome.get('validated', False)
+                if confidence > 0.8 and not verified:
+                    original_delta = weight_delta
+                    weight_delta *= WEIGHT_PENALTY_UNVERIFIED
+                    logger.info(
+                        f"[Learning] GAP 10 FIX: Unverified high-confidence penalty: "
+                        f"{original_delta:+.4f} * {WEIGHT_PENALTY_UNVERIFIED} = {weight_delta:+.4f}"
+                    )
             
             if weight_delta != 0.0:  # Only process if there's a weight change
                 with self._weight_lock:
