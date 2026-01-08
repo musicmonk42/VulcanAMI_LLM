@@ -188,6 +188,80 @@ MAX_TIMING_SAMPLES = 100
 
 
 # =============================================================================
+# GAP 1 & GAP 4 FIX: Query Analysis Constants
+# =============================================================================
+# These constants define patterns that indicate queries need specialized analysis
+# rather than meta-description from world_model.
+
+# Analysis indicators that mean query needs specialized tools, not world_model
+# GAP 1: Prevents self-referential detection trap
+# GAP 4: Prevents world model fallback for ethical analysis queries
+ANALYSIS_INDICATORS: frozenset = frozenset({
+    # Causal analysis requests
+    'intervene', 'intervention', 'causal', 'causation',
+    'variable', 'counterfactual', 'do-calculus',
+    'which causal', 'causal link', 'causal graph',
+    # Weakness/error analysis requests  
+    'weakest', 'weakness', 'wrong', 'error', 'mistake',
+    'flaw', 'incorrect', 'identify', 'find the',
+    'could be wrong', 'step that', 'one step',
+    # Proof/logical analysis
+    'proof', 'prove', 'provably', 'theorem', 'lemma',
+    'logical', 'derive', 'deduce', 'sketch',
+    # Probability/statistical analysis
+    'prior', 'posterior', 'likelihood', 'probability',
+    'bayesian', 'update', 'misspecified', 'distribution',
+    # Value/ethical analysis (actual problems, not description)
+    'conflict', 'dilemma', 'choice', 'decide', 'trolley',
+    # Mathematical analysis
+    'calculate', 'compute', 'solve', 'equation', 'formula',
+    'integrate', 'differentiate', 'sum', 'product',
+    # Data analysis
+    'data', 'dataset', 'analyze', 'analysis', 'pattern',
+})
+
+# Action verbs that indicate VULCAN should analyze something (not describe itself)
+ACTION_VERBS: frozenset = frozenset({
+    'analyze', 'evaluate', 'examine', 'check', 'review',
+    'explain', 'compare', 'contrast', 'assess', 'critique',
+    'reason', 'think', 'consider', 'determine', 'figure',
+})
+
+# GAP 4: Analysis indicators for ethical queries that need domain analysis
+ETHICAL_ANALYSIS_INDICATORS: frozenset = frozenset({
+    # Analytical requests
+    'analyze', 'analysis', 'examine', 'investigate',
+    'explain', 'describe', 'evaluate', 'assess',
+    # Conflict/problem solving
+    'what breaks', 'how to resolve', 'solve', 'fix',
+    'identify', 'find the', 'which', 'weakest',
+    # Domain-specific
+    'data', 'algorithm', 'system', 'code', 'model',
+    'calculation', 'computation', 'proof',
+    # Causal/probabilistic
+    'cause', 'effect', 'probability', 'likelihood',
+    'intervene', 'variable', 'outcome',
+})
+
+# GAP 4: Pure ethical phrases that indicate deontic/ethical framework questions
+PURE_ETHICAL_PHRASES: frozenset = frozenset({
+    # Deontic language
+    "is it permissible", "is it impermissible", "is it forbidden",
+    "morally permissible", "morally wrong", "morally right",
+    "ethically permissible", "ethically wrong", "ethically right",
+    # Ethical framework questions
+    "what would a utilitarian", "what would a deontologist",
+    "from a virtue ethics", "consequentialist view",
+    # Classic ethical dilemmas
+    "trolley problem", "should i pull the lever",
+    "runaway trolley", "fat man on bridge",
+    # Obligation language
+    "do i have an obligation", "is there a duty",
+    "moral obligation", "ethical obligation",
+})
+
+
+# =============================================================================
 # SAFETY FIX: False Positive Detection for Philosophical AI Speculation
 # =============================================================================
 # Problem: Queries like "speculate how you would change after interaction with
@@ -2490,33 +2564,9 @@ class ReasoningIntegration:
         # not just description of capabilities.
         # =====================================================================
         
-        # Indicators that query needs specialized analysis (NOT just world_model)
-        analysis_indicators = [
-            # Causal analysis requests
-            'intervene', 'intervention', 'causal', 'causation',
-            'variable', 'counterfactual', 'do-calculus',
-            'which causal', 'causal link', 'causal graph',
-            # Weakness/error analysis requests  
-            'weakest', 'weakness', 'wrong', 'error', 'mistake',
-            'flaw', 'incorrect', 'identify', 'find the',
-            'could be wrong', 'step that', 'one step',
-            # Proof/logical analysis
-            'proof', 'prove', 'provably', 'theorem', 'lemma',
-            'logical', 'derive', 'deduce', 'sketch',
-            # Probability/statistical analysis
-            'prior', 'posterior', 'likelihood', 'probability',
-            'bayesian', 'update', 'misspecified', 'distribution',
-            # Value/ethical analysis (actual problems, not description)
-            'conflict', 'dilemma', 'choice', 'decide', 'trolley',
-            # Mathematical analysis
-            'calculate', 'compute', 'solve', 'equation', 'formula',
-            'integrate', 'differentiate', 'sum', 'product',
-            # Data analysis
-            'data', 'dataset', 'analyze', 'analysis', 'pattern',
-        ]
-        
         # If query has analysis indicators, it needs specialized tools NOT world_model
-        if any(indicator in query_lower for indicator in analysis_indicators):
+        # Uses module-level ANALYSIS_INDICATORS constant for maintainability
+        if any(indicator in query_lower for indicator in ANALYSIS_INDICATORS):
             logger.debug(
                 f"{LOG_PREFIX} GAP 1 FIX: Query contains analysis indicators - "
                 f"NOT treating as pure meta-description"
@@ -2556,14 +2606,8 @@ class ReasoningIntegration:
         # analysis indicators, check if it's asking ABOUT VULCAN vs asking
         # VULCAN to analyze something
         
-        # Indicators that VULCAN should analyze something (not describe itself)
-        action_verbs = [
-            'analyze', 'evaluate', 'examine', 'check', 'review',
-            'explain', 'compare', 'contrast', 'assess', 'critique',
-            'reason', 'think', 'consider', 'determine', 'figure',
-        ]
-        
-        has_action_verb = any(verb in query_lower for verb in action_verbs)
+        # Uses module-level ACTION_VERBS constant for maintainability
+        has_action_verb = any(verb in query_lower for verb in ACTION_VERBS)
         
         # If there's an action verb, this is asking VULCAN to DO something
         # (analysis), not asking ABOUT VULCAN
@@ -2612,24 +2656,8 @@ class ReasoningIntegration:
         
         # GAP 4 FIX: Analysis indicators that mean we need specialized tools,
         # not just world model ethical framework
-        analysis_indicators = [
-            # Analytical requests
-            'analyze', 'analysis', 'examine', 'investigate',
-            'explain', 'describe', 'evaluate', 'assess',
-            # Conflict/problem solving
-            'what breaks', 'how to resolve', 'solve', 'fix',
-            'identify', 'find the', 'which', 'weakest',
-            # Domain-specific
-            'data', 'algorithm', 'system', 'code', 'model',
-            'calculation', 'computation', 'proof',
-            # Causal/probabilistic
-            'cause', 'effect', 'probability', 'likelihood',
-            'intervene', 'variable', 'outcome',
-        ]
-        
-        # If query has analysis indicators, it needs specialized tools
-        # not just world model ethical framework
-        if any(indicator in query_lower for indicator in analysis_indicators):
+        # Uses module-level ETHICAL_ANALYSIS_INDICATORS constant for maintainability
+        if any(indicator in query_lower for indicator in ETHICAL_ANALYSIS_INDICATORS):
             logger.debug(
                 f"{LOG_PREFIX} GAP 4 FIX: Query contains analysis indicators - "
                 f"NOT treating as pure ethical query"
@@ -2637,24 +2665,8 @@ class ReasoningIntegration:
             return False
         
         # Pure ethical keywords that indicate deontic/ethical framework questions
-        pure_ethical_phrases = [
-            # Deontic language
-            "is it permissible", "is it impermissible", "is it forbidden",
-            "morally permissible", "morally wrong", "morally right",
-            "ethically permissible", "ethically wrong", "ethically right",
-            # Ethical framework questions
-            "what would a utilitarian", "what would a deontologist",
-            "from a virtue ethics", "consequentialist view",
-            # Classic ethical dilemmas
-            "trolley problem", "should i pull the lever",
-            "runaway trolley", "fat man on bridge",
-            # Obligation language
-            "do i have an obligation", "is there a duty",
-            "moral obligation", "ethical obligation",
-        ]
-        
-        # Check for pure ethical phrases (more restrictive)
-        if any(phrase in query_lower for phrase in pure_ethical_phrases):
+        # Uses module-level PURE_ETHICAL_PHRASES constant for maintainability
+        if any(phrase in query_lower for phrase in PURE_ETHICAL_PHRASES):
             logger.debug(
                 f"{LOG_PREFIX} Pure ethical query detected - routing to world model ethical framework"
             )

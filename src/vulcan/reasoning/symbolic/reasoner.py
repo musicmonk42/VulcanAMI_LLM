@@ -437,7 +437,6 @@ class SymbolicReasoner:
         """Analyze causal intervention questions."""
         
         # Extract variable being intervened on
-        import re
         var_match = re.search(r'(?:remove|intervene on|set|fix)\s+(?:variable\s+)?([A-Za-z_][A-Za-z0-9_]*)', query, re.IGNORECASE)
         variable = var_match.group(1) if var_match else 'X'
         
@@ -471,7 +470,6 @@ class SymbolicReasoner:
         """Analyze proof sketch requests."""
         
         # Try to extract what needs to be proven
-        import re
         prove_match = re.search(r'(?:prove|show|demonstrate)\s+(?:that\s+)?(.+?)(?:\.|$)', query, re.IGNORECASE)
         target = prove_match.group(1).strip() if prove_match else 'the statement'
         
