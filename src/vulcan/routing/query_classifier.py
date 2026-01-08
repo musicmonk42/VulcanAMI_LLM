@@ -131,6 +131,8 @@ CHITCHAT_PATTERNS: Tuple[re.Pattern, ...] = (
 )
 
 # Logical/SAT problem indicators - complexity 0.7+, tools=['symbolic']
+# FIX: Added "implies", "imply", "implication" for natural language logical queries
+# Example: "If A implies B and B implies C, does A imply C?" should be LOGICAL
 LOGICAL_KEYWORDS: FrozenSet[str] = frozenset([
     "satisfiable", "unsatisfiable", "sat", "unsat",
     "cnf", "dnf", "∧", "∨", "→", "¬", "⊢", "⊨",
@@ -138,6 +140,18 @@ LOGICAL_KEYWORDS: FrozenSet[str] = frozenset([
     "propositional", "first-order", "fol",
     "modus ponens", "modus tollens",
     "forall", "exists", "∀", "∃",
+    # FIX: Natural language logical keywords
+    "implies", "imply", "implication",
+    "entails", "entail", "entailment",
+    "if-then", "if and only if", "iff",
+    "therefore", "hence", "thus",
+    "deduce", "deduction", "deductive",
+    "infer", "inference", "inferential",
+    "logical", "logic",  # General logic indicators
+    # FIX: Formalization and quantifier keywords for logical reasoning
+    "formalize", "formalization", "formalise", "formalisation",
+    "quantifier", "quantifiers", "universal", "existential",
+    "predicate", "predicates", "predicate logic",
 ])
 
 # Probabilistic/Bayesian indicators - complexity 0.5+, tools=['probabilistic']
@@ -603,15 +617,19 @@ HEADER_STRIP_PATTERNS: Tuple[re.Pattern, ...] = (
     # Note: Only strip "variant" and anything before it, keeping the content after
     re.compile(r'^[^(\n]*variant\s*', re.MULTILINE | re.IGNORECASE),
     # FIX: Test header patterns that confuse classification
-    # E.g., "Numeric Verification (∑(2k-1)):" → "(∑(2k-1)):"
+    # E.g., "Numeric Verification (∑(2k-1)):" → "∑(2k-1):"
     # E.g., "Rule Chaining (Different Query):" → "(Different Query):"
     # E.g., "Quantifier Scope:" → ""
     # These test headers include labels like "Numeric Verification", "Rule Chaining", etc.
     # that can trigger incorrect keyword matching (e.g., "verification" → CRYPTOGRAPHIC)
+    #
+    # NOTE: The pattern must NOT remove parenthetical content containing mathematical
+    # symbols like ∑, ∏, ∫, etc. These are critical for mathematical classification.
+    # The fix: Only remove parenthetical content that does NOT contain math symbols.
     re.compile(
         r'^(?:Numeric|Rule|Quantifier|Causal|Analogical|Self[- ]?Description)\s+'
         r'(?:Verification|Chaining|Scope|Reasoning|Queries?)\s*'
-        r'(?:\([^)]*\)\s*)?[:\-—]*\s*',
+        r'(?:\([^)∑∏∫√π∂∇]*\)\s*)?[:\-—]*\s*',  # Exclude parens containing math symbols
         re.MULTILINE | re.IGNORECASE
     ),
 )
@@ -1072,7 +1090,13 @@ class QueryClassifier:
         
         # Check logical/SAT indicators
         logical_count = sum(1 for kw in LOGICAL_KEYWORDS if kw in query_lower)
-        if logical_count >= LOGICAL_KEYWORD_THRESHOLD or any(sym in query_lower for sym in ['∧', '∨', '→', '¬', '⊢', '⊨']):
+        # FIX: "formalize" is a strong indicator of logical reasoning - treat it like logic symbols
+        # Similar to how "bayes" is a strong indicator for probabilistic reasoning
+        has_strong_logical_indicator = any(
+            indicator in query_lower 
+            for indicator in ['formalize', 'formalise', 'fol', 'sat problem', 'propositional']
+        )
+        if logical_count >= LOGICAL_KEYWORD_THRESHOLD or has_strong_logical_indicator or any(sym in query_lower for sym in ['∧', '∨', '→', '¬', '⊢', '⊨']):
             return QueryClassification(
                 category=QueryCategory.LOGICAL.value,
                 complexity=0.7 + min(0.2, logical_count * 0.05),
