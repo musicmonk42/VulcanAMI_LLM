@@ -2235,7 +2235,7 @@ class AnalogicalReasoningEngine(AnalogicalReasoner):
     - Transfers inferences from source to target domain
     - Analyzes effect of changes through analogical projection
     
-    BUG M FIX: Enhanced to properly handle deep analogical structure mapping
+    Note: Enhanced to properly handle deep analogical structure mapping
     for cross-domain transfer (e.g., distributed systems → biology).
     """
 
@@ -2248,7 +2248,7 @@ class AnalogicalReasoningEngine(AnalogicalReasoner):
         """
         Main reasoning interface with enhanced structure mapping.
         
-        BUG M FIX: Now handles natural language analogical queries including:
+        Note: Now handles natural language analogical queries including:
         - Cross-domain structure mapping (e.g., software → biology)
         - Effect-of-change analysis through analogical projection
         - Deep relational structure alignment
@@ -2267,7 +2267,7 @@ class AnalogicalReasoningEngine(AnalogicalReasoner):
         query = query or {}
 
         if isinstance(input_data, dict):
-            # BUG M FIX: Handle natural language analogical queries
+            # Note: Handle natural language analogical queries
             if "query" in input_data:
                 return self._analyze_analogical_query(input_data["query"], input_data)
             
@@ -2320,7 +2320,7 @@ class AnalogicalReasoningEngine(AnalogicalReasoner):
         """
         Analyze a natural language analogical query with deep structure mapping.
         
-        BUG M FIX: This is the core enhancement for analogical reasoning.
+        Note: This is the core enhancement for analogical reasoning.
         Implements Gentner's Structure Mapping Theory to:
         1. Parse source and target domains from text
         2. Extract entities and relations from each domain

@@ -198,44 +198,43 @@ SUCCESS_CONFIDENCE_THRESHOLD = 0.5  # Minimum confidence for success
 MAX_SUCCESS_TIME_MS = 10000  # Maximum execution time (ms) for success
 
 # ==============================================================================
-# Constants for BUG #5 FIX - Learned Weight Thresholds
 # ==============================================================================
-# Threshold below which tools are considered "too unreliable" based on learned weights
-# Tools with weight below this are skipped in classifier suggestions
+# Learned Weight Thresholds
+# ==============================================================================
+# Threshold below which tools are considered "too unreliable" based on learned weights.
+# Tools with weight below this are skipped in classifier suggestions.
 NEGATIVE_WEIGHT_THRESHOLD = -0.05
 
 # ==============================================================================
-# Constants for BUG #15 & #7 FIX - Learning Reward Penalties
+# Learning Reward Penalties
 # ==============================================================================
-# BUG #15: Penalty factor for unverified high-confidence results
-# Prevents learning from potentially wrong but confident answers
+# Penalty factor for unverified high-confidence results.
+# Prevents learning from potentially wrong but confident answers.
 UNVERIFIED_QUALITY_PENALTY = 0.7  # Reduce to 70% of claimed confidence
 
-# BUG #7: Penalty factor for fallback results
-# Heavily penalizes fallback paths to prevent reinforcing failures
+# Penalty factor for fallback results.
+# Heavily penalizes fallback paths to prevent reinforcing failures.
 FALLBACK_QUALITY_PENALTY = 0.3  # Reduce to 30% of quality
 
 # ==============================================================================
-# Constants for BUG #1 FIX - QueryRouter Tool Selection
+# QueryRouter Tool Selection
 # ==============================================================================
-# Default available tools when not specified in class instance
-# These represent all reasoning tools that can be selected by the QueryRouter
-# BUG F FIX: Added 'world_model' to allow self-introspection queries to execute.
-# The world_model tool routes queries about Vulcan's capabilities, goals, and
-# identity to the WorldModel's meta-reasoning components instead of filtering
-# them out and falling back to probabilistic reasoning.
-# CRITICAL #1 FIX: Added 'language' for NLP tasks (quantifier scope, parsing, etc.)
+# Default available tools when not specified in class instance.
+# These represent all reasoning tools that can be selected by the QueryRouter.
+# Includes 'world_model' for self-introspection queries (routing queries about
+# Vulcan's capabilities, goals, and identity to WorldModel's meta-reasoning).
+# Includes 'language' for NLP tasks (quantifier scope, parsing, etc.).
 DEFAULT_AVAILABLE_TOOLS = (
     'symbolic', 'probabilistic', 'causal', 'analogical', 'multimodal',
     'mathematical', 'philosophical', 'language', 'world_model'
 )
 
 # ==============================================================================
-# Constants for BUG #2 FIX - Multimodal Detection
+# Multimodal Detection
 # ==============================================================================
-# Minimum string length to be considered as potential URL or file path
+# Minimum string length to be considered as potential URL or file path.
 MULTIMODAL_MIN_URL_LENGTH = 50
-# Minimum string length to be considered as potential base64 data
+# Minimum string length to be considered as potential base64 data.
 MULTIMODAL_MIN_BASE64_LENGTH = 100
 
 # ==============================================================================
@@ -405,11 +404,11 @@ CLEANUP_MISS_INTERVAL = 100  # Trigger cleanup every N cache misses
 MULTIMODAL_TIME_BUDGET_MULTIPLIER = 3.0  # Allow multimodal more time headroom
 
 # ==============================================================================
-# BUG #1 FIX: Candidate filtering to prevent all-tools-selected bug
+# Candidate Filtering Configuration
 # ==============================================================================
 # Different reasoning paradigms (causal, symbolic, probabilistic, analogical, 
 # multimodal) are COMPLEMENTARY, not redundant. They produce different outputs
-# BY DESIGN. The fix is to run only the best-matched tool(s), not all 5.
+# BY DESIGN. Run only the best-matched tool(s), not all 5.
 #
 # When semantic matching returns {causal: 0.70, symbolic: 0.08, ...}, we should
 # only run the clearly winning tool, not all 5 tools.
@@ -486,7 +485,7 @@ class MultiTierFeatureExtractor:
     def _normalize_text(cls, text: str) -> str:
         """Normalize text for consistent cache key generation.
         
-        BUG #1 FIX: Ensures cache hits by normalizing query text consistently.
+        Ensures cache hits by normalizing query text consistently.
         Without normalization, "hello world" and "Hello World " would generate
         different cache keys despite being semantically identical queries.
         
@@ -510,8 +509,7 @@ class MultiTierFeatureExtractor:
         
         Uses SHA-256 with 32 chars (128-bit space) to reduce collision risk in high-throughput.
         This is a shared helper to ensure consistent key computation across cache operations.
-        
-        BUG #1 FIX: Now normalizes text before hashing to ensure consistent cache hits.
+        Normalizes text before hashing to ensure consistent cache hits.
         """
         # Normalize text before computing hash to ensure consistent cache keys
         normalized_text = cls._normalize_text(text)
@@ -1122,8 +1120,8 @@ class ToolSelectionBandit:
     def select_tool(self, features: np.ndarray, constraints: Dict[str, float]) -> str:
         """Select a tool using the adaptive bandit orchestrator."""
         if not self.is_enabled:
-            # CRITICAL BUG FIX: Use deterministic fallback instead of random selection.
-            # Random selection causes non-deterministic results and "Tool Selector at 40% health".
+            # Use deterministic fallback instead of random selection.
+            # Random selection causes non-deterministic results and inconsistent tool health.
             # Default to "probabilistic" as a reasonable general-purpose fallback.
             logger.info("[ToolSelectionBandit] Using deterministic fallback: probabilistic")
             return "probabilistic"
@@ -1148,20 +1146,24 @@ class ToolSelectionBandit:
         """
         Update the bandit orchestrator with execution results.
         
-        BUG #15 FIX: Now accepts is_verified parameter to indicate if the
-        result was mathematically verified as correct. Unverified results
-        receive reduced rewards.
-        
-        BUG #7 FIX: Now accepts is_fallback parameter to indicate if the
-        result came from a fallback mechanism. Fallback results receive
-        heavily reduced rewards.
+        Args:
+            features: Feature vector for the context.
+            tool_name: Name of the tool that was executed.
+            quality: Quality score of the result (0-1).
+            time_ms: Execution time in milliseconds.
+            energy_mj: Energy consumption in millijoules.
+            constraints: Constraint dictionary for context.
+            is_verified: If True, the result was mathematically verified as correct.
+                Unverified results receive reduced rewards.
+            is_fallback: If True, the result came from a fallback mechanism.
+                Fallback results receive heavily reduced rewards.
         """
 
         # **************************************************************************
         # START CRITICAL FIX: Wrap entire method in lock to prevent race conditions
         with self.update_lock:
             if not self.is_enabled:
-                # CRITICAL FIX: Update fallback statistics even when disabled
+                # Update fallback statistics even when disabled
                 if tool_name not in self.statistics:
                     self.statistics[tool_name] = {"pulls": 0, "rewards": []}
                 self.statistics[tool_name]["pulls"] += 1
@@ -1173,8 +1175,7 @@ class ToolSelectionBandit:
                 return
 
             try:
-                # 1. Compute reward from the outcome
-                # BUG #15 & #7 FIX: Pass verification and fallback status
+                # 1. Compute reward from the outcome (with verification and fallback status)
                 reward = self._compute_reward(
                     quality, time_ms, energy_mj, constraints,
                     is_verified=is_verified, is_fallback=is_fallback
@@ -1231,12 +1232,10 @@ class ToolSelectionBandit:
         """
         Computes a reward score between 0 and 1.
         
-        BUG #15 FIX: Now considers whether the answer was verified as correct
-        before rewarding. Unverified answers with high confidence should NOT
-        receive full reward - confidence != correctness.
-        
-        BUG #7 FIX: Fallback results receive reduced rewards to prevent
-        learning from potentially incorrect LLM responses.
+        Considers whether the answer was verified as correct before rewarding.
+        Unverified answers with high confidence should NOT receive full reward -
+        confidence != correctness. Fallback results receive reduced rewards to
+        prevent learning from potentially incorrect LLM responses.
         
         Args:
             quality: Confidence score from the tool (0-1)
@@ -1255,27 +1254,31 @@ class ToolSelectionBandit:
         time_score = max(0, 1 - (time_ms / time_budget))
         energy_score = max(0, 1 - (energy_mj / energy_budget))
 
-        # BUG #15 FIX: Penalize unverified high-confidence results
+        # Penalize unverified high-confidence results.
         # If result is not verified, reduce the effective quality score
-        # to prevent learning from potentially wrong but confident answers
+        # to prevent learning from potentially wrong but confident answers.
         effective_quality = quality
         if not is_verified and quality > 0.7:
             # Reduce confidence for unverified high-confidence answers
             effective_quality = quality * UNVERIFIED_QUALITY_PENALTY
             logger.debug(
-                f"[BUG#15 FIX] Reduced reward for unverified high-confidence result: "
+                f"[ToolSelector] Reduced reward for unverified high-confidence result: "
                 f"{quality:.2f} -> {effective_quality:.2f}"
             )
         
-        # BUG #7 FIX: Significantly reduce reward for fallback results
+        # Significantly reduce reward for fallback results.
         # Fallback typically means primary engine failed, so we shouldn't
-        # strongly reinforce this path
+        # strongly reinforce this path.
         if is_fallback:
             effective_quality = effective_quality * FALLBACK_QUALITY_PENALTY
             logger.debug(
-                f"[BUG#7 FIX] Reduced reward for fallback result: "
+                f"[ToolSelector] Reduced reward for fallback result: "
                 f"{quality:.2f} -> {effective_quality:.2f}"
             )
+
+        # Weighted combination, prioritizing quality
+        reward = 0.6 * effective_quality + 0.3 * time_score + 0.1 * energy_score
+        return float(np.clip(reward, 0.0, 1.0))
 
         # Weighted combination, prioritizing quality
         reward = 0.6 * effective_quality + 0.3 * time_score + 0.1 * energy_score
@@ -1399,8 +1402,8 @@ class SymbolicToolWrapper:
         start_time = time.time()
         
         try:
-            # BUG #4 FIX: Clear state before each query to prevent cross-contamination
-            # This prevents previous query results from leaking into new queries
+            # Clear state before each query to prevent cross-contamination.
+            # This prevents previous query results from leaking into new queries.
             if hasattr(self.engine, 'clear_state'):
                 self.engine.clear_state()
             
@@ -1551,7 +1554,7 @@ class SymbolicToolWrapper:
         original_query = query
         
         # ====================================================================
-        # BUG #1 FIX: Skip header/metadata lines FIRST before other processing
+        # Skip header/metadata lines FIRST before other processing.
         # This prevents the bug where "Language Reasoning" header is parsed
         # instead of the actual SAT content below it.
         # ====================================================================
@@ -1586,7 +1589,7 @@ class SymbolicToolWrapper:
     
     def _skip_header_lines(self, query: str) -> str:
         """
-        BUG #1 FIX: Skip header/metadata lines from the query.
+        Skip header/metadata lines from the query.
         
         The issue is that queries like:
             "Symbolic Reasoning
@@ -1789,12 +1792,12 @@ class ProbabilisticToolWrapper:
     2. Executes Bayesian inference
     3. Returns probability distribution
     
-    BUG #2 FIX: Now properly extracts probability parameters from natural
+    Note: Now properly extracts probability parameters from natural
     language queries instead of passing the query title as the variable.
     """
     
     # Regex patterns for extracting Bayesian parameters
-    # BUG #2 FIX: Extract actual numbers, not query titles
+    # Note: Extract actual numbers, not query titles
     _SENSITIVITY_PATTERN = re.compile(
         r'sensitivity\s*[=:]\s*(\d+(?:\.\d*)?|\.\d+)',
         re.IGNORECASE
@@ -1812,7 +1815,7 @@ class ProbabilisticToolWrapper:
         re.IGNORECASE
     )
     
-    # BUG #5 FIX: Keywords that indicate probability/statistical queries
+    # Note: Keywords that indicate probability/statistical queries
     # Used by gate check to reject non-probability queries and prevent P(if) errors
     # Extracted to class constant to avoid duplication (per code review feedback)
     _PROBABILITY_KEYWORDS = (
@@ -1846,7 +1849,7 @@ class ProbabilisticToolWrapper:
             # Extract meaningful text from problem for keyword detection
             query_str = self._extract_query_text(problem)
             
-            # BUG #5 FIX: Add fallback gate check directly in wrapper
+            # Note: Add fallback gate check directly in wrapper
             # This catches cases where the engine's gate check is not available
             # Examples that should be rejected: "if given opportunity...", "What color is the sky?"
             is_probability_query = False
@@ -1855,7 +1858,7 @@ class ProbabilisticToolWrapper:
             if query_str and hasattr(self.engine, '_is_probability_query'):
                 is_probability_query = self.engine._is_probability_query(query_str)
             else:
-                # BUG #5 FIX: Fallback gate check using class constant
+                # Note: Fallback gate check using class constant
                 # This prevents "Computing P(if | evidence={})" errors
                 query_lower = query_str.lower() if query_str else ''
                 is_probability_query = any(kw in query_lower for kw in self._PROBABILITY_KEYWORDS)
@@ -1863,7 +1866,7 @@ class ProbabilisticToolWrapper:
             if query_str and not is_probability_query:
                 logger.info(
                     f"[ProbabilisticEngine] Gate check: Query does not appear to be a probability question "
-                    f"(BUG#5 FIX prevents P(if) style errors)"
+                    f"(prevents P(if) style errors)"
                 )
                 return {
                     "tool": self.name,
@@ -1874,11 +1877,11 @@ class ProbabilisticToolWrapper:
                     "execution_time_ms": (time.time() - start_time) * 1000,
                 }
             
-            # BUG #4 FIX: Clear state before each query
+            # Note: Clear state before each query
             if hasattr(self.engine, 'clear_state'):
                 self.engine.clear_state()
             
-            # BUG #2 FIX: Try Bayesian calculation first for explicit probability queries
+            # Note: Try Bayesian calculation first for explicit probability queries
             bayes_result = self._try_bayesian_calculation(problem)
             if bayes_result is not None:
                 return bayes_result
@@ -1987,7 +1990,7 @@ class ProbabilisticToolWrapper:
     
     def _try_bayesian_calculation(self, problem: Any) -> Optional[Dict[str, Any]]:
         """
-        BUG #2 FIX: Detect and compute explicit Bayesian probability queries.
+        Note: Detect and compute explicit Bayesian probability queries.
         
         This handles queries like:
         - "P1 — Bayes: Sensitivity=0.99, Specificity=0.95, Prevalence=0.01"
@@ -2010,7 +2013,7 @@ class ProbabilisticToolWrapper:
         prev_match = self._PREVALENCE_PATTERN.search(problem_text)
         
         # =========================================================================
-        # BUG #1 FIX (Jan 7 2026): Recognize Bayes problems by parameters alone
+        # Recognize Bayes problems by parameters alone
         # =========================================================================
         # If ALL THREE parameters (sensitivity, specificity, prevalence) are present,
         # this is clearly a Bayes theorem problem even without explicit "bayes" keyword.
@@ -2091,11 +2094,11 @@ class ProbabilisticToolWrapper:
     def _parse_problem(self, problem: Any) -> tuple:
         """Parse problem into query_var, evidence, and rules.
         
-        BUG #2 FIX: Now handles natural language queries better by extracting
+        Note: Now handles natural language queries better by extracting
         the actual query variable instead of using the entire text.
         """
         if isinstance(problem, str):
-            # BUG #2 FIX: For string queries, try to extract a meaningful variable name
+            # Note: For string queries, try to extract a meaningful variable name
             # instead of passing the whole query title
             var_name = self._extract_variable_from_text(problem)
             return var_name, {}, []
@@ -2107,7 +2110,7 @@ class ProbabilisticToolWrapper:
         else:
             return str(problem), {}, []
     
-    # BUG #5 FIX: Common English words that should NOT be used as probability variable names
+    # Note: Common English words that should NOT be used as probability variable names
     # This prevents absurd queries like "Computing P(if | evidence={})"
     _COMMON_ENGLISH_WORDS = frozenset([
         # Conjunctions and conditionals
@@ -2131,8 +2134,8 @@ class ProbabilisticToolWrapper:
     
     def _extract_variable_from_text(self, text: str) -> str:
         """
-        BUG #2 FIX: Extract a meaningful variable name from natural language text.
-        BUG #5 FIX: Reject common English words to prevent P(if), P(the), etc.
+        Note: Extract a meaningful variable name from natural language text.
+        Note: Reject common English words to prevent P(if), P(the), etc.
         
         Instead of:
             Computing P(Multimodal Reasoning (cross-constraints))  # WRONG
@@ -2163,7 +2166,7 @@ class ProbabilisticToolWrapper:
         prob_match = re.search(r'P\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*(?:\||\))', text)
         if prob_match:
             var_name = prob_match.group(1)
-            # BUG #5 FIX: Still reject common English words even in P(X) notation
+            # Note: Still reject common English words even in P(X) notation
             # But allow single uppercase letters like P(A), P(X)
             if is_valid_variable(var_name):
                 return var_name
@@ -2186,11 +2189,11 @@ class ProbabilisticToolWrapper:
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
                 var_name = match.group(1)
-                # BUG #5 FIX: Reject common English words
+                # Note: Reject common English words
                 if is_valid_variable(var_name):
                     return var_name
         
-        # BUG #5 FIX: If we couldn't find a valid variable name, return "X"
+        # Note: If we couldn't find a valid variable name, return "X"
         # This is better than extracting nonsense like "if" from "if given opportunity..."
         #
         # REMOVED the fallback that extracted first word - this was the root cause of
@@ -2391,7 +2394,7 @@ class MultimodalToolWrapper:
 
 
 # =============================================================================
-# BUG S FIX: World Model Tool Wrapper for Self-Introspection Queries
+# World Model Tool Wrapper for Self-Introspection Queries
 # =============================================================================
 # This wrapper enables queries about Vulcan's own capabilities, goals, and
 # limitations to be routed to the World Model's SelfModel component instead
@@ -2892,14 +2895,14 @@ class WorldModelToolWrapper:
 
 
 # =============================================================================
-# BUG #14 FIX: Cryptographic Tool Wrapper
+# Note: Cryptographic Tool Wrapper
 # =============================================================================
 
 class CryptographicToolWrapper:
     """
     Wrapper for CryptographicEngine that exposes reason() method.
     
-    BUG #14 FIX: The system was falling back to OpenAI for cryptographic
+    Note: The system was falling back to OpenAI for cryptographic
     computations (SHA-256, MD5, etc.), which resulted in hallucinated 
     (incorrect) hash values.
     
@@ -2943,7 +2946,7 @@ class CryptographicToolWrapper:
         """
         Execute cryptographic computation on the problem.
         
-        BUG #14 FIX: Provides deterministic, accurate cryptographic results
+        Note: Provides deterministic, accurate cryptographic results
         instead of relying on LLM fallback which hallucinates.
         
         Args:
@@ -3092,7 +3095,7 @@ class ToolSelector:
 
         self.cache = SelectionCache(config.get("cache_config", {}))
 
-        # BUG FIX Issues #3, #44: Use singleton WarmStartPool to prevent
+        # Use singleton WarmStartPool to prevent
         # "Warm pool initialized with 5 tool pools" appearing multiple times.
         # The singleton is shared across all ToolSelector instances.
         try:
@@ -3246,7 +3249,7 @@ class ToolSelector:
 
     def _detect_math_symbols(self, query: str) -> bool:
         """
-        Issue #4 FIX: Detect MATHEMATICAL symbols (NOT logic symbols).
+        Detect MATHEMATICAL symbols (NOT logic symbols).
         
         This is separate from formal logic detection because symbols like ∑ (summation),
         ∫ (integral), ∂ (partial derivative) are MATH symbols, not logic symbols.
@@ -3272,7 +3275,7 @@ class ToolSelector:
         # Pure math operators (NOT logic)
         math_symbols = ['∑', '∫', '∂', '∇', '∏', '√', '≤', '≥', '≠', '≈', '±', '×', '÷', '∞']
         if any(symbol in query for symbol in math_symbols):
-            logger.debug("[ToolSelector] Issue#4 FIX: Detected Unicode math symbol")
+            logger.debug("[ToolSelector] Detected Unicode math symbol")
             return True
         
         # Math-specific keywords (not shared with logic)
@@ -3283,7 +3286,7 @@ class ToolSelector:
             'arithmetic progression', 'geometric series'
         ]
         if any(keyword in query_lower for keyword in math_keywords):
-            logger.debug("[ToolSelector] Issue#4 FIX: Detected math keyword")
+            logger.debug("[ToolSelector] Detected math keyword")
             return True
         
         # Summation notation patterns: ∑(k=1 to n) or sum from k=1 to n
@@ -3294,32 +3297,32 @@ class ToolSelector:
         ]
         for pattern in sum_patterns:
             if re.search(pattern, query_lower):
-                logger.debug(f"[ToolSelector] Issue#4 FIX: Detected summation pattern: {pattern}")
+                logger.debug(f"[ToolSelector] Detected summation pattern: {pattern}")
                 return True
         
         # Integral notation patterns
         if re.search(r'∫.*d[xyz]', query):
-            logger.debug("[ToolSelector] Issue#4 FIX: Detected integral pattern")
+            logger.debug("[ToolSelector] Detected integral pattern")
             return True
         
         # Limit notation patterns
         if re.search(r'lim.*→|limit.*as.*→', query_lower):
-            logger.debug("[ToolSelector] Issue#4 FIX: Detected limit pattern")
+            logger.debug("[ToolSelector] Detected limit pattern")
             return True
         
         return False
     
     def _detect_formal_logic(self, query: str) -> bool:
         """
-        TASK 3 FIX: Detect formal logic notation to route to symbolic engine.
+        Detect formal logic notation to route to symbolic engine.
         
         This prevents SAT/FOL problems from being misrouted to probabilistic
         engine by the LLM classifier.
         
-        Issue #4 FIX: NO LONGER detects math symbols (∑, ∫, etc.). Those are
+        NO LONGER detects math symbols (∑, ∫, etc.). Those are
         handled separately by _detect_math_symbols() for mathematical routing.
         
-        BUG #3 FIX: NO LONGER triggers on ethical/philosophical queries that
+        Note: NO LONGER triggers on ethical/philosophical queries that
         contain natural language choice structures like "option A or B".
         
         Detects:
@@ -3337,15 +3340,15 @@ class ToolSelector:
         if not query or not isinstance(query, str):
             return False
         
-        # Issue #4 FIX: First check if this is a math query - math takes priority
+        # First check if this is a math query - math takes priority
         # over logic symbol detection because math queries may contain both
         if self._detect_math_symbols(query):
-            logger.debug("[ToolSelector] Issue#4 FIX: Query is mathematical, not formal logic")
+            logger.debug("[ToolSelector] Query is mathematical, not formal logic")
             return False
         
         query_lower = query.lower()
         
-        # BUG #3 FIX: Check if this is an ethical/philosophical query FIRST
+        # Note: Check if this is an ethical/philosophical query FIRST
         # Ethical queries contain natural language choice structures ("A or B",
         # "not pulling the lever") that should NOT trigger formal logic routing.
         # The symbolic engine cannot parse natural language ethical dilemmas.
@@ -3361,19 +3364,19 @@ class ToolSelector:
         if ethical_count >= 2:
             # Multiple ethical indicators = likely philosophical query
             logger.debug(
-                f"[ToolSelector] BUG#3 FIX: Detected {ethical_count} ethical indicators - "
+                f"[ToolSelector] Detected {ethical_count} ethical indicators - "
                 f"NOT routing to symbolic engine (ethical queries need philosophical reasoning)"
             )
             return False
         
         # Check for Unicode logic symbols (optimized using any())
-        # Issue #4 FIX: REMOVED ∑, ∫, ∂, ∇ from this list - they are MATH symbols!
+        # Note: REMOVED ∑, ∫, ∂, ∇ from this list - they are MATH symbols!
         logic_symbols = ['→', '∧', '∨', '¬', '∀', '∃', '⊢', '⊨', '↔', '⇒', '⇔']
         if any(symbol in query for symbol in logic_symbols):
             logger.debug("[ToolSelector] TASK 3: Detected Unicode logic symbol")
             return True
         
-        # BUG #3 FIX: More restrictive ASCII logic detection
+        # Note: More restrictive ASCII logic detection
         # Don't match natural language patterns like "option A or B" or "not pulling"
         # Only match patterns that look like actual formal logic: "A -> B", "P && Q"
         # The check for 'not ', 'and ', 'or ' is too aggressive for natural language.
@@ -3406,7 +3409,7 @@ class ToolSelector:
             return True
         
         # Check for first-order logic quantifiers in natural language
-        # BUG #3 FIX: Only trigger if BOTH quantifier AND logic keywords present
+        # Note: Only trigger if BOTH quantifier AND logic keywords present
         fol_patterns = [
             r'\bfor\s+all\b',
             r'\bthere\s+exists?\b',
@@ -3430,7 +3433,7 @@ class ToolSelector:
         """
         Initialize reasoning tools with ACTUAL reasoning engines.
         
-        BUG FIX: Previously this method created MockTool placeholders that just
+        Note: Previously this method created MockTool placeholders that just
         returned canned responses. This caused the selected tools to never
         actually execute any reasoning logic - OpenAI answered everything.
         
@@ -3443,8 +3446,8 @@ class ToolSelector:
         the actual engine's query/inference logic is executed (SAT solving,
         Bayesian inference, causal analysis, etc.)
         
-        BUG S FIX: Added world_model tool for self-introspection queries.
-        BUG #14 FIX: Added cryptographic tool for hash/encoding computations.
+        Note: Added world_model tool for self-introspection queries.
+        Note: Added cryptographic tool for hash/encoding computations.
         """
         tool_configs = {
             "symbolic": {"speed": "medium", "accuracy": "high", "energy": "medium"},
@@ -3452,8 +3455,8 @@ class ToolSelector:
             "causal": {"speed": "slow", "accuracy": "high", "energy": "high"},
             "analogical": {"speed": "fast", "accuracy": "low", "energy": "low"},
             "multimodal": {"speed": "slow", "accuracy": "high", "energy": "very_high"},
-            "world_model": {"speed": "fast", "accuracy": "high", "energy": "low"},  # BUG S FIX
-            "cryptographic": {"speed": "fast", "accuracy": "perfect", "energy": "low"},  # BUG #14 FIX
+            "world_model": {"speed": "fast", "accuracy": "high", "energy": "low"},  # Note: world_model tool
+            "cryptographic": {"speed": "fast", "accuracy": "perfect", "energy": "low"},  # Note: cryptographic tool
         }
 
         # Try to initialize real reasoning engines
@@ -3550,7 +3553,7 @@ class ToolSelector:
             engines["multimodal"] = None
         
         # ============================================================
-        # BUG S FIX: WORLD MODEL ENGINE (Self-introspection queries)
+        # WORLD MODEL ENGINE (Self-introspection queries)
         # ============================================================
         # This enables queries about Vulcan's capabilities, goals, and limitations
         # to be routed to the World Model's SelfModel instead of reasoning engines.
@@ -3579,14 +3582,14 @@ class ToolSelector:
             engines["world_model"] = None
         
         # ============================================================
-        # BUG #14 FIX: CRYPTOGRAPHIC ENGINE (Hash/encoding computations)
+        # Note: CRYPTOGRAPHIC ENGINE (Hash/encoding computations)
         # ============================================================
         # This enables deterministic cryptographic computations (SHA-256, MD5, etc.)
         # instead of relying on LLM fallback which hallucinates incorrect values.
         try:
             from ..cryptographic_engine import CryptographicEngine
             engines["cryptographic"] = CryptographicToolWrapper(CryptographicEngine())
-            logger.info("[ToolSelector] BUG#14 FIX: CryptographicEngine loaded successfully")
+            logger.info("[ToolSelector] CryptographicEngine loaded successfully")
         except ImportError as e:
             logger.warning(f"[ToolSelector] CryptographicEngine not available: {e}")
             engines["cryptographic"] = None
@@ -3732,19 +3735,19 @@ class ToolSelector:
             # ================================================================
             # CRITICAL FIX (Jan 6 2026): Check for world model delegation FIRST
             # ================================================================
-            # PROBLEM: TASK 3 FIX was overriding world model delegation because
+            # Note: Previously routing was overriding world model delegation because
             # it detected "formal logic" keywords in cryptocurrency questions.
             #
             # Evidence from diagnostic report:
             #   Line 2854: [WorldModel] DELEGATION RECOMMENDED: 'mathematical'
-            #   Line 2855: [ToolSelector] TASK 3 FIX: Formal logic detected - routing to symbolic
+            #   Line 2855: [ToolSelector] Formal logic detected - routing to symbolic
             #   ^ CONTRADICTION: Delegation ignored, symbolic used instead
             #
-            # FIX: Check if delegation is active BEFORE applying TASK 3 FIX.
+            # Check if delegation is active BEFORE applying special routing.
             # If delegation context is set, skip the early detection overrides.
             # 
             # Note: delegation_active and skip_task3 are used in the conditional below
-            # to determine whether to skip TASK 3 FIX routing.
+            # to determine whether to skip special routing.
             # ================================================================
             delegation_active = False
             if hasattr(request, 'context') and isinstance(request.context, dict):
@@ -3758,12 +3761,12 @@ class ToolSelector:
                 if delegation_active:
                     delegated_tool = request.context.get('world_model_recommended_tool', 'unknown')
                     logger.info(
-                        f"[ToolSelector] TASK 3 FIX CHECK: Delegation active to '{delegated_tool}' - "
+                        f"[ToolSelector] Delegation check: Delegation active to '{delegated_tool}' - "
                         f"NOT overriding with formal logic detection"
                     )
 
             # ================================================================
-            # TASK 3 FIX: Early detection of formal logic queries
+            # Early detection of formal logic queries
             # Route SAT/FOL/theorem proving queries to symbolic engine BEFORE
             # the LLM classifier, which often misroutes them to probabilistic.
             #
@@ -3773,7 +3776,7 @@ class ToolSelector:
                 problem_text = str(request.problem)
                 if self._detect_formal_logic(problem_text):
                     logger.info(
-                        f"[ToolSelector] TASK 3 FIX: Formal logic detected - routing to symbolic engine "
+                        f"[ToolSelector] Formal logic detected - routing to symbolic engine "
                         f"(bypassing LLM classifier to prevent misrouting to probabilistic)"
                     )
                     # Execute with symbolic engine directly
@@ -3796,17 +3799,17 @@ class ToolSelector:
                     
                     self._update_statistics(final_result)
                     
-                    logger.info(f"[ToolSelector] TASK 3 FIX: Executed formal logic query with symbolic engine")
+                    logger.info(f"[ToolSelector] Executed formal logic query with symbolic engine")
                     return final_result
                 
                 # ================================================================
-                # Issue #4 FIX: Early detection of mathematical symbols
+                # Early detection of mathematical symbols
                 # Route math queries with ∑, ∫, etc. to mathematical engine BEFORE
                 # the LLM classifier, which might misroute them to symbolic.
                 # ================================================================
                 if self._detect_math_symbols(problem_text):
                     logger.info(
-                        f"[ToolSelector] Issue#4 FIX: Mathematical symbols detected - routing to mathematical engine "
+                        f"[ToolSelector] Mathematical symbols detected - routing to mathematical engine "
                         f"(bypassing LLM classifier to prevent misrouting to symbolic)"
                     )
                     # Execute with mathematical engine directly
@@ -3829,28 +3832,28 @@ class ToolSelector:
                     
                     self._update_statistics(final_result)
                     
-                    logger.info(f"[ToolSelector] Issue#4 FIX: Executed math query with mathematical engine")
+                    logger.info(f"[ToolSelector] Executed math query with mathematical engine")
                     return final_result
 
             # ================================================================
-            # BUG #0 FIX: Check if QueryClassifier already suggested tools
+            # Note: Check if QueryClassifier already suggested tools
             # The classifier uses LLM-based language understanding to identify
             # the correct tool based on query intent (not heuristics).
             # This is the PRIMARY tool selection path.
             #
-            # BUG #1 FIX (CRITICAL): Skip classifier if this is a fallback attempt.
+            # CRITICAL: Skip classifier if this is a fallback attempt.
             # When a tool fails and we're trying a fallback (fallback_attempt=True),
             # the classifier must NOT override the explicit fallback tool selection.
             # The classifier would just re-select the same failed tool (e.g., symbolic
             # for logic queries), causing an infinite retry loop.
             # ================================================================
             if hasattr(request, 'context') and isinstance(request.context, dict):
-                # BUG #1 FIX: Check if this is a fallback attempt - skip classifier if so
+                # Note: Check if this is a fallback attempt - skip classifier if so
                 is_fallback_attempt = request.context.get('fallback_attempt', False)
                 
                 if is_fallback_attempt:
                     logger.info(
-                        f"[ToolSelector] BUG#1 FIX: Fallback attempt detected - skipping "
+                        f"[ToolSelector] Fallback attempt detected - skipping "
                         f"classifier to allow direct tool override via router_tools"
                     )
                     # Fall through to router_tools check below
@@ -3862,7 +3865,7 @@ class ToolSelector:
                 
                 if classifier_tools and isinstance(classifier_tools, (list, tuple)) and len(classifier_tools) > 0:
                     logger.info(
-                        f"[ToolSelector] BUG#0 FIX: Using LLM classifier's suggested tools: {classifier_tools} "
+                        f"[ToolSelector] Using LLM classifier's suggested tools: {classifier_tools} "
                         f"for category={classifier_category} (LLM understands query intent)"
                     )
                     # Filter to only include available tools
@@ -3870,7 +3873,7 @@ class ToolSelector:
                     valid_classifier_tools = [t for t in classifier_tools if t in available_tools]
                     
                     # ================================================================
-                    # BUG #5 FIX: Respect learned weights - skip tools with very negative weights
+                    # Note: Respect learned weights - skip tools with very negative weights
                     # The learning system punishes failing tools, but previously the
                     # classifier/router bypassed this. Now we filter out tools that have
                     # been learned to be unreliable (weight < NEGATIVE_WEIGHT_THRESHOLD).
@@ -3881,7 +3884,7 @@ class ToolSelector:
                             weight = self.learning_system.get_tool_weight_adjustment(tool)
                             if weight < NEGATIVE_WEIGHT_THRESHOLD:
                                 logger.info(
-                                    f"[ToolSelector] BUG#5 FIX: Skipping '{tool}' - learned weight "
+                                    f"[ToolSelector] Skipping '{tool}' - learned weight "
                                     f"too low ({weight:.3f}), suggesting alternative"
                                 )
                                 # Don't add this tool - it has been learned to be unreliable
@@ -3891,7 +3894,7 @@ class ToolSelector:
                         # If all classifier tools were filtered out, suggest fallback
                         if not filtered_tools and valid_classifier_tools:
                             logger.warning(
-                                f"[ToolSelector] BUG#5 FIX: All classifier tools rejected by "
+                                f"[ToolSelector] All classifier tools rejected by "
                                 f"learned weights, using world_model as fallback"
                             )
                             filtered_tools = ['world_model']
@@ -3924,7 +3927,7 @@ class ToolSelector:
                         return final_result
 
             # ================================================================
-            # BUG #1 FIX: Check if QueryRouter already selected tools
+            # Note: Check if QueryRouter already selected tools
             # If routing_plan.tools is provided for a typed fast-path (e.g., MATH-FAST-PATH),
             # use those tools directly instead of running SemanticBoost/bandit selection.
             # This prevents ToolSelector from overriding the router's intelligent selection.
@@ -3964,7 +3967,7 @@ class ToolSelector:
                 if routing_tools and isinstance(routing_tools, (list, tuple)) and len(routing_tools) > 0:
                     # Router has already made a selection - use it directly
                     logger.info(
-                        f"[ToolSelector] BUG#1 FIX: Using QueryRouter's pre-selected tools: {routing_tools} "
+                        f"[ToolSelector] Using QueryRouter's pre-selected tools: {routing_tools} "
                         f"for task_type={task_type} (bypassing SemanticBoost/bandit selection)"
                     )
                     # Filter to only include available tools (using constant)
@@ -4035,7 +4038,7 @@ class ToolSelector:
                 prior_context = request.context.copy() if isinstance(request.context, dict) else {}
             
             # ================================================================
-            # BUG #0 FIX EXTENSION: Skip SemanticBoost if LLM classifier is authoritative
+            # Note: Skip SemanticBoost if LLM classifier is authoritative
             # When classifier identifies UNKNOWN, CREATIVE, CONVERSATIONAL, or GENERAL queries,
             # its tool selection is authoritative and should not be overridden by
             # semantic matching (which uses embeddings, not language understanding).
@@ -4263,7 +4266,7 @@ class ToolSelector:
                 )
 
             # ================================================================
-            # BUG #2 FIX: Stricter multimodal detection
+            # Note: Stricter multimodal detection
             # Only trigger multimodal when ACTUAL multimodal data is present,
             # not just keyword mentions like "image" or "picture" in text queries.
             # This prevents false positives like "2+2" triggering multimodal boost
@@ -4308,7 +4311,7 @@ class ToolSelector:
             return features
         except Exception as e:
             logger.error(f"Feature extraction failed: {e}")
-            # CRITICAL BUG FIX: Use deterministic zeros instead of random features.
+            # Use deterministic zeros instead of random features.
             # Random features cause non-deterministic tool selection.
             return np.zeros(128)
 
@@ -4395,7 +4398,7 @@ class ToolSelector:
     ) -> List[Dict[str, Any]]:
         """Generate tool candidates filtered by semantic matching prior.
         
-        CRITICAL BUG #1 FIX: Different reasoning paradigms (causal, symbolic, 
+        CRITICAL Note: Different reasoning paradigms (causal, symbolic, 
         probabilistic, analogical, multimodal) are COMPLEMENTARY, not redundant.
         They produce different outputs BY DESIGN. We should run the best-matched 
         tool(s), not all 5.
@@ -4495,7 +4498,7 @@ class ToolSelector:
     ) -> ExecutionStrategy:
         """Select execution strategy - prefer SINGLE tool for different reasoning paradigms.
         
-        BUG #1 FIX: Different reasoning types (causal, symbolic, etc.) are 
+        Note: Different reasoning types (causal, symbolic, etc.) are 
         complementary, not redundant. Running multiple and checking "consensus" 
         is wrong - they SHOULD differ. Prefer SINGLE tool in most cases.
         """
@@ -4534,7 +4537,7 @@ class ToolSelector:
     ) -> Any:
         """Execute tools using portfolio executor.
         
-        BUG #6 FIX: Limit tools based on strategy to prevent excessive
+        Note: Limit tools based on strategy to prevent excessive
         multi-tool execution even when candidates are filtered.
         """
 
@@ -4589,20 +4592,20 @@ class ToolSelector:
             primary_result = execution_result.primary_result
 
             # Calibrate confidence if enabled
-            # BUG #3 FIX: Properly extract confidence from engine result
+            # Note: Properly extract confidence from engine result
             # The primary_result is often a Dict, not an object with attributes
             confidence = 0.5
             calibrated_confidence = 0.5
 
             if primary_result:
                 # Try to extract confidence from the result
-                # BUG #3 FIX: Handle both dict and object forms
+                # Note: Handle both dict and object forms
                 if isinstance(primary_result, dict):
                     confidence = primary_result.get("confidence", 0.5)
                 elif hasattr(primary_result, "confidence"):
                     confidence = primary_result.confidence
                 
-                # BUG #3 FIX: If confidence is 0.0 or very low, don't override to 0.5
+                # Note: If confidence is 0.0 or very low, don't override to 0.5
                 # This respects the engine's assessment that it couldn't answer
                 if confidence <= 0.1:
                     logger.warning(
@@ -4657,18 +4660,18 @@ class ToolSelector:
         """
         Update learning components including mathematical accuracy feedback.
         
-        BUG #15 FIX: Now checks if result was verified before rewarding.
-        BUG #7 FIX: Now checks if result came from fallback.
+        Note: Now checks if result was verified before rewarding.
+        Note: Now checks if result came from fallback.
         """
 
         try:
-            # BUG #15 FIX: Check if result was mathematically verified
+            # Note: Check if result was mathematically verified
             is_verified = False
             if result.metadata:
                 math_verification = result.metadata.get("math_verification", {})
                 is_verified = math_verification.get("status") == "verified"
             
-            # BUG #7 FIX: Check if result came from fallback
+            # Note: Check if result came from fallback
             is_fallback = False
             if result.metadata:
                 is_fallback = result.metadata.get("used_fallback", False)
@@ -4679,11 +4682,11 @@ class ToolSelector:
             # Log learning update with verification status
             if is_fallback:
                 logger.info(
-                    f"[BUG#7 FIX] Learning update for FALLBACK result - reduced reward"
+                    f"[ToolSelector] Learning update for FALLBACK result - reduced reward"
                 )
             if not is_verified and result.confidence > 0.7:
                 logger.info(
-                    f"[BUG#15 FIX] Learning update for UNVERIFIED high-confidence result - reduced reward"
+                    f"[ToolSelector] Learning update for UNVERIFIED high-confidence result - reduced reward"
                 )
             
             # Update bandit with verification and fallback status
@@ -5004,7 +5007,7 @@ class ToolSelector:
         2. Confidence: > 0.7 = success, < 0.3 = failure
         3. Strategy: single tool = simple query, portfolio = complex query
         
-        BUG #3 FIX: Status should reflect whether the tool EXECUTED successfully,
+        Note: Status should reflect whether the tool EXECUTED successfully,
         not whether different reasoning paradigms "agreed" (they SHOULD differ).
         """
         if not OUTCOME_BRIDGE_AVAILABLE or record_query_outcome is None:
@@ -5014,7 +5017,7 @@ class ToolSelector:
             # Generate a unique query ID for this outcome
             query_id = f"tool_sel_{uuid.uuid4().hex[:12]}"
             
-            # BUG #3 FIX: Determine status based on execution success, not consensus
+            # Note: Determine status based on execution success, not consensus
             # A tool selection is successful if:
             # 1. A tool was selected
             # 2. The tool executed and produced a result

@@ -410,7 +410,7 @@ class QueryToProblemBridge:
                 r.confidence * (r.execution_time_ms + 1) for r in successful
             ) / total_weight
         else:
-            # BUG FIX: Use minimum confidence floor (0.1) instead of 0.0
+            # Note: Use minimum confidence floor (0.1) instead of 0.0
             # A confidence of 0.0 should only be used for truly impossible cases
             # When aggregation fails, we still have some (low) confidence
             weighted_confidence = 0.1

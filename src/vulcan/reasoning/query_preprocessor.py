@@ -599,7 +599,7 @@ class QueryPreprocessor:
         for constraint in constraint_matches:
             normalized = self._normalize_operators(constraint.strip())
             if normalized:
-                # BUG D FIX: Validate constraint contains at least one proposition
+                # Note: Validate constraint contains at least one proposition
                 if re.search(r'[A-Za-z]', normalized):
                     formal_constraints.append(normalized)
                 else:
@@ -962,7 +962,7 @@ class QueryPreprocessor:
         cleaned = cleaned.strip()
 
         # ====================================================================
-        # BUG D FIX: Filter out standalone operators and invalid formulas
+        # Note: Filter out standalone operators and invalid formulas
         # ====================================================================
         # A valid formula MUST contain at least one proposition letter (A-Z or a-z)
         # Standalone operators like '→', '∧', '∨', '¬', '(→)', '(∧)', etc. are INVALID

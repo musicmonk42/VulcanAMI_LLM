@@ -740,7 +740,7 @@ def get_reasoning_attr(
     2. A dictionary (with keys)
     3. Any other object (returns default)
     
-    BUG FIX: This resolves the "'ReasoningResult' object has no attribute 'get'" error
+    Note: This resolves the "'ReasoningResult' object has no attribute 'get'" error
     that occurs when code assumes a ReasoningResult is a dictionary.
     
     Args:
@@ -782,7 +782,7 @@ def reasoning_result_to_dict(
     """
     Convert a ReasoningResult object to a dictionary safely.
     
-    BUG FIX: This helper ensures that ReasoningResult objects can be safely
+    Note: This helper ensures that ReasoningResult objects can be safely
     converted to dictionaries for serialization or dict-based operations.
     
     Args:

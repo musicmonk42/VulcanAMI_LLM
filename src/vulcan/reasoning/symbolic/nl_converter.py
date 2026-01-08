@@ -1,7 +1,7 @@
 """
 Natural Language to Formal Logic Converter.
 
-BUG #5 FIX: The symbolic parser expects formal logic notation but receives
+Note: The symbolic parser expects formal logic notation but receives
 natural language, causing parse errors like:
     [Parse error] Unexpected token 'Every' at line 1, column 12
 
@@ -241,7 +241,7 @@ class NaturalLanguageToLogicConverter:
     """
     Convert natural language to formal logic notation.
     
-    BUG #5 FIX: This class handles the conversion from natural language
+    Note: This class handles the conversion from natural language
     sentences like "Every engineer reviewed a document" to formal logic
     notation like "∀e ∃d Reviewed(e, d)".
     
@@ -269,7 +269,7 @@ class NaturalLanguageToLogicConverter:
     def __init__(self) -> None:
         """Initialize the converter with compiled patterns."""
         self._patterns: Tuple[PatternConfig, ...] = self._compile_patterns()
-        logger.debug("[NLConverter] BUG#5 FIX: NL to Logic converter initialized")
+        logger.debug("[NLConverter] Note: NL to Logic converter initialized")
     
     @property
     def patterns(self) -> Tuple[PatternConfig, ...]:
@@ -521,7 +521,7 @@ class NaturalLanguageToLogicConverter:
         """
         Convert natural language to formal logic.
         
-        BUG #5 FIX: This is the main entry point for converting natural
+        Note: This is the main entry point for converting natural
         language sentences to formal first-order logic notation.
         
         Args:
@@ -557,7 +557,7 @@ class NaturalLanguageToLogicConverter:
         
         # Check if already looks like formal logic (contains logic symbols)
         if self._is_formal_logic(text):
-            logger.debug("[NLConverter] BUG#5 FIX: Text already appears to be formal logic")
+            logger.debug("[NLConverter] Note: Text already appears to be formal logic")
             return text
         
         # Try each pattern
@@ -570,7 +570,7 @@ class NaturalLanguageToLogicConverter:
                     if formal:
                         if logger.isEnabledFor(logging.INFO):
                             logger.info(
-                                f"[NLConverter] BUG#5 FIX: Converted NL to formal logic: "
+                                f"[NLConverter] Note: Converted NL to formal logic: "
                                 f"'{text[:50]}...' -> '{formal}'"
                             )
                         return formal
@@ -586,13 +586,13 @@ class NaturalLanguageToLogicConverter:
         if simple:
             if logger.isEnabledFor(logging.INFO):
                 logger.info(
-                    f"[NLConverter] BUG#5 FIX: Extracted simple predicate: "
+                    f"[NLConverter] Note: Extracted simple predicate: "
                     f"'{text[:50]}...' -> '{simple}'"
                 )
             return simple
         
         logger.debug(
-            f"[NLConverter] BUG#5 FIX: No conversion pattern matched for: '{text[:50]}...'"
+            f"[NLConverter] Note: No conversion pattern matched for: '{text[:50]}...'"
         )
         return None
     
@@ -1084,7 +1084,7 @@ def convert_nl_to_logic(text: str) -> Optional[str]:
     """
     Convert natural language text to formal logic.
     
-    BUG #5 FIX: Convenience function for converting natural language
+    Note: Convenience function for converting natural language
     to formal first-order logic notation.
     
     Args:

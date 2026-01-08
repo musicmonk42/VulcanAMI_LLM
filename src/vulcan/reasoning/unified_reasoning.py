@@ -48,7 +48,7 @@ logger = logging.getLogger(__name__)
 # CACHE CONFIGURATION
 # ==============================================================================
 # These constants control the unified reasoning cache behavior.
-# BUG FIX (Jan 7 2026): Cache key was using only 8 chars, causing collisions.
+# Note: Cache key was using only 8 chars, causing collisions.
 
 # Number of hex characters to use from SHA-256 hash for cache keys
 # 16 hex chars = 64 bits = very low collision probability
@@ -62,7 +62,7 @@ def _compute_query_hash(query_data: Any) -> str:
     """
     Compute a consistent hash for query data.
     
-    BUG FIX (Jan 7 2026): Extracted into helper function to ensure consistent
+    Note: Extracted into helper function to ensure consistent
     hash computation across cache key generation and cache validation.
     
     Args:
@@ -154,7 +154,7 @@ CREATIVE_TASK_KEYWORDS = (
 # Maximum text length to check for creative keywords (performance optimization)
 MAX_CREATIVE_CHECK_LENGTH = 2000
 
-# BUG #18 FIX: Pre-compile regex patterns at module level
+# Note: Pre-compile regex patterns at module level
 # Previously patterns were recompiled on every call to _is_creative_task
 import re
 _CREATIVE_KEYWORD_PATTERNS = {}
@@ -200,7 +200,7 @@ def _is_creative_task(task: 'ReasoningTask') -> bool:
         query_str = str(task.query)[:MAX_CREATIVE_CHECK_LENGTH]
         text_to_check += " " + query_str.lower()
     
-    # Check for creative keywords using pre-compiled patterns (BUG #18 FIX)
+    # Check for creative keywords using pre-compiled patterns 
     for keyword in CREATIVE_TASK_KEYWORDS:
         if ' ' not in keyword:
             # Use pre-compiled regex pattern
@@ -267,7 +267,7 @@ def _is_test_environment() -> bool:
 
 
 # ==============================================================================
-# BUG #5 FIX: Singleton Tool Weight Manager
+# Note: Singleton Tool Weight Manager
 # ==============================================================================
 # Learning system and Ensemble had separate weight dictionaries, so learned
 # weights were never propagated. This singleton ensures all systems share the
@@ -276,7 +276,7 @@ def _is_test_environment() -> bool:
 class ToolWeightManager:
     """Singleton manager for tool weights shared between Learning and Ensemble.
     
-    BUG #5 FIX: Learning system was updating tool weights in its own dictionary,
+    Note: Learning system was updating tool weights in its own dictionary,
     but Ensemble was reading from a separate dictionary. Weights never propagated.
     This singleton ensures both systems use the same weight storage.
     """
@@ -297,7 +297,7 @@ class ToolWeightManager:
     def get_weight(self, tool: str, default: float = 1.0) -> float:
         """Get weight for a single tool.
         
-        ISSUE #7 FIX: Return default weight (1.0) for tools that haven't been
+        Note: Return default weight (1.0) for tools that haven't been
         seen before, rather than 0.0 which causes all weights to be zero.
         This ensures ensemble weighting works correctly even before learning
         has had time to adjust weights.
@@ -315,12 +315,12 @@ class ToolWeightManager:
     def set_weight(self, tool: str, value: float) -> None:
         """Set absolute weight value for a tool.
         
-        BUG #1 FIX: Floor weight at a minimum positive value to prevent
+        Note: Floor weight at a minimum positive value to prevent
         the "death spiral" where accumulated penalties cause tools to have
         zero or negative weights, breaking the ensemble calculations.
         """
         with self._update_lock:
-            # BUG #1 FIX: Ensure weight is always positive (minimum 0.1)
+            # Note: Ensure weight is always positive (minimum 0.1)
             # This prevents the death spiral where negative weights cause
             # "All weights are zero" ensemble fallback
             if value < 0.1:
@@ -335,17 +335,17 @@ class ToolWeightManager:
     def adjust_weight(self, tool: str, delta: float) -> None:
         """Adjust weight by delta (used by Learning system).
         
-        ISSUE #7 FIX: Initialize from 1.0 (neutral weight) instead of 0.0
+        Note: Initialize from 1.0 (neutral weight) instead of 0.0
         so that tools start with sensible weights before learning adjusts them.
         
-        BUG #1 FIX: Floor the result at 0.1 to prevent death spiral.
+        Note: Floor the result at 0.1 to prevent death spiral.
         """
         with self._update_lock:
             # Start from 1.0 (neutral) instead of 0.0
             current = self._weights.get(tool, 1.0)
             new_weight = current + delta
             
-            # BUG #1 FIX: Floor at minimum positive weight
+            # Note: Floor at minimum positive weight
             if new_weight < 0.1:
                 logger.warning(
                     f"[WeightManager] Flooring weight after adjustment for '{tool}': "
@@ -359,7 +359,7 @@ class ToolWeightManager:
     def get_all_weights(self, tools: List[str]) -> Dict[str, float]:
         """Get weights for multiple tools (used by Ensemble).
         
-        ISSUE #7 FIX: Returns normalized weights with default value of 1.0 for
+        Note: Returns normalized weights with default value of 1.0 for
         unseen tools, rather than 0.01. This ensures ensemble weighting works
         correctly even before learning has adjusted weights.
         
@@ -774,7 +774,7 @@ class UnifiedReasoner:
             if "CrossModalReasoner" in reasoning_components:
                 self.cross_modal = reasoning_components["CrossModalReasoner"]()
             if "MultiModalReasoningEngine" in reasoning_components:
-                # BUG FIX Issues #2-3: Use singleton MultiModalReasoningEngine
+                # Note: Use singleton MultiModalReasoningEngine
                 # to prevent "Neural reasoning modules initialized" appearing multiple times
                 try:
                     from vulcan.reasoning.singletons import get_multimodal_engine
@@ -1000,7 +1000,7 @@ class UnifiedReasoner:
         # Runtime integration - PRODUCTION FIX: Skip heavy runtime in test environments
         # unless VULCAN_FORCE_PRODUCTION_REASONING is set to 'true'
         # Bug #3 Fix: Default to PRODUCTION mode unless explicitly in test
-        # ISSUE #2 FIX: Use singleton to prevent re-initialization per query
+        # Note: Use singleton to prevent re-initialization per query
         self.runtime = None
         if "UnifiedRuntime" in optional_components:
             # Use improved environment detection (Bug #3 fix)
@@ -1010,7 +1010,7 @@ class UnifiedReasoner:
             # Initialize runtime if not explicitly in test mode and not skipped
             if not in_test and not skip_via_config:
                 try:
-                    # ISSUE #2 FIX: Use singleton pattern to prevent manifest reload per-query
+                    # Note: Use singleton pattern to prevent manifest reload per-query
                     # Previously: self.runtime = optional_components["UnifiedRuntime"]()
                     # This was causing UnifiedRuntime re-initialization on every query
                     from vulcan.reasoning.singletons import get_or_create_unified_runtime
@@ -1303,7 +1303,7 @@ class UnifiedReasoner:
                     cached_result = self.result_cache[cache_key]
                     
                     # =========================================================================
-                    # BUG FIX (Jan 7 2026): Validate cached result before returning
+                    # Note: Validate cached result before returning
                     # =========================================================================
                     # PROBLEM: Cache key collisions caused wrong results to be returned
                     # Example: Counterfactual reasoning query got MATHEMATICAL result (0.1 confidence)
@@ -1487,7 +1487,7 @@ class UnifiedReasoner:
                         del self.result_cache[key]
 
                 # =========================================================================
-                # BUG FIX (Jan 7 2026): Store cache metadata for validation
+                # Note: Store cache metadata for validation
                 # =========================================================================
                 # Store timestamp and query hash so we can validate cache entries on retrieval
                 # This prevents cache poisoning where wrong results contaminate other queries
@@ -2244,14 +2244,14 @@ class UnifiedReasoner:
         This simulates a trained model by scoring reasoning types based on features
         of the input data and query.
         
-        BUG FIX: Now checks keywords in BOTH input_data AND query dict.
+        Note: Now checks keywords in BOTH input_data AND query dict.
         Previously only checked query dict, which is often empty when input_data
         contains the actual query text. This caused all queries to fall back to PROBABILISTIC.
         """
         scores = defaultdict(float)
         query_str = str(query).lower()
         
-        # BUG FIX: Also extract text from input_data for keyword matching
+        # Note: Also extract text from input_data for keyword matching
         # This fixes the issue where queries passed as input_data were not being classified
         input_str = ""
         if isinstance(input_data, str):
@@ -2409,7 +2409,7 @@ class UnifiedReasoner:
                 "deontic",
             ],
         }
-        # BUG FIX: Use combined_str (input_data + query) for keyword matching
+        # Note: Use combined_str (input_data + query) for keyword matching
         for r_type, keywords in keyword_map.items():
             for keyword in keywords:
                 if keyword in combined_str:
@@ -2434,7 +2434,7 @@ class UnifiedReasoner:
         ):
             scores[ReasoningType.SYMBOLIC] += 0.5
         
-        # BUG FIX: Enhanced detection for specific problem types
+        # Note: Enhanced detection for specific problem types
         # These patterns need stronger detection to avoid misclassification
         
         # SAT/satisfiability problems -> SYMBOLIC
@@ -2525,7 +2525,7 @@ class UnifiedReasoner:
                 logger.error(f"Sequential task execution failed: {e}")
 
         if results:
-            # Issue #5 FIX: Select BEST result (highest confidence), NOT last result
+            # Note: Select BEST result (highest confidence), NOT last result
             # Previously: final_result = results[-1] (last tool wins bug)
             # Now: Use max() to select the result with highest confidence
             # Note: Using getattr with default 0 is intentional - results may come from
@@ -2537,13 +2537,13 @@ class UnifiedReasoner:
             last_result = results[-1]
             if final_result != last_result:
                 logger.info(
-                    f"[UnifiedReasoner] Issue#5 FIX: Selected BEST result "
+                    f"[UnifiedReasoner] Note: Selected BEST result "
                     f"(confidence={final_result.confidence:.2f}) instead of LAST result "
                     f"(confidence={last_result.confidence:.2f})"
                 )
             else:
                 logger.debug(
-                    f"[UnifiedReasoner] Issue#5 FIX: Best result == last result "
+                    f"[UnifiedReasoner] Note: Best result == last result "
                     f"(confidence={final_result.confidence:.2f})"
                 )
 
@@ -2683,11 +2683,11 @@ class UnifiedReasoner:
         # If all weights are zero, fall back to uniform weights to prevent np.average error
         total_weight = sum(weights)
         if total_weight <= 0:
-            # BUG #3 FIX: Log detailed diagnostics when all weights are zero
+            # Note: Log detailed diagnostics when all weights are zero
             logger.warning("[Ensemble] All weights are zero - using uniform weights")
             logger.warning(f"[Ensemble] Weight breakdown: {list(zip([r[0].value for r in results], weights))}")
             
-            # BUG #3 FIX: Log what's in the ToolWeightManager to debug weight propagation
+            # Note: Log what's in the ToolWeightManager to debug weight propagation
             try:
                 wm = get_weight_manager()
                 raw_weights = wm.get_raw_weights()
@@ -2708,7 +2708,7 @@ class UnifiedReasoner:
             # Ensure weights list matches number of results
             weights = [1.0 / len(results)] * len(results) if results else [1.0]
         else:
-            # BUG #3 FIX: Log when weights ARE working correctly
+            # Note: Log when weights ARE working correctly
             logger.info(f"[Ensemble] Using learned weights: {dict(zip([r[0].value for r in results], weights))}")
         
         ensemble_conclusion = self._weighted_voting(conclusions, weights)
@@ -3040,7 +3040,7 @@ class UnifiedReasoner:
         FIX: Calculate utility of a reasoning result using measured costs
         instead of placeholders.
         
-        BUG #1 FIX: Ensure utility is always positive to prevent negative weights
+        Note: Ensure utility is always positive to prevent negative weights
         in ensemble calculations. The utility model can return negative values when
         penalties (time, energy, risk) outweigh quality, but negative utility weights
         cause the ensemble to fail with "All weights are zero" fallback.
@@ -3059,7 +3059,7 @@ class UnifiedReasoner:
                 context=context,
             )
             
-            # BUG #1 FIX: Floor utility at a small positive value to prevent
+            # Note: Floor utility at a small positive value to prevent
             # negative weights in ensemble. Use 0.01 as minimum to ensure
             # tools with poor utility still contribute (just minimally) rather
             # than being completely ignored or causing negative weight products.
@@ -3203,7 +3203,7 @@ class UnifiedReasoner:
                     )
 
             elif task.task_type == ReasoningType.SYMBOLIC:
-                # BUG FIX: Handle both structured and natural language string inputs
+                # Note: Handle both structured and natural language string inputs
                 # The symbolic reasoner expects structured input (kb and hypothesis)
                 # but often receives natural language queries. We need to extract
                 # formal constraints from natural language.
@@ -3261,7 +3261,7 @@ class UnifiedReasoner:
                                 )
                             else:
                                 # =========================================================
-                                # BUG FIX (Jan 7 2026): Provide user-friendly output
+                                # Note: Provide user-friendly output
                                 # =========================================================
                                 # Previously returned debug info like:
                                 #   {"constraints_added": 1, "extracted": {...}}
@@ -3450,7 +3450,7 @@ class UnifiedReasoner:
                     result = self._create_empty_result()
 
             elif task.task_type == ReasoningType.ANALOGICAL:
-                # BUG #20 FIX: Handle ANALOGICAL reasoning type 
+                # Note: Handle ANALOGICAL reasoning type 
                 # Previously this was incorrectly handled as SYMBOLIC (duplicate branch)
                 if hasattr(reasoner, "reason"):
                     raw_result = reasoner.reason(task.input_data, task.query)
@@ -3550,7 +3550,7 @@ class UnifiedReasoner:
                             f"Failed to create reasoning chain for task {task.task_id}: {e}"
                         )
 
-        # BUG #20 FIX: Ensure result is never None
+        # Note: Ensure result is never None
         # If an elif branch didn't set result, create an empty result
         if result is None:
             logger.warning(f"[UnifiedReasoner] No result from _execute_reasoner for task_type={task.task_type}")
@@ -3735,7 +3735,7 @@ class UnifiedReasoner:
     def _get_reasoning_type_weight(self, reasoning_type: ReasoningType) -> float:
         """Get historical performance weight for reasoning type.
         
-        BUG #3 FIX: Improved weight retrieval with better logging and fallback.
+        Note: Improved weight retrieval with better logging and fallback.
         The previous implementation could return 0 in edge cases.
         """
 
@@ -3743,11 +3743,11 @@ class UnifiedReasoner:
             return 1.0
 
         try:
-            # BUG #3 FIX: First check shared weight manager for learned weights
+            # Note: First check shared weight manager for learned weights
             tool_name = reasoning_type.value if reasoning_type else "unknown"
             shared_weight = get_weight_manager().get_weight(tool_name, default=1.0)
             
-            # BUG #3 FIX: Always use at least 1.0 as minimum weight to prevent zero products
+            # Note: Always use at least 1.0 as minimum weight to prevent zero products
             # The default is 1.0, so this should normally be satisfied
             if shared_weight <= 0:
                 logger.warning(f"[Ensemble] Weight for {tool_name} is {shared_weight:.4f}, using 1.0 minimum")
@@ -3759,7 +3759,7 @@ class UnifiedReasoner:
             historical_weight = self._get_historical_weight(reasoning_type)
             combined = (shared_weight + historical_weight) / 2
             
-            # BUG #3 FIX: Ensure we never return 0 or negative
+            # Note: Ensure we never return 0 or negative
             return max(0.1, combined)
             
         except Exception as e:
@@ -3792,7 +3792,7 @@ class UnifiedReasoner:
         """
         Compute deterministic cache key for task.
         
-        BUG FIX (Jan 7 2026): Fixed cache key collision bug.
+        Note: Fixed cache key collision bug.
         
         PREVIOUS PROBLEM:
         - Cache key used only 8 chars of hash: str(hash(str(task.query)))[:8]
@@ -3888,7 +3888,7 @@ class UnifiedReasoner:
             )
             if result.confidence < threshold:
                 # =========================================================================
-                # BUG FIX (Jan 7 2026): Store debug info in metadata, NOT conclusion
+                # Note: Store debug info in metadata, NOT conclusion
                 # =========================================================================
                 # Previously, debug info was stored in conclusion like:
                 #   {"original": ..., "filtered": True, "reason": "Confidence 0.20 below threshold 0.5"}

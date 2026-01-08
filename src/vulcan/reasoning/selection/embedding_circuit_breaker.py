@@ -63,7 +63,7 @@ class CircuitState(Enum):
 # retrying embeddings. This is different from QUERY_ROUTING_TIMEOUT (5s) in
 # query_router.py which limits how long we wait for routing to complete.
 #
-# BUG FIX Issue #4: Increased DEFAULT_LATENCY_THRESHOLD_MS from 1000ms to 5000ms
+# Note Issue #4: Increased DEFAULT_LATENCY_THRESHOLD_MS from 1000ms to 5000ms
 # The previous 1000ms threshold was too aggressive and caused the circuit breaker
 # to trip on normal embeddings (observed: 3168ms). On CPU-only or slower hardware,
 # embedding generation can take 3-5 seconds which is acceptable. The 5000ms threshold

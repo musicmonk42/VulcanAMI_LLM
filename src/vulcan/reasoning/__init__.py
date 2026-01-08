@@ -236,7 +236,7 @@ except ImportError as e:
     LANGUAGE_AVAILABLE = False
 
 # ============================================================================
-# BUG #14 FIX: Cryptographic Engine - Deterministic hash/encoding computations
+# Note: Cryptographic Engine - Deterministic hash/encoding computations
 # ============================================================================
 try:
     from .cryptographic_engine import (
@@ -248,7 +248,7 @@ try:
     )
 
     CRYPTOGRAPHIC_AVAILABLE = True
-    logger.info("BUG#14 FIX: Cryptographic engine loaded successfully")
+    logger.info("Note: Cryptographic engine loaded successfully")
 except ImportError as e:
     logger.warning(f"Cryptographic engine import failed: {e}")
     CryptographicEngine = None
@@ -358,7 +358,7 @@ __all__ = [
     "LanguageReasoning",
     "LanguageReasoningConfig",
     "LanguageReasoner",
-    # ===== BUG #14 FIX: Cryptographic Engine =====
+    # ===== Note: Cryptographic Engine =====
     "CryptographicEngine",
     "CryptoOperation",
     "CryptoResult",
@@ -405,7 +405,7 @@ __all__ = [
     "MULTIMODAL_AVAILABLE",
     "PHILOSOPHICAL_AVAILABLE",  # FIX: Add availability flag
     "LANGUAGE_AVAILABLE",  # Language reasoning availability flag
-    "CRYPTOGRAPHIC_AVAILABLE",  # BUG #14 FIX: Add availability flag
+    "CRYPTOGRAPHIC_AVAILABLE",  # Note: Add availability flag
     "UNIFIED_AVAILABLE",
     "EXPLAINER_AVAILABLE",
     "SELECTION_AVAILABLE",
@@ -484,7 +484,7 @@ def create_unified_reasoner(
     """
     Convenience function to get or create a UnifiedReasoner with error handling.
 
-    ISSUE #2 FIX: Now uses singleton pattern to prevent re-initialization per query.
+    Note: Now uses singleton pattern to prevent re-initialization per query.
     The first call with specific config creates the singleton instance; subsequent
     calls return the cached instance (ignoring config).
 
@@ -508,7 +508,7 @@ def create_unified_reasoner(
         )
 
     try:
-        # ISSUE #2 FIX: Use singleton to prevent re-initialization per query
+        # Note: Use singleton to prevent re-initialization per query
         from .singletons import get_unified_reasoner
         reasoner = get_unified_reasoner(
             config=config, enable_learning=enable_learning, enable_safety=enable_safety

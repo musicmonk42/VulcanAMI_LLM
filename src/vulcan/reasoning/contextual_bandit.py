@@ -42,7 +42,7 @@ except ImportError:
 
 
 # ============================================================
-# BUG #8 FIX: Router Disagreement Penalty
+# Note: Router Disagreement Penalty
 # ============================================================
 # When the selected tool wasn't in the router's recommended list,
 # we apply this penalty to reduce the reward signal.
@@ -764,7 +764,7 @@ class ContextualBandit:
 
     def _get_tool_name(self, action_id: int) -> str:
         """Map action to tool"""
-        # BUG FIX: Added mathematical, philosophical, and world_model to complete tool list
+        # Note: Added mathematical, philosophical, and world_model to complete tool list
         tools = ["symbolic", "probabilistic", "causal", "analogical", "multimodal", "mathematical", "philosophical", "world_model"]
         return tools[action_id % len(tools)]
 
@@ -879,7 +879,7 @@ class LinUCBBandit:
             logger.error(f"LinUCB update failed: {e}")
 
     def _get_tool_name(self, action_id: int) -> str:
-        # BUG FIX: Added mathematical, philosophical, and world_model to complete tool list
+        # Note: Added mathematical, philosophical, and world_model to complete tool list
         tools = ["symbolic", "probabilistic", "causal", "analogical", "multimodal", "mathematical", "philosophical", "world_model"]
         return tools[action_id % len(tools)]
 
@@ -1021,7 +1021,7 @@ class NeuralContextualBandit(nn.Module):
             logger.error(f"Neural update failed: {e}")
 
     def _get_tool_name(self, action_id: int) -> str:
-        # BUG FIX: Added mathematical, philosophical, and world_model to complete tool list
+        # Note: Added mathematical, philosophical, and world_model to complete tool list
         tools = ["symbolic", "probabilistic", "causal", "analogical", "multimodal", "mathematical", "philosophical", "world_model"]
         return tools[action_id % len(tools)]
 
@@ -1512,7 +1512,7 @@ class ToolSelectionBandit(AdaptiveBanditOrchestrator):
     ):
         """Update from execution.
         
-        BUG #8 FIX: Added router_selected_tools and source parameters to check
+        Note: Added router_selected_tools and source parameters to check
         if the tool was CORRECT for the query type. Don't reward a tool just
         because OpenAI fallback succeeded - reward only when the tool was
         actually the right choice based on query router's analysis.
@@ -1528,7 +1528,7 @@ class ToolSelectionBandit(AdaptiveBanditOrchestrator):
             source: Source of result (e.g., 'openai_fallback', 'local')
         """
         try:
-            # BUG #8 FIX: Check if result came from OpenAI fallback
+            # Note: Check if result came from OpenAI fallback
             # If so, don't reward the selected tool - it didn't actually produce the result
             if source and 'openai' in source.lower() and 'fallback' in source.lower():
                 logger.info(
@@ -1537,7 +1537,7 @@ class ToolSelectionBandit(AdaptiveBanditOrchestrator):
                 )
                 return
             
-            # BUG #8 FIX: Check router agreement
+            # Note: Check router agreement
             # Only reward tool if it was in the router's recommended list
             if router_selected_tools and tool_name not in router_selected_tools:
                 logger.info(

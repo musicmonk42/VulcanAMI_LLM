@@ -23,7 +23,7 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 # ============================================================
-# BUG #4 FIX: Global singleton for embeddings
+# Note: Global singleton for embeddings
 # ============================================================
 # This ensures the embedding model is loaded ONCE per process,
 # preventing 50ms→6400ms performance degradation from repeated loading.
@@ -37,7 +37,7 @@ def get_global_embedding_model():
     """
     Get or create the global embedding model singleton.
     
-    BUG #4 FIX: This function ensures the SentenceTransformer model
+    Note: This function ensures the SentenceTransformer model
     is loaded only ONCE per process, preventing expensive reloads that
     cause performance degradation.
     
@@ -364,7 +364,7 @@ class BayesianMemoryPrior:
                 "Using keyword-only tool selection."
             )
         elif SEMANTIC_MATCHER_AVAILABLE:
-            # BUG #4 FIX: Use singleton pattern ONLY - never create new SemanticToolMatcher instances
+            # Note: Use singleton pattern ONLY - never create new SemanticToolMatcher instances
             # Creating new instances causes embedding model to reload (50ms → 6400ms degradation)
             try:
                 from vulcan.reasoning.singletons import get_semantic_matcher
@@ -372,14 +372,14 @@ class BayesianMemoryPrior:
                 if self.semantic_matcher is not None:
                     logger.info("[BayesianMemoryPrior] Semantic matching ENABLED (using singleton from registry)")
                 else:
-                    # BUG #4 FIX: Do NOT fallback to direct creation - this causes model reload
+                    # Note: Do NOT fallback to direct creation - this causes model reload
                     # Instead, log warning and continue without semantic matching
                     logger.warning(
                         "[BayesianMemoryPrior] Singleton SemanticToolMatcher not available. "
                         "Using keyword-only matching to prevent embedding model reload."
                     )
             except ImportError as e:
-                # BUG #4 FIX: Do NOT create new SemanticToolMatcher - causes model reload
+                # Note: Do NOT create new SemanticToolMatcher - causes model reload
                 logger.warning(
                     f"[BayesianMemoryPrior] Singletons module not available: {e}. "
                     "Using keyword-only matching to prevent embedding model reload."
@@ -509,7 +509,7 @@ class BayesianMemoryPrior:
                 prior = self._uniform_prior(available_tools)
 
         # ================================================================
-        # BUG #0 FIX EXTENSION: Check if semantic boost should be skipped
+        # Note EXTENSION: Check if semantic boost should be skipped
         # When the LLM classifier has made an authoritative decision about
         # the query category (UNKNOWN, CREATIVE, CONVERSATIONAL, etc.),
         # we should NOT override it with semantic embedding matching.
@@ -572,7 +572,7 @@ class BayesianMemoryPrior:
                     logger.warning(f"Semantic boost failed: {e}")
 
         # Additional boost for multimodal when multimodal content is detected
-        # BUG #2 FIX: Only apply boost when actual multimodal data is present
+        # Note: Only apply boost when actual multimodal data is present
         # (detected via stricter checks in tool_selector.py), NOT just keyword matches
         if context and context.get('is_multimodal') and 'multimodal' in available_tools:
             # Double-check: Only boost if we have evidence of actual multimodal data

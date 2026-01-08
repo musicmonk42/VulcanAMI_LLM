@@ -289,7 +289,7 @@ class PortfolioExecutor:
         return engines
 
     # =============================================================================
-    # BUG #2 FIX (Jan 7 2026): Tool Fallback Mapping
+    # Note (Jan 7 2026): Tool Fallback Mapping
     # =============================================================================
     # If a requested tool isn't available, map it to an equivalent tool.
     # This prevents "No valid tools found in ['philosophical']" errors when
@@ -361,14 +361,14 @@ class PortfolioExecutor:
             # Validate tools exist, with fallback support
             valid_tools = [t for t in tool_names if t in self.tools]
             
-            # BUG #2 FIX (Jan 7 2026): Try fallbacks for unavailable tools
+            # Note (Jan 7 2026): Try fallbacks for unavailable tools
             if not valid_tools:
                 for requested_tool in tool_names:
                     if requested_tool not in self.tools:
                         fallbacks = self._get_fallback_tools(requested_tool)
                         if fallbacks:
                             logger.warning(
-                                f"[PortfolioExecutor] BUG#2 FIX: Tool '{requested_tool}' not available, "
+                                f"[PortfolioExecutor] Note: Tool '{requested_tool}' not available, "
                                 f"using fallback: {fallbacks[0]}"
                             )
                             valid_tools.append(fallbacks[0])

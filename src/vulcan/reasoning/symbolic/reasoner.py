@@ -58,9 +58,9 @@ from .core import (
 
 # FIX: This import will now work correctly after the move of the classes
 from .parsing import ASTConverter, Lexer, Parser
-# BUG #5 FIX: Import the NL to Logic converter for handling natural language queries
+# Note: Import the NL to Logic converter for handling natural language queries
 from .nl_converter import NaturalLanguageToLogicConverter
-# BUG #8 FIX: Import the formula validator for pre-validation with helpful errors
+# Note: Import the formula validator for pre-validation with helpful errors
 from .formula_validator import FormulaValidator
 from .provers import (
     BaseProver,
@@ -75,7 +75,7 @@ logger = logging.getLogger(__name__)
 
 
 # ============================================================================
-# TASK 5 FIX: Confidence Constants for Symbolic Reasoning
+# Note: Confidence Constants for Symbolic Reasoning
 # ============================================================================
 
 # Confidence when symbolic reasoner successfully proves a query
@@ -126,7 +126,7 @@ class SymbolicReasoner:
         >>> result = reasoner.query("mortal(socrates)")
     """
 
-    # BUG #4 FIX: Constants for symbolic query detection
+    # Note: Constants for symbolic query detection
     # Minimum number of logic keywords required to classify as symbolic
     MIN_LOGIC_KEYWORDS = 2
     
@@ -144,9 +144,9 @@ class SymbolicReasoner:
         self.prover_type = prover_type
         self.prover = self._create_prover()
         self.converter = ASTConverter()
-        # BUG #5 FIX: Initialize NL to Logic converter for handling natural language queries
+        # Note: Initialize NL to Logic converter for handling natural language queries
         self.nl_converter = NaturalLanguageToLogicConverter()
-        # BUG #8 FIX: Initialize formula validator for pre-validation with helpful errors
+        # Note: Initialize formula validator for pre-validation with helpful errors
         self.formula_validator = FormulaValidator()
 
     def _create_prover(self) -> BaseProver:
@@ -164,7 +164,7 @@ class SymbolicReasoner:
 
     def is_symbolic_query(self, query: str) -> bool:
         """
-        BUG #4 FIX: Check if query is actually about formal logic.
+        Note: Check if query is actually about formal logic.
         
         The symbolic parser expects formal logic but often receives natural language,
         causing parse errors like "Unexpected token 'the' at line 1, column 5".
@@ -291,7 +291,7 @@ class SymbolicReasoner:
 
     def check_applicability(self, query: str) -> Dict[str, Any]:
         """
-        BUG #4 FIX: Check if query is applicable for symbolic reasoning.
+        Note: Check if query is applicable for symbolic reasoning.
         
         This is the public interface for applicability checking. Use this before
         calling query() to avoid parse errors on non-symbolic queries.
@@ -351,7 +351,7 @@ class SymbolicReasoner:
         Args:
             query_str: Query formula
             timeout: Timeout in seconds
-            check_applicability: BUG #4 FIX - If True, check if query is symbolic before parsing
+            check_applicability: Note - If True, check if query is symbolic before parsing
 
         Returns:
             Dictionary with:
@@ -359,19 +359,19 @@ class SymbolicReasoner:
                 - confidence: float
                 - proof: ProofNode or None
                 - method: str (if parallel prover)
-                - applicable: bool (BUG #4 FIX - whether query was applicable for symbolic reasoning)
-                - validation: str (BUG #6 FIX - 'PASSED' if model validated, 'FAILED' if not)
+                - applicable: bool (Note - whether query was applicable for symbolic reasoning)
+                - validation: str (Note - 'PASSED' if model validated, 'FAILED' if not)
         """
-        # BUG #4 FIX: Check applicability before attempting to parse
+        # Note: Check applicability before attempting to parse
         # This prevents parse errors like "Unexpected token 'the'" on natural language
         if check_applicability and not self.is_symbolic_query(query_str):
             logger.warning(
                 f"[SymbolicReasoner] Query does not appear to contain formal logic, "
-                f"returning not applicable (BUG#4 FIX prevents wasted computation)"
+                f"returning not applicable (prevents wasted computation)"
             )
             return {
                 "proven": False,
-                # TASK 5 FIX: Return 0.0 for non-applicable so it routes to correct engine
+                # Note: Return 0.0 for non-applicable so it routes to correct engine
                 "confidence": SYMBOLIC_NOT_APPLICABLE_CONFIDENCE,
                 "proof": None,
                 "method": self.prover_type,
@@ -405,31 +405,31 @@ class SymbolicReasoner:
                     "applicable": True,
                 }
             
-            # TASK 5 FIX: Boost confidence for applicable queries that succeed
+            # Note: Boost confidence for applicable queries that succeed
             # If the query is in our domain (passed applicability check) and we got a result,
             # we should have high confidence - symbolic provers are deterministic
             if result.get("applicable") and result.get("proven"):
                 # Proven results from symbolic reasoner should be high confidence
                 result["confidence"] = max(result.get("confidence", 0.0), SYMBOLIC_PROVEN_CONFIDENCE)
                 logger.debug(
-                    f"[SymbolicReasoner] TASK 5 FIX: Boosted confidence to {result['confidence']:.2f} "
+                    f"[SymbolicReasoner] Note: Boosted confidence to {result['confidence']:.2f} "
                     f"(proven result in symbolic domain)"
                 )
             elif result.get("applicable") and not result.get("proven"):
                 # We tried but couldn't prove - moderate confidence (we did the work)
                 result["confidence"] = max(result.get("confidence", 0.0), SYMBOLIC_UNPROVABLE_CONFIDENCE)
             
-            # BUG #6 FIX: Validate result before returning success
+            # Note: Validate result before returning success
             # If we claim something is proven, verify we can extract a valid model
             if result["proven"] and result["confidence"] >= 0.5:
                 validation_passed = self._validate_proof_result(result, query_str)
                 if not validation_passed:
                     logger.error(
-                        f"[SymbolicReasoner] BUG#6 FIX: Result validation FAILED! "
+                        f"[SymbolicReasoner] Note: Result validation FAILED! "
                         f"Proof claims success but validation failed."
                     )
                     result["proven"] = False
-                    # TASK 5 FIX: Still give moderate confidence since we processed the query
+                    # Note: Still give moderate confidence since we processed the query
                     result["confidence"] = SYMBOLIC_VALIDATION_FAILED_CONFIDENCE
                     result["validation"] = "FAILED"
                     result["error"] = "Model validation failed - result may violate constraints"
@@ -440,13 +440,13 @@ class SymbolicReasoner:
             
         except Exception as e:
             logger.error(f"Query failed: {e}")
-            # TASK 5 FIX: Return moderate confidence for parse errors on applicable queries
+            # Note: Return moderate confidence for parse errors on applicable queries
             # The query looked like it was in our domain but failed to parse
             return {"proven": False, "confidence": SYMBOLIC_PARSE_ERROR_CONFIDENCE, "proof": None, "error": str(e), "applicable": True}
 
     def _validate_proof_result(self, result: Dict[str, Any], query_str: str) -> bool:
         """
-        BUG #6 FIX: Validate that proof result is internally consistent.
+        Note: Validate that proof result is internally consistent.
         
         This prevents false success reporting where:
         - SAT result claims A=T, B=T, C=F but this violates B→C
@@ -462,7 +462,7 @@ class SymbolicReasoner:
         # Basic validation: if proven is True, confidence should be reasonable
         if result.get("proven") and result.get("confidence", 0) < 0.3:
             logger.warning(
-                f"[SymbolicReasoner] BUG#6 FIX: Suspicious result - "
+                f"[SymbolicReasoner] Note: Suspicious result - "
                 f"proven=True but confidence={result.get('confidence')}"
             )
             return False
@@ -474,7 +474,7 @@ class SymbolicReasoner:
             conclusion = getattr(proof, "conclusion", None)
             if conclusion is None or not str(conclusion).strip():
                 logger.warning(
-                    f"[SymbolicReasoner] BUG#6 FIX: Proof has no valid conclusion"
+                    f"[SymbolicReasoner] Note: Proof has no valid conclusion"
                 )
                 return False
         
@@ -485,12 +485,12 @@ class SymbolicReasoner:
         """
         FIXED: Complete formula parser with comprehensive support.
 
-        BUG #5 FIX: Now includes Natural Language to Logic conversion.
+        Note: Now includes Natural Language to Logic conversion.
         The parser first attempts to parse the input as formal logic.
         If that fails, it tries to convert natural language to formal logic
         before falling back to the simple parser.
         
-        BUG #8 FIX: Now validates formula syntax FIRST and provides helpful
+        Note: Now validates formula syntax FIRST and provides helpful
         error messages instead of cryptic parse errors.
 
         Handles:
@@ -515,13 +515,13 @@ class SymbolicReasoner:
             logger.debug("Empty formula string received, returning empty clause")
             return Clause(literals=[], is_goal=False)
 
-        # BUG #8 FIX: Pre-validate formula syntax for helpful error messages
+        # Note: Pre-validate formula syntax for helpful error messages
         # Only validate if it looks like formal logic (has logic symbols)
         if self.is_symbolic_query(formula_str):
             is_valid, error_msg = self.formula_validator.validate(formula_str)
             if not is_valid:
                 logger.warning(
-                    f"[SymbolicReasoner] BUG#8 FIX: Formula validation failed:\n{error_msg}"
+                    f"[SymbolicReasoner] Note: Formula validation failed:\n{error_msg}"
                 )
                 # Don't raise immediately - try NL conversion as it might be natural language
                 # But log the validation error for debugging
@@ -543,10 +543,10 @@ class SymbolicReasoner:
             return clause
 
         except Exception as e:
-            # BUG #5 FIX: Try NL to Logic conversion before fallback
+            # Note: Try NL to Logic conversion before fallback
             if logger.isEnabledFor(logging.INFO):
                 logger.info(
-                    f"[SymbolicReasoner] BUG#5 FIX: Standard parser failed for "
+                    f"[SymbolicReasoner] Note: Standard parser failed for "
                     f"'{formula_str[:50]}...', attempting NL to Logic conversion"
                 )
             
@@ -557,7 +557,7 @@ class SymbolicReasoner:
                 if formal_logic and formal_logic != formula_str:
                     if logger.isEnabledFor(logging.INFO):
                         logger.info(
-                            f"[SymbolicReasoner] BUG#5 FIX: Converted NL to formal logic: "
+                            f"[SymbolicReasoner] Note: Converted NL to formal logic: "
                             f"'{formula_str[:30]}...' -> '{formal_logic}'"
                         )
                     
@@ -571,7 +571,7 @@ class SymbolicReasoner:
                         return clause
                     except Exception as inner_e:
                         logger.warning(
-                            f"[SymbolicReasoner] BUG#5 FIX: Converted logic still failed to parse: {inner_e}"
+                            f"[SymbolicReasoner] Note: Converted logic still failed to parse: {inner_e}"
                         )
             except Exception as nl_e:
                 logger.debug(f"[SymbolicReasoner] NL conversion failed: {nl_e}")
@@ -713,7 +713,7 @@ class SymbolicReasoner:
 
     def clear_state(self):
         """
-        BUG #4 FIX: Clear knowledge base and prover state to prevent cross-query contamination.
+        Note: Clear knowledge base and prover state to prevent cross-query contamination.
         
         This should be called before each new reasoning query when working with
         independent queries that shouldn't share state.
@@ -734,10 +734,10 @@ class SymbolicReasoner:
         # Re-create converter to clear any internal state
         self.converter = ASTConverter()
         
-        # BUG #5 FIX: Reset NL converter as well
+        # Note: Reset NL converter as well
         self.nl_converter = NaturalLanguageToLogicConverter()
         
-        # BUG #8 FIX: Reset formula validator (stateless, but for consistency)
+        # Note: Reset formula validator (stateless, but for consistency)
         self.formula_validator = FormulaValidator()
 
     def explain_proof(self, proof: Optional[ProofNode]) -> str:
@@ -816,7 +816,7 @@ class ProbabilisticReasoner:
 
     def clear_state(self):
         """
-        BUG #4 FIX: Clear all state to prevent cross-query contamination.
+        Note: Clear all state to prevent cross-query contamination.
         
         This resets the Bayesian network, rules, and variables to their
         initial state, allowing independent queries to not interfere.

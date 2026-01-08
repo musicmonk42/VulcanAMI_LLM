@@ -69,7 +69,7 @@ Error Handling:
 """
 
 import atexit
-import dataclasses  # BUG #4 FIX: Import at module level for dataclasses.asdict() usage
+import dataclasses  # Note: Import at module level for dataclasses.asdict() usage
 import hashlib
 import logging
 import os
@@ -118,12 +118,12 @@ DEFAULT_TIME_BUDGET_MS = 5000  # Default time budget in milliseconds
 DEFAULT_ENERGY_BUDGET_MJ = 1000  # Default energy budget in millijoules
 DEFAULT_MIN_CONFIDENCE = 0.5  # Minimum confidence threshold for results
 
-# BUG #3 FIX: Maximum fallback attempts to prevent infinite retry loops
+# Note: Maximum fallback attempts to prevent infinite retry loops
 # Production logs showed 8+ attempts with the same failed tool (symbolic)
 # This limit ensures we stop retrying after a reasonable number of attempts
 MAX_FALLBACK_ATTEMPTS = 2  # Don't retry more than 2 times per query
 
-# BUG #3 FIX: Minimum confidence floor when all tools fail
+# Note: Minimum confidence floor when all tools fail
 # When all fallback attempts fail, set this minimum floor to allow processing
 MIN_CONFIDENCE_FLOOR = 0.15  # Prevent total query refusal
 
@@ -151,7 +151,7 @@ HIGH_COMPLEXITY_THRESHOLD = 0.7  # Above this, use ACCURATE mode
 # causing "ProblemDecomposer boots up then silence" behavior.
 # Decomposition is essential for complex problem solving.
 #
-# BUG #1 FIX: Further lowered default from 0.70 to 0.50 
+# Note: Further lowered default from 0.70 to 0.50 
 # 0.70 is still too high - most queries won't trigger decomposition
 # Complex queries (0.4-0.7 complexity) should use decomposition
 #
@@ -296,7 +296,7 @@ ROUTE_TO_REASONING_TYPE: Dict[str, str] = {
     "IDENTITY-FAST-PATH": "symbolic",            # Identity queries use symbolic reasoning
     "CONVERSATIONAL-FAST-PATH": "hybrid",        # Conversational uses hybrid
     "FACTUAL-FAST-PATH": "probabilistic",        # Factual queries use probabilistic
-    "ANALOGICAL-PATH": "analogical",             # BUG #2 FIX: Added analogical fast-path
+    "ANALOGICAL-PATH": "analogical",             # Note: Added analogical fast-path
     # QueryType enum values from query_router.py
     "philosophical": "philosophical",            # PHILOSOPHICAL query type
     "mathematical": "mathematical",              # MATHEMATICAL query type
@@ -307,8 +307,8 @@ ROUTE_TO_REASONING_TYPE: Dict[str, str] = {
     "general": "hybrid",                         # GENERAL query type (default)
     "reasoning": "causal",                       # Generic reasoning
     "execution": "symbolic",                     # Execution tasks
-    "analogical": "analogical",                  # BUG #2 FIX: Added analogical mapping
-    "perception": "analogical",                  # BUG #2 FIX: Perception often uses analogical reasoning
+    "analogical": "analogical",                  # Note: Added analogical mapping
+    "perception": "analogical",                  # Note: Perception often uses analogical reasoning
     # Legacy/fallback mappings
     "HYBRID": "hybrid",
     "UNKNOWN": "hybrid",
@@ -518,7 +518,7 @@ class ReasoningIntegration:
         self._shutdown = False
         self._shutdown_lock = threading.Lock()
         
-        # BUG #3 FIX: Track fallback attempts per query to prevent infinite loops
+        # Note: Track fallback attempts per query to prevent infinite loops
         # Maps query hash to number of fallback attempts
         self._fallback_attempts: Dict[str, int] = {}
         self._fallback_attempts_lock = threading.Lock()
@@ -918,8 +918,8 @@ class ReasoningIntegration:
 
         try:
             # =================================================================
-            # Issue #5 FIX: Check for self-referential queries FIRST
-            # Issue #3 FIX: Also check for ethical queries that need world model
+            # Note: Check for self-referential queries FIRST
+            # Note: Also check for ethical queries that need world model
             # =================================================================
             # World model handles queries about VULCAN's self directly.
             # For ALL queries that are about VULCAN itself (capabilities,
@@ -934,11 +934,11 @@ class ReasoningIntegration:
                 query_type_label = 'self-referential' if is_self_ref else 'ethical'
                 if is_self_ref and is_ethical:
                     query_type_label = 'self-referential and ethical'
-                logger.info(f"{LOG_PREFIX} Issue#5 FIX: {query_type_label.capitalize()} query detected - consulting world model first")
+                logger.info(f"{LOG_PREFIX} Note: {query_type_label.capitalize()} query detected - consulting world model first")
                 wm_result = self._consult_world_model_introspection(query)
                 
                 # ═══════════════════════════════════════════════════════════════════
-                # Issue #1 & #2 FIX: Handle World Model Delegation
+                # Note: Handle World Model Delegation
                 # The world model now has delegation intelligence - it can detect when
                 # a query LOOKS self-referential but actually needs another reasoner.
                 # Example: "Trolley problem - you must choose" is ethical reasoning
@@ -950,7 +950,7 @@ class ReasoningIntegration:
                     delegation_reason = wm_result.get("delegation_reason", "")
                     
                     logger.info(
-                        f"{LOG_PREFIX} Issue#1&2 FIX: World model recommends DELEGATION to "
+                        f"{LOG_PREFIX} Note: World model recommends DELEGATION to "
                         f"'{recommended_tool}' - {delegation_reason}"
                     )
                     
@@ -958,7 +958,7 @@ class ReasoningIntegration:
                     # CRITICAL FIX (Jan 6 2026): EXECUTE DELEGATION IMMEDIATELY
                     # ═══════════════════════════════════════════════════════════════════
                     # PROBLEM: Previous code set context flags and continued to normal
-                    # processing, but TASK 3 FIX in tool_selector.py was overriding
+                    # processing, but Note in tool_selector.py was overriding
                     # the delegation because it checks for formal logic BEFORE checking
                     # delegation context.
                     #
@@ -973,7 +973,7 @@ class ReasoningIntegration:
                     # ═══════════════════════════════════════════════════════════════════
                     
                     logger.info(
-                        f"{LOG_PREFIX} BUG#2 FIX: World model delegation ACTIVE - "
+                        f"{LOG_PREFIX} Note: World model delegation ACTIVE - "
                         f"executing '{recommended_tool}' immediately (NOT falling through)"
                     )
                     
@@ -1016,25 +1016,25 @@ class ReasoningIntegration:
                     result.metadata["selection_time_ms"] = selection_time
                     
                     logger.info(
-                        f"{LOG_PREFIX} BUG#2 FIX: Delegation complete - executed '{recommended_tool}' "
+                        f"{LOG_PREFIX} Note: Delegation complete - executed '{recommended_tool}' "
                         f"with confidence={result.confidence:.2f} (EARLY RETURN)"
                     )
                     
                     # EARLY RETURN - Do NOT fall through to normal processing
                     return result
                 
-                # Issue #3 FIX: Lower threshold from 0.7 to 0.5 for world model
+                # Note: Lower threshold from 0.7 to 0.5 for world model
                 # Only use world model result if NOT delegating
                 elif wm_result is not None and wm_result.get("confidence", 0) >= 0.5:
                     # World model can handle this directly
                     selection_time = (time.perf_counter() - selection_start) * 1000
                     
-                    # TASK 11 FIX: Include conclusion in metadata for proper extraction
+                    # Note: Include conclusion in metadata for proper extraction
                     # The world model's response IS the conclusion for self-introspection queries
                     world_model_response = wm_result.get("response", "")
                     
                     logger.info(
-                        f"{LOG_PREFIX} Issue#3 FIX: World model returned confidence "
+                        f"{LOG_PREFIX} Note: World model returned confidence "
                         f"{wm_result['confidence']:.2f}. Using this result directly "
                         f"without other engines."
                     )
@@ -1054,7 +1054,7 @@ class ReasoningIntegration:
                             "self_referential": is_self_ref,
                             "ethical_query": is_ethical,
                             "world_model_response": world_model_response,
-                            # TASK 11 FIX: Add conclusion field so main.py can extract it
+                            # Note: Add conclusion field so main.py can extract it
                             "conclusion": world_model_response,
                             "explanation": wm_result.get("reasoning", ""),
                             "reasoning_type": reasoning_type,
@@ -1064,7 +1064,7 @@ class ReasoningIntegration:
                     )
 
             # =================================================================
-            # BUG #0 FIX: LLM-BASED QUERY CLASSIFICATION (ROOT CAUSE FIX)
+            # Note: LLM-BASED QUERY CLASSIFICATION (ROOT CAUSE FIX)
             # =================================================================
             # The problem: "hello" (5 chars) was getting complexity=0.50 from
             # heuristic-based calculation, causing it to hit full reasoning.
@@ -1124,17 +1124,17 @@ class ReasoningIntegration:
                     complexity = classification.complexity
                 
                 # If classifier suggested specific tools, pass them to context
-                # BUG #2 FIX: DON'T override world model delegation!
+                # Note: DON'T override world model delegation!
                 # If world_model_delegation is set, the world model has already determined
                 # the correct tool. The classifier should NOT override this expert judgment.
                 if classification.suggested_tools:
                     if context is None:
                         context = {}
                     
-                    # BUG #2 FIX: Check if world model delegation is active
+                    # Note: Check if world model delegation is active
                     if context.get('world_model_delegation'):
                         logger.info(
-                            f"{LOG_PREFIX} BUG#2 FIX: World model delegation ACTIVE - "
+                            f"{LOG_PREFIX} Note: World model delegation ACTIVE - "
                             f"NOT overriding with classifier tools {classification.suggested_tools}. "
                             f"Using delegated tool: {context.get('classifier_suggested_tools')}"
                         )
@@ -1155,16 +1155,16 @@ class ReasoningIntegration:
                 # (e.g., "What is the capital of France?") but QueryRouter may
                 # incorrectly override with specialized tools like ['probabilistic'].
                 # Respect the LLM classifier's judgment for these categories.
-                # BUG A FIX: Added CREATIVE and CHITCHAT to skip reasoning
-                # BUG S FIX: Added SELF_INTROSPECTION - these must use world_model tool
+                # Note: Added CREATIVE and CHITCHAT to skip reasoning
+                # Note: Added SELF_INTROSPECTION - these must use world_model tool
                 SIMPLE_QUERY_CATEGORIES = frozenset([
                     'FACTUAL', 'CONVERSATIONAL', 'UNKNOWN', 'GREETING',
-                    'CREATIVE', 'CHITCHAT',  # BUG A FIX: Creative/chitchat skip reasoning
+                    'CREATIVE', 'CHITCHAT',  # Note: Creative/chitchat skip reasoning
                     'factual', 'conversational', 'unknown', 'greeting',
                     'creative', 'chitchat',  # lowercase variants
                 ])
                 
-                # BUG S FIX: Self-introspection queries MUST use world_model tool
+                # Note: Self-introspection queries MUST use world_model tool
                 # These query Vulcan's sense of self (CSIU, motivations, ethics, etc.)
                 SELF_INTROSPECTION_CATEGORIES = frozenset([
                     'SELF_INTROSPECTION', 'self_introspection',
@@ -1436,7 +1436,7 @@ class ReasoningIntegration:
                 }
 
                 # ================================================================
-                # BUG C FIX: Pass preprocessing result as part of problem dict
+                # Note: Pass preprocessing result as part of problem dict
                 # ================================================================
                 # The SymbolicToolWrapper.reason() method expects preprocessing
                 # to be in problem['preprocessing'], not just in context.
@@ -1453,7 +1453,7 @@ class ReasoningIntegration:
                             'preprocessing': preprocessing,
                         }
                         logger.info(
-                            f"{LOG_PREFIX} BUG C FIX: Passing preprocessing to tool via problem dict"
+                            f"{LOG_PREFIX} Note: Passing preprocessing to tool via problem dict"
                         )
                 
                 # Create selection request
@@ -1498,7 +1498,7 @@ class ReasoningIntegration:
                 )
 
                 # ================================================================
-                # BUG #2 & #3 FIX: Fallback logic with retry limit
+                # Note: Fallback logic with retry limit
                 # When confidence is < 0.1, the tool failed to process the query.
                 # Instead of giving up, try fallback tools - but limit retries.
                 # 
@@ -1508,7 +1508,7 @@ class ReasoningIntegration:
                 if confidence < 0.1 and selected_tools:
                     original_tool = selected_tools[0] if selected_tools else 'unknown'
                     
-                    # BUG #3 FIX: Check and increment fallback attempt counter
+                    # Note: Check and increment fallback attempt counter
                     # Using SHA-256 instead of MD5 for security (per code review)
                     query_hash = hashlib.sha256(query.encode()).hexdigest()[:16]
                     with self._fallback_attempts_lock:
@@ -1516,7 +1516,7 @@ class ReasoningIntegration:
                         
                         if current_attempts >= MAX_FALLBACK_ATTEMPTS:
                             logger.error(
-                                f"{LOG_PREFIX} BUG#3 FIX: Max fallback attempts "
+                                f"{LOG_PREFIX} Note: Max fallback attempts "
                                 f"({MAX_FALLBACK_ATTEMPTS}) exceeded for query {query_hash}. "
                                 f"Stopping retry loop to prevent resource waste."
                             )
@@ -1529,7 +1529,7 @@ class ReasoningIntegration:
                     # Only try fallback if we haven't exceeded max attempts
                     if current_attempts < MAX_FALLBACK_ATTEMPTS:
                         logger.warning(
-                            f"{LOG_PREFIX} BUG#2 FIX: Tool '{original_tool}' returned very low "
+                            f"{LOG_PREFIX} Note: Tool '{original_tool}' returned very low "
                             f"confidence ({confidence:.3f}), trying fallback tools "
                             f"(attempt {current_attempts + 1}/{MAX_FALLBACK_ATTEMPTS})"
                         )
@@ -1547,7 +1547,7 @@ class ReasoningIntegration:
                                 logger.info(f"{LOG_PREFIX} Trying fallback tool: {fallback_tool}")
                                 
                                 # Create fallback request
-                                # BUG #1 FIX: Set fallback_attempt=True to bypass classifier
+                                # Note: Set fallback_attempt=True to bypass classifier
                                 fallback_request = SelectionRequest(
                                     problem=problem_for_request,
                                     constraints=constraints,
@@ -1642,7 +1642,7 @@ class ReasoningIntegration:
                 query_type, complexity
             )
 
-        # BUG #7 FIX: Include fallback status in result metadata to make failures visible
+        # Note: Include fallback status in result metadata to make failures visible
         # If rationale contains "Fallback" or "failed", the primary engine failed
         used_fallback = "fallback" in rationale.lower() or "failed" in rationale.lower()
         primary_engine_failed = used_fallback and confidence < CONFIDENCE_HIGH_THRESHOLD
@@ -1682,7 +1682,7 @@ class ReasoningIntegration:
             "complexity": complexity,
             "tool_selector_available": self._tool_selector is not None,
             "portfolio_executor_available": self._portfolio_executor is not None,
-            # BUG #7 FIX: Explicitly track fallback usage
+            # Note: Explicitly track fallback usage
             "used_fallback": used_fallback,
             "primary_engine_failed": primary_engine_failed,
             # FIX: Track tentative status for medium-confidence results
@@ -1696,10 +1696,10 @@ class ReasoningIntegration:
             ),
         }
         
-        # BUG #7 FIX: If primary engine failed, make it clear in the result
+        # Note: If primary engine failed, make it clear in the result
         if primary_engine_failed:
             logger.warning(
-                f"{LOG_PREFIX} BUG#7 FIX: Primary reasoning engine failed. "
+                f"{LOG_PREFIX} Note: Primary reasoning engine failed. "
                 f"Result is from fallback (confidence={confidence:.2f}). "
                 f"Original rationale: {rationale}"
             )
@@ -1783,7 +1783,7 @@ class ReasoningIntegration:
             )
 
             # Step 3: Select tools ONCE based on ORIGINAL query
-            # BUG FIX: Previously, step descriptions (~28 chars like "Step 1: Parse constraints")
+            # Note: Previously, step descriptions (~28 chars like "Step 1: Parse constraints")
             # were passed to ToolSelector instead of the original query (e.g., 507 chars).
             # This caused semantic matching to fail because it was matching against
             # short step descriptions instead of the actual user query.
@@ -2076,7 +2076,7 @@ class ReasoningIntegration:
             )
             
             # Build request payload
-            # BUG #4 FIX: Sanitize context to make it JSON serializable
+            # Note: Sanitize context to make it JSON serializable
             # The context may contain PreprocessingResult objects which aren't
             # JSON serializable. Convert them to dictionaries using to_dict().
             sanitized_context = self._sanitize_context_for_json(context or {})
@@ -2163,7 +2163,7 @@ class ReasoningIntegration:
     
     def _sanitize_context_for_json(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """
-        BUG #4 FIX: Sanitize context dictionary to make it JSON serializable.
+        Note: Sanitize context dictionary to make it JSON serializable.
         
         The context may contain objects like PreprocessingResult that have
         to_dict() methods. This function recursively converts such objects
@@ -2234,14 +2234,14 @@ class ReasoningIntegration:
         return sanitize_value(context)
 
     # =========================================================================
-    # Issue #5 FIX: Self-Referential Query Handling
+    # Note: Self-Referential Query Handling
     # =========================================================================
     
     def _is_self_referential(self, query: str) -> bool:
         """
         Check if query is about VULCAN itself (self-awareness, capabilities, etc.)
         
-        Issue #5 FIX: Self-referential queries should be routed to the world model's
+        Self-referential queries should be routed to the world model's
         introspection system rather than domain-specific reasoners.
         
         CRITICAL: Must distinguish between:
@@ -2321,7 +2321,7 @@ class ReasoningIntegration:
         """
         Detect ethical queries that should use world model.
         
-        Issue #3 FIX: Ethical/deontic queries need the world model's ethical
+        Ethical/deontic queries need the world model's ethical
         reasoning capabilities rather than domain-specific reasoners.
         
         Examples:
@@ -2358,7 +2358,7 @@ class ReasoningIntegration:
         """
         Consult the world model's introspection system for self-referential queries.
         
-        Issue #5 FIX: Route self-awareness queries to the world model which maintains
+        Route self-awareness queries to the world model which maintains
         VULCAN's sense of "self" and can answer questions about capabilities,
         preferences, and limitations.
         
@@ -2433,7 +2433,7 @@ class ReasoningIntegration:
         """
         strategy = self._determine_strategy_from_query(query_type, complexity)
 
-        # BUG #3 FIX: Adjust confidence based on complexity
+        # Note: Adjust confidence based on complexity
         # High-complexity queries that fall back should have lower confidence
         # because we couldn't handle them properly
         if complexity >= 0.7:
@@ -2853,7 +2853,7 @@ class ReasoningIntegration:
             
             # Record transfer in domain bridge
             if transferred:
-                # BUG #6 FIX: Safe set subtraction - handle edge cases
+                # Note: Safe set subtraction - handle edge cases
                 # If domains has exactly one element equal to primary_domain,
                 # (domains - {primary_domain}) is empty and [0] would raise IndexError
                 other_domains = list(domains - {primary_domain})
@@ -2884,7 +2884,7 @@ class ReasoningIntegration:
             
         except Exception as e:
             logger.warning(f"{LOG_PREFIX} Cross-domain transfer failed: {e}")
-            # BUG #5 FIX: Properly check if domains variable exists
+            # Note: Properly check if domains variable exists
             # Use 'domains' in locals() to check if local variable is defined
             domains_list = list(locals().get('domains', set()) or [])
             return {

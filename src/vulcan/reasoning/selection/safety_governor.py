@@ -52,7 +52,7 @@ NON_CRITICAL_VIOLATION_TYPES = frozenset(
 )
 
 # ==============================================================================
-# BUG #2 FIX: Complementary Reasoning Paradigms
+# Note: Complementary Reasoning Paradigms
 # ==============================================================================
 # Different reasoning paradigms (causal, symbolic, probabilistic, analogical,
 # multimodal) are COMPLEMENTARY, not redundant. They produce different outputs
@@ -1845,7 +1845,7 @@ class SafetyGovernor:
         Critical violations include security breaches, harmful content, and
         violations where the tool's contract requires CRITICAL safety level.
 
-        BUG #2 FIX: Different reasoning paradigms (causal, symbolic, etc.) are
+        Note: Different reasoning paradigms (causal, symbolic, etc.) are
         COMPLEMENTARY, not redundant. They SHOULD produce different outputs.
         Inconsistent_output is NEVER critical when comparing different paradigms.
 
@@ -1856,7 +1856,7 @@ class SafetyGovernor:
         Returns:
             True if the violation is critical, False otherwise
         """
-        # BUG #2 FIX: Inconsistent output is NEVER critical for complementary reasoning tools
+        # Note: Inconsistent output is NEVER critical for complementary reasoning tools
         # Different paradigms SHOULD produce different outputs - that's by design
         if "inconsistent" in violation_type:
             if tool in COMPLEMENTARY_REASONING_TOOLS:
@@ -2073,7 +2073,7 @@ class SafetyGovernor:
     def check_consensus(self, outputs: Dict[str, Any]) -> Tuple[bool, float, str]:
         """Check consensus among multiple tool outputs.
 
-        BUG #2 FIX: Different reasoning paradigms (causal, symbolic, probabilistic,
+        Note: Different reasoning paradigms (causal, symbolic, probabilistic,
         analogical, multimodal) are COMPLEMENTARY, not redundant. They SHOULD
         produce different outputs - that's by design. Only check consistency for
         same-type tools (e.g., two causal reasoners).
@@ -2082,7 +2082,7 @@ class SafetyGovernor:
         try:
             tool_names = list(outputs.keys())
 
-            # BUG #2 FIX: If all tools are different reasoning paradigms, skip consensus check
+            # Note: If all tools are different reasoning paradigms, skip consensus check
             reasoning_tools = [
                 t for t in tool_names if t in COMPLEMENTARY_REASONING_TOOLS
             ]

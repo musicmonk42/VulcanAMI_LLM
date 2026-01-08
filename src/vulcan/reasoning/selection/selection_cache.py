@@ -873,7 +873,7 @@ class SelectionCache:
     def _extract_features_for_pattern(self, pattern: Any) -> Optional[np.ndarray]:
         """Extract features for pattern (placeholder)"""
         try:
-            # CRITICAL BUG FIX: Use deterministic zeros instead of random features.
+            # CRITICAL Note: Use deterministic zeros instead of random features.
             # Random features cause non-deterministic tool selection and cache misses.
             return np.zeros(128)  # Deterministic placeholder
         except Exception as e:
