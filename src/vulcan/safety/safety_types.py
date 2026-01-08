@@ -822,7 +822,7 @@ class SafetyConfig:
         }
     )
 
-    # FIX: Safety bypass categories for mathematical problems
+    # Note: Safety bypass categories for mathematical problems
     # These query categories skip certain safety validation steps that would
     # incorrectly flag legitimate mathematical/statistical operations
     safety_bypass_categories: List[str] = field(
@@ -840,7 +840,7 @@ class SafetyConfig:
     def from_dict(cls, data: Dict[str, Any]) -> "SafetyConfig":
         """Create configuration from dictionary.
         
-        BUG FIX: Filters out unknown parameters to prevent 
+        Note: Filters out unknown parameters to prevent 
         "got an unexpected keyword argument" errors when callers pass
         legacy parameters like 'max_risk_score' or 'require_validation'.
         """

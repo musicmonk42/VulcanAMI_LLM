@@ -171,7 +171,7 @@ except Exception as e:
 
     class GraphixVulcanBridge:
         def __init__(self):
-            # FIX: Lambda signatures must accept `self` as first argument when used as methods
+            # Note: Lambda signatures must accept `self` as first argument when used as methods
             # "update": lambda x: None was failing with "takes 1 positional argument but 2 were given"
             # because Python passes `self` implicitly when calling methods on instances
             self.world_model = type(
@@ -1253,7 +1253,7 @@ class GraphixVulcanLLM:
         Returns True if a loop is already running (and run_until_complete would fail),
         False if it's safe to create and run a new loop.
         
-        BUG FIX: Added thread context logging to help debug why internal LLM
+        Note: Added thread context logging to help debug why internal LLM
         returns None when called from HybridLLMExecutor.run_in_executor().
         """
         import threading
@@ -1704,7 +1704,7 @@ class GraphixVulcanLLM:
                 loop = asyncio.new_event_loop()
 
                 try:
-                    # FIX: Add timeout wrapper to prevent infinite hangs
+                    # Note: Add timeout wrapper to prevent infinite hangs
                     async def run_with_timeout():
                         return await self._consume_async_result(gen_result, effective_timeout)
                     

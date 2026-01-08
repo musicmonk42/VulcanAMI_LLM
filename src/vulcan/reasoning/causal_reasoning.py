@@ -697,7 +697,7 @@ class EnhancedCausalReasoning(CausalReasoningEngine):
                 direct_effects={},
                 total_effects={},
                 causal_paths=[],
-                # FIX: Use minimum confidence floor instead of 0.0
+                # Note: Use minimum confidence floor instead of 0.0
                 confidence=0.1,
                 explanation="No causal DAG available",
             )
@@ -1928,7 +1928,7 @@ class CausalReasoner(EnhancedCausalReasoning):
 
                 if variable and value is not None:
                     result = self.perform_intervention(variable, value)
-                    # FIX: Ensure minimum confidence floor
+                    # Note: Ensure minimum confidence floor
                     confidence = max(0.3, result.confidence) if result.confidence else 0.3
                     return {
                         "intervention": result.intervention,
@@ -1945,7 +1945,7 @@ class CausalReasoner(EnhancedCausalReasoning):
                 data = input_data.get("data")
 
                 result = self.compute_causal_effect(treatment, outcome, data)
-                # FIX: Ensure minimum confidence floor
+                # Note: Ensure minimum confidence floor
                 if isinstance(result, dict) and result.get("confidence", 0.0) == 0.0:
                     result["confidence"] = 0.25
                 return result
@@ -1954,7 +1954,7 @@ class CausalReasoner(EnhancedCausalReasoning):
         elif isinstance(input_data, str):
             return self._analyze_causal_query(input_data, {})
 
-        # FIX: Return minimum confidence (0.15) instead of 0.0 for unsupported format
+        # Note: Return minimum confidence (0.15) instead of 0.0 for unsupported format
         return {"error": "Unsupported input format", "confidence": 0.15}
 
     def _analyze_causal_query(self, query_text: str, context: Dict) -> Dict[str, Any]:

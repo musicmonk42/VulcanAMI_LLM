@@ -661,7 +661,7 @@ class GraphixExecutor:
         # when the system is under load from other processes.
         self._set_cpu_priority()
 
-        # FIX: Model warm-up to prevent 7-second cold start delay
+        # Note: Model warm-up to prevent 7-second cold start delay
         # Perform a dummy inference pass during initialization to pin tensors in RAM
         # This prevents lazy loading delays on the first real inference request
         self._warmup_model()
@@ -907,7 +907,7 @@ class GraphixExecutor:
         embeddings = []
         for token_idx in range(len(tokens)):
             # Get token ID (convert if needed)
-            # FIX: Handle string tokens that cannot be converted to int
+            # Note: Handle string tokens that cannot be converted to int
             # Use hash-based mapping for string tokens to get a stable token ID
             token = tokens[token_idx]
             if isinstance(token, int):

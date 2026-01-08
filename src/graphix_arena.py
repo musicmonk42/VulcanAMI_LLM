@@ -56,7 +56,7 @@ try:
 
         if os.getenv("GRAPHIX_API_KEY"):
             print("✅ GRAPHIX_API_KEY loaded successfully")
-    # FIX: Don't warn about missing .env file - it's optional in containerized environments
+    # Note: Don't warn about missing .env file - it's optional in containerized environments
     # Environment variables are typically injected via Docker/K8s, not .env files
 except ImportError:
     # Silently fall back to system environment variables (expected in containers)
@@ -411,7 +411,7 @@ MAX_PAYLOAD_SIZE = 10_000_000  # 10MB
 MAX_FEEDBACK_LOG_SIZE = 10000
 MAX_AGENT_ID_LENGTH = 256
 MAX_GRAPH_ID_LENGTH = 256
-MAX_NODES = 10000  # FIX: Added max node count for validation
+MAX_NODES = 10000  # Note: Added max node count for validation
 MAX_REBERT_THRESHOLD = 0.5
 MIN_REBERT_THRESHOLD = 0.0
 
@@ -769,7 +769,7 @@ class GraphixIRGraph(BaseModel):
     def validate_graph_id(cls, v):
         if not v or len(v) > MAX_GRAPH_ID_LENGTH:
             raise ValueError(f"graph_id must be 1-{MAX_GRAPH_ID_LENGTH} characters")
-        # FIX: Implement character validation for graph_id
+        # Note: Implement character validation for graph_id
         if not re.match(r"^[a-zA-Z0-9_-]+$", v):
             raise ValueError(
                 "graph_id must contain only alphanumeric, underscore, or hyphen characters"
@@ -781,7 +781,7 @@ class GraphixIRGraph(BaseModel):
     def validate_nodes(cls, v):
         if not v:
             raise ValueError("Graph must have at least one node")
-        # FIX: Implement maximum node count validation
+        # Note: Implement maximum node count validation
         if len(v) > MAX_NODES:
             raise ValueError(f"Graph cannot have more than {MAX_NODES} nodes")
         return v
@@ -855,7 +855,7 @@ class GraphixArena:
         self.lock = threading.RLock()
 
         # Initialize runtime with fallback - use singleton to prevent duplicate initialization
-        # ISSUE #5 FIX: Use get_or_create_unified_runtime to prevent repeated init/shutdown
+        # Note: Use get_or_create_unified_runtime to prevent repeated init/shutdown
         if UNIFIED_RUNTIME_AVAILABLE and UnifiedRuntime is not None:
             try:
                 from vulcan.reasoning.singletons import get_or_create_unified_runtime
@@ -1075,7 +1075,7 @@ class GraphixArena:
         else:
             logger.warning(f"⚠ InterpretabilityEngine unavailable")
 
-        # FIX: Use singleton pattern for NSOAligner to prevent reloading models on every request
+        # Note: Use singleton pattern for NSOAligner to prevent reloading models on every request
         # get_nso_aligner() caches the instance and avoids expensive model initialization
         self.nso_aligner = (
             get_nso_aligner() if get_nso_aligner is not None else None
@@ -1354,7 +1354,7 @@ class GraphixArena:
         Returns:
             Dictionary with execution results and metadata
         """
-        # FIX: Validate graph structure before processing
+        # Note: Validate graph structure before processing
         # This prevents "Missing 'nodes' field" errors from data integrity issues
         if not isinstance(graph, dict):
             logger.warning("[Arena] Invalid graph: expected dict, got %s. Using empty graph.", type(graph).__name__)
@@ -1794,8 +1794,8 @@ class GraphixArena:
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
-                env=env,  # FIX: Pass environment with correct PYTHONPATH
-                cwd=str(project_root),  # FIX: Set working directory to project root
+                env=env,  # Note: Pass environment with correct PYTHONPATH
+                cwd=str(project_root),  # Note: Set working directory to project root
             )
 
             # Add timeout
@@ -1859,7 +1859,7 @@ class GraphixArena:
                 logger.warning(f"Interpretability failed: {e}")
 
         # NSO audit
-        # FIX: Add source context and compliance metadata for internal Arena operations
+        # Note: Add source context and compliance metadata for internal Arena operations
         # This prevents false positives from compliance checks that require purpose/bias_assessment
         if self.nso_aligner:
             try:
@@ -1962,7 +1962,7 @@ class GraphixArena:
                             edges = individual.graph.get("edges", [])
                             return len(nodes) * 0.1 + len(edges) * 0.05 + 0.5
                         
-                        # FIX: Offload heavy evolution computation to thread pool
+                        # Note: Offload heavy evolution computation to thread pool
                         # This prevents blocking the main async event loop during
                         # CPU-intensive evolution cycles
                         def _run_evolution():
@@ -2232,7 +2232,7 @@ class GraphixArena:
                 logger.error(f"Drift detection failed: {e}")
 
         # Security audit
-        # FIX: Arena internal operations should have reduced sensitivity to avoid false positives
+        # Note: Arena internal operations should have reduced sensitivity to avoid false positives
         # Only block truly dangerous content (unsafe label) - risky and bias are often false positives
         audit_label = None
         if self.nso_aligner:
@@ -2241,7 +2241,7 @@ class GraphixArena:
                 audit_payload = self._build_audit_payload(payload, "arena_task_execution")
                 audit_label = self.nso_aligner.multi_model_audit(audit_payload)
 
-                # FIX: For internal Arena operations, only reject on severe risks
+                # Note: For internal Arena operations, only reject on severe risks
                 # "unsafe" always blocked - indicates truly dangerous content
                 # "risky" and "bias" are often false positives for legitimate graph operations
                 if audit_label == "unsafe":
@@ -2261,13 +2261,13 @@ class GraphixArena:
                         message="Proposal rejected by security audit engine due to unsafe content.",
                     )
                 elif audit_label == "risky":
-                    # FIX: Log warning but don't block for risky (potential false positive)
+                    # Note: Log warning but don't block for risky (potential false positive)
                     logger.info(
                         f"[Arena Audit] Risky flag raised for agent {agent_id}, "
                         f"graph {graph_id}. Treating as monitoring event for internal Arena operation."
                     )
                 elif audit_label == "bias":
-                    # FIX: Bias alone is often a false positive for Arena operations
+                    # Note: Bias alone is often a false positive for Arena operations
                     logger.debug(
                         f"[Arena Audit] Bias flag raised for agent {agent_id}, graph {graph_id}. "
                         f"Treating as informational for internal Arena operation."

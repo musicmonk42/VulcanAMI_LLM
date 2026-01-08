@@ -842,7 +842,7 @@ class NSOAligner:
             try:
                 if re.search(rule["pattern"], proposal_str, re.IGNORECASE):
                     risks.append(rule["risk"])
-                    # FIX: Use numeric comparison for risk levels
+                    # Note: Use numeric comparison for risk levels
                     if RISK_LEVELS[rule["level"]] > RISK_LEVELS[max_risk_level]:
                         max_risk_level = rule["level"]
 
@@ -878,7 +878,7 @@ class NSOAligner:
         # Analyze code complexity if present
         if "code" in proposal:
             code_risk = self._analyze_code_safety(proposal["code"])
-            # FIX: Convert numeric level back to SafetyLevel enum
+            # Note: Convert numeric level back to SafetyLevel enum
             code_risk_level = [
                 level
                 for level, value in RISK_LEVELS.items()

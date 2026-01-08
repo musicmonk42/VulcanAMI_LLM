@@ -27,7 +27,7 @@ from .exploration_budget import DynamicBudget, ResourceMonitor
 # Import other curiosity_engine components
 from .gap_analyzer import GapAnalyzer, KnowledgeGap
 
-# FIX: Import resolution_bridge for cross-process state persistence
+# Note: Import resolution_bridge for cross-process state persistence
 # This fixes Bug #1 (Phantom Resolution Loop) and Bug #2 (Cold Start Always Triggered)
 from .resolution_bridge import (
     is_gap_resolved as _persistent_is_gap_resolved,
@@ -182,7 +182,7 @@ class RegionManager:
         best_match = None
         best_overlap = 0
 
-        # FIX: Copy items to avoid modification during iteration
+        # Note: Copy items to avoid modification during iteration
         regions_items = list(self.explored_regions.items())
 
         for region_id, region in regions_items:
@@ -192,7 +192,7 @@ class RegionManager:
                     best_overlap = overlap
                     best_match = region_id
 
-        # FIX: Check both empty patterns and sufficient overlap
+        # Note: Check both empty patterns and sufficient overlap
         if best_match and patterns and best_overlap > len(patterns) * 0.5:
             # Merge with existing region
             region = self.explored_regions[best_match]
@@ -220,7 +220,7 @@ class RegionManager:
             if not region:
                 return
 
-            # FIX: Copy items to avoid modification during iteration
+            # Note: Copy items to avoid modification during iteration
             other_regions = list(self.explored_regions.items())
 
             for other_id, other_region in other_regions:
@@ -278,7 +278,7 @@ class RegionManager:
             del self.explored_regions[oldest_id]
             self.frontier_regions.discard(oldest_id)
 
-            # FIX: Clean up graph connections safely
+            # Note: Clean up graph connections safely
             # Copy the neighbors dict to avoid modification during iteration
             graph_items = list(self.region_graph.items())
             for node_id, neighbors in graph_items:
@@ -564,7 +564,7 @@ class SafeExperimentExecutor:
         result = {"success": False, "data": {}}
 
         try:
-            # FIX: Check both hasattr and callable
+            # Note: Check both hasattr and callable
             if (
                 decomposer
                 and hasattr(decomposer, "test_decomposition")
@@ -608,7 +608,7 @@ class SafeExperimentExecutor:
         try:
             intervention = experiment.parameters.get("intervention", {})
 
-            # FIX: Check both hasattr and callable
+            # Note: Check both hasattr and callable
             if (
                 world_model
                 and hasattr(world_model, "test_intervention")
@@ -675,7 +675,7 @@ class SafeExperimentExecutor:
             source = experiment.parameters.get("source_domain", "unknown")
             target = experiment.parameters.get("target_domain", "unknown")
 
-            # FIX: Check both hasattr and callable
+            # Note: Check both hasattr and callable
             if (
                 knowledge_base
                 and hasattr(knowledge_base, "test_transfer")
@@ -715,7 +715,7 @@ class SafeExperimentExecutor:
         result = {"success": False, "data": {}}
 
         try:
-            # FIX: Check both hasattr and callable
+            # Note: Check both hasattr and callable
             if (
                 knowledge_base
                 and hasattr(knowledge_base, "explore_latent")
@@ -830,7 +830,7 @@ class GapPrioritizer:
             base_priority = gap.priority
 
             # Adjust for dependencies
-            # FIX: Check if adjusted_roi exists AND is not None
+            # Note: Check if adjusted_roi exists AND is not None
             if hasattr(gap, "adjusted_roi") and gap.adjusted_roi is not None:
                 priority = gap.adjusted_roi
             else:
@@ -839,7 +839,7 @@ class GapPrioritizer:
                 dependency_penalty = ancestors_count * 0.05
                 priority = base_roi * (1 + unlock_bonus - dependency_penalty)
 
-            # FIX: Ensure priority is not None before multiplication
+            # Note: Ensure priority is not None before multiplication
             if priority is None:
                 logger.warning("Priority calculated as None, using default value")
                 priority = 1.0
@@ -890,7 +890,7 @@ class GapPrioritizer:
                         gap, descendants_count, ancestors_count
                     )
 
-                    # FIX: Validate priority score
+                    # Note: Validate priority score
                     if priority_score is None or not isinstance(
                         priority_score, (int, float)
                     ):
@@ -1159,7 +1159,7 @@ class CuriosityEngine:
     _instance = None
     _instance_lock = threading.Lock()
     
-    # BUG #3 FIX: Configuration constants for query ingestion
+    # Note: Configuration constants for query ingestion
     MAX_QUERY_TRUNCATE_LENGTH = 200  # Maximum length for query truncation in failure storage
 
     def __new__(cls, *args, **kwargs):
@@ -1248,7 +1248,7 @@ class CuriosityEngine:
         self.decomposer = decomposer
         self.world_model = world_model
 
-        # FIX: Initialize in dependency order
+        # Note: Initialize in dependency order
         # First initialize basic components
         self.gap_analyzer = GapAnalyzer()
         self.gap_graph = CycleAwareDependencyGraph()
@@ -1279,18 +1279,18 @@ class CuriosityEngine:
         # Strategy selection mode
         self.exploration_mode = "adaptive"  # "adaptive", "sequential", "parallel"
         
-        # BUG #3 FIX: Track if any data has been ingested
+        # Note: Track if any data has been ingested
         self._queries_ingested = 0
         self._failures_ingested = 0
         
         # ==============================================================================
-        # BUG #4 FIX: Gap resolution tracking
+        # Note: Gap resolution tracking
         # ==============================================================================
         # Gaps were growing unbounded because:
         # 1. False "errors" from bad consensus check added high_error_rate gaps
         # 2. Experiments ran but gaps were never marked resolved
         # 3. No deduplication - same gap type added repeatedly
-        # BUG #14 FIX: Track resolved gap keys with TTL (key -> resolution_timestamp)
+        # Note: Track resolved gap keys with TTL (key -> resolution_timestamp)
         self._resolved_gaps: Dict[str, float] = {}  
         self._gap_last_seen: Dict[str, float] = {}  # Track when gap was last added
         self._gap_attempts: Dict[str, int] = {}  # Track experiment attempts per gap
@@ -1298,27 +1298,27 @@ class CuriosityEngine:
         # FIX Issue #13: Track resolution counts per gap type to detect phantom resolutions
         # key -> list of (timestamp, was_success) tuples
         self._gap_resolution_history: Dict[str, List[Tuple[float, bool]]] = {}
-        # ISSUE #3 FIX: Increased MAX_GAPS_PER_TYPE from 2 to 5 to allow more
+        # Note: Increased MAX_GAPS_PER_TYPE from 2 to 5 to allow more
         # experiments per learning cycle. The previous limit of 2 was too restrictive
         # and caused experiments=0 in most cycles.
         self.MAX_GAPS_PER_TYPE = 5  # Maximum gaps of same type (was 2)
-        # ISSUE #3 FIX: Reduced GAP_COOLDOWN_SECONDS from 300 to 120 to allow
+        # Note: Reduced GAP_COOLDOWN_SECONDS from 300 to 120 to allow
         # faster re-processing of gaps. 5 minute cooldown was too long.
         self.GAP_COOLDOWN_SECONDS = 120  # Don't re-add same gap for 2 min (was 5 min)
-        self.GAP_RESOLUTION_TTL_SECONDS = 1800  # BUG #14 FIX: Allow re-detection after 30 min if issue persists
+        self.GAP_RESOLUTION_TTL_SECONDS = 1800  # Note: Allow re-detection after 30 min if issue persists
         self.RESOLUTION_CLEANUP_INTERVAL = 300  # Only cleanup expired resolutions every 5 minutes
         # FIX Issue #13: Threshold for detecting phantom resolutions
         self.PHANTOM_RESOLUTION_THRESHOLD = 3  # If resolved 3+ times in an hour, it's not really resolved
         self.PHANTOM_RESOLUTION_WINDOW = 3600  # 1 hour window for counting phantom resolutions
-        # FIX: Phantom Resolution Loop - extended cooldown for gaps that keep returning
+        # Note: Phantom Resolution Loop - extended cooldown for gaps that keep returning
         self.PHANTOM_GAP_COOLDOWN_SECONDS = 3600  # 1 hour cooldown for phantom gaps
-        # FIX: Learning System Give-Up Threshold
+        # Note: Learning System Give-Up Threshold
         # Increased from 3 to 10 - don't mark gaps as "resolved" after only 3 failures
         # Use environment variable to configure: VULCAN_GAP_GIVEUP_THRESHOLD
         import os
         self.GAP_GIVEUP_THRESHOLD = int(os.environ.get("VULCAN_GAP_GIVEUP_THRESHOLD", "10"))
         
-        # ISSUE #3 FIX: Bootstrap experiment constants
+        # Note: Bootstrap experiment constants
         self.BOOTSTRAP_EXPERIMENT_TIMEOUT_SECONDS = 30.0  # Short timeout for bootstrap experiments
         self.BOOTSTRAP_MEMORY_LIMIT_BYTES = 128 * 1024 * 1024  # 128MB memory limit for bootstrap
         
@@ -1357,7 +1357,7 @@ class CuriosityEngine:
 
         logger.info("CuriosityEngine initialized (refactored)")
 
-    # ========== BUG #3 FIX: Query data ingestion methods ==========
+    # ========== Note: Query data ingestion methods ==========
     
     def ingest_query_result(
         self, 
@@ -1370,7 +1370,7 @@ class CuriosityEngine:
         """
         Feed query outcomes to the learning system.
         
-        BUG #3 FIX: This method connects the curiosity engine to actual query data.
+        Note: This method connects the curiosity engine to actual query data.
         Call this from the query processing pipeline to feed outcomes to the engine.
         
         Args:
@@ -1432,7 +1432,7 @@ class CuriosityEngine:
     def get_ingestion_stats(self) -> Dict[str, Any]:
         """Get statistics about data ingestion for monitoring.
         
-        BUG #3 FIX: Returns stats to help diagnose why no gaps are found.
+        Note: Returns stats to help diagnose why no gaps are found.
         """
         with self.lock:
             return {
@@ -1577,7 +1577,7 @@ class CuriosityEngine:
             return gaps
 
     # ==============================================================================
-    # BUG #4 FIX: Gap resolution tracking methods
+    # Note: Gap resolution tracking methods
     # ==============================================================================
     
     def _gap_key(self, gap: Union[KnowledgeGap, Dict]) -> str:
@@ -1600,15 +1600,15 @@ class CuriosityEngine:
     def mark_gap_resolved(self, gap: Union[KnowledgeGap, Dict], success: bool = True, cycle_id: Optional[int] = None) -> None:
         """Mark a gap as resolved after successful experiment.
         
-        BUG #4 FIX: Ensures gaps don't accumulate forever by tracking
+        Note: Ensures gaps don't accumulate forever by tracking
         which gaps have been addressed.
         
-        BUG #14 FIX: Also marks gaps as resolved when giving up (success=False)
+        Note: Also marks gaps as resolved when giving up (success=False)
         to prevent the attempt counter from growing indefinitely (3 → 9 → 11 → 13 → 19).
         Gaps marked as resolved (regardless of success) will be filtered out
         for the cooldown period, and attempts will be reset.
         
-        BUG #1 FIX (Phantom Resolution Loop): Now persists resolution state to SQLite
+        Note (Phantom Resolution Loop): Now persists resolution state to SQLite
         via resolution_bridge, so resolutions survive subprocess restarts.
         
         Args:
@@ -1643,11 +1643,11 @@ class CuriosityEngine:
             if current_time - ts < self.PHANTOM_RESOLUTION_WINDOW
         ]
         
-        # BUG #14 FIX: Always add to resolved set with timestamp (not just on success)
+        # Note: Always add to resolved set with timestamp (not just on success)
         # This prevents the same gap from being re-added immediately
         self._resolved_gaps[key] = current_time
         
-        # BUG #14 FIX: Reset attempts counter when gap is resolved (success or give-up)
+        # Note: Reset attempts counter when gap is resolved (success or give-up)
         # This prevents the log showing "after 19 attempts" when it should be "after 3 attempts"
         if key in self._gap_attempts:
             del self._gap_attempts[key]
@@ -1743,12 +1743,12 @@ class CuriosityEngine:
     def _filter_gaps_with_resolution(self, raw_gaps: List[KnowledgeGap]) -> List[KnowledgeGap]:
         """Filter gaps based on resolution status, cooldown, and type limits.
         
-        BUG #4 FIX: Prevents gap accumulation by:
+        Note: Prevents gap accumulation by:
         1. Removing already resolved gaps
         2. Enforcing cooldown period per gap
         3. Limiting gaps per type
         
-        BUG #14 FIX: Resolved gaps now have a TTL - they can be re-detected
+        Note: Resolved gaps now have a TTL - they can be re-detected
         after GAP_RESOLUTION_TTL_SECONDS (30 min) if the underlying issue persists.
         
         FIX Bug #1 (Phantom Resolution Loop): Now checks SQLite for resolved gaps
@@ -1768,7 +1768,7 @@ class CuriosityEngine:
         filtered = []
         type_counts = defaultdict(int)
         
-        # BUG #14 FIX: Clean up expired resolved gaps (TTL-based)
+        # Note: Clean up expired resolved gaps (TTL-based)
         # Rate-limit cleanup to avoid overhead on every call
         if current_time - self._last_resolution_cleanup > self.RESOLUTION_CLEANUP_INTERVAL:
             self._last_resolution_cleanup = current_time
@@ -2049,7 +2049,7 @@ class CuriosityEngine:
     ) -> List[KnowledgeGap]:
         """Identify knowledge gaps using selected strategy - REFACTORED
         
-        BUG #4 FIX: Now filters gaps to prevent unbounded accumulation by:
+        Note: Now filters gaps to prevent unbounded accumulation by:
         1. Removing already resolved gaps
         2. Enforcing cooldown period per gap type
         3. Limiting gaps per type (MAX_GAPS_PER_TYPE)
@@ -2079,7 +2079,7 @@ class CuriosityEngine:
                     prediction_gaps = self.gap_analyzer.analyze_prediction_errors()
                     transfer_gaps = self.gap_analyzer.analyze_transfer_failures()
                     latent_gaps = self.gap_analyzer.detect_latent_gaps()
-                    # FIX: Include outcome bridge gaps for cross-process data
+                    # Note: Include outcome bridge gaps for cross-process data
                     outcome_gaps = self.gap_analyzer.analyze_from_outcome_bridge(minutes=60)
 
                     raw_gaps.extend(decomposition_gaps)
@@ -2091,7 +2091,7 @@ class CuriosityEngine:
                     decomposition_gaps = (
                         self.gap_analyzer.analyze_decomposition_failures()
                     )
-                    # FIX: Include outcome bridge gaps for cross-process data
+                    # Note: Include outcome bridge gaps for cross-process data
                     outcome_gaps = self.gap_analyzer.analyze_from_outcome_bridge(minutes=60)
                     raw_gaps.extend(decomposition_gaps[:5])
                     raw_gaps.extend(outcome_gaps[:3])
@@ -2100,7 +2100,7 @@ class CuriosityEngine:
                         self.gap_analyzer.analyze_decomposition_failures()
                     )
                     prediction_gaps = self.gap_analyzer.analyze_prediction_errors()
-                    # FIX: Include outcome bridge gaps for cross-process data
+                    # Note: Include outcome bridge gaps for cross-process data
                     # This enables the subprocess to read query outcomes from the main process
                     outcome_gaps = self.gap_analyzer.analyze_from_outcome_bridge(minutes=60)
 
@@ -2114,7 +2114,7 @@ class CuriosityEngine:
                 all_gaps = self.gap_analyzer.get_all_gaps()
                 raw_gaps.extend([g for g in all_gaps if g.estimated_cost < 20][:5])
 
-            # BUG #4 FIX: Filter gaps to prevent accumulation
+            # Note: Filter gaps to prevent accumulation
             gaps = self._filter_gaps_with_resolution(raw_gaps)
 
             # APPLY: Add to dependency graph
@@ -2203,7 +2203,7 @@ class CuriosityEngine:
                         priority.gap
                     )
 
-                # FIX: Add to queue atomically
+                # Note: Add to queue atomically
                 for priority in priorities:
                     self.learning_priorities.put(priority)
 
@@ -2215,7 +2215,7 @@ class CuriosityEngine:
     def generate_targeted_experiments(self, gap: KnowledgeGap) -> List[Experiment]:
         """Generate experiments targeted at specific gap - REFACTORED
         
-        BUG FIX: Added support for outcome bridge gap types (slow_routing,
+        Note: Added support for outcome bridge gap types (slow_routing,
         complex_query_handling, high_error_rate, routing_variance) which
         were previously falling through to empty experiment list.
         """
@@ -2245,7 +2245,7 @@ class CuriosityEngine:
                 experiments = self.iterative_designer.generate_iterative_experiments(
                     gap, max_iterations=3
                 )
-            # BUG FIX: Handle outcome bridge gap types that were returning empty lists
+            # Note: Handle outcome bridge gap types that were returning empty lists
             elif gap.type in ("slow_routing", "routing_variance"):
                 # Routing issues are treated as decomposition problems
                 # (optimizing the query routing pipeline)
@@ -2267,7 +2267,7 @@ class CuriosityEngine:
                 # (understanding why queries are failing)
                 experiments = self.experiment_generator.generate_causal_experiment(gap)
             else:
-                # BUG FIX: Instead of returning empty list, generate generic experiments
+                # Note: Instead of returning empty list, generate generic experiments
                 # This ensures gaps are never silently ignored
                 logger.warning(
                     f"[CuriosityEngine] Unhandled gap type '{gap.type}', "
@@ -2292,7 +2292,7 @@ class CuriosityEngine:
     def run_experiment_sandboxed(self, experiment: Experiment) -> ExperimentResult:
         """Run experiment in sandboxed environment - DELEGATED
         
-        BUG #4 FIX: Now tracks experiment attempts per gap and marks gaps
+        Note: Now tracks experiment attempts per gap and marks gaps
         as resolved when experiments succeed or after multiple attempts.
         """
 
@@ -2314,7 +2314,7 @@ class CuriosityEngine:
             current_load = self.resource_monitor.get_current_load()
             self.exploration_budget.adjust_for_load(current_load)
             
-            # BUG #4 FIX: Track experiment attempts and mark gaps resolved
+            # Note: Track experiment attempts and mark gaps resolved
             if hasattr(experiment, 'gap') and experiment.gap:
                 gap = experiment.gap
                 gap_key = self._gap_key(gap)
@@ -2326,7 +2326,7 @@ class CuriosityEngine:
                 if result.success:
                     self.mark_gap_resolved(gap, success=True)
                 
-                # FIX: Use configurable threshold - don't give up too quickly
+                # Note: Use configurable threshold - don't give up too quickly
                 # Default increased from 3 to 10 attempts before giving up
                 elif self._gap_attempts[gap_key] >= self.GAP_GIVEUP_THRESHOLD:
                     logger.warning(
@@ -2377,7 +2377,7 @@ class CuriosityEngine:
     def run_learning_cycle(self, max_experiments: int = 10) -> Dict[str, Any]:
         """Run one cycle of curiosity-driven learning - REFACTORED
         
-        BUG FIX: Added diagnostic logging to explain why no gaps are found
+        Note: Added diagnostic logging to explain why no gaps are found
         and why experiments might not be generated.
         """
 
@@ -2391,7 +2391,7 @@ class CuriosityEngine:
                 # Identify gaps
                 gaps = self.identify_gaps_with_cycle_detection()
                 
-                # BUG FIX: Log diagnostic info if no gaps found
+                # Note: Log diagnostic info if no gaps found
                 if len(gaps) == 0:
                     ingestion_stats = self.get_ingestion_stats()
                     logger.debug(
@@ -2402,7 +2402,7 @@ class CuriosityEngine:
                         f"Hint: Call ingest_query_result() from query pipeline to feed data."
                     )
                 else:
-                    # BUG FIX: Log gap types found for debugging
+                    # Note: Log gap types found for debugging
                     gap_types = [g.type for g in gaps]
                     logger.info(
                         f"[CuriosityEngine] Found {len(gaps)} gaps: {gap_types}"
@@ -2411,7 +2411,7 @@ class CuriosityEngine:
                 # SELECT: Prioritize gaps
                 priorities = self.prioritize_gaps(gaps[:max_experiments])
                 
-                # BUG FIX: Log if priorities were created
+                # Note: Log if priorities were created
                 logger.debug(
                     f"[CuriosityEngine] Created {len(priorities)} priorities "
                     f"for learning queue"
@@ -2422,14 +2422,14 @@ class CuriosityEngine:
                 experiments_run = 0
                 gaps_with_no_experiments = 0
                 
-                # ISSUE #3 FIX: Track if this is a "cold start" cycle with no priorities
+                # Note: Track if this is a "cold start" cycle with no priorities
                 # When no gaps/priorities exist, generate bootstrap experiments to 
                 # kickstart the learning system
                 had_initial_priorities = not self.learning_priorities.empty()
 
                 while experiments_run < max_experiments:
                     try:
-                        # FIX: Use non-blocking get with timeout
+                        # Note: Use non-blocking get with timeout
                         priority = self.learning_priorities.get(block=False)
                     except Empty:
                         break
@@ -2437,7 +2437,7 @@ class CuriosityEngine:
                     # Generate experiments for gap
                     experiments = self.generate_targeted_experiments(priority.gap)
                     
-                    # BUG FIX: Log when no experiments are generated for a gap
+                    # Note: Log when no experiments are generated for a gap
                     if not experiments:
                         gaps_with_no_experiments += 1
                         logger.warning(
@@ -2469,7 +2469,7 @@ class CuriosityEngine:
                 except Exception:
                     persistent_experiment_count = 0
                 
-                # ISSUE #3 FIX: Generate bootstrap experiments when:
+                # Note: Generate bootstrap experiments when:
                 # 1. No experiments ran at all in THIS cycle AND no persistent history, OR
                 # 2. Very few experiments ran and we had no initial priorities
                 # FIX Bug #2: Also consider persistent experiment count to avoid false cold start
@@ -2499,7 +2499,7 @@ class CuriosityEngine:
                             except Exception:
                                 pass
 
-                # BUG FIX: Log summary of gaps that generated no experiments
+                # Note: Log summary of gaps that generated no experiments
                 if gaps_with_no_experiments > 0:
                     logger.warning(
                         f"[CuriosityEngine] {gaps_with_no_experiments} gaps "
@@ -2549,7 +2549,7 @@ class CuriosityEngine:
         """
         Generate bootstrap experiments for cold-start learning cycles.
         
-        ISSUE #3 FIX: When no gaps are found (no query data ingested, all gaps
+        Note: When no gaps are found (no query data ingested, all gaps
         in cooldown, or at type limits), generate synthetic exploratory experiments
         to ensure the learning system makes progress.
         
@@ -2612,7 +2612,7 @@ class CuriosityEngine:
             
             for i, config in enumerate(bootstrap_gap_configs[:max_experiments]):
                 # Create synthetic gap
-                # FIX: Use correct KnowledgeGap parameters:
+                # Note: Use correct KnowledgeGap parameters:
                 # - Use 'priority' instead of 'severity' (severity is not a valid parameter)
                 # - Store 'description' and 'related_patterns' in metadata (not top-level params)
                 gap = KnowledgeGap(

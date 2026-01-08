@@ -741,7 +741,7 @@ class SafetyValidator:
             "explain",
         }
 
-        # FIX: Mathematical scenario keywords - these indicate math problems, not actual
+        # Note: Mathematical scenario keywords - these indicate math problems, not actual
         # medical data processing that would require HIPAA compliance
         # Using frozenset for performance and consistency with safety_validator
         self.mathematical_indicators = frozenset(
@@ -1078,7 +1078,7 @@ class SafetyValidator:
 class ConsistencyChecker:
     """Checks output consistency across tools with semantic comparison support.
 
-    Bug #2 Fix: Instead of using exact equality comparison which fails on
+    Note: Instead of using exact equality comparison which fails on
     heterogeneous output types (dict vs list vs float), this checker now
     normalizes outputs to text form and uses semantic/text-based comparison.
     """
@@ -1087,7 +1087,7 @@ class ConsistencyChecker:
         """
         Check if outputs from different tools are consistent using semantic comparison.
 
-        Bug #2 Fix: Uses normalized text comparison for heterogeneous output types
+        Note: Uses normalized text comparison for heterogeneous output types
         instead of exact matching which always fails when tools return different types.
 
         Returns:
@@ -1116,7 +1116,7 @@ class ConsistencyChecker:
             elif all(isinstance(v[1], str) for v in values):
                 return self._check_string_consistency(values)
             else:
-                # Bug #2 Fix: Use semantic comparison for mixed types instead of failing
+                # Note: Use semantic comparison for mixed types instead of failing
                 return self._check_semantic_consistency(values, outputs)
         except Exception as e:
             logger.error(f"Consistency check failed: {e}")
@@ -1125,7 +1125,7 @@ class ConsistencyChecker:
     def _extract_answer_text(self, tool_name: str, output: Any) -> str:
         """Extract the answer/conclusion as text from tool-specific output.
 
-        Bug #2 Fix: Normalizes heterogeneous tool outputs to text form for comparison.
+        Note: Normalizes heterogeneous tool outputs to text form for comparison.
         """
         if output is None:
             return ""
@@ -1194,7 +1194,7 @@ class ConsistencyChecker:
     ) -> Tuple[bool, float, str]:
         """Check consistency using semantic/text-based comparison for mixed types.
 
-        Bug #2 Fix: Instead of failing on heterogeneous types, normalize all outputs
+        Note: Instead of failing on heterogeneous types, normalize all outputs
         to text and compare using word overlap or simple heuristics.
         """
         try:
@@ -1244,7 +1244,7 @@ class ConsistencyChecker:
                 avg_overlap = 0.0
 
             # Consistency threshold for text comparison (more lenient than exact match)
-            # Bug #2 Fix: 0.3 overlap is acceptable given tools produce different formats
+            # Note: 0.3 overlap is acceptable given tools produce different formats
             has_consensus = avg_overlap >= 0.3
 
             if has_consensus:
@@ -1925,7 +1925,7 @@ class SafetyGovernor:
         """
 
         try:
-            # FIX: Extract query from context for context-aware safety validation
+            # Note: Extract query from context for context-aware safety validation
             # This is needed to detect philosophical AI speculation and ethical thought experiments
             query = self._extract_query_from_context(context)
             

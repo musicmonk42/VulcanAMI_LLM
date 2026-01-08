@@ -556,7 +556,7 @@ class QueryPreprocessor:
         constraint_matches = self._constraint_line_pattern.findall(constraints_str)
 
         # =======================================================================
-        # FIX: Handle inline comma-separated constraint format
+        # Note: Handle inline comma-separated constraint format
         # =======================================================================
         # If numbered/bulleted list pattern fails, try parsing inline format like:
         # "A → B, B → C, ¬C, A ∨ B"

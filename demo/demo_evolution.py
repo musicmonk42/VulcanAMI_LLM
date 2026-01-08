@@ -187,7 +187,7 @@ class EvolutionDemo:
         if UnifiedRuntime is None:
             raise ImportError("UnifiedRuntime is not available. Cannot initialize runtime.")
 
-        # BUG FIX Issue #1: Use singleton to prevent per-demo reinitialization
+        # Note Issue #1: Use singleton to prevent per-demo reinitialization
         try:
             from vulcan.reasoning.singletons import get_or_create_unified_runtime, set_unified_runtime
             self.runtime = get_or_create_unified_runtime()

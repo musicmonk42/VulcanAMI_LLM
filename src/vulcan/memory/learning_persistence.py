@@ -60,12 +60,12 @@ logger = logging.getLogger(__name__)
 # Railway volume mount point path constant
 RAILWAY_VOLUME_PATH = "/mnt/vulcan-data"
 
-# BUG #2 FIX: Aggressive storage path discovery with actual write test
+# Note: Aggressive storage path discovery with actual write test
 # The previous implementation checked if paths existed but didn't verify write access
 def _get_default_storage_path() -> str:
     """Get default storage path with VERIFIED write access.
     
-    BUG #2 FIX: Previous implementation returned paths without testing write access,
+    Note: Previous implementation returned paths without testing write access,
     causing "Storage unavailable, state cached in memory only" on every query.
     This version actually tests write access before returning a path.
     """
@@ -90,7 +90,7 @@ def _get_default_storage_path() -> str:
             continue
             
         try:
-            # BUG #2 FIX: Actually try to create directory AND write a test file
+            # Note: Actually try to create directory AND write a test file
             candidate_path = Path(candidate)
             candidate_path.mkdir(parents=True, exist_ok=True)
             
@@ -106,7 +106,7 @@ def _get_default_storage_path() -> str:
             logger.debug(f"[LearningStatePersistence] Cannot use {candidate}: {e}")
             continue
     
-    # BUG #2 FIX: If all else fails, use temp directory which should always work
+    # Note: If all else fails, use temp directory which should always work
     fallback = os.path.join(tempfile.gettempdir(), "vulcan-data")
     try:
         Path(fallback).mkdir(parents=True, exist_ok=True)
@@ -126,7 +126,7 @@ SCHEMA_VERSION = "1.0.0"
 MAX_BACKUP_COUNT = 5
 BACKUP_SUFFIX = ".backup"
 
-# BUG #16 FIX: Save throttling configuration
+# Note: Save throttling configuration
 # Problem: Tool weight persistence was saving after every single query outcome,
 # causing excessive I/O (18+ saves in a single session).
 # Solution: Throttle saves to at most once per MIN_SAVE_INTERVAL seconds.
@@ -135,7 +135,7 @@ MIN_SAVE_INTERVAL_SECONDS = 30.0  # Minimum seconds between disk saves
 # Validation constraints
 MAX_TOOL_NAME_LENGTH = 256
 MAX_TOOL_WEIGHT_VALUE = 1.0
-# BUG #1 FIX: Changed from -1.0 to -0.9 to prevent tool weight "death spiral"
+# Note: Changed from -1.0 to -0.9 to prevent tool weight "death spiral"
 # The persistence stores weight ADJUSTMENTS (cumulative deltas from 1.0).
 # If adjustment = -1.0, then absolute weight = 1.0 + (-1.0) = 0.0, breaking ensemble.
 # Setting minimum to -0.9 ensures absolute weight >= 0.1 (positive, usable).
@@ -148,7 +148,7 @@ MAX_TOOL_COUNT = 10000
 WEIGHT_RESET_THRESHOLD = -0.9
 WEIGHT_DEFAULT_VALUE = 0.0  # Default adjustment is 0.0 (absolute weight = 1.0)
 
-# BUG #4 FIX: Weight corruption detection constants
+# Note: Weight corruption detection constants
 # These thresholds are used in reset_tool_weights_if_corrupted() to detect
 # runaway feedback loops and death spirals.
 DEATH_SPIRAL_NEGATIVE_THRESHOLD = -0.05  # Weight below this is considered negative
@@ -351,7 +351,7 @@ class LearningStatePersistence:
         "_dirty",
         "_storage_available",
         "_stats",
-        "_last_disk_save_time",  # BUG #16 FIX: Track last disk save for throttling
+        "_last_disk_save_time",  # Note: Track last disk save for throttling
     )
     
     def __init__(
@@ -411,10 +411,10 @@ class LearningStatePersistence:
             "errors_count": 0,
             "last_save_time": None,
             "last_load_time": None,
-            "throttled_saves": 0,  # BUG #16 FIX: Track throttled saves
+            "throttled_saves": 0,  # Note: Track throttled saves
         }
         
-        # BUG #16 FIX: Track last disk save time for throttling
+        # Note: Track last disk save time for throttling
         # This prevents excessive I/O by ensuring saves occur at most
         # once every MIN_SAVE_INTERVAL_SECONDS
         self._last_disk_save_time: float = 0.0
@@ -546,7 +546,7 @@ class LearningStatePersistence:
                 )
                 return True  # Cache updated successfully
             
-            # BUG #16 FIX: Throttle disk writes to prevent excessive I/O
+            # Note: Throttle disk writes to prevent excessive I/O
             # Only write to disk if enough time has passed since last save
             current_time = time.time()
             time_since_last_save = current_time - self._last_disk_save_time
@@ -555,7 +555,7 @@ class LearningStatePersistence:
                 # Throttled - state is cached in memory, will be saved later
                 self._stats["throttled_saves"] += 1
                 logger.debug(
-                    f"[LearningStatePersistence] BUG#16 FIX: Save throttled "
+                    f"[LearningStatePersistence] Note: Save throttled "
                     f"({time_since_last_save:.1f}s < {MIN_SAVE_INTERVAL_SECONDS}s), "
                     f"state cached in memory"
                 )
@@ -572,7 +572,7 @@ class LearningStatePersistence:
                 if success:
                     self._stats["total_saves"] += 1
                     self._stats["last_save_time"] = current_time
-                    self._last_disk_save_time = current_time  # BUG #16 FIX: Update throttle timer
+                    self._last_disk_save_time = current_time  # Note: Update throttle timer
                     
                     tool_count = len(state.get("tool_weights", {}))
                     save_count = state.get("metadata", {}).get("save_count", 0)
@@ -617,7 +617,7 @@ class LearningStatePersistence:
             >>> print(success)
             True
         """
-        # BUG #1 FIX: Floor weights at minimum value before validation and save
+        # Note: Floor weights at minimum value before validation and save
         # This prevents the "death spiral" where accumulated penalties push weights negative
         floored_weights = {}
         for tool, weight in tool_weights.items():
@@ -656,7 +656,7 @@ class LearningStatePersistence:
     
     def flush(self, force: bool = False) -> bool:
         """
-        BUG #16 FIX: Force flush cached state to disk.
+        Note: Force flush cached state to disk.
         
         This method bypasses the throttling mechanism to ensure the current
         in-memory state is written to disk. Useful for shutdown handlers or
@@ -861,7 +861,7 @@ class LearningStatePersistence:
     
     def reset_tool_weights_if_corrupted(self, dominance_threshold: float = 0.15) -> bool:
         """
-        BUG #4 FIX: Reset tool weights if they show signs of corruption.
+        Note: Reset tool weights if they show signs of corruption.
         
         Corruption indicators:
         1. One tool has weight > dominance_threshold (runaway positive feedback)
@@ -1025,7 +1025,7 @@ class LearningStatePersistence:
                 test_file.unlink()
                 logger.info(f"[LearningStatePersistence] ✓ Storage directory verified: {self.storage_path}")
             except (OSError, PermissionError) as write_err:
-                # BUG #2 FIX: If write fails, try to find an alternate writable path
+                # Note: If write fails, try to find an alternate writable path
                 logger.warning(
                     f"[LearningStatePersistence] Storage directory not writable: "
                     f"{self.storage_path} - {write_err}"
@@ -1049,7 +1049,7 @@ class LearningStatePersistence:
                 f"{self.storage_path}: {e}"
             )
             
-            # BUG #2 FIX: Try alternate paths on failure
+            # Note: Try alternate paths on failure
             alternate_path = self._find_writable_alternate()
             if alternate_path:
                 logger.info(f"[LearningStatePersistence] Switching to writable alternate: {alternate_path}")
@@ -1061,7 +1061,7 @@ class LearningStatePersistence:
     
     def _find_writable_alternate(self) -> Optional[str]:
         """
-        BUG #2 FIX: Find an alternate writable storage path.
+        Note: Find an alternate writable storage path.
         
         Returns:
             Writable path or None if no writable path found.
@@ -1342,7 +1342,7 @@ class LearningStatePersistence:
         # Update load count
         state["metadata"]["load_count"] = state["metadata"].get("load_count", 0) + 1
         
-        # BUG #1 FIX: Reset negative/low weights to prevent tool weight death spiral
+        # Note: Reset negative/low weights to prevent tool weight death spiral
         # When weights go negative due to accumulated penalties, tools become unusable
         # as the ensemble ignores them entirely. Reset any weight below threshold to default.
         if "tool_weights" in state:

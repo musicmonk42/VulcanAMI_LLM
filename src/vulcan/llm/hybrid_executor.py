@@ -95,7 +95,7 @@ OPENAI_FALLBACK_CONFIDENCE = 0.6
 #   - OpenAI MUST NOT generate code
 #   - All reasoning happens in VULCAN's mind BEFORE OpenAI is called
 #
-# FIX: Default to "true" to match .env.example documentation and prevent 60-second timeouts.
+# Note: Default to "true" to match .env.example documentation and prevent 60-second timeouts.
 # This enables fast OpenAI formatting (~2-5s) while VULCAN LLM learns via distillation.
 _openai_language_formatting_env = os.environ.get("OPENAI_LANGUAGE_FORMATTING", "true").lower()
 OPENAI_LANGUAGE_FORMATTING = _openai_language_formatting_env in ("true", "1", "yes")
@@ -123,7 +123,7 @@ SKIP_LOCAL_LLM = _skip_local_llm_env in ("true", "1", "yes")
 # ============================================================
 # TIMEOUT CONFIGURATION - INCREASED FOR CPU EXECUTION
 # ============================================================
-# FIX: Increased timeouts to prevent premature timeouts during CPU-intensive
+# Note: Increased timeouts to prevent premature timeouts during CPU-intensive
 # language generation. The internal LLM can take 3+ seconds per token on CPU.
 # CPU Cloud Fix: At ~500ms per token, generating 120 tokens takes 60s which was
 # causing TimeoutError. Increased to 300s (5 minutes) to allow ~600 tokens on CPU.
@@ -135,7 +135,7 @@ PER_TOKEN_TIMEOUT = float(os.environ.get("VULCAN_LLM_PER_TOKEN_TIMEOUT", "30.0")
 FAST_MODE_MAX_TIMEOUT_SECONDS = float(os.environ.get("VULCAN_LLM_FAST_TIMEOUT", "60.0"))  # 60 seconds
 
 # ============================================================
-# BUG #5 FIX: PARALLEL MODE GRACE PERIOD
+# Note: PARALLEL MODE GRACE PERIOD
 # ============================================================
 # When OpenAI finishes first in parallel mode, wait this long for local to complete
 # This prevents cancelling local when it's almost done
@@ -144,7 +144,7 @@ LOCAL_GRACE_PERIOD_SECONDS = float(os.environ.get("VULCAN_LOCAL_GRACE_PERIOD", "
 # ============================================================
 # ADAPTIVE TIMEOUT CALCULATION
 # ============================================================
-# FIX: Implement adaptive timeout to prevent timeouts during CPU inference.
+# Note: Implement adaptive timeout to prevent timeouts during CPU inference.
 # Formula: timeout = BASE_TIMEOUT_SECONDS + (max_tokens * TIMEOUT_PER_TOKEN_SECONDS)
 # This dynamically scales the timeout based on the expected generation length.
 BASE_TIMEOUT_SECONDS = float(os.environ.get("VULCAN_BASE_TIMEOUT", "5.0"))  # 5 seconds base
@@ -179,7 +179,7 @@ def calculate_adaptive_timeout(max_tokens: int) -> float:
 # ============================================================
 # CPU CLOUD EXECUTION - MAX TOKENS LIMIT
 # ============================================================
-# FIX: Limit max tokens for CPU execution to prevent timeout issues.
+# Note: Limit max tokens for CPU execution to prevent timeout issues.
 # At 500ms per token, max_tokens=50 takes ~25s, ensuring completion before timeout.
 # This can be overridden via environment variable for GPU environments.
 CPU_MAX_TOKENS_DEFAULT = int(os.environ.get("VULCAN_CPU_MAX_TOKENS", "50"))
@@ -604,7 +604,7 @@ class HybridLLMExecutor:
     ENSEMBLE_LOCAL_RESPONSE_MAX_LENGTH = 500
     # Valid execution modes
     # TASK 2 FIX: Added 'reasoning_first' mode that prioritizes reasoning results
-    # FIX: Added 'openai_only', 'local_only', and 'sequential' modes for explicit operation
+    # Note: Added 'openai_only', 'local_only', and 'sequential' modes for explicit operation
     # 'sequential' = Try OpenAI first (fast), fallback to local LLM if OpenAI fails
     VALID_MODES = ("local_first", "openai_first", "parallel", "ensemble", "reasoning_first", "openai_only", "local_only", "sequential")
     
@@ -681,7 +681,7 @@ class HybridLLMExecutor:
         self.prefer_reasoning = prefer_reasoning
         self.reasoning_confidence_threshold = reasoning_confidence_threshold
         
-        # FIX: Check if OpenAI client is available for mode override
+        # Note: Check if OpenAI client is available for mode override
         # Local LLM (GraphixVulcanLLM) times out (~120s) on CPU - use OpenAI only for language generation
         # Reasoning engines in src/vulcan/reasoning/* are unaffected - they still do all the thinking
         self.openai_client = self.openai_client_getter()
@@ -695,7 +695,7 @@ class HybridLLMExecutor:
             )
             mode_lower = "parallel"
         
-        # FIX: Override mode based on backend availability for language generation
+        # Note: Override mode based on backend availability for language generation
         # Local LLM is too slow (~120s timeout) - use sequential mode (OpenAI first, local fallback)
         # Note: Reasoning systems (symbolic, causal, probabilistic) are UNAFFECTED - they still run
         if mode_lower == "parallel":
@@ -729,7 +729,7 @@ class HybridLLMExecutor:
             thread_name_prefix="hybrid_timeout_"
         )
         # Parse VULCAN_LLM_TIMEOUT with error handling for invalid values
-        # FIX: Use VULCAN_HARD_TIMEOUT constant (default 300s) for CPU-intensive reasoning
+        # Note: Use VULCAN_HARD_TIMEOUT constant (default 300s) for CPU-intensive reasoning
         # CPU CLOUD FIX: Increased from 120s to 300s to allow more tokens before timeout
         try:
             env_timeout = os.environ.get("VULCAN_LLM_TIMEOUT")
@@ -832,7 +832,7 @@ class HybridLLMExecutor:
                 loop, prompt, max_tokens, temperature, effective_system_prompt, conversation_history
             )
         elif self.mode == "openai_only":
-            # FIX: OpenAI-only mode for fast language generation (~3s instead of 120s timeout)
+            # Note: OpenAI-only mode for fast language generation (~3s instead of 120s timeout)
             # Reasoning engines still handle all thinking - this is just for language output
             result = await self._execute_openai_only(
                 loop, prompt, max_tokens, temperature, effective_system_prompt, conversation_history
@@ -1478,7 +1478,7 @@ class HybridLLMExecutor:
             tasks = {local_task, openai_task}
             start_wait = time.perf_counter()
             
-            # BUG #5 FIX: Track results from each task
+            # Note: Track results from each task
             # This allows us to prefer local results over OpenAI even if OpenAI finishes first,
             # IF local has already produced a usable result
             local_result = None
@@ -1516,7 +1516,7 @@ class HybridLLMExecutor:
                                 openai_result = result
                                 self.logger.info(f"[HybridExecutor] OpenAI produced valid result")
                             
-                            # BUG #5 FIX: Prefer local results over OpenAI
+                            # Note: Prefer local results over OpenAI
                             # If we have a local result, use it immediately (VULCAN should do reasoning)
                             # This prevents OpenAI from "winning" just because it's faster
                             if local_result:
@@ -1537,7 +1537,7 @@ class HybridLLMExecutor:
                             # If only OpenAI has a result, check if local is still running
                             # Give local a short grace period to complete
                             if openai_result and not local_result and local_task in pending:
-                                # BUG #5 FIX: Wait a bit longer for local to finish
+                                # Note: Wait a bit longer for local to finish
                                 # This prevents cancelling local when it's almost done
                                 grace_period = min(LOCAL_GRACE_PERIOD_SECONDS, remaining_timeout)
                                 self.logger.info(f"[HybridExecutor] OpenAI won first, waiting {grace_period}s for local to finish...")
@@ -1955,7 +1955,7 @@ class HybridLLMExecutor:
         ARCHITECTURE: VULCAN is primary brain, OpenAI is language fallback only.
         This method attempts to use VULCAN's internal LLM first.
         
-        BUG #1 FIX: Added detailed error logging to expose why local model
+        Note: Added detailed error logging to expose why local model
         generation fails silently. Previously, exceptions were caught and
         logged at debug level, hiding the real cause of 100% OpenAI fallback.
         
@@ -1973,7 +1973,7 @@ class HybridLLMExecutor:
             )
             return None
         
-        # BUG #1 FIX: Log entry point with model state
+        # Note: Log entry point with model state
         self.logger.info("=" * 60)
         self.logger.info("[HybridExecutor] ATTEMPTING LOCAL LLM GENERATION")
         self.logger.info(f"[HybridExecutor] local_llm is None: {self.local_llm is None}")
@@ -1983,7 +1983,7 @@ class HybridLLMExecutor:
             self.logger.info("=" * 60)
             return None
         
-        # BUG #1 FIX: Log detailed model state
+        # Note: Log detailed model state
         self.logger.info(f"[HybridExecutor] local_llm type: {type(self.local_llm).__name__}")
         self.logger.info(f"[HybridExecutor] local_llm has generate: {hasattr(self.local_llm, 'generate')}")
         
@@ -2065,7 +2065,7 @@ class HybridLLMExecutor:
                 self.logger.warning("[HybridExecutor] Local LLM returned None - triggering fallback")
                 return None
 
-            # BUG #1 FIX: Log successful generation
+            # Note: Log successful generation
             if hasattr(result, "text"):
                 self.logger.info(f"[HybridExecutor] ✓ LOCAL GENERATION SUCCEEDED ({len(result.text)} chars)")
                 self.logger.info("=" * 60)
@@ -2085,7 +2085,7 @@ class HybridLLMExecutor:
                 return result_str
                 
         except Exception as e:
-            # BUG #1 FIX: Log FULL error details - this is critical for debugging
+            # Note: Log FULL error details - this is critical for debugging
             self.logger.error("=" * 60)
             self.logger.error("[HybridExecutor] LOCAL MODEL GENERATION FAILED!")
             self.logger.error(f"[HybridExecutor] Exception type: {type(e).__name__}")
@@ -2455,14 +2455,14 @@ You receive JSON containing:
 
 Make this human-readable. Nothing more."""
 
-        # BUG #5 FIX: Check reasoning confidence BEFORE sending to OpenAI
+        # Note: Check reasoning confidence BEFORE sending to OpenAI
         # If confidence is too low, don't let OpenAI try to solve the problem
         MIN_REASONING_CONFIDENCE = 0.5
         reasoning_confidence = getattr(reasoning_output, 'confidence', None) or 0.0
         
         if reasoning_confidence < MIN_REASONING_CONFIDENCE:
             self.logger.warning(
-                f"[HybridExecutor] BUG#5 FIX: Reasoning confidence ({reasoning_confidence:.2f}) < "
+                f"[HybridExecutor] Note: Reasoning confidence ({reasoning_confidence:.2f}) < "
                 f"threshold ({MIN_REASONING_CONFIDENCE}). Returning failure message instead of "
                 f"letting OpenAI compensate."
             )
@@ -2473,7 +2473,7 @@ Make this human-readable. Nothing more."""
             )
 
         # Build the user prompt with VULCAN's structured output
-        # BUG #5 FIX: Do NOT include original_query to prevent OpenAI from solving independently
+        # Note: Do NOT include original_query to prevent OpenAI from solving independently
         output_dict = None
         try:
             output_dict = reasoning_output.to_dict()
@@ -2482,7 +2482,7 @@ Make this human-readable. Nothing more."""
             self.logger.warning(f"Failed to serialize reasoning output: {e}")
             output_json = str(reasoning_output)
 
-        # BUG #5 FIX: Removed original question from prompt
+        # Note: Removed original question from prompt
         # OpenAI should ONLY see the reasoning output, not the original question
         # This prevents OpenAI from solving problems independently when reasoning fails
         user_prompt = f"""Format this VULCAN reasoning output for the user.
@@ -2504,10 +2504,10 @@ Do NOT add any analysis or reasoning beyond what is in VULCAN's output."""
             )
             
             if response and len(response.strip()) > self.MIN_MEANINGFUL_LENGTH:
-                # BUG #8 FIX: Detect hallucinations before returning response
+                # Note: Detect hallucinations before returning response
                 if self._is_hallucination(response, output_json):
                     self.logger.error(
-                        f"[HybridExecutor] BUG#8 FIX: Hallucination detected in OpenAI response. "
+                        f"[HybridExecutor] Note: Hallucination detected in OpenAI response. "
                         f"Response contains fabricated content not in reasoning output."
                     )
                     # Return a safe failure message instead of the hallucinated response
@@ -2587,7 +2587,7 @@ Do NOT add any analysis or reasoning beyond what is in VULCAN's output."""
     
     def _is_hallucination(self, response: str, reasoning_output_json: str) -> bool:
         """
-        BUG #8 FIX: Detect if response contains fabricated content.
+        Note: Detect if response contains fabricated content.
         
         Hallucination indicators are phrases or content that appear in OpenAI's
         response but were NOT in VULCAN's reasoning output. This typically happens
@@ -2628,7 +2628,7 @@ Do NOT add any analysis or reasoning beyond what is in VULCAN's output."""
             # Check if indicator is in response but NOT in reasoning output
             if indicator_lower in response_lower and indicator_lower not in reasoning_lower:
                 self.logger.warning(
-                    f"[HybridExecutor] BUG#8 FIX: Possible hallucination detected - "
+                    f"[HybridExecutor] Note: Possible hallucination detected - "
                     f"'{indicator}' in response but not in reasoning output"
                 )
                 return True
@@ -2942,7 +2942,7 @@ Do NOT add any analysis or reasoning beyond what is in VULCAN's output."""
         """
         Warm up the local LLM to reduce cold start latency.
         
-        BUG #4 FIX: CPU "Cold Start" and Cache Thrashing Prevention
+        Note: CPU "Cold Start" and Cache Thrashing Prevention
         
         The first token generation on CPU can take 7+ seconds due to:
         1. Model weights being swapped from disk/compressed memory into RAM

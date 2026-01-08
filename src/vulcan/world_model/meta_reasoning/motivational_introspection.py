@@ -38,7 +38,7 @@ def _lazy_import_component(component_name):
     """Helper to lazy-load components, falling back to MagicMock on failure."""
     try:
         module = importlib.import_module(f".{component_name}", __package__)
-        # BUG FIX Issue #29: Downgrade to DEBUG since these are loaded at startup
+        # Note Issue #29: Downgrade to DEBUG since these are loaded at startup
         # not truly "lazy" (on-demand). The INFO log was misleading.
         logger.debug(f"Loaded meta-reasoning component: {component_name}")
         return module

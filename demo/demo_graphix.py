@@ -331,7 +331,7 @@ class EnhancedGraphixDemo:
             self.tournament = None
 
         try:
-            # BUG FIX Issue #1: Use singleton to prevent per-demo reinitialization
+            # Note Issue #1: Use singleton to prevent per-demo reinitialization
             if UnifiedRuntime:
                 try:
                     from vulcan.reasoning.singletons import get_or_create_unified_runtime, set_unified_runtime

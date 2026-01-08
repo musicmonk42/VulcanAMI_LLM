@@ -58,7 +58,7 @@ except ImportError:
 # Exceptions and result types
 # ----------------------------
 
-# FIX: Trusted LLM providers list to prevent policy deadlock
+# Note: Trusted LLM providers list to prevent policy deadlock
 # These providers are allowed to be used by the self-improvement system
 # for code generation without triggering the EXTERNAL_LLM_DISABLED policy block.
 # By including local_llm and graphix variants, we ensure that Vulcan's internal

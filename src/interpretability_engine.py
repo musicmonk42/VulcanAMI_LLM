@@ -76,7 +76,7 @@ class _SingletonMeta(type):
             with cls._lock:
                 if cls._instance is None:
                     cls._instance = super().__call__(*args, **kwargs)
-        # FIX: Allow re-initialization (re-configuration) of the existing instance
+        # Note: Allow re-initialization (re-configuration) of the existing instance
         # when arguments are passed. This enables testing of __init__ validation.
         elif args or kwargs:
             # Explicitly call __init__ on the existing instance
@@ -181,7 +181,7 @@ class InterpretabilityEngine(metaclass=_SingletonMeta):
         handler = logging.FileHandler(log_file)
         handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
 
-        # FIX: Ensure handlers are managed properly, especially when __init__ is re-called
+        # Note: Ensure handlers are managed properly, especially when __init__ is re-called
         # Clear existing handlers if they are present (typical pattern for re-init of loggers)
         if self.logger.hasHandlers():
             self.logger.handlers.clear()

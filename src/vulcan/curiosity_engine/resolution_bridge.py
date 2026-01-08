@@ -493,7 +493,7 @@ def mark_gap_resolved(
     giving up after too many attempts. The resolution persists across
     subprocess restarts.
     
-    ISSUE #2 FIX: Added phantom resolution detection and cooldown period.
+    Note: Added phantom resolution detection and cooldown period.
     Before this fix, gaps were being "resolved" 49x in one hour without
     actual verification, causing the phantom resolution death spiral.
     
@@ -519,7 +519,7 @@ def mark_gap_resolved(
     if not _init_db(db_path):
         return False
     
-    # ISSUE #2 FIX: Check for phantom resolution before marking
+    # Note: Check for phantom resolution before marking
     # This prevents the death spiral where gaps are "resolved" 49x/hour
     if not skip_phantom_check:
         if is_phantom_resolution(gap_key, db_path=db_path):
@@ -529,7 +529,7 @@ def mark_gap_resolved(
             )
             return False
         
-        # ISSUE #2 FIX: Add cooldown check - don't resolve same gap within 1 hour
+        # Note: Add cooldown check - don't resolve same gap within 1 hour
         # This prevents rapid re-resolution that indicates the underlying issue isn't fixed
         try:
             with _get_db(db_path) as conn:

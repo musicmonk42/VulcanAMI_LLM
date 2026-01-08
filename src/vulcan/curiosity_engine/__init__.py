@@ -230,7 +230,7 @@ except ImportError as e:
     create_curiosity_driver = None
 
 # Query outcome and buffer for data flow to curiosity engine
-# BUG #3 FIX: Enable data flow from main process to curiosity engine
+# Note: Enable data flow from main process to curiosity engine
 try:
     from .query_outcome import QueryOutcome, OutcomeStatus
     from .outcome_queue import (
@@ -412,7 +412,7 @@ __all__ = [
     "DriverState",
     "ProcessPoolManager",
     "create_curiosity_driver",
-    # Query Outcome (BUG #3 FIX: Data flow to curiosity engine)
+    # Query Outcome (Note: Data flow to curiosity engine)
     "QueryOutcome",
     "OutcomeStatus",
     "OutcomeBuffer",

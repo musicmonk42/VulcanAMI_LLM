@@ -1972,7 +1972,7 @@ class InterventionExecutor:
         return results
 
 
-# FIX: Add the missing InterventionManager class as requested
+# Note: Add the missing InterventionManager class as requested
 class InterventionManager:
     """Placeholder for the top-level InterventionManager class"""
 

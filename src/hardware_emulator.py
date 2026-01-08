@@ -208,7 +208,7 @@ class HardwareEmulator:
         norm = np.linalg.norm(tensor)
         scale = np.clip(norm / max_norm, 0.1, 1.0)
 
-        # FIX: Convert the numpy scalar `scale` to a native Python float
+        # Note: Convert the numpy scalar `scale` to a native Python float
         # to prevent TypeError in _inject_noise's strict type check.
         scale = float(scale)
 
@@ -374,7 +374,7 @@ class HardwareEmulator:
                 # Apply noise to each batch element
                 noisy_result = np.empty_like(result)
                 for i in range(result.shape[0]):
-                    # FIX: Convert scale element to float before injecting noise
+                    # Note: Convert scale element to float before injecting noise
                     scale_val = float(scales[i])
                     noisy_result[i] = self._inject_noise(result[i], scale=scale_val)
 

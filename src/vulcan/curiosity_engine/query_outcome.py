@@ -6,7 +6,7 @@ This module defines the QueryOutcome dataclass that represents the outcome
 of a processed query. It enables data flow from the main query processing
 pipeline to the curiosity engine for learning and gap analysis.
 
-BUG #3 FIX: This solves the problem of the curiosity engine finding 0 knowledge
+Note: This solves the problem of the curiosity engine finding 0 knowledge
 gaps because it had no data. QueryOutcome captures all relevant metrics from
 query processing that the curiosity engine needs for pattern recognition.
 

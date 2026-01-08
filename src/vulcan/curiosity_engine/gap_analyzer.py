@@ -152,7 +152,7 @@ class Pattern:
                 self_set = set(map(str, self.components))
                 other_set = set(map(str, other.components))
 
-                # FIX: Check for empty sets
+                # Note: Check for empty sets
                 if not self_set and not other_set:
                     return 1.0
 
@@ -160,7 +160,7 @@ class Pattern:
                     intersection = len(self_set & other_set)
                     union = len(self_set | other_set)
 
-                    # FIX: Check division by zero
+                    # Note: Check division by zero
                     jaccard = intersection / union if union > 0 else 0.0
 
                     # Weight by confidence
@@ -216,13 +216,13 @@ class KnowledgeGap:
     complexity: float = 0.5
     dependencies: List[str] = field(default_factory=list)
     adjusted_roi: Optional[float] = None
-    # ISSUE FIX: Add severity as an alias for priority for backward compatibility
+    # Note: Add severity as an alias for priority for backward compatibility
     # This addresses the KnowledgeGap constructor bug where callers pass severity=
     severity: Optional[float] = None  # Alias for priority
 
     def __post_init__(self):
         """Generate ID if not provided and handle severity alias"""
-        # ISSUE FIX: Handle severity as an alias for priority
+        # Note: Handle severity as an alias for priority
         # If severity is provided and priority is at default, use severity
         if self.severity is not None:
             if self.priority == _DEFAULT_PRIORITY:
@@ -435,7 +435,7 @@ class PatternTracker:
     """Tracks patterns for analysis - SEPARATED CONCERN"""
 
     def __init__(self, max_history: int = 1000):
-        # FIX: Use regular dict instead of defaultdict for thread safety
+        # Note: Use regular dict instead of defaultdict for thread safety
         self.observed_patterns = {}
         self.max_history = max_history
         self.lock = threading.RLock()
@@ -485,7 +485,7 @@ class GapRegistry:
         self.identified_gaps = {}
         self.gap_history = deque(maxlen=max_history)
         self.total_gaps_found = 0
-        # FIX: Use regular dict instead of defaultdict
+        # Note: Use regular dict instead of defaultdict
         self.gaps_by_type = {}
         self.gap_success_rate = {}
         self.lock = threading.RLock()
@@ -555,7 +555,7 @@ class GapRegistry:
         with self.lock:
             try:
                 success_rates = {}
-                # FIX: Copy items before iterating
+                # Note: Copy items before iterating
                 success_items = list(self.gap_success_rate.items())
                 for gap_type, stats in success_items:
                     if stats["total"] > 0:
@@ -588,7 +588,7 @@ class DecompositionAnalyzer:
         gaps = []
 
         try:
-            # FIX: Validate input
+            # Note: Validate input
             if not failures or not isinstance(failures, list):
                 return gaps
 
@@ -606,7 +606,7 @@ class DecompositionAnalyzer:
             total_failures = max(1, len(failures))
 
             for pattern_key, pattern_failures in failure_patterns.items():
-                # FIX: Check division by zero
+                # Note: Check division by zero
                 frequency = (
                     len(pattern_failures) / total_failures if total_failures > 0 else 0
                 )
@@ -709,7 +709,7 @@ class PredictionAnalyzer:
         gaps = []
 
         try:
-            # FIX: Validate input
+            # Note: Validate input
             if not errors or not isinstance(errors, list):
                 return gaps
 
@@ -839,7 +839,7 @@ class TransferAnalyzer:
         gaps = []
 
         try:
-            # FIX: Validate input
+            # Note: Validate input
             if not failures or not isinstance(failures, list):
                 return gaps
 
@@ -859,7 +859,7 @@ class TransferAnalyzer:
             total_failures = max(1, len(failures))
 
             for pair_key, pair_failures in transfer_patterns.items():
-                # FIX: Check division by zero
+                # Note: Check division by zero
                 frequency = (
                     len(pair_failures) / total_failures if total_failures > 0 else 0
                 )
@@ -926,7 +926,7 @@ class TransferAnalyzer:
             for (source, target), stats in domain_pairs.items():
                 total = stats["success"] + stats["failure"]
                 if total >= 5:
-                    # FIX: Check division by zero
+                    # Note: Check division by zero
                     failure_rate = stats["failure"] / total if total > 0 else 0
                     if failure_rate > 0.6:
                         gap = KnowledgeGap(
@@ -989,7 +989,7 @@ class AnomalyAnalyzer:
     ) -> List[Dict[str, Any]]:
         """Detect anomalies in predictions"""
         try:
-            # FIX: Validate input
+            # Note: Validate input
             if (
                 not predictions
                 or not isinstance(predictions, list)
@@ -1081,7 +1081,7 @@ class AnomalyAnalyzer:
                 mean = np.mean(features_array)
                 std = np.std(features_array)
 
-                # FIX: Check for zero std
+                # Note: Check for zero std
                 if std > 1e-10:
                     # Find outliers using z-score
                     for idx, value in enumerate(features):
@@ -1122,7 +1122,7 @@ class LatentGapDetector:
         gaps = []
 
         try:
-            # FIX: Validate input
+            # Note: Validate input
             if not patterns or not isinstance(patterns, dict):
                 return gaps
 
@@ -1176,7 +1176,7 @@ class LatentGapDetector:
             confidence = anomaly.get("confidence", 0.5)
 
             # Impact increases with deviation and confidence
-            # FIX: Ensure division is safe
+            # Note: Ensure division is safe
             base_impact = min(1.0, (z_score / 10) * confidence) if z_score > 0 else 0
 
             # Adjust for frequency (rare events can be more impactful)
@@ -1228,7 +1228,7 @@ class GapAnalyzer:
         # Thread safety
         self._lock = threading.RLock()
         
-        # FIX: Track last outcome bridge load count for change detection
+        # Note: Track last outcome bridge load count for change detection
         self._last_outcome_count = 0
 
         logger.info("GapAnalyzer initialized (refactored)")
@@ -1404,7 +1404,7 @@ class GapAnalyzer:
         """Get all identified gaps - REFACTORED"""
         with self._lock:
             try:
-                # FIX: Atomic cache check
+                # Note: Atomic cache check
                 cache_key = "all_gaps"
                 current_time = time.time()
 
@@ -1422,7 +1422,7 @@ class GapAnalyzer:
                 all_gaps.extend(self.analyze_transfer_failures())
                 all_gaps.extend(self.detect_latent_gaps())
                 
-                # FIX: Also analyze from outcome bridge (cross-process data)
+                # Note: Also analyze from outcome bridge (cross-process data)
                 # This enables the subprocess to access query outcomes from main process
                 all_gaps.extend(self.analyze_from_outcome_bridge(minutes=60))
 

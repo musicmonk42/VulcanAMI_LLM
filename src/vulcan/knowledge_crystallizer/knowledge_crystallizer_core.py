@@ -1170,7 +1170,7 @@ class KnowledgeCrystallizer:
                     id=key,
                     name=f"Knowledge_{key}",
                     description=str(value),
-                    core_pattern=None,  # FIX: Added required core_pattern parameter
+                    core_pattern=None,  # Note: Added required core_pattern parameter
                     confidence=0.5,
                     domain="general",
                 )

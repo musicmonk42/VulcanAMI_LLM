@@ -551,7 +551,7 @@ class CodeKnowledgeStore:
         
         try:
             from persistant_memory_v46 import GraphRAG
-            # FIX: Changed from invalid "llm_embeddings" to valid model "all-MiniLM-L6-v2"
+            # Note: Changed from invalid "llm_embeddings" to valid model "all-MiniLM-L6-v2"
             return GraphRAG(embedding_model="all-MiniLM-L6-v2")
         except ImportError:
             logger.debug("GraphRAG not available, using local cache only")
@@ -852,7 +852,7 @@ class SelfImprovementState:
     pending_approvals: List[Dict[str, Any]] = field(default_factory=list)
     improvements_this_session: int = 0
     last_improvement: float = (
-        0  # FIX: Default to 0, will be initialized in __post_init__
+        0  # Note: Default to 0, will be initialized in __post_init__
     )
     last_trigger_check: float = 0
     session_start_time: float = field(default_factory=time.time)
@@ -1005,7 +1005,7 @@ class SelfImprovementDrive:
         }
 
         # CSIU: Tracking variables
-        # FIX: Start with very negative value so any utility is an improvement
+        # Note: Start with very negative value so any utility is an improvement
         self._csiu_U_prev = -1000.0
         self._csiu_u_ewma = 0.0
         self._csiu_ewma_alpha = 0.3
@@ -1234,7 +1234,7 @@ class SelfImprovementDrive:
         return {
             "enabled": True,
             "priority": 0.8,
-            "description": "Continuous self-improvement and bug fixing",
+            "description": "Continuous self-improvement and Noteing",
             "objectives": [
                 {
                     "type": "fix_circular_imports",
@@ -1402,7 +1402,7 @@ class SelfImprovementDrive:
                     improvements_this_session=0,  # Reset on load
                     last_improvement=state_dict.get(
                         "last_improvement", 0
-                    ),  # FIX: Load saved value or 0 (will init in __post_init__)
+                    ),  # Note: Load saved value or 0 (will init in __post_init__)
                     last_trigger_check=state_dict.get("last_trigger_check", 0),
                     session_start_time=time.time(),  # New session
                     total_cost_usd=state_dict.get("total_cost_usd", 0.0),
@@ -1434,7 +1434,7 @@ class SelfImprovementDrive:
                 )
                 return state
             else:
-                # FIX: State file doesn't exist - this is expected on first run
+                # Note: State file doesn't exist - this is expected on first run
                 # Use INFO level and create the directory/file proactively
                 logger.info(
                     f"State file not found at: {self.state_path} - "
@@ -1970,7 +1970,7 @@ class SelfImprovementDrive:
 
         # Session cost
         max_session = float(limits.get("max_cost_usd_per_session", float("inf")))
-        # FIX: Handle zero max limits
+        # Note: Handle zero max limits
         if max_session == 0.0 and self.state.total_cost_usd > 0.0:
             return (
                 False,
@@ -2015,7 +2015,7 @@ class SelfImprovementDrive:
 
         # Daily limit (interpreted over tracking window for flexibility)
         max_daily = float(limits.get("max_cost_usd_per_day", float("inf")))
-        # FIX: Handle zero max limits
+        # Note: Handle zero max limits
         if max_daily == 0.0 and self.state.daily_cost_usd > 0.0:
             return (
                 False,
@@ -2054,7 +2054,7 @@ class SelfImprovementDrive:
 
         # Monthly limit (fixed 30d window for simplicity)
         max_monthly = float(limits.get("max_cost_usd_per_month", float("inf")))
-        # FIX: Handle zero max limits
+        # Note: Handle zero max limits
         if max_monthly == 0.0 and self.state.monthly_cost_usd > 0.0:
             return (
                 False,
@@ -3604,7 +3604,7 @@ FILE: <path/to/file.py>
 ```
 """
 
-        # FIX: Policy Deadlock Resolution - Use local GraphixVulcanLLM for code generation
+        # Note: Policy Deadlock Resolution - Use local GraphixVulcanLLM for code generation
         # This bypasses the EXTERNAL_LLM_DISABLED policy block by ensuring we only use
         # trusted internal LLM providers for self-improvement operations.
         # Call LLM (Mock integration if WorldModel not fully wired, otherwise use it)
@@ -4512,7 +4512,7 @@ Output the complete modified file content.
 """
         
         # Call LLM with grounded context
-        # FIX: Policy Deadlock Resolution - Use local GraphixVulcanLLM for code generation
+        # Note: Policy Deadlock Resolution - Use local GraphixVulcanLLM for code generation
         # This ensures self-improvement operations use trusted internal LLM providers
         improvement = None
         if self.world_model and hasattr(self.world_model, "ask_llm"):
