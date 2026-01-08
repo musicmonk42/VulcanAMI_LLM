@@ -73,6 +73,7 @@ import dataclasses  # Note: Import at module level for dataclasses.asdict() usag
 import hashlib
 import logging
 import os
+import re
 import threading
 import time
 from dataclasses import dataclass, field
@@ -2538,7 +2539,6 @@ class ReasoningIntegration:
         # CREATIVE INDICATORS - These are NOT self-referential!
         # Check for creative writing requests FIRST before checking self-reference.
         # =====================================================================
-        import re
         
         creative_words = [
             'write', 'poem', 'story', 'compose', 'create',

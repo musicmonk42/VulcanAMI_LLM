@@ -4,6 +4,7 @@ Core reasoning types and data structures
 Fixed version with comprehensive validation and error handling.
 """
 
+import math
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -791,6 +792,9 @@ class EnhancedConfidence:
             value = getattr(self, field_name)
             if not isinstance(value, (int, float)):
                 raise TypeError(f"{field_name} must be numeric, got {type(value)}")
+            # Check for NaN - NaN comparisons always return False
+            if math.isnan(value):
+                raise ValueError(f"{field_name} cannot be NaN")
             if not 0.0 <= value <= 1.0:
                 raise ValueError(f"{field_name} must be in [0, 1], got {value}")
     
@@ -826,7 +830,8 @@ class EnhancedConfidence:
             Weighted confidence score in [0, 1]
         """
         total_weight = applicability_weight + answer_weight + evidence_weight
-        if total_weight == 0:
+        # Use math.isclose for floating point comparison
+        if math.isclose(total_weight, 0.0, abs_tol=1e-9):
             return 0.0
         
         return (
