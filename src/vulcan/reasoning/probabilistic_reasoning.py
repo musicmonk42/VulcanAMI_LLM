@@ -2049,6 +2049,95 @@ class ProbabilisticReasoner(EnhancedProbabilisticReasoner):
         logger.debug(f"[ProbabilisticReasoner] Gate check FAIL: no probability indicators detected in query")
         return False
 
+    def _is_methodology_query(self, query: str) -> bool:
+        """
+        FIX (Jan 8 2026): Detect queries about probability methodology/theory.
+        
+        These queries contain probability keywords but are asking about THEORY,
+        METHODOLOGY, or PHILOSOPHY of probability, not asking for a calculation.
+        
+        They should be routed to philosophical/world_model engines, not probabilistic.
+        
+        Examples that ARE methodology queries (return True):
+        - "Update a prior when the likelihood function is misspecified"
+        - "How do you handle model misspecification in Bayesian inference?"
+        - "What happens when prior and likelihood conflict?"
+        - "When should you use Bayesian vs frequentist approaches?"
+        
+        Examples that are NOT methodology queries (return False):
+        - "P(Disease|Test+) with sens=0.99, spec=0.95, prev=0.01"  → calculation
+        - "What is the probability of rolling a 6?"  → calculation
+        - "Given P(A)=0.3, what is P(not A)?"  → calculation
+        
+        Evidence from problem statement:
+        - "Update a prior when the likelihood function is misspecified"
+          → Routed to probabilistic engine → returned meaningless P(X=True)=0.5000
+          → Should have been routed to philosophical/world_model
+        
+        Args:
+            query: The query string
+            
+        Returns:
+            True if query is about methodology/theory rather than calculation
+        """
+        if not isinstance(query, str):
+            return False
+        
+        query_lower = query.lower()
+        
+        # Methodology indicators - asking about HOW probability works, not FOR a probability
+        methodology_phrases = [
+            # Model specification issues
+            'misspecified', 'misspecification', 'mis-specified',
+            'model specification', 'correctly specified', 'incorrectly specified',
+            # Methodology questions
+            'when should', 'how do you', 'how should', 'how to handle',
+            'what happens when', 'what if the', 'what do you do when',
+            # Comparison/choice questions
+            'bayesian vs', 'frequentist vs', 'versus frequentist',
+            'which approach', 'which method', 'better approach',
+            # Theory questions
+            'why is', 'why does', 'why should', 'explain why',
+            'foundation of', 'philosophy of', 'theory of',
+            # Conflict/edge case questions
+            'conflict between', 'conflicting', 'when they conflict',
+            'edge case', 'corner case', 'problematic case',
+            # "When the X is Y" patterns about probability theory
+            'when the likelihood', 'when the prior', 'when the posterior',
+            'if the likelihood', 'if the prior', 'if the model',
+        ]
+        
+        for phrase in methodology_phrases:
+            if phrase in query_lower:
+                logger.info(
+                    f"[ProbabilisticReasoner] FIX: Methodology query detected "
+                    f"(phrase='{phrase}'). This should be routed to philosophical engine."
+                )
+                return True
+        
+        # Pattern-based detection for "Update X when Y is Z" pattern
+        # "Update a prior when the likelihood function is misspecified"
+        update_when_pattern = re.compile(
+            r'\bupdate\s+(?:a\s+)?(?:prior|posterior|belief|model)\s+when\b',
+            re.IGNORECASE
+        )
+        if update_when_pattern.search(query):
+            logger.info(
+                f"[ProbabilisticReasoner] FIX: Methodology query detected "
+                f"(pattern='update X when Y'). This should be routed to philosophical engine."
+            )
+            return True
+        
+        # "Handle X when Y" pattern for methodology questions
+        handle_when_pattern = re.compile(
+            r'\bhandle\s+(?:the\s+)?(?:case|situation|problem)\s+when\b',
+            re.IGNORECASE
+        )
+        if handle_when_pattern.search(query):
+            return True
+        
+        return False
+
     def _is_simple_probability_query(self, query: str) -> bool:
         """
         Note: Check if query is a simple probability question.
@@ -2382,6 +2471,39 @@ class ProbabilisticReasoner(EnhancedProbabilisticReasoner):
                 metadata={
                     "gate_check": "failed",
                     "reason": "No probability keywords detected",
+                },
+            )
+        
+        # FIX (Jan 8 2026): METHODOLOGY QUERY CHECK
+        # Queries about probability METHODOLOGY/THEORY should not go through
+        # probabilistic calculation - they need philosophical/world_model reasoning.
+        # Example: "Update a prior when the likelihood function is misspecified"
+        if self._is_methodology_query(query_str):
+            logger.info(
+                f"[ProbabilisticReasoner] FIX: Methodology query detected - "
+                f"this is a THEORY question, not a calculation request. "
+                f"Returning 'not applicable' to allow routing to philosophical engine."
+            )
+            return ReasoningResult(
+                conclusion={
+                    "applicable": False,
+                    "reason": "Query asks about probability methodology/theory, not a calculation",
+                    "not_applicable": True,
+                    "recommended_engine": "philosophical",
+                },
+                confidence=0.0,
+                reasoning_type=ReasoningType.PROBABILISTIC,
+                explanation=(
+                    "This query appears to be asking about probability METHODOLOGY or THEORY "
+                    "(e.g., how to handle misspecified models, when to use certain approaches) "
+                    "rather than requesting an actual probability CALCULATION. "
+                    "This is better handled by philosophical reasoning about statistical foundations."
+                ),
+                metadata={
+                    "gate_check": "passed",
+                    "methodology_check": "failed",
+                    "reason": "Methodology/theory query, not calculation",
+                    "recommended_engine": "philosophical",
                 },
             )
         

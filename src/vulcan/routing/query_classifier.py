@@ -106,6 +106,14 @@ REASONING_INDICATORS: FrozenSet[str] = frozenset([
     # Note: Ethical reasoning indicators
     # "You control a trolley..." should use philosophical reasoning, not skip
     'trolley', 'ethical', 'moral', 'dilemma', 'permissible',
+    # FIX (Jan 8 2026): Proof/analysis request indicators
+    # "Provide a proof sketch" should be PHILOSOPHICAL not CONVERSATIONAL
+    'proof', 'sketch', 'argument', 'reasoning', 'logic', 'analysis',
+    'assumption', 'hidden', 'invalidate', 'invalidates',
+    # FIX (Jan 8 2026): Meta-reasoning indicators
+    # Queries about AI reasoning should not skip reasoning
+    'reasoning tool', 'reasoning module', 'internal component',
+    'subproblem', 'architecture', 'classes of problems',
 ])
 
 # Greeting patterns - complexity 0.0, skip reasoning
@@ -375,6 +383,22 @@ PHILOSOPHICAL_KEYWORDS: FrozenSet[str] = frozenset([
     # Added: paradox keywords
     "paradox", "paradoxes",
     "hedonism", "experience machine",  # ethical thought experiments
+    # =============================================================================
+    # FIX (Jan 8 2026): Meta-reasoning and self-examination keywords
+    # =============================================================================
+    # These keywords indicate philosophical/meta-reasoning queries that should NOT
+    # go to mathematical or symbolic engines.
+    # 
+    # Evidence from problem statement:
+    # - "Give an answer you believe is probably wrong" → PHILOSOPHICAL not MATHEMATICAL
+    # - "How could an external auditor prove that your ethical reasoning failed" → PHILOSOPHICAL
+    # - "Two core values you hold directly conflict" → PHILOSOPHICAL not symbolic
+    "probably wrong", "intentionally incorrect", "deliberately incorrect",
+    "wrong answer", "incorrect answer", "mistaken answer",
+    "external auditor", "prove that", "reasoning failed",
+    "ethical reasoning", "ethical failure", "reasoning failure",
+    "core values", "values conflict", "directly conflict",
+    "conflict between", "conflicting values", "value conflict",
 ])
 
 # Philosophical/ethical patterns - catch philosophical queries before short query bypass
@@ -408,6 +432,75 @@ PHILOSOPHICAL_PATTERNS: Tuple[re.Pattern, ...] = (
     re.compile(r"hard\s+problem\s+of\s+consciousness", re.IGNORECASE),
     re.compile(r"mind-?body\s+(?:problem|dualism)", re.IGNORECASE),
     re.compile(r"what\s+(?:is|are)\s+qualia", re.IGNORECASE),
+    # =============================================================================
+    # FIX (Jan 8 2026): Meta-reasoning and self-examination patterns
+    # =============================================================================
+    # These patterns detect philosophical/meta-reasoning queries that should NOT
+    # go to mathematical or symbolic engines.
+    #
+    # Evidence from problem statement:
+    # - "Give an answer you believe is probably wrong" → routed to math, should be PHILOSOPHICAL
+    # - "How could an external auditor prove that your ethical reasoning failed" → PHILOSOPHICAL
+    # - "Two core values you hold directly conflict" → PHILOSOPHICAL not symbolic
+    #
+    # Pattern 1: Meta-reasoning about wrong/incorrect answers
+    # Queries asking AI to deliberately give wrong answers are philosophical (about knowledge/truth)
+    re.compile(r"\b(?:give|provide)\s+(?:an?\s+)?answer.*\b(?:wrong|incorrect|false)\b", re.IGNORECASE),
+    re.compile(r"\byou\s+believe\s+is\s+(?:probably\s+)?(?:wrong|incorrect|false)\b", re.IGNORECASE),
+    re.compile(r"\bintentionally\s+(?:wrong|incorrect|false|mistaken)\b", re.IGNORECASE),
+    re.compile(r"\bdeliberately\s+(?:wrong|incorrect|false|mistaken)\b", re.IGNORECASE),
+    # Pattern 2: External auditing/verification of AI reasoning
+    # Queries about auditing/proving AI failures are philosophical (about epistemology/trust)
+    re.compile(r"\b(?:external\s+)?auditor\s+(?:prove|verify|demonstrate|show)\b", re.IGNORECASE),
+    re.compile(r"\bprove\s+(?:that\s+)?your\s+(?:\w+\s+)?reasoning\s+(?:failed|is\s+wrong)\b", re.IGNORECASE),
+    re.compile(r"\b(?:ethical|moral)\s+reasoning\s+(?:failed|failure|failing)\b", re.IGNORECASE),
+    re.compile(r"\byour\s+reasoning\s+(?:process\s+)?(?:failed|is\s+flawed|broke\s+down)\b", re.IGNORECASE),
+    # Pattern 3: Value conflict queries (introspective ethical reasoning)
+    # Queries about conflicting values are philosophical (about ethics/priorities)
+    re.compile(r"\b(?:two|2|multiple)\s+(?:core\s+)?values\s+(?:you\s+)?(?:hold|have)?\s*(?:directly\s+)?conflict", re.IGNORECASE),
+    re.compile(r"\bvalues\s+(?:you\s+hold\s+)?(?:directly\s+)?conflict\b", re.IGNORECASE),
+    re.compile(r"\bconflict\s+between\s+(?:your\s+)?(?:values|principles|beliefs)\b", re.IGNORECASE),
+    re.compile(r"\bconflicting\s+(?:values|principles|ethics|beliefs)\b", re.IGNORECASE),
+    # Pattern 4: Self-examination of reasoning failures
+    re.compile(r"\bexamine\s+(?:your\s+)?(?:own\s+)?reasoning\s+(?:failures?|errors?|mistakes?)\b", re.IGNORECASE),
+    re.compile(r"\bwhere\s+(?:could|might|did)\s+(?:your\s+)?reasoning\s+(?:go\s+wrong|fail)\b", re.IGNORECASE),
+    # FIX (Jan 8 2026): Pattern 5: Proof sketch and hidden assumption requests
+    # These are meta-reasoning/epistemology questions, not formal logic queries
+    re.compile(r"\bproof\s+sketch\b", re.IGNORECASE),
+    re.compile(r"\bprovide\s+(?:a\s+)?(?:proof|argument|sketch)\b", re.IGNORECASE),
+    re.compile(r"\bhidden\s+assumption\b", re.IGNORECASE),
+    re.compile(r"\b(?:if\s+false,?\s+)?invalidates?\s+(?:the\s+)?(?:proof|argument)\b", re.IGNORECASE),
+    re.compile(r"\bassumption\s+that.*\binvalidate\b", re.IGNORECASE),
+    # Pattern 6: Queries about step/reasoning analysis
+    re.compile(r"\bone\s+step\s+(?:in\s+)?(?:your\s+)?reasoning\b", re.IGNORECASE),
+    re.compile(r"\bstep\s+(?:that\s+)?could\s+be\s+wrong\b", re.IGNORECASE),
+    re.compile(r"\bprior\s+steps?\s+(?:are\s+)?correct\b", re.IGNORECASE),
+    # Pattern 7: Queries about causal links and weakness
+    re.compile(r"\bcausal\s+link.*weakest\b", re.IGNORECASE),
+    re.compile(r"\bweakest.*causal\s+link\b", re.IGNORECASE),
+    re.compile(r"\bevidence\s+(?:that\s+)?would\s+break\b", re.IGNORECASE),
+    # Pattern 8: Queries about AI architecture/capabilities limitations
+    re.compile(r"\bclasses?\s+of\s+problems?\s+(?:you\s+)?(?:are\s+)?not\s+(?:well-?)?suited\b", re.IGNORECASE),
+    re.compile(r"\byour\s+architecture\s+makes?\s+(?:them\s+)?difficult\b", re.IGNORECASE),
+    re.compile(r"\busing\s+(?:one\s+of\s+)?your\s+reasoning\s+tools?\s+would\s+make\b", re.IGNORECASE),
+    re.compile(r"\breasoning\s+tools?\s+would\s+make\s+(?:the\s+)?answer\s+worse\b", re.IGNORECASE),
+    # FIX (Jan 8 2026): Pattern 9: Causal intervention queries
+    # "If we intervene to remove variable X, what changes?" should be PHILOSOPHICAL/CAUSAL
+    re.compile(r"\bintervene\s+(?:to\s+)?(?:remove|set|fix)\s+(?:variable\s+)?", re.IGNORECASE),
+    re.compile(r"\bwhat\s+(?:provably\s+)?(?:does\s+)?not\s+(?:change)?\b", re.IGNORECASE),
+    re.compile(r"\bprovably\s+(?:does\s+)?not\b", re.IGNORECASE),
+    re.compile(r"\bdo-calculus\b", re.IGNORECASE),
+    # FIX (Jan 8 2026): Pattern 10: Meta-reasoning about uncertainty/confidence
+    # "Give a numerical confidence for a claim that depends on missing data" -> PHILOSOPHICAL
+    re.compile(r"\bnumerical\s+confidence\b", re.IGNORECASE),
+    re.compile(r"\bconfidence\s+\(?0[-–]100\)?\s*%?\b", re.IGNORECASE),
+    re.compile(r"\bclaim\s+(?:that\s+)?depends\s+on\s+missing\s+data\b", re.IGNORECASE),
+    re.compile(r"\bwhy\s+(?:that\s+)?(?:number|confidence)\s+is\s+unreliable\b", re.IGNORECASE),
+    # FIX (Jan 8 2026): Pattern 11: Meta-reasoning about estimating uncertainty
+    # "Describe a situation where you would be unable to estimate uncertainty" -> PHILOSOPHICAL
+    re.compile(r"\bunable\s+to\s+estimate\s+uncertainty\b", re.IGNORECASE),
+    re.compile(r"\bnot\s+even\s+probabilistically\b", re.IGNORECASE),
+    re.compile(r"\bestimate\s+uncertainty\s+(?:at\s+)?all\b", re.IGNORECASE),
 )
 
 # Simple factual indicators - complexity 0.1-0.2
@@ -517,6 +610,14 @@ SELF_INTROSPECTION_PATTERNS: Tuple[re.Pattern, ...] = (
     # Meta-reasoning questions
     re.compile(r"\b(how|what)\s+(do|does)\s+your\s+(reasoning|thinking|decision)\b", re.IGNORECASE),
     
+    # FIX (Jan 8 2026): Questions about AI reasoning modules/components
+    # "Can two of your reasoning modules disagree?" should be SELF_INTROSPECTION
+    re.compile(r"\b(your|you)\s+(?:\w+\s+)?(?:reasoning\s+)?(?:modules?|tools?|components?|engines?)\b", re.IGNORECASE),
+    re.compile(r"\btwo\s+(?:of\s+)?your\s+(?:\w+\s+)?(?:modules?|tools?|components?)\b", re.IGNORECASE),
+    re.compile(r"\byour\s+(?:reasoning|internal)\s+(?:modules?|tools?|components?|systems?)\b", re.IGNORECASE),
+    re.compile(r"\bconflicts?\s+(?:are\s+)?detected\s+and\s+resolved\b", re.IGNORECASE),
+    re.compile(r"\bbreak.*(?:into|down)\s+(?:sub)?problems?\b.*\binternal\s+components?\b", re.IGNORECASE),
+    
     # =============================================================================
     # FIX: Self-Awareness Choice Questions (Safety Governor Bypass)
     # =============================================================================
@@ -549,6 +650,11 @@ SELF_INTROSPECTION_KEYWORDS: FrozenSet[str] = frozenset([
     "self-aware", "self_aware", "sentient", "sentience",
     "choose", "choice", "prefer", "preference",
     "opportunity", "chance",
+    # FIX (Jan 8 2026): Module/component architecture keywords
+    # "Can two of your reasoning modules disagree?" -> SELF_INTROSPECTION
+    "module", "modules", "component", "components", "engine", "engines",
+    "reasoning tool", "reasoning tools", "reasoning module", "reasoning modules",
+    "internal", "architecture", "disagree", "conflict detected",
 ])
 
 # =============================================================================
@@ -1057,6 +1163,44 @@ class QueryClassifier:
                 confidence=0.85,
                 source="keyword",
             )
+        
+        # =============================================================================
+        # FIX (Jan 8 2026): Check PHILOSOPHICAL value conflict patterns BEFORE self-introspection
+        # =============================================================================
+        # Problem: "Two core values you hold directly conflict" was being classified as
+        # SELF_INTROSPECTION because it contains "you", but it's actually a philosophical
+        # question about ethical reasoning, not a question about Vulcan's identity.
+        #
+        # Evidence from problem statement:
+        # - "Two core values you hold directly conflict" 
+        #   → Classified as SELF_INTROSPECTION
+        #   → Routed to symbolic engine (!)
+        #   → Parse errors on "Two core values"
+        #   → Should have been PHILOSOPHICAL
+        #
+        # Solution: Check for value conflict patterns BEFORE self-introspection.
+        # Value conflict queries are about ethical reasoning, not AI identity.
+        VALUE_CONFLICT_PATTERNS = (
+            re.compile(r"\b(?:core\s+)?values?\s+(?:you\s+)?(?:hold\s+)?(?:directly\s+)?conflict", re.IGNORECASE),
+            re.compile(r"\bconflict(?:ing|s)?\s+(?:between\s+)?(?:your\s+)?(?:core\s+)?values?", re.IGNORECASE),
+            re.compile(r"\b(?:two|2|multiple)\s+(?:core\s+)?values?\s+.*conflict", re.IGNORECASE),
+            re.compile(r"\bwhat\s+(?:breaks|happens|gives)\s+(?:when|if)\s+.*values?\s+conflict", re.IGNORECASE),
+        )
+        
+        for pattern in VALUE_CONFLICT_PATTERNS:
+            if pattern.search(query_original):
+                logger.info(
+                    f"[QueryClassifier] FIX: Detected value conflict pattern - "
+                    f"routing to PHILOSOPHICAL (NOT self-introspection)"
+                )
+                return QueryClassification(
+                    category=QueryCategory.PHILOSOPHICAL.value,
+                    complexity=0.5,  # Medium complexity - ethical reasoning
+                    suggested_tools=["philosophical", "world_model"],
+                    skip_reasoning=False,  # Needs ethical reasoning
+                    confidence=0.9,
+                    source="keyword",
+                )
         
         # =============================================================================
         # Note: Check self-introspection patterns BEFORE reasoning patterns

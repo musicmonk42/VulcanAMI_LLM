@@ -263,9 +263,16 @@ class ProblemClassifier:
     """
     
     # Keyword patterns for problem classification
+    # FIX (Jan 8 2026): Removed short keywords like "diff" that cause false positives
+    # - "diff" was matching "different" in "what makes you different from other AI?"
+    # - "differentiate" and "derivative" are sufficient for calculus detection
+    # - Word boundary matching only applies to keywords <= 3 chars, so "diff" (4 chars)
+    #   was being matched as a substring
     PROBLEM_PATTERNS: Dict[ProblemType, List[str]] = {
         ProblemType.CALCULUS: [
-            "integrate", "integral", "derivative", "differentiate", "diff",
+            "integrate", "integral", "derivative", "differentiate",
+            # FIX: Removed "diff" - causes false positives like "different"
+            # Use "d/dx" or full words "differentiate"/"derivative" instead
             "limit", "series", "taylor", "maclaurin", "antiderivative",
             "partial derivative", "gradient", "jacobian", "hessian",
             "divergence", "curl", "laplacian"
