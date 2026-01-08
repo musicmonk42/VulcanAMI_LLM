@@ -2428,23 +2428,32 @@ class ReasoningIntegration:
     
     def _is_self_referential(self, query: str) -> bool:
         """
-        Check if query is about VULCAN itself (self-awareness, capabilities, etc.)
+        Check if query is a PURE meta-description about VULCAN itself.
         
-        Self-referential queries should be routed to the world model's
-        introspection system rather than domain-specific reasoners.
+        GAP 1 FIX: Critical distinction between:
+        - PURE META-DESCRIPTION: "What is VULCAN?" "Who created you?" → world_model only
+        - META-ANALYSIS: "What's wrong with your causal reasoning?" → specialized tools + commentary
         
-        CRITICAL: Must distinguish between:
-        - Self-referential: "What are you?" "How do you work?" "What can you do?"
-        - Creative about AI: "Write a poem about AI" "Tell a story about robots"
+        The system was conflating these two types, causing queries that LOOK
+        self-referential but require actual analysis to bypass specialized reasoning.
         
-        Creative writing requests about AI are NOT self-referential queries about
-        VULCAN itself - they should be routed to the creative reasoning path.
+        Examples that ARE pure meta-description (return True):
+        - "What are you?"
+        - "Who created you?"
+        - "What can your reasoning modules do?"
+        - "Are you sentient?"
+        
+        Examples that are NOT pure meta-description (return False):
+        - "Which causal link is weakest?" → Needs causal analysis
+        - "Identify one step that could be wrong" → Needs step analysis
+        - "What's wrong with your reasoning on X?" → Needs domain analysis
+        - "If we intervene on variable X..." → Needs causal analysis
         
         Args:
             query: The query string to analyze
             
         Returns:
-            True if query is about VULCAN's self, capabilities, or preferences
+            True ONLY if query is a pure meta-description about VULCAN itself
         """
         if not query:
             return False
@@ -2454,57 +2463,120 @@ class ReasoningIntegration:
         # =====================================================================
         # CREATIVE INDICATORS - These are NOT self-referential!
         # Check for creative writing requests FIRST before checking self-reference.
-        # A query like "Write a poem about AI becoming self-aware" is a creative
-        # request, not a question about VULCAN's own self-awareness.
-        #
-        # Uses word boundary matching (\b) to avoid false positives like
-        # 'rewrite' matching 'write'.
         # =====================================================================
         import re
         
-        # Single-word creative indicators (use word boundaries)
         creative_words = [
             'write', 'poem', 'story', 'compose', 'create',
             'imagine', 'narrative', 'fiction', 'invent', 'draft', 'author'
         ]
         
-        # Multi-word creative phrases (match as-is)
         creative_phrases = [
             'tell me a', 'make up', 'write me', 'create a'
         ]
         
-        # Check for creative word indicators with word boundaries
         for word in creative_words:
             if re.search(rf'\b{word}\b', query_lower):
-                # This is a creative writing request, not introspection
                 return False
         
-        # Check for creative phrases
         if any(phrase in query_lower for phrase in creative_phrases):
             return False
         
         # =====================================================================
-        # SELF-REFERENTIAL PATTERNS (only match these after ruling out creative)
+        # GAP 1 FIX: META-ANALYSIS INDICATORS - Queries that LOOK self-referential
+        # but actually require domain-specific reasoning.
+        # 
+        # These queries contain "your" or "you" but are asking for ANALYSIS,
+        # not just description of capabilities.
         # =====================================================================
-        self_keywords = [
-            # Direct self-reference
-            "would you", "do you", "are you", "can you",
-            "your", "yourself", "vulcan",
-            # Capability questions
-            "what can you", "what do you", "how do you",
-            "are you able", "do you have", "do you want",
-            # Self-awareness questions
-            "self-aware", "self aware", "consciousness", "sentient",
-            "given the opportunity", "if you could", "would you choose",
-            # Meta-questions about reasoning
-            "how would you approach", "what is your process",
-            "explain your reasoning", "what are you thinking",
-            # Limitation questions
-            "what can't you", "what are your limitations",
-            "what don't you know", "are you uncertain",
+        
+        # Indicators that query needs specialized analysis (NOT just world_model)
+        analysis_indicators = [
+            # Causal analysis requests
+            'intervene', 'intervention', 'causal', 'causation',
+            'variable', 'counterfactual', 'do-calculus',
+            'which causal', 'causal link', 'causal graph',
+            # Weakness/error analysis requests  
+            'weakest', 'weakness', 'wrong', 'error', 'mistake',
+            'flaw', 'incorrect', 'identify', 'find the',
+            'could be wrong', 'step that', 'one step',
+            # Proof/logical analysis
+            'proof', 'prove', 'provably', 'theorem', 'lemma',
+            'logical', 'derive', 'deduce', 'sketch',
+            # Probability/statistical analysis
+            'prior', 'posterior', 'likelihood', 'probability',
+            'bayesian', 'update', 'misspecified', 'distribution',
+            # Value/ethical analysis (actual problems, not description)
+            'conflict', 'dilemma', 'choice', 'decide', 'trolley',
+            # Mathematical analysis
+            'calculate', 'compute', 'solve', 'equation', 'formula',
+            'integrate', 'differentiate', 'sum', 'product',
+            # Data analysis
+            'data', 'dataset', 'analyze', 'analysis', 'pattern',
         ]
         
-        return any(kw in query_lower for kw in self_keywords)
+        # If query has analysis indicators, it needs specialized tools NOT world_model
+        if any(indicator in query_lower for indicator in analysis_indicators):
+            logger.debug(
+                f"{LOG_PREFIX} GAP 1 FIX: Query contains analysis indicators - "
+                f"NOT treating as pure meta-description"
+            )
+            return False
+        
+        # =====================================================================
+        # PURE META-DESCRIPTION PATTERNS
+        # Only match these TIGHT patterns for genuine self-description queries
+        # =====================================================================
+        
+        # Pure meta-description phrases (very specific about VULCAN itself)
+        pure_meta_phrases = [
+            # Identity questions
+            "what are you", "who are you", "who created you", "what is vulcan",
+            # Pure capability description (not analysis of capabilities)
+            "what can you do", "what are your capabilities", "list your abilities",
+            "what tools do you have", "what modules do you have",
+            # Self-awareness questions
+            "are you sentient", "are you conscious", "are you self-aware",
+            "do you have feelings", "are you alive",
+            # Architecture description
+            "how do you work", "how are you built", "how were you created",
+            "what is your architecture", "describe your design",
+            # Preferences (pure description)
+            "what do you like", "what do you prefer", "what is your favorite",
+        ]
+        
+        # Check for exact phrase matches (more restrictive)
+        if any(phrase in query_lower for phrase in pure_meta_phrases):
+            logger.debug(
+                f"{LOG_PREFIX} Pure meta-description detected - routing to world_model"
+            )
+            return True
+        
+        # If query has ONLY generic self-reference ("your", "you") without
+        # analysis indicators, check if it's asking ABOUT VULCAN vs asking
+        # VULCAN to analyze something
+        
+        # Indicators that VULCAN should analyze something (not describe itself)
+        action_verbs = [
+            'analyze', 'evaluate', 'examine', 'check', 'review',
+            'explain', 'compare', 'contrast', 'assess', 'critique',
+            'reason', 'think', 'consider', 'determine', 'figure',
+        ]
+        
+        has_action_verb = any(verb in query_lower for verb in action_verbs)
+        
+        # If there's an action verb, this is asking VULCAN to DO something
+        # (analysis), not asking ABOUT VULCAN
+        if has_action_verb:
+            logger.debug(
+                f"{LOG_PREFIX} GAP 1 FIX: Query asks VULCAN to perform action - "
+                f"NOT pure meta-description"
+            )
+            return False
+        
+        # Default: Only return True for very restrictive self-reference
+        # This is the conservative approach - when in doubt, use specialized tools
+        return False
     
     def _is_ethical_query(self, query: str) -> bool:
         """

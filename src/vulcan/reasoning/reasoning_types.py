@@ -724,6 +724,197 @@ class DistributionShift:
 
 
 # =============================================================================
+# GAP 6 FIX: Enhanced Confidence Structure
+# =============================================================================
+# Problem: All components return a single "confidence" score, but they measure
+# different things:
+# - World Model: "I'm sure this is a meta-query" (applicability)
+# - Probabilistic: "I'm sure of this probability" (answer confidence)
+# - Symbolic: "I'm sure of this proof" (evidence quality)
+# - Mathematical: "I'm sure of this calculation" (answer confidence)
+#
+# Solution: Separate confidence types so the system can properly combine them.
+# =============================================================================
+
+
+@dataclass
+class EnhancedConfidence:
+    """
+    GAP 6 FIX: Structured confidence with separate applicability vs answer confidence.
+    
+    This fixes the confidence calibration issue where world_model (high applicability
+    confidence) was beating specialized tools (high answer confidence) because they
+    were measured on the same scale.
+    
+    Attributes:
+        applicability_confidence: How well does this tool apply to the query? (0-1)
+            - 1.0 = This tool is perfect for this query
+            - 0.5 = This tool might apply
+            - 0.0 = This tool is not applicable
+            
+        answer_confidence: How certain is the answer from this tool? (0-1)
+            - 1.0 = Answer is definitely correct (e.g., mathematical proof)
+            - 0.5 = Answer is uncertain
+            - 0.0 = Answer is unknown or failed
+            
+        evidence_quality: How good is the evidence supporting the answer? (0-1)
+            - 1.0 = Strong evidence (formal proof, calculation)
+            - 0.5 = Moderate evidence (heuristic, pattern)
+            - 0.0 = No evidence or failed verification
+            
+    Example:
+        For query "What is 2+2?" with mathematical tool:
+        - applicability_confidence = 0.95 (math tool applies well)
+        - answer_confidence = 1.0 (4 is definitely correct)
+        - evidence_quality = 1.0 (verified calculation)
+        - overall_score = 0.95 * 1.0 * 1.0 = 0.95
+        
+        For query "What is 2+2?" with world_model:
+        - applicability_confidence = 0.2 (not a meta-query)
+        - answer_confidence = 0.8 (can answer but not specialized)
+        - evidence_quality = 0.3 (no calculation, just knowledge)
+        - overall_score = 0.2 * 0.8 * 0.3 = 0.048 (much lower than math tool)
+    """
+    
+    applicability_confidence: float
+    answer_confidence: float
+    evidence_quality: float
+    
+    # Optional: reason for each score (for debugging/logging)
+    applicability_reason: str = ""
+    answer_reason: str = ""
+    evidence_reason: str = ""
+    
+    def __post_init__(self):
+        """Validate confidence values."""
+        for field_name in ['applicability_confidence', 'answer_confidence', 'evidence_quality']:
+            value = getattr(self, field_name)
+            if not isinstance(value, (int, float)):
+                raise TypeError(f"{field_name} must be numeric, got {type(value)}")
+            if not 0.0 <= value <= 1.0:
+                raise ValueError(f"{field_name} must be in [0, 1], got {value}")
+    
+    def overall_score(self) -> float:
+        """
+        Compute overall confidence score by combining all factors.
+        
+        Uses multiplicative combination so that low scores in ANY factor
+        significantly reduce the overall score.
+        
+        Returns:
+            Overall confidence score in [0, 1]
+        """
+        return self.applicability_confidence * self.answer_confidence * self.evidence_quality
+    
+    def weighted_score(
+        self, 
+        applicability_weight: float = 0.3,
+        answer_weight: float = 0.5,
+        evidence_weight: float = 0.2
+    ) -> float:
+        """
+        Compute weighted average confidence score.
+        
+        Useful when you want to weight factors differently based on context.
+        
+        Args:
+            applicability_weight: Weight for applicability (default 0.3)
+            answer_weight: Weight for answer confidence (default 0.5)
+            evidence_weight: Weight for evidence quality (default 0.2)
+            
+        Returns:
+            Weighted confidence score in [0, 1]
+        """
+        total_weight = applicability_weight + answer_weight + evidence_weight
+        if total_weight == 0:
+            return 0.0
+        
+        return (
+            applicability_weight * self.applicability_confidence +
+            answer_weight * self.answer_confidence +
+            evidence_weight * self.evidence_quality
+        ) / total_weight
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for serialization."""
+        return {
+            "applicability_confidence": self.applicability_confidence,
+            "answer_confidence": self.answer_confidence,
+            "evidence_quality": self.evidence_quality,
+            "overall_score": self.overall_score(),
+            "applicability_reason": self.applicability_reason,
+            "answer_reason": self.answer_reason,
+            "evidence_reason": self.evidence_reason,
+        }
+    
+    @classmethod
+    def from_legacy_confidence(cls, confidence: float, tool_type: str = "unknown") -> "EnhancedConfidence":
+        """
+        Create EnhancedConfidence from legacy single confidence value.
+        
+        This helps migrate existing code that uses single confidence scores.
+        
+        Args:
+            confidence: Legacy confidence value (0-1)
+            tool_type: Type of tool (affects how confidence is distributed)
+            
+        Returns:
+            EnhancedConfidence with estimated component scores
+        """
+        # Distribute legacy confidence based on tool type
+        if tool_type in ["world_model", "meta_reasoning"]:
+            # World model: high applicability for meta-queries, moderate answer
+            return cls(
+                applicability_confidence=confidence,
+                answer_confidence=confidence * 0.6,  # Lower answer confidence
+                evidence_quality=0.3,  # Generic knowledge, not specific evidence
+                applicability_reason="Meta-reasoning query",
+                answer_reason="Generic self-knowledge",
+                evidence_reason="No specific evidence"
+            )
+        elif tool_type in ["mathematical", "symbolic"]:
+            # Math/symbolic: high answer confidence if successful
+            return cls(
+                applicability_confidence=confidence * 0.8,
+                answer_confidence=confidence,  # High answer confidence
+                evidence_quality=confidence * 0.95,  # Formal proof/calculation
+                applicability_reason="Domain-specific tool",
+                answer_reason="Formal calculation/proof",
+                evidence_reason="Verified computation"
+            )
+        elif tool_type in ["probabilistic", "causal"]:
+            # Probabilistic/causal: moderate everything
+            return cls(
+                applicability_confidence=confidence * 0.85,
+                answer_confidence=confidence * 0.9,
+                evidence_quality=confidence * 0.7,
+                applicability_reason="Statistical/causal analysis",
+                answer_reason="Probabilistic inference",
+                evidence_reason="Statistical evidence"
+            )
+        elif tool_type == "philosophical":
+            # Philosophical: high applicability for ethics, moderate answer
+            return cls(
+                applicability_confidence=confidence * 0.9,
+                answer_confidence=confidence * 0.7,  # Philosophical answers are nuanced
+                evidence_quality=confidence * 0.5,  # Arguments, not proofs
+                applicability_reason="Ethical/philosophical reasoning",
+                answer_reason="Philosophical argument",
+                evidence_reason="Reasoned argument"
+            )
+        else:
+            # Unknown: distribute evenly
+            return cls(
+                applicability_confidence=confidence,
+                answer_confidence=confidence,
+                evidence_quality=confidence,
+                applicability_reason="Unknown tool type",
+                answer_reason="Unknown confidence source",
+                evidence_reason="Unknown evidence"
+            )
+
+
+# =============================================================================
 # Helper Functions for Type-Safe Attribute Access
 # =============================================================================
 
