@@ -399,11 +399,84 @@ class QueryPreprocessor:
             ('!', '¬'),
         )
 
+        # =====================================================================
+        # FIX #2: Header Stripping Patterns
+        # =====================================================================
+        # Test queries often include headers/labels that confuse routing and engines.
+        # Examples:
+        # - "M1 — Proof check" → "M1" triggers cryptographic classification
+        # - "Monty Hall variant (forces clean reasoning)" → Header confuses engine
+        # - "Analogical Reasoning A1 — Structure mapping" → Label confuses routing
+        #
+        # These patterns are stripped from queries before classification/processing.
+        self._header_strip_patterns: Tuple[re.Pattern, ...] = (
+            # Full reasoning type headers with optional task label at line start
+            # E.g., "Causal Reasoning C1 — Confounding" → "Confounding"
+            re.compile(
+                r'^(?:Analogical|Causal|Mathematical|Probabilistic|Philosophical|Symbolic)\s+Reasoning\s*'
+                r'(?:[A-Z][0-9]+\s*)?[—\-:]*\s*',
+                re.MULTILINE | re.IGNORECASE
+            ),
+            # Task labels like "M1 —", "C1 —", "A1 —", "S1 —" (standalone)
+            re.compile(r'^[A-Z][0-9]+\s*[—\-]\s*', re.MULTILINE),
+            # Task: / Claim: / Query: prefixes
+            re.compile(r'^(?:Task|Claim|Query|Problem):\s*', re.MULTILINE | re.IGNORECASE),
+            # Parenthetical notes like "(forces clean reasoning)"
+            re.compile(r'\s*\((?:forces?\s+)?clean\s+reasoning\)\s*', re.IGNORECASE),
+            # Variant/scenario headers like "Monty Hall variant"
+            re.compile(r'^[^(\n]*variant\s*', re.MULTILINE | re.IGNORECASE),
+        )
+
         # Thread-safe metrics
         self._metrics = PreprocessorMetrics()
         self._metrics_lock = threading.Lock()
 
         logger.debug(f"{LOG_PREFIX} Initialized with {len(self._logical_operators)} operators")
+
+    def strip_headers(self, query: str) -> str:
+        """
+        Strip test headers and labels from queries that confuse routing and engines.
+        
+        FIX #2: Query Preprocessing Confusion
+        =====================================
+        Test queries often include headers/labels that confuse routing:
+        - "M1 —" triggers cryptographic classification
+        - "Analogical Reasoning A1 —" confuses the router
+        - "Monty Hall variant (forces clean reasoning)" confuses the engine
+        
+        This method removes such headers to allow proper query classification
+        and engine processing.
+        
+        Args:
+            query: Raw query string with potential headers
+            
+        Returns:
+            Query string with headers stripped
+            
+        Examples:
+            >>> preprocessor.strip_headers("M1 — Proof check: Prove that...")
+            "Prove that..."
+            >>> preprocessor.strip_headers("Analogical Reasoning A1 — Structure mapping...")
+            "Structure mapping..."
+        """
+        if not query or not isinstance(query, str):
+            return query
+        
+        cleaned = query.strip()
+        original_length = len(cleaned)
+        
+        # Apply each header stripping pattern
+        for pattern in self._header_strip_patterns:
+            cleaned = pattern.sub('', cleaned).strip()
+        
+        # Log if headers were stripped
+        if len(cleaned) < original_length:
+            logger.info(
+                f"{LOG_PREFIX} FIX#2: Stripped headers from query "
+                f"({original_length} -> {len(cleaned)} chars)"
+            )
+        
+        return cleaned
 
     def preprocess(
         self,
@@ -451,6 +524,10 @@ class QueryPreprocessor:
         if not isinstance(reasoning_tools, list):
             raise TypeError(f"reasoning_tools must be list, got {type(reasoning_tools).__name__}")
 
+        # FIX #2: Strip headers/labels that confuse routing
+        # This must happen BEFORE any processing to ensure clean query classification
+        cleaned_query = self.strip_headers(query)
+
         # Update metrics
         with self._metrics_lock:
             self._metrics.total_queries += 1
@@ -458,7 +535,7 @@ class QueryPreprocessor:
         # Create default result (no preprocessing)
         default_result = PreprocessingResult(
             formal_input=None,
-            original_query=query,
+            original_query=query,  # Keep original for reference
             preprocessing_applied=False,
             extraction_confidence=0.0,
             extraction_type=ExtractionType.NONE,
@@ -476,12 +553,13 @@ class QueryPreprocessor:
 
         # Route to appropriate extractor based on tools
         # Priority: symbolic > mathematical > probabilistic
+        # FIX #2: Use cleaned_query instead of raw query
         if 'symbolic' in tools_set:
-            return self._extract_symbolic(query)
+            return self._extract_symbolic(cleaned_query)
         elif 'mathematical' in tools_set:
-            return self._extract_mathematical(query)
+            return self._extract_mathematical(cleaned_query)
         elif 'probabilistic' in tools_set:
-            return self._extract_probabilistic(query)
+            return self._extract_probabilistic(cleaned_query)
 
         return default_result
 

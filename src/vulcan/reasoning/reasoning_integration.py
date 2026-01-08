@@ -1623,13 +1623,22 @@ class ReasoningIntegration:
                             f"(attempt {current_attempts + 1}/{MAX_FALLBACK_ATTEMPTS})"
                         )
                         
-                        # Try fallback tools in order of general applicability
-                        # world_model can handle meta-questions about capabilities
-                        # probabilistic is a general-purpose fallback
-                        fallback_tools = ['world_model', 'probabilistic', 'analogical']
-                        
-                        # Filter out the tool that already failed
-                        fallback_tools = [t for t in fallback_tools if t not in selected_tools]
+                        # FIX #4: Improved fallback logic - try alternative engines before LLM
+                        # =====================================================================
+                        # Instead of a fixed list, select fallback tools based on query type
+                        # and the original tool that failed. This ensures queries get routed
+                        # to the most appropriate alternative engine.
+                        #
+                        # Priority order:
+                        # 1. Query-type specific fallbacks (e.g., philosophical for ethical queries)
+                        # 2. General-purpose fallbacks (world_model, probabilistic)
+                        # 3. Arena delegation (LLM) as last resort
+                        # =====================================================================
+                        fallback_tools = self._get_fallback_tools(
+                            query_type=query_type,
+                            original_tool=original_tool,
+                            failed_tools=selected_tools
+                        )
                         
                         for fallback_tool in fallback_tools:
                             try:
@@ -2000,6 +2009,97 @@ class ReasoningIntegration:
 
         # Default fallback
         return ["general"]
+
+    def _get_fallback_tools(
+        self,
+        query_type: str,
+        original_tool: str,
+        failed_tools: List[str],
+    ) -> List[str]:
+        """
+        Get appropriate fallback tools based on query type and failed tools.
+        
+        FIX #4: Improved Fallback Logic
+        ===============================
+        Instead of a fixed fallback list, select tools based on query characteristics.
+        This ensures queries are routed to the most appropriate alternative engine
+        before falling back to LLM (Arena delegation).
+        
+        Priority:
+        1. Query-type specific alternatives (e.g., philosophical for ethical queries)
+        2. General-purpose fallbacks (world_model for meta-queries, probabilistic)
+        3. The fallback list is filtered to exclude already-failed tools
+        
+        Args:
+            query_type: Type of query (reasoning, ethical, mathematical, etc.)
+            original_tool: The tool that originally failed
+            failed_tools: List of tools that have already been tried and failed
+            
+        Returns:
+            List of fallback tool names to try, in priority order
+        """
+        # Map query types to preferred fallback tools
+        # FIX #1: Include newly registered philosophical and mathematical engines
+        query_type_fallbacks = {
+            # Ethical/philosophical queries → try philosophical engine first
+            'ethical': ['philosophical', 'world_model', 'analogical'],
+            'philosophical': ['world_model', 'analogical', 'probabilistic'],
+            
+            # Mathematical queries → try mathematical engine first
+            'mathematical': ['symbolic', 'probabilistic'],
+            'symbolic': ['mathematical', 'probabilistic'],
+            
+            # Causal queries → try related engines
+            'causal': ['probabilistic', 'analogical', 'world_model'],
+            
+            # Analogical queries → try related engines  
+            'analogical': ['causal', 'world_model', 'probabilistic'],
+            
+            # Probabilistic queries → try related engines
+            'probabilistic': ['mathematical', 'causal', 'analogical'],
+            
+            # Cryptographic queries → try mathematical fallback
+            'cryptographic': ['mathematical', 'symbolic'],
+            
+            # Self-introspection queries → world_model is primary
+            'self_introspection': ['philosophical', 'analogical'],
+            
+            # General/reasoning queries → broad fallback
+            'reasoning': ['world_model', 'probabilistic', 'analogical'],
+            'general': ['world_model', 'probabilistic', 'analogical'],
+        }
+        
+        # Normalize query type
+        query_type_lower = query_type.lower() if query_type else 'general'
+        
+        # Get type-specific fallbacks, or default to general
+        fallback_list = query_type_fallbacks.get(
+            query_type_lower,
+            ['world_model', 'probabilistic', 'analogical']
+        ).copy()  # Copy to avoid modifying the dict value
+        
+        # Ensure we have the general-purpose fallbacks at the end
+        # Use set for O(1) membership testing instead of O(n) list lookup
+        default_fallbacks = ['world_model', 'probabilistic', 'analogical', 'philosophical', 'mathematical']
+        existing_tools = set(fallback_list)
+        for tool in default_fallbacks:
+            if tool not in existing_tools:
+                fallback_list.append(tool)
+                existing_tools.add(tool)
+        
+        # Filter out the tools that have already failed
+        failed_set = set(failed_tools) | {original_tool}
+        fallback_list = [t for t in fallback_list if t not in failed_set]
+        
+        # Limit to top 3 fallbacks to prevent excessive retries
+        fallback_list = fallback_list[:3]
+        
+        logger.debug(
+            f"{LOG_PREFIX} FIX#4: Selected fallback tools for query_type='{query_type}', "
+            f"original_tool='{original_tool}': {fallback_list}"
+        )
+        
+        return fallback_list
 
     def _predict_tools_for_preprocessing(
         self,

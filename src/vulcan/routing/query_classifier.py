@@ -572,6 +572,83 @@ SPECULATION_KEYWORDS: FrozenSet[str] = frozenset([
 ])
 
 
+# =============================================================================
+# FIX #2: Header Stripping Patterns
+# =============================================================================
+# Test queries often include headers/labels that confuse routing.
+# These patterns strip headers BEFORE classification to prevent misclassification.
+#
+# Evidence from problem statement:
+# - "Causal Reasoning C1 — Confounding..." → "C1" was misclassified
+# - "Analogical Reasoning A1 — Structure mapping" → "A1" confuses router
+# - "M1 — Proof check" → "M1" triggers cryptographic classification
+#
+# The fix: Strip these headers before keyword-based classification.
+HEADER_STRIP_PATTERNS: Tuple[re.Pattern, ...] = (
+    # Full reasoning type headers with optional task label at line start
+    # E.g., "Causal Reasoning C1 — Confounding" → "Confounding"
+    # E.g., "Analogical Reasoning A1 — Structure" → "Structure"
+    re.compile(
+        r'^(?:Analogical|Causal|Mathematical|Probabilistic|Philosophical|Symbolic)\s+Reasoning\s*'
+        r'(?:[A-Z][0-9]+\s*)?[—\-:]*\s*',
+        re.MULTILINE | re.IGNORECASE
+    ),
+    # Task labels like "M1 —", "C1 —", "A1 —", "S1 —" at line start (standalone)
+    re.compile(r'^[A-Z][0-9]+\s*[—\-]\s*', re.MULTILINE),
+    # Task: / Claim: / Query: prefixes
+    re.compile(r'^(?:Task|Claim|Query|Problem):\s*', re.MULTILINE | re.IGNORECASE),
+    # Parenthetical notes like "(forces clean reasoning)"
+    re.compile(r'\s*\((?:forces?\s+)?clean\s+reasoning\)\s*', re.IGNORECASE),
+    # "variant" type headers like "Monty Hall variant"
+    # Note: Only strip "variant" and anything before it, keeping the content after
+    re.compile(r'^[^(\n]*variant\s*', re.MULTILINE | re.IGNORECASE),
+)
+
+
+def strip_query_headers(query: str) -> str:
+    """
+    Strip test headers and labels from queries that confuse classification.
+    
+    FIX #2: Query Preprocessing Confusion
+    =====================================
+    Test queries include headers/labels that confuse routing:
+    - "M1 —" triggers cryptographic classification  
+    - "Analogical Reasoning A1 —" confuses the router
+    
+    This function removes such headers BEFORE classification.
+    
+    Args:
+        query: Raw query string with potential headers
+        
+    Returns:
+        Query string with headers stripped
+        
+    Examples:
+        >>> strip_query_headers("M1 — Proof check: Prove that...")
+        "Proof check: Prove that..."
+        >>> strip_query_headers("Causal Reasoning C1 — Confounding...")
+        "Confounding..."
+    """
+    if not query or not isinstance(query, str):
+        return query
+    
+    cleaned = query.strip()
+    original_length = len(cleaned)
+    
+    # Apply each header stripping pattern
+    for pattern in HEADER_STRIP_PATTERNS:
+        cleaned = pattern.sub('', cleaned).strip()
+    
+    # Log if headers were stripped
+    if len(cleaned) < original_length:
+        logger.debug(
+            f"[QueryClassifier] FIX#2: Stripped headers from query "
+            f"({original_length} -> {len(cleaned)} chars)"
+        )
+    
+    return cleaned
+
+
 class QueryClassifier:
     """
     Hybrid query classifier using keywords + LLM.
@@ -637,9 +714,17 @@ class QueryClassifier:
         with self._stats_lock:
             self._stats["total_classifications"] += 1
         
+        # FIX #2: Strip headers/labels that confuse classification
+        # This must happen BEFORE any classification to prevent misclassification.
+        # Example: "Causal Reasoning C1 — Confounding..." should not trigger
+        # cryptographic classification due to the "C1" label.
+        query_cleaned = strip_query_headers(query)
+        
         # Normalize query for matching
-        query_normalized = query.strip()
+        query_normalized = query_cleaned.strip()
         query_lower = query_normalized.lower()
+        # Use cleaned query for cache hash to ensure consistent caching
+        # Same logical query with different headers should hit the same cache entry
         query_hash = self._hash_query(query_lower)
         
         # Step 1: Check cache
