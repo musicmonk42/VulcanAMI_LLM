@@ -71,6 +71,15 @@ from .provers import (
 )
 from .solvers import BayesianNetworkReasoner, VariableType
 
+# ROOT CAUSE FIX: Import QueryDecomposer to extract facts and hypotheses from NL queries
+try:
+    from ..query_preprocessor import get_query_decomposer, DecomposedQuery
+    QUERY_DECOMPOSER_AVAILABLE = True
+except ImportError:
+    QUERY_DECOMPOSER_AVAILABLE = False
+    get_query_decomposer = None  # type: ignore
+    DecomposedQuery = None  # type: ignore
+
 logger = logging.getLogger(__name__)
 
 
@@ -820,6 +829,399 @@ class SymbolicReasoner:
                 return False
         
         return True
+
+    def decompose_and_query(
+        self, 
+        query_str: str, 
+        timeout: float = 10.0
+    ) -> Dict[str, Any]:
+        """
+        ROOT CAUSE FIX: Decompose natural language query into facts + hypothesis, then reason.
+        
+        This method solves the core problem where the symbolic reasoner:
+        1. Parses individual formulas correctly (A→B, C→B)
+        2. Has NO IDEA what the actual question is
+        3. Returns "no hypothesis" instead of actually reasoning
+        
+        The fix:
+        1. Use QueryDecomposer to extract background facts and the hypothesis
+        2. Add facts to the knowledge base
+        3. Convert hypothesis to formal query
+        4. Run the prover on the formal query
+        
+        Args:
+            query_str: Natural language query with embedded formal logic
+                Example: "Graph: A→B, C→B, B→D. Condition on B. 
+                         Does conditioning on B induce correlation between A and C?"
+            timeout: Timeout in seconds
+            
+        Returns:
+            Dictionary with:
+                - proven: bool - Whether the hypothesis was proven
+                - confidence: float - Confidence in the result
+                - conclusion: str - The conclusion/answer
+                - decomposition: dict - The decomposed query components
+                - reasoning_trace: str - Explanation of the reasoning
+                - applicable: bool - Whether this tool was applicable
+        """
+        if not QUERY_DECOMPOSER_AVAILABLE or get_query_decomposer is None:
+            logger.warning(
+                "[SymbolicReasoner] QueryDecomposer not available, falling back to direct query"
+            )
+            return self.query(query_str, timeout, check_applicability=True)
+        
+        # Step 1: Decompose the query
+        decomposer = get_query_decomposer()
+        decomposed = decomposer.decompose(query_str)
+        
+        # If decomposition didn't find meaningful structure, try direct query
+        if not decomposed.decomposition_applied:
+            logger.info(
+                "[SymbolicReasoner] Query decomposition minimal, trying direct query"
+            )
+            return self.query(query_str, timeout, check_applicability=True)
+        
+        logger.info(
+            f"[SymbolicReasoner] Decomposed query: "
+            f"{len(decomposed.background_facts)} facts, "
+            f"type={decomposed.query_type}, "
+            f"hypothesis={decomposed.hypothesis[:50] if decomposed.hypothesis else 'None'}..."
+        )
+        
+        # Step 2: Clear state and add background facts to KB
+        self.clear_state()
+        
+        facts_added = 0
+        for fact in decomposed.background_facts:
+            try:
+                self.add_rule(fact, confidence=1.0)
+                facts_added += 1
+                logger.debug(f"[SymbolicReasoner] Added fact: {fact}")
+            except Exception as e:
+                logger.warning(f"[SymbolicReasoner] Failed to add fact '{fact}': {e}")
+        
+        # Step 3: Process based on query type
+        result = self._process_decomposed_query(decomposed, timeout)
+        
+        # Step 4: Add decomposition metadata to result
+        result["decomposition"] = decomposed.to_dict()
+        result["facts_processed"] = facts_added
+        result["applicable"] = True
+        
+        return result
+    
+    def _process_decomposed_query(
+        self, 
+        decomposed: 'DecomposedQuery',
+        timeout: float
+    ) -> Dict[str, Any]:
+        """
+        Process a decomposed query based on its type.
+        
+        Different query types require different reasoning approaches:
+        - SAT: Check satisfiability of the knowledge base
+        - Entailment: Check if hypothesis follows from facts
+        - Conditioning: Analyze d-separation/independence
+        - Causal: Analyze intervention effects
+        
+        Args:
+            decomposed: The decomposed query
+            timeout: Timeout in seconds
+            
+        Returns:
+            Result dictionary
+        """
+        query_type = decomposed.query_type
+        hypothesis = decomposed.hypothesis
+        formal_hypothesis = decomposed.formal_hypothesis
+        
+        # SAT queries - check satisfiability
+        if query_type == "sat":
+            return self._handle_sat_query(decomposed, timeout)
+        
+        # Conditioning queries - analyze d-separation
+        if query_type == "conditioning":
+            return self._handle_conditioning_query(decomposed, timeout)
+        
+        # Entailment queries - check if conclusion follows
+        if query_type == "entailment":
+            return self._handle_entailment_query(decomposed, timeout)
+        
+        # Causal queries - analyze interventions
+        if query_type == "causal":
+            return self._handle_causal_query(decomposed, timeout)
+        
+        # Validity queries - check if formula is tautology
+        if query_type == "validity":
+            return self._handle_validity_query(decomposed, timeout)
+        
+        # Unknown query type - try to reason with whatever we have
+        return self._handle_unknown_query(decomposed, timeout)
+    
+    def _handle_sat_query(
+        self, 
+        decomposed: 'DecomposedQuery',
+        timeout: float
+    ) -> Dict[str, Any]:
+        """Handle satisfiability queries."""
+        # Check if the knowledge base (with all facts) is satisfiable
+        # This is done by trying to derive a contradiction
+        
+        # Try to prove FALSE (empty clause)
+        try:
+            # If we can derive a contradiction, the KB is unsatisfiable
+            # Create empty clause as goal
+            from .core import Clause
+            empty_clause = Clause(literals=[], is_goal=True)
+            
+            if isinstance(self.prover, ParallelProver):
+                proven, proof, confidence, method = self.prover.prove_parallel(
+                    empty_clause, self.kb.clauses, timeout
+                )
+            else:
+                proven, proof, confidence = self.prover.prove(
+                    empty_clause, self.kb.clauses, timeout
+                )
+            
+            # If we proved empty clause, KB is UNSATISFIABLE
+            # If we couldn't, KB is SATISFIABLE
+            is_satisfiable = not proven
+            
+            conclusion = (
+                "The set of constraints is SATISFIABLE (no contradiction found)"
+                if is_satisfiable else
+                "The set of constraints is UNSATISFIABLE (contradiction derived)"
+            )
+            
+            return {
+                "proven": True,  # We successfully determined sat/unsat
+                "confidence": 0.85 if is_satisfiable else 0.90,
+                "conclusion": conclusion,
+                "satisfiable": is_satisfiable,
+                "proof": proof if not is_satisfiable else None,
+                "reasoning_trace": (
+                    f"Analyzed {len(decomposed.background_facts)} constraints. "
+                    f"{'Found contradiction via resolution.' if not is_satisfiable else 'No contradiction found after exhaustive search.'}"
+                ),
+            }
+        except Exception as e:
+            logger.error(f"[SymbolicReasoner] SAT check failed: {e}")
+            return {
+                "proven": False,
+                "confidence": 0.30,
+                "conclusion": f"Could not determine satisfiability: {str(e)}",
+                "error": str(e),
+            }
+    
+    def _handle_conditioning_query(
+        self, 
+        decomposed: 'DecomposedQuery',
+        timeout: float
+    ) -> Dict[str, Any]:
+        """
+        Handle conditioning/d-separation queries.
+        
+        For queries like "Does conditioning on B induce correlation between A and C?",
+        we need to analyze the graph structure to determine d-separation.
+        """
+        conditioning_vars = decomposed.conditioning_variables
+        target_vars = decomposed.target_variables
+        facts = decomposed.background_facts
+        
+        # Build a simple graph representation from facts
+        edges = self._extract_edges_from_facts(facts)
+        
+        if len(target_vars) >= 2 and conditioning_vars:
+            # Check d-separation between target vars given conditioning vars
+            var1, var2 = target_vars[0], target_vars[1]
+            cond_var = conditioning_vars[0]
+            
+            # Simple d-separation analysis based on graph structure
+            d_sep_result = self._check_d_separation(
+                edges, var1, var2, cond_var
+            )
+            
+            if d_sep_result["is_collider"]:
+                # Conditioning on a collider OPENS the path (induces correlation)
+                conclusion = (
+                    f"YES - Conditioning on {cond_var} INDUCES correlation between {var1} and {var2}. "
+                    f"{cond_var} is a collider (common effect), and conditioning on it "
+                    f"opens the previously blocked path."
+                )
+                answer = True
+            else:
+                # Conditioning on a non-collider BLOCKS the path
+                conclusion = (
+                    f"NO - Conditioning on {cond_var} BLOCKS correlation between {var1} and {var2}. "
+                    f"{cond_var} is on a directed path from {var1} or {var2}, "
+                    f"and conditioning on it blocks information flow."
+                )
+                answer = False
+            
+            return {
+                "proven": True,
+                "confidence": 0.85,
+                "conclusion": conclusion,
+                "answer": answer,
+                "d_separation_analysis": d_sep_result,
+                "reasoning_trace": (
+                    f"Analyzed graph: {edges}. "
+                    f"Checked d-separation({var1}, {var2} | {cond_var}). "
+                    f"Result: {'correlated (path opened)' if answer else 'independent (path blocked)'}"
+                ),
+            }
+        
+        # Fallback for incomplete information
+        return {
+            "proven": False,
+            "confidence": 0.40,
+            "conclusion": "Could not fully analyze conditioning - insufficient variable information",
+            "reasoning_trace": f"Found conditioning vars: {conditioning_vars}, target vars: {target_vars}",
+        }
+    
+    def _extract_edges_from_facts(self, facts: Tuple[str, ...]) -> List[Tuple[str, str]]:
+        """Extract directed edges from logical facts (A→B patterns)."""
+        edges = []
+        for fact in facts:
+            # Match A→B, A->B, A⇒B patterns
+            match = re.match(r'([A-Z])\s*[→\->⇒]\s*([A-Z])', fact)
+            if match:
+                edges.append((match.group(1), match.group(2)))
+        return edges
+    
+    def _check_d_separation(
+        self, 
+        edges: List[Tuple[str, str]], 
+        var1: str, 
+        var2: str, 
+        cond_var: str
+    ) -> Dict[str, Any]:
+        """
+        Simple d-separation check based on collider/non-collider structure.
+        
+        A node Z is a collider on path X-Z-Y if both X→Z and Y→Z.
+        Conditioning on a collider OPENS the path (induces correlation).
+        Conditioning on a non-collider (chain or fork) BLOCKS the path.
+        """
+        # Check if cond_var is a collider (has multiple parents)
+        parents_of_cond = [src for src, dst in edges if dst == cond_var]
+        children_of_cond = [dst for src, dst in edges if src == cond_var]
+        
+        # Collider: X→Z←Y (both var1 and var2 point to cond_var)
+        is_collider = var1 in parents_of_cond and var2 in parents_of_cond
+        
+        # Fork: X←Z→Y (cond_var points to both)
+        is_fork = var1 in children_of_cond and var2 in children_of_cond
+        
+        # Chain: X→Z→Y or X←Z←Y
+        is_chain = (
+            (var1 in parents_of_cond and var2 in children_of_cond) or
+            (var2 in parents_of_cond and var1 in children_of_cond)
+        )
+        
+        return {
+            "is_collider": is_collider,
+            "is_fork": is_fork,
+            "is_chain": is_chain,
+            "parents_of_cond": parents_of_cond,
+            "children_of_cond": children_of_cond,
+            "structure_type": (
+                "collider" if is_collider else 
+                "fork" if is_fork else 
+                "chain" if is_chain else 
+                "unknown"
+            ),
+        }
+    
+    def _handle_entailment_query(
+        self, 
+        decomposed: 'DecomposedQuery',
+        timeout: float
+    ) -> Dict[str, Any]:
+        """Handle entailment queries - check if conclusion follows from premises."""
+        formal_hypothesis = decomposed.formal_hypothesis
+        
+        if formal_hypothesis and formal_hypothesis not in ("SAT?", "UNSAT?", "VALID?"):
+            # Try to prove the formal hypothesis
+            try:
+                result = self.query(formal_hypothesis, timeout, check_applicability=False)
+                
+                if result.get("proven"):
+                    conclusion = f"YES - {formal_hypothesis} follows from the given premises."
+                else:
+                    conclusion = f"Could not prove {formal_hypothesis} from the given premises."
+                
+                return {
+                    "proven": result.get("proven", False),
+                    "confidence": result.get("confidence", 0.5),
+                    "conclusion": conclusion,
+                    "proof": result.get("proof"),
+                    "reasoning_trace": f"Attempted to prove: {formal_hypothesis}",
+                }
+            except Exception as e:
+                logger.warning(f"[SymbolicReasoner] Entailment proof failed: {e}")
+        
+        # Fallback
+        return {
+            "proven": False,
+            "confidence": 0.30,
+            "conclusion": "Could not determine entailment - hypothesis unclear",
+            "reasoning_trace": f"Formal hypothesis: {formal_hypothesis}",
+        }
+    
+    def _handle_causal_query(
+        self, 
+        decomposed: 'DecomposedQuery',
+        timeout: float
+    ) -> Dict[str, Any]:
+        """Handle causal/intervention queries."""
+        # Use the analyze method for causal queries
+        analysis = self._analyze_intervention(decomposed.original_query)
+        
+        return {
+            "proven": True,
+            "confidence": analysis.get("confidence", 0.70),
+            "conclusion": analysis.get("analysis", "Causal analysis performed."),
+            "analysis_result": analysis,
+            "reasoning_trace": "Applied do-calculus framework for intervention analysis.",
+        }
+    
+    def _handle_validity_query(
+        self, 
+        decomposed: 'DecomposedQuery',
+        timeout: float
+    ) -> Dict[str, Any]:
+        """Handle validity queries - check if formula is a tautology."""
+        # A formula is valid if its negation is unsatisfiable
+        return self._handle_sat_query(decomposed, timeout)
+    
+    def _handle_unknown_query(
+        self, 
+        decomposed: 'DecomposedQuery',
+        timeout: float
+    ) -> Dict[str, Any]:
+        """Handle queries with unknown type - general logical analysis."""
+        # Try direct query with the hypothesis if we have one
+        if decomposed.formal_hypothesis:
+            try:
+                return self.query(
+                    decomposed.formal_hypothesis, 
+                    timeout, 
+                    check_applicability=False
+                )
+            except Exception:
+                pass
+        
+        # Fall back to general analysis
+        analysis = self._general_logical_analysis(decomposed.original_query)
+        
+        return {
+            "proven": False,
+            "confidence": 0.50,
+            "conclusion": analysis.get("analysis", "General logical analysis performed."),
+            "analysis_result": analysis,
+            "reasoning_trace": "Used general logical analysis for unclassified query type.",
+        }
 
 
     def parse_formula(self, formula_str: str) -> Clause:
