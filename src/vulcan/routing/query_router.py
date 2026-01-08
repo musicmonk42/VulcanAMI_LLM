@@ -3105,7 +3105,8 @@ class QueryAnalyzer:
         original_query = query  # Keep for telemetry
         if HEADER_STRIPPING_AVAILABLE and strip_query_headers is not None:
             query = strip_query_headers(query)
-            if query != original_query:
+            # Optimization: Check length first (cheap) before string comparison
+            if len(query) != len(original_query):
                 logger.info(
                     f"[QueryRouter] {query_id}: FIX Preprocessing Order - "
                     f"Stripped headers ({len(original_query)} -> {len(query)} chars)"
@@ -5861,7 +5862,8 @@ async def route_query_async(
     original_query = query
     if HEADER_STRIPPING_AVAILABLE and strip_query_headers is not None:
         query = strip_query_headers(query)
-        if query != original_query:
+        # Optimization: Check length first (cheap) before string comparison
+        if len(query) != len(original_query):
             logger.debug(
                 f"[QueryRouter.async] Stripped headers ({len(original_query)} -> {len(query)} chars)"
             )
