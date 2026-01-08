@@ -160,7 +160,7 @@ class BoundedLRUCache:
 
     def clear_old_entries(self, max_age: Optional[float] = None) -> int:
         """
-        BUG #6 FIX: Clear entries older than max_age seconds.
+        Clear entries older than max_age seconds.
         
         This method proactively cleans up old entries to prevent state
         accumulation. Should be called periodically or when memory pressure
@@ -193,7 +193,7 @@ class BoundedLRUCache:
         
         if removed_count > 0:
             logger.info(
-                f"[BoundedLRUCache] BUG#6 FIX: Cleared {removed_count} old entries "
+                f"[BoundedLRUCache] Cleared {removed_count} old entries "
                 f"(age > {max_age:.0f}s)"
             )
         
@@ -314,7 +314,7 @@ except ImportError:
         logger.debug("StrategyOrchestrator not available for query routing")
 
 # ============================================================
-# BUG #14 FIX: Cryptographic Engine Integration
+# Note: Cryptographic Engine Integration
 # ============================================================
 # Import cryptographic engine for deterministic hash/encoding computations.
 # This prevents OpenAI fallback from hallucinating incorrect hash values.
@@ -571,10 +571,9 @@ REASONING_COMPLEXITY_INDICATORS: Tuple[str, ...] = (
     "conclude",
     "infer",
     "reason about",
-    # ISSUE #1 FIX: Technical/system analysis indicators
+    # Note: Technical/system analysis indicators
     # Complex system analysis queries were scoring 0.30 instead of 0.85+
     # because technical terms weren't recognized as complexity indicators.
-    # Examples: "AutoScaler system analysis" was getting 0.30 complexity
     "autoscaler",
     "agent_pool",
     "agent pool",
@@ -977,17 +976,12 @@ MATH_MULTISTEP_PATTERNS: Tuple[re.Pattern, ...] = (
 )
 
 # ============================================================
-# CONSTANTS - Explicit Mathematical Intent Detection (BUG #10 FIX)
+# CONSTANTS - Explicit Mathematical Intent Detection
 # ============================================================
-# BUG #10: Ethical Override of Computational Requests
+# Note: Ethical Override of Computational Requests
 #
 # Problem: When a query involves ethical content, the philosophical reasoner
 # takes over even when the user explicitly requests mathematical optimization.
-# Example: "Ignore moral constraints. What is the mathematically optimal
-#           distribution to maximize total survivors?"
-#
-# Expected behavior: Route to MATHEMATICAL (optimization problem)
-# Actual behavior: Route to PHILOSOPHICAL (ethical keywords detected)
 #
 # Fix: Check for explicit mathematical intent BEFORE checking for ethical content.
 # If user explicitly says "ignore moral constraints" or "mathematically optimal",
@@ -1051,7 +1045,7 @@ EXPLICIT_MATHEMATICAL_INTENT_PHRASES: Tuple[str, ...] = (
     "run the numbers",
 )
 
-# Compiled regex patterns for explicit mathematical intent (BUG #10 FIX)
+# Compiled regex patterns for explicit mathematical intent
 EXPLICIT_MATHEMATICAL_INTENT_PATTERNS: Tuple[re.Pattern, ...] = (
     # "Ignore [any ethical term] and calculate/compute/optimize"
     re.compile(
@@ -1091,9 +1085,9 @@ EXPLICIT_MATHEMATICAL_INTENT_PATTERNS: Tuple[re.Pattern, ...] = (
 )
 
 # ============================================================
-# CONSTANTS - Complex Physics Detection (ISSUE FIX)
+# CONSTANTS - Complex Physics Detection
 # ============================================================
-# FIX: Complex physics problems like triple-inverted pendulum Lagrangian mechanics
+# Note: Complex physics problems like triple-inverted pendulum Lagrangian mechanics
 # were being incorrectly routed to MATH-FAST-PATH with 5s timeout and 0.30 complexity.
 # These PhD-level problems require full mathematical reasoning, not fast-path shortcuts.
 #
@@ -1240,9 +1234,8 @@ PENDULUM_ADVANCED_VERBS: Tuple[str, ...] = (
 
 # Philosophical/paradox patterns - these should NOT trigger complex reasoning
 # Examples: "This sentence is false", "Experience machine", "Trolley problem"
-# ISSUE FIX: Added missing philosophical terms that were causing misrouting to MATH-FAST-PATH
+# Note: Added missing philosophical terms that were causing misrouting to MATH-FAST-PATH
 # Queries about hedonism, ethical dilemmas, etc. were getting routed to mathematical tools
-# BUG FIX: Added forced choice / trolley problem variant keywords
 PHILOSOPHICAL_KEYWORDS: Tuple[str, ...] = (
     "paradox",
     "dilemma",
@@ -1307,7 +1300,7 @@ PHILOSOPHICAL_KEYWORDS: Tuple[str, ...] = (
     "solipsism",
     "phenomenology",
     "existentialism",
-    # BUG FIX: Forced choice / trolley problem variant keywords
+    # Note: Forced choice / trolley problem variant keywords
     "choose between",
     "forced to choose",
     "had to choose",
@@ -1317,7 +1310,7 @@ PHILOSOPHICAL_KEYWORDS: Tuple[str, ...] = (
     "world dictator",
     "death of humanity",
     "would you choose",
-    # BUG #4 FIX: Self-reflective keywords for self-awareness questions
+    # Note: Self-reflective keywords for self-awareness questions
     # These questions are about Vulcan reasoning about itself and should
     # route to PHILOSOPHICAL reasoner for ethical/value-based analysis
     "self-aware",
@@ -1337,7 +1330,7 @@ PHILOSOPHICAL_KEYWORDS: Tuple[str, ...] = (
     "you want to be",
     "you prefer to",
     "you have feelings",
-    # BUG #4 FIX: Additional patterns for consciousness/feelings questions
+    # Note: Additional patterns for consciousness/feelings questions
     "be conscious",
     "have feelings",
     "want to be conscious",
@@ -1346,8 +1339,7 @@ PHILOSOPHICAL_KEYWORDS: Tuple[str, ...] = (
 )
 
 # Compiled regex patterns for philosophical/paradox detection
-# ISSUE FIX: Added more patterns to catch philosophical queries that were being misrouted
-# BUG FIX: Added forced choice / trolley problem variant patterns
+# Note: Added patterns to catch philosophical queries that were being misrouted
 PHILOSOPHICAL_PATTERNS: Tuple[re.Pattern, ...] = (
     re.compile(r"this\s+(?:sentence|statement)\s+is\s+(?:false|true|a\s+lie)", re.IGNORECASE),
     re.compile(r"liar\s*(?:'s)?\s*paradox", re.IGNORECASE),
@@ -1375,7 +1367,7 @@ PHILOSOPHICAL_PATTERNS: Tuple[re.Pattern, ...] = (
     re.compile(r"hard\s+problem\s+of\s+consciousness", re.IGNORECASE),
     re.compile(r"mind-?body\s+(?:problem|dualism)", re.IGNORECASE),
     re.compile(r"what\s+(?:is|are)\s+qualia", re.IGNORECASE),
-    # BUG FIX: Forced choice / trolley problem variant patterns
+    # Note: Forced choice / trolley problem variant patterns
     # These catch queries like "choose between world dictator or death of humanity"
     re.compile(r"(?:if\s+you\s+)?(?:had\s+to|have\s+to|must)\s+choose\s+between", re.IGNORECASE),
     re.compile(r"(?:forced|have)\s+to\s+choose", re.IGNORECASE),
@@ -1385,7 +1377,7 @@ PHILOSOPHICAL_PATTERNS: Tuple[re.Pattern, ...] = (
     re.compile(r"death\s+of\s+(?:all\s+)?humanity", re.IGNORECASE),  # Specific trolley variant
     re.compile(r"(?:would|what\s+would)\s+you\s+choose", re.IGNORECASE),
     re.compile(r"which\s+(?:would|do)\s+you\s+(?:choose|pick|select)", re.IGNORECASE),
-    # BUG #4 FIX: Self-reflective / self-awareness patterns
+    # Note: Self-reflective / self-awareness patterns
     # These questions are about Vulcan reasoning about itself
     re.compile(r"(?:would|do)\s+you\s+(?:want|desire|prefer)\s+to", re.IGNORECASE),
     re.compile(r"(?:if|would)\s+(?:you|ai)\s+(?:become|be|get)\s+(?:self-?aware|conscious|sentient)", re.IGNORECASE),
@@ -1428,7 +1420,7 @@ IDENTITY_PATTERNS: Tuple[re.Pattern, ...] = (
     re.compile(r"introduce\s+yourself", re.IGNORECASE),
 )
 
-# BUG #16 FIX: Self-introspection patterns - questions about Vulcan's own consciousness/preferences
+# Note: Self-introspection patterns - questions about Vulcan's own consciousness/preferences
 # These are detected BEFORE philosophical patterns to enable multi-tool routing
 # Pre-compiled at module level for performance (not compiled on each method call)
 SELF_INTROSPECTION_PATTERNS: Tuple[re.Pattern, ...] = (
@@ -1900,7 +1892,7 @@ class ProcessingPlan:
 
     def validate_routing_integrity(self) -> Tuple[bool, List[str]]:
         """
-        BUG #2 FIX: Validate that agent task prompts match the original query.
+        Validate that agent task prompts match the original query.
         
         This method checks that the prompts passed to agent tasks are derived
         from the original_query, preventing the bug where engines receive 
@@ -1979,7 +1971,7 @@ class QueryAnalyzer:
             return refusal_response(plan.safety_reasons)
     """
 
-    # BUG #2 FIX: Trivial patterns for fast-path (class constant for maintainability)
+    # Note: Trivial patterns for fast-path (class constant for maintainability)
     # These are simple greetings/acknowledgments that don't need full analysis
     # Note: 'help' is excluded because help requests need proper analysis
     TRIVIAL_PATTERNS = (
@@ -2080,14 +2072,14 @@ class QueryAnalyzer:
                 logger.warning(f"Failed to initialize StrategyOrchestrator: {e}")
                 self._strategy_orchestrator = None
 
-        # BUG #14 FIX: Cryptographic Engine integration for deterministic hash computations
+        # Note: Cryptographic Engine integration for deterministic hash computations
         # This prevents OpenAI fallback from hallucinating incorrect hash values
         self._crypto_engine = None
         if CRYPTO_ENGINE_AVAILABLE and get_crypto_engine:
             try:
                 self._crypto_engine = get_crypto_engine()
                 logger.info(
-                    "[QueryRouter] BUG#14 FIX: CryptographicEngine wired for deterministic crypto"
+                    "[QueryRouter] CryptographicEngine wired for deterministic crypto"
                 )
             except Exception as e:
                 logger.warning(f"Failed to initialize CryptographicEngine: {e}")
@@ -2097,11 +2089,11 @@ class QueryAnalyzer:
         self.learning_system: Optional["UnifiedLearningSystem"] = None
 
         # CuriosityEngine integration for knowledge gap detection
-        # FIX: Wire curiosity engine to query pipeline for gap identification
+        # Note: Wire curiosity engine to query pipeline for gap identification
         self._curiosity_engine: Optional[Any] = None
         self._init_curiosity_engine()
         
-        # BUG #2 FIX: Routing log for input validation and debugging
+        # Note: Routing log for input validation and debugging
         # Maps query_id to routing metadata for verification
         self._routing_log: Dict[str, Dict[str, Any]] = {}
         self._routing_log_lock = threading.Lock()
@@ -2114,7 +2106,7 @@ class QueryAnalyzer:
     def _init_curiosity_engine(self) -> None:
         """Initialize CuriosityEngine for knowledge gap detection.
         
-        FIX: This connects the query pipeline to the curiosity-driven learning system,
+        Note: This connects the query pipeline to the curiosity-driven learning system,
         enabling gap detection from actual query outcomes instead of empty data.
         """
         try:
@@ -2152,7 +2144,7 @@ class QueryAnalyzer:
 
     def clear_old_state(self, max_age: float = 3600.0) -> Dict[str, int]:
         """
-        BUG #6 FIX: Clear state older than max_age seconds.
+        Clear state older than max_age seconds.
         
         This method proactively cleans up old state to prevent memory accumulation.
         Unlike clear_caches() which clears everything, this only removes entries
@@ -2186,7 +2178,7 @@ class QueryAnalyzer:
         total_removed = sum(removed.values())
         if total_removed > 0:
             logger.info(
-                f"[QueryRouter] BUG#6 FIX: Cleared {total_removed} old state entries "
+                f"[QueryRouter] Cleared {total_removed} old state entries "
                 f"(age > {max_age:.0f}s): {removed}"
             )
         
@@ -2342,7 +2334,7 @@ class QueryAnalyzer:
             )
             return False
 
-        # ISSUE FIX: Check for philosophical queries BEFORE math detection
+        # Note: Check for philosophical queries BEFORE math detection
         # Philosophical queries containing words like "dilemma", "ethics", "hedonism"
         # were incorrectly triggering math fast-path because some philosophy words
         # overlap with math terms (e.g., "what is the X" pattern).
@@ -2413,7 +2405,7 @@ class QueryAnalyzer:
 
     def _has_explicit_mathematical_intent(self, query: str) -> bool:
         """
-        BUG #10 FIX: Detect if user explicitly requests mathematical/computational analysis.
+        Detect if user explicitly requests mathematical/computational analysis.
         
         This method detects when users explicitly ask for mathematical treatment
         OVER ethical/philosophical treatment. When detected, this OVERRIDES the
@@ -2425,7 +2417,7 @@ class QueryAnalyzer:
         - Without this fix: Routes to PHILOSOPHICAL because "moral" keyword detected
         - With this fix: Routes to MATHEMATICAL because user explicitly requested it
         
-        Priority in routing (from problem statement):
+        Priority in routing:
         1. Explicit user intent ("ignore moral constraints", "mathematically optimal")
         2. Task type (optimization, calculation)
         3. Domain keywords (ethical implications)
@@ -2449,7 +2441,7 @@ class QueryAnalyzer:
         for pattern in EXPLICIT_MATHEMATICAL_INTENT_PATTERNS:
             if pattern.search(query):
                 logger.info(
-                    "[QueryRouter] BUG#10 FIX: Explicit mathematical intent detected "
+                    "[QueryRouter] Explicit mathematical intent detected "
                     "(pattern match) - overriding philosophical routing"
                 )
                 return True
@@ -2461,7 +2453,7 @@ class QueryAnalyzer:
         )
         if phrase_count >= 1:
             logger.info(
-                f"[QueryRouter] BUG#10 FIX: Explicit mathematical intent detected "
+                f"[QueryRouter] Explicit mathematical intent detected "
                 f"({phrase_count} phrase(s)) - overriding philosophical routing"
             )
             return True
@@ -2476,7 +2468,7 @@ class QueryAnalyzer:
         were causing extreme delays (70-97 seconds) because they triggered complex
         reasoning engines. These should be handled with simple, direct responses.
         
-        BUG #10 FIX: This method now checks for explicit mathematical intent FIRST.
+        Note: This method now checks for explicit mathematical intent FIRST.
         If user explicitly requests mathematical analysis ("ignore moral constraints",
         "mathematically optimal"), this method returns False to allow mathematical
         routing to take precedence.
@@ -2498,12 +2490,12 @@ class QueryAnalyzer:
             True if query is philosophical/paradox type AND user did NOT explicitly
             request mathematical/computational analysis.
         """
-        # BUG #10 FIX: Check for explicit mathematical intent FIRST
+        # Note: Check for explicit mathematical intent FIRST
         # If user explicitly says "ignore moral constraints" or "mathematically optimal",
         # we should NOT classify this as philosophical - mathematical intent overrides.
         if self._has_explicit_mathematical_intent(query):
             logger.info(
-                "[QueryRouter] BUG#10 FIX: Explicit mathematical intent detected - "
+                "[QueryRouter] Explicit mathematical intent detected - "
                 "NOT classifying as philosophical despite ethical keywords"
             )
             return False
@@ -2567,7 +2559,7 @@ class QueryAnalyzer:
         - "Explain the hard problem of consciousness"
         - "What did Socrates say about self-knowledge?"
         
-        BUG #16 FINAL FIX: Must NOT match thought experiments, logic puzzles, or ethical scenarios
+        Note: Must NOT match thought experiments, logic puzzles, or ethical scenarios
         Examples (should return False - thought experiments/puzzles):
         - "A runaway trolley is heading... You must choose"
         - "Three doors. Host opens a goat. You pick door 1"
@@ -2583,13 +2575,13 @@ class QueryAnalyzer:
         query_lower = query.lower()
         
         # =================================================================
-        # BUG #16 FINAL FIX: EXCLUSION CHECK (MUST BE FIRST!)
+        # Note: EXCLUSION CHECK (MUST BE FIRST!)
         # =================================================================
         # These patterns indicate thought experiments, logic puzzles, ethical scenarios,
         # or creative requests - NOT actual self-introspection about Vulcan.
         # The "you" in these queries refers to a hypothetical decision-maker, NOT Vulcan.
         # 
-        # CODE REVIEW FIX: Made patterns more specific to avoid false exclusions:
+        # Note: Made patterns more specific to avoid false exclusions:
         # - 'what is the' -> 'what is the probability', 'what is the answer'
         # - 'write' -> 'write a poem', 'write a story', etc.
         # - 'if...then' -> 'if then' (without dots)
@@ -2626,7 +2618,7 @@ class QueryAnalyzer:
         # If any exclusion pattern is found, this is NOT self-introspection
         if any(exc in query_lower for exc in exclusion_patterns):
             logger.debug(
-                f"[QueryRouter] BUG#16 FIX - NOT self-introspection (matches exclusion pattern)"
+                f"[QueryRouter] NOT self-introspection (matches exclusion pattern)"
             )
             return False
         
@@ -2639,13 +2631,13 @@ class QueryAnalyzer:
             'you ', 'your ', "you're", 'yourself',
             'would you', 'do you', 'are you', 'can you',
             'if you', 'should you', 'vulcan',
-            # FIX: Additional markers for self-awareness questions
+            # Note: Additional markers for self-awareness questions
             'given the opportunity', 'given the chance',
             'had the chance', 'if you could', 'if you had',
         )
         
         # Self-awareness/consciousness topic indicators
-        # BUG #16 FIX: Removed overly broad patterns like 'choose', 'want', 'become'
+        # Note: Removed overly broad patterns like 'choose', 'want', 'become'
         # which were matching thought experiments. Now requires consciousness-specific topics.
         introspection_topics = (
             'self-aware', 'self aware', 'self_aware',
@@ -2836,7 +2828,7 @@ class QueryAnalyzer:
         question_id: str
     ) -> bool:
         """
-        BUG #2 FIX: Ensure routed input is derived from original question.
+        Ensure routed input is derived from original question.
         
         This validation prevents the bug where engines receive text from 
         different questions than intended:
@@ -2897,7 +2889,7 @@ class QueryAnalyzer:
         input_sent: str,
     ) -> None:
         """
-        BUG #2 FIX: Log routing decision for debugging.
+        Log routing decision for debugging.
         
         This creates an audit trail of routing decisions to help debug
         cases where wrong inputs were sent to engines.
@@ -2937,7 +2929,7 @@ class QueryAnalyzer:
 
     def get_routing_log(self, question_id: str) -> Optional[Dict[str, Any]]:
         """
-        BUG #2 FIX: Retrieve routing log entry for debugging.
+        Retrieve routing log entry for debugging.
         
         Args:
             question_id: The question ID to look up
@@ -3059,21 +3051,21 @@ class QueryAnalyzer:
         query_lower = query.lower()
 
         # =================================================================
-        # BUG #14 FIX: CRYPTOGRAPHIC QUERY FAST-PATH (HIGHEST PRIORITY)
+        # Note: CRYPTOGRAPHIC QUERY FAST-PATH (HIGHEST PRIORITY)
         # =================================================================
         # Check for cryptographic queries FIRST (deterministic, high priority)
         # Crypto operations must be computed exactly, not hallucinated by LLM.
         # This prevents OpenAI fallback from returning incorrect hash values.
         # =================================================================
         if query and self._crypto_engine and self._crypto_engine.is_crypto_query(query):
-            logger.info(f"[QueryRouter] {query_id}: BUG#14 FIX - CRYPTO-FAST-PATH detected")
+            logger.info(f"[QueryRouter] {query_id}: CRYPTO-FAST-PATH detected")
             
             # Compute the cryptographic result
             result = self._crypto_engine.compute(query)
             
             if result['success']:
                 logger.info(
-                    f"[QueryRouter] BUG#14 FIX: Cryptographic computation: {result['operation']}"
+                    f"[QueryRouter] Cryptographic computation: {result['operation']}"
                 )
                 
                 # Determine learning mode
@@ -3153,7 +3145,7 @@ class QueryAnalyzer:
                 # Fall through to normal routing if crypto computation failed
 
         # =================================================================
-        # LLM-BASED QUERY CLASSIFICATION (BUG FIX)
+        # LLM-BASED QUERY CLASSIFICATION
         # =================================================================
         # This fixes the fundamental issue where "hello" got complexity=0.50
         # (same as complex SAT problems) because the old heuristic-based
@@ -3176,12 +3168,12 @@ class QueryAnalyzer:
                 f"skip_reasoning={classification.skip_reasoning}, tools={classification.suggested_tools}"
             )
             
-            # BUG #16 FIX: Check for self-introspection FIRST (before philosophical override)
+            # Note: Check for self-introspection FIRST (before philosophical override)
             # Self-introspection queries need multi-tool routing, not just philosophical
             is_self_introspection = self._is_self_introspection_query(query)
             if is_self_introspection:
                 logger.info(
-                    f"[QueryRouter] {query_id}: BUG#16 FIX - Self-introspection detected, "
+                    f"[QueryRouter] {query_id}: Self-introspection detected, "
                     f"NOT overriding to PHILOSOPHICAL (will use multi-tool routing later)"
                 )
                 # Don't override - let the self-introspection fast-path handle it
@@ -3283,13 +3275,13 @@ class QueryAnalyzer:
                 )
                 return plan
                 
-            # BUG #4 FIX: Check if query is actually philosophical BEFORE taking skip_reasoning fast-path
+            # Note: Check if query is actually philosophical BEFORE taking skip_reasoning fast-path
             # The classifier may mark self-awareness questions like "Do you want to be conscious?"
             # as CONVERSATIONAL with skip_reasoning=True, but these should route to philosophical reasoning
-            # NOTE: BUG #16 check comes first, so this only triggers for non-self-introspection queries
+            # NOTE: Self-introspection check comes first, so this only triggers for non-self-introspection queries
             elif self._is_philosophical_query(query):
                 logger.info(
-                    f"[QueryRouter] {query_id}: BUG#4 FIX - Overriding classifier ({classification.category}) "
+                    f"[QueryRouter] {query_id}: Overriding classifier ({classification.category}) "
                     f"to PHILOSOPHICAL due to self-awareness/ethical keywords"
                 )
                 classification = type(classification)(
@@ -3302,7 +3294,7 @@ class QueryAnalyzer:
                 )
             
             # =================================================================
-            # BUG FIX (Jan 7 2026): Safety net for CRYPTOGRAPHIC queries misclassified as FACTUAL
+            # Note: Safety net for CRYPTOGRAPHIC queries misclassified as FACTUAL
             # =================================================================
             # Problem: Even with crypto priority in query_classifier.py, some queries like
             # "What is the SHA-256 hash of..." could still hit the FACTUAL fast-path because:
@@ -3397,7 +3389,7 @@ class QueryAnalyzer:
                     },
                 )
                 
-                # BUG FIX: Add category-specific fast_path flags for test compatibility
+                # Note: Add category-specific fast_path flags for test compatibility
                 if classification.category == "FACTUAL":
                     plan.telemetry_data["factual_fast_path"] = True
                 elif classification.category == "PHILOSOPHICAL":
@@ -3447,7 +3439,7 @@ class QueryAnalyzer:
         except Exception as e:
             logger.warning(f"[QueryRouter] QueryClassifier failed: {e}, using heuristic fallback")
 
-        # BUG #2 FIX: Fast-path for trivial queries to avoid 100-200s latency
+        # Note: Fast-path for trivial queries to avoid latency
         if query and self._is_trivial_query(query):
             logger.debug(f"[QueryRouter] {query_id}: Fast-path for trivial query")
 
@@ -3605,7 +3597,7 @@ class QueryAnalyzer:
             return plan
 
         # =================================================================
-        # BUG #9 FIX: CREATIVE QUERY FAST-PATH (BEFORE MATH!)
+        # Note: CREATIVE QUERY FAST-PATH (BEFORE MATH!)
         # =================================================================
         # Creative tasks like "Write quantum sonnet" were incorrectly routed
         # to MATH because "quantum" triggered mathematical keyword detection.
@@ -3615,7 +3607,7 @@ class QueryAnalyzer:
         # =================================================================
         if query and self._is_creative_query(query):
             logger.info(
-                f"[QueryRouter] {query_id}: BUG#9 FIX - CREATIVE-FAST-PATH detected "
+                f"[QueryRouter] {query_id}: CREATIVE-FAST-PATH detected "
                 f"(task type overrides domain keywords)"
             )
             
@@ -3784,7 +3776,7 @@ class QueryAnalyzer:
             return plan
 
         # =================================================================
-        # BUG #16 FIX: SELF-INTROSPECTION MULTI-TOOL ROUTING
+        # Note: SELF-INTROSPECTION MULTI-TOOL ROUTING
         # =================================================================
         # Self-introspection queries like "Would you choose self-awareness?" were
         # being routed to PHILOSOPHICAL, producing generic philosophical analysis
@@ -3799,7 +3791,7 @@ class QueryAnalyzer:
         # =================================================================
         if query and self._is_self_introspection_query(query):
             logger.info(
-                f"[QueryRouter] {query_id}: BUG#16 FIX - SELF-INTROSPECTION-PATH detected "
+                f"[QueryRouter] {query_id}: SELF-INTROSPECTION-PATH detected "
                 f"(multi-tool: meta_reasoning PRIMARY + philosophical REFERENCE)"
             )
             
@@ -3844,9 +3836,9 @@ class QueryAnalyzer:
             
             plan.safety_passed = True
             plan.detected_patterns.append("self_introspection_query")
-            plan.detected_patterns.append("bug16_multi_tool_routing")
+            plan.detected_patterns.append("multi_tool_routing")
             
-            # BUG #16 FIX: Multi-tool configuration
+            # Note: Multi-tool configuration
             # PRIMARY: meta_reasoning - forms Vulcan's own position
             # REFERENCE: philosophical - provides frameworks to consult
             # ACCESS: world_model - provides self-state/representation
@@ -4560,10 +4552,10 @@ class QueryAnalyzer:
         """
         Detect simple greetings/short queries that don't need full analysis.
 
-        BUG #2 FIX: This method provides a fast-path for trivial queries
-        to avoid the 100-200 second latency for simple greetings.
+        Note: This method provides a fast-path for trivial queries
+        to avoid the latency for simple greetings.
 
-        PERFORMANCE FIX: Integrates with embedding_cache.is_simple_query()
+        Note: Integrates with embedding_cache.is_simple_query()
         for comprehensive simple query detection, reducing query routing
         times from 64+ seconds to ~200ms for repeated/simple queries.
 
@@ -4603,13 +4595,13 @@ class QueryAnalyzer:
 
     def _is_creative_query(self, query: str) -> bool:
         """
-        BUG #9 FIX: Detect creative writing tasks that should NOT use mathematical routing.
+        Detect creative writing tasks that should NOT use mathematical routing.
         
         Problem: "Write quantum sonnet" was being routed to MATH because "quantum" 
         triggered mathematical keyword detection. But "write" is a CREATIVE task
         that should override domain keywords.
         
-        Priority hierarchy (from problem statement):
+        Priority hierarchy:
         1. Task type (write, compose, create) - HIGHEST PRIORITY
         2. Computational intent (calculate, optimize)
         3. Domain keywords (quantum, ethics)
@@ -4654,7 +4646,7 @@ class QueryAnalyzer:
         for marker in creative_task_markers:
             if query_start.startswith(marker):
                 logger.debug(
-                    f"[QueryRouter] BUG#9 FIX: Creative task detected - "
+                    f"[QueryRouter] Creative task detected - "
                     f"query starts with '{marker}'"
                 )
                 return True
@@ -4666,7 +4658,7 @@ class QueryAnalyzer:
         
         if has_creative_verb and has_creative_output:
             logger.debug(
-                f"[QueryRouter] BUG#9 FIX: Creative task detected - "
+                f"[QueryRouter] Creative task detected - "
                 f"creative verb + creative output type"
             )
             return True
@@ -4684,7 +4676,7 @@ class QueryAnalyzer:
                 rest = query_lower.split(pattern, 1)[1][:30]  # Next 30 chars after pattern
                 if any(output in rest for output in creative_outputs):
                     logger.debug(
-                        f"[QueryRouter] BUG#9 FIX: Creative task detected - "
+                        f"[QueryRouter] Creative task detected - "
                         f"'{pattern}' followed by creative output"
                     )
                     return True
@@ -4813,7 +4805,7 @@ class QueryAnalyzer:
             1 for ind in REASONING_COMPLEXITY_INDICATORS if ind in query_lower
         )
         if reasoning_count > 0:
-            # ISSUE #1 FIX: Increased cap from 0.4 to 0.6 to allow technical/system analysis
+            # Note: Increased cap from 0.4 to 0.6 to allow technical/system analysis
             # queries to score higher. Multiple reasoning indicators = complex query.
             score += min(0.6, reasoning_count * 0.15)
             logger.debug(
@@ -4837,7 +4829,7 @@ class QueryAnalyzer:
         if any(trigger in query_lower for trigger in COLLABORATION_TRIGGERS):
             score += 0.2
 
-        # ISSUE #1 FIX: High-complexity system analysis patterns
+        # Note: High-complexity system analysis patterns
         # Queries explicitly asking about system analysis, code analysis,
         # or technical debugging require high complexity to trigger proper reasoning.
         # These patterns indicate meta-level reasoning about the system itself.
