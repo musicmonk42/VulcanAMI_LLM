@@ -107,7 +107,6 @@ class AgentCapability(Enum):
     CRYPTOGRAPHIC = "cryptographic"      # Maps to CryptographicEngine
     WORLD_MODEL = "world_model"          # Maps to WorldModel
     MULTIMODAL = "multimodal"            # Maps to MultimodalReasoner
-    LANGUAGE = "language"                # Maps to LanguageReasoner
 
     def __str__(self):
         return self.value

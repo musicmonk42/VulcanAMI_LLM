@@ -2726,7 +2726,6 @@ class AgentPoolManager:
                 "counterfactual", "multimodal", "deductive", "inductive", "abductive",
                 "philosophical", "mathematical", "hybrid",  # Note: Added missing types
                 "self_introspection", "meta_reasoning", "world_model",  # TASK 6 FIX: Self-awareness queries
-                "language",  # TASK 6 FIX: NLP/language reasoning
             }
             is_reasoning_task = normalized_task_type in reasoning_task_types
             
@@ -3840,8 +3839,7 @@ class AgentPoolManager:
             "inductive": ReasoningType.INDUCTIVE,
             "abductive": ReasoningType.ABDUCTIVE,
             "reasoning": ReasoningType.HYBRID,  # Generic reasoning -> hybrid
-            "general": ReasoningType.SYMBOLIC,  # Note: General queries -> SYMBOLIC (language reasoning)
-            "language": ReasoningType.SYMBOLIC,  # Language tasks -> SYMBOLIC
+            "general": ReasoningType.SYMBOLIC,  # Note: General queries -> SYMBOLIC
             "text": ReasoningType.SYMBOLIC,  # Text tasks -> SYMBOLIC
             "mathematical": ReasoningType.MATHEMATICAL,  # Mathematical tasks
             "math": ReasoningType.MATHEMATICAL,  # Math shorthand
@@ -3882,7 +3880,7 @@ class AgentPoolManager:
         }
         
         # Note: Default to SYMBOLIC instead of UNKNOWN for unrecognized task types
-        # SYMBOLIC includes language reasoning which can handle most general queries
+        # SYMBOLIC reasoning can handle most general queries
         result = task_to_reasoning_map.get(task_type.lower())
         if result is None:
             # Log warning for unrecognized task types to help identify missing mappings

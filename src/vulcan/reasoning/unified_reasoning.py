@@ -578,28 +578,6 @@ def _load_reasoning_components():
     except ImportError as e:
         logger.warning(f"ModalityType not available: {e}")
 
-    try:
-        from vulcan.reasoning.language_reasoning import LanguageReasoner  # UNCOMMENTED!
-
-        _REASONING_COMPONENTS["LanguageReasoner"] = LanguageReasoner
-        logger.info("LanguageReasoner loaded successfully")
-    except ImportError as e:
-        logger.warning(f"LanguageReasoner not available: {e}")
-
-        # Minimal fallback only if import fails
-        class LanguageReasonerFallback:
-            def reason(
-                self, input_data: Any, query: Optional[Dict[str, Any]] = None
-            ) -> ReasoningResult:
-                return ReasoningResult(
-                    conclusion="Language reasoning unavailable",
-                    confidence=0.0,  # Not 0.95!
-                    reasoning_type=ReasoningType.SYMBOLIC,
-                    explanation="Real implementation not imported",
-                )
-
-        _REASONING_COMPONENTS["LanguageReasoner"] = LanguageReasonerFallback
-
     return _REASONING_COMPONENTS
 
 
@@ -742,14 +720,6 @@ class UnifiedReasoner:
                 self.reasoners[ReasoningType.ANALOGICAL] = reasoning_components[
                     "AnalogicalReasoningEngine"
                 ](enable_learning=enable_learning)
-            # Use LanguageReasoner as fallback only if SymbolicReasoner is not available
-            if (
-                "LanguageReasoner" in reasoning_components
-                and ReasoningType.SYMBOLIC not in self.reasoners
-            ):
-                self.reasoners[ReasoningType.SYMBOLIC] = reasoning_components[
-                    "LanguageReasoner"
-                ]()
             if "AbstractReasoner" in reasoning_components:
                 reasoning_components["AbstractReasoner"]
                 # self.reasoners[ReasoningType.ABSTRACT] = AbstractReasoner() # This is an abstract class

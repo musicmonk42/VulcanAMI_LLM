@@ -331,21 +331,18 @@ class ProblemClassifier:
         query_lower = query.lower()
         
         # Count keyword matches for each problem type
-        # Use word boundary matching for short keywords to avoid false positives
+        # ROOT CAUSE FIX: Use word boundary matching for ALL keywords
+        # to avoid false positives like "solve riddle" or "integrate feedback"
         scores: Dict[ProblemType, Tuple[int, List[str]]] = {}
         
         for problem_type, keywords in self.PROBLEM_PATTERNS.items():
             matches = []
             for kw in keywords:
-                # Use word boundary regex for short keywords (<=3 chars)
-                # to avoid matching "ode" in "code" or "node"
-                if len(kw) <= 3:
-                    pattern = r'\b' + re.escape(kw) + r'\b'
-                    if re.search(pattern, query_lower):
-                        matches.append(kw)
-                else:
-                    if kw in query_lower:
-                        matches.append(kw)
+                # ROOT CAUSE FIX: Use word boundary for ALL keywords
+                # Previously only used for keywords <= 3 chars
+                pattern = r'\b' + re.escape(kw) + r'\b'
+                if re.search(pattern, query_lower):
+                    matches.append(kw)
             scores[problem_type] = (len(matches), matches)
         
         # Priority order for tie-breaking (more specific types have higher priority)
@@ -380,9 +377,20 @@ class ProblemClassifier:
                 best_keywords = keywords
                 best_priority = priority
         
-        # Calculate confidence
-        total_keywords = sum(len(kws) for kws in self.PROBLEM_PATTERNS.values())
-        confidence = min(1.0, best_score / 3.0) if best_score > 0 else 0.1
+        # ROOT CAUSE FIX: Require at least 2 keyword matches for high confidence
+        # A single match like "solve" could be "solve this riddle" (not math)
+        if best_score < 2:
+            # Check for actual math expressions to confirm it's mathematical
+            has_math_expr = self._has_mathematical_expression(query)
+            if not has_math_expr and best_score == 1:
+                # Single keyword without math expression = low confidence
+                best_type = ProblemType.UNKNOWN
+                confidence = 0.1
+            else:
+                confidence = min(1.0, best_score / 3.0) if best_score > 0 else 0.1
+        else:
+            # Multiple keyword matches = higher confidence
+            confidence = min(1.0, best_score / 3.0)
         
         # Determine strategy
         strategy = self._suggest_strategy(best_type, query_lower)
@@ -397,6 +405,35 @@ class ProblemClassifier:
             suggested_strategy=strategy,
             variables=variables
         )
+    
+    def _has_mathematical_expression(self, query: str) -> bool:
+        """
+        ROOT CAUSE FIX: Check if query contains actual mathematical expressions.
+        
+        This prevents false positives from queries like "solve this riddle"
+        where "solve" matches but there's no actual math content.
+        """
+        # Check for arithmetic expressions: 2+2, 3*4, etc.
+        if re.search(r'\d+\s*[+\-*/^]\s*\d+', query):
+            return True
+        
+        # Check for equations: x = 5, y + 2 = 10
+        if re.search(r'[a-z]\s*[+\-*/^]?\s*=\s*\d+', query, re.I):
+            return True
+        
+        # Check for mathematical notation
+        if any(sym in query for sym in ['∑', '∏', '∫', '√', 'π', '∞', '±']):
+            return True
+        
+        # Check for function calls with numbers: sin(30), log(10)
+        if re.search(r'\b(sin|cos|tan|log|ln|exp|sqrt)\s*\(\s*[\d.]+', query, re.I):
+            return True
+        
+        # Check for polynomial notation: x^2, x**2
+        if re.search(r'[a-z]\s*[\^*]{1,2}\s*\d+', query, re.I):
+            return True
+        
+        return False
     
     def _suggest_strategy(self, problem_type: ProblemType, query: str) -> SolutionStrategy:
         """Suggest best solving strategy based on problem type."""
@@ -911,20 +948,36 @@ result = simplify(integral)
         # - "Verify proof about differentiable functions" -> Proof verification, not computation
         # - "Formalize in FOL" -> First-order logic, not math
         # =================================================================
+        # ROOT CAUSE FIX: Expanded logic patterns to catch more cases
         logic_patterns = [
-            # Propositional logic
-            '→', '∧', '∨', '¬', '⊢', '⊨',
+            # Propositional logic symbols
+            '→', '∧', '∨', '¬', '⊢', '⊨', '⇒', '⇔',
+            # Propositional logic keywords
             'satisfiable', 'unsatisfiable', 'tautology', 'contradiction',
-            'propositional', 'boolean',
-            # First-order logic
-            '∀', '∃', 'forall', 'exists',
-            'formalize', 'fol', 'first-order logic', 'first order logic',
-            'predicate', 'quantifier',
-            # Proof verification (not computation)
+            'propositional', 'boolean', 'truth table', 'truth value',
+            # First-order logic symbols
+            '∀', '∃',
+            # First-order logic keywords
+            'forall', 'exists', 'formalize', 'fol', 
+            'first-order logic', 'first order logic',
+            'predicate', 'quantifier', 'universal quantifier', 'existential',
+            # Proof theory - ROOT CAUSE FIX: Added missing patterns
+            'prove that', 'prove the', 'proof that', 'proof of',
             'verify proof', 'check proof', 'is the proof valid',
             'proof is valid', 'proof is invalid',
-            # SAT/Model checking
-            'sat problem', 'model', 'assignment',
+            'theorem', 'axiom', 'lemma', 'corollary',
+            # Logic validation - ROOT CAUSE FIX: Added
+            'is valid', 'is invalid', 'validity',
+            'sound', 'soundness', 'complete', 'completeness',
+            'entails', 'implies that', 'logically follows',
+            # Model theory - ROOT CAUSE FIX: Added
+            'interpretation', 'model of', 'satisfies',
+            'consistent', 'inconsistent', 'consistency',
+            # SAT/SMT
+            'sat problem', 'sat solver', 'smt',
+            # Self-introspection queries (not math!)
+            'what makes you', 'who are you', 'are you', 'your capabilities',
+            'how do you', 'your reasoning', 'your architecture',
         ]
         
         if any(pattern in query_lower for pattern in logic_patterns):
@@ -935,7 +988,7 @@ result = simplify(integral)
             return None
         
         # Also check for logic symbols in original query (case-sensitive)
-        if any(sym in query for sym in ['→', '∧', '∨', '¬', '∀', '∃', '⊢', '⊨']):
+        if any(sym in query for sym in ['→', '∧', '∨', '¬', '∀', '∃', '⊢', '⊨', '⇒', '⇔']):
             logger.info(
                 f"[MathTool] Note: Query contains logic symbols. "
                 f"Declining to compute. Query: {query[:80]}..."
@@ -1090,6 +1143,10 @@ result = simplify(integral)
         LLM INTERFACE FIX: Added early detection of string LLM parameters
         to provide clear error messages instead of confusing attribute errors.
         
+        ROOT CAUSE FIX: Added pre-flight check to reject non-mathematical queries
+        before asking LLM to generate code. Prevents LLM from generating
+        garbage code for queries like "What makes you different?"
+        
         Args:
             query: The mathematical problem to solve
             llm: LLM client object (NOT a model name string)
@@ -1104,6 +1161,15 @@ result = simplify(integral)
                 f"LLM Interface Bug: _generate_llm_code received a string ('{llm_preview}') "
                 f"instead of an LLM client object. This indicates a configuration error upstream. "
                 f"The 'llm' parameter should be an instantiated client object, not a model name."
+            )
+            return None
+        
+        # ROOT CAUSE FIX: Pre-flight check for mathematical content
+        # Prevents LLM from generating code for non-mathematical queries
+        if not self._is_genuinely_mathematical(query):
+            logger.info(
+                f"[MathTool] LLM code generation declined - query is not mathematical: "
+                f"{query[:80]}..."
             )
             return None
         
@@ -1336,6 +1402,73 @@ Brief explanation:"""
         except Exception as e:
             logger.warning(f"Unexpected error in simple arithmetic: {e}")
             return None
+
+    def _is_genuinely_mathematical(self, query: str) -> bool:
+        """
+        ROOT CAUSE FIX: Check if query is ACTUALLY mathematical.
+        
+        This prevents generating code for queries like:
+        - "What makes you different from other AI systems?"
+        - "Can you solve this riddle?"
+        - "Integrate this feedback into your response"
+        
+        Returns:
+            True if query contains genuine mathematical content,
+            False if it's a non-mathematical query that happens to contain math words.
+        """
+        query_lower = query.lower()
+        
+        # Check for logic/proof queries (NOT mathematical computation)
+        logic_indicators = [
+            # Logic symbols
+            '→', '∧', '∨', '¬', '⊢', '⊨', '∀', '∃', '⇒', '⇔',
+            # Logic keywords
+            'satisfiable', 'tautology', 'valid', 'entails',
+            'prove that', 'prove the', 'is the proof',
+            'formalize', 'fol', 'first-order',
+            # Self-introspection (definitely not math!)
+            'what makes you', 'who are you', 'are you', 'your capabilities',
+        ]
+        if any(ind in query_lower or ind in query for ind in logic_indicators):
+            return False
+        
+        # Check for ACTUAL math expressions
+        # Arithmetic: 2+2, 3*4, etc.
+        if re.search(r'\d+\s*[+\-*/^]\s*\d+', query):
+            return True
+        
+        # Equations: x = 5, 2x + 3 = 10
+        if re.search(r'[a-z]\s*[+\-*/^]?\s*=\s*[\d]', query, re.I):
+            return True
+        
+        # Mathematical notation: ∑, ∫, √, π
+        if any(sym in query for sym in ['∑', '∏', '∫', '√', 'π', '∞', '±']):
+            return True
+        
+        # Function calls: sin(30), log(10), sqrt(16)
+        if re.search(r'\b(sin|cos|tan|log|ln|exp|sqrt)\s*\(\s*[\d.]+', query, re.I):
+            return True
+        
+        # Polynomial notation: x^2, x**2, x²
+        if re.search(r'[a-z]\s*[\^*²³]{1,2}\s*\d*', query, re.I):
+            return True
+        
+        # Derivative/integral notation: d/dx, dy/dx, ∫
+        if re.search(r'd\s*/\s*d[a-z]', query, re.I):
+            return True
+        
+        # Check for mathematical keywords with actual math content nearby
+        math_keywords = ['integrate', 'derivative', 'solve', 'equation', 'limit', 'sum']
+        has_math_keyword = any(re.search(r'\b' + kw + r'\b', query_lower) for kw in math_keywords)
+        
+        if has_math_keyword:
+            # Must also have some mathematical content (numbers, variables, operators)
+            has_math_content = bool(re.search(r'\d', query) or 
+                                   re.search(r'\b[xyz]\b', query_lower) or
+                                   re.search(r'[+\-*/^()²³]', query))
+            return has_math_content
+        
+        return False
 
     def _try_fallback(
         self, 

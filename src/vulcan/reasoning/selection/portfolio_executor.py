@@ -74,12 +74,6 @@ try:
 except ImportError as e:
     logger.warning(f"[PortfolioExecutor] MultimodalReasoner not available: {e}")
 
-try:
-    from vulcan.reasoning.language_reasoning import LanguageReasoner
-    _AVAILABLE_ENGINES['language'] = LanguageReasoner
-except ImportError as e:
-    logger.warning(f"[PortfolioExecutor] LanguageReasoner not available: {e}")
-
 # Pattern 1 FIX: Add CryptographicEngine to available engines
 # The 'cryptographic' tool was in the tools list but not imported/initialized
 try:
@@ -298,14 +292,14 @@ class PortfolioExecutor:
     # COMPREHENSIVE FIX (Jan 7 2026): Added 'creative' and 'general' tool mappings
     # to ensure all query types route through VULCAN reasoning, not OpenAI directly.
     TOOL_FALLBACKS: Dict[str, List[str]] = {
-        'philosophical': ['world_model', 'symbolic', 'language'],  # Philosophical → world_model (mode='philosophical')
-        'creative': ['world_model', 'language'],  # Creative → world_model (mode='creative')
+        'philosophical': ['world_model', 'symbolic'],  # Philosophical → world_model (mode='philosophical')
+        'creative': ['world_model', 'symbolic'],  # Creative → world_model (mode='creative')
         'cryptographic': ['symbolic', 'mathematical'],  # Crypto falls back to symbolic
         'analogical': ['symbolic', 'probabilistic'],  # Analogical falls back to symbolic
         'causal': ['probabilistic', 'symbolic'],  # Causal falls back to probabilistic
         'mathematical': ['symbolic'],  # Mathematical falls back to symbolic
-        'multimodal': ['language', 'symbolic'],  # Multimodal falls back to language
-        'general': ['world_model', 'language'],  # General queries → world_model
+        'multimodal': ['symbolic'],  # Multimodal falls back to symbolic
+        'general': ['world_model', 'symbolic'],  # General queries → world_model
     }
 
     def _get_fallback_tools(self, tool_name: str) -> List[str]:
