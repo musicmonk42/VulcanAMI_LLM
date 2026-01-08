@@ -553,7 +553,7 @@ class LearningStatePersistence:
             
             if time_since_last_save < MIN_SAVE_INTERVAL_SECONDS:
                 # Throttled - state is cached in memory, will be saved later
-                self._stats["throttled_saves"] = self._stats.get("throttled_saves", 0) + 1
+                self._stats["throttled_saves"] += 1
                 logger.debug(
                     f"[LearningStatePersistence] BUG#16 FIX: Save throttled "
                     f"({time_since_last_save:.1f}s < {MIN_SAVE_INTERVAL_SECONDS}s), "

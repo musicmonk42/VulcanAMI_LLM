@@ -2201,7 +2201,6 @@ class ReasoningIntegration:
             # Handle dataclasses with __dataclass_fields__
             if hasattr(value, '__dataclass_fields__'):
                 try:
-                    # Uses module-level dataclasses import for asdict()
                     return dataclasses.asdict(value)
                 except Exception as e:
                     logger.warning(
