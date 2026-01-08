@@ -50,6 +50,12 @@ except ImportError:
 # different tools (and OpenAI fallback produced the actual result).
 ROUTER_DISAGREEMENT_PENALTY = 0.5  # Halve the quality when router disagreed
 
+# ROOT CAUSE FIX: Penalty for using fallback or having low confidence
+# When a tool fails and fallback is used, the tool should get NEGATIVE reward
+FALLBACK_NEGATIVE_REWARD = -0.5  # Negative reward when fallback was used
+LOW_CONFIDENCE_THRESHOLD = 0.15  # Below this, assume tool failed
+ROUTER_DISAGREEMENT_NEGATIVE_REWARD = -0.3  # Negative when wrong tool for query type
+
 
 class ExplorationStrategy(Enum):
     """Exploration strategies for bandit algorithms"""
@@ -1509,44 +1515,123 @@ class ToolSelectionBandit(AdaptiveBanditOrchestrator):
         constraints: Dict[str, float],
         router_selected_tools: Optional[List[str]] = None,
         source: Optional[str] = None,
+        tool_confidence: Optional[float] = None,
+        used_fallback: Optional[bool] = None,
     ):
         """Update from execution.
+        
+        ROOT CAUSE FIX: Now properly handles fallback and low confidence cases
+        by giving NEGATIVE rewards instead of just skipping reward.
         
         Note: Added router_selected_tools and source parameters to check
         if the tool was CORRECT for the query type. Don't reward a tool just
         because OpenAI fallback succeeded - reward only when the tool was
         actually the right choice based on query router's analysis.
         
+        ROOT CAUSE FIX: Added tool_confidence and used_fallback parameters
+        for explicit detection of fallback scenarios.
+        
         Args:
             features: Context features
             tool_name: Tool that was used
-            quality: Quality score of result
+            quality: Quality score of result (may be from final output including fallback)
             time_ms: Execution time in milliseconds
             energy_mj: Energy used in millijoules
             constraints: Budget constraints
             router_selected_tools: Tools that the QueryRouter recommended (for correctness check)
             source: Source of result (e.g., 'openai_fallback', 'local')
+            tool_confidence: Confidence score from the tool's own output (ROOT CAUSE FIX)
+            used_fallback: Explicit flag indicating if fallback was used (ROOT CAUSE FIX)
         """
         try:
-            # Note: Check if result came from OpenAI fallback
-            # If so, don't reward the selected tool - it didn't actually produce the result
-            if source and 'openai' in source.lower() and 'fallback' in source.lower():
+            # ROOT CAUSE FIX: Detect fallback using multiple methods
+            # Method 1: Explicit used_fallback flag
+            fallback_detected = used_fallback is True
+            
+            # Method 2: Low tool confidence (below threshold)
+            if tool_confidence is not None and tool_confidence < LOW_CONFIDENCE_THRESHOLD:
+                fallback_detected = True
                 logger.info(
-                    f"[ToolSelectionBandit] SKIPPING reward for '{tool_name}' - "
-                    f"result came from OpenAI fallback, not tool execution"
+                    f"[ToolSelectionBandit] Detected fallback due to low confidence: "
+                    f"tool_confidence={tool_confidence:.2f} < {LOW_CONFIDENCE_THRESHOLD}"
                 )
+            
+            # Method 3: Source string check (original method)
+            if source and 'openai' in source.lower() and 'fallback' in source.lower():
+                fallback_detected = True
+            
+            # ROOT CAUSE FIX: Give NEGATIVE reward when fallback was used
+            # The tool failed, so it should be penalized, not just skipped
+            if fallback_detected:
+                logger.info(
+                    f"[ToolSelectionBandit] NEGATIVE reward for '{tool_name}' - "
+                    f"result came from fallback (confidence={tool_confidence}, source={source})"
+                )
+                reward = FALLBACK_NEGATIVE_REWARD
+                
+                # Still update the bandit with negative reward
+                context = BanditContext(
+                    features=features,
+                    problem_type="tool_selection",
+                    constraints=constraints,
+                )
+                action_id = (
+                    self.tool_names.index(tool_name) if tool_name in self.tool_names else 0
+                )
+                action = BanditAction(
+                    tool_name=tool_name,
+                    action_id=action_id,
+                    expected_reward=reward,
+                    probability=1.0,
+                )
+                feedback = BanditFeedback(
+                    context=context,
+                    action=action,
+                    reward=reward,
+                    execution_time=time_ms,
+                    energy_used=energy_mj,
+                    success=False,  # Explicitly mark as failure
+                )
+                self.update(feedback)
                 return
             
-            # Note: Check router agreement
-            # Only reward tool if it was in the router's recommended list
+            # ROOT CAUSE FIX: Check router agreement with stronger penalty
+            # If tool wasn't recommended by router, give NEGATIVE reward (not just reduced)
             if router_selected_tools and tool_name not in router_selected_tools:
                 logger.info(
-                    f"[ToolSelectionBandit] REDUCED reward for '{tool_name}' - "
+                    f"[ToolSelectionBandit] NEGATIVE reward for '{tool_name}' - "
                     f"not in router's selection: {router_selected_tools}"
                 )
-                # Apply penalty: tool wasn't the router's choice
-                quality = quality * ROUTER_DISAGREEMENT_PENALTY
+                # ROOT CAUSE FIX: Use negative reward instead of just halving quality
+                reward = ROUTER_DISAGREEMENT_NEGATIVE_REWARD
+                
+                context = BanditContext(
+                    features=features,
+                    problem_type="tool_selection",
+                    constraints=constraints,
+                )
+                action_id = (
+                    self.tool_names.index(tool_name) if tool_name in self.tool_names else 0
+                )
+                action = BanditAction(
+                    tool_name=tool_name,
+                    action_id=action_id,
+                    expected_reward=reward,
+                    probability=1.0,
+                )
+                feedback = BanditFeedback(
+                    context=context,
+                    action=action,
+                    reward=reward,
+                    execution_time=time_ms,
+                    energy_used=energy_mj,
+                    success=False,  # Wrong tool type
+                )
+                self.update(feedback)
+                return
             
+            # Tool succeeded without fallback and was recommended by router
+            # Give positive reward based on quality
             reward = self._compute_reward(quality, time_ms, energy_mj, constraints)
 
             context = BanditContext(
