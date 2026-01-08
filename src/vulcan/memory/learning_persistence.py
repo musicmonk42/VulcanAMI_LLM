@@ -126,6 +126,12 @@ SCHEMA_VERSION = "1.0.0"
 MAX_BACKUP_COUNT = 5
 BACKUP_SUFFIX = ".backup"
 
+# BUG #16 FIX: Save throttling configuration
+# Problem: Tool weight persistence was saving after every single query outcome,
+# causing excessive I/O (18+ saves in a single session).
+# Solution: Throttle saves to at most once per MIN_SAVE_INTERVAL seconds.
+MIN_SAVE_INTERVAL_SECONDS = 30.0  # Minimum seconds between disk saves
+
 # Validation constraints
 MAX_TOOL_NAME_LENGTH = 256
 MAX_TOOL_WEIGHT_VALUE = 1.0
@@ -345,6 +351,7 @@ class LearningStatePersistence:
         "_dirty",
         "_storage_available",
         "_stats",
+        "_last_disk_save_time",  # BUG #16 FIX: Track last disk save for throttling
     )
     
     def __init__(
@@ -404,7 +411,13 @@ class LearningStatePersistence:
             "errors_count": 0,
             "last_save_time": None,
             "last_load_time": None,
+            "throttled_saves": 0,  # BUG #16 FIX: Track throttled saves
         }
+        
+        # BUG #16 FIX: Track last disk save time for throttling
+        # This prevents excessive I/O by ensuring saves occur at most
+        # once every MIN_SAVE_INTERVAL_SECONDS
+        self._last_disk_save_time: float = 0.0
         
         # Initialize storage directory
         self._storage_available = self._ensure_storage_directory()
@@ -533,6 +546,21 @@ class LearningStatePersistence:
                 )
                 return True  # Cache updated successfully
             
+            # BUG #16 FIX: Throttle disk writes to prevent excessive I/O
+            # Only write to disk if enough time has passed since last save
+            current_time = time.time()
+            time_since_last_save = current_time - self._last_disk_save_time
+            
+            if time_since_last_save < MIN_SAVE_INTERVAL_SECONDS:
+                # Throttled - state is cached in memory, will be saved later
+                self._stats["throttled_saves"] = self._stats.get("throttled_saves", 0) + 1
+                logger.debug(
+                    f"[LearningStatePersistence] BUG#16 FIX: Save throttled "
+                    f"({time_since_last_save:.1f}s < {MIN_SAVE_INTERVAL_SECONDS}s), "
+                    f"state cached in memory"
+                )
+                return True  # Cache updated successfully, disk save deferred
+            
             try:
                 # Create backup of existing file
                 if self.state_file.exists():
@@ -543,7 +571,8 @@ class LearningStatePersistence:
                 
                 if success:
                     self._stats["total_saves"] += 1
-                    self._stats["last_save_time"] = time.time()
+                    self._stats["last_save_time"] = current_time
+                    self._last_disk_save_time = current_time  # BUG #16 FIX: Update throttle timer
                     
                     tool_count = len(state.get("tool_weights", {}))
                     save_count = state.get("metadata", {}).get("save_count", 0)
@@ -624,6 +653,41 @@ class LearningStatePersistence:
         """
         state = self.load_state()
         return copy.deepcopy(state.get("tool_weights", {}))
+    
+    def flush(self, force: bool = False) -> bool:
+        """
+        BUG #16 FIX: Force flush cached state to disk.
+        
+        This method bypasses the throttling mechanism to ensure the current
+        in-memory state is written to disk. Useful for shutdown handlers or
+        when state must be persisted immediately.
+        
+        Args:
+            force: If True, write to disk even if recently saved.
+                   If False, only write if there's cached state.
+        
+        Returns:
+            True if flush succeeded or no flush needed, False on error.
+        
+        Example:
+            >>> # On shutdown, ensure all state is persisted
+            >>> persistence.flush(force=True)
+            True
+        """
+        with self._lock:
+            if self._cached_state is None:
+                return True  # Nothing to flush
+            
+            if not self._storage_available:
+                logger.warning("[LearningStatePersistence] Cannot flush: storage unavailable")
+                return False
+            
+            if force:
+                # Bypass throttling - update throttle timer to allow immediate save
+                self._last_disk_save_time = 0.0
+            
+            # Save current cached state
+            return self.save_state(self._cached_state)
     
     def update_concept_library(self, concept_library: Dict[str, Any]) -> bool:
         """
