@@ -674,9 +674,13 @@ class EnhancedCausalReasoning(CausalReasoningEngine):
             return self._pc_algorithm(data, variable_names, alpha)
 
     def perform_intervention(
-        self, variable: str, value: Any, use_do_calculus: bool = True
+        self, variable: str, value: Any, _use_do_calculus: bool = True
     ) -> InterventionResult:
-        """Perform causal intervention with do-calculus"""
+        """Perform causal intervention with do-calculus.
+        
+        Note: _use_do_calculus parameter is reserved for future implementation
+        of alternative intervention methods.
+        """
 
         # CRITICAL FIX: Check if DAG exists AND has nodes, not if NetworkX is available
         if not self.causal_dag or (
@@ -843,9 +847,14 @@ class EnhancedCausalReasoning(CausalReasoningEngine):
             return False
 
     def identify_confounders(
-        self, treatment: str, outcome: str, use_criteria: str = "backdoor"
+        self, treatment: str, outcome: str, _use_criteria: str = "backdoor"
     ) -> Set[str]:
-        """Identify confounders using various criteria"""
+        """Identify confounders using various criteria.
+        
+        Note: _use_criteria parameter is reserved for future implementation
+        of alternative criteria (e.g., 'frontdoor'). Currently only backdoor
+        criterion is implemented.
+        """
 
         if not self.causal_dag or not NETWORKX_AVAILABLE:
             return super().detect_confounders(treatment, outcome)

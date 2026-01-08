@@ -414,7 +414,7 @@ class TableauProver(BaseProver):
         return True
 
     def _select_formula_to_expand(
-        self, formulas: List[Clause], used: Set[int], instantiated: Set[Tuple]
+        self, formulas: List[Clause], _used: Set[int], instantiated: Set[Tuple]
     ) -> Tuple[Optional[int], Optional[str]]:
         """
         Select next formula to expand.
@@ -428,7 +428,7 @@ class TableauProver(BaseProver):
 
         Args:
             formulas: Available formulas
-            used: Set of already used formula indices
+            _used: Reserved - Set of already used formula indices (for future prioritization)
             instantiated: Set of (formula_idx, term) pairs for universals
 
         Returns:

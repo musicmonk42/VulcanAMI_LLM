@@ -549,7 +549,7 @@ class MathematicalVerificationEngine:
         self,
         problem: BayesianProblem,
         claimed_posterior: float,
-        calculation_steps: Optional[List[str]] = None,
+        _calculation_steps: Optional[List[str]] = None,
     ) -> VerificationResult:
         """
         Verify a Bayesian inference calculation.
@@ -560,7 +560,8 @@ class MathematicalVerificationEngine:
         Args:
             problem: Bayesian problem specification
             claimed_posterior: The claimed result to verify
-            calculation_steps: Optional list of calculation steps for analysis
+            _calculation_steps: Reserved for future implementation - optional
+                list of calculation steps for detailed analysis
             
         Returns:
             VerificationResult with status, errors, and corrections
