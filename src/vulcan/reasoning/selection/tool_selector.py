@@ -3056,6 +3056,205 @@ class CryptographicToolWrapper:
         }
 
 
+# ==============================================================================
+# FIX #1: PhilosophicalToolWrapper - Register philosophical reasoning engine
+# ==============================================================================
+class PhilosophicalToolWrapper:
+    """
+    Wrapper for PhilosophicalReasoner that exposes reason() method.
+    
+    FIX #1: Missing Engine Registration
+    Evidence from logs: "Tool 'philosophical' not available, using fallback: world_model"
+    
+    The PhilosophicalReasoner performs ethical/deontic reasoning including:
+    - Standard deontic logic (SDL) with P(ermitted), O(bligatory), F(orbidden)
+    - Moral uncertainty handling using MEC-inspired heuristics
+    - Pareto dominance checking for ethical alternatives
+    - Trolley problem variants and ethical dilemma analysis
+    """
+    
+    def __init__(self, engine):
+        """
+        Initialize with a PhilosophicalReasoner instance.
+        
+        Args:
+            engine: PhilosophicalReasoner instance
+        """
+        self.engine = engine
+        self.name = "philosophical"
+    
+    def reason(self, problem: Any) -> Dict[str, Any]:
+        """
+        Execute philosophical/ethical reasoning on the problem.
+        
+        Args:
+            problem: Dict with query, or string query
+            
+        Returns:
+            Dict with reasoning result and confidence
+        """
+        start_time = time.time()
+        
+        try:
+            # Extract query string from problem
+            if isinstance(problem, str):
+                query = problem
+                context = None
+            elif isinstance(problem, dict):
+                query = problem.get("query") or problem.get("text") or problem.get("problem", "")
+                context = problem.get("context")
+            else:
+                query = str(problem)
+                context = None
+            
+            logger.info(f"[PhilosophicalEngine] Analyzing ethical query: {query[:100]}...")
+            
+            # Execute philosophical reasoning
+            if hasattr(self.engine, "reason"):
+                result = self.engine.reason(problem, context=context)
+            elif hasattr(self.engine, "analyze"):
+                result = self.engine.analyze(query, context=context)
+            elif hasattr(self.engine, "evaluate"):
+                result = self.engine.evaluate(query)
+            else:
+                # Fallback if engine doesn't have expected methods
+                result = {
+                    "analysis": "Philosophical analysis requested",
+                    "query": query,
+                    "confidence": 0.5
+                }
+            
+            execution_time = (time.time() - start_time) * 1000
+            
+            # Extract confidence from result
+            confidence = 0.7
+            if isinstance(result, dict):
+                confidence = result.get("confidence", 0.7)
+            
+            logger.info(f"[PhilosophicalEngine] Analysis complete: confidence={confidence:.3f}, time={execution_time:.0f}ms")
+            
+            return {
+                "tool": self.name,
+                "result": result,
+                "confidence": confidence,
+                "execution_time_ms": execution_time,
+                "engine": "PhilosophicalReasoner",
+            }
+            
+        except Exception as e:
+            logger.error(f"[PhilosophicalEngine] Reasoning failed: {e}", exc_info=True)
+            return {
+                "tool": self.name,
+                "result": None,
+                "confidence": 0.1,
+                "error": str(e),
+                "engine": "PhilosophicalReasoner",
+                "execution_time_ms": (time.time() - start_time) * 1000,
+            }
+
+
+# ==============================================================================
+# FIX #1: MathematicalToolWrapper - Register mathematical computation engine
+# ==============================================================================
+class MathematicalToolWrapper:
+    """
+    Wrapper for MathematicalComputationTool that exposes reason() method.
+    
+    FIX #1: Missing Engine Registration
+    Evidence from logs: "Tool 'mathematical' not available, using fallback: symbolic"
+    
+    The MathematicalComputationTool performs symbolic math computation using:
+    - SymPy for symbolic algebra, calculus, etc.
+    - LLM-based code generation for complex problems
+    - Template-based generation for common operations
+    - Safe sandboxed execution via RestrictedPython
+    """
+    
+    def __init__(self, engine):
+        """
+        Initialize with a MathematicalComputationTool instance.
+        
+        Args:
+            engine: MathematicalComputationTool instance
+        """
+        self.engine = engine
+        self.name = "mathematical"
+    
+    def reason(self, problem: Any) -> Dict[str, Any]:
+        """
+        Execute mathematical computation on the problem.
+        
+        Args:
+            problem: Dict with query, or string query
+            
+        Returns:
+            Dict with computation result and confidence
+        """
+        start_time = time.time()
+        
+        try:
+            # Extract query string from problem
+            if isinstance(problem, str):
+                query = problem
+            elif isinstance(problem, dict):
+                query = problem.get("query") or problem.get("text") or problem.get("problem", "")
+            else:
+                query = str(problem)
+            
+            logger.info(f"[MathematicalEngine] Computing: {query[:100]}...")
+            
+            # Execute mathematical computation
+            if hasattr(self.engine, "compute"):
+                result = self.engine.compute(query)
+            elif hasattr(self.engine, "solve"):
+                result = self.engine.solve(query)
+            elif hasattr(self.engine, "reason"):
+                result = self.engine.reason(problem)
+            else:
+                # Fallback if engine doesn't have expected methods
+                result = {
+                    "analysis": "Mathematical computation requested",
+                    "query": query,
+                    "success": False,
+                    "confidence": 0.3
+                }
+            
+            execution_time = (time.time() - start_time) * 1000
+            
+            # Extract confidence and success from result
+            confidence = 0.7
+            success = True
+            if isinstance(result, dict):
+                confidence = result.get("confidence", 0.7)
+                success = result.get("success", True)
+                # If computation failed, reduce confidence
+                if not success:
+                    confidence = min(confidence, 0.3)
+            
+            logger.info(f"[MathematicalEngine] Computation complete: success={success}, confidence={confidence:.3f}, time={execution_time:.0f}ms")
+            
+            return {
+                "tool": self.name,
+                "result": result,
+                "confidence": confidence,
+                "success": success,
+                "execution_time_ms": execution_time,
+                "engine": "MathematicalComputationTool",
+            }
+            
+        except Exception as e:
+            logger.error(f"[MathematicalEngine] Computation failed: {e}", exc_info=True)
+            return {
+                "tool": self.name,
+                "result": None,
+                "confidence": 0.1,
+                "success": False,
+                "error": str(e),
+                "engine": "MathematicalComputationTool",
+                "execution_time_ms": (time.time() - start_time) * 1000,
+            }
+
+
 class ToolSelector:
     """
     Main tool selector orchestrating all components
@@ -3448,6 +3647,7 @@ class ToolSelector:
         
         Note: Added world_model tool for self-introspection queries.
         Note: Added cryptographic tool for hash/encoding computations.
+        Note: Added philosophical and mathematical tools (FIX #1 - Missing Engine Registration).
         """
         tool_configs = {
             "symbolic": {"speed": "medium", "accuracy": "high", "energy": "medium"},
@@ -3457,6 +3657,10 @@ class ToolSelector:
             "multimodal": {"speed": "slow", "accuracy": "high", "energy": "very_high"},
             "world_model": {"speed": "fast", "accuracy": "high", "energy": "low"},  # Note: world_model tool
             "cryptographic": {"speed": "fast", "accuracy": "perfect", "energy": "low"},  # Note: cryptographic tool
+            # FIX #1: Register philosophical and mathematical tools
+            # These engines were being routed to but not available, causing fallback to wrong tools
+            "philosophical": {"speed": "medium", "accuracy": "high", "energy": "medium"},  # FIX #1: philosophical tool
+            "mathematical": {"speed": "medium", "accuracy": "high", "energy": "medium"},   # FIX #1: mathematical tool
         }
 
         # Try to initialize real reasoning engines
@@ -3596,6 +3800,40 @@ class ToolSelector:
         except Exception as e:
             logger.error(f"[ToolSelector] CryptographicEngine initialization failed: {e}")
             engines["cryptographic"] = None
+        
+        # ============================================================
+        # FIX #1: PHILOSOPHICAL ENGINE (Ethical/deontic reasoning)
+        # ============================================================
+        # This enables routing of philosophical/ethical queries to the proper
+        # reasoning engine instead of falling back to world_model or LLM.
+        # Evidence from logs: "Tool 'philosophical' not available, using fallback: world_model"
+        try:
+            from ..philosophical_reasoning import PhilosophicalReasoner
+            engines["philosophical"] = PhilosophicalToolWrapper(PhilosophicalReasoner())
+            logger.info("[ToolSelector] PhilosophicalReasoner loaded successfully")
+        except ImportError as e:
+            logger.warning(f"[ToolSelector] PhilosophicalReasoner not available: {e}")
+            engines["philosophical"] = None
+        except Exception as e:
+            logger.error(f"[ToolSelector] PhilosophicalReasoner initialization failed: {e}")
+            engines["philosophical"] = None
+        
+        # ============================================================
+        # FIX #1: MATHEMATICAL ENGINE (Symbolic math computation)
+        # ============================================================
+        # This enables routing of mathematical queries to the proper
+        # computation engine instead of falling back to symbolic or LLM.
+        # Evidence from logs: "Tool 'mathematical' not available, using fallback: symbolic"
+        try:
+            from ..mathematical_computation import MathematicalComputationTool
+            engines["mathematical"] = MathematicalToolWrapper(MathematicalComputationTool())
+            logger.info("[ToolSelector] MathematicalComputationTool loaded successfully")
+        except ImportError as e:
+            logger.warning(f"[ToolSelector] MathematicalComputationTool not available: {e}")
+            engines["mathematical"] = None
+        except Exception as e:
+            logger.error(f"[ToolSelector] MathematicalComputationTool initialization failed: {e}")
+            engines["mathematical"] = None
         
         return engines
 
