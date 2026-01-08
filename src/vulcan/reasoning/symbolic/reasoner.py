@@ -73,7 +73,7 @@ from .solvers import BayesianNetworkReasoner, VariableType
 
 # ROOT CAUSE FIX: Import QueryDecomposer to extract facts and hypotheses from NL queries
 try:
-    from ..query_preprocessor import get_query_decomposer, DecomposedQuery
+    from ..query_decomposer import get_query_decomposer, DecomposedQuery
     QUERY_DECOMPOSER_AVAILABLE = True
 except ImportError:
     QUERY_DECOMPOSER_AVAILABLE = False

@@ -83,16 +83,12 @@ from typing import Any, Dict, List, Optional
 logger = logging.getLogger(__name__)
 
 # =============================================================================
-# Query Preprocessor Import (FIX #1)
+# Query Preprocessor - REMOVED (was architectural band-aid)
 # =============================================================================
-# Import query preprocessor for extracting formal syntax from natural language
-# This prevents parse errors like "Unexpected token 'Reasoning'" in engines
-try:
-    from .query_preprocessor import get_query_preprocessor
-    QUERY_PREPROCESSOR_AVAILABLE = True
-except ImportError:
-    QUERY_PREPROCESSOR_AVAILABLE = False
-    get_query_preprocessor = None  # type: ignore
+# The query preprocessor has been removed. Root causes are now fixed directly
+# in the engines (cryptographic engine, symbolic reasoner, etc.)
+QUERY_PREPROCESSOR_AVAILABLE = False
+get_query_preprocessor = None  # type: ignore
 
 # =============================================================================
 # Answer Validator Import (META-REASONING FIX)
@@ -949,27 +945,15 @@ class ReasoningIntegration:
     def _init_query_bridge(self) -> Optional[Any]:
         """
         Initialize QueryToProblemBridge component with error handling.
+        
+        NOTE: QueryToProblemBridge has been REMOVED as part of architecture simplification.
+        The bridge was patching router decomposition issues that are now fixed at root cause.
 
         Returns:
-            QueryToProblemBridge instance if successful, None otherwise.
+            None - bridge is no longer used.
         """
-        try:
-            from vulcan.reasoning.query_to_problem_bridge import get_query_to_problem_bridge
-
-            bridge = get_query_to_problem_bridge()
-            logger.info(f"{LOG_PREFIX} QueryToProblemBridge initialized successfully")
-            return bridge
-
-        except ImportError as e:
-            logger.warning(
-                f"{LOG_PREFIX} QueryToProblemBridge not available (missing dependency): {e}"
-            )
-        except Exception as e:
-            logger.error(
-                f"{LOG_PREFIX} QueryToProblemBridge initialization failed: {e}",
-                exc_info=True
-            )
-
+        # QueryToProblemBridge removed - return None
+        logger.debug(f"{LOG_PREFIX} QueryToProblemBridge removed (architectural simplification)")
         return None
 
     def _init_semantic_bridge(self) -> Optional[Any]:
@@ -1491,39 +1475,12 @@ class ReasoningIntegration:
                 )
 
             # ================================================================
-            # FIX #1: QUERY PREPROCESSING - Extract formal syntax
+            # FIX #1: QUERY PREPROCESSING - REMOVED (architectural band-aid)
             # ================================================================
-            # Preprocess query BEFORE passing to reasoning engines
-            # This prevents parse errors like "Unexpected token 'Reasoning'"
-            preprocessing_result = None
-            if QUERY_PREPROCESSOR_AVAILABLE and get_query_preprocessor is not None:
-                try:
-                    # Determine which tools are likely to be used
-                    # Use a quick heuristic based on query type
-                    predicted_tools = self._predict_tools_for_preprocessing(query, query_type)
-                    
-                    # Now preprocess based on predicted tools
-                    preprocessor = get_query_preprocessor()
-                    preprocessing_result = preprocessor.preprocess(
-                        query=query,
-                        query_type=query_type,
-                        reasoning_tools=predicted_tools
-                    )
-                    
-                    # PreprocessingResult is a dataclass with attribute access
-                    if preprocessing_result.preprocessing_applied:
-                        logger.info(
-                            f"{LOG_PREFIX} Preprocessing extracted formal input "
-                            f"(confidence={preprocessing_result.extraction_confidence:.2f})"
-                        )
-                        
-                        # Store preprocessing result in context for engines
-                        if context is None:
-                            context = {}
-                        context['preprocessing'] = preprocessing_result
-                        
-                except Exception as e:
-                    logger.warning(f"{LOG_PREFIX} Query preprocessing failed: {e}")
+            # Query preprocessing has been removed. Root causes are now fixed
+            # directly in the engines (cryptographic engine header detection,
+            # symbolic reasoner query decomposition, etc.)
+            # The QueryDecomposer is used directly by the SymbolicReasoner.
 
             # Check if we should use decomposition for complex queries
             if self._should_use_decomposition(complexity):
