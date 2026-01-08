@@ -94,6 +94,21 @@ except ImportError:
     get_query_preprocessor = None  # type: ignore
 
 # =============================================================================
+# Answer Validator Import (META-REASONING FIX)
+# =============================================================================
+# Import answer validator for meta-reasoning coherence checking.
+# This prevents returning wrong-domain answers (e.g., mathematical results
+# for self-introspection queries). The validator catches obvious mismatches
+# like "3x**2" being returned for "what makes you different from other AIs?"
+try:
+    from .answer_validator import validate_reasoning_result, ValidationResult
+    ANSWER_VALIDATOR_AVAILABLE = True
+except ImportError:
+    ANSWER_VALIDATOR_AVAILABLE = False
+    validate_reasoning_result = None  # type: ignore
+    ValidationResult = None  # type: ignore
+
+# =============================================================================
 # SystemObserver Import for World Model Integration
 # =============================================================================
 # The SystemObserver connects query processing to the WorldModel's learning system.
@@ -1329,6 +1344,69 @@ class ReasoningIntegration:
 
             # Add timing to metadata
             result.metadata["selection_time_ms"] = selection_time
+
+            # ================================================================
+            # META-REASONING VALIDATION FIX: Validate answer coherence
+            # ================================================================
+            # This critical validation layer catches cases where:
+            # - A mathematical result is returned for a self-introspection query
+            # - A calculus answer is returned for a logical/ethical query
+            # - WorldModel response is discarded and wrong cached result returned
+            #
+            # Example bug this fixes:
+            #   Query: "what makes you different from other ai systems?"
+            #   Wrong answer: "3*x**2" (derivative from cached math result)
+            #   Expected: World model introspection about VULCAN's capabilities
+            # ================================================================
+            if ANSWER_VALIDATOR_AVAILABLE and validate_reasoning_result is not None:
+                try:
+                    # Get the conclusion from metadata or reasoning output
+                    conclusion = ""
+                    if result.metadata:
+                        conclusion = result.metadata.get("conclusion", "")
+                        if not conclusion:
+                            conclusion = result.metadata.get("world_model_response", "")
+                        if not conclusion:
+                            # Check for reasoning_output in metadata
+                            reasoning_output = result.metadata.get("reasoning_output", {})
+                            if isinstance(reasoning_output, dict):
+                                conclusion = reasoning_output.get("conclusion", "")
+                    
+                    # Only validate if we have something to validate
+                    if conclusion:
+                        validation_result = validate_reasoning_result(
+                            query=query,
+                            result={"conclusion": conclusion},
+                            expected_type=query_type
+                        )
+                        
+                        if not validation_result.valid:
+                            logger.warning(
+                                f"{LOG_PREFIX} META-REASONING VALIDATION FAILED: "
+                                f"Answer does not match query type. "
+                                f"Query: '{query[:60]}...', "
+                                f"Answer type mismatch detected. "
+                                f"Explanation: {validation_result.explanation}"
+                            )
+                            # Mark result as potentially invalid
+                            result.metadata["validation_failed"] = True
+                            result.metadata["validation_explanation"] = validation_result.explanation
+                            # Reduce confidence to signal uncertainty
+                            original_confidence = result.confidence
+                            result.confidence = min(result.confidence, 0.3)
+                            logger.warning(
+                                f"{LOG_PREFIX} Confidence reduced from {original_confidence:.2f} "
+                                f"to {result.confidence:.2f} due to validation failure"
+                            )
+                        else:
+                            logger.debug(
+                                f"{LOG_PREFIX} Meta-reasoning validation passed for query"
+                            )
+                except Exception as validation_err:
+                    # Validation is non-critical - log but don't fail the whole request
+                    logger.debug(
+                        f"{LOG_PREFIX} Meta-reasoning validation failed (non-critical): {validation_err}"
+                    )
 
             # ================================================================
             # FIX #3: LEARN FROM SUCCESSFUL REASONING
