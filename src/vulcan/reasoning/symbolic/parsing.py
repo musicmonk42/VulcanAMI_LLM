@@ -179,6 +179,9 @@ class Lexer:
         #
         # New approach: Don't remove commas if the text looks like function call syntax
         # Function calls have the pattern: identifier(args...)
+        # Note: This pattern is simplified and may not handle deeply nested parens,
+        # but for most FOL function-style syntax (implies(A, B), and(x, y)), it works.
+        # The key insight is we're just detecting IF there's function syntax, not parsing it.
         has_function_syntax = bool(re.search(r'\w+\s*\([^)]*,', result))
         if not has_function_syntax:
             result = re.sub(r',\s+([a-z])', r' \1', result)

@@ -69,6 +69,7 @@ Error Handling:
 """
 
 import atexit
+import dataclasses  # BUG #4 FIX: Import at module level for _sanitize_context_for_json
 import hashlib
 import logging
 import os
@@ -2200,7 +2201,7 @@ class ReasoningIntegration:
             # Handle dataclasses with __dataclass_fields__
             if hasattr(value, '__dataclass_fields__'):
                 try:
-                    import dataclasses
+                    # Uses module-level import of dataclasses for better performance
                     return dataclasses.asdict(value)
                 except Exception as e:
                     logger.warning(
