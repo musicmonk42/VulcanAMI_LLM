@@ -52,7 +52,7 @@ logger = logging.getLogger(__name__)
 
 # Number of hex characters to use from SHA-256 hash for cache keys
 # 32 hex chars = 128 bits = extremely low collision probability
-# Birthday paradox: 50% collision after ~2^64 queries (18 quintillion)
+# Birthday paradox: 50% collision after ~2^64 operations (sqrt of 2^128 hash space)
 CACHE_HASH_LENGTH = 32
 
 # Maximum cache entry age in seconds (5 minutes)
@@ -104,6 +104,10 @@ CONFIDENCE_FLOOR_CAUSAL_DEFAULT = 0.15  # Minimum floor for causal reasoning
 CONFIDENCE_FLOOR_ANALOGICAL_DEFAULT = 0.15  # Minimum floor for analogical reasoning
 CONFIDENCE_FLOOR_DEFAULT = 0.2  # Generic minimum floor for other reasoners
 CONFIDENCE_FLOOR_NO_RESULT = 0.1  # Floor when reasoner returns empty/null result
+
+# Minimum weight floor for ensemble calculations
+# Prevents floating-point underflow when all weight components are small
+MIN_ENSEMBLE_WEIGHT_FLOOR = 0.001
 
 # Problem type identifiers
 PROBLEM_TYPE_BAYESIAN = 'bayesian'
@@ -2671,10 +2675,10 @@ class UnifiedReasoner:
             else:
                 raw_weight = base_weight * type_weight
             
-            # FIX: Floor individual weights at 0.001 to prevent floating-point underflow
+            # FIX: Floor individual weights to prevent floating-point underflow
             # When all components are small (0.1 * 0.1 * 0.01), product can round to 0
             # This ensures each result contributes at least minimally to the ensemble
-            weights.append(max(0.001, raw_weight))
+            weights.append(max(MIN_ENSEMBLE_WEIGHT_FLOOR, raw_weight))
 
         # Issue #53: Defensive handling for zero weights
         # If all weights are zero, fall back to uniform weights to prevent np.average error
