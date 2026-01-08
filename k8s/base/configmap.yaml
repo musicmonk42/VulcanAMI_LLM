@@ -132,7 +132,7 @@ data:
   # Timeout for parallel LLM execution (both local and OpenAI running concurrently)
   # First successful response wins; pending tasks are cancelled
   HYBRID_EXECUTOR_TIMEOUT: "30.0"
-  # BUG #5 FIX: Grace period before cancelling local VULCAN task when OpenAI finishes first
+  # Note: Grace period before cancelling local VULCAN task when OpenAI finishes first
   # This allows VULCAN's local reasoning to complete even if slower than OpenAI
   # Ensures VULCAN reasoning is preferred over OpenAI fallback
   VULCAN_LOCAL_GRACE_PERIOD: "2.0"

@@ -472,7 +472,7 @@ hybridExecutor:
   # Both local LLM and OpenAI run concurrently; first successful response wins
   # Pending tasks are cancelled after timeout
   timeout: 30.0
-  # BUG #5 FIX: Grace period before cancelling local task when OpenAI finishes first
+  # Note: Grace period before cancelling local task when OpenAI finishes first
   # This allows VULCAN's local reasoning to complete even if slower than OpenAI
   # Ensures VULCAN reasoning is preferred over OpenAI fallback
   localGracePeriodSeconds: 2.0
