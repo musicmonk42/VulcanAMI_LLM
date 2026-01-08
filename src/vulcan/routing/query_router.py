@@ -333,6 +333,40 @@ except ImportError:
         logger.debug("CryptographicEngine not available for query routing")
 
 # ============================================================
+# Note: QUERY HEADER STRIPPING INTEGRATION
+# ============================================================
+# Import strip_query_headers from query_classifier to preprocess queries
+# BEFORE any classification or fast-path checks.
+#
+# FIX: Preprocessing Order Issue
+# =====================================
+# Problem: Classification was happening BEFORE preprocessing:
+#   1. QueryClassifier runs ← Sees "A1" → CRYPTOGRAPHIC ❌
+#   2. QueryRouter routes based on classification
+#   3. QueryPreprocessor strips headers ← TOO LATE!
+#   4. Reasoning engines receive cleaned query but routing already wrong
+#
+# Solution: Strip headers at the BEGINNING of route_query(), BEFORE
+# any classification or fast-path checks:
+#   1. strip_query_headers(raw_query) → strips headers
+#   2. classify_query(preprocessed_query) → correct classification
+#   3. route_to_engine() → correct engine
+
+try:
+    from .query_classifier import strip_query_headers
+
+    HEADER_STRIPPING_AVAILABLE = True
+except ImportError:
+    try:
+        from vulcan.routing.query_classifier import strip_query_headers
+
+        HEADER_STRIPPING_AVAILABLE = True
+    except ImportError:
+        strip_query_headers = None
+        HEADER_STRIPPING_AVAILABLE = False
+        logger.warning("strip_query_headers not available - header stripping disabled")
+
+# ============================================================
 # CONSTANTS - Query Classification Keywords
 # ============================================================
 
@@ -3048,6 +3082,36 @@ class QueryAnalyzer:
             query_number = self._query_count
 
         query_id = f"q_{uuid.uuid4().hex[:12]}"
+        
+        # =================================================================
+        # FIX: PREPROCESSING ORDER - Strip headers BEFORE any classification
+        # =================================================================
+        # This fixes the fundamental issue where classification happened BEFORE
+        # preprocessing, causing headers like "A1" to trigger CRYPTOGRAPHIC routing.
+        #
+        # Problem (before):
+        #   1. QueryClassifier runs ← Sees "A1" → CRYPTOGRAPHIC ❌
+        #   2. QueryRouter routes based on classification
+        #   3. QueryPreprocessor strips headers ← TOO LATE!
+        #
+        # Solution (now):
+        #   1. strip_query_headers(raw_query) → strips headers
+        #   2. classify_query(preprocessed_query) → correct classification
+        #   3. route_to_engine() → correct engine
+        #
+        # NOTE: We keep the original query for logging/telemetry but use the
+        # preprocessed query for ALL routing decisions.
+        # =================================================================
+        original_query = query  # Keep for telemetry
+        if HEADER_STRIPPING_AVAILABLE and strip_query_headers is not None:
+            query = strip_query_headers(query)
+            # Optimization: Check length first (cheap) before string comparison
+            if len(query) != len(original_query):
+                logger.info(
+                    f"[QueryRouter] {query_id}: FIX Preprocessing Order - "
+                    f"Stripped headers ({len(original_query)} -> {len(query)} chars)"
+                )
+        
         query_lower = query.lower()
 
         # =================================================================
@@ -3083,7 +3147,7 @@ class QueryAnalyzer:
                 # Create plan with pre-computed crypto result
                 plan = ProcessingPlan(
                     query_id=query_id,
-                    original_query=query,
+                    original_query=original_query,
                     source=source,
                     learning_mode=learning_mode,
                     query_type=QueryType.EXECUTION,  # Crypto is deterministic execution
@@ -3210,7 +3274,7 @@ class QueryAnalyzer:
                 
                 plan = ProcessingPlan(
                     query_id=query_id,
-                    original_query=query,
+                    original_query=original_query,
                     source=source,
                     learning_mode=learning_mode,
                     query_type=QueryType.PHILOSOPHICAL,  # Philosophical task type
@@ -3367,7 +3431,7 @@ class QueryAnalyzer:
                 
                 plan = ProcessingPlan(
                     query_id=query_id,
-                    original_query=query,
+                    original_query=original_query,
                     source=source,
                     learning_mode=learning_mode,
                     query_type=query_type,
@@ -3458,7 +3522,7 @@ class QueryAnalyzer:
             # Return minimal plan for trivial query
             plan = ProcessingPlan(
                 query_id=query_id,
-                original_query=query,
+                original_query=original_query,
                 source=source,
                 learning_mode=learning_mode,
                 query_type=QueryType.GENERAL,
@@ -3522,7 +3586,7 @@ class QueryAnalyzer:
             # Create plan for complex physics with FULL analysis
             plan = ProcessingPlan(
                 query_id=query_id,
-                original_query=query,
+                original_query=original_query,
                 source=source,
                 learning_mode=learning_mode,
                 query_type=QueryType.REASONING,  # Complex physics is reasoning
@@ -3626,7 +3690,7 @@ class QueryAnalyzer:
             # Create plan for creative tasks
             plan = ProcessingPlan(
                 query_id=query_id,
-                original_query=query,
+                original_query=original_query,
                 source=source,
                 learning_mode=learning_mode,
                 query_type=QueryType.REASONING,  # Creative uses reasoning (analogical)
@@ -3706,7 +3770,7 @@ class QueryAnalyzer:
             # Create optimized plan for mathematical queries
             plan = ProcessingPlan(
                 query_id=query_id,
-                original_query=query,
+                original_query=original_query,
                 source=source,
                 learning_mode=learning_mode,
                 query_type=QueryType.EXECUTION,  # Mathematical execution
@@ -3810,7 +3874,7 @@ class QueryAnalyzer:
             # Create plan for self-introspection with multi-tool routing
             plan = ProcessingPlan(
                 query_id=query_id,
-                original_query=query,
+                original_query=original_query,
                 source=source,
                 learning_mode=learning_mode,
                 query_type=QueryType.REASONING,  # Use REASONING, not PHILOSOPHICAL
@@ -3923,7 +3987,7 @@ class QueryAnalyzer:
 
             plan = ProcessingPlan(
                 query_id=query_id,
-                original_query=query,
+                original_query=original_query,
                 source=source,
                 learning_mode=learning_mode,
                 query_type=QueryType.PHILOSOPHICAL,
@@ -4001,7 +4065,7 @@ class QueryAnalyzer:
 
             plan = ProcessingPlan(
                 query_id=query_id,
-                original_query=query,
+                original_query=original_query,
                 source=source,
                 learning_mode=learning_mode,
                 query_type=QueryType.IDENTITY,
@@ -4070,7 +4134,7 @@ class QueryAnalyzer:
 
             plan = ProcessingPlan(
                 query_id=query_id,
-                original_query=query,
+                original_query=original_query,
                 source=source,
                 learning_mode=learning_mode,
                 query_type=QueryType.CONVERSATIONAL,
@@ -4139,7 +4203,7 @@ class QueryAnalyzer:
 
             plan = ProcessingPlan(
                 query_id=query_id,
-                original_query=query,
+                original_query=original_query,
                 source=source,
                 learning_mode=learning_mode,
                 query_type=QueryType.FACTUAL,
@@ -4231,7 +4295,7 @@ class QueryAnalyzer:
         # Create processing plan
         plan = ProcessingPlan(
             query_id=query_id,
-            original_query=query,
+            original_query=original_query,
             source=source,
             learning_mode=learning_mode,
             query_type=query_type,
@@ -5792,6 +5856,18 @@ async def route_query_async(
     loop = asyncio.get_running_loop()
     executor = _get_blocking_executor()
 
+    # FIX: Preprocess query for header stripping in async path too
+    # This ensures consistent behavior between sync and async routing.
+    # Note: We keep original_query for fallback plan's original_query field.
+    original_query = query
+    if HEADER_STRIPPING_AVAILABLE and strip_query_headers is not None:
+        query = strip_query_headers(query)
+        # Optimization: Check length first (cheap) before string comparison
+        if len(query) != len(original_query):
+            logger.debug(
+                f"[QueryRouter.async] Stripped headers ({len(original_query)} -> {len(query)} chars)"
+            )
+
     # PERFORMANCE FIX Issue #2: Use shorter timeout for simple queries
     # Simple queries don't need semantic matching so can route much faster
     is_simple = False
@@ -5827,7 +5903,7 @@ async def route_query_async(
             f"[QueryRouter] Query routing timed out after {effective_timeout}s. "
             f"Returning fallback plan for source={source}"
         )
-        return _create_fallback_plan(query, source, session_id, timeout_exceeded=True)
+        return _create_fallback_plan(original_query, source, session_id, timeout_exceeded=True)
 
 
 def _create_fallback_plan(
