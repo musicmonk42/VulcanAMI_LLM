@@ -94,7 +94,7 @@ class Token:
 class Lexer:
     """Lexical analyzer for FOL formulas.
     
-    BUG #1 FIX: Now preprocesses natural language text to handle:
+    Note: Now preprocesses natural language text to handle:
     - Em-dashes (—) converted to regular dashes (-)
     - Slashes (/) that are not part of comments converted to OR
     - Other Unicode characters that might appear in natural language
@@ -105,7 +105,7 @@ class Lexer:
     """
 
     # Character substitution map for preprocessing
-    # BUG #1 FIX: Handle natural language characters
+    # Note: Handle natural language characters
     CHAR_SUBSTITUTIONS = {
         "—": "-",      # Em-dash to hyphen
         "–": "-",      # En-dash to hyphen
@@ -124,8 +124,8 @@ class Lexer:
     @classmethod
     def preprocess_natural_language(cls, text: str) -> str:
         """
-        BUG #1 FIX: Preprocess natural language text before tokenization.
-        BUG #5 & #8 FIX: Handle commas and function notation in NL context.
+        Note: Preprocess natural language text before tokenization.
+        Note: Handle commas and function notation in NL context.
         
         This method:
         1. Normalizes Unicode characters (em-dashes, smart quotes, etc.)
@@ -148,7 +148,7 @@ class Lexer:
         for old_char, new_char in cls.CHAR_SUBSTITUTIONS.items():
             result = result.replace(old_char, new_char)
         
-        # Step 2: BUG #5/8 FIX: Handle function notation (SHA256, BLAKE2b, etc.)
+        # Step 2: Handle function notation (SHA256, BLAKE2b, etc.)
         # Replace cryptographic function calls with placeholders to avoid parse errors
         # Pattern matches: SHA256(x), BLAKE2b(y), H(x), etc.
         # Note: [A-Z][A-Z0-9]* allows single letter functions (H) or multi-char (SHA256)
@@ -158,15 +158,15 @@ class Lexer:
             logger.debug(f"Lexer: Found function notation, replacing: {func_matches[:3]}")
             result = func_pattern.sub('FUNC', result)
         
-        # Step 3: BUG #5/8 FIX: Handle concatenation operator ||
+        # Step 3: Handle concatenation operator ||
         # Replace || with a placeholder since it's not a standard FOL operator
         result = result.replace('||', ' CONCAT ')
         
-        # Step 4: BUG #5/8 FIX: Handle commas in natural language context
+        # Step 4: Handle commas in natural language context
         # Keep commas only when they appear between logical expressions
         # Remove commas that appear in prose (after lowercase words, before 'and', etc.)
         # 
-        # BUG #1 FIX: Be careful NOT to remove commas inside function arguments!
+        # Note: Be careful NOT to remove commas inside function arguments!
         # Example: and(m, f) - the comma separates function arguments
         # The heuristic: commas inside parentheses are function arguments, keep them.
         #
@@ -212,7 +212,7 @@ class Lexer:
                         'what ', 'how ', 'why ', 'where ', 'who ',
                         'prove ', 'show ', 'verify ', 'check ', 'find ',
                         'calculate ', 'compute ', 'determine ', 'evaluate ',
-                        # BUG #5/8 FIX: Additional prose patterns
+                        # Note: Additional prose patterns
                         'cryptographer', 'claims', 'design', 'because ',
                         'breaking', 'requires', 'collision', 'property']):
                     continue
@@ -226,7 +226,7 @@ class Lexer:
         return result
 
     def __init__(self, text: str, preprocess: bool = True):
-        # BUG #1 FIX: Preprocess natural language input
+        # Note: Preprocess natural language input
         if preprocess:
             self.text = Lexer.preprocess_natural_language(text)
             # Log if preprocessing changed the text
@@ -322,7 +322,7 @@ class Lexer:
             if token_type:
                 return Token(token_type, value, self.line, start_col)
         elif kind == "MISMATCH":
-            # BUG #1 FIX: Skip unknown characters instead of crashing
+            # Note: Skip unknown characters instead of crashing
             # This allows natural language text to pass through more gracefully
             # Log a warning but don't fail
             logger.debug(
@@ -653,7 +653,7 @@ class Parser:
         """
         Parse atom: predicate | LPAREN formula RPAREN | operator_function
         
-        BUG #1 FIX: Also handles function-style operator syntax like:
+        Note: Also handles function-style operator syntax like:
         - implies(A, B) -> A → B
         - and(X, Y) -> X ∧ Y  
         - or(A, B) -> A ∨ B
@@ -675,7 +675,7 @@ class Parser:
         if self.current_token.type == TokenType.IDENTIFIER:
             return self.predicate()
         
-        # BUG #1 FIX: Handle function-style operator syntax
+        # Note: Handle function-style operator syntax
         # When decomposer generates implies(A, B), and(m, f), or(g, d)
         # the lexer tokenizes them as IMPLIES/AND/OR tokens.
         # If followed by LPAREN, convert to logical operator AST.
@@ -691,7 +691,7 @@ class Parser:
     
     def _parse_operator_function(self) -> ASTNode:
         """
-        BUG #1 FIX: Parse function-style operator syntax.
+        Note: Parse function-style operator syntax.
         
         Converts:
         - implies(A, B) -> A → B (implication)

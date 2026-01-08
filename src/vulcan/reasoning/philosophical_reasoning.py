@@ -2242,7 +2242,7 @@ class PhilosophicalReasoner(AbstractReasoner):
             return PhilosophicalQueryType.VALUE_COMPARISON
         if 'conflict' in query_lower or 'dilemma' in query_lower:
             return PhilosophicalQueryType.CONFLICT_RESOLUTION
-        # BUG FIX: Detect forced choice / trolley problem variants
+        # Note: Detect forced choice / trolley problem variants
         if self._is_forced_choice_dilemma(query):
             return PhilosophicalQueryType.CONFLICT_RESOLUTION
         

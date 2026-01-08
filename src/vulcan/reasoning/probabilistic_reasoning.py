@@ -8,7 +8,7 @@ FULLY IMPLEMENTED VERSION with:
 - Advanced hyperparameter optimization
 - Automatic relevance determination (ARD)
 
-BUG #13 FIX: Added deterministic seeding and state isolation to ensure
+Note: Added deterministic seeding and state isolation to ensure
 same query produces same result across sessions.
 """
 
@@ -29,7 +29,7 @@ from .reasoning_types import ReasoningResult, ReasoningType
 
 logger = logging.getLogger(__name__)
 
-# BUG #13 FIX: Default seed for deterministic behavior
+# Note: Default seed for deterministic behavior
 DEFAULT_RANDOM_SEED = 42
 
 try:
@@ -897,12 +897,12 @@ class EnhancedProbabilisticReasoner:
         self.adaptation_frequency = 50
         self.update_counter = 0
         
-        # BUG #13 FIX: Store seed for deterministic behavior
+        # Note: Store seed for deterministic behavior
         self._random_seed = DEFAULT_RANDOM_SEED
 
     def reset_state(self, seed: Optional[int] = None) -> None:
         """
-        BUG #13 FIX: Reset all internal state for deterministic behavior.
+        Note: Reset all internal state for deterministic behavior.
         
         This method clears caches, resets random state, and ensures that
         the same query will produce the same result across sessions.
@@ -918,7 +918,7 @@ class EnhancedProbabilisticReasoner:
         # Use provided seed or default
         seed = seed if seed is not None else self._random_seed
         
-        # BUG #13 FIX: Set deterministic seeds
+        # Note: Set deterministic seeds
         random.seed(seed)
         np.random.seed(seed)
         
@@ -941,7 +941,7 @@ class EnhancedProbabilisticReasoner:
         self.trained = False
         
         logger.debug(
-            f"[ProbabilisticReasoner] BUG#13 FIX: State reset with seed={seed}"
+            f"[ProbabilisticReasoner] Note: State reset with seed={seed}"
         )
 
     def rbf_kernel(
@@ -2051,7 +2051,7 @@ class ProbabilisticReasoner(EnhancedProbabilisticReasoner):
 
     def _is_simple_probability_query(self, query: str) -> bool:
         """
-        BUG #3 FIX: Check if query is a simple probability question.
+        Note: Check if query is a simple probability question.
         
         Simple probability questions don't need full Bayesian inference.
         They can be answered directly with known probability values.
@@ -2109,7 +2109,7 @@ class ProbabilisticReasoner(EnhancedProbabilisticReasoner):
 
     def _compute_simple_probability(self, query: str) -> Optional[ReasoningResult]:
         """
-        BUG #3 FIX: Compute simple probability directly without full Bayesian inference.
+        Note: Compute simple probability directly without full Bayesian inference.
         
         This provides fast, deterministic answers to common probability questions
         like "What is the probability of heads?" (answer: 0.5).
@@ -2160,7 +2160,7 @@ class ProbabilisticReasoner(EnhancedProbabilisticReasoner):
         for keywords, (probability, explanation) in known_probabilities.items():
             if all(kw in query_lower for kw in keywords):
                 logger.info(
-                    f"[ProbabilisticReasoner] BUG#3 FIX: Simple probability detected - "
+                    f"[ProbabilisticReasoner] Note: Simple probability detected - "
                     f"keywords={keywords}, P={probability:.4f}"
                 )
                 
@@ -2187,7 +2187,7 @@ class ProbabilisticReasoner(EnhancedProbabilisticReasoner):
 
     def _try_bayesian_calculation(self, input_data: Any) -> Optional[ReasoningResult]:
         """
-        BUG FIX: Detect and compute explicit Bayesian probability queries.
+        Note: Detect and compute explicit Bayesian probability queries.
         
         Handles queries like:
         - "Bayes: Sensitivity=0.99, Specificity=0.95, Prevalence=0.01. Compute P(X|+)"
@@ -2214,7 +2214,7 @@ class ProbabilisticReasoner(EnhancedProbabilisticReasoner):
         prev_match = self._prevalence_pattern.search(input_data)
         
         # =========================================================================
-        # BUG #1 FIX (Jan 7 2026): Recognize Bayes problems by parameters alone
+        # Note (Jan 7 2026): Recognize Bayes problems by parameters alone
         # =========================================================================
         # If ALL THREE parameters (sensitivity, specificity, prevalence) are present,
         # this is clearly a Bayes theorem problem even without explicit "bayes" keyword.
@@ -2335,14 +2335,14 @@ class ProbabilisticReasoner(EnhancedProbabilisticReasoner):
         FIX #1: Now includes early gate check for probability keywords to avoid
         wasting computation on non-probability queries.
         
-        BUG FIX: Now first checks for explicit Bayesian calculation queries
+        Note: Now first checks for explicit Bayesian calculation queries
         before falling back to GP-based probabilistic inference.
         
-        BUG #3 FIX (0.500 Bug): Detects when the model returns uninformative 
+        Note (0.500 Bug): Detects when the model returns uninformative 
         default values (0.5/0.5) and returns a "not applicable" result instead
         of the confusing probabilistic metrics.
         
-        BUG #13 FIX: Now resets state before computation to ensure deterministic
+        Note: Now resets state before computation to ensure deterministic
         results across sessions.
         
         Args:
@@ -2353,7 +2353,7 @@ class ProbabilisticReasoner(EnhancedProbabilisticReasoner):
         Returns:
             ReasoningResult with probabilistic conclusions
         """
-        # BUG #13 FIX: Reset state for deterministic behavior
+        # Note: Reset state for deterministic behavior
         if reset_state:
             self.reset_state()
         
@@ -2385,18 +2385,18 @@ class ProbabilisticReasoner(EnhancedProbabilisticReasoner):
                 },
             )
         
-        # BUG #3 FIX: Try simple probability path FIRST (before Bayesian)
+        # Note: Try simple probability path FIRST (before Bayesian)
         # Simple questions like "What is probability of heads?" don't need full inference
         if self._is_simple_probability_query(query_str):
             simple_result = self._compute_simple_probability(query_str)
             if simple_result is not None:
                 logger.info(
-                    f"[ProbabilisticReasoner] BUG#3 FIX: Using simple probability path "
+                    f"[ProbabilisticReasoner] Note: Using simple probability path "
                     f"(no full Bayesian inference needed)"
                 )
                 return simple_result
         
-        # BUG FIX: Try explicit Bayesian calculation for conditional queries
+        # Note: Try explicit Bayesian calculation for conditional queries
         bayes_result = self._try_bayesian_calculation(input_data)
         if bayes_result is not None:
             return bayes_result
@@ -2418,7 +2418,7 @@ class ProbabilisticReasoner(EnhancedProbabilisticReasoner):
             mean_val = result["mean"]
             std_val = result["std"]
             
-            # BUG #3 FIX (0.500 Bug): Detect uninformative results
+            # Note (0.500 Bug): Detect uninformative results
             # When mean == 0.5 and std == 0.5 (or very close), this indicates the model
             # returned default values because it couldn't process the input.
             # This happens for queries like "Hello" that are not probabilistic questions.
@@ -2453,7 +2453,7 @@ class ProbabilisticReasoner(EnhancedProbabilisticReasoner):
                     },
                 )
 
-            # TASK 5 FIX: Improved confidence calibration
+            # Note: Improved confidence calibration
             # The old formula (1.0 - std_val) gave 0.5 confidence for std=0.5
             # which is right at threshold and causes LLM fallback
             # 
@@ -2468,7 +2468,7 @@ class ProbabilisticReasoner(EnhancedProbabilisticReasoner):
             confidence = min(1.0, base_confidence + certainty_boost + domain_boost)
             
             logger.debug(
-                f"[ProbabilisticReasoner] TASK 5 FIX: Confidence calibration - "
+                f"[ProbabilisticReasoner] Note: Confidence calibration - "
                 f"base={base_confidence:.2f}, certainty_boost={certainty_boost:.2f}, "
                 f"domain_boost={domain_boost:.2f}, final={confidence:.2f}"
             )

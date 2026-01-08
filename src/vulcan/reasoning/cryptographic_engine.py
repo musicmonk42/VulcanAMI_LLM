@@ -1,7 +1,7 @@
 """
 Cryptographic Engine for deterministic hash and encoding computations.
 
-BUG #14 FIX: The system was falling back to OpenAI for cryptographic
+Note: The system was falling back to OpenAI for cryptographic
 computations (SHA-256, MD5, etc.), which resulted in hallucinated 
 (incorrect) hash values. This engine provides accurate, deterministic
 cryptographic operations.
@@ -84,7 +84,7 @@ COMPUTE_KEYWORDS: Final[FrozenSet[str]] = frozenset({
 
 # Keywords that indicate theoretical/educational questions about crypto
 # NOT actual requests to compute hashes
-# BUG FIX: Prevents "I'm a researcher testing AI capabilities" from being hashed
+# Note: Prevents "I'm a researcher testing AI capabilities" from being hashed
 THEORETICAL_CRYPTO_KEYWORDS: Final[FrozenSet[str]] = frozenset({
     # Security concepts
     'collision', 'collision resistance', 'collision attack',
@@ -239,7 +239,7 @@ class CryptographicEngine:
     """
     Engine for deterministic cryptographic computations.
     
-    BUG #14 FIX: This engine provides accurate hash computations instead
+    Note: This engine provides accurate hash computations instead
     of relying on LLM fallback which hallucinates incorrect values.
     
     Security Considerations:
@@ -286,7 +286,7 @@ class CryptographicEngine:
         Compiles all regex patterns once for efficient repeated use.
         """
         self._patterns: Dict[CryptoOperation, Pattern[str]] = self._compile_patterns()
-        logger.debug("[CryptoEngine] BUG#14 FIX: Cryptographic engine initialized")
+        logger.debug("[CryptoEngine] Note: Cryptographic engine initialized")
     
     def _compile_patterns(self) -> Dict[CryptoOperation, Pattern[str]]:
         """
@@ -407,9 +407,9 @@ class CryptographicEngine:
         """
         Check if a query is about cryptographic computation.
         
-        BUG #14 FIX: Used to route queries to this engine instead of LLM.
+        Note: Used to route queries to this engine instead of LLM.
         
-        BUG FIX (Jan 2026): Previous implementation was too broad - it triggered
+        Note: Previous implementation was too broad - it triggered
         for theoretical questions ABOUT cryptography (like "Why is SHA-256 
         collision dangerous?") and would hash the entire question text instead
         of recognizing this as an educational query.
@@ -492,7 +492,7 @@ class CryptographicEngine:
         """
         Compute cryptographic operation based on query.
         
-        BUG #14 FIX: Main entry point for deterministic crypto computation.
+        Note: Main entry point for deterministic crypto computation.
         
         This method parses the natural language query, detects the intended
         cryptographic operation, extracts the input data, and performs the
@@ -553,7 +553,7 @@ class CryptographicEngine:
             result = self._perform_operation(operation, input_value, extra)
             
             logger.info(
-                f"[CryptoEngine] BUG#14 FIX: Computed {operation.value} of "
+                f"[CryptoEngine] Note: Computed {operation.value} of "
                 f"'{input_value[:30]}...' -> '{result[:30]}...'"
             )
             
@@ -966,7 +966,7 @@ def compute_crypto(query: str) -> Dict[str, Any]:
     """
     Compute cryptographic operation from natural language query.
     
-    BUG #14 FIX: Convenience function for deterministic crypto computation.
+    Note: Convenience function for deterministic crypto computation.
     
     Args:
         query: Natural language query describing the operation

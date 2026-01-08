@@ -725,7 +725,7 @@ class MultiModalReasoningEngine:
         chain.final_conclusion = conclusion
         chain.total_confidence = confidence
 
-        # BUG FIX (Jan 7 2026): Store filter info in metadata, not conclusion
+        # Note (Jan 7 2026): Store filter info in metadata, not conclusion
         # Previously leaked debug info to users like "original: {...}, filtered: True"
         result_metadata = {}
         if confidence < confidence_threshold:
@@ -868,7 +868,7 @@ class MultiModalReasoningEngine:
                     # Perform modality-specific reasoning
                     result = reasoner.reason({"input": data.raw_data, "query": query})
 
-                    # BUG FIX: Convert ReasoningResult to dict for consistent handling
+                    # Note: Convert ReasoningResult to dict for consistent handling
                     # This fixes "'ReasoningResult' object has no attribute 'get'" error
                     if isinstance(result, ReasoningResult):
                         result = reasoning_result_to_dict(result)
@@ -982,7 +982,7 @@ class MultiModalReasoningEngine:
                     reasoner = self.modality_reasoners[modality]
                     result = reasoner.reason({"input": data.raw_data, "query": query})
 
-                    # BUG FIX: Convert ReasoningResult to dict for consistent handling
+                    # Note: Convert ReasoningResult to dict for consistent handling
                     if isinstance(result, ReasoningResult):
                         result = reasoning_result_to_dict(result)
                     elif not isinstance(result, dict):
@@ -1676,7 +1676,7 @@ class MultiModalReasoningEngine:
         weights = []
 
         for modality, result in results.items():
-            # BUG FIX: Use helper to safely get attributes from dict or ReasoningResult
+            # Note: Use helper to safely get attributes from dict or ReasoningResult
             conclusion_data = get_reasoning_attr(result, "conclusion", result)
             conclusions.append(conclusion_data)
 

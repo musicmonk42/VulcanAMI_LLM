@@ -43,7 +43,7 @@ _self_improvement_drive: Optional[Any] = None
 _unified_runtime: Optional[Any] = None
 _ai_runtime: Optional[Any] = None
 _multimodal_engine: Optional[Any] = None
-_unified_reasoner: Optional[Any] = None  # BUG FIX: Add singleton for UnifiedReasoner
+_unified_reasoner: Optional[Any] = None  # Note: Add singleton for UnifiedReasoner
 _math_verification_engine: Optional[Any] = None  # CACHING FIX: Singleton for MathematicalVerificationEngine
 _hierarchical_memory: Optional[Any] = None  # PERF FIX Issue #2: Singleton for HierarchicalMemory
 _unified_learning_system: Optional[Any] = None  # PERF FIX Issue #5: Singleton for UnifiedLearningSystem
@@ -83,7 +83,7 @@ def get_tool_selector():
     """
     Get or create the global ToolSelector instance.
     
-    BUG FIX: Tool Weight Memory Amnesia - Now loads persisted state at startup
+    Note: Tool Weight Memory Amnesia - Now loads persisted state at startup
     so bandit weights survive restarts.
     
     Returns:
@@ -104,7 +104,7 @@ def get_tool_selector():
             from vulcan.reasoning.selection.tool_selector import ToolSelector
             _tool_selector = ToolSelector()
             
-            # BUG FIX: Tool Weight Memory Amnesia - Load persisted state
+            # Note: Tool Weight Memory Amnesia - Load persisted state
             state_path = _get_tool_selector_state_path()
             if state_path.exists():
                 try:
@@ -125,7 +125,7 @@ def get_tool_selector():
 
 def save_tool_selector_state():
     """
-    BUG FIX: Tool Weight Memory Amnesia - Save ToolSelector state to disk.
+    Note: Tool Weight Memory Amnesia - Save ToolSelector state to disk.
     
     Call this periodically or on shutdown to persist bandit weights and other
     learned state so it survives restarts.
@@ -228,7 +228,7 @@ def get_unified_reasoner(
     """
     Get singleton UnifiedReasoner instance.
     
-    BUG FIX: The UnifiedReasoner was being instantiated per-query, causing
+    Note: The UnifiedReasoner was being instantiated per-query, causing
     WarmStartPool, ToolSelector, and MultiModalReasoningEngine to be
     reinitialized each time. This singleton ensures unified reasoning
     components are created once at startup.
@@ -369,7 +369,7 @@ def get_warm_pool(tools: Optional[dict] = None, config: Optional[dict] = None):
     """
     Get singleton WarmStartPool instance.
     
-    BUG FIX Issues #3, #44: The WarmStartPool was being initialized multiple times
+    Note: The WarmStartPool was being initialized multiple times
     per query ("Warm pool initialized with 5 tool pools" appearing repeatedly).
     This singleton ensures the pool is created once at startup.
     
@@ -565,7 +565,7 @@ def prewarm_all():
     
     This prevents the first query from triggering expensive model loading.
     
-    BUG FIX Issues #1-5, #27-28: Now includes WorldModel, SelfImprovementDrive,
+    Note: Now includes WorldModel, SelfImprovementDrive,
     UnifiedRuntime, AIRuntime, and MultiModalReasoningEngine to prevent 
     per-query reinitialization.
     
@@ -598,7 +598,7 @@ def prewarm_all():
     ce = get_curiosity_engine()
     results['curiosity_engine'] = ce is not None
     
-    # BUG FIX Issues #1-5, #27: Pre-warm critical per-query reinitialized components
+    # Note Issues #1-5, #27: Pre-warm critical per-query reinitialized components
     wm = get_world_model()
     results['world_model'] = wm is not None
     
@@ -608,7 +608,7 @@ def prewarm_all():
     ur = get_unified_runtime()
     results['unified_runtime'] = ur is not None
     
-    # BUG FIX Issues #2-3, #28: Pre-warm AIRuntime and MultiModalReasoningEngine
+    # Note Issues #2-3, #28: Pre-warm AIRuntime and MultiModalReasoningEngine
     ar = get_ai_runtime()
     results['ai_runtime'] = ar is not None
     
@@ -633,12 +633,12 @@ def cleanup():
     """
     Release all singletons. Call on shutdown.
     
-    BUG FIX: Tool Weight Memory Amnesia - Now saves ToolSelector state before cleanup
+    Note: Tool Weight Memory Amnesia - Now saves ToolSelector state before cleanup
     so bandit weights persist across restarts.
     
     This clears all cached singletons to free memory.
     """
-    # BUG FIX: Save tool selector state before cleanup
+    # Note: Save tool selector state before cleanup
     save_tool_selector_state()
     
     reset_all()
@@ -728,7 +728,7 @@ def get_world_model(config: Optional[dict] = None) -> Optional[Any]:
     """
     Get singleton WorldModel instance.
     
-    BUG FIX Issue #1-4: The WorldModel was being reinitialized per-query,
+    Note: The WorldModel was being reinitialized per-query,
     causing ~10-15 seconds of initialization overhead. This singleton ensures
     it's only initialized once at startup.
     
@@ -773,7 +773,7 @@ def get_self_improvement_drive(config_path: Optional[str] = None, state_path: Op
     """
     Get singleton SelfImprovementDrive instance.
     
-    BUG FIX Issue #5: The SelfImprovementDrive was reloading state file repeatedly.
+    Note: The SelfImprovementDrive was reloading state file repeatedly.
     This singleton ensures state is loaded once and persisted in memory.
     
     Args:
@@ -821,10 +821,10 @@ def get_unified_runtime(config: Optional[Any] = None) -> Optional[Any]:
     """
     Get singleton UnifiedRuntime instance.
     
-    BUG FIX Issue #27: The UnifiedRuntime was loading manifest file on every query.
+    Note: The UnifiedRuntime was loading manifest file on every query.
     This singleton ensures manifest is loaded once at startup.
     
-    ISSUE #5 FIX: Prevent repeated initialization/shutdown cycles by ensuring
+    Note: Prevent repeated initialization/shutdown cycles by ensuring
     only one UnifiedRuntime instance exists across the entire application.
     Multiple fallback patterns in graphix_arena.py, main.py, and deployment.py
     were creating separate instances when singleton returned None.
@@ -849,7 +849,7 @@ def get_unified_runtime(config: Optional[Any] = None) -> Optional[Any]:
         try:
             from unified_runtime.unified_runtime_core import UnifiedRuntime
             _unified_runtime = UnifiedRuntime(config=config)
-            # BUG FIX Issue #1: Mark as singleton so __del__ knows to cleanup
+            # Note Issue #1: Mark as singleton so __del__ knows to cleanup
             _unified_runtime._is_singleton = True
             UnifiedRuntime._singleton_instance = _unified_runtime
             logger.info("[Singletons] ✓ UnifiedRuntime created and cached")
@@ -864,7 +864,7 @@ def get_unified_runtime(config: Optional[Any] = None) -> Optional[Any]:
 
 def set_unified_runtime(runtime: Any) -> bool:
     """
-    ISSUE #5 FIX: Register a UnifiedRuntime instance with the singleton registry.
+    Note: Register a UnifiedRuntime instance with the singleton registry.
     
     This allows callers to register a manually-created UnifiedRuntime instance
     with the singleton registry, preventing duplicate instances when fallback
@@ -881,7 +881,7 @@ def set_unified_runtime(runtime: Any) -> bool:
     with _unified_runtime_lock:
         if _unified_runtime is None:
             _unified_runtime = runtime
-            # BUG FIX Issue #1: Mark as singleton so __del__ knows to cleanup
+            # Note Issue #1: Mark as singleton so __del__ knows to cleanup
             # Note: _is_singleton is always initialized in UnifiedRuntime.__init__()
             runtime._is_singleton = True
             logger.info("[Singletons] UnifiedRuntime registered from external source")
@@ -896,7 +896,7 @@ def set_unified_runtime(runtime: Any) -> bool:
 
 def get_or_create_unified_runtime(config: Optional[Any] = None) -> Optional[Any]:
     """
-    ISSUE #5 FIX: Get or create UnifiedRuntime with automatic singleton registration.
+    Note: Get or create UnifiedRuntime with automatic singleton registration.
     
     This is a convenience function that:
     1. Tries to get the singleton UnifiedRuntime
@@ -931,7 +931,7 @@ def get_or_create_unified_runtime(config: Optional[Any] = None) -> Optional[Any]
         try:
             from unified_runtime.unified_runtime_core import UnifiedRuntime
             _unified_runtime = UnifiedRuntime(config=config)
-            # BUG FIX Issue #1: Mark as singleton so __del__ knows to cleanup
+            # Note Issue #1: Mark as singleton so __del__ knows to cleanup
             _unified_runtime._is_singleton = True
             UnifiedRuntime._singleton_instance = _unified_runtime
             logger.info("[Singletons] ✓ UnifiedRuntime created via fallback and cached")
@@ -955,7 +955,7 @@ def get_ai_runtime(config: Optional[dict] = None) -> Optional[Any]:
     """
     Get singleton AIRuntime instance.
     
-    BUG FIX Issue #28: The AIRuntime was registering OpenAI provider multiple times
+    Note: The AIRuntime was registering OpenAI provider multiple times
     because it was being re-instantiated per-query. This singleton ensures
     providers are registered only once at startup.
     
@@ -1000,7 +1000,7 @@ def get_multimodal_engine(enable_learning: bool = True, device: str = "cpu") -> 
     """
     Get singleton MultiModalReasoningEngine instance.
     
-    BUG FIX Issues #2-3: The MultiModalReasoningEngine was logging
+    Note: The MultiModalReasoningEngine was logging
     "Neural reasoning modules initialized successfully" multiple times
     per query because it was being re-instantiated. This singleton ensures
     neural modules are initialized only once at startup.

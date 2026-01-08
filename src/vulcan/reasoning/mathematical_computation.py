@@ -126,7 +126,7 @@ def extract_math_expression(query: str) -> Optional[str]:
     """
     Extract mathematical expressions from query text.
     
-    TASK 4 FIX: Enhanced to handle more mathematical notation patterns.
+    Note: Enhanced to handle more mathematical notation patterns.
     
     Handles:
     - Unicode math: ∑, ∏, ∫, √, π, α, β, γ, δ, ε, λ, μ, σ
@@ -145,7 +145,7 @@ def extract_math_expression(query: str) -> Optional[str]:
     if not query or not query.strip():
         return None
     
-    # TASK 4 FIX: Pattern 0 - Check for "Compute exactly:" pattern first
+    # Note: Pattern 0 - Check for "Compute exactly:" pattern first
     # This catches: "Compute exactly: ∑(k=1 to n)(2k−1)"
     compute_exact_pattern = r'(?:Compute|Calculate|Evaluate|Find|Solve)\s+(?:exactly|precisely)?\s*:?\s*(.+?)(?:\.|$|Then|Task|Verify)'
     match = re.search(compute_exact_pattern, query, re.IGNORECASE | re.DOTALL)
@@ -154,10 +154,10 @@ def extract_math_expression(query: str) -> Optional[str]:
         # Check if it contains math symbols
         math_indicators = ['∑', '∏', '∫', '√', 'π', '+', '-', '*', '/', '^', '=', '(', ')']
         if any(ind in candidate for ind in math_indicators):
-            logger.debug(f"[MathTool] TASK 4 FIX: Extracted via 'Compute exactly' pattern: {candidate}")
+            logger.debug(f"[MathTool] Note: Extracted via 'Compute exactly' pattern: {candidate}")
             return candidate
     
-    # TASK 4 FIX: Pattern 1 - Unicode math symbols with improved character set
+    # Note: Pattern 1 - Unicode math symbols with improved character set
     # Using explicit Unicode characters instead of character class ranges
     # which may not work correctly across all Python versions/platforms
     # Math symbols: ∑ (summation), ∏ (product), ∫ (integral), √ (sqrt), π (pi)
@@ -182,10 +182,10 @@ def extract_math_expression(query: str) -> Optional[str]:
                 break
         extracted = rest.strip()
         if extracted:
-            logger.debug(f"[MathTool] TASK 4 FIX: Extracted via Unicode pattern: {extracted}")
+            logger.debug(f"[MathTool] Note: Extracted via Unicode pattern: {extracted}")
             return extracted
     
-    # TASK 4 FIX: Pattern 1b - Natural language sum/product
+    # Note: Pattern 1b - Natural language sum/product
     # Matches: "sum from k=1 to n of (2k-1)"
     natural_sum_pattern = r'(?:sum(?:mation)?|product)\s+(?:from\s+)?(\w+)\s*=\s*(\d+)\s+to\s+(\w+)\s+(?:of\s+)?(.+?)(?:\.|$|Then|Task)'
     match = re.search(natural_sum_pattern, query, re.IGNORECASE)
@@ -197,7 +197,7 @@ def extract_math_expression(query: str) -> Optional[str]:
         expr_clean = expr_clean.replace('−', '-')  # Unicode minus to ASCII
         expr_clean = re.sub(r'(\d)([a-z])', r'\1*\2', expr_clean)  # 2k → 2*k
         result = f"summation({expr_clean}, ({index}, {lower}, {upper}))"
-        logger.debug(f"[MathTool] TASK 4 FIX: Converted natural sum to: {result}")
+        logger.debug(f"[MathTool] Note: Converted natural sum to: {result}")
         return result
     
     # Pattern 2: Probability notation P(X|Y), P(A ∧ B)
@@ -744,13 +744,13 @@ result = simplify(integral)
                 # Step 3: Generate code
                 code = self._generate_code(query, classification, strategy, llm)
                 
-                # BUG #12 FIX: Handle None return when no math expression found
+                # Note: Handle None return when no math expression found
                 # Previously this assumed code was always a string. Now _generate_code
                 # returns None when no mathematical content is detected, which means
                 # the math engine should gracefully decline rather than compute garbage.
                 if not code or not code.strip():
                     logger.info(
-                        f"[MathTool] BUG#12 FIX: No mathematical expression found in query. "
+                        f"[MathTool] Note: No mathematical expression found in query. "
                         f"Returning failure result instead of computing default expression."
                     )
                     return self._create_error_result(
@@ -760,7 +760,7 @@ result = simplify(integral)
 
                 # Step 4: Execute the code
                 if not SAFE_EXECUTION_AVAILABLE or execute_math_code is None:
-                    # BUG #3 FIX: Try simple arithmetic fallback before giving up
+                    # Note: Try simple arithmetic fallback before giving up
                     # This allows basic calculations like "2+2" to work without SymPy
                     simple_result = self._try_simple_arithmetic(query)
                     if simple_result is not None:
@@ -847,7 +847,7 @@ result = simplify(integral)
         
         Uses strategy-appropriate code generation method.
         
-        BUG #12 FIX: Returns None when no mathematical content is found.
+        Note: Returns None when no mathematical content is found.
         Previously, this always returned code (falling back to default expression).
         Now returns None if the query doesn't contain mathematical content,
         allowing callers to handle non-math queries appropriately.
@@ -868,7 +868,7 @@ result = simplify(integral)
             if llm_code:
                 return llm_code
         
-        # BUG #12 FIX: Fallback to template - but this can now return None
+        # Note: Fallback to template - but this can now return None
         # if no mathematical content is found in the query
         return self._generate_template_code(query, classification)
 
@@ -879,7 +879,7 @@ result = simplify(integral)
         Uses a priority-based matching system where more specific patterns
         are checked before general ones to ensure correct template selection.
         
-        BUG #12 FIX: Returns None when no mathematical expression is found.
+        Note: Returns None when no mathematical expression is found.
         Previously, this method returned a default expression "x**2 + 2*x + 1"
         which caused irrelevant mathematical output to be sent to OpenAI when
         non-math queries were incorrectly routed to the math engine.
@@ -893,7 +893,7 @@ result = simplify(integral)
         var = variables[0] if variables else 'x'
         
         # =================================================================
-        # BUG #12 FIX (CRITICAL): PRIORITY 0 - Reject non-mathematical queries
+        # Note (CRITICAL): PRIORITY 0 - Reject non-mathematical queries
         # =================================================================
         # These patterns indicate queries that should NOT be processed by the
         # math engine, even if they contain math-related words like "proof"
@@ -922,7 +922,7 @@ result = simplify(integral)
         
         if any(pattern in query_lower for pattern in logic_patterns):
             logger.info(
-                f"[MathTool] BUG#12 FIX: Query contains logic patterns, not mathematical. "
+                f"[MathTool] Note: Query contains logic patterns, not mathematical. "
                 f"Declining to compute. Query: {query[:80]}..."
             )
             return None
@@ -930,7 +930,7 @@ result = simplify(integral)
         # Also check for logic symbols in original query (case-sensitive)
         if any(sym in query for sym in ['→', '∧', '∨', '¬', '∀', '∃', '⊢', '⊨']):
             logger.info(
-                f"[MathTool] BUG#12 FIX: Query contains logic symbols. "
+                f"[MathTool] Note: Query contains logic symbols. "
                 f"Declining to compute. Query: {query[:80]}..."
             )
             return None
@@ -1014,7 +1014,7 @@ result = simplify(integral)
             return self._templates.integration("x**2", var)
         
         # PRIORITY 7: Differentiation
-        # BUG #12 FIX: Use word-boundary matching for short keywords like "diff"
+        # Note: Use word-boundary matching for short keywords like "diff"
         # to avoid matching "differentiable" or "difference"
         # - "differentiate" and "derivative" are long enough to be safe
         # - "diff" needs word boundary check
@@ -1058,13 +1058,13 @@ result = simplify(integral)
         elif classification.problem_type == ProblemType.ALGEBRA:
             return self._templates.solve_equation("x**2 - 4", var)
         
-        # BUG #12 FIX: Return None when no mathematical content is found
+        # Note: Return None when no mathematical content is found
         # Previously this returned "x**2 + 2*x + 1" as a default, which caused
         # irrelevant math output (the expansion of (x+1)²) to be included in
         # responses to non-mathematical queries. The math engine should NOT
         # compute anything when no math expression is found in the query.
         logger.warning(
-            f"[MathTool] BUG#12 FIX: No mathematical expression found in query. "
+            f"[MathTool] Note: No mathematical expression found in query. "
             f"Returning None instead of default expression. Query: {query[:100]}..."
         )
         return None
@@ -1233,7 +1233,7 @@ Brief explanation:"""
 
     def _try_simple_arithmetic(self, query: str) -> Optional[Union[int, float]]:
         """
-        BUG #3 FIX: Try to evaluate simple arithmetic expressions.
+        Note: Try to evaluate simple arithmetic expressions.
         
         This is a fallback for when SymPy/RestrictedPython is not available.
         Only allows safe mathematical operations - no arbitrary code execution.

@@ -1,7 +1,7 @@
 """
 Formula Validator for Symbolic Logic.
 
-BUG #8 FIX: The symbolic parser was accepting malformed logic and producing
+Note: The symbolic parser was accepting malformed logic and producing
 cryptic errors that didn't help users understand what was wrong.
 
 This module provides:
@@ -245,7 +245,7 @@ class ValidationResult:
 
 class FormulaValidator:
     """
-    Validate formula syntax before reasoning (BUG #8 FIX).
+    Validate formula syntax before reasoning (Note).
     
     This validator checks for common syntax errors and provides helpful
     error messages that guide users to fix their formulas.
@@ -289,7 +289,7 @@ class FormulaValidator:
         """
         Validate formula and return helpful error messages.
         
-        BUG #8 FIX: This method provides pre-validation with actionable
+        Note: This method provides pre-validation with actionable
         error messages instead of letting the parser produce cryptic errors.
         
         Args:
@@ -353,10 +353,10 @@ class FormulaValidator:
         
         if errors:
             logger.warning(
-                f"[FormulaValidator] BUG#8 FIX: {len(errors)} error(s) in formula"
+                f"[FormulaValidator] Note: {len(errors)} error(s) in formula"
             )
         else:
-            logger.debug("[FormulaValidator] BUG#8 FIX: Formula validated successfully")
+            logger.debug("[FormulaValidator] Note: Formula validated successfully")
         
         return ValidationResult(
             is_valid=is_valid,
@@ -558,7 +558,7 @@ def validate_formula(formula: str) -> Tuple[bool, Optional[str]]:
     """
     Validate a formula string.
     
-    BUG #8 FIX: Convenience function for quick validation without
+    Note: Convenience function for quick validation without
     instantiating a FormulaValidator object.
     
     This function creates a new validator instance for each call,

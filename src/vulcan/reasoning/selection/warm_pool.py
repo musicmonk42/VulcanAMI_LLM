@@ -1090,8 +1090,8 @@ class DemandPredictor:
             if len(history) < 2:
                 return 0.1  # Default low demand
 
-            # Simple moving average
-            recent_window = 60  # seconds
+            # Simple moving average using the specified horizon
+            recent_window = horizon_seconds  # Use parameter instead of hardcoded value
             current_time = time.time()
             recent_requests = sum(
                 1 for t in history if current_time - t < recent_window

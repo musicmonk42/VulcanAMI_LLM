@@ -24,7 +24,7 @@ os.environ["NUMEXPR_NUM_THREADS"] = "4"
 os.environ["TOKENIZERS_PARALLELISM"] = "false"  # Prevent tokenizer deadlocks
 
 # ====================================================================
-# BUG #7 FIX: Disable TQDM progress bars that clutter logs
+# Note: Disable TQDM progress bars that clutter logs
 # This environment variable disables all TQDM progress bars globally.
 # Progress bars like "Batches: 100%|██████████| 1/1 [00:19<00:00, 19.69s/it]"
 # are noisy in production logs and provide no value for batch embedding operations.
@@ -447,7 +447,7 @@ else:
 # ============================================================
 # REASONING RESULT HELPER FUNCTIONS
 # ============================================================
-# BUG FIX: These helpers resolve the "'ReasoningResult' object has no attribute 'get'"
+# Note: These helpers resolve the "'ReasoningResult' object has no attribute 'get'"
 # error that occurs when agent_reasoning_output is a ReasoningResult dataclass
 # instead of a dictionary. The code was calling .get() on ReasoningResult objects
 # which don't have that method (they have attributes instead).
@@ -528,11 +528,11 @@ def _format_direct_reasoning_response(
     """
     Format reasoning engine result as final user response.
     
-    TASK 1 FIX: This function formats high-confidence reasoning results
+    Note: This function formats high-confidence reasoning results
     directly for user output WITHOUT passing through OpenAI, ensuring
     that specialized reasoning engine outputs are preserved.
     
-    BUG FIX (Jan 7 2026): Handle ReasoningResult objects and debug info dicts.
+    Note (Jan 7 2026): Handle ReasoningResult objects and debug info dicts.
     Previously, raw Python objects (like ReasoningResult) were dumped to users
     as their repr() string (e.g., "ReasoningResult(conclusion=..., evidence=[...])")
     causing 6000+ token outputs of technical internals.
@@ -579,7 +579,7 @@ def _format_direct_reasoning_response(
     response_parts = []
     
     # ==========================================================================
-    # BUG FIX: Handle ReasoningResult dataclass objects
+    # Note: Handle ReasoningResult dataclass objects
     # ==========================================================================
     # Check if conclusion is a ReasoningResult object (has attributes like
     # conclusion, confidence, reasoning_type, evidence, explanation)
@@ -606,7 +606,7 @@ def _format_direct_reasoning_response(
         conclusion = inner_conclusion
     
     # ==========================================================================
-    # BUG FIX: Handle debug wrapper dicts that shouldn't be shown to users
+    # Note: Handle debug wrapper dicts that shouldn't be shown to users
     # ==========================================================================
     # Detect {"original": ..., "filtered": True, "reason": ...} pattern
     if isinstance(conclusion, dict) and "filtered" in conclusion and "original" in conclusion:
@@ -663,7 +663,7 @@ def _format_conclusion_for_user(conclusion: Any, reasoning_type: str = "") -> st
     """
     Format a conclusion value for human-readable output.
     
-    BUG FIX (Jan 7 2026): This helper handles various conclusion types including:
+    Note (Jan 7 2026): This helper handles various conclusion types including:
     - ReasoningResult objects (recursively unwrap)
     - Moral uncertainty analysis dicts (format nicely for trolley problem)
     - Debug wrapper dicts (unwrap)
@@ -695,7 +695,7 @@ def _format_conclusion_for_user(conclusion: Any, reasoning_type: str = "") -> st
     
     if isinstance(conclusion, str):
         # ======================================================================
-        # BUG FIX (Jan 7 2026): Handle strings with embedded JSON/dict
+        # Note (Jan 7 2026): Handle strings with embedded JSON/dict
         # ======================================================================
         # Some reasoning engines (like PhilosophicalReasoner) return conclusions
         # like "Some preamble text...\n{'type': 'moral_uncertainty_analysis', ...}"
@@ -1105,7 +1105,7 @@ async def lifespan(app: FastAPI):
             lambda: ProductionDeployment(config, checkpoint_path=checkpoint_to_load, redis_client=redis_client),
         )
 
-        # BUG FIX Issue #27: Use singleton UnifiedRuntime to prevent manifest reload per-query
+        # Note Issue #27: Use singleton UnifiedRuntime to prevent manifest reload per-query
         if UNIFIED_RUNTIME_AVAILABLE:
             # ISSUE #5 FIX: Use get_or_create_unified_runtime to prevent repeated init/shutdown
             set_runtime_func = None
@@ -1119,7 +1119,7 @@ async def lifespan(app: FastAPI):
                     logger.warning("UnifiedRuntime not available")
             except ImportError:
                 deployment.unified_runtime = UnifiedRuntime()
-                # BUG FIX Issue #1: Register fallback instance with singleton
+                # Note Issue #1: Register fallback instance with singleton
                 if set_runtime_func is not None:
                     try:
                         set_runtime_func(deployment.unified_runtime)
@@ -1133,7 +1133,7 @@ async def lifespan(app: FastAPI):
         )
         app.state.llm = llm_instance
         
-        # BUG #2 FIX: Register LLM client with singletons module
+        # Note: Register LLM client with singletons module
         # This ensures MathematicalComputationTool and other reasoning components
         # receive the actual LLM client object instead of None or a string.
         # Without this, tools fall back to template-only mode.
@@ -3305,7 +3305,7 @@ async def chat(request: ChatRequest):
         """
         STEP 3: Apply Vulcan's Reasoning Systems (SELECTIVE based on classification)
         
-        BUG N FIX: Only run reasoning engines that are RELEVANT to the query.
+        Note: Only run reasoning engines that are RELEVANT to the query.
         Previously, ALL engines ran on every query, causing:
         - Math output appearing in non-math queries (e.g., "x² + 2x + 1" in greetings)
         - Wasted compute on irrelevant reasoning
@@ -3318,7 +3318,7 @@ async def chat(request: ChatRequest):
         _systems = []
 
         # ================================================================
-        # BUG N FIX: Determine which reasoning engines to run based on
+        # Note: Determine which reasoning engines to run based on
         # query classification. Default to minimal reasoning for unknown.
         # ================================================================
         relevant_engines = set()
@@ -3346,16 +3346,16 @@ async def chat(request: ChatRequest):
                 relevant_engines.update(['symbolic', 'causal'])
             elif query_type in ('greeting', 'chitchat', 'conversational', 'creative', 'factual'):
                 # These don't need reasoning engines at all
-                # BUG N FIX: Skip reasoning entirely for these categories
+                # Note: Skip reasoning entirely for these categories
                 # Note: 'factual' queries are simple factual lookups, not probabilistic inference
                 logger.info(
-                    f"[VULCAN] BUG N FIX: Skipping reasoning for query_type={query_type}"
+                    f"[VULCAN] Note: Skipping reasoning for query_type={query_type}"
                 )
                 return _reasoning, _systems
             elif query_type in ('self_introspection',):
                 # Self-introspection uses world model, not these engines
                 logger.info(
-                    f"[VULCAN] BUG N FIX: Skipping reasoning for self_introspection "
+                    f"[VULCAN] Note: Skipping reasoning for self_introspection "
                     f"(handled by world model)"
                 )
                 return _reasoning, _systems
@@ -3402,7 +3402,7 @@ async def chat(request: ChatRequest):
                 return _reasoning, _systems
         
         logger.info(
-            f"[VULCAN] BUG N FIX: Running only relevant engines: {relevant_engines}"
+            f"[VULCAN] Note: Running only relevant engines: {relevant_engines}"
         )
 
         # Create subtasks for each reasoning type (only if relevant)
@@ -3458,7 +3458,7 @@ async def chat(request: ChatRequest):
                 return None
             if deps.causal:
                 try:
-                    # BUG L FIX: Use full CausalReasoner.reason() method for
+                    # Note: Use full CausalReasoner.reason() method for
                     # natural language causal queries, not just estimate_causal_effect
                     if hasattr(deps.causal, "reason"):
                         result = await loop.run_in_executor(
@@ -3486,7 +3486,7 @@ async def chat(request: ChatRequest):
         async def _analogical():
             if 'analogical' not in relevant_engines:
                 return None
-            # BUG M FIX: Use AnalogicalReasoningEngine.reason() for
+            # Note: Use AnalogicalReasoningEngine.reason() for
             # structure mapping queries
             if deps.abstract:
                 try:
@@ -3511,7 +3511,7 @@ async def chat(request: ChatRequest):
                     logger.debug(f"[VULCAN] Analogical reasoning failed: {e}")
             return None
 
-        # BUG N FIX: Only run relevant reasoning subtasks
+        # Note: Only run relevant reasoning subtasks
         tasks_to_run = []
         if 'symbolic' in relevant_engines:
             tasks_to_run.append(_symbolic())
@@ -3643,7 +3643,7 @@ async def chat(request: ChatRequest):
                 return None
 
             # =================================================================
-            # BUG #4 FIX (Jan 7 2026): Add creative/philosophical reasoning via world_model
+            # Note (Jan 7 2026): Add creative/philosophical reasoning via world_model
             # =================================================================
             # Creative and philosophical queries should invoke world_model.reason()
             # with the appropriate mode to generate VULCAN's structured reasoning.
@@ -3667,7 +3667,7 @@ async def chat(request: ChatRequest):
                 if hasattr(deps.world_model, "reason"):
                     try:
                         mode = 'creative' if is_creative else 'philosophical'
-                        logger.info(f"[VULCAN] BUG#4 FIX: Invoking world_model.reason(mode={mode})")
+                        logger.info(f"[VULCAN] Invoking world_model.reason(mode={mode})")
                         
                         result = await loop.run_in_executor(
                             None,
@@ -3683,7 +3683,7 @@ async def chat(request: ChatRequest):
                             reasoning_trace = result.get('reasoning_trace', {})
                             
                             logger.info(
-                                f"[VULCAN] BUG#4 FIX: world_model.reason() returned response "
+                                f"[VULCAN] world_model.reason() returned response "
                                 f"(len={len(response)}, confidence={confidence}, mode={mode})"
                             )
                             
@@ -3699,11 +3699,11 @@ async def chat(request: ChatRequest):
                                 f"world_model_{mode}_reasoning"
                             )
                     except Exception as e:
-                        logger.warning(f"[VULCAN] BUG#4 FIX: world_model.reason() failed: {e}")
+                        logger.warning(f"[VULCAN] world_model.reason() failed: {e}")
                 return None
 
             # Run all world model subtasks in parallel
-            # BUG #4 FIX: Added _creative_philosophical_reasoning for creative/philosophical queries
+            # Note: Added _creative_philosophical_reasoning for creative/philosophical queries
             results = await asyncio.gather(
                 _get_state(), _prediction(), _causal_graph(),
                 _counterfactual(), _invariants(), _dynamics(),
@@ -3882,7 +3882,7 @@ async def chat(request: ChatRequest):
     # This ensures reasoning engines invoked via agent_pool feed into response
     # FIX: Now uses TournamentManager for multi-agent selection when available
     #
-    # BUG #3 FIX: "Parallel Execution" Orphanage Prevention
+    # Note: "Parallel Execution" Orphanage Prevention
     # Added retry loop with exponential backoff to properly wait for agent
     # pool jobs to complete before proceeding. This prevents double work.
     # ================================================================
@@ -3891,7 +3891,7 @@ async def chat(request: ChatRequest):
     
     if submitted_jobs and collective and hasattr(collective, "agent_pool") and collective.agent_pool:
         try:
-            # BUG #3 FIX: Use retry loop with exponential backoff
+            # Note: Use retry loop with exponential backoff
             # instead of single short poll that times out prematurely
             MAX_POLL_ATTEMPTS = 5  # Max number of poll attempts
             INITIAL_POLL_DELAY = 0.1  # Start with 100ms
@@ -4024,7 +4024,7 @@ async def chat(request: ChatRequest):
     # Merge agent reasoning output into reasoning_insights (preserving existing data)
     if agent_reasoning_output:
         # Add agent-based reasoning as a distinct category (merges with existing insights)
-        # BUG FIX: Use helper to handle both dict and ReasoningResult objects
+        # Note: Use helper to handle both dict and ReasoningResult objects
         reasoning_insights["agent_reasoning"] = {
             "conclusion": _get_reasoning_attr(agent_reasoning_output, "conclusion"),
             "confidence": _get_reasoning_attr(agent_reasoning_output, "confidence"),
@@ -4039,7 +4039,7 @@ async def chat(request: ChatRequest):
     # ================================================================
     # STEP 6: Build Context from ALL Vulcan's Cognitive Systems
     # ================================================================
-    # BUG #4 FIX (Jan 7 2026): Check for world_model creative/philosophical reasoning
+    # Note (Jan 7 2026): Check for world_model creative/philosophical reasoning
     # These responses should be properly extracted and presented, not dumped as JSON
     vulcan_direct_response = None  # Response from VULCAN's reasoning that can be returned directly
     
@@ -4051,7 +4051,7 @@ async def chat(request: ChatRequest):
             if isinstance(creative_result, dict) and 'response' in creative_result:
                 vulcan_direct_response = creative_result['response']
                 logger.info(
-                    f"[VULCAN] BUG#4 FIX: Found creative reasoning response "
+                    f"[VULCAN] Found creative reasoning response "
                     f"(len={len(vulcan_direct_response)}, confidence={creative_result.get('confidence', 0.7)})"
                 )
         
@@ -4061,7 +4061,7 @@ async def chat(request: ChatRequest):
             if isinstance(phil_result, dict) and 'response' in phil_result:
                 vulcan_direct_response = phil_result['response']
                 logger.info(
-                    f"[VULCAN] BUG#4 FIX: Found philosophical reasoning response "
+                    f"[VULCAN] Found philosophical reasoning response "
                     f"(len={len(vulcan_direct_response)}, confidence={phil_result.get('confidence', 0.7)})"
                 )
     
@@ -4074,7 +4074,7 @@ async def chat(request: ChatRequest):
         except Exception:
             pass
 
-    # BUG #1 FIX (Jan 7 2026): Extract actual answers from reasoning insights, not raw JSON
+    # Note (Jan 7 2026): Extract actual answers from reasoning insights, not raw JSON
     # Reasoning engines return dicts with 'answer', 'explanation', 'response' fields
     # that contain the actual reasoning output - don't truncate these!
     if reasoning_insights:
@@ -4106,7 +4106,7 @@ async def chat(request: ChatRequest):
             if reasoning_parts:
                 reasoning_str = "VULCAN Reasoning Analysis:\n" + "\n".join(reasoning_parts)
                 context_parts.append(reasoning_str)
-                logger.info(f"[VULCAN] BUG#1 FIX: Extracted {len(reasoning_parts)} reasoning answers")
+                logger.info(f"[VULCAN] Extracted {len(reasoning_parts)} reasoning answers")
         except Exception as e:
             logger.warning(f"[VULCAN] Failed to format reasoning insights: {e}")
             # Fallback to original behavior
@@ -4115,7 +4115,7 @@ async def chat(request: ChatRequest):
 
     if world_model_insights:
         try:
-            # BUG #4 FIX: For creative/philosophical, extract the actual response
+            # Note: For creative/philosophical, extract the actual response
             world_parts = []
             for insight_name, result in world_model_insights.items():
                 if isinstance(result, dict):
@@ -4148,7 +4148,7 @@ async def chat(request: ChatRequest):
 
     vulcan_context = "\n".join(context_parts) if context_parts else ""
 
-    # BUG #4 FIX: If we have a direct VULCAN response from creative/philosophical reasoning,
+    # Note: If we have a direct VULCAN response from creative/philosophical reasoning,
     # use a different prompt that instructs OpenAI to translate/present it naturally
     if vulcan_direct_response:
         enhanced_prompt = f"""You are VULCAN, an advanced AI system with comprehensive cognitive architecture.
@@ -4179,7 +4179,7 @@ Based on your analysis through memory retrieval, multi-modal reasoning, causal m
     response_text = ""
 
     # ================================================================
-    # BUG #17 FIX: Check for deterministic fast-path results FIRST
+    # Note: Check for deterministic fast-path results FIRST
     # Cryptographic and mathematical fast-path results are precomputed
     # by QueryRouter and MUST be returned directly, NOT sent to LLM.
     # This prevents OpenAI from returning "unable to calculate" errors.
@@ -4189,13 +4189,13 @@ Based on your analysis through memory retrieval, multi-modal reasoning, causal m
     is_math_fast_path = telemetry_data.get('math_fast_path', False)
     
     if is_crypto_fast_path:
-        # BUG #17 FIX: Return precomputed cryptographic result directly
+        # Note: Return precomputed cryptographic result directly
         crypto_result = telemetry_data.get('crypto_result')
         crypto_operation = telemetry_data.get('crypto_operation', 'hash')
         
         if crypto_result:
             logger.info(
-                f"[VULCAN] BUG#17 FIX: Returning deterministic crypto result directly, "
+                f"[VULCAN] Returning deterministic crypto result directly, "
                 f"skipping LLM generation entirely. operation={crypto_operation}"
             )
             response_text = f"The {crypto_operation.upper()} hash is: {crypto_result}"
@@ -4299,7 +4299,7 @@ Based on your analysis through memory retrieval, multi-modal reasoning, causal m
     if not response_text and (reasoning_insights or world_model_insights):
         response_text = "Based on VULCAN's cognitive analysis:\n\n"
         
-        # BUG #1 FIX: Extract actual answers from reasoning insights, not raw dicts
+        # Note: Extract actual answers from reasoning insights, not raw dicts
         for engine_name, result in reasoning_insights.items():
             if isinstance(result, dict):
                 answer = result.get('answer') or result.get('response') or result.get('explanation')
@@ -4567,7 +4567,7 @@ Based on your analysis through memory retrieval, multi-modal reasoning, causal m
 
     # ================================================================
     # STEP 9.5: Record outcome for Curiosity Engine learning
-    # BUG #3 FIX: Feed query outcomes to curiosity engine for gap analysis
+    # Note: Feed query outcomes to curiosity engine for gap analysis
     # ================================================================
     try:
         from vulcan.curiosity_engine import (
@@ -4780,7 +4780,7 @@ CHARS_PER_TOKEN_ESTIMATE = 3  # Conservative estimate for token calculation
 # JOB-TO-RESPONSE GAP FIX: Timing thresholds for debugging
 SLOW_PHASE_THRESHOLD_MS = 1000  # Log warning if phase takes longer than this
 SLOW_REQUEST_THRESHOLD_MS = 5000  # Include timing breakdown for requests slower than this
-# BUG #35 FIX: Threshold for marking query outcomes as "slow" (matches COMPLEX_QUERY_TIME_THRESHOLD_MS)
+# Note: Threshold for marking query outcomes as "slow" (matches COMPLEX_QUERY_TIME_THRESHOLD_MS)
 SLOW_QUERY_OUTCOME_THRESHOLD_MS = 30000  # 30 seconds - queries slower than this are marked as "slow"
 
 # ISSUE #35 FIX: Outcome status thresholds
@@ -5022,13 +5022,13 @@ Do NOT generate generic answers - USE the specific analysis below.
 def _format_dict_result(reasoning_type: str, result: Dict[str, Any]) -> str:
     """Format a dictionary result from a reasoning engine.
     
-    BUG FIX (Jan 7 2026): CRITICAL - Extract user-facing content from 'response'
+    Note (Jan 7 2026): CRITICAL - Extract user-facing content from 'response'
     or 'answer' fields FIRST, instead of concatenating all dictionary fields.
     
     Previously, this function would concatenate ALL fields including debug info,
     metadata, computation_time, etc. which made outputs look broken.
     
-    BUG FIX (Jan 7 2026): Handle debug wrapper dicts with "filtered" field.
+    Note (Jan 7 2026): Handle debug wrapper dicts with "filtered" field.
     Some code paths wrap low-confidence results in {"original": ..., "filtered": True}.
     We now unwrap these to show the original content instead of debug info.
     
@@ -5111,7 +5111,7 @@ def _format_dict_result(reasoning_type: str, result: Dict[str, Any]) -> str:
             lines.append(f"Conclusion: {conclusion}")
     
     # =========================================================================
-    # BUG #2 FIX (Jan 7 2026): Handle Symbolic Reasoning Output Format
+    # Note (Jan 7 2026): Handle Symbolic Reasoning Output Format
     # =========================================================================
     # Symbolic reasoner returns {proven, confidence, proof, method, applicable}
     # Previously this was falling through to fallback and dumping all fields.
@@ -5144,15 +5144,15 @@ def _format_dict_result(reasoning_type: str, result: Dict[str, Any]) -> str:
         if conf is not None and isinstance(conf, (int, float)):
             lines.append(f"Confidence: {conf:.1%}")
     
-    # BUG FIX: Add explanation if present (from ReasoningResult)
+    # Note: Add explanation if present (from ReasoningResult)
     if "explanation" in result and result["explanation"]:
         lines.append(f"Explanation: {result['explanation']}")
     
-    # BUG FIX: Add reasoning type if present (from ReasoningResult)
+    # Note: Add reasoning type if present (from ReasoningResult)
     if "reasoning_type" in result and result["reasoning_type"]:
         lines.append(f"Reasoning Type: {result['reasoning_type']}")
     
-    # BUG FIX: Format reasoning chain steps if present
+    # Note: Format reasoning chain steps if present
     if "reasoning_steps" in result:
         steps = result["reasoning_steps"]
         if isinstance(steps, list) and steps:
@@ -5279,7 +5279,7 @@ def _format_list_result(reasoning_type: str, result: list) -> str:
 def _format_object_result(reasoning_type: str, result: Any) -> str:
     """Format an object result from a reasoning engine.
     
-    BUG FIX (Jan 7 2026): Properly handle ReasoningResult objects.
+    Note (Jan 7 2026): Properly handle ReasoningResult objects.
     Previously, ReasoningResult objects were converted via str() which created
     raw Python repr output like:
         "ReasoningResult(conclusion=..., confidence=0.55, ...)"
@@ -5289,7 +5289,7 @@ def _format_object_result(reasoning_type: str, result: Any) -> str:
     _format_conclusion_for_user() which produces human-readable output.
     """
     # ==========================================================================
-    # BUG FIX: Handle ReasoningResult objects specially
+    # Note: Handle ReasoningResult objects specially
     # ==========================================================================
     # Check if this is a ReasoningResult dataclass (has conclusion, confidence, reasoning_type)
     if hasattr(result, 'conclusion') and hasattr(result, 'confidence') and hasattr(result, 'reasoning_type'):
@@ -5326,7 +5326,7 @@ def _format_object_result(reasoning_type: str, result: Any) -> str:
     if hasattr(result, "to_string"):
         return result.to_string()
     
-    # BUG FIX: Don't use str() blindly - it creates Python repr for dataclasses
+    # Note: Don't use str() blindly - it creates Python repr for dataclasses
     # Instead, check if __dict__ exists and format that
     if hasattr(result, "__dict__"):
         obj_dict = {k: v for k, v in result.__dict__.items() if not k.startswith("_")}
@@ -6037,7 +6037,7 @@ async def unified_chat(request: UnifiedChatRequest):
                     
                     if unified_result:
                         # Extract reasoning results from ReasoningResult object
-                        # BUG FIX: ReasoningResult has 'conclusion' attribute, NOT 'result'
+                        # Note: ReasoningResult has 'conclusion' attribute, NOT 'result'
                         # This was causing all VULCAN reasoning output to be discarded
                         if hasattr(unified_result, 'conclusion') and unified_result.conclusion is not None:
                             # Include full reasoning context: conclusion, confidence, explanation
@@ -6059,7 +6059,7 @@ async def unified_chat(request: UnifiedChatRequest):
                                         }
                                         for step in chain.steps[:MAX_REASONING_STEPS]  # Limit steps to avoid context overflow
                                     ]
-                            # BUG FIX: Log successful extraction for debugging
+                            # Note: Log successful extraction for debugging
                             logger.info(
                                 f"[VULCAN/v1/chat] Extracted reasoning: "
                                 f"conclusion_type={type(unified_result.conclusion).__name__}, "
@@ -6078,7 +6078,7 @@ async def unified_chat(request: UnifiedChatRequest):
                             logger.info(f"[VULCAN/v1/chat] Fallback stringified reasoning result")
                         
                         # Track which reasoning type was used
-                        # BUG FIX: ReasoningResult has 'reasoning_type' attribute, NOT 'selected_tool'
+                        # Note: ReasoningResult has 'reasoning_type' attribute, NOT 'selected_tool'
                         reasoning_type = getattr(unified_result, 'reasoning_type', None)
                         if reasoning_type is not None:
                             # Use isinstance for type-safe enum check
@@ -6261,7 +6261,7 @@ async def unified_chat(request: UnifiedChatRequest):
         async def _world_model_task():
             """STEP 5: World Model Consultation
             
-            BUG FIX: Reconnected world_model.update and meta_reasoning integration.
+            Note: Reconnected world_model.update and meta_reasoning integration.
             This ensures the world model is updated with each observation and
             meta-reasoning is consulted for intelligent query handling.
             """
@@ -6434,7 +6434,7 @@ async def unified_chat(request: UnifiedChatRequest):
         # CRITICAL FIX: Inject agent-based reasoning output into LLM context
         # This ensures reasoning engines invoked via agent_pool feed into response
         # 
-        # BUG #3 FIX: "Parallel Execution" Orphanage Prevention
+        # Note: "Parallel Execution" Orphanage Prevention
         # The original implementation had a single 0.1s poll which was too short
         # for jobs to complete, causing double work (agent pool + direct reasoning).
         # 
@@ -6445,7 +6445,7 @@ async def unified_chat(request: UnifiedChatRequest):
         agent_reasoning_output = None
         if submitted_jobs and pool:
             try:
-                # BUG #3 FIX: Use retry loop with exponential backoff
+                # Note: Use retry loop with exponential backoff
                 # instead of single short poll that times out prematurely
                 MAX_POLL_ATTEMPTS = 5  # Max number of poll attempts
                 INITIAL_POLL_DELAY = 0.1  # Start with 100ms
@@ -6506,7 +6506,7 @@ async def unified_chat(request: UnifiedChatRequest):
         # Merge agent reasoning output into reasoning_results (preserving existing data)
         if agent_reasoning_output:
             # Add agent-based reasoning as a distinct category (merges with existing results)
-            # BUG FIX: Use helper to handle both dict and ReasoningResult objects
+            # Note: Use helper to handle both dict and ReasoningResult objects
             reasoning_results["agent_reasoning"] = {
                 "conclusion": _get_reasoning_attr(agent_reasoning_output, "conclusion"),
                 "confidence": _get_reasoning_attr(agent_reasoning_output, "confidence"),
@@ -6520,7 +6520,7 @@ async def unified_chat(request: UnifiedChatRequest):
 
         # ================================================================
         # STEP 6.6: FALLBACK - Direct Reasoning Invocation (GraphixArena Pattern)
-        # BUG #2 FIX: When agent pool jobs don't complete in time, invoke reasoning
+        # Note: When agent pool jobs don't complete in time, invoke reasoning
         # directly using the proven GraphixArena pattern. This ensures reasoning
         # results are available for the LLM context even if agent pool is slow.
         #
@@ -6657,7 +6657,7 @@ async def unified_chat(request: UnifiedChatRequest):
                     logger.warning(f"[VULCAN/v1/chat] Direct reasoning invocation failed: {e}")
 
         # ================================================================
-        # TASK 1 FIX: USE REASONING RESULTS DIRECTLY WHEN CONFIDENCE IS HIGH
+        # Note: USE REASONING RESULTS DIRECTLY WHEN CONFIDENCE IS HIGH
         # ================================================================
         # CRITICAL: When specialized reasoning engines produce high-confidence
         # results, use them DIRECTLY instead of passing to OpenAI which may
@@ -6773,7 +6773,7 @@ async def unified_chat(request: UnifiedChatRequest):
         # TIMING: Start measuring context building
         _context_start = time.perf_counter()
         
-        # TASK 6 FIX: Configuration flag to disable OpenAI reasoning fallback
+        # Note: Configuration flag to disable OpenAI reasoning fallback
         DISABLE_OPENAI_REASONING_FALLBACK = os.environ.get(
             "VULCAN_DISABLE_OPENAI_REASONING_FALLBACK", "false"
         ).lower() == "true"
@@ -6785,10 +6785,10 @@ async def unified_chat(request: UnifiedChatRequest):
                 f"falling back to LLM synthesis"
             )
             
-            # TASK 6 FIX: If fallback is disabled, return low-confidence result with explanation
+            # Note: If fallback is disabled, return low-confidence result with explanation
             if DISABLE_OPENAI_REASONING_FALLBACK:
                 logger.info(
-                    f"[VULCAN] TASK 6 FIX: OpenAI fallback disabled, returning low-confidence "
+                    f"[VULCAN] Note: OpenAI fallback disabled, returning low-confidence "
                     f"reasoning result (confidence={best_confidence:.2f})"
                 )
                 
@@ -6884,7 +6884,7 @@ async def unified_chat(request: UnifiedChatRequest):
                     except Exception:
                         plan_str = ""
 
-                # BUG FIX: Include world model insights in the LLM context
+                # Note: Include world model insights in the LLM context
                 # This reconnects the world_model and meta_reasoning to the response generation
                 world_model_str = ""
                 if world_model_insight and isinstance(world_model_insight, dict):
@@ -6909,7 +6909,7 @@ async def unified_chat(request: UnifiedChatRequest):
                 if reasoning_results:
                     try:
                         reasoning_str = _format_reasoning_results(reasoning_results)
-                        # BUG FIX: Log reasoning output to verify it's reaching this point
+                        # Note: Log reasoning output to verify it's reaching this point
                         logger.info(
                             f"[VULCAN] Reasoning results formatted: "
                             f"keys={list(reasoning_results.keys())}, "
@@ -6958,7 +6958,7 @@ User Query: {user_message}
 Provide a helpful, accurate, and comprehensive response to the user's query. Be concise but thorough."""
 
                 # ================================================================
-                # BUG #17 FIX: Check for deterministic fast-path results FIRST
+                # Note: Check for deterministic fast-path results FIRST
                 # Cryptographic and mathematical fast-path results are precomputed
                 # by QueryRouter and MUST be returned directly, NOT sent to LLM.
                 # This prevents OpenAI from returning "unable to calculate" errors.
@@ -6967,13 +6967,13 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
                 v1_is_crypto_fast_path = v1_telemetry_data.get('crypto_fast_path', False)
                 
                 if v1_is_crypto_fast_path:
-                    # BUG #17 FIX: Return precomputed cryptographic result directly
+                    # Note: Return precomputed cryptographic result directly
                     crypto_result = v1_telemetry_data.get('crypto_result')
                     crypto_operation = v1_telemetry_data.get('crypto_operation', 'hash')
                     
                     if crypto_result:
                         logger.info(
-                            f"[VULCAN/v1/chat] BUG#17 FIX: Returning deterministic crypto result directly, "
+                            f"[VULCAN/v1/chat] Note: Returning deterministic crypto result directly, "
                             f"skipping LLM generation entirely. operation={crypto_operation}"
                         )
                         response_text = f"The {crypto_operation.upper()} hash is: {crypto_result}"
@@ -7245,7 +7245,7 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
             # Record via OutcomeBridge for learning system integration
             bridge = get_outcome_bridge()
             
-            # BUG FIX Issue #35: Determine status based on actual timing
+            # Note Issue #35: Determine status based on actual timing
             # Queries taking > 30s should be marked as "slow", not "success"
             # This ensures gap detection properly identifies slow queries
             if float(latency_ms) > SLOW_QUERY_OUTCOME_THRESHOLD_MS:
@@ -7356,7 +7356,7 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
             logger.debug(f"[VULCAN/v1/chat] Knowledge crystallization skipped: {e}")
 
         # ================================================================
-        # TASK 7 FIX: Add Transparency About Source
+        # Note: Add Transparency About Source
         # Include detailed metadata about where the answer came from
         # ================================================================
         
@@ -7403,7 +7403,7 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
             # RLHF INTEGRATION: Include IDs for feedback (Task 4 - UI thumbs buttons)
             "query_id": query_id,
             "response_id": response_id,
-            # TASK 7 FIX: Include transparency about response source
+            # Note: Include transparency about response source
             "transparency": transparency,
         }
 
@@ -10729,7 +10729,7 @@ def main():
                 logger.warning(
                     f"Self-improvement config file not found at {self_improvement_config_path}, using default config settings."
                 )
-                # BUG FIX Issue #5: Use singleton to prevent repeated state file loading
+                # Note Issue #5: Use singleton to prevent repeated state file loading
                 try:
                     from vulcan.reasoning.singletons import get_self_improvement_drive
                     self_improvement_drive = get_self_improvement_drive()
@@ -10748,7 +10748,7 @@ def main():
                         f"Failed to initialize SelfImprovementDrive with default config, using MagicMock: {e}"
                     )
             else:
-                # BUG FIX Issue #5: Use singleton to prevent repeated state file loading
+                # Note Issue #5: Use singleton to prevent repeated state file loading
                 try:
                     from vulcan.reasoning.singletons import get_self_improvement_drive
                     self_improvement_drive = get_self_improvement_drive(

@@ -1401,7 +1401,7 @@ class UnifiedReasoner:
 class ToolWeightManager:
     """Singleton manager for tool weights shared between Learning and Ensemble.
     
-    BUG #5 FIX: Learning system was updating tool weights in its own dictionary,
+    Note: Learning system was updating tool weights in its own dictionary,
     but Ensemble was reading from a separate dictionary. Weights never propagated.
     This singleton ensures both systems use the same weight storage.
     """

@@ -549,7 +549,7 @@ class MathematicalVerificationEngine:
         self,
         problem: BayesianProblem,
         claimed_posterior: float,
-        calculation_steps: Optional[List[str]] = None,
+        _calculation_steps: Optional[List[str]] = None,
     ) -> VerificationResult:
         """
         Verify a Bayesian inference calculation.
@@ -558,12 +558,13 @@ class MathematicalVerificationEngine:
         problem parameters. Detects common errors like specificity confusion.
         
         Args:
-            problem: Bayesian problem specification
-            claimed_posterior: The claimed result to verify
-            calculation_steps: Optional list of calculation steps for analysis
+            problem: Bayesian problem specification.
+            claimed_posterior: The claimed result to verify.
+            _calculation_steps: Reserved for future implementation. Optional list
+                of calculation steps for detailed analysis. Currently ignored.
             
         Returns:
-            VerificationResult with status, errors, and corrections
+            VerificationResult with status, errors, and corrections.
         """
         with self.lock:
             start_time = time.time()

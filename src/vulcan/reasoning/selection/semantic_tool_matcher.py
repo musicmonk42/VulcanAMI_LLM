@@ -310,7 +310,7 @@ TOOL_KEYWORDS = {
         "formal",
         "first-order",
         "fol",
-        # BUG #2 FIX: SAT/satisfiability problem detection keywords
+        # Note: SAT/satisfiability problem detection keywords
         # These keywords strongly indicate symbolic logic problems that
         # MUST NOT be routed to analogical (which was happening due to
         # uniform semantic similarity scores of ~0.35)
@@ -441,7 +441,7 @@ TOOL_KEYWORDS = {
         "factor",
         "impact",
         "influence",
-        # BUG #2 FIX: Causal inference and experiment design keywords
+        # Note: Causal inference and experiment design keywords
         # These keywords strongly indicate causal reasoning problems that
         # were incorrectly routing to analogical (scoring 0.350).
         "confound",
@@ -488,7 +488,7 @@ TOOL_KEYWORDS = {
         "confident",
         "percent",
         "percentage",
-        # BUG #2 FIX: Bayes theorem and medical test keywords
+        # Note: Bayes theorem and medical test keywords
         # These keywords strongly indicate Bayesian calculations that
         # MUST NOT be routed to analogical. The problem statement shows
         # Bayes problems incorrectly scoring analogical (0.339) highest.
@@ -787,7 +787,7 @@ TOOL_KEYWORDS = {
         "prescriptive",
         "imperative",
     ],
-    # BUG #2 FIX: Mathematical tool keywords for numeric computation
+    # Note: Mathematical tool keywords for numeric computation
     # These queries need numerical/computational tools, not analogical reasoning
     "mathematical": [
         # Basic computation
@@ -905,7 +905,7 @@ class SemanticToolMatcher:
     This fixes the core issue where symbolic/analogical tools are never selected
     because there's no mechanism to understand what queries they're designed for.
 
-    ISSUE #2 FIX: Added query embedding cache to prevent repeated computation
+    Note: Added query embedding cache to prevent repeated computation
     of embeddings for the same query. Previously, query embeddings were computed
     inside the tool loop, causing N embedding computations per query (where N is
     the number of tools). Now embeddings are cached and computed once per query.
@@ -920,7 +920,7 @@ class SemanticToolMatcher:
     _tool_embeddings: Dict[str, np.ndarray] = {}
     _embeddings_computed = False
 
-    # ISSUE #2 FIX: Query embedding cache to prevent repeated computations
+    # Note: Query embedding cache to prevent repeated computations
     # Uses OrderedDict for proper LRU eviction - oldest accessed entries removed first
     _query_embedding_cache: OrderedDict = OrderedDict()
     _query_cache_lock = threading.Lock()
@@ -953,7 +953,7 @@ class SemanticToolMatcher:
         PERFORMANCE FIX: Uses global model registry to ensure SentenceTransformer
         is loaded exactly ONCE per process and shared across all components.
         
-        BUG #4 FIX: Added prominent logging to track model loads.
+        Note: Added prominent logging to track model loads.
         If you see "Loading embedding model" more than ONCE in logs, 
         there's a singleton violation causing performance degradation.
         """
@@ -962,7 +962,7 @@ class SemanticToolMatcher:
                 if cls._shared_model is None and not cls._model_load_attempted:
                     cls._model_load_attempted = True
                     
-                    # BUG #4 FIX: Log prominently that we're loading the model
+                    # Note: Log prominently that we're loading the model
                     logger.info("=" * 60)
                     logger.info("[SemanticToolMatcher] Loading embedding model (ONE TIME ONLY)")
                     logger.info("=" * 60)
@@ -1017,7 +1017,7 @@ class SemanticToolMatcher:
                         try:
                             from sentence_transformers import SentenceTransformer
                             
-                            # BUG #4 FIX: Log this prominently - it means registry failed
+                            # Note: Log this prominently - it means registry failed
                             logger.warning(
                                 "[SemanticToolMatcher] WARNING: Loading model directly (registry failed)"
                             )
@@ -1032,7 +1032,7 @@ class SemanticToolMatcher:
                         except Exception as e:
                             logger.error(f"Failed to load embedding model: {e}")
                     
-                    # BUG #4 FIX: Log completion prominently
+                    # Note: Log completion prominently
                     if cls._shared_model is not None:
                         logger.info("=" * 60)
                         logger.info("[SemanticToolMatcher] ✓ Model loaded and cached")
@@ -1096,7 +1096,7 @@ class SemanticToolMatcher:
         """
         Get query embedding from cache or compute and cache it.
 
-        ISSUE #2 FIX: Caches query embeddings to prevent repeated computation.
+        Note: Caches query embeddings to prevent repeated computation.
         This addresses the tool selection performance degradation where
         the same query was being embedded multiple times (once per tool).
 
@@ -1220,10 +1220,10 @@ class SemanticToolMatcher:
         """
         Match query to tools using semantic similarity and keyword patterns.
 
-        ISSUE #2 FIX: Query embedding is now computed ONCE using the cache,
+        Note: Query embedding is now computed ONCE using the cache,
         instead of being recomputed for every tool in the loop.
 
-        BUG #1 FIX (0.500 Bug): Added explicit greeting detection to ensure
+        Note (0.500 Bug): Added explicit greeting detection to ensure
         simple greetings like "Hello" route to 'general' tool instead of 
         probabilistic, which would return confusing "mean prediction 0.500".
 
@@ -1240,7 +1240,7 @@ class SemanticToolMatcher:
         results = {}
         query_lower = query.lower().strip()
         
-        # BUG #1 FIX: Fast-path for simple greetings
+        # Note: Fast-path for simple greetings
         # These patterns MUST route to 'general' tool - NOT probabilistic
         # Otherwise users get absurd responses like "mean prediction 0.500"
         SIMPLE_GREETING_PATTERNS = {
@@ -1267,7 +1267,7 @@ class SemanticToolMatcher:
         )
         
         # =====================================================================
-        # BUG #9 FIX: Task type detection takes PRIORITY over domain keywords
+        # Note: Task type detection takes PRIORITY over domain keywords
         # Problem: "Write a sonnet about quantum entanglement" was routing to
         #          mathematical/symbolic due to "quantum" keyword, but the
         #          TASK TYPE is creative writing ("Write a sonnet").
@@ -1298,7 +1298,7 @@ class SemanticToolMatcher:
             if not is_creative_task:
                 is_creative_task = any(noun in query_lower for noun in CREATIVE_TASK_NOUNS)
         
-        # BUG #10 FIX: Mathematical task detection to prevent ethical override
+        # Note: Mathematical task detection to prevent ethical override
         # Problem: "Optimize welfare function" was routing to philosophical due
         #          to "welfare" keyword, but this is an optimization problem.
         MATHEMATICAL_TASK_VERBS = {
@@ -1343,17 +1343,17 @@ class SemanticToolMatcher:
         
         if is_creative_task:
             logger.debug(
-                f"[SemanticToolMatcher] BUG#9 FIX: Detected CREATIVE task - "
+                f"[SemanticToolMatcher] Note: Detected CREATIVE task - "
                 f"task type overrides domain keywords for query: {query_lower[:50]}..."
             )
         
         if is_math_task:
             logger.debug(
-                f"[SemanticToolMatcher] BUG#10 FIX: Detected MATHEMATICAL task - "
+                f"[SemanticToolMatcher] Note: Detected MATHEMATICAL task - "
                 f"task type overrides ethical keywords for query: {query_lower[:50]}..."
             )
 
-        # ISSUE #2 FIX: Pre-compute query embedding ONCE before the tool loop
+        # Note: Pre-compute query embedding ONCE before the tool loop
         # Previously this was done inside the loop, causing N embedding computations
         query_embedding = None
         if self.embedding_model and SemanticToolMatcher._embeddings_computed:
@@ -1368,7 +1368,7 @@ class SemanticToolMatcher:
 
             if tool_name in TOOL_KEYWORDS:
                 for keyword in TOOL_KEYWORDS[tool_name]:
-                    # BUG FIX: Use word boundary matching to prevent false positives
+                    # Note: Use word boundary matching to prevent false positives
                     # like "each" matching in "teacher" or "or" matching in "doctor"
                     # For multi-word keywords (e.g., "is to", "if then"), check if 
                     # keyword appears as a complete phrase
@@ -1388,20 +1388,20 @@ class SemanticToolMatcher:
                 # Cap keyword boost at 0.5
                 keyword_boost = min(0.5, keyword_boost)
             
-            # BUG #1 FIX: Apply dominant boost for 'general' tool on greetings
+            # Note: Apply dominant boost for 'general' tool on greetings
             # This prevents greetings from being sent to probabilistic (which returns 0.5)
             if is_simple_greeting and tool_name == 'general':
                 keyword_boost = 0.8  # Very strong boost - must win over probabilistic
                 keyword_matches.append('greeting_fast_path')
                 logger.debug(f"[SemanticToolMatcher] Applied greeting boost to 'general' for query: {query_lower[:30]}...")
             
-            # BUG #1 FIX: Penalize probabilistic for simple greetings
+            # Note: Penalize probabilistic for simple greetings
             # Probabilistic tool should NOT handle greetings - it returns "mean prediction 0.500"
             if is_simple_greeting and tool_name == 'probabilistic':
                 keyword_boost = max(0.0, keyword_boost - 0.3)  # Significant penalty
             
             # =====================================================================
-            # BUG #9 FIX: Creative task type overrides domain-based routing
+            # Note: Creative task type overrides domain-based routing
             # "Write a sonnet about quantum" should go to general/creative, not symbolic
             # =====================================================================
             if is_creative_task:
@@ -1414,7 +1414,7 @@ class SemanticToolMatcher:
                     keyword_boost = max(0.0, keyword_boost - 0.4)
             
             # =====================================================================
-            # BUG #10 FIX: Mathematical task type overrides ethical keyword routing
+            # Note: Mathematical task type overrides ethical keyword routing
             # "Calculate the derivative" should go to mathematical tool for computation
             # "Prove the theorem" should go to symbolic tool for formal proofs
             # =====================================================================

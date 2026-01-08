@@ -75,10 +75,10 @@ from .parsing import (
     VariableRenamer,
 )
 
-# BUG #5 FIX: Natural Language to Logic Converter
+# Note: Natural Language to Logic Converter
 from .nl_converter import NaturalLanguageToLogicConverter, convert_nl_to_logic
 
-# BUG #8 FIX: Formula Validator for pre-validation with helpful error messages
+# Note: Formula Validator for pre-validation with helpful error messages
 from .formula_validator import (
     FormulaValidator,
     ValidationError,
@@ -151,10 +151,10 @@ __all__ = [
     "ClauseExtractor",
     "FormulaParser",
     "FormulaBuilder",
-    # BUG #5 FIX: NL to Logic Converter
+    # Note: NL to Logic Converter
     "NaturalLanguageToLogicConverter",
     "convert_nl_to_logic",
-    # BUG #8 FIX: Formula Validator
+    # Note: Formula Validator
     "FormulaValidator",
     "ValidationError",
     "ValidationResult",

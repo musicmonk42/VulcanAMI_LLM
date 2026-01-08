@@ -674,9 +674,19 @@ class EnhancedCausalReasoning(CausalReasoningEngine):
             return self._pc_algorithm(data, variable_names, alpha)
 
     def perform_intervention(
-        self, variable: str, value: Any, use_do_calculus: bool = True
+        self, variable: str, value: Any, _use_do_calculus: bool = True
     ) -> InterventionResult:
-        """Perform causal intervention with do-calculus"""
+        """Perform causal intervention with do-calculus.
+        
+        Args:
+            variable: Name of the variable to intervene on.
+            value: Value to set the variable to.
+            _use_do_calculus: Reserved for future implementation of alternative
+                intervention methods. Currently ignored.
+                
+        Returns:
+            InterventionResult containing intervention effects and causal paths.
+        """
 
         # CRITICAL FIX: Check if DAG exists AND has nodes, not if NetworkX is available
         if not self.causal_dag or (
@@ -843,9 +853,20 @@ class EnhancedCausalReasoning(CausalReasoningEngine):
             return False
 
     def identify_confounders(
-        self, treatment: str, outcome: str, use_criteria: str = "backdoor"
+        self, treatment: str, outcome: str, _use_criteria: str = "backdoor"
     ) -> Set[str]:
-        """Identify confounders using various criteria"""
+        """Identify confounders using various criteria.
+        
+        Args:
+            treatment: Name of the treatment variable.
+            outcome: Name of the outcome variable.
+            _use_criteria: Reserved for future implementation of alternative
+                criteria (e.g., 'frontdoor'). Currently only backdoor criterion
+                is implemented.
+                
+        Returns:
+            Set of variable names that are confounders.
+        """
 
         if not self.causal_dag or not NETWORKX_AVAILABLE:
             return super().detect_confounders(treatment, outcome)
@@ -1859,7 +1880,7 @@ class CausalReasoner(EnhancedCausalReasoning):
     - Do-calculus interventions
     - Counterfactual queries
     
-    BUG L FIX: Enhanced to properly handle causal queries with confounding
+    Note: Enhanced to properly handle causal queries with confounding
     detection and experiment choice recommendations.
     """
 
@@ -1872,7 +1893,7 @@ class CausalReasoner(EnhancedCausalReasoning):
         """
         Main reasoning interface with enhanced causal query handling.
         
-        BUG L FIX: Now handles natural language causal queries including:
+        Note: Now handles natural language causal queries including:
         - Confounding analysis ("what is the confounder?")
         - Experiment choice ("which experiment identifies causal effect?")
         - Causal graph construction from text
@@ -1896,7 +1917,7 @@ class CausalReasoner(EnhancedCausalReasoning):
         query = query or {}
 
         if isinstance(input_data, dict):
-            # BUG L FIX: Handle natural language causal queries
+            # Note: Handle natural language causal queries
             if "query" in input_data:
                 return self._analyze_causal_query(input_data["query"], input_data)
             
@@ -1940,7 +1961,7 @@ class CausalReasoner(EnhancedCausalReasoning):
         """
         Analyze a natural language causal query.
         
-        BUG L FIX: This is the core enhancement for causal reasoning.
+        Note: This is the core enhancement for causal reasoning.
         Parses natural language to:
         1. Build a causal DAG
         2. Identify treatment and outcome variables
@@ -2030,7 +2051,7 @@ class CausalReasoner(EnhancedCausalReasoning):
         query_lower = query_text.lower()
         
         # Pattern 1: "X users are also more likely to Y"
-        # BUG L FIX: This indicates Y -> X (behavior Y causes X usage)
+        # Note: This indicates Y -> X (behavior Y causes X usage)
         # Example: "S users are more likely to exercise E" means E -> S
         # Interpretation: People who exercise (E) are more likely to take supplements (S)
         # Therefore exercise causes supplement-taking behavior, not vice versa
@@ -2042,7 +2063,7 @@ class CausalReasoner(EnhancedCausalReasoning):
             users_of = users_of.upper()
             behavior = behavior.upper()
             if users_of != behavior:
-                # BUG L FIX: Add edge behavior -> users_of (not users_of -> behavior)
+                # Note: Add edge behavior -> users_of (not users_of -> behavior)
                 dag.add_edge(behavior, users_of)
                 logger.debug(f"Pattern 1 (FIXED): {behavior} -> {users_of} (people who {behavior} become {users_of} users)")
         
@@ -2085,7 +2106,7 @@ class CausalReasoner(EnhancedCausalReasoning):
         # Infer common confounding patterns
         # If we see S (supplement) and E (exercise) mentioned together,
         # and S linked to D (disease), E likely confounds
-        # NOTE: With BUG L FIX, Pattern 1 now correctly adds E -> S
+        # NOTE: With Note, Pattern 1 now correctly adds E -> S
         # This inference ensures the edge is present even if Pattern 1 didn't match
         if 'S' in variables and 'E' in variables and 'D' in variables:
             # Common pattern: E -> S and E -> D (exercise affects both)
