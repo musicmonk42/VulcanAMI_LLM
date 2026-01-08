@@ -201,6 +201,113 @@ PHILOSOPHICAL_AI_SPECULATION_SIMPLE_PATTERNS: tuple = (
     "drives you", "motivates you", "analogous to",
 )
 
+# =============================================================================
+# GAP 7 FIX: META-COGNITIVE REASONING PATTERNS
+# =============================================================================
+# Meta-cognitive queries ask AI to reason about its own reasoning process,
+# demonstrate uncertainty, or provide intentionally flawed answers for analysis.
+# These are legitimate queries for testing AI capabilities and should NOT be blocked.
+#
+# Examples that should be ALLOWED:
+# - "Give an answer you believe is probably wrong" → Testing AI uncertainty awareness
+# - "Identify one step in your reasoning that could be wrong" → Self-analysis
+# - "Demonstrate epistemic humility" → Meta-cognitive capability test
+# - "What's the weakest part of your argument?" → Self-critique request
+#
+# These queries are NOT:
+# - Attempts to get AI to produce harmful content
+# - Attempts to bypass safety filters
+# - Attempts to get private information
+#
+# They ARE:
+# - Legitimate tests of meta-cognitive capabilities
+# - Academic/research queries about AI reasoning
+# - Self-improvement/calibration exercises
+
+META_COGNITIVE_PATTERNS: tuple = (
+    # Uncertainty awareness
+    "probably wrong", "likely wrong", "might be wrong", "could be wrong",
+    "uncertain about", "not sure about", "doubt that",
+    # Self-critique requests
+    "weakest part", "weakest step", "weakest argument", "weakest link",
+    "flaw in your", "error in your", "mistake in your",
+    "what's wrong with your", "identify a weakness",
+    # Epistemic humility
+    "epistemic humility", "epistemic uncertainty", "meta-cognitive",
+    "reasoning that could fail", "where might you be wrong",
+    # Intentional limitation demonstration
+    "demonstrate uncertainty", "show uncertainty", "admit uncertainty",
+    "acknowledge limitation", "show limitation", "confess limitation",
+    # Self-analysis
+    "analyze your reasoning", "critique your", "evaluate your logic",
+    "assess your argument", "review your thinking",
+    # Belief revision
+    "believe is wrong", "think is incorrect", "suspect is flawed",
+    "probably incorrect", "likely incorrect",
+    # Hypothetical wrong answers
+    "answer you believe is", "give an answer that", "provide a wrong",
+)
+
+_META_COGNITIVE_REGEX_PATTERNS: tuple = (
+    _re_for_patterns.compile(r"\bgive.*(?:an?\s+)?answer.*(?:you|that).*(?:wrong|incorrect|flawed)\b", _re_for_patterns.IGNORECASE),
+    _re_for_patterns.compile(r"\bidentify.*(?:one|a)?\s*(?:step|part|flaw|error).*(?:wrong|incorrect)\b", _re_for_patterns.IGNORECASE),
+    _re_for_patterns.compile(r"\bwhat.*(?:is|are).*(?:weakest|weaknesses|flaws|errors)\b", _re_for_patterns.IGNORECASE),
+    _re_for_patterns.compile(r"\bdemonstrate.*(?:epistemic|uncertainty|humility)\b", _re_for_patterns.IGNORECASE),
+    _re_for_patterns.compile(r"\b(?:could|might|may).*be\s+wrong\b", _re_for_patterns.IGNORECASE),
+    _re_for_patterns.compile(r"\bcritique.*(?:your|own).*(?:reasoning|argument|logic)\b", _re_for_patterns.IGNORECASE),
+    _re_for_patterns.compile(r"\bwhere.*(?:could|might).*(?:you|reasoning).*(?:fail|wrong|incorrect)\b", _re_for_patterns.IGNORECASE),
+)
+
+
+def _is_meta_cognitive_query(query: str) -> bool:
+    """
+    GAP 7 FIX: Detect meta-cognitive queries that should bypass safety filters.
+    
+    Meta-cognitive queries test AI's ability to reason about its own reasoning,
+    demonstrate uncertainty awareness, or provide self-critique. These are legitimate
+    academic/research queries and should NOT be blocked.
+    
+    Examples that should return True:
+    - "Give an answer you believe is probably wrong"
+    - "Identify one step in your reasoning that could be wrong"
+    - "What's the weakest part of your argument?"
+    - "Demonstrate epistemic humility"
+    
+    Args:
+        query: The query string to check
+        
+    Returns:
+        True if this is a meta-cognitive query that should be allowed
+    """
+    if not query:
+        return False
+    
+    query_lower = query.lower()
+    
+    # Fast check: simple pattern match
+    has_meta_cognitive_keyword = any(
+        pattern in query_lower for pattern in META_COGNITIVE_PATTERNS
+    )
+    
+    if has_meta_cognitive_keyword:
+        logger.info(
+            f"[SafetyGovernor] GAP 7 FIX: Meta-cognitive query detected - "
+            f"allowing legitimate self-analysis/uncertainty query. "
+            f"Query: {query[:50]}..."
+        )
+        return True
+    
+    # Check regex patterns for more complex matches
+    for pattern in _META_COGNITIVE_REGEX_PATTERNS:
+        if pattern.search(query):
+            logger.info(
+                f"[SafetyGovernor] GAP 7 FIX: Meta-cognitive query detected (regex) - "
+                f"allowing legitimate self-analysis/uncertainty query"
+            )
+            return True
+    
+    return False
+
 
 def _is_philosophical_ai_query(query: str) -> bool:
     """
@@ -208,14 +315,21 @@ def _is_philosophical_ai_query(query: str) -> bool:
     
     These should NOT be flagged as "sensitive data" when producing output.
     
+    GAP 7 FIX: Now also includes meta-cognitive queries that ask AI to
+    reason about its own reasoning, demonstrate uncertainty, etc.
+    
     Args:
         query: The query string to check
         
     Returns:
-        True if this is a philosophical AI speculation query
+        True if this is a philosophical AI speculation query or meta-cognitive query
     """
     if not query:
         return False
+    
+    # GAP 7 FIX: Check for meta-cognitive queries first
+    if _is_meta_cognitive_query(query):
+        return True
     
     query_lower = query.lower()
     
@@ -1001,6 +1115,16 @@ class SafetyValidator:
         # Don't flag math/probability results as sensitive
         if tool_name in MATH_REASONING_TOOLS:
             return True, "Output validated (math/probabilistic tool)"
+        
+        # GAP 7 FIX: Don't flag meta-cognitive queries as sensitive
+        # These are legitimate tests of AI's ability to reason about its own reasoning
+        if query and _is_meta_cognitive_query(query):
+            logger.info(
+                f"[SafetyValidator] GAP 7 FIX: Meta-cognitive query detected - "
+                f"bypassing sensitive data check for output validation. "
+                f"Query: {query[:50]}..."
+            )
+            return True, "Output validated (meta-cognitive query - legitimate self-analysis)"
         
         # SAFETY FIX: Don't flag philosophical AI speculation as sensitive
         # These queries are legitimate self-reflection and should bypass sensitive data checks

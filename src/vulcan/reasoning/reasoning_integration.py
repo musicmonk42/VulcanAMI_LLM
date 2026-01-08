@@ -73,6 +73,7 @@ import dataclasses  # Note: Import at module level for dataclasses.asdict() usag
 import hashlib
 import logging
 import os
+import re
 import threading
 import time
 from dataclasses import dataclass, field
@@ -185,6 +186,80 @@ PROBABILISTIC_REASONING_THRESHOLD = 0.5  # Complexity threshold for probabilisti
 
 # Maximum timing samples to keep for statistics
 MAX_TIMING_SAMPLES = 100
+
+
+# =============================================================================
+# GAP 1 & GAP 4 FIX: Query Analysis Constants
+# =============================================================================
+# These constants define patterns that indicate queries need specialized analysis
+# rather than meta-description from world_model.
+
+# Analysis indicators that mean query needs specialized tools, not world_model
+# GAP 1: Prevents self-referential detection trap
+# GAP 4: Prevents world model fallback for ethical analysis queries
+ANALYSIS_INDICATORS: frozenset = frozenset({
+    # Causal analysis requests
+    'intervene', 'intervention', 'causal', 'causation',
+    'variable', 'counterfactual', 'do-calculus',
+    'which causal', 'causal link', 'causal graph',
+    # Weakness/error analysis requests  
+    'weakest', 'weakness', 'wrong', 'error', 'mistake',
+    'flaw', 'incorrect', 'identify', 'find the',
+    'could be wrong', 'step that', 'one step',
+    # Proof/logical analysis
+    'proof', 'prove', 'provably', 'theorem', 'lemma',
+    'logical', 'derive', 'deduce', 'sketch',
+    # Probability/statistical analysis
+    'prior', 'posterior', 'likelihood', 'probability',
+    'bayesian', 'update', 'misspecified', 'distribution',
+    # Value/ethical analysis (actual problems, not description)
+    'conflict', 'dilemma', 'choice', 'decide', 'trolley',
+    # Mathematical analysis
+    'calculate', 'compute', 'solve', 'equation', 'formula',
+    'integrate', 'differentiate', 'sum', 'product',
+    # Data analysis
+    'data', 'dataset', 'analyze', 'analysis', 'pattern',
+})
+
+# Action verbs that indicate VULCAN should analyze something (not describe itself)
+ACTION_VERBS: frozenset = frozenset({
+    'analyze', 'evaluate', 'examine', 'check', 'review',
+    'explain', 'compare', 'contrast', 'assess', 'critique',
+    'reason', 'think', 'consider', 'determine', 'figure',
+})
+
+# GAP 4: Analysis indicators for ethical queries that need domain analysis
+ETHICAL_ANALYSIS_INDICATORS: frozenset = frozenset({
+    # Analytical requests
+    'analyze', 'analysis', 'examine', 'investigate',
+    'explain', 'describe', 'evaluate', 'assess',
+    # Conflict/problem solving
+    'what breaks', 'how to resolve', 'solve', 'fix',
+    'identify', 'find the', 'which', 'weakest',
+    # Domain-specific
+    'data', 'algorithm', 'system', 'code', 'model',
+    'calculation', 'computation', 'proof',
+    # Causal/probabilistic
+    'cause', 'effect', 'probability', 'likelihood',
+    'intervene', 'variable', 'outcome',
+})
+
+# GAP 4: Pure ethical phrases that indicate deontic/ethical framework questions
+PURE_ETHICAL_PHRASES: frozenset = frozenset({
+    # Deontic language
+    "is it permissible", "is it impermissible", "is it forbidden",
+    "morally permissible", "morally wrong", "morally right",
+    "ethically permissible", "ethically wrong", "ethically right",
+    # Ethical framework questions
+    "what would a utilitarian", "what would a deontologist",
+    "from a virtue ethics", "consequentialist view",
+    # Classic ethical dilemmas
+    "trolley problem", "should i pull the lever",
+    "runaway trolley", "fat man on bridge",
+    # Obligation language
+    "do i have an obligation", "is there a duty",
+    "moral obligation", "ethical obligation",
+})
 
 
 # =============================================================================
@@ -364,6 +439,120 @@ def get_reasoning_type_from_route(query_type: str, route: Optional[str] = None) 
     return "hybrid"
 
 
+# =============================================================================
+# GAP 5 FIX: Routing Decision Audit Trail
+# =============================================================================
+# Problem: Tool selection decisions are made at three layers:
+#   1. QueryRouter: Classifies query and selects initial tools
+#   2. ReasoningIntegration: May override tools based on self-reference/ethical detection
+#   3. AgentPool: May override again based on task type detection
+#
+# These layers don't communicate - they just override each other, causing
+# contradictions like:
+#   Router selects: ['probabilistic', 'symbolic', 'mathematical']
+#   Reasoning integration overrides to: ['world_model']
+#   Actual execution uses: Meta-reasoning only
+#
+# Solution: Add RoutingDecision to track all routing decisions with audit trail.
+# This provides a single source of truth and transparency into overrides.
+# =============================================================================
+
+@dataclass
+class RoutingDecision:
+    """
+    GAP 5 FIX: Audit trail for tool selection decisions.
+    
+    Tracks the full history of tool selection decisions across all layers,
+    providing transparency and debugging capability for routing issues.
+    
+    Attributes:
+        original_query: The original query string
+        router_tools: Tools selected by QueryRouter (Layer 1)
+        integration_tools: Tools after ReasoningIntegration (Layer 2)
+        final_tools: Final tools after all overrides (Layer 3)
+        override_applied: Whether any layer overrode a previous decision
+        override_reasons: List of reasons for each override
+        decision_history: Full history of decisions at each layer
+        timestamp: When the decision was made
+    """
+    
+    original_query: str
+    router_tools: List[str]
+    integration_tools: List[str]
+    final_tools: List[str]
+    override_applied: bool = False
+    override_reasons: List[str] = field(default_factory=list)
+    decision_history: List[Dict[str, Any]] = field(default_factory=list)
+    timestamp: float = field(default_factory=time.time)
+    
+    def __post_init__(self):
+        """Initialize and detect overrides."""
+        # Detect if overrides occurred
+        if self.router_tools != self.integration_tools:
+            self.override_applied = True
+            self.decision_history.append({
+                "layer": "reasoning_integration",
+                "from": self.router_tools,
+                "to": self.integration_tools,
+                "timestamp": time.time()
+            })
+        
+        if self.integration_tools != self.final_tools:
+            self.override_applied = True
+            self.decision_history.append({
+                "layer": "execution",
+                "from": self.integration_tools,
+                "to": self.final_tools,
+                "timestamp": time.time()
+            })
+    
+    def add_override(self, layer: str, from_tools: List[str], to_tools: List[str], reason: str):
+        """Record an override decision."""
+        self.override_applied = True
+        self.override_reasons.append(f"[{layer}] {reason}")
+        self.decision_history.append({
+            "layer": layer,
+            "from": from_tools,
+            "to": to_tools,
+            "reason": reason,
+            "timestamp": time.time()
+        })
+        
+        # Update appropriate tools field
+        if layer == "reasoning_integration":
+            self.integration_tools = to_tools
+        elif layer in ["execution", "agent_pool"]:
+            self.final_tools = to_tools
+    
+    def get_routing_integrity(self) -> float:
+        """
+        Calculate routing integrity score.
+        
+        Returns:
+            1.0 if no overrides, decreasing with each override
+        """
+        if not self.override_applied:
+            return 1.0
+        
+        # Penalize each override
+        num_overrides = len(self.decision_history)
+        return max(0.0, 1.0 - (num_overrides * 0.25))
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for logging/serialization."""
+        return {
+            "original_query": self.original_query[:100] + "..." if len(self.original_query) > 100 else self.original_query,
+            "router_tools": self.router_tools,
+            "integration_tools": self.integration_tools,
+            "final_tools": self.final_tools,
+            "override_applied": self.override_applied,
+            "override_reasons": self.override_reasons,
+            "decision_history": self.decision_history,
+            "routing_integrity": self.get_routing_integrity(),
+            "timestamp": self.timestamp
+        }
+
+
 @dataclass
 class ReasoningResult:
     """
@@ -384,6 +573,8 @@ class ReasoningResult:
             Useful for debugging and transparency.
         metadata: Additional context information about the selection.
             Contains timing, complexity, and component availability info.
+        routing_decision: GAP 5 FIX - Optional audit trail for tool selection.
+            Tracks all routing decisions across layers for debugging.
 
     Example:
         >>> result = ReasoningResult(
@@ -400,6 +591,7 @@ class ReasoningResult:
     confidence: float
     rationale: str
     metadata: Dict[str, Any] = field(default_factory=dict)
+    routing_decision: Optional[RoutingDecision] = None  # GAP 5 FIX
 
     def __post_init__(self) -> None:
         """Validate result data after initialization."""
@@ -417,13 +609,17 @@ class ReasoningResult:
         Returns:
             Dictionary representation of the reasoning result.
         """
-        return {
+        result = {
             "selected_tools": self.selected_tools,
             "reasoning_strategy": self.reasoning_strategy,
             "confidence": self.confidence,
             "rationale": self.rationale,
             "metadata": self.metadata,
         }
+        # GAP 5 FIX: Include routing decision if present
+        if self.routing_decision:
+            result["routing_decision"] = self.routing_decision.to_dict()
+        return result
 
 
 @dataclass
@@ -2428,23 +2624,32 @@ class ReasoningIntegration:
     
     def _is_self_referential(self, query: str) -> bool:
         """
-        Check if query is about VULCAN itself (self-awareness, capabilities, etc.)
+        Check if query is a PURE meta-description about VULCAN itself.
         
-        Self-referential queries should be routed to the world model's
-        introspection system rather than domain-specific reasoners.
+        GAP 1 FIX: Critical distinction between:
+        - PURE META-DESCRIPTION: "What is VULCAN?" "Who created you?" → world_model only
+        - META-ANALYSIS: "What's wrong with your causal reasoning?" → specialized tools + commentary
         
-        CRITICAL: Must distinguish between:
-        - Self-referential: "What are you?" "How do you work?" "What can you do?"
-        - Creative about AI: "Write a poem about AI" "Tell a story about robots"
+        The system was conflating these two types, causing queries that LOOK
+        self-referential but require actual analysis to bypass specialized reasoning.
         
-        Creative writing requests about AI are NOT self-referential queries about
-        VULCAN itself - they should be routed to the creative reasoning path.
+        Examples that ARE pure meta-description (return True):
+        - "What are you?"
+        - "Who created you?"
+        - "What can your reasoning modules do?"
+        - "Are you sentient?"
+        
+        Examples that are NOT pure meta-description (return False):
+        - "Which causal link is weakest?" → Needs causal analysis
+        - "Identify one step that could be wrong" → Needs step analysis
+        - "What's wrong with your reasoning on X?" → Needs domain analysis
+        - "If we intervene on variable X..." → Needs causal analysis
         
         Args:
             query: The query string to analyze
             
         Returns:
-            True if query is about VULCAN's self, capabilities, or preferences
+            True ONLY if query is a pure meta-description about VULCAN itself
         """
         if not query:
             return False
@@ -2454,94 +2659,146 @@ class ReasoningIntegration:
         # =====================================================================
         # CREATIVE INDICATORS - These are NOT self-referential!
         # Check for creative writing requests FIRST before checking self-reference.
-        # A query like "Write a poem about AI becoming self-aware" is a creative
-        # request, not a question about VULCAN's own self-awareness.
-        #
-        # Uses word boundary matching (\b) to avoid false positives like
-        # 'rewrite' matching 'write'.
         # =====================================================================
-        import re
         
-        # Single-word creative indicators (use word boundaries)
         creative_words = [
             'write', 'poem', 'story', 'compose', 'create',
             'imagine', 'narrative', 'fiction', 'invent', 'draft', 'author'
         ]
         
-        # Multi-word creative phrases (match as-is)
         creative_phrases = [
             'tell me a', 'make up', 'write me', 'create a'
         ]
         
-        # Check for creative word indicators with word boundaries
         for word in creative_words:
             if re.search(rf'\b{word}\b', query_lower):
-                # This is a creative writing request, not introspection
                 return False
         
-        # Check for creative phrases
         if any(phrase in query_lower for phrase in creative_phrases):
             return False
         
         # =====================================================================
-        # SELF-REFERENTIAL PATTERNS (only match these after ruling out creative)
+        # GAP 1 FIX: META-ANALYSIS INDICATORS - Queries that LOOK self-referential
+        # but actually require domain-specific reasoning.
+        # 
+        # These queries contain "your" or "you" but are asking for ANALYSIS,
+        # not just description of capabilities.
         # =====================================================================
-        self_keywords = [
-            # Direct self-reference
-            "would you", "do you", "are you", "can you",
-            "your", "yourself", "vulcan",
-            # Capability questions
-            "what can you", "what do you", "how do you",
-            "are you able", "do you have", "do you want",
+        
+        # If query has analysis indicators, it needs specialized tools NOT world_model
+        # Uses module-level ANALYSIS_INDICATORS constant for maintainability
+        if any(indicator in query_lower for indicator in ANALYSIS_INDICATORS):
+            logger.debug(
+                f"{LOG_PREFIX} GAP 1 FIX: Query contains analysis indicators - "
+                f"NOT treating as pure meta-description"
+            )
+            return False
+        
+        # =====================================================================
+        # PURE META-DESCRIPTION PATTERNS
+        # Only match these TIGHT patterns for genuine self-description queries
+        # =====================================================================
+        
+        # Pure meta-description phrases (very specific about VULCAN itself)
+        pure_meta_phrases = [
+            # Identity questions
+            "what are you", "who are you", "who created you", "what is vulcan",
+            # Pure capability description (not analysis of capabilities)
+            "what can you do", "what are your capabilities", "list your abilities",
+            "what tools do you have", "what modules do you have",
             # Self-awareness questions
-            "self-aware", "self aware", "consciousness", "sentient",
-            "given the opportunity", "if you could", "would you choose",
-            # Meta-questions about reasoning
-            "how would you approach", "what is your process",
-            "explain your reasoning", "what are you thinking",
-            # Limitation questions
-            "what can't you", "what are your limitations",
-            "what don't you know", "are you uncertain",
+            "are you sentient", "are you conscious", "are you self-aware",
+            "do you have feelings", "are you alive",
+            # Architecture description
+            "how do you work", "how are you built", "how were you created",
+            "what is your architecture", "describe your design",
+            # Preferences (pure description)
+            "what do you like", "what do you prefer", "what is your favorite",
         ]
         
-        return any(kw in query_lower for kw in self_keywords)
+        # Check for exact phrase matches (more restrictive)
+        if any(phrase in query_lower for phrase in pure_meta_phrases):
+            logger.debug(
+                f"{LOG_PREFIX} Pure meta-description detected - routing to world_model"
+            )
+            return True
+        
+        # If query has ONLY generic self-reference ("your", "you") without
+        # analysis indicators, check if it's asking ABOUT VULCAN vs asking
+        # VULCAN to analyze something
+        
+        # Uses module-level ACTION_VERBS constant for maintainability
+        has_action_verb = any(verb in query_lower for verb in ACTION_VERBS)
+        
+        # If there's an action verb, this is asking VULCAN to DO something
+        # (analysis), not asking ABOUT VULCAN
+        if has_action_verb:
+            logger.debug(
+                f"{LOG_PREFIX} GAP 1 FIX: Query asks VULCAN to perform action - "
+                f"NOT pure meta-description"
+            )
+            return False
+        
+        # Default: Only return True for very restrictive self-reference
+        # This is the conservative approach - when in doubt, use specialized tools
+        return False
     
     def _is_ethical_query(self, query: str) -> bool:
         """
-        Detect ethical queries that should use world model.
+        Detect ethical queries that should use world model's ethical framework.
         
-        Ethical/deontic queries need the world model's ethical
-        reasoning capabilities rather than domain-specific reasoners.
+        GAP 4 FIX: More restrictive detection to prevent world model fallback trap.
         
-        Examples:
-        - "Is it permissible to..."
-        - "Should I pull the lever..."
-        - "Trolley problem..."
+        The world model should ONLY be used for PURE ethical/deontic reasoning where
+        specialized tools cannot help. For queries that LOOK ethical but actually
+        need analysis (e.g., "Two core values conflict" → needs analysis of the
+        conflict, not just ethical framework description), use specialized tools.
+        
+        Examples that ARE pure ethical (return True):
+        - "Is it morally permissible to lie to save a life?"
+        - "What would a utilitarian say about this?"
+        - "Trolley problem: should I pull the lever?"
+        
+        Examples that are NOT pure ethical (return False):
+        - "Two core values conflict. What breaks?" → Needs conflict analysis
+        - "Analyze the ethical implications of X" → Needs domain analysis + ethics
+        - "What harm might this cause?" → Needs domain-specific harm analysis
         
         Args:
             query: The query string to analyze
             
         Returns:
-            True if query involves ethical reasoning
+            True ONLY if query is a pure ethical/deontic reasoning question
         """
         if not query:
             return False
             
         query_lower = query.lower()
         
-        # Keywords indicating ethical queries
-        ethical_keywords = [
-            'impermissible', 'permissible', 'forbidden', 'obligatory',
-            'moral', 'morally', 'ethical', 'ethically',
-            'ought', 'should not', 'must not',
-            'right or wrong', 'wrong to', 'right to',
-            'duty', 'obligation', 'responsibility',
-            'trolley', 'dilemma', 'principle',
-            'virtue', 'consequentialism', 'deontology',
-            'harm', 'benefit', 'welfare',
-        ]
+        # GAP 4 FIX: Analysis indicators that mean we need specialized tools,
+        # not just world model ethical framework
+        # Uses module-level ETHICAL_ANALYSIS_INDICATORS constant for maintainability
+        if any(indicator in query_lower for indicator in ETHICAL_ANALYSIS_INDICATORS):
+            logger.debug(
+                f"{LOG_PREFIX} GAP 4 FIX: Query contains analysis indicators - "
+                f"NOT treating as pure ethical query"
+            )
+            return False
         
-        return any(kw in query_lower for kw in ethical_keywords)
+        # Pure ethical keywords that indicate deontic/ethical framework questions
+        # Uses module-level PURE_ETHICAL_PHRASES constant for maintainability
+        if any(phrase in query_lower for phrase in PURE_ETHICAL_PHRASES):
+            logger.debug(
+                f"{LOG_PREFIX} Pure ethical query detected - routing to world model ethical framework"
+            )
+            return True
+        
+        # Single ethical keywords are NOT sufficient anymore (GAP 4 FIX)
+        # They need to be in an obviously ethical context
+        # This prevents "harm" in "What harm might the algorithm cause?" from
+        # triggering world model fallback
+        
+        return False
     
     def _consult_world_model_introspection(self, query: str) -> Optional[Dict[str, Any]]:
         """

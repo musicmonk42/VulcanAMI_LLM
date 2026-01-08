@@ -463,6 +463,16 @@ class EnhancedMetricsCollector:
     def _compute_health_score(self) -> float:
         """
         Compute overall system health score (0.0 to 1.0)
+        
+        GAP 9 FIX: Now includes answer quality metrics, not just throughput/latency.
+        
+        Factors considered:
+        - Success rate (40% weight) - task completion
+        - Uncertainty (15% weight) - model confidence calibration
+        - Latency efficiency (15% weight) - response time
+        - Answer quality (15% weight) - GAP 9 FIX: actual correctness
+        - Tool diversity (10% weight) - GAP 9 FIX: specialized tools used
+        - Routing integrity (5% weight) - GAP 9 FIX: routing decisions respected
 
         Returns:
             Health score where 1.0 is perfect health
@@ -470,24 +480,24 @@ class EnhancedMetricsCollector:
         factors = []
         weights = []
 
-        # Success rate factor (weight: 0.4)
+        # Success rate factor (weight: 0.40)
         total_actions = self.counters.get("successful_actions", 0) + self.counters.get(
             "failed_actions", 0
         )
         if total_actions > 0:
             success_rate = self.counters["successful_actions"] / total_actions
             factors.append(success_rate)
-            weights.append(0.4)
+            weights.append(0.40)
 
-        # Uncertainty factor (weight: 0.3)
+        # Uncertainty factor (weight: 0.15)
         if "current_uncertainty" in self.gauges:
             uncertainty = self.gauges["current_uncertainty"]
             # Lower uncertainty is better
             uncertainty_score = max(0.0, 1.0 - uncertainty)
             factors.append(uncertainty_score)
-            weights.append(0.3)
+            weights.append(0.15)
 
-        # Resource efficiency factor (weight: 0.3)
+        # Resource efficiency factor (weight: 0.15)
         if (
             "step_duration_ms" in self.histograms
             and len(self.histograms["step_duration_ms"]) > 0
@@ -500,7 +510,54 @@ class EnhancedMetricsCollector:
             else:
                 efficiency = 0.0
             factors.append(efficiency)
-            weights.append(0.3)
+            weights.append(0.15)
+        
+        # =====================================================================
+        # GAP 9 FIX: Answer quality factor (weight: 0.15)
+        # Measures actual correctness, not just completion
+        # =====================================================================
+        if "answer_quality" in self.histograms and len(self.histograms["answer_quality"]) > 0:
+            recent_quality = list(self.histograms["answer_quality"])[-100:]
+            avg_quality = np.mean(recent_quality)
+            factors.append(avg_quality)
+            weights.append(0.15)
+        elif "user_satisfaction" in self.histograms and len(self.histograms["user_satisfaction"]) > 0:
+            # Fallback to user satisfaction if answer_quality not tracked
+            recent_satisfaction = list(self.histograms["user_satisfaction"])[-100:]
+            avg_satisfaction = np.mean(recent_satisfaction)
+            factors.append(avg_satisfaction)
+            weights.append(0.15)
+        
+        # =====================================================================
+        # GAP 9 FIX: Tool diversity factor (weight: 0.10)
+        # Penalizes over-reliance on fallback tools like world_model
+        # =====================================================================
+        if "tool_diversity" in self.gauges:
+            tool_diversity = self.gauges["tool_diversity"]
+            factors.append(tool_diversity)
+            weights.append(0.10)
+        else:
+            # Calculate from tool usage counters if available
+            tool_usage = self._compute_tool_diversity()
+            if tool_usage is not None:
+                factors.append(tool_usage)
+                weights.append(0.10)
+        
+        # =====================================================================
+        # GAP 9 FIX: Routing integrity factor (weight: 0.05)
+        # Measures how often routing decisions are being overridden
+        # =====================================================================
+        if "routing_integrity" in self.gauges:
+            routing_integrity = self.gauges["routing_integrity"]
+            factors.append(routing_integrity)
+            weights.append(0.05)
+        elif "routing_overrides" in self.counters and "routing_total" in self.counters:
+            total_routing = self.counters["routing_total"]
+            if total_routing > 0:
+                override_rate = self.counters["routing_overrides"] / total_routing
+                routing_integrity = 1.0 - override_rate
+                factors.append(routing_integrity)
+                weights.append(0.05)
 
         # Compute weighted average
         if factors:
@@ -511,6 +568,115 @@ class EnhancedMetricsCollector:
 
         # Default to neutral score if no data
         return 0.5
+    
+    def _compute_tool_diversity(self) -> Optional[float]:
+        """
+        GAP 9 FIX: Compute tool diversity score.
+        
+        Low diversity (only using world_model/general) = unhealthy
+        High diversity (using specialized tools) = healthy
+        
+        Returns:
+            Tool diversity score (0-1) or None if not enough data
+        """
+        # Count tool usage from counters
+        tool_counts = {}
+        fallback_tools = {'world_model', 'general', 'meta_reasoning'}
+        specialized_tools = {'causal', 'probabilistic', 'symbolic', 'mathematical', 
+                            'philosophical', 'analogical', 'multimodal', 'cryptographic'}
+        
+        for key, count in self.counters.items():
+            if key.startswith("tool_") and key.endswith("_count"):
+                tool_name = key[5:-6]  # Extract tool name from "tool_X_count"
+                tool_counts[tool_name] = count
+        
+        if not tool_counts:
+            return None
+        
+        total_usage = sum(tool_counts.values())
+        if total_usage == 0:
+            return None
+        
+        # Calculate fallback vs specialized usage
+        fallback_usage = sum(tool_counts.get(t, 0) for t in fallback_tools)
+        specialized_usage = sum(tool_counts.get(t, 0) for t in specialized_tools)
+        
+        # Diversity score: higher when more specialized tools are used
+        if specialized_usage + fallback_usage == 0:
+            return 0.5  # No data
+        
+        diversity = specialized_usage / (specialized_usage + fallback_usage)
+        
+        # Also penalize if only one tool is used (even if specialized)
+        unique_tools = sum(1 for c in tool_counts.values() if c > 0)
+        if unique_tools == 1:
+            diversity *= 0.5  # Penalize single-tool usage
+        
+        return diversity
+    
+    # =========================================================================
+    # GAP 9 FIX: New methods for tracking answer quality
+    # =========================================================================
+    
+    def record_answer_quality(
+        self, 
+        query_id: str,
+        tools_used: list,
+        tools_intended: list,
+        confidence: float,
+        correctness: Optional[float] = None,
+        user_satisfaction: Optional[float] = None
+    ):
+        """
+        GAP 9 FIX: Record answer quality metrics.
+        
+        Unlike record_step() which only tracks completion, this method
+        tracks whether the answer was actually correct/useful.
+        
+        Args:
+            query_id: Unique identifier for the query
+            tools_used: List of tools that were actually used
+            tools_intended: List of tools that were originally selected
+            confidence: Model confidence in the answer
+            correctness: Optional correctness score (0-1) if known
+            user_satisfaction: Optional user satisfaction score (0-1)
+        """
+        with self._lock:
+            # Track tool override rate
+            was_overridden = set(tools_used) != set(tools_intended)
+            self.counters["routing_total"] += 1
+            if was_overridden:
+                self.counters["routing_overrides"] += 1
+                logger.debug(
+                    f"[Metrics] GAP 9: Tool override detected: "
+                    f"intended={tools_intended}, used={tools_used}"
+                )
+            
+            # Track tool usage
+            for tool in tools_used:
+                self.counters[f"tool_{tool}_count"] += 1
+            
+            # Track answer quality if provided
+            if correctness is not None:
+                self.histograms["answer_quality"].append(correctness)
+                self.timeseries["answer_quality_time"].append((time.time(), correctness))
+            
+            if user_satisfaction is not None:
+                self.histograms["user_satisfaction"].append(user_satisfaction)
+                self.timeseries["user_satisfaction_time"].append((time.time(), user_satisfaction))
+            
+            # Track confidence for calibration
+            self.histograms["answer_confidence"].append(confidence)
+            
+            # Update routing integrity gauge
+            total_routing = self.counters.get("routing_total", 1)
+            override_count = self.counters.get("routing_overrides", 0)
+            self.gauges["routing_integrity"] = 1.0 - (override_count / total_routing)
+            
+            # Update tool diversity gauge
+            diversity = self._compute_tool_diversity()
+            if diversity is not None:
+                self.gauges["tool_diversity"] = diversity
 
     def _perform_cleanup(self):
         """Perform cleanup of old data to maintain memory bounds"""
