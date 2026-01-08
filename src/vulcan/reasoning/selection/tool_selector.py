@@ -3093,7 +3093,7 @@ class PhilosophicalToolWrapper:
         Returns:
             Dict with reasoning result and confidence
         """
-        start_time = time.time()
+        start_time = time.perf_counter()
         
         try:
             # Extract query string from problem
@@ -3124,7 +3124,7 @@ class PhilosophicalToolWrapper:
                     "confidence": 0.5
                 }
             
-            execution_time = (time.time() - start_time) * 1000
+            execution_time = (time.perf_counter() - start_time) * 1000
             
             # Extract confidence from result
             confidence = 0.7
@@ -3149,7 +3149,7 @@ class PhilosophicalToolWrapper:
                 "confidence": 0.1,
                 "error": str(e),
                 "engine": "PhilosophicalReasoner",
-                "execution_time_ms": (time.time() - start_time) * 1000,
+                "execution_time_ms": (time.perf_counter() - start_time) * 1000,
             }
 
 
@@ -3190,7 +3190,7 @@ class MathematicalToolWrapper:
         Returns:
             Dict with computation result and confidence
         """
-        start_time = time.time()
+        start_time = time.perf_counter()
         
         try:
             # Extract query string from problem
@@ -3219,7 +3219,7 @@ class MathematicalToolWrapper:
                     "confidence": 0.3
                 }
             
-            execution_time = (time.time() - start_time) * 1000
+            execution_time = (time.perf_counter() - start_time) * 1000
             
             # Extract confidence and success from result
             confidence = 0.7
@@ -3251,7 +3251,7 @@ class MathematicalToolWrapper:
                 "success": False,
                 "error": str(e),
                 "engine": "MathematicalComputationTool",
-                "execution_time_ms": (time.time() - start_time) * 1000,
+                "execution_time_ms": (time.perf_counter() - start_time) * 1000,
             }
 
 

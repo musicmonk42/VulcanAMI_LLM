@@ -723,8 +723,9 @@ class QueryClassifier:
         # Normalize query for matching
         query_normalized = query_cleaned.strip()
         query_lower = query_normalized.lower()
-        # Use original query for cache hash to maintain consistent caching
-        query_hash = self._hash_query(query.strip().lower())
+        # Use cleaned query for cache hash to ensure consistent caching
+        # Same logical query with different headers should hit the same cache entry
+        query_hash = self._hash_query(query_lower)
         
         # Step 1: Check cache
         cached = self._get_cached(query_hash)

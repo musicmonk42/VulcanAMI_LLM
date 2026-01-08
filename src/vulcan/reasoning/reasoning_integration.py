@@ -2076,13 +2076,16 @@ class ReasoningIntegration:
         fallback_list = query_type_fallbacks.get(
             query_type_lower,
             ['world_model', 'probabilistic', 'analogical']
-        )
+        ).copy()  # Copy to avoid modifying the dict value
         
         # Ensure we have the general-purpose fallbacks at the end
+        # Use set for O(1) membership testing instead of O(n) list lookup
         default_fallbacks = ['world_model', 'probabilistic', 'analogical', 'philosophical', 'mathematical']
+        existing_tools = set(fallback_list)
         for tool in default_fallbacks:
-            if tool not in fallback_list:
+            if tool not in existing_tools:
                 fallback_list.append(tool)
+                existing_tools.add(tool)
         
         # Filter out the tools that have already failed
         failed_set = set(failed_tools) | {original_tool}
