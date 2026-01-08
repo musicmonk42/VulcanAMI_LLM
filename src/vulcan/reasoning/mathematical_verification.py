@@ -558,13 +558,13 @@ class MathematicalVerificationEngine:
         problem parameters. Detects common errors like specificity confusion.
         
         Args:
-            problem: Bayesian problem specification
-            claimed_posterior: The claimed result to verify
-            _calculation_steps: Reserved for future implementation - optional
-                list of calculation steps for detailed analysis
+            problem: Bayesian problem specification.
+            claimed_posterior: The claimed result to verify.
+            _calculation_steps: Reserved for future implementation. Optional list
+                of calculation steps for detailed analysis. Currently ignored.
             
         Returns:
-            VerificationResult with status, errors, and corrections
+            VerificationResult with status, errors, and corrections.
         """
         with self.lock:
             start_time = time.time()

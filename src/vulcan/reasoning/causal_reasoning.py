@@ -678,8 +678,14 @@ class EnhancedCausalReasoning(CausalReasoningEngine):
     ) -> InterventionResult:
         """Perform causal intervention with do-calculus.
         
-        Note: _use_do_calculus parameter is reserved for future implementation
-        of alternative intervention methods.
+        Args:
+            variable: Name of the variable to intervene on.
+            value: Value to set the variable to.
+            _use_do_calculus: Reserved for future implementation of alternative
+                intervention methods. Currently ignored.
+                
+        Returns:
+            InterventionResult containing intervention effects and causal paths.
         """
 
         # CRITICAL FIX: Check if DAG exists AND has nodes, not if NetworkX is available
@@ -851,9 +857,15 @@ class EnhancedCausalReasoning(CausalReasoningEngine):
     ) -> Set[str]:
         """Identify confounders using various criteria.
         
-        Note: _use_criteria parameter is reserved for future implementation
-        of alternative criteria (e.g., 'frontdoor'). Currently only backdoor
-        criterion is implemented.
+        Args:
+            treatment: Name of the treatment variable.
+            outcome: Name of the outcome variable.
+            _use_criteria: Reserved for future implementation of alternative
+                criteria (e.g., 'frontdoor'). Currently only backdoor criterion
+                is implemented.
+                
+        Returns:
+            Set of variable names that are confounders.
         """
 
         if not self.causal_dag or not NETWORKX_AVAILABLE:
