@@ -182,7 +182,12 @@ class Lexer:
         # Note: This pattern is simplified and may not handle deeply nested parens,
         # but for most FOL function-style syntax (implies(A, B), and(x, y)), it works.
         # The key insight is we're just detecting IF there's function syntax, not parsing it.
-        has_function_syntax = bool(re.search(r'\w+\s*\([^)]*,', result))
+        #
+        # FUNCTION_CALL_WITH_ARGS_PATTERN matches: word(anything_without_rparen,
+        # Examples: "func(a, b)", "implies(A, B)", "and(x, y)"
+        # This detects function syntax to preserve commas as argument separators.
+        FUNCTION_CALL_WITH_ARGS_PATTERN = r'\w+\s*\([^)]*,'
+        has_function_syntax = bool(re.search(FUNCTION_CALL_WITH_ARGS_PATTERN, result))
         if not has_function_syntax:
             result = re.sub(r',\s+([a-z])', r' \1', result)
             # Pattern: comma followed by 'and', 'or', 'but' (NL conjunctions)

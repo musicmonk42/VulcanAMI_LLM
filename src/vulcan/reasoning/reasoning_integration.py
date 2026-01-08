@@ -69,7 +69,7 @@ Error Handling:
 """
 
 import atexit
-import dataclasses  # BUG #4 FIX: Import at module level for _sanitize_context_for_json
+import dataclasses  # BUG #4 FIX: Import at module level for dataclasses.asdict() usage
 import hashlib
 import logging
 import os
@@ -2201,7 +2201,7 @@ class ReasoningIntegration:
             # Handle dataclasses with __dataclass_fields__
             if hasattr(value, '__dataclass_fields__'):
                 try:
-                    # Uses module-level import of dataclasses for better performance
+                    # Uses module-level dataclasses import for asdict()
                     return dataclasses.asdict(value)
                 except Exception as e:
                     logger.warning(
@@ -2221,8 +2221,9 @@ class ReasoningIntegration:
             if isinstance(value, (set, frozenset)):
                 return [sanitize_value(item) for item in value]
             
-            # Handle Enum
-            if hasattr(value, 'value') and hasattr(value, 'name'):
+            # Handle Enum - use isinstance for robust detection
+            # Enum is already imported at module level (from enum import Enum)
+            if isinstance(value, Enum):
                 return value.value
             
             # Fallback: convert to string
