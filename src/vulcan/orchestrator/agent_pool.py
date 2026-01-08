@@ -3070,8 +3070,10 @@ class AgentPoolManager:
                     # ==================================================================
                     if hasattr(integration_result, 'metadata') and integration_result.metadata:
                         updated_query_type = integration_result.metadata.get('query_type')
-                        is_self_introspection = integration_result.metadata.get('self_referential', False) or \
-                                                integration_result.metadata.get('is_self_introspection', False)
+                        is_self_introspection = (
+                            integration_result.metadata.get('self_referential', False) or
+                            integration_result.metadata.get('is_self_introspection', False)
+                        )
                         
                         if updated_query_type and updated_query_type != task_type:
                             logger.info(
