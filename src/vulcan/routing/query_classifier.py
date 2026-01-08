@@ -602,6 +602,18 @@ HEADER_STRIP_PATTERNS: Tuple[re.Pattern, ...] = (
     # "variant" type headers like "Monty Hall variant"
     # Note: Only strip "variant" and anything before it, keeping the content after
     re.compile(r'^[^(\n]*variant\s*', re.MULTILINE | re.IGNORECASE),
+    # FIX: Test header patterns that confuse classification
+    # E.g., "Numeric Verification (∑(2k-1)):" → "(∑(2k-1)):"
+    # E.g., "Rule Chaining (Different Query):" → "(Different Query):"
+    # E.g., "Quantifier Scope:" → ""
+    # These test headers include labels like "Numeric Verification", "Rule Chaining", etc.
+    # that can trigger incorrect keyword matching (e.g., "verification" → CRYPTOGRAPHIC)
+    re.compile(
+        r'^(?:Numeric|Rule|Quantifier|Causal|Analogical|Self[- ]?Description)\s+'
+        r'(?:Verification|Chaining|Scope|Reasoning|Queries?)\s*'
+        r'(?:\([^)]*\)\s*)?[:\-—]*\s*',
+        re.MULTILINE | re.IGNORECASE
+    ),
 )
 
 
