@@ -1187,9 +1187,15 @@ class ReasoningIntegration:
                 
                 if classification.category in SELF_INTROSPECTION_CATEGORIES:
                     # For self-introspection queries, ensure we use world_model tool
+                    # BUG FIX: Also update query_type to prevent type mismatch downstream
+                    # Previously, query_type stayed as 'MATHEMATICAL' even after overriding tools
+                    original_query_type = query_type
+                    query_type = 'self_introspection'  # FIX: Update query_type to match actual query
+                    
                     logger.info(
                         f"{LOG_PREFIX} SELF_INTROSPECTION detected - using world_model tool "
-                        f"(classifier suggested: {classification.suggested_tools})"
+                        f"(classifier suggested: {classification.suggested_tools}). "
+                        f"Updated query_type: {original_query_type} -> {query_type}"
                     )
                     # Ensure world_model is in the suggested tools
                     if 'world_model' not in (classification.suggested_tools or []):
@@ -1200,6 +1206,7 @@ class ReasoningIntegration:
                     context['prevent_router_tool_override'] = True
                     context['classifier_is_authoritative'] = True
                     context['is_self_introspection'] = True
+                    context['original_query_type'] = original_query_type  # FIX: Track original for debugging
                 
                 elif classification.category in SIMPLE_QUERY_CATEGORIES:
                     # For simple queries, ensure we use general tools

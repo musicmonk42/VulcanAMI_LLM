@@ -3058,6 +3058,34 @@ class AgentPoolManager:
                     
                     # Note: Mark that reasoning was actually invoked
                     reasoning_was_invoked = True
+                    
+                    # ==================================================================
+                    # BUG FIX: Update task_type based on what reasoning_integration detected
+                    # ==================================================================
+                    # The LLM classifier in reasoning_integration may override the initial
+                    # query_type (e.g., from 'MATHEMATICAL' to 'self_introspection').
+                    # If we don't update task_type here, main.py will use the wrong type
+                    # to select results, causing the bug where self-introspection queries
+                    # return cached mathematical results like "3*x**2".
+                    # ==================================================================
+                    if hasattr(integration_result, 'metadata') and integration_result.metadata:
+                        updated_query_type = integration_result.metadata.get('query_type')
+                        is_self_introspection = integration_result.metadata.get('self_referential', False) or \
+                                                integration_result.metadata.get('is_self_introspection', False)
+                        
+                        if updated_query_type and updated_query_type != task_type:
+                            logger.info(
+                                f"[AgentPool] BUG FIX: Updating task_type from '{task_type}' to "
+                                f"'{updated_query_type}' based on reasoning_integration override"
+                            )
+                            task_type = updated_query_type
+                        
+                        if is_self_introspection and task_type != 'self_introspection':
+                            logger.info(
+                                f"[AgentPool] BUG FIX: Detected self-introspection query, "
+                                f"updating task_type from '{task_type}' to 'self_introspection'"
+                            )
+                            task_type = 'self_introspection'
                         
                 except Exception as reasoning_error:
                     logger.warning(
