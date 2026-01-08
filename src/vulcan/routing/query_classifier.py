@@ -43,9 +43,9 @@ class QueryCategory(Enum):
     GREETING = "GREETING"
     CHITCHAT = "CHITCHAT"
     FACTUAL = "FACTUAL"
-    CREATIVE = "CREATIVE"  # BUG A FIX: Creative writing, stories, poems
-    CONVERSATIONAL = "CONVERSATIONAL"  # BUG A FIX: General conversation
-    SELF_INTROSPECTION = "SELF_INTROSPECTION"  # BUG S FIX: Questions about Vulcan's capabilities/identity
+    CREATIVE = "CREATIVE"  # Creative writing, stories, poems
+    CONVERSATIONAL = "CONVERSATIONAL"  # General conversation
+    SELF_INTROSPECTION = "SELF_INTROSPECTION"  # Questions about Vulcan's capabilities/identity
     SPECULATION = "SPECULATION"  # Counterfactual/hypothetical reasoning queries
     MATHEMATICAL = "MATHEMATICAL"
     LOGICAL = "LOGICAL"
@@ -53,7 +53,7 @@ class QueryCategory(Enum):
     CAUSAL = "CAUSAL"
     ANALOGICAL = "ANALOGICAL"
     PHILOSOPHICAL = "PHILOSOPHICAL"
-    CRYPTOGRAPHIC = "CRYPTOGRAPHIC"  # FIX (Jan 6 2026): Cryptocurrency/hash/security technical queries
+    CRYPTOGRAPHIC = "CRYPTOGRAPHIC"  # Cryptocurrency/hash/security technical queries
     COMPLEX_RESEARCH = "COMPLEX_RESEARCH"
     UNKNOWN = "UNKNOWN"
 
@@ -100,10 +100,10 @@ REASONING_INDICATORS: FrozenSet[str] = frozenset([
     'p(', 'probability', 'bayes',
     'formalize', 'fol', 'sat',
     'cause', 'causal', 'intervention',
-    # BUG #3 FIX (Jan 7 2026): Add mathematical computation indicators
+    # Note: Mathematical computation indicators
     # "Calculate sum of 1 to 100" should use reasoning, not be skipped as conversational
     'calculate', 'compute', 'solve', 'evaluate', 'sum', 'integral', 'derivative',
-    # BUG #3 FIX (Jan 7 2026): Add ethical reasoning indicators
+    # Note: Ethical reasoning indicators
     # "You control a trolley..." should use philosophical reasoning, not skip
     'trolley', 'ethical', 'moral', 'dilemma', 'permissible',
 ])
@@ -125,7 +125,7 @@ CHITCHAT_PATTERNS: Tuple[re.Pattern, ...] = (
     re.compile(r"^how'?s\s+it\s+going", re.IGNORECASE),
     re.compile(r"^nice\s+to\s+meet", re.IGNORECASE),
     re.compile(r"^pleased\s+to\s+meet", re.IGNORECASE),
-    # BUG A2 FIX: Match chitchat after greeting prefix (e.g., "hi, how are you?")
+    # Note: Match chitchat after greeting prefix (e.g., "hi, how are you?")
     re.compile(r"^(hi|hello|hey|yo)[,.]?\s+how\s+are\s+you", re.IGNORECASE),
     re.compile(r"^(hi|hello|hey|yo)[,.]?\s+what'?s\s+up", re.IGNORECASE),
 )
@@ -158,7 +158,7 @@ CAUSAL_KEYWORDS: FrozenSet[str] = frozenset([
     "intervention", "do(", "counterfactual",
     "randomize", "randomized", "rct",
     "pearl", "dag", "backdoor", "frontdoor",
-    "collider",  # FIX: Collider is a causal graph concept, not logical
+    "collider",  # Collider is a causal graph concept, not logical
     "observational", "experimental",
 ])
 
@@ -172,7 +172,7 @@ MATHEMATICAL_KEYWORDS: FrozenSet[str] = frozenset([
 ])
 
 # =============================================================================
-# BUG #3 FIX (Jan 7 2026): Mathematical Symbol Detection
+# Note: Mathematical Symbol Detection
 # =============================================================================
 # Query "Compute ∑(2k-1) from k=1 to n" was routing to probabilistic because:
 # - Only 1 keyword match ("compute") vs MATH_KEYWORD_THRESHOLD = 2
@@ -261,7 +261,7 @@ CRYPTOGRAPHIC_PATTERNS: Tuple[re.Pattern, ...] = (
 )
 
 # ============================================================
-# BUG #10 FIX: Explicit Mathematical Intent Detection
+# Note: Explicit Mathematical Intent Detection
 # ============================================================
 # Import explicit mathematical intent detection from query_router to avoid
 # code duplication and ensure consistency (DRY principle).
@@ -306,7 +306,7 @@ except ImportError:
 
 def _has_explicit_mathematical_intent(query: str) -> bool:
     """
-    BUG #10 FIX: Check if query has explicit mathematical intent that overrides
+    Check if query has explicit mathematical intent that overrides
     philosophical/ethical routing.
     
     Args:
@@ -331,14 +331,14 @@ def _has_explicit_mathematical_intent(query: str) -> bool:
 
 
 # Philosophical/ethical indicators - complexity 0.4+, tools=['philosophical']
-# BUG FIX: Added forced choice patterns for trolley problem variants
+# Note: Added forced choice patterns for trolley problem variants
 PHILOSOPHICAL_KEYWORDS: FrozenSet[str] = frozenset([
     "ethical", "ethics", "moral", "morality",
     "permissible", "forbidden", "obligatory",
     "deontological", "utilitarian", "consequentialist",
     "trolley problem", "thought experiment",
     "virtue", "justice", "rights", "duty",
-    # BUG FIX: Added forced choice / trolley problem variant patterns
+    # Note: Forced choice / trolley problem variant patterns
     "choose between", "forced to choose", "had to choose",
     "no third choice", "no other choice", "only two options",
     "dilemma", "ethical dilemma", "moral dilemma",
@@ -349,7 +349,7 @@ PHILOSOPHICAL_KEYWORDS: FrozenSet[str] = frozenset([
 ])
 
 # Philosophical/ethical patterns - catch philosophical queries before short query bypass
-# BUG FIX: "This sentence is false" must be classified as PHILOSOPHICAL, not CONVERSATIONAL
+# Note: "This sentence is false" must be classified as PHILOSOPHICAL, not CONVERSATIONAL
 PHILOSOPHICAL_PATTERNS: Tuple[re.Pattern, ...] = (
     # Paradoxes
     re.compile(r"this\s+(?:sentence|statement)\s+is\s+(?:false|true|a\s+lie)", re.IGNORECASE),
@@ -367,12 +367,12 @@ PHILOSOPHICAL_PATTERNS: Tuple[re.Pattern, ...] = (
     # Ethical dilemmas
     re.compile(r"(?:ethical|moral)\s+(?:dilemma|problem|question|issue)", re.IGNORECASE),
     re.compile(r"(?:is\s+it|would\s+it\s+be)\s+(?:ethical|moral|right|wrong)\s+to", re.IGNORECASE),
-    # BUG FIX: Add "moral implications" pattern for ethical reasoning queries
+    # Note: Add "moral implications" pattern for ethical reasoning queries
     re.compile(r"(?:ethical|moral)\s+(?:implications?|consequences?|considerations?)", re.IGNORECASE),
     # Trolley problem variants
     re.compile(r"trolley\s+problem", re.IGNORECASE),
     re.compile(r"(?:if\s+you\s+)?(?:had\s+to|have\s+to|must)\s+choose\s+between", re.IGNORECASE),
-    # BUG #3 FIX (Jan 7 2026): Add trolley scenario pattern for "You control a trolley..."
+    # Note: Add trolley scenario pattern for "You control a trolley..."
     re.compile(r"(?:you\s+)?(?:control|drive|operate)\s+(?:a\s+)?(?:runaway\s+)?trolley", re.IGNORECASE),
     re.compile(r"trolley\s+(?:is\s+)?(?:heading|barreling|moving|going)\s+towards?", re.IGNORECASE),
     # Philosophy of mind
@@ -392,7 +392,7 @@ FACTUAL_PATTERNS: Tuple[re.Pattern, ...] = (
 )
 
 # =============================================================================
-# BUG A FIX: Creative writing patterns - complexity 0.2, skip reasoning
+# Note: Creative writing patterns - complexity 0.2, skip reasoning
 # =============================================================================
 # Creative writing queries should NOT go through reasoning engines
 # They should be routed directly to LLM for generation
@@ -434,7 +434,7 @@ CONVERSATIONAL_PATTERNS: Tuple[re.Pattern, ...] = (
 )
 
 # =============================================================================
-# BUG S FIX: Self-Introspection patterns - Route to World Model
+# Note: Self-Introspection patterns - Route to World Model
 # =============================================================================
 # These queries ask about Vulcan's own capabilities, goals, limitations, etc.
 # They should be routed to the World Model's SelfModel component, NOT to
@@ -743,7 +743,7 @@ class QueryClassifier:
                 )
         
         # =============================================================================
-        # BUG FIX (Jan 7 2026): Check CRYPTOGRAPHIC keywords FIRST before factual patterns
+        # Note: Check CRYPTOGRAPHIC keywords FIRST before factual patterns
         # =============================================================================
         # Problem: "What is the SHA-256 hash of..." was being classified as FACTUAL
         # because "What is" pattern matched before cryptographic keywords were checked.
@@ -788,8 +788,7 @@ class QueryClassifier:
         # Check factual patterns (simple questions)
         # BUT: Skip factual classification if query is about "you" - 
         # those should go to self-introspection first
-        # BUG FIX: Also skip if query contains philosophical keywords
-        # BUG FIX (Jan 7 2026): Also skip if query contains cryptographic keywords
+        # Note: Also skip if query contains philosophical or cryptographic keywords
         query_about_self = any(word in query_lower for word in ['you', 'your', 'yourself'])
         query_has_philosophical = any(kw in query_lower for kw in PHILOSOPHICAL_KEYWORDS)
         if not query_about_self and not query_has_philosophical and not query_has_cryptographic:
@@ -805,7 +804,7 @@ class QueryClassifier:
                     )
         
         # =============================================================================
-        # BUG A FIX (Jan 7 2026 UPDATED): Creative patterns route to world_model
+        # Note: Creative patterns route to world_model
         # =============================================================================
         # Creative queries like "write a story about..." should go through VULCAN's
         # world_model for creative structure generation, NOT skip reasoning entirely.
@@ -835,14 +834,14 @@ class QueryClassifier:
             )
         
         # =============================================================================
-        # BUG #10 FIX: Check for EXPLICIT MATHEMATICAL INTENT before philosophical patterns
+        # Note: Check for EXPLICIT MATHEMATICAL INTENT before philosophical patterns
         # =============================================================================
         # When user explicitly says "ignore moral constraints" or "mathematically optimal",
         # we should route to MATHEMATICAL, not PHILOSOPHICAL, even if ethical keywords
         # are present. This fixes the food distribution optimization scenario.
         if _has_explicit_mathematical_intent(query_original):
             logger.info(
-                f"[QueryClassifier] BUG#10 FIX: Explicit mathematical intent detected - "
+                f"[QueryClassifier] Explicit mathematical intent detected - "
                 f"routing to MATHEMATICAL despite ethical keywords"
             )
             return QueryClassification(
@@ -855,7 +854,7 @@ class QueryClassifier:
             )
         
         # =============================================================================
-        # BUG FIX: Check PHILOSOPHICAL_PATTERNS BEFORE conversational patterns
+        # Note: Check PHILOSOPHICAL_PATTERNS BEFORE conversational patterns
         # =============================================================================
         # "Explain the moral implications..." matches "^explain\s+" in CONVERSATIONAL_PATTERNS
         # but is actually a philosophical query. Check philosophical patterns first.
@@ -928,7 +927,7 @@ class QueryClassifier:
             )
         
         # =============================================================================
-        # BUG S FIX: Check self-introspection patterns BEFORE reasoning patterns
+        # Note: Check self-introspection patterns BEFORE reasoning patterns
         # =============================================================================
         # Questions about Vulcan's capabilities, goals, limitations should route to
         # World Model's SelfModel, NOT to ProbabilisticEngine or other reasoning tools.
@@ -1014,7 +1013,7 @@ class QueryClassifier:
         math_count = sum(1 for kw in MATHEMATICAL_KEYWORDS if kw in query_lower)
         
         # =====================================================================
-        # BUG #3 FIX (Jan 7 2026): Check for mathematical SYMBOLS first
+        # Note: Check for mathematical SYMBOLS first
         # =====================================================================
         # Query "Compute ∑(2k-1) from k=1 to n" has math symbol (∑) and keyword
         # (compute), but only 1 keyword match < MATH_KEYWORD_THRESHOLD (2).
@@ -1035,7 +1034,7 @@ class QueryClassifier:
             effective_count = math_count + (2 if has_math_symbols else 0) + (1 if has_summation_pattern else 0)
             
             logger.info(
-                f"[QueryClassifier] BUG#3 FIX: MATHEMATICAL classification - "
+                f"[QueryClassifier] MATHEMATICAL classification - "
                 f"keywords={math_count}, has_symbols={has_math_symbols}, has_summation={has_summation_pattern}"
             )
             return QueryClassification(
@@ -1060,10 +1059,10 @@ class QueryClassifier:
             )
         
         # Check philosophical indicators
-        # BUG #10 FIX: Skip philosophical classification if explicit mathematical intent detected
+        # Note: Skip philosophical classification if explicit mathematical intent detected
         phil_count = sum(1 for kw in PHILOSOPHICAL_KEYWORDS if kw in query_lower)
         if phil_count >= PHIL_KEYWORD_THRESHOLD:
-            # BUG #10: Check for explicit mathematical intent before classifying as philosophical
+            # Note: Check for explicit mathematical intent before classifying as philosophical
             if not _has_explicit_mathematical_intent(query_original):
                 return QueryClassification(
                     category=QueryCategory.PHILOSOPHICAL.value,
@@ -1075,17 +1074,17 @@ class QueryClassifier:
                 )
             else:
                 logger.info(
-                    f"[QueryClassifier] BUG#10 FIX: Skipping PHILOSOPHICAL classification - "
+                    f"[QueryClassifier] Skipping PHILOSOPHICAL classification - "
                     f"explicit mathematical intent detected"
                 )
         
         # =============================================================================
-        # BUG FIX: Check PHILOSOPHICAL_PATTERNS BEFORE short query bypass
+        # Note: Check PHILOSOPHICAL_PATTERNS BEFORE short query bypass
         # =============================================================================
         # "This sentence is false" (liar's paradox) is only 4 words but is clearly
         # a philosophical paradox that requires reasoning, not a conversational query.
         # Check patterns before falling back to CONVERSATIONAL for short queries.
-        # BUG #10 FIX: Skip this check if explicit mathematical intent detected
+        # Note: Skip this check if explicit mathematical intent detected
         if not _has_explicit_mathematical_intent(query_original):
             for pattern in PHILOSOPHICAL_PATTERNS:
                 if pattern.search(query_original):
