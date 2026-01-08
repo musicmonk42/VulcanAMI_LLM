@@ -154,6 +154,16 @@ LOGICAL_KEYWORDS: FrozenSet[str] = frozenset([
     "predicate", "predicates", "predicate logic",
 ])
 
+# Strong logical indicators - these alone trigger LOGICAL classification
+# (without requiring the 2-keyword threshold)
+# These are highly specific to formal logic and should immediately route to symbolic
+STRONG_LOGICAL_INDICATORS: FrozenSet[str] = frozenset([
+    "formalize", "formalise",  # Explicit request for formalization
+    "fol",  # First-order logic abbreviation
+    "sat problem",  # SAT problem reference
+    "propositional",  # Propositional logic
+])
+
 # Probabilistic/Bayesian indicators - complexity 0.5+, tools=['probabilistic']
 PROBABILISTIC_KEYWORDS: FrozenSet[str] = frozenset([
     "probability", "p(", "bayes", "bayesian",
@@ -195,6 +205,11 @@ MATHEMATICAL_KEYWORDS: FrozenSet[str] = frozenset([
 # Fix: Add pattern matching for mathematical symbols that should immediately
 # route to mathematical/symbolic engine regardless of keyword count.
 MATH_SYMBOL_PATTERN = re.compile(r"[∫∑∏∂∇∈∀∃∅∞≠≤≥≈±×÷√∝]")
+
+# Mathematical symbols to preserve in header stripping
+# These symbols indicate mathematical content that should NOT be stripped when
+# removing test headers like "Numeric Verification (∑(2k-1))"
+PRESERVED_MATH_SYMBOLS: str = "∑∏∫√π∂∇"
 
 # Summation notation patterns: ∑(k=1 to n), sum from k=1, etc.
 SUMMATION_PATTERNS: Tuple[re.Pattern, ...] = (
@@ -626,10 +641,12 @@ HEADER_STRIP_PATTERNS: Tuple[re.Pattern, ...] = (
     # NOTE: The pattern must NOT remove parenthetical content containing mathematical
     # symbols like ∑, ∏, ∫, etc. These are critical for mathematical classification.
     # The fix: Only remove parenthetical content that does NOT contain math symbols.
+    # The symbols in this pattern must match PRESERVED_MATH_SYMBOLS defined above.
     re.compile(
         r'^(?:Numeric|Rule|Quantifier|Causal|Analogical|Self[- ]?Description)\s+'
         r'(?:Verification|Chaining|Scope|Reasoning|Queries?)\s*'
-        r'(?:\([^)∑∏∫√π∂∇]*\)\s*)?[:\-—]*\s*',  # Exclude parens containing math symbols
+        # Exclude parens containing math symbols (must match PRESERVED_MATH_SYMBOLS)
+        r'(?:\([^)∑∏∫√π∂∇]*\)\s*)?[:\-—]*\s*',
         re.MULTILINE | re.IGNORECASE
     ),
 )
@@ -1092,9 +1109,10 @@ class QueryClassifier:
         logical_count = sum(1 for kw in LOGICAL_KEYWORDS if kw in query_lower)
         # FIX: "formalize" is a strong indicator of logical reasoning - treat it like logic symbols
         # Similar to how "bayes" is a strong indicator for probabilistic reasoning
+        # Use module-level constant STRONG_LOGICAL_INDICATORS for maintainability
         has_strong_logical_indicator = any(
             indicator in query_lower 
-            for indicator in ['formalize', 'formalise', 'fol', 'sat problem', 'propositional']
+            for indicator in STRONG_LOGICAL_INDICATORS
         )
         if logical_count >= LOGICAL_KEYWORD_THRESHOLD or has_strong_logical_indicator or any(sym in query_lower for sym in ['∧', '∨', '→', '¬', '⊢', '⊨']):
             return QueryClassification(
