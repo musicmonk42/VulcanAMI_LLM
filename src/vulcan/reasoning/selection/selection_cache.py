@@ -143,16 +143,25 @@ class LRUCache:
                     self.size_bytes -= old_entry.size_bytes
 
                 # Check if we need to evict
-                while (
+                # FIX: Batch eviction - remove 10% of entries when at capacity
+                # to reduce lock contention and eviction overhead
+                needs_eviction = (
                     len(self.cache) >= self.max_size
                     or self.size_bytes + size_bytes > self.max_bytes
-                ):
-                    if not self.cache:
-                        break
-                    # Remove least recently used
-                    oldest_key = next(iter(self.cache))
-                    oldest_entry = self.cache.pop(oldest_key)
-                    self.size_bytes -= oldest_entry.size_bytes
+                )
+                if needs_eviction and self.cache:
+                    # Evict 10% of entries (min 1) instead of just 1
+                    evict_count = max(1, self.max_size // 10)
+                    evicted = 0
+                    while evicted < evict_count and self.cache:
+                        if len(self.cache) < self.max_size * 0.8 and self.size_bytes + size_bytes <= self.max_bytes:
+                            # Stop early if we've freed enough space (below 80% capacity)
+                            break
+                        # Remove least recently used
+                        oldest_key = next(iter(self.cache))
+                        oldest_entry = self.cache.pop(oldest_key)
+                        self.size_bytes -= oldest_entry.size_bytes
+                        evicted += 1
 
                 # Add new entry
                 entry = CacheEntry(

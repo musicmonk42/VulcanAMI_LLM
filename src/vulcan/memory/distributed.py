@@ -564,16 +564,29 @@ class DistributedMemory(BaseMemorySystem):
                     self.cipher = Fernet(key.encode())
                     logger.info("Using encryption key from environment")
                 else:
-                    # Generate ephemeral key and warn about federation issues
-                    self.cipher = Fernet(Fernet.generate_key())
-                    logger.warning("=" * 60)
-                    logger.warning("GENERATED EPHEMERAL ENCRYPTION KEY")
-                    logger.warning("This key is NOT shared across federation nodes.")
-                    logger.warning("Decryption will fail if memories are replicated.")
-                    logger.warning(
-                        "Set MEMORY_ENCRYPT_KEY or provide federation_key parameter."
-                    )
-                    logger.warning("=" * 60)
+                    # FIX #MEM-3: Check if distributed mode before using ephemeral key
+                    # In distributed mode, ephemeral keys will cause decryption failures
+                    # when memories are replicated to other nodes
+                    if len(self.federation.nodes) > 1:
+                        # Distributed without shared key → FAIL FAST
+                        raise ValueError(
+                            "Distributed mode requires MEMORY_ENCRYPT_KEY environment variable "
+                            "or federation_key parameter. Cannot use ephemeral keys because "
+                            "replicated memories would be unreadable on other nodes."
+                        )
+                    else:
+                        # Single node → ephemeral OK (warn but continue)
+                        self.cipher = Fernet(Fernet.generate_key())
+                        logger.warning("=" * 60)
+                        logger.warning("GENERATED EPHEMERAL ENCRYPTION KEY (single node)")
+                        logger.warning(
+                            "This is acceptable for single-node operation but will cause "
+                            "decryption failures if you add more nodes to the federation."
+                        )
+                        logger.warning(
+                            "Set MEMORY_ENCRYPT_KEY or provide federation_key for multi-node."
+                        )
+                        logger.warning("=" * 60)
 
         # Redis client fallback
         self.redis_client: Optional[redis.Redis] = None

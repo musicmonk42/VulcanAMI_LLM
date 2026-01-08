@@ -71,6 +71,7 @@ Error Handling:
 import atexit
 import dataclasses  # Note: Import at module level for dataclasses.asdict() usage
 import hashlib
+import json
 import logging
 import os
 import re
@@ -83,16 +84,12 @@ from typing import Any, Dict, List, Optional
 logger = logging.getLogger(__name__)
 
 # =============================================================================
-# Query Preprocessor Import (FIX #1)
+# Query Preprocessor - REMOVED (was architectural band-aid)
 # =============================================================================
-# Import query preprocessor for extracting formal syntax from natural language
-# This prevents parse errors like "Unexpected token 'Reasoning'" in engines
-try:
-    from .query_preprocessor import get_query_preprocessor
-    QUERY_PREPROCESSOR_AVAILABLE = True
-except ImportError:
-    QUERY_PREPROCESSOR_AVAILABLE = False
-    get_query_preprocessor = None  # type: ignore
+# The query preprocessor has been removed. Root causes are now fixed directly
+# in the engines (cryptographic engine, symbolic reasoner, etc.)
+QUERY_PREPROCESSOR_AVAILABLE = False
+get_query_preprocessor = None  # type: ignore
 
 # =============================================================================
 # Answer Validator Import (META-REASONING FIX)
@@ -949,27 +946,15 @@ class ReasoningIntegration:
     def _init_query_bridge(self) -> Optional[Any]:
         """
         Initialize QueryToProblemBridge component with error handling.
+        
+        NOTE: QueryToProblemBridge has been REMOVED as part of architecture simplification.
+        The bridge was patching router decomposition issues that are now fixed at root cause.
 
         Returns:
-            QueryToProblemBridge instance if successful, None otherwise.
+            None - bridge is no longer used.
         """
-        try:
-            from vulcan.reasoning.query_to_problem_bridge import get_query_to_problem_bridge
-
-            bridge = get_query_to_problem_bridge()
-            logger.info(f"{LOG_PREFIX} QueryToProblemBridge initialized successfully")
-            return bridge
-
-        except ImportError as e:
-            logger.warning(
-                f"{LOG_PREFIX} QueryToProblemBridge not available (missing dependency): {e}"
-            )
-        except Exception as e:
-            logger.error(
-                f"{LOG_PREFIX} QueryToProblemBridge initialization failed: {e}",
-                exc_info=True
-            )
-
+        # QueryToProblemBridge removed - return None
+        logger.debug(f"{LOG_PREFIX} QueryToProblemBridge removed (architectural simplification)")
         return None
 
     def _init_semantic_bridge(self) -> Optional[Any]:
@@ -1217,6 +1202,21 @@ class ReasoningIntegration:
                         query, query_type, complexity, context
                     )
                     selection_time = (time.perf_counter() - selection_time_start) * 1000
+                    
+                    # FIX: Verify delegation actually happened - log warning if not
+                    actual_tool = result.selected_tools[0] if result.selected_tools else "none"
+                    if actual_tool != recommended_tool:
+                        logger.warning(
+                            f"{LOG_PREFIX} DELEGATION MISMATCH: World model recommended "
+                            f"'{recommended_tool}' but tool_selector returned '{actual_tool}'. "
+                            f"This may indicate tool_selector is overriding delegation."
+                        )
+                        # Still return result - but flag the mismatch
+                        if result.metadata is None:
+                            result.metadata = {}
+                        result.metadata["delegation_mismatch"] = True
+                        result.metadata["expected_tool"] = recommended_tool
+                        result.metadata["actual_tool"] = actual_tool
                     
                     # Add delegation metadata to result (with safety check)
                     if result.metadata is None:
@@ -1491,39 +1491,12 @@ class ReasoningIntegration:
                 )
 
             # ================================================================
-            # FIX #1: QUERY PREPROCESSING - Extract formal syntax
+            # FIX #1: QUERY PREPROCESSING - REMOVED (architectural band-aid)
             # ================================================================
-            # Preprocess query BEFORE passing to reasoning engines
-            # This prevents parse errors like "Unexpected token 'Reasoning'"
-            preprocessing_result = None
-            if QUERY_PREPROCESSOR_AVAILABLE and get_query_preprocessor is not None:
-                try:
-                    # Determine which tools are likely to be used
-                    # Use a quick heuristic based on query type
-                    predicted_tools = self._predict_tools_for_preprocessing(query, query_type)
-                    
-                    # Now preprocess based on predicted tools
-                    preprocessor = get_query_preprocessor()
-                    preprocessing_result = preprocessor.preprocess(
-                        query=query,
-                        query_type=query_type,
-                        reasoning_tools=predicted_tools
-                    )
-                    
-                    # PreprocessingResult is a dataclass with attribute access
-                    if preprocessing_result.preprocessing_applied:
-                        logger.info(
-                            f"{LOG_PREFIX} Preprocessing extracted formal input "
-                            f"(confidence={preprocessing_result.extraction_confidence:.2f})"
-                        )
-                        
-                        # Store preprocessing result in context for engines
-                        if context is None:
-                            context = {}
-                        context['preprocessing'] = preprocessing_result
-                        
-                except Exception as e:
-                    logger.warning(f"{LOG_PREFIX} Query preprocessing failed: {e}")
+            # Query preprocessing has been removed. Root causes are now fixed
+            # directly in the engines (cryptographic engine header detection,
+            # symbolic reasoner query decomposition, etc.)
+            # The QueryDecomposer is used directly by the SymbolicReasoner.
 
             # Check if we should use decomposition for complex queries
             if self._should_use_decomposition(complexity):
@@ -1793,13 +1766,21 @@ class ReasoningIntegration:
                 if confidence < 0.1 and selected_tools:
                     original_tool = selected_tools[0] if selected_tools else 'unknown'
                     
-                    # Note: Check and increment fallback attempt counter
+                    # FIX: Check and increment fallback attempt counter
                     # Using SHA-256 instead of MD5 for security (per code review)
+                    # Fixed to increment THEN check to avoid off-by-one error
                     query_hash = hashlib.sha256(query.encode()).hexdigest()[:16]
+                    should_try_fallback = False
+                    attempt_number = 0
+                    
                     with self._fallback_attempts_lock:
                         current_attempts = self._fallback_attempts.get(query_hash, 0)
+                        # Increment FIRST, then check
+                        new_attempts = current_attempts + 1
+                        self._fallback_attempts[query_hash] = new_attempts
+                        attempt_number = new_attempts
                         
-                        if current_attempts >= MAX_FALLBACK_ATTEMPTS:
+                        if new_attempts > MAX_FALLBACK_ATTEMPTS:
                             logger.error(
                                 f"{LOG_PREFIX} Note: Max fallback attempts "
                                 f"({MAX_FALLBACK_ATTEMPTS}) exceeded for query {query_hash}. "
@@ -1808,15 +1789,14 @@ class ReasoningIntegration:
                             # Set minimum floor and continue without more retries
                             confidence = MIN_CONFIDENCE_FLOOR
                         else:
-                            # Increment attempt counter
-                            self._fallback_attempts[query_hash] = current_attempts + 1
+                            should_try_fallback = True
                     
                     # Only try fallback if we haven't exceeded max attempts
-                    if current_attempts < MAX_FALLBACK_ATTEMPTS:
+                    if should_try_fallback:
                         logger.warning(
                             f"{LOG_PREFIX} Note: Tool '{original_tool}' returned very low "
                             f"confidence ({confidence:.3f}), trying fallback tools "
-                            f"(attempt {current_attempts + 1}/{MAX_FALLBACK_ATTEMPTS})"
+                            f"(attempt {attempt_number}/{MAX_FALLBACK_ATTEMPTS})"
                         )
                         
                         # FIX #4: Improved fallback logic - try alternative engines before LLM
@@ -2502,7 +2482,15 @@ class ReasoningIntegration:
             )
             
             if response.status_code == 200:
-                arena_result = response.json()
+                try:
+                    arena_result = response.json()
+                except json.JSONDecodeError as e:
+                    logger.error(
+                        f"{LOG_PREFIX} Arena returned invalid JSON: {e}. "
+                        f"Response: {response.text[:200]}"
+                    )
+                    return None
+                    
                 result_data = arena_result.get('result', {})
                 
                 logger.info(
@@ -2518,8 +2506,9 @@ class ReasoningIntegration:
                     'original_tool': original_tool,
                 }
             else:
-                logger.warning(
-                    f"{LOG_PREFIX} Arena returned status {response.status_code}: "
+                # FIX: More descriptive error for HTTP errors
+                logger.error(
+                    f"{LOG_PREFIX} Arena HTTP error {response.status_code}: "
                     f"{response.text[:200]}"
                 )
                 return None
@@ -2543,7 +2532,7 @@ class ReasoningIntegration:
             )
             return None
         except Exception as e:
-            logger.error(f"{LOG_PREFIX} Arena delegation failed: {e}")
+            logger.error(f"{LOG_PREFIX} Arena delegation failed: {e}", exc_info=True)
             return None
     
     def _sanitize_context_for_json(self, context: Dict[str, Any]) -> Dict[str, Any]:
@@ -2683,16 +2672,38 @@ class ReasoningIntegration:
         # 
         # These queries contain "your" or "you" but are asking for ANALYSIS,
         # not just description of capabilities.
+        #
+        # FIX: Distinguish between asking ABOUT VULCAN's analysis capabilities
+        # vs asking VULCAN to PERFORM analysis on external data.
         # =====================================================================
         
-        # If query has analysis indicators, it needs specialized tools NOT world_model
-        # Uses module-level ANALYSIS_INDICATORS constant for maintainability
+        # Check if query is directed AT VULCAN (about its own capabilities/state)
+        vulcan_directed_indicators = [
+            'your ', 'your\n', 'you ', 'you?', "you'", 'yourself',
+            'vulcan', 'about you', 'tell me about', 'describe your',
+        ]
+        is_about_vulcan = any(ind in query_lower for ind in vulcan_directed_indicators)
+        
+        # If query has analysis indicators AND is about VULCAN, it's META-ANALYSIS
+        # e.g., "What are YOUR weaknesses?" → This IS self-referential (about VULCAN)
+        # vs "What is the weakest causal link in this data?" → NOT self-referential
         if any(indicator in query_lower for indicator in ANALYSIS_INDICATORS):
-            logger.debug(
-                f"{LOG_PREFIX} GAP 1 FIX: Query contains analysis indicators - "
-                f"NOT treating as pure meta-description"
-            )
-            return False
+            if is_about_vulcan:
+                # FIX: Query is asking about VULCAN's own analysis/weaknesses/etc
+                # This IS self-referential - should use world_model
+                logger.debug(
+                    f"{LOG_PREFIX} META-ANALYSIS about VULCAN detected - "
+                    f"treating as self-referential (world_model)"
+                )
+                # Don't return False - let it fall through to meta-description check
+            else:
+                # Query has analysis indicators but NOT about VULCAN
+                # This needs specialized tools
+                logger.debug(
+                    f"{LOG_PREFIX} GAP 1 FIX: Query contains analysis indicators - "
+                    f"NOT treating as pure meta-description"
+                )
+                return False
         
         # =====================================================================
         # PURE META-DESCRIPTION PATTERNS
@@ -3211,6 +3222,18 @@ class ReasoningIntegration:
         try:
             # Step 1: Get domains involved
             domains = self._domain_bridge.get_domains_for_tools(selected_tools)
+            
+            # FIX: Early exit if only one domain - no cross-domain transfer possible
+            if len(domains) < 2:
+                logger.debug(
+                    f"{LOG_PREFIX} Single domain query - cross-domain transfer not applicable"
+                )
+                return {
+                    'success': False,
+                    'error': 'single_domain_query',
+                    'domains': list(domains),
+                    'transfer_count': 0,
+                }
             
             # Step 2: Identify primary domain
             query_type = query_analysis.get('type', 'general')

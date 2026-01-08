@@ -1968,6 +1968,12 @@ class CausalReasoner(EnhancedCausalReasoning):
         3. Detect confounders
         4. Recommend experiment choice
         
+        ROOT CAUSE FIX: Now returns found=False when parsing fails instead of
+        always returning found=True with potentially wrong results.
+        
+        ROOT CAUSE FIX: Confidence is now calibrated based on analysis quality
+        instead of hardcoded 0.85/0.60 values.
+        
         Args:
             query_text: Natural language query about causation
             context: Additional context (experiments, etc.)
@@ -1980,8 +1986,38 @@ class CausalReasoner(EnhancedCausalReasoning):
         # Step 1: Parse the query to build a causal DAG
         self._query_dag = self._parse_query_to_dag(query_text)
         
+        # ROOT CAUSE FIX: Check if DAG construction succeeded
+        if self._query_dag is None or self._query_dag.number_of_edges() == 0:
+            logger.warning(
+                "[CausalReasoner] Could not build DAG from query - "
+                "no causal relationships extracted"
+            )
+            return {
+                "found": False,
+                "reason": "Could not extract causal relationships from query",
+                "confidence": 0.15,
+                "hint": "Use explicit causal language like 'X causes Y' or 'A→B'",
+                "query_text": query_text[:100] + "..." if len(query_text) > 100 else query_text,
+                "reasoning_type": "causal",
+            }
+        
         # Step 2: Extract treatment and outcome variables
         treatment, outcome = self._extract_treatment_outcome(query_text)
+        
+        # ROOT CAUSE FIX: Check if treatment and outcome are in the DAG
+        if treatment not in self._query_dag.nodes() or outcome not in self._query_dag.nodes():
+            logger.warning(
+                f"[CausalReasoner] Treatment '{treatment}' or outcome '{outcome}' "
+                f"not found in DAG nodes: {list(self._query_dag.nodes())}"
+            )
+            return {
+                "found": False,
+                "reason": f"Treatment '{treatment}' or outcome '{outcome}' not found in causal graph",
+                "confidence": 0.20,
+                "causal_graph": self._dag_to_string(),
+                "variables_found": list(self._query_dag.nodes()),
+                "reasoning_type": "causal",
+            }
         
         # Step 3: Find confounders using the DAG
         confounders = self._find_confounders_from_dag(treatment, outcome)
@@ -2005,7 +2041,13 @@ class CausalReasoner(EnhancedCausalReasoning):
         # Step 8: Determine if causal effect is identifiable
         identifiable = self._is_effect_identifiable(treatment, outcome, confounders)
         
+        # ROOT CAUSE FIX: Compute calibrated confidence
+        confidence = self._compute_causal_confidence(
+            self._query_dag, treatment, outcome, confounders, experiments
+        )
+        
         return {
+            "found": True,
             "causal_graph": graph_str,
             "treatment": treatment,
             "outcome": outcome,
@@ -2015,19 +2057,119 @@ class CausalReasoner(EnhancedCausalReasoning):
             "experiments": experiments,
             "identifiable": identifiable,
             "explanation": explanation,
-            "confidence": 0.85 if confounders or best_experiment else 0.60,
+            "confidence": confidence,
             "reasoning_type": "causal",
         }
+    
+    def _compute_causal_confidence(
+        self,
+        dag: "nx.DiGraph",
+        treatment: str,
+        outcome: str,
+        confounders: Set[str],
+        experiments: List[Dict]
+    ) -> float:
+        """
+        ROOT CAUSE FIX: Compute calibrated confidence based on analysis quality.
+        
+        Confidence is based on:
+        1. DAG construction quality (number of edges, is it a valid DAG)
+        2. Variable extraction success (treatment and outcome found)
+        3. Confounder identification (found confounders using backdoor criterion)
+        4. Experiment analysis (identified valid experiments)
+        
+        This replaces the hardcoded 0.85/0.60 values.
+        
+        Args:
+            dag: The causal DAG
+            treatment: Treatment variable
+            outcome: Outcome variable
+            confounders: Set of identified confounders
+            experiments: List of extracted experiments
+            
+        Returns:
+            Calibrated confidence score between 0.15 and 0.95
+        """
+        if not NETWORKX_AVAILABLE or dag is None:
+            return 0.15
+        
+        confidence = 0.0
+        
+        # 1. DAG construction quality (0-0.4)
+        dag_score = 0.0
+        
+        # Has nodes
+        if dag.number_of_nodes() > 0:
+            dag_score += 0.1
+        
+        # Has edges (captured relationships)
+        num_edges = dag.number_of_edges()
+        if num_edges > 0:
+            # More edges = more context = higher confidence (capped at 3 edges)
+            dag_score += min(0.2, num_edges * 0.07)
+        
+        # Is a valid DAG (no cycles)
+        if nx.is_directed_acyclic_graph(dag):
+            dag_score += 0.1
+        
+        confidence += dag_score
+        
+        # 2. Variable extraction quality (0-0.2)
+        var_score = 0.0
+        if treatment in dag.nodes():
+            var_score += 0.1
+        if outcome in dag.nodes():
+            var_score += 0.1
+        
+        confidence += var_score
+        
+        # 3. Confounder identification quality (0-0.2)
+        conf_score = 0.0
+        if confounders:
+            # Found confounders - good, we identified potential issues
+            conf_score = min(0.2, len(confounders) * 0.1)
+        else:
+            # No confounders found - could mean none exist OR we missed them
+            # Give partial credit if DAG has no other variables
+            if dag.number_of_nodes() == 2:  # Only treatment and outcome
+                conf_score = 0.1  # Simple graph, confounders unlikely
+        
+        confidence += conf_score
+        
+        # 4. Experiment analysis quality (0-0.15)
+        exp_score = 0.0
+        if experiments:
+            # Found experiments to evaluate
+            exp_score = min(0.15, len(experiments) * 0.05)
+        
+        confidence += exp_score
+        
+        # Apply floor (0.15) and ceiling (0.95)
+        confidence = max(0.15, min(0.95, confidence))
+        
+        logger.debug(
+            f"[CausalReasoner] Calibrated confidence: {confidence:.2f} "
+            f"(dag={dag_score:.2f}, vars={var_score:.2f}, "
+            f"conf={conf_score:.2f}, exp={exp_score:.2f})"
+        )
+        
+        return confidence
 
     def _parse_query_to_dag(self, query_text: str) -> "nx.DiGraph":
         """
         Parse natural language query to build a causal DAG.
         
+        ROOT CAUSE FIX: Enhanced pattern matching to support:
+        - Single-letter variables: "S causes D"
+        - Multi-word variables: "smoking causes cancer"
+        - More flexible phrasing: "RCT", "randomized trial", etc.
+        
         Looks for patterns like:
-        - "X causes Y"
+        - "X causes Y" / "X leads to Y" / "X affects Y"
         - "X users are more likely to Y"
-        - "X linked to Y"
-        - "X have lower Y"
+        - "X linked to Y" / "X associated with Y"
+        - "X have lower/higher Y"
+        - Arrow notation: "X→Y" or "X->Y"
         
         Args:
             query_text: Natural language describing causal relationships
@@ -2044,11 +2186,36 @@ class CausalReasoner(EnhancedCausalReasoning):
         dag = nx.DiGraph()
         
         # Extract single-letter variable names (common in causal examples)
-        variables = set(re.findall(r'\b([A-Z])\b', query_text))
-        for var in variables:
+        single_letter_vars = set(re.findall(r'\b([A-Z])\b', query_text))
+        for var in single_letter_vars:
             dag.add_node(var)
         
         query_lower = query_text.lower()
+        
+        # ROOT CAUSE FIX: Extract multi-word variable names (for more natural queries)
+        # Look for capitalized words that might be variable names
+        multi_word_vars = re.findall(r'\b([A-Z][a-z]+(?:\s+[A-Z]?[a-z]+)*)\b', query_text)
+        variable_aliases = {}  # Map multi-word names to single letters
+        for var in multi_word_vars:
+            if len(var) > 1:  # Skip single letters (already captured)
+                # Create a single-letter alias if possible
+                alias = var[0].upper()
+                if alias not in dag.nodes():
+                    dag.add_node(alias)
+                    variable_aliases[var.lower()] = alias
+                    logger.debug(f"[CausalReasoner] Variable alias: '{var}' -> '{alias}'")
+        
+        # ROOT CAUSE FIX: Arrow notation patterns (X→Y, X->Y)
+        arrow_patterns = re.findall(
+            r'([A-Z]|[A-Z][a-z]+)\s*[→\->]+\s*([A-Z]|[A-Z][a-z]+)',
+            query_text
+        )
+        for cause, effect in arrow_patterns:
+            cause = cause[0].upper() if len(cause) > 1 else cause.upper()
+            effect = effect[0].upper() if len(effect) > 1 else effect.upper()
+            if cause != effect:
+                dag.add_edge(cause, effect)
+                logger.debug(f"Arrow pattern: {cause} -> {effect}")
         
         # Pattern 1: "X users are also more likely to Y"
         # Note: This indicates Y -> X (behavior Y causes X usage)
@@ -2108,7 +2275,7 @@ class CausalReasoner(EnhancedCausalReasoning):
         # and S linked to D (disease), E likely confounds
         # NOTE: With Note, Pattern 1 now correctly adds E -> S
         # This inference ensures the edge is present even if Pattern 1 didn't match
-        if 'S' in variables and 'E' in variables and 'D' in variables:
+        if 'S' in single_letter_vars and 'E' in single_letter_vars and 'D' in single_letter_vars:
             # Common pattern: E -> S and E -> D (exercise affects both)
             if 'exercise' in query_lower or 'E' in query_text:
                 if not dag.has_edge('E', 'S'):
@@ -2279,22 +2446,47 @@ class CausalReasoner(EnhancedCausalReasoning):
         return experiments
 
     def _classify_experiment(self, description: str) -> str:
-        """Classify experiment type from description."""
+        """
+        ROOT CAUSE FIX: More flexible experiment classification.
+        
+        Recognizes:
+        - "randomize X" / "randomized X" / "randomly assign X"
+        - "RCT" / "randomized controlled trial"
+        - observational / no intervention
+        - controlled studies
+        """
+        import re
         desc_lower = description.lower()
         
-        if 'randomize' in desc_lower:
-            # Extract what is being randomized
-            import re
-            match = re.search(r'randomize\s+(\w+)', desc_lower)
+        # ROOT CAUSE FIX: More flexible randomization patterns
+        randomize_patterns = [
+            r'randomize[d]?\s+(\w+)',           # "randomize S" / "randomized S"
+            r'randomly\s+assign\s+(?:\w+\s+)?(\w+)',  # "randomly assign participants to S"
+            r'rct\s+(?:of|with|for)\s+(\w+)',   # "RCT of S"
+            r'randomized\s+(?:controlled\s+)?trial\s+(?:of|with|for)\s+(\w+)',  # "randomized trial of S"
+        ]
+        
+        for pattern in randomize_patterns:
+            match = re.search(pattern, desc_lower)
             if match:
                 return f"randomize_{match.group(1)}"
+        
+        # Generic randomization (RCT without specific variable)
+        if 'randomize' in desc_lower or 'randomly' in desc_lower or 'rct' in desc_lower:
             return "randomize"
-        elif 'observe' in desc_lower or 'no intervention' in desc_lower:
+        
+        # Observational
+        if 'observe' in desc_lower or 'no intervention' in desc_lower or 'observational' in desc_lower:
             return "observational"
-        elif 'control' in desc_lower:
+        
+        # Quasi-experimental designs
+        if 'control for' in desc_lower or 'adjust for' in desc_lower:
+            return "controlled_observational"
+        
+        if 'control' in desc_lower:
             return "controlled"
-        else:
-            return "unknown"
+        
+        return "unknown"
 
     def _recommend_experiment(
         self,
@@ -2305,6 +2497,9 @@ class CausalReasoner(EnhancedCausalReasoning):
     ) -> tuple:
         """
         Recommend the best experiment to identify causal effect.
+        
+        ROOT CAUSE FIX: More flexible matching for experiment descriptions.
+        Recognizes RCT, randomized trials, and other phrasings.
         
         Pearl's do-calculus: To identify P(Y|do(X)):
         - Randomizing X breaks all incoming edges to X
@@ -2327,31 +2522,61 @@ class CausalReasoner(EnhancedCausalReasoning):
         best_reason = ""
         best_score = -1
         
+        treatment_lower = treatment.lower()
+        
         for exp in experiments:
             exp_type = exp.get('type', '')
             exp_desc = exp.get('description', '').lower()
             score = 0
             reason = ""
             
-            # Randomizing the treatment is the gold standard
-            if f"randomize_{treatment.lower()}" == exp_type or \
-               f"randomize {treatment.lower()}" in exp_desc:
+            # ROOT CAUSE FIX: More flexible randomization detection
+            # Check if experiment randomizes the treatment
+            randomizes_treatment = (
+                f"randomize_{treatment_lower}" == exp_type or
+                f"randomize {treatment_lower}" in exp_desc or
+                f"randomized {treatment_lower}" in exp_desc or
+                f"randomly assign" in exp_desc and treatment_lower in exp_desc or
+                ("rct" in exp_desc or "randomized" in exp_desc) and treatment_lower in exp_desc
+            )
+            
+            if randomizes_treatment:
                 score = 100
                 reason = (
                     f"Randomizing {treatment} breaks all backdoor paths through "
                     f"confounders {confounders if confounders else 'if any'}. "
                     f"This isolates the causal effect {treatment}→{outcome}."
                 )
+            # Generic RCT without specific variable (assume it randomizes treatment)
+            elif exp_type == "randomize" or ("rct" in exp_desc and treatment_lower not in exp_desc):
+                # RCT mentioned but not specifically for a variable
+                score = 90
+                reason = (
+                    f"Randomized controlled trial can identify causal effect if it "
+                    f"randomizes {treatment}. Confirm trial design targets {treatment}→{outcome}."
+                )
             # Randomizing a confounder can help but isn't as direct
-            elif any(f"randomize {c.lower()}" in exp_desc for c in confounders):
+            elif any(
+                f"randomize {c.lower()}" in exp_desc or 
+                f"randomized {c.lower()}" in exp_desc
+                for c in confounders
+            ):
                 score = 50
                 randomized = next(
-                    (c for c in confounders if f"randomize {c.lower()}" in exp_desc),
+                    (c for c in confounders 
+                     if f"randomize {c.lower()}" in exp_desc or f"randomized {c.lower()}" in exp_desc),
                     "confounder"
                 )
                 reason = (
                     f"Randomizing confounder {randomized} can help identify the "
                     f"direct effect but doesn't fully isolate {treatment}→{outcome}."
+                )
+            # Controlled observational (controls for confounders)
+            elif exp_type == "controlled_observational":
+                score = 40
+                reason = (
+                    f"Controlling for confounders in observational data can reduce bias "
+                    f"but may not eliminate unmeasured confounding."
                 )
             # Pure observation doesn't identify causal effect
             elif exp_type == "observational" or "observe" in exp_desc:

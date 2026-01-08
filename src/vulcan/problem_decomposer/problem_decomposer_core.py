@@ -10,7 +10,7 @@ import json
 import logging
 import threading
 import time
-from collections import Counter, defaultdict, deque
+from collections import Counter, defaultdict, deque, OrderedDict
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
@@ -573,6 +573,20 @@ class StrategyProfiler:
         self, strategy_name: str, domain: str, complexity: float, success: bool
     ):
         """Update strategy affinity scores"""
+        # FIX: Enforce strategy limit in domain_affinity - strategies can be added
+        # directly via update_affinity() without going through profile_strategy()
+        if strategy_name not in self.domain_affinity and len(self.domain_affinity) >= self.max_strategies:
+            # Remove strategy with worst overall domain affinity
+            if self.domain_affinity:
+                worst_strategy = min(
+                    self.domain_affinity.items(),
+                    key=lambda x: sum(x[1].values()) if x[1] else 0
+                )
+                del self.domain_affinity[worst_strategy[0]]
+                # Also clean up complexity affinity
+                if worst_strategy[0] in self.complexity_affinity:
+                    del self.complexity_affinity[worst_strategy[0]]
+        
         # Enforce domain limit per strategy
         if len(self.domain_affinity[strategy_name]) >= self.max_domains_per_strategy:
             # Remove domain with lowest affinity
@@ -789,8 +803,9 @@ class ProblemDecomposer:
         self.domain_selector = DomainSelector()
 
         # Cache - with thread safety
-        self.decomposition_cache = {}
-        self.signature_cache = {}
+        # FIX: Use OrderedDict for LRU behavior instead of dict (FIFO)
+        self.decomposition_cache = OrderedDict()
+        self.signature_cache = OrderedDict()
         self.cache_size = 100
         self._cache_lock = threading.RLock()
 
@@ -1224,6 +1239,8 @@ class ProblemDecomposer:
 
         with self._cache_lock:
             if sig_str in self.signature_cache:
+                # FIX: Move to end for LRU behavior
+                self.signature_cache.move_to_end(sig_str)
                 return self.signature_cache[sig_str]
 
         # Convert to graph

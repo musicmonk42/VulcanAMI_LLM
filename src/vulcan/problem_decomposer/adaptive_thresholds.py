@@ -524,8 +524,8 @@ class PerformanceTracker:
             metadata: Additional metadata
         """
         with self._lock:
-            # FIX: Increment total_attempts counter
-            self.total_attempts += 1
+            # Note: total_attempts is incremented in record_attempt() or record_execution()
+            # Do NOT increment here to avoid double counting
 
             record = PerformanceRecord(
                 problem_signature=problem_signature,
@@ -565,8 +565,8 @@ class PerformanceTracker:
             execution_time: Execution time
         """
         with self._lock:
-            # FIX: Increment total_attempts counter
-            self.total_attempts += 1
+            # Note: total_attempts is incremented in record_attempt() or record_execution()
+            # Do NOT increment here to avoid double counting
 
             record = PerformanceRecord(
                 problem_signature=problem_signature,

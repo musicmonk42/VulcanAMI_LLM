@@ -1456,9 +1456,12 @@ class SemanticToolMatcher:
                 try:
                     tool_embedding = SemanticToolMatcher._tool_embeddings[tool_name]
 
-                    # Cosine similarity (embeddings are normalized)
-                    similarity_score = float(np.dot(query_embedding, tool_embedding))
-                    similarity_score = max(0.0, similarity_score)  # Clamp to [0, 1]
+                    # Cosine similarity (embeddings are normalized, so dot product = cosine similarity)
+                    # Range is [-1, 1] for normalized vectors
+                    raw_similarity = float(np.dot(query_embedding, tool_embedding))
+                    # FIX: Normalize to [0, 1] range for use as probability-like score
+                    # Map [-1, 1] -> [0, 1] then clamp
+                    similarity_score = np.clip((raw_similarity + 1.0) / 2.0, 0.0, 1.0)
                 except Exception as e:
                     logger.warning(f"Embedding similarity failed for {tool_name}: {e}")
 

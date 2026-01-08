@@ -242,14 +242,45 @@ class AnswerValidator:
     ])
     
     # META-REASONING FIX: Keywords for self-introspection queries
+    # ROOT CAUSE FIX: Expanded keyword list to catch more variations
     _SELF_INTROSPECTION_KEYWORDS: FrozenSet[str] = frozenset([
+        # Original keywords
         'what makes you different', 'are you self-aware', 'your capabilities',
         'what are you', 'who are you', 'your limitations', 'your strengths',
         'can you think', 'consciousness', 'sentient', 'how do you reason',
         'your reasoning', 'your architecture', 'what makes vulcan',
         'vulcan different', 'vulcan unique', 'tell me about yourself',
         'describe yourself', 'your abilities', 'about yourself',
+        # ROOT CAUSE FIX: Additional variations
+        'your skill', 'your capability', 'your ability',  # Singular forms
+        'compare you', 'compared to you', 'different from chatgpt',
+        'different from gpt', 'different from other ai', 'how are you different',
+        'why are you different', 'vulcan feature', 'vulcan key',
+        'vulcan\'s feature', 'vulcan\'s key', 'vulcan\'s capabilit',
+        'your approach', 'your method', 'your technique',
+        'explain how you', 'describe how you', 'how do you work',
+        'how you work', 'how you think', 'how you process',
+        'what can you do', 'what do you do', 'how you differ',
+        'are you conscious', 'are you aware', 'your awareness',
+        'your understanding', 'your knowledge', 'your intelligence',
+        'your ai', 'you as an ai', 'you an ai', 'are you an ai',
+        # Third-person VULCAN references
+        'vulcan\'s approach', 'vulcan\'s method', 'vulcan\'s reasoning',
+        'vulcan system', 'about vulcan', 'vulcan capabilities',
+        'vulcan features', 'vulcan abilities', 'vulcan strengths',
     ])
+    
+    # ROOT CAUSE FIX: Engine capability mapping for pre-routing validation
+    _ENGINE_CAPABILITIES: Dict[str, FrozenSet[str]] = {
+        'symbolic': frozenset(['fol', 'sat', 'proof', 'logic']),
+        'mathematical': frozenset(['mathematical', 'computation', 'numeric']),
+        'analogical': frozenset(['analogy', 'comparison', 'transfer']),
+        'causal': frozenset(['causal', 'counterfactual', 'intervention']),
+        'world_model': frozenset(['self_introspection', 'meta_reasoning', 'world_model']),
+        'philosophical': frozenset(['ethical', 'philosophical', 'moral']),
+        'probabilistic': frozenset(['bayesian', 'probabilistic', 'uncertainty']),
+        'language': frozenset(['general', 'factual', 'yes_no']),
+    }
     
     def __init__(self) -> None:
         """Initialize the AnswerValidator with domain-specific validators."""
@@ -266,6 +297,85 @@ class AnswerValidator:
             'meta_reasoning': self._validate_self_introspection_answer,
             'world_model': self._validate_self_introspection_answer,
         }
+    
+    def validate_engine_compatibility(
+        self,
+        query: str,
+        engine_name: str
+    ) -> ValidationResult:
+        """
+        ROOT CAUSE FIX: Pre-routing validation to check if engine can handle query.
+        
+        This method should be called BEFORE routing to prevent selecting
+        incompatible engines. Returns invalid if the engine lacks the capability
+        to handle the query type.
+        
+        Args:
+            query: The query to analyze
+            engine_name: Name of the engine to check
+            
+        Returns:
+            ValidationResult with valid=False if engine cannot handle query type
+        """
+        query_type = self._infer_expected_type(query)
+        
+        # Get engine capabilities
+        engine_caps = self._ENGINE_CAPABILITIES.get(engine_name.lower(), frozenset())
+        
+        # Check if query type is in engine's capabilities
+        if query_type in engine_caps or 'general' in engine_caps:
+            return ValidationResult(
+                valid=True,
+                confidence=1.0,
+                failures=[],
+                explanation=f"Engine '{engine_name}' can handle '{query_type}' queries",
+                suggestions=[]
+            )
+        
+        # Engine cannot handle this query type
+        # Find compatible engines
+        compatible_engines = [
+            eng for eng, caps in self._ENGINE_CAPABILITIES.items()
+            if query_type in caps
+        ]
+        
+        return ValidationResult(
+            valid=False,
+            confidence=0.0,
+            failures=[ValidationFailureReason.WRONG_DOMAIN],
+            explanation=f"Engine '{engine_name}' cannot handle '{query_type}' queries",
+            suggestions=[
+                f"Use one of these engines instead: {compatible_engines}"
+            ] if compatible_engines else ["No compatible engine found"]
+        )
+    
+    def get_compatible_engines(self, query: str) -> List[str]:
+        """
+        ROOT CAUSE FIX: Get list of engines compatible with a query.
+        
+        This can be used by the router to filter incompatible engines
+        before selecting a tool.
+        
+        Args:
+            query: The query to analyze
+            
+        Returns:
+            List of engine names that can handle this query type
+        """
+        query_type = self._infer_expected_type(query)
+        
+        compatible = []
+        for engine_name, capabilities in self._ENGINE_CAPABILITIES.items():
+            if query_type in capabilities:
+                compatible.append(engine_name)
+        
+        # If no specific engine, any engine with 'general' capability works
+        if not compatible:
+            for engine_name, capabilities in self._ENGINE_CAPABILITIES.items():
+                if 'general' in capabilities:
+                    compatible.append(engine_name)
+        
+        return compatible
     
     def validate(
         self, 

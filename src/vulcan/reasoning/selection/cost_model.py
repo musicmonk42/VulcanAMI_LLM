@@ -360,6 +360,13 @@ class StochasticCostModel:
             "neural": 1500.0,           # 1.5s - neural inference
             "hybrid": 3000.0,           # 3s - combination of methods
             "general": 1000.0,          # 1s - general fallback
+            # FIX: Added missing tool cost priors
+            "philosophical": 1500.0,    # 1.5s - ethical reasoning
+            "mathematical": 1200.0,     # 1.2s - mathematical computation
+            "world_model": 500.0,       # 0.5s - self-referential queries
+            "cryptographic": 100.0,     # 0.1s - hash computations are fast
+            "analogical": 600.0,        # 0.6s - analogical reasoning
+            "multimodal": 8000.0,       # 8s - multimodal processing is slow
         })
 
 

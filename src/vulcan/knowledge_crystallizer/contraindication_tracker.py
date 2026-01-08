@@ -1295,18 +1295,22 @@ class CascadeAnalyzer:
                 scenario["severity"] *= impact
                 scenario["affected_components"] = path
 
-        # Cache result
-        self.simulation_cache[cache_key] = (time.time(), scenario)
+        # FIX #KC-1: Cache result with size enforcement INSIDE lock to prevent race condition
+        # Previously, cache additions happened outside lock, allowing multiple threads
+        # to exceed the 200 entry limit simultaneously before cleanup
+        with self.lock:
+            self.simulation_cache[cache_key] = (time.time(), scenario)
 
-        # Clean old cache entries periodically with size enforcement
-        if len(self.simulation_cache) > 200:
-            self._clean_cache()
-            # If still over limit after cleaning, enforce hard limit
+            # Clean old cache entries periodically with size enforcement
             if len(self.simulation_cache) > 200:
-                sorted_items = sorted(
-                    self.simulation_cache.items(), key=lambda x: x[1][0], reverse=True
-                )
-                self.simulation_cache = dict(sorted_items[:200])
+                self._clean_cache()
+                # If still over limit after cleaning, enforce hard limit
+                if len(self.simulation_cache) > 200:
+                    # FIX: Sort ascending by time (oldest first) and keep newest 200
+                    sorted_items = sorted(
+                        self.simulation_cache.items(), key=lambda x: x[1][0]
+                    )
+                    self.simulation_cache = dict(sorted_items[-200:])  # Keep newest 200
 
         return scenario
 

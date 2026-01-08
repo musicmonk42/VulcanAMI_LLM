@@ -4869,13 +4869,27 @@ class ToolSelector:
                     # Could return safety-filtered result here
 
             # Check consensus if multiple results
+            # FIX: Only check consensus for REDUNDANT tools (same paradigm), not
+            # for COMPLEMENTARY tools (different paradigms) which SHOULD give different results.
             if len(execution_result.all_results) > 1:
-                is_consistent, consensus_conf, details = (
-                    self.safety_governor.check_consensus(execution_result.all_results)
-                )
+                # Determine if tools are from the same paradigm or different paradigms
+                tool_paradigms = {self._get_tool_paradigm(t) for t in execution_result.tools_used}
+                
+                if len(tool_paradigms) == 1:
+                    # Same paradigm - consensus IS expected (redundant execution)
+                    is_consistent, consensus_conf, details = (
+                        self.safety_governor.check_consensus(execution_result.all_results)
+                    )
 
-                if not is_consistent and consensus_conf < 0.5:
-                    logger.warning(f"Low consensus: {details}")
+                    if not is_consistent and consensus_conf < 0.5:
+                        logger.warning(f"Low consensus among redundant tools: {details}")
+                else:
+                    # Different paradigms - consensus NOT expected (complementary reasoning)
+                    # Each paradigm provides different insights, disagreement is normal
+                    logger.debug(
+                        f"[ToolSelector] Multi-paradigm execution ({tool_paradigms}) - "
+                        f"diverse results expected, skipping consensus check"
+                    )
 
             execution_time = (time.time() - start_time) * 1000
 
@@ -5376,6 +5390,41 @@ class ToolSelector:
             all_results={},
             metadata={"safety_veto": True},
         )
+
+    def _get_tool_paradigm(self, tool_name: str) -> str:
+        """
+        Map tool name to its reasoning paradigm.
+        
+        Tools within the same paradigm are expected to give similar results.
+        Tools from different paradigms are EXPECTED to give different results
+        (complementary reasoning).
+        
+        Paradigm categories:
+        - logic: Symbolic, formal reasoning (proofs, theorems)
+        - probability: Statistical, Bayesian reasoning
+        - causality: Causal inference, interventions
+        - analogy: Analogical reasoning, structure mapping
+        - computation: Mathematical calculations
+        - philosophical: Ethical, deontic reasoning
+        
+        Args:
+            tool_name: Name of the tool
+            
+        Returns:
+            Paradigm name (string)
+        """
+        paradigm_map = {
+            'symbolic': 'logic',
+            'probabilistic': 'probability',
+            'bayesian': 'probability',
+            'causal': 'causality',
+            'analogical': 'analogy',
+            'mathematical': 'computation',
+            'philosophical': 'philosophical',
+            'world_model': 'meta',
+            'multimodal': 'multimodal',
+        }
+        return paradigm_map.get(tool_name.lower(), 'unknown')
 
     def _create_failure_result(self) -> SelectionResult:
         """Create result for execution failure"""

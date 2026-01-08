@@ -761,14 +761,19 @@ class CrystallizationSelector:
 
         if domain == "general":
             return DomainType.GENERAL
-        elif domain in known_domains:
-            # Check if in known_domains BEFORE checking for underscores
-            return DomainType.SPECIALIZED
-        elif "_" in domain or "-" in domain:
-            # Likely cross-domain
+        
+        # FIX #KC-3: Check for cross-domain indicators FIRST (more specific pattern)
+        # A domain like "optimization_control" should be CROSS_DOMAIN even if it's
+        # in known_domains, because the underscore indicates it spans multiple areas
+        if "_" in domain or "-" in domain:
             return DomainType.CROSS_DOMAIN
-        else:
-            return DomainType.NOVEL
+        
+        # Then check if it's a known specialized domain (single-area domains only)
+        if domain in known_domains:
+            return DomainType.SPECIALIZED
+        
+        # Unknown domain without cross-domain indicators
+        return DomainType.NOVEL
 
     def _calculate_failure_rate(self, trace: Any, context: Dict[str, Any]) -> float:
         """Calculate failure rate from trace and context"""

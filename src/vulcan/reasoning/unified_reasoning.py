@@ -51,8 +51,9 @@ logger = logging.getLogger(__name__)
 # Note: Cache key was using only 8 chars, causing collisions.
 
 # Number of hex characters to use from SHA-256 hash for cache keys
-# 16 hex chars = 64 bits = very low collision probability
-CACHE_HASH_LENGTH = 16
+# 32 hex chars = 128 bits = extremely low collision probability
+# Birthday paradox: 50% collision after ~2^64 operations (sqrt of 2^128 hash space)
+CACHE_HASH_LENGTH = 32
 
 # Maximum cache entry age in seconds (5 minutes)
 CACHE_MAX_AGE_SECONDS = 300.0
@@ -104,6 +105,10 @@ CONFIDENCE_FLOOR_ANALOGICAL_DEFAULT = 0.15  # Minimum floor for analogical reaso
 CONFIDENCE_FLOOR_DEFAULT = 0.2  # Generic minimum floor for other reasoners
 CONFIDENCE_FLOOR_NO_RESULT = 0.1  # Floor when reasoner returns empty/null result
 
+# Minimum weight floor for ensemble calculations
+# Prevents floating-point underflow when all weight components are small
+MIN_ENSEMBLE_WEIGHT_FLOOR = 0.001
+
 # Problem type identifiers
 PROBLEM_TYPE_BAYESIAN = 'bayesian'
 
@@ -154,13 +159,15 @@ CREATIVE_TASK_KEYWORDS = (
 # Maximum text length to check for creative keywords (performance optimization)
 MAX_CREATIVE_CHECK_LENGTH = 2000
 
-# Note: Pre-compile regex patterns at module level
-# Previously patterns were recompiled on every call to _is_creative_task
+# Note: Pre-compile regex patterns at module level for ALL keywords
+# Previously: only single-word keywords had patterns, multi-word used substring
+# FIX: Use word boundaries for all keywords to prevent false positives like
+# "creative problem solving" matching "creative" or "non-creative writing" matching "creative writing"
 import re
 _CREATIVE_KEYWORD_PATTERNS = {}
 for _kw in CREATIVE_TASK_KEYWORDS:
-    if ' ' not in _kw:
-        _CREATIVE_KEYWORD_PATTERNS[_kw] = re.compile(r'\b' + re.escape(_kw) + r'\b')
+    # Use word boundaries for both single and multi-word keywords
+    _CREATIVE_KEYWORD_PATTERNS[_kw] = re.compile(r'\b' + re.escape(_kw) + r'\b', re.IGNORECASE)
 
 
 def _is_creative_task(task: 'ReasoningTask') -> bool:
@@ -200,17 +207,12 @@ def _is_creative_task(task: 'ReasoningTask') -> bool:
         query_str = str(task.query)[:MAX_CREATIVE_CHECK_LENGTH]
         text_to_check += " " + query_str.lower()
     
-    # Check for creative keywords using pre-compiled patterns 
+    # Check for creative keywords using pre-compiled patterns with word boundaries
+    # FIX: All keywords now use word boundary patterns to prevent false positives
     for keyword in CREATIVE_TASK_KEYWORDS:
-        if ' ' not in keyword:
-            # Use pre-compiled regex pattern
-            pattern = _CREATIVE_KEYWORD_PATTERNS.get(keyword)
-            if pattern and pattern.search(text_to_check):
-                return True
-        else:
-            # Multi-word keywords: direct substring match is fine
-            if keyword in text_to_check:
-                return True
+        pattern = _CREATIVE_KEYWORD_PATTERNS.get(keyword)
+        if pattern and pattern.search(text_to_check):
+            return True
     
     return False
 
@@ -222,6 +224,9 @@ def _is_test_environment() -> bool:
     Only return True if explicitly in test mode via environment or explicit test framework.
     
     PRINCIPLE: Safety-first - default to production mode when uncertain.
+    
+    FIX: Added detection for pytest being imported without PYTEST_CURRENT_TEST.
+    This helps detect test runs that didn't set the env var properly.
     """
     import sys
     
@@ -236,10 +241,22 @@ def _is_test_environment() -> bool:
         logger.debug("Test environment detected via explicit indicator")
         return True
     
-    # Check for pytest-xdist parallel worker (separate from PYTEST_CURRENT_TEST check above)
-    # PYTEST_CURRENT_TEST is set during normal pytest runs, but pytest-xdist workers
-    # use a different environment variable
-    if "_pytest" in sys.modules:
+    # FIX: Check if pytest is imported as a module (indicates test context)
+    # This catches cases where PYTEST_CURRENT_TEST isn't set
+    if "pytest" in sys.modules or "_pytest" in sys.modules:
+        # Additionally check if we're actually in a test by looking for test frames
+        # This prevents false positives when pytest is installed but not running tests
+        try:
+            import traceback
+            for frame in traceback.extract_stack():
+                # Check if any frame is from a test file or pytest
+                if '/pytest' in frame.filename or 'test_' in frame.filename:
+                    logger.debug("Test environment detected via pytest in call stack")
+                    return True
+        except Exception:
+            pass
+        
+        # pytest-xdist parallel worker check
         pytest_worker = os.getenv("PYTEST_XDIST_WORKER") is not None
         if pytest_worker:
             logger.debug("Test environment detected via pytest-xdist worker")
@@ -387,12 +404,18 @@ class ToolWeightManager:
             return self._weights.copy()
 
 
-# Global instance accessor
+# Global instance accessor with proper locking
 _weight_manager: Optional[ToolWeightManager] = None
+_weight_manager_lock = threading.Lock()
 
 
 def get_weight_manager() -> ToolWeightManager:
     """Get the singleton ToolWeightManager instance.
+    
+    Note: Uses double-checked locking to ensure thread-safe singleton.
+    The ToolWeightManager class also uses __new__ for singleton pattern,
+    but this accessor adds an additional layer of protection against race
+    conditions when multiple threads call get_weight_manager() simultaneously.
     
     Usage in Learning system:
         from vulcan.reasoning.unified_reasoning import get_weight_manager
@@ -403,8 +426,11 @@ def get_weight_manager() -> ToolWeightManager:
         weights = get_weight_manager().get_all_weights(["causal", "symbolic"])
     """
     global _weight_manager
+    # Double-checked locking pattern for thread safety
     if _weight_manager is None:
-        _weight_manager = ToolWeightManager()
+        with _weight_manager_lock:
+            if _weight_manager is None:
+                _weight_manager = ToolWeightManager()
     return _weight_manager
 
 
@@ -578,28 +604,6 @@ def _load_reasoning_components():
     except ImportError as e:
         logger.warning(f"ModalityType not available: {e}")
 
-    try:
-        from vulcan.reasoning.language_reasoning import LanguageReasoner  # UNCOMMENTED!
-
-        _REASONING_COMPONENTS["LanguageReasoner"] = LanguageReasoner
-        logger.info("LanguageReasoner loaded successfully")
-    except ImportError as e:
-        logger.warning(f"LanguageReasoner not available: {e}")
-
-        # Minimal fallback only if import fails
-        class LanguageReasonerFallback:
-            def reason(
-                self, input_data: Any, query: Optional[Dict[str, Any]] = None
-            ) -> ReasoningResult:
-                return ReasoningResult(
-                    conclusion="Language reasoning unavailable",
-                    confidence=0.0,  # Not 0.95!
-                    reasoning_type=ReasoningType.SYMBOLIC,
-                    explanation="Real implementation not imported",
-                )
-
-        _REASONING_COMPONENTS["LanguageReasoner"] = LanguageReasonerFallback
-
     return _REASONING_COMPONENTS
 
 
@@ -742,14 +746,6 @@ class UnifiedReasoner:
                 self.reasoners[ReasoningType.ANALOGICAL] = reasoning_components[
                     "AnalogicalReasoningEngine"
                 ](enable_learning=enable_learning)
-            # Use LanguageReasoner as fallback only if SymbolicReasoner is not available
-            if (
-                "LanguageReasoner" in reasoning_components
-                and ReasoningType.SYMBOLIC not in self.reasoners
-            ):
-                self.reasoners[ReasoningType.SYMBOLIC] = reasoning_components[
-                    "LanguageReasoner"
-                ]()
             if "AbstractReasoner" in reasoning_components:
                 reasoning_components["AbstractReasoner"]
                 # self.reasoners[ReasoningType.ABSTRACT] = AbstractReasoner() # This is an abstract class
@@ -2675,9 +2671,14 @@ class UnifiedReasoner:
                 utility_weight = self._calculate_result_utility(
                     result, plan.tasks[0].utility_context, execution_time_ms
                 )
-                weights.append(base_weight * type_weight * utility_weight)
+                raw_weight = base_weight * type_weight * utility_weight
             else:
-                weights.append(base_weight * type_weight)
+                raw_weight = base_weight * type_weight
+            
+            # FIX: Floor individual weights to prevent floating-point underflow
+            # When all components are small (0.1 * 0.1 * 0.01), product can round to 0
+            # This ensures each result contributes at least minimally to the ensemble
+            weights.append(max(MIN_ENSEMBLE_WEIGHT_FLOOR, raw_weight))
 
         # Issue #53: Defensive handling for zero weights
         # If all weights are zero, fall back to uniform weights to prevent np.average error

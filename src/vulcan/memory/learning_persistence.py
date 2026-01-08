@@ -135,17 +135,19 @@ MIN_SAVE_INTERVAL_SECONDS = 30.0  # Minimum seconds between disk saves
 # Validation constraints
 MAX_TOOL_NAME_LENGTH = 256
 MAX_TOOL_WEIGHT_VALUE = 1.0
-# Note: Changed from -1.0 to -0.9 to prevent tool weight "death spiral"
+# FIX #MEM-1: Changed from -0.9 to -0.5 to prevent tool weight "death spiral"
 # The persistence stores weight ADJUSTMENTS (cumulative deltas from 1.0).
-# If adjustment = -1.0, then absolute weight = 1.0 + (-1.0) = 0.0, breaking ensemble.
-# Setting minimum to -0.9 ensures absolute weight >= 0.1 (positive, usable).
-MIN_TOOL_WEIGHT_VALUE = -0.9
+# If adjustment = -0.9, then absolute weight = 1.0 + (-0.9) = 0.1, which is
+# effectively zero in most ensemble voting schemes (tools get ignored).
+# Setting minimum to -0.5 ensures absolute weight >= 0.5 (still usable in ensembles).
+# This prevents good tools from becoming permanently disabled after a few bad outcomes.
+MIN_TOOL_WEIGHT_VALUE = -0.5
 MAX_TOOL_COUNT = 10000
 
 # Weight reset threshold - adjustments below this indicate legacy corruption
 # (from old code that may have stored absolute values instead of adjustments)
-# The absolute weight would be 1.0 + adjustment, so adjustment of -1.0 = absolute 0.0
-WEIGHT_RESET_THRESHOLD = -0.9
+# The absolute weight would be 1.0 + adjustment, so adjustment of -0.5 = absolute 0.5
+WEIGHT_RESET_THRESHOLD = -0.5
 WEIGHT_DEFAULT_VALUE = 0.0  # Default adjustment is 0.0 (absolute weight = 1.0)
 
 # Note: Weight corruption detection constants
@@ -352,6 +354,8 @@ class LearningStatePersistence:
         "_storage_available",
         "_stats",
         "_last_disk_save_time",  # Note: Track last disk save for throttling
+        "_shutdown_event",  # FIX #MEM-2: Event to signal background saver shutdown
+        "_background_saver_thread",  # FIX #MEM-2: Background thread for throttled saves
     )
     
     def __init__(
@@ -418,6 +422,16 @@ class LearningStatePersistence:
         # This prevents excessive I/O by ensuring saves occur at most
         # once every MIN_SAVE_INTERVAL_SECONDS
         self._last_disk_save_time: float = 0.0
+        
+        # FIX #MEM-2: Add background saver to ensure throttled saves eventually persist
+        # This prevents data loss when saves are throttled and process crashes
+        self._shutdown_event: threading.Event = threading.Event()
+        self._background_saver_thread: threading.Thread = threading.Thread(
+            target=self._background_saver_loop,
+            daemon=True,
+            name="LearningPersistence-BackgroundSaver"
+        )
+        self._background_saver_thread.start()
         
         # Initialize storage directory
         self._storage_available = self._ensure_storage_directory()
@@ -552,14 +566,16 @@ class LearningStatePersistence:
             time_since_last_save = current_time - self._last_disk_save_time
             
             if time_since_last_save < MIN_SAVE_INTERVAL_SECONDS:
-                # Throttled - state is cached in memory, will be saved later
+                # FIX #MEM-2: Mark as dirty so background saver will persist it
+                # This prevents data loss when saves are throttled
+                self._dirty = True
                 self._stats["throttled_saves"] += 1
                 logger.debug(
                     f"[LearningStatePersistence] Note: Save throttled "
                     f"({time_since_last_save:.1f}s < {MIN_SAVE_INTERVAL_SECONDS}s), "
-                    f"state cached in memory"
+                    f"state cached in memory (background saver will persist)"
                 )
-                return True  # Cache updated successfully, disk save deferred
+                return True  # Cache updated successfully, background thread will save
             
             try:
                 # Create backup of existing file
@@ -570,6 +586,7 @@ class LearningStatePersistence:
                 success = self._atomic_write(state)
                 
                 if success:
+                    self._dirty = False  # FIX #MEM-2: Clear dirty flag on successful save
                     self._stats["total_saves"] += 1
                     self._stats["last_save_time"] = current_time
                     self._last_disk_save_time = current_time  # Note: Update throttle timer
@@ -688,6 +705,85 @@ class LearningStatePersistence:
             
             # Save current cached state
             return self.save_state(self._cached_state)
+    
+    def _background_saver_loop(self) -> None:
+        """
+        FIX #MEM-2: Background thread that periodically saves dirty state.
+        
+        This ensures that throttled saves eventually persist to disk, preventing
+        data loss if the process crashes during the throttle window.
+        
+        The thread wakes up every MIN_SAVE_INTERVAL_SECONDS and saves if:
+        1. There is cached state that hasn't been persisted (dirty flag)
+        2. Storage is available
+        3. Not shutting down
+        """
+        while not self._shutdown_event.is_set():
+            # Wait for the save interval or shutdown signal
+            if self._shutdown_event.wait(timeout=MIN_SAVE_INTERVAL_SECONDS):
+                # Shutdown signaled
+                break
+            
+            # Check if we have dirty state to save
+            with self._lock:
+                if self._cached_state is None or not self._dirty:
+                    continue
+                
+                if not self._storage_available:
+                    continue
+                
+                # Check if enough time has passed since last save
+                current_time = time.time()
+                time_since_last_save = current_time - self._last_disk_save_time
+                
+                if time_since_last_save < MIN_SAVE_INTERVAL_SECONDS:
+                    continue
+                
+                # Perform the save
+                try:
+                    success = self._atomic_write(self._cached_state)
+                    
+                    if success:
+                        self._dirty = False
+                        self._stats["total_saves"] += 1
+                        self._stats["last_save_time"] = current_time
+                        self._last_disk_save_time = current_time
+                        logger.debug(
+                            "[LearningStatePersistence] Background saver: persisted throttled state"
+                        )
+                except Exception as e:
+                    logger.error(
+                        f"[LearningStatePersistence] Background save failed: {e}"
+                    )
+                    self._stats["errors_count"] += 1
+        
+        logger.debug("[LearningStatePersistence] Background saver thread stopped")
+    
+    def shutdown(self) -> None:
+        """
+        FIX #MEM-2: Clean shutdown - stop background thread and flush state.
+        
+        This should be called on application shutdown to ensure:
+        1. Background saver thread is stopped cleanly
+        2. Any pending state changes are persisted to disk
+        """
+        logger.info("[LearningStatePersistence] Shutting down...")
+        
+        # Signal the background thread to stop
+        self._shutdown_event.set()
+        
+        # Wait for background thread to finish
+        if self._background_saver_thread.is_alive():
+            self._background_saver_thread.join(timeout=5.0)
+            if self._background_saver_thread.is_alive():
+                logger.warning(
+                    "[LearningStatePersistence] Background saver thread did not stop in time"
+                )
+        
+        # Final flush
+        self.flush(force=True)
+        
+        logger.info("[LearningStatePersistence] Shutdown complete")
     
     def update_concept_library(self, concept_library: Dict[str, Any]) -> bool:
         """

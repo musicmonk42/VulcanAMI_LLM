@@ -174,16 +174,14 @@ class ParameterHistoryManager:
         """
         FIXED: Queue checkpoint for asynchronous saving with backpressure
         Accepts either an nn.Module or a pre-built state dict
+        
+        FIX #L-1: Removed racy qsize() check. Now uses put_nowait() which is atomic
+        and raises queue.Full if the queue is at capacity. This prevents the race
+        condition where multiple threads could pass the qsize() check simultaneously
+        and then all try to add to the queue, causing OOM.
         """
         if self._shutdown.is_set():
             logger.warning("Cannot queue checkpoint: manager is shutting down")
-            return
-
-        # FIXED: Check queue size to prevent memory explosion
-        if self.checkpoint_queue.qsize() >= 5:
-            with self._lock:
-                self.stats["queue_full_events"] += 1
-            logger.warning("Checkpoint queue full, skipping async checkpoint")
             return
 
         try:
@@ -214,12 +212,14 @@ class ParameterHistoryManager:
                 logger.error(f"async_checkpoint received invalid type: {type(model)}")
                 return
 
-            # Use timeout to avoid blocking forever
-            self.checkpoint_queue.put((state_dict, model_class, metadata), timeout=0.1)
+            # FIX #L-1: Use put_nowait() for atomic queue insertion.
+            # This is thread-safe and will raise queue.Full immediately if at capacity,
+            # avoiding the race condition of checking qsize() then putting.
+            self.checkpoint_queue.put_nowait((state_dict, model_class, metadata))
         except queue.Full:
             with self._lock:
                 self.stats["queue_full_events"] += 1
-            logger.warning("Failed to queue checkpoint - queue full")
+            logger.warning("Checkpoint queue full, skipping async checkpoint")
         except Exception as e:
             logger.error(f"Failed to queue async checkpoint: {e}")
 
@@ -229,62 +229,71 @@ class ParameterHistoryManager:
             try:
                 state_dict, model_class, metadata = self.checkpoint_queue.get(timeout=1)
 
-                checkpoint_id = f"async_checkpoint_{int(time.time())}"
+                try:
+                    checkpoint_id = f"async_checkpoint_{int(time.time())}"
 
-                # FIXED: Use Path object and ensure parent exists
-                checkpoint_path = self.base_path / f"{checkpoint_id}.pt"
-                checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+                    # FIXED: Use Path object and ensure parent exists
+                    checkpoint_path = self.base_path / f"{checkpoint_id}.pt"
+                    checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
 
-                checkpoint = {
-                    "model_state_dict": state_dict,
-                    "timestamp": time.time(),
-                    "datetime": datetime.now().isoformat(),
-                    "metadata": metadata or {},
-                    "checkpoint_id": checkpoint_id,
-                    "model_class": model_class,
-                }
+                    checkpoint = {
+                        "model_state_dict": state_dict,
+                        "timestamp": time.time(),
+                        "datetime": datetime.now().isoformat(),
+                        "metadata": metadata or {},
+                        "checkpoint_id": checkpoint_id,
+                        "model_class": model_class,
+                    }
 
-                # Calculate checksum
-                state_bytes = pickle.dumps(state_dict)
-                checkpoint["checksum"] = hashlib.sha256(state_bytes).hexdigest()
+                    # Calculate checksum
+                    state_bytes = pickle.dumps(state_dict)
+                    checkpoint["checksum"] = hashlib.sha256(state_bytes).hexdigest()
 
-                if self.compress_checkpoints:
-                    import gzip
+                    if self.compress_checkpoints:
+                        import gzip
 
-                    # FIXED: Use Path.with_suffix() and ensure parent exists
-                    compressed_path = checkpoint_path.with_suffix(".pt.gz")
-                    compressed_path.parent.mkdir(parents=True, exist_ok=True)
+                        # FIXED: Use Path.with_suffix() and ensure parent exists
+                        compressed_path = checkpoint_path.with_suffix(".pt.gz")
+                        compressed_path.parent.mkdir(parents=True, exist_ok=True)
 
-                    with gzip.open(compressed_path, "wb") as f:
-                        torch.save(checkpoint, f)
-                    checkpoint_path = compressed_path
-                else:
-                    torch.save(checkpoint, checkpoint_path)
+                        with gzip.open(compressed_path, "wb") as f:
+                            torch.save(checkpoint, f)
+                        checkpoint_path = compressed_path
+                    else:
+                        torch.save(checkpoint, checkpoint_path)
 
-                with self._lock:
-                    self.parameter_history.append(
-                        {
-                            "checkpoint_id": checkpoint_id,
-                            "path": str(checkpoint_path),
-                            "timestamp": checkpoint["timestamp"],
-                            "datetime": checkpoint["datetime"],
-                            "checksum": checkpoint["checksum"],
-                            "metadata": metadata,
-                            "size_bytes": checkpoint_path.stat().st_size,
-                            "async": True,
-                        }
-                    )
-                    self.stats["total_checkpoints"] += 1
+                    with self._lock:
+                        self.parameter_history.append(
+                            {
+                                "checkpoint_id": checkpoint_id,
+                                "path": str(checkpoint_path),
+                                "timestamp": checkpoint["timestamp"],
+                                "datetime": checkpoint["datetime"],
+                                "checksum": checkpoint["checksum"],
+                                "metadata": metadata,
+                                "size_bytes": checkpoint_path.stat().st_size,
+                                "async": True,
+                            }
+                        )
+                        self.stats["total_checkpoints"] += 1
 
-                logger.debug(f"Async checkpoint saved: {checkpoint_id}")
+                    logger.debug(f"Async checkpoint saved: {checkpoint_id}")
+
+                except Exception as e:
+                    if not self._shutdown.is_set():
+                        with self._lock:
+                            self.stats["failed_saves"] += 1
+                        logger.error(f"Checkpoint worker error: {e}")
+                finally:
+                    # FIX: Always call task_done() to maintain queue consistency
+                    # This allows join() to work correctly if needed
+                    self.checkpoint_queue.task_done()
 
             except QueueEmpty:
                 continue
             except Exception as e:
                 if not self._shutdown.is_set():
-                    with self._lock:
-                        self.stats["failed_saves"] += 1
-                    logger.error(f"Checkpoint worker error: {e}")
+                    logger.error(f"Checkpoint worker unexpected error: {e}")
 
     def load_checkpoint(
         self, checkpoint_path: str, model: nn.Module, strict: bool = True
@@ -709,12 +718,20 @@ class ParameterHistoryManager:
                     logger.warning("Checkpoint thread did not terminate in time")
 
         # FIXED: Drain queue with proper timeout and discard pending items
+        # FIX: Also call task_done() to maintain queue consistency
         logger.info("Draining checkpoint queue...")
         drained = 0
         timeout_time = time.time() + 2
         while not self.checkpoint_queue.empty() and time.time() < timeout_time:
             try:
                 self.checkpoint_queue.get_nowait()
+                # FIX: Call task_done() to maintain queue state consistency
+                # This prevents issues if join() is ever called on the queue
+                try:
+                    self.checkpoint_queue.task_done()
+                except ValueError:
+                    # task_done() called more times than get(), ignore
+                    pass
                 drained += 1
             except QueueEmpty:
                 break

@@ -104,15 +104,28 @@ class PrincipleVersion:
             base_principle: Base principle to apply diff to
             
         Returns:
-            Reconstructed principle or None if reconstruction fails
+            Reconstructed principle
+            
+        Raises:
+            ValueError: If principle cannot be reconstructed due to missing diff,
+                       missing base principle, or reconstruction failure
         """
         # If we have the full principle stored, return it directly
         if self.principle is not None:
             return self.principle
 
-        # Can't reconstruct without diff or base
-        if self.principle_diff is None or base_principle is None:
-            return None
+        # FIX #KC-2: Raise explicit errors instead of returning None silently
+        # This prevents callers from accidentally using None or wrong versions
+        if self.principle_diff is None:
+            raise ValueError(
+                f"Cannot reconstruct principle: version {self.version} has no diff or full principle stored"
+            )
+        
+        if base_principle is None:
+            raise ValueError(
+                f"Cannot reconstruct principle: version {self.version} requires base version "
+                f"{self.base_version} but it was not provided"
+            )
 
         try:
             # Convert base principle to JSON string
@@ -135,32 +148,43 @@ class PrincipleVersion:
                 # Try alternative: apply the diff as a patch
                 patched_lines = self._apply_unified_diff(base_lines, self.principle_diff)
             
+            # FIX #KC-2: Raise explicit error if diff application produced no output
+            if not patched_lines:
+                raise ValueError(
+                    f"Diff application produced no output for version {self.version}"
+                )
+            
             # Join the patched lines back into a string
-            if patched_lines:
-                patched_str = ''.join(patched_lines)
-                
-                # Parse JSON back to dictionary
+            patched_str = ''.join(patched_lines)
+            
+            # Parse JSON back to dictionary
+            try:
                 patched_dict = json.loads(patched_str)
-                
-                # Reconstruct the principle object
-                if hasattr(base_principle, "__dataclass_fields__"):
-                    # For dataclasses, create a new instance
-                    principle_class = type(base_principle)
-                    return principle_class(**patched_dict)
-                else:
-                    # For regular classes, update attributes
-                    reconstructed = copy.deepcopy(base_principle)
-                    for key, value in patched_dict.items():
-                        setattr(reconstructed, key, value)
-                    return reconstructed
+            except json.JSONDecodeError as e:
+                raise ValueError(
+                    f"Failed to parse reconstructed principle JSON for version {self.version}: {e}"
+                ) from e
+            
+            # Reconstruct the principle object
+            if hasattr(base_principle, "__dataclass_fields__"):
+                # For dataclasses, create a new instance
+                principle_class = type(base_principle)
+                return principle_class(**patched_dict)
             else:
-                logger.warning("Diff application produced no output, returning base principle")
-                return base_principle
+                # For regular classes, update attributes
+                reconstructed = copy.deepcopy(base_principle)
+                for key, value in patched_dict.items():
+                    setattr(reconstructed, key, value)
+                return reconstructed
                 
+        except ValueError:
+            # Re-raise ValueError exceptions (our explicit failures)
+            raise
         except Exception as e:
-            logger.error("Failed to reconstruct principle from diff: %s", e)
-            # Fallback to base principle if reconstruction fails
-            return base_principle
+            # FIX #KC-2: Convert unexpected errors to ValueError instead of silent fallback
+            raise ValueError(
+                f"Failed to reconstruct principle from diff for version {self.version}: {e}"
+            ) from e
     
     def _apply_unified_diff(self, base_lines: List[str], diff_lines: List[str]) -> List[str]:
         """
@@ -1622,7 +1646,10 @@ class VersionedKnowledgeBase:
                 try:
                     # Use deep comparison
                     if self._values_differ(old_val, new_val):
-                        changes.append(f"Modified {key}")
+                        # FIX #KC-4: Provide detailed change description for collections
+                        # instead of just "Modified {key}"
+                        change_desc = self._describe_change(key, old_val, new_val)
+                        changes.append(change_desc)
                 except Exception as e:
                     # If comparison fails, assume changed
                     logger.debug(f"Error comparing {key}: {e}")
@@ -1675,6 +1702,107 @@ class VersionedKnowledgeBase:
             return val1 != val2
         except Exception as e:  # If comparison fails, try string comparison
             return str(val1) != str(val2)
+
+    def _describe_change(self, key: str, old_val: Any, new_val: Any) -> str:
+        """
+        FIX #KC-4: Provide detailed change description for collections
+        
+        Instead of just "Modified {key}", describe what specifically changed
+        (items added, removed, keys changed, etc.)
+        
+        Args:
+            key: Attribute name
+            old_val: Old value
+            new_val: New value
+            
+        Returns:
+            Detailed change description string
+        """
+        try:
+            # List changes - show added/removed items
+            if isinstance(old_val, list) and isinstance(new_val, list):
+                # Convert to sets for hashable items, fall back for unhashable
+                try:
+                    old_set = set(old_val)
+                    new_set = set(new_val)
+                    added = new_set - old_set
+                    removed = old_set - new_set
+                    
+                    parts = []
+                    if added:
+                        added_str = ", ".join(repr(x) for x in list(added)[:3])
+                        if len(added) > 3:
+                            added_str += f", ... ({len(added)} total)"
+                        parts.append(f"added [{added_str}]")
+                    if removed:
+                        removed_str = ", ".join(repr(x) for x in list(removed)[:3])
+                        if len(removed) > 3:
+                            removed_str += f", ... ({len(removed)} total)"
+                        parts.append(f"removed [{removed_str}]")
+                    if not added and not removed and old_val != new_val:
+                        parts.append("reordered")
+                    
+                    if parts:
+                        return f"Modified {key}: {'; '.join(parts)}"
+                except TypeError:
+                    # Items not hashable, just report length change
+                    if len(old_val) != len(new_val):
+                        return f"Modified {key}: length changed from {len(old_val)} to {len(new_val)}"
+            
+            # Dictionary changes - show added/removed/modified keys
+            if isinstance(old_val, dict) and isinstance(new_val, dict):
+                old_keys = set(old_val.keys())
+                new_keys = set(new_val.keys())
+                added_keys = new_keys - old_keys
+                removed_keys = old_keys - new_keys
+                common_keys = old_keys & new_keys
+                modified_keys = {k for k in common_keys if old_val[k] != new_val[k]}
+                
+                parts = []
+                if added_keys:
+                    keys_str = ", ".join(repr(k) for k in list(added_keys)[:3])
+                    if len(added_keys) > 3:
+                        keys_str += f", ... ({len(added_keys)} total)"
+                    parts.append(f"added keys [{keys_str}]")
+                if removed_keys:
+                    keys_str = ", ".join(repr(k) for k in list(removed_keys)[:3])
+                    if len(removed_keys) > 3:
+                        keys_str += f", ... ({len(removed_keys)} total)"
+                    parts.append(f"removed keys [{keys_str}]")
+                if modified_keys:
+                    keys_str = ", ".join(repr(k) for k in list(modified_keys)[:3])
+                    if len(modified_keys) > 3:
+                        keys_str += f", ... ({len(modified_keys)} total)"
+                    parts.append(f"changed keys [{keys_str}]")
+                
+                if parts:
+                    return f"Modified {key}: {'; '.join(parts)}"
+            
+            # Set changes
+            if isinstance(old_val, set) and isinstance(new_val, set):
+                added = new_val - old_val
+                removed = old_val - new_val
+                
+                parts = []
+                if added:
+                    added_str = ", ".join(repr(x) for x in list(added)[:3])
+                    if len(added) > 3:
+                        added_str += f", ... ({len(added)} total)"
+                    parts.append(f"added [{added_str}]")
+                if removed:
+                    removed_str = ", ".join(repr(x) for x in list(removed)[:3])
+                    if len(removed) > 3:
+                        removed_str += f", ... ({len(removed)} total)"
+                    parts.append(f"removed [{removed_str}]")
+                
+                if parts:
+                    return f"Modified {key}: {'; '.join(parts)}"
+        
+        except Exception as e:
+            logger.debug(f"Error describing change for {key}: {e}")
+        
+        # Default fallback
+        return f"Modified {key}"
 
     def _calculate_similarity(self, p1, p2) -> float:
         """Calculate similarity between principles"""

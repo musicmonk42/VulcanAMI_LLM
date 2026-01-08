@@ -63,22 +63,11 @@ except ImportError as e:
     MODULE_IMPORTS_SUCCESSFUL = False
     IMPORT_ERROR_MESSAGE = str(e)
 
-# Try to import MockLanguageReasoner for fallback detection
-try:
-    from vulcan.reasoning.unified_reasoning import MockLanguageReasoner
-
-    MOCK_REASONER_AVAILABLE = True
-except ImportError:
-    MOCK_REASONER_AVAILABLE = False
-    MockLanguageReasoner = None
-
 
 def is_mock_symbolic_reasoner(reasoner):
     """Check if the symbolic reasoner is a mock/fallback implementation."""
-    if MockLanguageReasoner is not None and isinstance(reasoner, MockLanguageReasoner):
-        return True
-    # Also check by class name in case import failed
-    return "MockLanguageReasoner" in type(reasoner).__name__
+    # Check by class name for fallback implementations
+    return "Fallback" in type(reasoner).__name__ or "Mock" in type(reasoner).__name__
 
 
 # ============================================================================
@@ -123,7 +112,7 @@ class TestUnifiedReasoningIntegration:
     def test_unified_reasoner_instantiation_and_loading(self, unified_reasoner):
         """2. [Component Loading] Verifies the UnifiedReasoner loads all its sub-reasoners.
 
-        Note: The symbolic reasoner may be a MockLanguageReasoner if the full
+        Note: The symbolic reasoner may be a fallback if the full
         SymbolicReasoner dependencies are not available. This is valid fallback behavior.
         """
         assert unified_reasoner is not None
@@ -137,16 +126,16 @@ class TestUnifiedReasoningIntegration:
             ProbabilisticReasoner,
         )
 
-        # Symbolic reasoner may be either the real SymbolicReasoner or MockLanguageReasoner fallback
+        # Symbolic reasoner may be either the real SymbolicReasoner or a fallback
         symbolic_reasoner = unified_reasoner.reasoners.get(ReasoningType.SYMBOLIC)
         if is_mock_symbolic_reasoner(symbolic_reasoner):
             print(
-                "\n[WARNING] SymbolicReasoner using MockLanguageReasoner fallback (dependencies may be missing)"
+                "\n[WARNING] SymbolicReasoner using fallback (dependencies may be missing)"
             )
             # This is acceptable - the mock is a valid fallback
             assert (
                 symbolic_reasoner is not None
-            ), "Symbolic reasoner slot should have a mock"
+            ), "Symbolic reasoner slot should have a fallback"
         else:
             assert isinstance(
                 symbolic_reasoner, SymbolicReasoner

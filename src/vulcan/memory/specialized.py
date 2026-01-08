@@ -379,6 +379,9 @@ class EpisodicMemory(BaseMemorySystem):
 
         # Episode chains for sequential patterns
         self.episode_chains = defaultdict(list)  # pattern_hash -> [episode_ids]
+        
+        # FIX #MEM-6: Add lock for thread-safe episode operations
+        self._episode_lock = threading.RLock()
 
         # Hierarchical storage - ensure config has required attributes
         # Create a copy with safe attribute access
@@ -436,46 +439,60 @@ class EpisodicMemory(BaseMemorySystem):
         self, outcome: Any = None, value: float = 0.0, emotional_valence: float = 0.0
     ):
         """End current episode."""
-        if self.current_episode:
-            # Create a local reference to avoid race conditions
+        # FIX #MEM-6: Use lock for thread-safe episode access
+        with self._episode_lock:
+            if self.current_episode is None:
+                return
+            
+            # Create a local reference and clear atomically while holding lock
             episode = self.current_episode
-            self.current_episode = (
-                None  # Clear immediately to prevent concurrent access
-            )
+            self.current_episode = None
 
-            episode.end_time = time.time()
-            episode.outcome = outcome
-            episode.value = value
-            episode.emotional_valence = emotional_valence
+        # Process episode outside the lock (these operations are episode-local)
+        episode.end_time = time.time()
+        episode.outcome = outcome
+        episode.value = value
+        episode.emotional_valence = emotional_valence
 
-            # Calculate importance
-            episode.importance = self._calculate_episode_importance(episode)
+        # Calculate importance
+        episode.importance = self._calculate_episode_importance(episode)
 
-            # Generate embedding
-            episode.embedding = self._generate_episode_embedding(episode)
+        # Generate embedding
+        episode.embedding = self._generate_episode_embedding(episode)
 
-            # Update indices
-            self._update_indices(episode)
+        # Update indices
+        self._update_indices(episode)
 
-            # Store in hierarchical memory
-            memory = episode.to_memory()
-            self.hierarchical_memory.store(
-                memory.content,
-                memory_type=MemoryType.EPISODIC,
-                importance=memory.importance,
-            )
+        # Store in hierarchical memory
+        memory = episode.to_memory()
+        self.hierarchical_memory.store(
+            memory.content,
+            memory_type=MemoryType.EPISODIC,
+            importance=memory.importance,
+        )
 
-            # Detect patterns
-            self._detect_episode_patterns(episode)
+        # Detect patterns
+        self._detect_episode_patterns(episode)
 
     def add_event(self, event: Dict[str, Any]):
         """Add event to current episode."""
-        if self.current_episode:
-            self.current_episode.add_event(event)
-
-            # Auto-end episode if too long
-            if len(self.current_episode.events) > 100:
-                self.end_episode()
+        # FIX #MEM-6: Use lock to prevent TOCTOU race condition
+        # Without lock, end_episode() could set current_episode to None
+        # between our check and use, causing AttributeError
+        with self._episode_lock:
+            episode = self.current_episode
+            if episode is None:
+                logger.debug("Cannot add event: no active episode")
+                return
+            
+            episode.add_event(event)
+            
+            # Check if auto-end needed (still holding episode reference)
+            should_end = len(episode.events) > 100
+        
+        # Auto-end episode if too long (outside lock to prevent deadlock)
+        if should_end:
+            self.end_episode()
 
     def store(self, content: Any, **kwargs) -> Memory:
         """Store content as episodic memory."""
@@ -2114,6 +2131,9 @@ class Skill:
         """Check if condition is met using safe expression evaluation.
 
         Fails securely by returning False when unsafe conditions are detected.
+        
+        FIX #MEM-7: Context is now sanitized to only allow primitive types,
+        preventing code injection through malicious context values.
         """
         try:
             # Parse condition as Python expression using AST
@@ -2161,10 +2181,49 @@ class Skill:
                             # Fail securely - return False instead of True
                             return False
 
-                    # Create a restricted namespace with only the context variables
+                    # FIX #MEM-7: Sanitize context - only allow primitive types
+                    # This prevents code injection through malicious context values
+                    # like {"__import__": __import__, "os": os}
+                    safe_context = {}
+                    for key, value in context.items():
+                        # Reject keys that could be used for injection
+                        if key.startswith("_"):
+                            logger.warning(
+                                f"Skipping underscore-prefixed context key: {key}"
+                            )
+                            continue
+                        
+                        # Only allow primitive types
+                        if isinstance(value, (str, int, float, bool, type(None))):
+                            safe_context[key] = value
+                        elif isinstance(value, (list, tuple)):
+                            # Allow lists/tuples of primitives only
+                            if all(isinstance(v, (str, int, float, bool, type(None))) for v in value):
+                                safe_context[key] = value
+                            else:
+                                logger.debug(
+                                    f"Skipping non-primitive list/tuple context var: {key}"
+                                )
+                        elif isinstance(value, dict):
+                            # Allow dicts with string keys and primitive values
+                            if all(
+                                isinstance(k, str) and isinstance(v, (str, int, float, bool, type(None)))
+                                for k, v in value.items()
+                            ):
+                                safe_context[key] = value
+                            else:
+                                logger.debug(
+                                    f"Skipping complex dict context var: {key}"
+                                )
+                        else:
+                            logger.debug(
+                                f"Skipping non-primitive context var: {key} (type={type(value).__name__})"
+                            )
+
+                    # Create a restricted namespace with only safe context variables
                     # and no builtins to prevent code injection
                     namespace = {"__builtins__": {}}
-                    namespace.update(context)
+                    namespace.update(safe_context)
 
                     # Compile and evaluate the safe expression
                     # nosec B307: Using eval with restricted namespace (no builtins) for safe evaluation
@@ -2850,4 +2909,17 @@ class WorkingMemory(BaseMemorySystem):
 
     def __del__(self):
         """Cleanup."""
+        self.shutdown()
+    
+    def shutdown(self):
+        """
+        FIX #MEM-10: Clean shutdown of rehearsal thread.
+        
+        This should be called when the WorkingMemory is no longer needed
+        to prevent thread resource leaks.
+        """
         self._running = False
+        if hasattr(self, 'rehearsal_thread') and self.rehearsal_thread.is_alive():
+            self.rehearsal_thread.join(timeout=2.0)
+            if self.rehearsal_thread.is_alive():
+                logger.warning("WorkingMemory rehearsal thread did not stop in time")
