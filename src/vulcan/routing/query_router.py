@@ -3748,14 +3748,13 @@ class QueryAnalyzer:
                         "preferred_tool": "general",  # BUG #14 FIX: Use LLM for creative writing
                         "response_type": "creative",
                         "bug9_fix": True,
-                        "bug14_fix": True,  # Mark that this fix was applied
                         "skip_reasoning": True,  # BUG #14: Skip formal reasoning for creative tasks
                     },
                 )
             ]
             
             plan.telemetry_data["selected_tools"] = creative_tools
-            plan.telemetry_data["reasoning_strategy"] = "creative_analogical"
+            plan.telemetry_data["reasoning_strategy"] = "creative_llm"  # BUG #14 FIX: Changed from "creative_analogical"
             
             logger.info(
                 f"[QueryRouter] {query_id}: CREATIVE-FAST-PATH source={source}, "

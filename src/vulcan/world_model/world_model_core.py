@@ -5776,7 +5776,7 @@ biased in ways I haven't acknowledged.
 
 **1. Real-Time Sensorimotor Control**
 - Why: I lack continuous sensor input and motor output
-- Examples: Robot navigation, autonomous driving, real-time game playing
+- Examples: Robot navigation, autonomous driving, real-time gameplay
 - Architectural limitation: Batch processing model, no embodiment
 
 **2. Problems Requiring True Randomness**
@@ -5821,8 +5821,9 @@ For these problem classes, I can:
         """
         Explain how VULCAN handles disagreement between reasoning modules.
         
-        BUG #14 FIX: Instead of generic self-description, explain the actual
-        conflict resolution mechanism.
+        BUG #14 FIX: Previously returned generic "I am VULCAN, an integrated 
+        reasoning system..." for all module conflict questions. Now provides
+        specific information about conflict resolution mechanisms.
         """
         return """
 **Can My Reasoning Modules Disagree? Yes, Absolutely.**
@@ -5939,8 +5940,9 @@ Look for:
 - Where I cite lack of data or information
 
 **In My Last Response:**
-(If you're asking about a specific analysis, please re-state it
-and I'll identify the weakest causal/logical link specifically.)
+To analyze a specific reasoning chain, please provide the analysis 
+you'd like me to examine, and I'll identify the weakest causal or 
+logical link in that specific argument.
 """
     
     def _analyze_own_reasoning_steps(self, query: str) -> str:
