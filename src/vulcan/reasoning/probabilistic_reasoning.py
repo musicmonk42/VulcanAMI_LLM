@@ -2146,6 +2146,62 @@ class ProbabilisticReasoner(EnhancedProbabilisticReasoner):
         
         return False
 
+    def _needs_gp_reasoning(self, query: str) -> bool:
+        """
+        FIX (Jan 8 2026): Determine if query actually needs GP-based reasoning.
+        
+        GP regression is appropriate for:
+        - Uncertainty quantification tasks (not simple probability)
+        - Feature-based prediction tasks
+        - Time series or sequential data analysis
+        - Complex statistical modeling with training data
+        
+        GP regression is NOT appropriate for:
+        - Simple probability questions (coin/dice/cards)
+        - Bayesian inference with known parameters
+        - Probability theory questions
+        - General probability queries without features
+        
+        Args:
+            query: The query string
+            
+        Returns:
+            True if GP reasoning is appropriate, False otherwise
+        """
+        query_lower = query.lower()
+        
+        # Keywords that indicate GP is actually needed
+        gp_indicators = [
+            'predict', 'forecast', 'estimate uncertainty',
+            'confidence interval', 'uncertainty quantification',
+            'feature', 'training data', 'regression',
+            'time series', 'sequential', 'trend',
+            'model uncertainty', 'epistemic uncertainty',
+            'gaussian process', 'kriging',
+        ]
+        
+        # If query explicitly mentions GP-related concepts, use GP
+        if any(ind in query_lower for ind in gp_indicators):
+            return True
+        
+        # If query is a standard probability question without GP indicators, don't use GP
+        probability_question_patterns = [
+            'what is the probability',
+            'what is p(',
+            'calculate the probability',
+            'compute the probability',
+            'find the probability',
+            'what are the odds',
+            'what is the chance',
+            'likelihood of',
+        ]
+        
+        if any(pat in query_lower for pat in probability_question_patterns):
+            return False
+        
+        # Default: allow GP for complex queries that passed gate but don't match patterns
+        return True
+
     def _is_simple_probability_query(self, query: str) -> bool:
         """
         Note: Check if query is a simple probability question.
@@ -2530,6 +2586,46 @@ class ProbabilisticReasoner(EnhancedProbabilisticReasoner):
         bayes_result = self._try_bayesian_calculation(input_data)
         if bayes_result is not None:
             return bayes_result
+        
+        # FIX (Jan 8 2026): ARCHITECTURAL FIX - Don't use GP for probability questions
+        # If query passed gate check (is a probability question) but wasn't handled by:
+        # 1. Simple probability path (coin/dice/cards)
+        # 2. Bayesian calculation path (sensitivity/specificity/prevalence)
+        # Then the query needs more specific information to compute probability.
+        # Using GP regression for probability questions is CONCEPTUALLY WRONG because:
+        # - GP predicts continuous values from features
+        # - Probability questions need domain-specific calculations
+        # - GP will return 0.5/0.5 for untrained model, which is meaningless
+        #
+        # Instead, return a helpful response asking for more specific information.
+        if self._is_probability_query(query_str) and not self._needs_gp_reasoning(query_str):
+            logger.info(
+                f"[ProbabilisticReasoner] FIX: Probability query detected but not "
+                f"handled by specialized paths. Returning guidance instead of GP."
+            )
+            return ReasoningResult(
+                conclusion={
+                    "needs_more_info": True,
+                    "reason": "Query involves probability but lacks specific parameters",
+                },
+                confidence=0.3,
+                reasoning_type=ReasoningType.PROBABILISTIC,
+                explanation=(
+                    "This appears to be a probability question, but I need more specific "
+                    "information to compute the answer. For probability calculations, please provide:\n"
+                    "- For Bayesian inference: sensitivity, specificity, and prevalence values\n"
+                    "- For simple probability: specify the exact scenario (e.g., fair coin, standard dice)\n"
+                    "- For conditional probability: specify P(A), P(B), and the relationship\n\n"
+                    "Example: 'Given sensitivity=0.99, specificity=0.95, prevalence=0.01, "
+                    "what is P(Disease|Positive)?'"
+                ),
+                metadata={
+                    "gate_check": "passed",
+                    "simple_probability": "not_matched",
+                    "bayesian_calculation": "missing_parameters",
+                    "gp_reasoning": "skipped",
+                },
+            )
         
         try:
             # Use intelligent feature extraction
