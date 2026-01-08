@@ -3716,8 +3716,21 @@ class QueryAnalyzer:
             plan.detected_patterns.append("creative_task")
             plan.detected_patterns.append("bug9_task_type_priority")
             
-            # Route to creative tools (analogical for metaphor/style, world_model for context)
-            creative_tools = ["analogical", "world_model"]
+            # BUG #14 FIX: Creative writing tasks (poems, stories) should use 'general' tool
+            # which routes to LLM for synthesis, NOT analogical reasoning.
+            # 
+            # Old (WRONG): creative_tools = ["analogical", "world_model"]
+            #   - AnalogicalReasoner does structure mapping, not creative writing
+            #   - This produced JSON like {"mapping": {}, "source_domain": "source"} for poems
+            # 
+            # New (CORRECT): creative_tools = ["general"]
+            #   - "general" tool uses LLM for creative synthesis
+            #   - This produces actual poems, stories, creative descriptions
+            #
+            # Note: Some creative tasks (like "describe X using the metaphor of Y") 
+            # might benefit from analogical reasoning, but pure creative writing
+            # (poems, stories) should go to LLM.
+            creative_tools = ["general"]
             
             plan.agent_tasks = [
                 AgentTask(
@@ -3732,9 +3745,11 @@ class QueryAnalyzer:
                         "skip_heavy_analysis": True,
                         "skip_arena": True,
                         "tools": creative_tools,
-                        "preferred_tool": "analogical",  # Best for creative tasks
+                        "preferred_tool": "general",  # BUG #14 FIX: Use LLM for creative writing
                         "response_type": "creative",
                         "bug9_fix": True,
+                        "bug14_fix": True,  # Mark that this fix was applied
+                        "skip_reasoning": True,  # BUG #14: Skip formal reasoning for creative tasks
                     },
                 )
             ]
