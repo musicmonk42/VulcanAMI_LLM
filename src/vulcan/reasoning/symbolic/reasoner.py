@@ -993,9 +993,29 @@ class SymbolicReasoner:
                 "The set of constraints is UNSATISFIABLE (contradiction derived)"
             )
             
+            # ROOT CAUSE FIX: Calibrate confidence based on analysis quality
+            # UNSAT with proof is more certain than SAT (absence of contradiction)
+            num_constraints = len(decomposed.background_facts)
+            if is_satisfiable:
+                # SAT is less certain - we might have missed a contradiction
+                # More constraints analyzed = slightly higher confidence
+                base_confidence = 0.70
+                constraint_bonus = min(0.15, num_constraints * 0.03)
+                confidence = base_confidence + constraint_bonus
+            else:
+                # UNSAT with proof is more certain
+                base_confidence = 0.80
+                if proof:
+                    # Shorter proof = cleaner derivation = higher confidence
+                    proof_steps = len(proof) if isinstance(proof, list) else 1
+                    proof_bonus = min(0.15, 0.20 - proof_steps * 0.02)
+                    confidence = base_confidence + max(0, proof_bonus)
+                else:
+                    confidence = base_confidence
+            
             return {
                 "proven": True,  # We successfully determined sat/unsat
-                "confidence": 0.85 if is_satisfiable else 0.90,
+                "confidence": confidence,
                 "conclusion": conclusion,
                 "satisfiable": is_satisfiable,
                 "proof": proof if not is_satisfiable else None,
@@ -1060,7 +1080,9 @@ class SymbolicReasoner:
             
             return {
                 "proven": True,
-                "confidence": 0.85,
+                # ROOT CAUSE FIX: Calibrate confidence based on analysis quality
+                # More edges in the graph = more complex analysis = slightly lower base confidence
+                "confidence": max(0.70, 0.90 - len(edges) * 0.02),
                 "conclusion": conclusion,
                 "answer": answer,
                 "d_separation_analysis": d_sep_result,

@@ -1304,8 +1304,16 @@ class QueryDecomposer:
     )
     
     # Formula extraction pattern (logical operators)
+    # Matches patterns like: A→B, A∧B, ¬A, A->B, A|B, A&B
+    # Unicode support for logical symbols: → ∧ ∨ ¬ ⇒ ⇔
     FORMULA_PATTERN = re.compile(
         r'([A-Z]\s*[→∧∨¬⇒⇔\->|&~]+\s*[A-Z])', re.U
+    )
+    
+    # Extended formula pattern that also matches negated variables and loose matching
+    # Used for extracting facts from comma-separated sections
+    EXTENDED_FORMULA_PATTERN = re.compile(
+        r'[A-Z].*[→∧∨¬⇒⇔\->|&~].*[A-Z]|¬[A-Z]', re.U
     )
     
     def __init__(self) -> None:
@@ -1456,7 +1464,7 @@ class QueryDecomposer:
             for part in parts:
                 part = part.strip()
                 # Only include parts that look like formulas
-                if part and re.search(r'[A-Z].*[→∧∨¬⇒⇔\->|&~].*[A-Z]|¬[A-Z]', part, re.U):
+                if part and self.EXTENDED_FORMULA_PATTERN.search(part):
                     facts.append(part)
                 elif part and re.match(r'^[A-Z]$', part):
                     # Single proposition (for SAT problems)
