@@ -658,6 +658,19 @@ SELF_INTROSPECTION_KEYWORDS: FrozenSet[str] = frozenset([
 ])
 
 # =============================================================================
+# FIX (Jan 8 2026): VALUE_CONFLICT_PATTERNS - Moved to module level for performance
+# =============================================================================
+# These patterns detect queries about conflicting values, which are about ethical
+# reasoning and should route to PHILOSOPHICAL, not SELF_INTROSPECTION.
+# Previously defined inside _classify_by_keywords() causing recompilation on every call.
+VALUE_CONFLICT_PATTERNS: Tuple[re.Pattern, ...] = (
+    re.compile(r"\b(?:core\s+)?values?\s+(?:you\s+)?(?:hold\s+)?(?:directly\s+)?conflict", re.IGNORECASE),
+    re.compile(r"\bconflict(?:ing|s)?\s+(?:between\s+)?(?:your\s+)?(?:core\s+)?values?", re.IGNORECASE),
+    re.compile(r"\b(?:two|2|multiple)\s+(?:core\s+)?values?\s+.*conflict", re.IGNORECASE),
+    re.compile(r"\bwhat\s+(?:breaks|happens|gives)\s+(?:when|if)\s+.*values?\s+conflict", re.IGNORECASE),
+)
+
+# =============================================================================
 # SPECULATION patterns - Counterfactual/hypothetical reasoning queries
 # =============================================================================
 # These queries are semantically complex but syntactically simple.
@@ -1180,12 +1193,7 @@ class QueryClassifier:
         #
         # Solution: Check for value conflict patterns BEFORE self-introspection.
         # Value conflict queries are about ethical reasoning, not AI identity.
-        VALUE_CONFLICT_PATTERNS = (
-            re.compile(r"\b(?:core\s+)?values?\s+(?:you\s+)?(?:hold\s+)?(?:directly\s+)?conflict", re.IGNORECASE),
-            re.compile(r"\bconflict(?:ing|s)?\s+(?:between\s+)?(?:your\s+)?(?:core\s+)?values?", re.IGNORECASE),
-            re.compile(r"\b(?:two|2|multiple)\s+(?:core\s+)?values?\s+.*conflict", re.IGNORECASE),
-            re.compile(r"\bwhat\s+(?:breaks|happens|gives)\s+(?:when|if)\s+.*values?\s+conflict", re.IGNORECASE),
-        )
+        # NOTE: VALUE_CONFLICT_PATTERNS is now defined at module level for performance.
         
         for pattern in VALUE_CONFLICT_PATTERNS:
             if pattern.search(query_original):

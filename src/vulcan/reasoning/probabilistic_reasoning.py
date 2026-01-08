@@ -1751,8 +1751,35 @@ class ProbabilisticReasoner(EnhancedProbabilisticReasoner):
         'stochastic', 'variance', 'deviation', 'mean', 'median', 'percentile'
     ])
     
+    # FIX (Jan 8 2026): Methodology phrases indicating theory/philosophy questions
+    # These queries contain probability keywords but ask about METHODOLOGY, not calculations
+    # Moved to class level to avoid recreation on every method call
+    METHODOLOGY_PHRASES = frozenset([
+        # Model specification issues
+        'misspecified', 'misspecification', 'mis-specified',
+        'model specification', 'correctly specified', 'incorrectly specified',
+        # Methodology questions
+        'when should', 'how do you', 'how should', 'how to handle',
+        'what happens when', 'what if the', 'what do you do when',
+        # Comparison/choice questions
+        'bayesian vs', 'frequentist vs', 'versus frequentist',
+        'which approach', 'which method', 'better approach',
+        # Theory questions - NOTE: Using multi-word phrases to avoid false positives
+        'explain why', 'foundation of', 'philosophy of', 'theory of',
+        # Conflict/edge case questions
+        'conflict between', 'conflicting', 'when they conflict',
+        'edge case', 'corner case', 'problematic case',
+        # "When the X is Y" patterns about probability theory
+        'when the likelihood', 'when the prior', 'when the posterior',
+        'if the likelihood', 'if the prior', 'if the model',
+    ])
+    
     # Regex pattern for word boundary keyword matching (compiled once)
     _PROBABILITY_KEYWORDS_PATTERN = None
+    
+    # FIX (Jan 8 2026): Pre-compiled patterns for methodology detection
+    _METHODOLOGY_UPDATE_PATTERN = None
+    _METHODOLOGY_HANDLE_PATTERN = None
 
     def __init__(self, enable_learning: bool = True):
         super().__init__(enable_learning=enable_learning)
@@ -1783,6 +1810,18 @@ class ProbabilisticReasoner(EnhancedProbabilisticReasoner):
             keywords_sorted = sorted(self.PROBABILITY_KEYWORDS, key=len, reverse=True)
             pattern = r'\b(?:' + '|'.join(re.escape(kw) for kw in keywords_sorted) + r')\b'
             ProbabilisticReasoner._PROBABILITY_KEYWORDS_PATTERN = re.compile(pattern, re.IGNORECASE)
+        
+        # FIX (Jan 8 2026): Compile methodology patterns once for efficient matching
+        if ProbabilisticReasoner._METHODOLOGY_UPDATE_PATTERN is None:
+            ProbabilisticReasoner._METHODOLOGY_UPDATE_PATTERN = re.compile(
+                r'\bupdate\s+(?:a\s+)?(?:prior|posterior|belief|model)\s+when\b',
+                re.IGNORECASE
+            )
+        if ProbabilisticReasoner._METHODOLOGY_HANDLE_PATTERN is None:
+            ProbabilisticReasoner._METHODOLOGY_HANDLE_PATTERN = re.compile(
+                r'\bhandle\s+(?:the\s+)?(?:case|situation|problem)\s+when\b',
+                re.IGNORECASE
+            )
     
     def _is_probability_query(self, query: str) -> bool:
         """
@@ -2085,29 +2124,8 @@ class ProbabilisticReasoner(EnhancedProbabilisticReasoner):
         
         query_lower = query.lower()
         
-        # Methodology indicators - asking about HOW probability works, not FOR a probability
-        methodology_phrases = [
-            # Model specification issues
-            'misspecified', 'misspecification', 'mis-specified',
-            'model specification', 'correctly specified', 'incorrectly specified',
-            # Methodology questions
-            'when should', 'how do you', 'how should', 'how to handle',
-            'what happens when', 'what if the', 'what do you do when',
-            # Comparison/choice questions
-            'bayesian vs', 'frequentist vs', 'versus frequentist',
-            'which approach', 'which method', 'better approach',
-            # Theory questions
-            'why is', 'why does', 'why should', 'explain why',
-            'foundation of', 'philosophy of', 'theory of',
-            # Conflict/edge case questions
-            'conflict between', 'conflicting', 'when they conflict',
-            'edge case', 'corner case', 'problematic case',
-            # "When the X is Y" patterns about probability theory
-            'when the likelihood', 'when the prior', 'when the posterior',
-            'if the likelihood', 'if the prior', 'if the model',
-        ]
-        
-        for phrase in methodology_phrases:
+        # Check methodology phrases (class-level constant for performance)
+        for phrase in self.METHODOLOGY_PHRASES:
             if phrase in query_lower:
                 logger.info(
                     f"[ProbabilisticReasoner] FIX: Methodology query detected "
@@ -2115,25 +2133,15 @@ class ProbabilisticReasoner(EnhancedProbabilisticReasoner):
                 )
                 return True
         
-        # Pattern-based detection for "Update X when Y is Z" pattern
-        # "Update a prior when the likelihood function is misspecified"
-        update_when_pattern = re.compile(
-            r'\bupdate\s+(?:a\s+)?(?:prior|posterior|belief|model)\s+when\b',
-            re.IGNORECASE
-        )
-        if update_when_pattern.search(query):
+        # Pattern-based detection using pre-compiled patterns
+        if self._METHODOLOGY_UPDATE_PATTERN and self._METHODOLOGY_UPDATE_PATTERN.search(query):
             logger.info(
                 f"[ProbabilisticReasoner] FIX: Methodology query detected "
                 f"(pattern='update X when Y'). This should be routed to philosophical engine."
             )
             return True
         
-        # "Handle X when Y" pattern for methodology questions
-        handle_when_pattern = re.compile(
-            r'\bhandle\s+(?:the\s+)?(?:case|situation|problem)\s+when\b',
-            re.IGNORECASE
-        )
-        if handle_when_pattern.search(query):
+        if self._METHODOLOGY_HANDLE_PATTERN and self._METHODOLOGY_HANDLE_PATTERN.search(query):
             return True
         
         return False
