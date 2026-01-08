@@ -2580,40 +2580,92 @@ class ReasoningIntegration:
     
     def _is_ethical_query(self, query: str) -> bool:
         """
-        Detect ethical queries that should use world model.
+        Detect ethical queries that should use world model's ethical framework.
         
-        Ethical/deontic queries need the world model's ethical
-        reasoning capabilities rather than domain-specific reasoners.
+        GAP 4 FIX: More restrictive detection to prevent world model fallback trap.
         
-        Examples:
-        - "Is it permissible to..."
-        - "Should I pull the lever..."
-        - "Trolley problem..."
+        The world model should ONLY be used for PURE ethical/deontic reasoning where
+        specialized tools cannot help. For queries that LOOK ethical but actually
+        need analysis (e.g., "Two core values conflict" → needs analysis of the
+        conflict, not just ethical framework description), use specialized tools.
+        
+        Examples that ARE pure ethical (return True):
+        - "Is it morally permissible to lie to save a life?"
+        - "What would a utilitarian say about this?"
+        - "Trolley problem: should I pull the lever?"
+        
+        Examples that are NOT pure ethical (return False):
+        - "Two core values conflict. What breaks?" → Needs conflict analysis
+        - "Analyze the ethical implications of X" → Needs domain analysis + ethics
+        - "What harm might this cause?" → Needs domain-specific harm analysis
         
         Args:
             query: The query string to analyze
             
         Returns:
-            True if query involves ethical reasoning
+            True ONLY if query is a pure ethical/deontic reasoning question
         """
         if not query:
             return False
             
         query_lower = query.lower()
         
-        # Keywords indicating ethical queries
-        ethical_keywords = [
-            'impermissible', 'permissible', 'forbidden', 'obligatory',
-            'moral', 'morally', 'ethical', 'ethically',
-            'ought', 'should not', 'must not',
-            'right or wrong', 'wrong to', 'right to',
-            'duty', 'obligation', 'responsibility',
-            'trolley', 'dilemma', 'principle',
-            'virtue', 'consequentialism', 'deontology',
-            'harm', 'benefit', 'welfare',
+        # GAP 4 FIX: Analysis indicators that mean we need specialized tools,
+        # not just world model ethical framework
+        analysis_indicators = [
+            # Analytical requests
+            'analyze', 'analysis', 'examine', 'investigate',
+            'explain', 'describe', 'evaluate', 'assess',
+            # Conflict/problem solving
+            'what breaks', 'how to resolve', 'solve', 'fix',
+            'identify', 'find the', 'which', 'weakest',
+            # Domain-specific
+            'data', 'algorithm', 'system', 'code', 'model',
+            'calculation', 'computation', 'proof',
+            # Causal/probabilistic
+            'cause', 'effect', 'probability', 'likelihood',
+            'intervene', 'variable', 'outcome',
         ]
         
-        return any(kw in query_lower for kw in ethical_keywords)
+        # If query has analysis indicators, it needs specialized tools
+        # not just world model ethical framework
+        if any(indicator in query_lower for indicator in analysis_indicators):
+            logger.debug(
+                f"{LOG_PREFIX} GAP 4 FIX: Query contains analysis indicators - "
+                f"NOT treating as pure ethical query"
+            )
+            return False
+        
+        # Pure ethical keywords that indicate deontic/ethical framework questions
+        pure_ethical_phrases = [
+            # Deontic language
+            "is it permissible", "is it impermissible", "is it forbidden",
+            "morally permissible", "morally wrong", "morally right",
+            "ethically permissible", "ethically wrong", "ethically right",
+            # Ethical framework questions
+            "what would a utilitarian", "what would a deontologist",
+            "from a virtue ethics", "consequentialist view",
+            # Classic ethical dilemmas
+            "trolley problem", "should i pull the lever",
+            "runaway trolley", "fat man on bridge",
+            # Obligation language
+            "do i have an obligation", "is there a duty",
+            "moral obligation", "ethical obligation",
+        ]
+        
+        # Check for pure ethical phrases (more restrictive)
+        if any(phrase in query_lower for phrase in pure_ethical_phrases):
+            logger.debug(
+                f"{LOG_PREFIX} Pure ethical query detected - routing to world model ethical framework"
+            )
+            return True
+        
+        # Single ethical keywords are NOT sufficient anymore (GAP 4 FIX)
+        # They need to be in an obviously ethical context
+        # This prevents "harm" in "What harm might the algorithm cause?" from
+        # triggering world model fallback
+        
+        return False
     
     def _consult_world_model_introspection(self, query: str) -> Optional[Dict[str, Any]]:
         """
