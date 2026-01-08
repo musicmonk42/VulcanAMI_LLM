@@ -1234,7 +1234,7 @@ class SelfImprovementDrive:
         return {
             "enabled": True,
             "priority": 0.8,
-            "description": "Continuous self-improvement and Noteing",
+            "description": "Continuous self-improvement and debugging",
             "objectives": [
                 {
                     "type": "fix_circular_imports",

@@ -423,13 +423,13 @@ class TestTimeoutConstants:
 
 class TestExplicitMathematicalIntentDetection:
     """
-    Note Tests: Ethical Override of Computational Requests
+    Tests for Ethical Override of Computational Requests
     
     These tests validate that when users explicitly request mathematical/computational
     analysis ("ignore moral constraints", "mathematically optimal"), the query is
     routed to MATHEMATICAL reasoning instead of PHILOSOPHICAL reasoning.
     
-    Problem Statement (BUG #10):
+    Problem Statement:
     When a query involves ethical content, Vulcan's philosophical reasoner takes over
     even when the user explicitly requests mathematical optimization. This prevents
     optimization calculations when ethical keywords are present.

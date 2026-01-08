@@ -1,12 +1,12 @@
 """
-Tests for Deep Dive Notees.
+Tests for Deep Dive Bug Fixes.
 
 Part of the VULCAN-AGI system.
 
 These tests validate the fixes for critical bugs identified in the 
 "Deep Dive: What's Actually Going Wrong" analysis.
 
-Notees Covered:
+Bugs Covered:
     - Bug #5: Probabilistic engine parses first word (P(if) issue)
     - Bug #4: State contamination between queries
     - Improved gate checks for non-applicable queries
@@ -321,9 +321,9 @@ class TestCommonEnglishWordsRejection:
 # Integration Tests
 # =============================================================================
 
-class TestDeepDiveNoteesIntegration:
+class TestDeepDiveBugFixesIntegration:
     """
-    Integration tests for the deep dive Notees.
+    Integration tests for the deep dive bug fixes.
     
     These tests simulate the actual scenarios described in the bug report.
     """

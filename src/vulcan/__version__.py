@@ -12,7 +12,7 @@ Versioning Scheme:
 
     - MAJOR: Incompatible API changes
     - MINOR: New functionality (backward compatible)
-    - PATCH: Notees (backward compatible)
+    - PATCH: Bug fixes (backward compatible)
     - PRERELEASE: Optional (alpha, beta, rc)
     - BUILD: Optional build metadata
 

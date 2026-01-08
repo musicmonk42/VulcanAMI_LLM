@@ -1,5 +1,5 @@
 """
-Test Notees for cpu_capabilities.py and performance_metrics.py
+Test fixes for cpu_capabilities.py and performance_metrics.py
 """
 
 import threading

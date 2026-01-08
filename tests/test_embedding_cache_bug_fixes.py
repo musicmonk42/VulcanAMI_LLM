@@ -1,5 +1,5 @@
 """
-Test suite for Bug #1 and Notees:
+Test suite for Bug #1 and Bug #2 fixes:
 - Bug #1: Embedding Cache Never Hits (0% Hit Rate)
 - Bug #2: Query Router Always Times Out (5 seconds)
 
