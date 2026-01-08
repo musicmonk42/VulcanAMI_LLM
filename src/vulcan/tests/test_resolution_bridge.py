@@ -263,7 +263,7 @@ class TestResolutionHistoryAndPhantom:
 
 
 class TestExperimentCounters:
-    """Tests for persistent experiment counters (Bug #2 Fix)."""
+    """Tests for persistent experiment counters (Note)."""
 
     def test_initial_experiment_count_zero(self, clean_database):
         """Test that experiment count is zero initially."""
@@ -598,7 +598,7 @@ class TestIntegration:
         assert count >= 5
 
     def test_cold_start_prevention_workflow(self, clean_database):
-        """Test cold start prevention workflow (Bug #2 Fix)."""
+        """Test cold start prevention workflow (Note)."""
         # Simulate first "process" running experiments
         increment_experiment_count("total_experiments", 1)
         increment_experiment_count("total_experiments", 1)
@@ -607,7 +607,7 @@ class TestIntegration:
         # "Second process" should see the experiments (not cold start)
         total = get_experiment_count("total_experiments")
         
-        # This is the key assertion for Bug #2 fix
+        # This is the key assertion for Note
         assert total >= 3, (
             f"Expected at least 3 experiments, got {total}. "
             "Subprocess should see experiment count from previous process."

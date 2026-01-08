@@ -171,12 +171,12 @@ class TestTrainingAndPrediction:
         result = basic_reasoner.predict_with_uncertainty_ensemble(test_point)
 
         # Should return default values
-        # BUG #6 FIX: Changed std from 1.0 to 0.5 for untrained models
+        # Note: Changed std from 1.0 to 0.5 for untrained models
         # This gives 50% confidence instead of 0% confidence, which is more
         # appropriate for a model that hasn't been trained yet.
         assert result["mean"] == 0.5
-        assert result["std"] == 0.5  # Changed from 1.0 to 0.5 for Bug #6 fix
-        assert result["epistemic"] == 0.5  # Changed from 1.0 to 0.5 for Bug #6 fix
+        assert result["std"] == 0.5  # Changed from 1.0 to 0.5 for Note
+        assert result["epistemic"] == 0.5  # Changed from 1.0 to 0.5 for Note
 
     def test_predict_1d_input(self, basic_reasoner, sample_data):
         X, y = sample_data
@@ -639,10 +639,10 @@ class TestNumericalStability:
         result = basic_reasoner.predict_with_uncertainty_ensemble(test_point)
 
         # Should initialize and return safe defaults
-        # BUG #6 FIX: Changed std from 1.0 to 0.5 for empty ensemble
+        # Note: Changed std from 1.0 to 0.5 for empty ensemble
         # This gives 50% confidence instead of 0% confidence
         assert result["mean"] == 0.5
-        assert result["std"] == 0.5  # Changed from 1.0 to 0.5 for Bug #6 fix
+        assert result["std"] == 0.5  # Changed from 1.0 to 0.5 for Note
 
     def test_predict_division_by_zero(self, basic_reasoner, sample_data):
         X, y = sample_data
@@ -822,10 +822,10 @@ class TestCompatibilityWrapper:
         result = compatibility_reasoner.reason_with_uncertainty(np.array([5.0]))
 
         # FIXED: Access attribute instead of dict key
-        # BUG #6 FIX: Uninformative results now return confidence=0.1 instead of 0.0
+        # Note: Uninformative results now return confidence=0.1 instead of 0.0
         # This allows the system to recognize "I don't know" vs "this is wrong"
         # The result will also have 'not_applicable' flag in the conclusion
-        assert result.confidence == 0.1  # Changed from 0.0 to 0.1 for Bug #6 fix
+        assert result.confidence == 0.1  # Changed from 0.0 to 0.1 for Note
 
 
 # Edge Cases Tests
@@ -958,7 +958,7 @@ class TestPerformance:
         assert len(basic_reasoner.observations) == 1000
 
 
-# Bug #3 Fix Tests: Uninformative Result Detection
+# Note Tests: Uninformative Result Detection
 class TestUninformativeResultDetection:
     """
     Test the fix for Bug #3 (0.500 Bug): When probabilistic reasoning

@@ -441,7 +441,7 @@ class TestArenaReasoningBypass(unittest.TestCase):
 
 class TestTaskTypeToReasoningTypeMapping(unittest.TestCase):
     """
-    Tests for Bug #1 Fix: Task type to ReasoningType mapping.
+    Tests for Note: Task type to ReasoningType mapping.
     
     The bug was that task types from query_router.py come with "_task" suffix
     (e.g., "mathematical_task", "philosophical_task"), but the mapping dict
@@ -522,7 +522,7 @@ class TestTaskTypeToReasoningTypeMapping(unittest.TestCase):
     
     def test_mathematical_task_not_fallback_to_symbolic(self):
         """Test that mathematical_task doesn't fall back to SYMBOLIC."""
-        # This tests the core bug fix: mathematical_task was returning SYMBOLIC
+        # This tests the core Note: mathematical_task was returning SYMBOLIC
         # which caused math queries to go to probabilistic reasoner
         try:
             from vulcan.reasoning.reasoning_types import ReasoningType
@@ -591,7 +591,7 @@ class TestTaskTypeToReasoningTypeMapping(unittest.TestCase):
 
 class TestSimpleArithmeticFallback(unittest.TestCase):
     """
-    Tests for Bug #3 fix: Simple arithmetic fallback in MathematicalComputationTool.
+    Tests for Note: Simple arithmetic fallback in MathematicalComputationTool.
     
     When SymPy/RestrictedPython is not available, the mathematical computation tool
     should use a simple arithmetic fallback for basic calculations instead of returning
@@ -718,7 +718,7 @@ class TestSimpleArithmeticFallback(unittest.TestCase):
 
 class TestBayesianCalculationFallback(unittest.TestCase):
     """
-    Tests for Bug #4 fix: Bayesian calculation fallback in ProbabilisticReasoner.
+    Tests for Note: Bayesian calculation fallback in ProbabilisticReasoner.
     
     When the probabilistic reasoner receives explicit Bayesian probability queries
     like "Bayes: Sensitivity=0.99, Specificity=0.95, Prevalence=0.01. Compute P(X|+)",

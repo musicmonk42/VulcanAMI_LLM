@@ -1047,7 +1047,7 @@ class TestBackgroundProcesses:
         assert selector.is_shutdown is True
 
 
-# Bug #1 Fix Tests: Greeting Detection in Semantic Tool Matcher
+# Note Tests: Greeting Detection in Semantic Tool Matcher
 class TestGreetingDetectionFix:
     """
     Test the fix for Bug #1 (0.500 Bug): Simple greetings like "Hello"
@@ -1121,10 +1121,10 @@ class TestGreetingDetectionFix:
         assert result["general"].combined_score > result["probabilistic"].combined_score
 
 
-# BUG #2 FIX Tests: Keyword Boosting for SAT, Bayes, Causal queries
+# Note Tests: Keyword Boosting for SAT, Bayes, Causal queries
 class TestKeywordBoostingFix:
     """
-    Test BUG #2 fix: Keyword-based boosting to prevent ALL queries
+    Test Note: Keyword-based boosting to prevent ALL queries
     from routing to 'analogical' due to miscalibrated semantic embeddings.
     
     The problem was that semantic similarity scores were nearly uniform
@@ -1236,7 +1236,7 @@ class TestKeywordBoostingFix:
         assert result["analogical"].combined_score >= result["causal"].combined_score
 
 
-# BUG FIX Tests: Query Classifier for Understanding-Based Complexity
+# Note Tests: Query Classifier for Understanding-Based Complexity
 class TestQueryClassifier:
     """
     Test the QueryClassifier that fixes the fundamental issue where
@@ -1363,11 +1363,11 @@ class TestQueryClassifier:
 
 
 # =============================================================================
-# BUG #1 FIX Tests: Header Skipping in SymbolicToolWrapper._preprocess_query
+# Note Tests: Header Skipping in SymbolicToolWrapper._preprocess_query
 # =============================================================================
 class TestSymbolicEngineHeaderSkipping:
     """
-    Test the BUG #1 fix: The symbolic engine was parsing "Language Reasoning"
+    Test the Note: The symbolic engine was parsing "Language Reasoning"
     (the header) instead of the actual SAT content, causing parse errors.
     
     The fix adds header-skipping logic via `_skip_header_lines()` that:

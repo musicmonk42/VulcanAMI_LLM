@@ -157,12 +157,12 @@ class TestLexer:
     def test_lexer_error_handling(self):
         """Test lexer graceful handling of invalid characters.
         
-        BUG #1 FIX: The Lexer now skips unknown characters instead of raising
+        Note: The Lexer now skips unknown characters instead of raising
         SyntaxError. This allows natural language text to pass through more
         gracefully and prevents parsing failures on queries containing
         unexpected Unicode characters.
         """
-        # Invalid characters should be skipped gracefully (BUG #1 FIX)
+        # Invalid characters should be skipped gracefully (Note)
         lexer = Lexer("P(x) @ Q")
         tokens = lexer.tokenize()
         

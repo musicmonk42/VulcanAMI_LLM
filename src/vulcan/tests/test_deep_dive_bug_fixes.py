@@ -1,12 +1,12 @@
 """
-Tests for Deep Dive Bug Fixes.
+Tests for Deep Dive Notees.
 
 Part of the VULCAN-AGI system.
 
 These tests validate the fixes for critical bugs identified in the 
 "Deep Dive: What's Actually Going Wrong" analysis.
 
-Bug Fixes Covered:
+Notees Covered:
     - Bug #5: Probabilistic engine parses first word (P(if) issue)
     - Bug #4: State contamination between queries
     - Improved gate checks for non-applicable queries
@@ -23,7 +23,7 @@ import re
 
 class TestBug5ProbabilisticFirstWordParsing:
     """
-    Tests for Bug #5 Fix: Probabilistic Engine First-Word Parsing.
+    Tests for Note: Probabilistic Engine First-Word Parsing.
     
     The bug caused queries like "if given the opportunity would you become self aware?"
     to trigger probabilistic reasoning with "Computing P(if | evidence={})".
@@ -154,7 +154,7 @@ class TestBug5ProbabilisticFirstWordParsing:
 
 class TestBug4StateCleaning:
     """
-    Tests for Bug #4 Fix: State Contamination Between Queries.
+    Tests for Note: State Contamination Between Queries.
     
     The bug caused symbolic/probabilistic engines to receive text from
     previous queries, resulting in:
@@ -173,7 +173,7 @@ class TestBug4StateCleaning:
             
             reasoner = SymbolicReasoner()
             assert hasattr(reasoner, 'clear_state'), (
-                "SymbolicReasoner must have clear_state method for Bug #4 fix"
+                "SymbolicReasoner must have clear_state method for Note"
             )
             
             # Call clear_state - should not raise
@@ -189,7 +189,7 @@ class TestBug4StateCleaning:
             
             reasoner = ProbabilisticReasoner()
             assert hasattr(reasoner, 'clear_state'), (
-                "ProbabilisticReasoner must have clear_state method for Bug #4 fix"
+                "ProbabilisticReasoner must have clear_state method for Note"
             )
             
             # Call clear_state - should not raise
@@ -321,9 +321,9 @@ class TestCommonEnglishWordsRejection:
 # Integration Tests
 # =============================================================================
 
-class TestDeepDiveBugFixesIntegration:
+class TestDeepDiveNoteesIntegration:
     """
-    Integration tests for the deep dive bug fixes.
+    Integration tests for the deep dive Notees.
     
     These tests simulate the actual scenarios described in the bug report.
     """

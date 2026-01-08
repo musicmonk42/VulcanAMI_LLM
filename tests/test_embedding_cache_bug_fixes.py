@@ -1,5 +1,5 @@
 """
-Test suite for Bug #1 and Bug #2 fixes:
+Test suite for Bug #1 and Notees:
 - Bug #1: Embedding Cache Never Hits (0% Hit Rate)
 - Bug #2: Query Router Always Times Out (5 seconds)
 
@@ -19,7 +19,7 @@ import pytest
 
 
 class TestEmbeddingCacheNormalization:
-    """Tests for Bug #1 fix: Embedding cache text normalization."""
+    """Tests for Note: Embedding cache text normalization."""
     
     def test_normalize_text_strips_whitespace(self):
         """Test that _normalize_text strips leading/trailing whitespace."""
@@ -138,7 +138,7 @@ class TestEmbeddingCacheNormalization:
 
 
 class TestQueryRouterTimeout:
-    """Tests for Bug #2 fix: Query Router timeout configuration."""
+    """Tests for Note: Query Router timeout configuration."""
     
     def test_timeout_constant_increased(self):
         """Test that QUERY_ROUTING_TIMEOUT_SECONDS is increased from 5s."""
