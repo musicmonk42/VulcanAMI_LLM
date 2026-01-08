@@ -529,6 +529,118 @@ class TestIntegration:
 
 
 # =============================================================================
+# Self-Introspection Validation Tests (META-REASONING FIX)
+# =============================================================================
+
+@pytest.mark.skipif(not VALIDATOR_AVAILABLE, reason="Answer validator not available")
+class TestSelfIntrospectionValidation:
+    """
+    Tests for self-introspection/meta-reasoning answer validation.
+    
+    These tests verify the fix for the bug where self-introspection queries
+    like "what makes you different from other AI systems?" were returning
+    mathematical results like "3*x**2" instead of proper introspection responses.
+    """
+    
+    def test_infer_self_introspection_type(self, validator):
+        """Test that self-introspection queries are correctly typed."""
+        queries = [
+            "what makes you different from other ai systems?",
+            "are you self-aware?",
+            "what are your capabilities?",
+            "tell me about yourself",
+            "what makes vulcan unique?",
+            "describe yourself and your abilities",
+        ]
+        
+        for query in queries:
+            result_type = validator._infer_expected_type(query)
+            assert result_type == 'self_introspection', f"Expected 'self_introspection' for: {query}, got: {result_type}"
+    
+    def test_valid_self_introspection_answer(self, validator):
+        """Test validation of valid self-introspection answers."""
+        query = "what makes you different from other ai systems?"
+        
+        valid_answers = [
+            {'conclusion': 'I am VULCAN, a multi-agent reasoning system with symbolic, probabilistic, and causal reasoning capabilities.'},
+            {'conclusion': 'My architecture includes multiple specialized reasoning engines that work together to analyze complex problems.'},
+            {'conclusion': 'VULCAN uses a unique combination of symbolic reasoning, causal inference, and probabilistic models.'},
+        ]
+        
+        for answer in valid_answers:
+            result = validator.validate(query, answer, expected_type='self_introspection')
+            assert result.valid, f"Should be valid: {answer['conclusion'][:50]}..."
+    
+    def test_invalid_self_introspection_math_answer(self, validator):
+        """
+        Test THE EXACT BUG SCENARIO: Self-introspection query gets derivative answer.
+        
+        This is the critical test that verifies the meta-reasoning fix works.
+        """
+        query = "what makes you different from other ai systems?"
+        answer = {'conclusion': '3*x**2'}  # The known bug output
+        
+        result = validator.validate(query, answer, expected_type='self_introspection')
+        
+        assert not result.valid, "Mathematical answer should be invalid for self-introspection query"
+        # Should detect wrong domain or known bug output
+        assert any(failure in result.failures for failure in [
+            ValidationFailureReason.WRONG_DOMAIN,
+            ValidationFailureReason.NONSENSICAL_OUTPUT
+        ]), f"Expected WRONG_DOMAIN or NONSENSICAL_OUTPUT, got: {result.failures}"
+    
+    def test_invalid_self_introspection_calculus_answer(self, validator):
+        """Test rejection of calculus/derivative answers for self-introspection."""
+        query = "are you self-aware?"
+        answer = {'conclusion': 'The derivative is exp(x) * cos(x)'}
+        
+        result = validator.validate(query, answer, expected_type='self_introspection')
+        
+        assert not result.valid
+        assert ValidationFailureReason.WRONG_DOMAIN in result.failures
+    
+    def test_invalid_self_introspection_short_answer(self, validator):
+        """Test rejection of very short, uninformative answers."""
+        query = "describe yourself and your capabilities"
+        answer = {'conclusion': 'OK'}
+        
+        result = validator.validate(query, answer, expected_type='self_introspection')
+        
+        assert not result.valid
+        assert ValidationFailureReason.NO_ANSWER_PROVIDED in result.failures
+    
+    def test_nonsensical_self_introspection_detection(self, validator):
+        """Test _is_obviously_nonsensical for self-introspection + calculus mismatch."""
+        query = "what makes you different from other ai systems?"
+        answer = {'conclusion': '3x**2 + 2x'}
+        
+        is_nonsensical = validator._is_obviously_nonsensical(query, answer)
+        
+        assert is_nonsensical, "Self-introspection query with calculus answer should be detected as nonsensical"
+    
+    def test_world_model_type_alias(self, validator):
+        """Test that 'world_model' type uses self-introspection validator."""
+        query = "what are your capabilities?"
+        valid_answer = {'conclusion': 'VULCAN has multiple reasoning engines including symbolic and causal reasoning.'}
+        invalid_answer = {'conclusion': '3x**2'}
+        
+        # Should work with world_model type
+        valid_result = validator.validate(query, valid_answer, expected_type='world_model')
+        assert valid_result.valid
+        
+        invalid_result = validator.validate(query, invalid_answer, expected_type='world_model')
+        assert not invalid_result.valid
+    
+    def test_meta_reasoning_type_alias(self, validator):
+        """Test that 'meta_reasoning' type uses self-introspection validator."""
+        query = "how do you reason about problems?"
+        valid_answer = {'conclusion': 'I use a combination of symbolic reasoning and probabilistic inference to analyze problems.'}
+        
+        result = validator.validate(query, valid_answer, expected_type='meta_reasoning')
+        assert result.valid
+
+
+# =============================================================================
 # Main Entry Point
 # =============================================================================
 

@@ -241,6 +241,16 @@ class AnswerValidator:
         'likelihood', 'conditional probability'
     ])
     
+    # META-REASONING FIX: Keywords for self-introspection queries
+    _SELF_INTROSPECTION_KEYWORDS: FrozenSet[str] = frozenset([
+        'what makes you different', 'are you self-aware', 'your capabilities',
+        'what are you', 'who are you', 'your limitations', 'your strengths',
+        'can you think', 'consciousness', 'sentient', 'how do you reason',
+        'your reasoning', 'your architecture', 'what makes vulcan',
+        'vulcan different', 'vulcan unique', 'tell me about yourself',
+        'describe yourself', 'your abilities', 'about yourself',
+    ])
+    
     def __init__(self) -> None:
         """Initialize the AnswerValidator with domain-specific validators."""
         self.validators: Dict[str, ValidatorFunc] = {
@@ -251,6 +261,10 @@ class AnswerValidator:
             'proof': self._validate_proof_answer,
             'bayesian': self._validate_bayesian_answer,
             'ethical': self._validate_ethical_answer,
+            # META-REASONING FIX: Add self-introspection validator
+            'self_introspection': self._validate_self_introspection_answer,
+            'meta_reasoning': self._validate_self_introspection_answer,
+            'world_model': self._validate_self_introspection_answer,
         }
     
     def validate(
@@ -356,12 +370,19 @@ class AnswerValidator:
         Returns:
             String identifier for the expected answer type:
             'fol', 'sat', 'ethical', 'yes_no', 'mathematical', 'proof',
-            'bayesian', or 'general'
+            'bayesian', 'self_introspection', or 'general'
         """
         query_lower = query.lower()
         
         # Check for logic symbols in original query (case-sensitive)
         has_logic_symbols = any(sym in query for sym in _LOGIC_SYMBOLS)
+        
+        # META-REASONING FIX: Check self-introspection FIRST
+        # Self-introspection queries should be detected before other types
+        # to prevent them from being misclassified as 'general' and then
+        # routed to wrong engines.
+        if any(kw in query_lower for kw in self._SELF_INTROSPECTION_KEYWORDS):
+            return 'self_introspection'
         
         # FOL formalization (check before SAT since FOL is more specific)
         if any(kw in query_lower for kw in self._FOL_KEYWORDS):
@@ -695,6 +716,97 @@ class AnswerValidator:
             suggestions=suggestions
         )
     
+    def _validate_self_introspection_answer(self, query: str, result: Dict[str, Any]) -> ValidationResult:
+        """
+        Validate self-introspection/meta-reasoning answers.
+        
+        META-REASONING FIX: This validator ensures self-introspection queries
+        get proper answers about the AI system's capabilities, not unrelated
+        mathematical or technical outputs.
+        
+        Args:
+            query: Original query
+            result: Result dictionary with 'conclusion' key
+            
+        Returns:
+            ValidationResult for self-introspection-specific checks
+            
+        Examples of valid answers:
+            - "I am VULCAN, a multi-agent reasoning system..."
+            - "My capabilities include symbolic reasoning, causal inference..."
+            - "I use multiple specialized reasoning engines..."
+            
+        Examples of invalid answers:
+            - "3*x**2" (mathematical expression)
+            - "exp(x)" (calculus function)
+            - Empty or very short responses
+        """
+        failures: List[ValidationFailureReason] = []
+        suggestions: List[str] = []
+        
+        result_text = str(result.get('conclusion', ''))
+        result_lower = result_text.lower()
+        
+        # Self-introspection answers should contain some relevant content
+        introspection_keywords = [
+            'vulcan', 'reasoning', 'capabilities', 'i am', 'system', 'agent',
+            'symbolic', 'causal', 'probabilistic', 'inference', 'think',
+            'process', 'analyze', 'understand', 'learn', 'knowledge',
+            'architecture', 'engine', 'multi-agent', 'intelligent',
+        ]
+        
+        # Mathematical expressions that should NOT appear in self-introspection
+        bad_patterns = [
+            r'\d+x?\*\*\d+',  # Polynomial expressions like 3x**2
+            r'exp\(',         # Exponential function
+            r'sin\(|cos\(|tan\(',  # Trig functions
+            r'log\(|ln\(',    # Log functions
+            r'integral|derivative',  # Calculus keywords
+            r'\d+\s*\*\s*x',  # Coefficient times variable
+        ]
+        
+        # Check for mathematical expressions (wrong domain)
+        for pattern in bad_patterns:
+            if re.search(pattern, result_lower):
+                failures.append(ValidationFailureReason.WRONG_DOMAIN)
+                suggestions.append(
+                    f"Self-introspection answer contains mathematical content. "
+                    f"Expected: Information about VULCAN's reasoning capabilities. "
+                    f"Got: Mathematical expression"
+                )
+                break
+        
+        # Check for known bug outputs
+        for bug_output in _KNOWN_BUG_OUTPUTS:
+            if bug_output in result_text:
+                failures.append(ValidationFailureReason.NONSENSICAL_OUTPUT)
+                suggestions.append(
+                    f"Known incorrect output '{bug_output}' detected in self-introspection response. "
+                    f"This indicates a routing error - mathematical result returned for identity query."
+                )
+                break
+        
+        # Check that answer contains SOME introspection-related content
+        # (unless it's already flagged as wrong domain)
+        if not failures:
+            has_introspection_content = any(kw in result_lower for kw in introspection_keywords)
+            
+            # Very short answers are suspicious
+            if len(result_text.strip()) < 20 and not has_introspection_content:
+                failures.append(ValidationFailureReason.NO_ANSWER_PROVIDED)
+                suggestions.append(
+                    "Self-introspection answer is too short or lacks relevant content. "
+                    "Expected: Detailed information about VULCAN's nature and capabilities."
+                )
+        
+        return ValidationResult(
+            valid=len(failures) == 0,
+            confidence=1.0 if len(failures) == 0 else 0.0,
+            failures=failures,
+            explanation=self._format_explanation(failures, suggestions) if failures else "",
+            suggestions=suggestions
+        )
+    
     def _is_obviously_nonsensical(self, query: str, result: Dict[str, Any]) -> bool:
         """
         Check for obviously nonsensical outputs that indicate domain mismatch.
@@ -734,6 +846,17 @@ class AnswerValidator:
             'should', 'ought', 'forbidden'
         ]
         
+        # META-REASONING FIX: Self-introspection indicators
+        # These queries should NEVER return mathematical/calculus answers
+        self_introspection_indicators = [
+            'what makes you different', 'are you self-aware', 'your capabilities',
+            'what are you', 'who are you', 'your limitations', 'your strengths',
+            'can you think', 'do you have consciousness', 'are you sentient',
+            'how do you reason', 'your reasoning', 'your architecture',
+            'what makes vulcan', 'vulcan different', 'vulcan unique',
+            'tell me about yourself', 'describe yourself', 'your abilities',
+        ]
+        
         # Check for logic symbols in original query
         has_logic_symbols = any(sym in query for sym in _LOGIC_SYMBOLS)
         
@@ -743,6 +866,9 @@ class AnswerValidator:
             has_logic_symbols
         )
         is_ethical_query = any(ind in query_lower for ind in ethical_indicators)
+        
+        # META-REASONING FIX: Detect self-introspection queries
+        is_self_introspection = any(ind in query_lower for ind in self_introspection_indicators)
         
         # Detect answer type
         has_calculus_answer = any(ind in result_lower for ind in calculus_indicators)
@@ -760,6 +886,16 @@ class AnswerValidator:
             logger.warning(
                 f"[AnswerValidator] Nonsensical output: Ethical query got calculus answer. "
                 f"Query: {query[:60]}..."
+            )
+            return True
+        
+        # META-REASONING FIX: Self-introspection query + calculus answer = nonsensical
+        # This catches the specific bug where "what makes you different" returns "3*x**2"
+        if is_self_introspection and has_calculus_answer:
+            logger.warning(
+                f"[AnswerValidator] Nonsensical output: Self-introspection query got calculus answer. "
+                f"Query: {query[:60]}... Answer: {result_text[:60]}... "
+                f"Expected: World model introspection about VULCAN's capabilities"
             )
             return True
         
