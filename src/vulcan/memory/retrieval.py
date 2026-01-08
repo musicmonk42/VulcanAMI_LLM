@@ -710,16 +710,28 @@ class TemporalIndex:
     ) -> List[Memory]:
         """Search memories within time range."""
         with self.lock:
-            # Binary search for start and end positions
+            # FIX #MEM-9: Binary search on timestamps only to avoid type comparison issues
+            # Previous code used (end_time, "zzz") assuming "zzz" is larger than all memory IDs,
+            # which fails for IDs starting with 'z', '{', '~', etc.
+            # 
+            # New approach: Extract timestamps for binary search, then filter by range
             import bisect
-
+            
+            if not self.time_index:
+                return []
+            
+            # Find start position: first timestamp >= start_time
             start_idx = bisect.bisect_left(self.time_index, (start_time, ""))
-            end_idx = bisect.bisect_right(self.time_index, (end_time, "zzz"))
-
-            # Get memories in range
+            
+            # Get memories in range by iterating and checking timestamp
             results = []
-            for i in range(start_idx, min(end_idx, len(self.time_index))):
-                _, memory_id = self.time_index[i]
+            for i in range(start_idx, len(self.time_index)):
+                timestamp, memory_id = self.time_index[i]
+                
+                # Stop if we've passed the end time
+                if timestamp > end_time:
+                    break
+                    
                 if memory_id in self.memory_map:
                     results.append(self.memory_map[memory_id])
 
@@ -973,11 +985,15 @@ class AttentionMechanism:
         # FIX: Validate dimensions before matrix operations
         query_dim = query.shape[-1]
         if query_dim != self.input_dim:
-            logger.warning(
-                f"Query dimension {query_dim} doesn't match input_dim {self.input_dim}"
+            # FIX #MEM-5: Raise exception instead of returning uniform weights
+            # Silent failure makes debugging impossible - users think search works
+            # but get random results (uniform weights = all memories equally relevant)
+            raise ValueError(
+                f"Embedding dimension mismatch: query has {query_dim} dimensions "
+                f"but attention mechanism expects {self.input_dim} dimensions. "
+                f"Did you change the embedding model? "
+                f"Regenerate all memory embeddings or use the same embedding model."
             )
-            # Return uniform weights
-            return np.ones(len(keys)) / len(keys)
 
         # Project query and keys
         Q = np.dot(query, self.W_q)
