@@ -165,10 +165,33 @@ class Lexer:
         # Step 4: BUG #5/8 FIX: Handle commas in natural language context
         # Keep commas only when they appear between logical expressions
         # Remove commas that appear in prose (after lowercase words, before 'and', etc.)
-        # Pattern: comma followed by lowercase word (likely NL)
-        result = re.sub(r',\s+([a-z])', r' \1', result)
-        # Pattern: comma followed by 'and', 'or', 'but' (NL conjunctions)
-        result = re.sub(r',\s+(and|or|but)\s+', r' \1 ', result)
+        # 
+        # BUG #1 FIX: Be careful NOT to remove commas inside function arguments!
+        # Example: and(m, f) - the comma separates function arguments
+        # The heuristic: commas inside parentheses are function arguments, keep them.
+        #
+        # Pattern: comma followed by lowercase word ONLY when NOT inside parens
+        # We approximate this by checking if there's an unmatched open paren before the comma.
+        # For simple cases, we use a negative lookbehind for opening paren.
+        # Pattern: comma NOT preceded by word char + open paren, followed by lowercase word
+        # Actually, simpler: only apply NL comma removal if we're likely in prose context
+        # (i.e., no parentheses on the current line segment)
+        #
+        # New approach: Don't remove commas if the text looks like function call syntax
+        # Function calls have the pattern: identifier(args...)
+        # Note: This pattern is simplified and may not handle deeply nested parens,
+        # but for most FOL function-style syntax (implies(A, B), and(x, y)), it works.
+        # The key insight is we're just detecting IF there's function syntax, not parsing it.
+        #
+        # FUNCTION_CALL_WITH_ARGS_PATTERN matches: word(anything_without_rparen,
+        # Examples: "func(a, b)", "implies(A, B)", "and(x, y)"
+        # This detects function syntax to preserve commas as argument separators.
+        FUNCTION_CALL_WITH_ARGS_PATTERN = r'\w+\s*\([^)]*,'
+        has_function_syntax = bool(re.search(FUNCTION_CALL_WITH_ARGS_PATTERN, result))
+        if not has_function_syntax:
+            result = re.sub(r',\s+([a-z])', r' \1', result)
+            # Pattern: comma followed by 'and', 'or', 'but' (NL conjunctions)
+            result = re.sub(r',\s+(and|or|but)\s+', r' \1 ', result)
         
         # Step 5: Check if this looks like natural language prose
         # If it has multiple lines with non-formula content, try to extract formulas
@@ -628,7 +651,15 @@ class Parser:
 
     def atom(self) -> ASTNode:
         """
-        Parse atom: predicate | LPAREN formula RPAREN
+        Parse atom: predicate | LPAREN formula RPAREN | operator_function
+        
+        BUG #1 FIX: Also handles function-style operator syntax like:
+        - implies(A, B) -> A → B
+        - and(X, Y) -> X ∧ Y  
+        - or(A, B) -> A ∨ B
+        
+        This is needed because query decomposition may generate function-style
+        operators that the parser must handle.
 
         Returns:
             ASTNode for atom
@@ -643,11 +674,60 @@ class Parser:
         # Predicate or propositional variable
         if self.current_token.type == TokenType.IDENTIFIER:
             return self.predicate()
+        
+        # BUG #1 FIX: Handle function-style operator syntax
+        # When decomposer generates implies(A, B), and(m, f), or(g, d)
+        # the lexer tokenizes them as IMPLIES/AND/OR tokens.
+        # If followed by LPAREN, convert to logical operator AST.
+        if self.current_token.type in [TokenType.IMPLIES, TokenType.AND, TokenType.OR]:
+            next_token = self.peek()
+            if next_token.type == TokenType.LPAREN:
+                return self._parse_operator_function()
 
         raise SyntaxError(
             f"Expected atom (predicate or parenthesized formula), got '{self.current_token.value}' "
             f"at line {self.current_token.line}, column {self.current_token.column}"
         )
+    
+    def _parse_operator_function(self) -> ASTNode:
+        """
+        BUG #1 FIX: Parse function-style operator syntax.
+        
+        Converts:
+        - implies(A, B) -> A → B (implication)
+        - and(X, Y) -> X ∧ Y (conjunction)
+        - or(A, B) -> A ∨ B (disjunction)
+        
+        Returns:
+            ASTNode for the logical operator
+        """
+        op_token = self.current_token
+        op_type = op_token.type
+        self.advance()  # consume operator keyword
+        
+        self.expect(TokenType.LPAREN)  # consume (
+        
+        # Parse first argument
+        left = self.formula()
+        
+        self.expect(TokenType.COMMA)  # consume ,
+        
+        # Parse second argument
+        right = self.formula()
+        
+        self.expect(TokenType.RPAREN)  # consume )
+        
+        # Create appropriate AST node based on operator type
+        if op_type == TokenType.IMPLIES:
+            return ASTNode(NodeType.IMPLIES, children=[left, right])
+        elif op_type == TokenType.AND:
+            return ASTNode(NodeType.AND, children=[left, right])
+        elif op_type == TokenType.OR:
+            return ASTNode(NodeType.OR, children=[left, right])
+        else:
+            raise SyntaxError(
+                f"Unexpected operator type in function syntax: {op_type}"
+            )
 
     def predicate(self) -> ASTNode:
         """

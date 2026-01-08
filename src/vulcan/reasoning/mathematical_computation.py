@@ -99,10 +99,22 @@ class ProblemClassification:
 try:
     from ..utils.safe_execution import execute_math_code, is_safe_execution_available
     SAFE_EXECUTION_AVAILABLE = is_safe_execution_available()
+    if not SAFE_EXECUTION_AVAILABLE:
+        # Provide more informative message about what's missing
+        logger.warning(
+            "Safe execution not fully available for mathematical computation. "
+            "Complex symbolic math (summations, integrals, etc.) will be limited. "
+            "Install RestrictedPython and SymPy for full functionality: "
+            "pip install RestrictedPython sympy"
+        )
 except ImportError:
     SAFE_EXECUTION_AVAILABLE = False
     execute_math_code = None
-    logger.warning("Safe execution module not available for mathematical computation")
+    logger.warning(
+        "Safe execution module not available for mathematical computation. "
+        "Install RestrictedPython and SymPy for full functionality: "
+        "pip install RestrictedPython sympy"
+    )
 
 
 # ============================================================================
