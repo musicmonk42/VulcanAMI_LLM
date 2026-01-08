@@ -2075,13 +2075,18 @@ class ReasoningIntegration:
             )
             
             # Build request payload
+            # BUG #4 FIX: Sanitize context to make it JSON serializable
+            # The context may contain PreprocessingResult objects which aren't
+            # JSON serializable. Convert them to dictionaries using to_dict().
+            sanitized_context = self._sanitize_context_for_json(context or {})
+            
             arena_payload = {
                 "query": query,
                 "selected_tools": [original_tool],
                 "query_type": query_type,
                 "complexity": complexity,
                 "context": {
-                    **(context or {}),
+                    **sanitized_context,
                     'vulcan_fallback': True,
                     'original_tool': original_tool,
                 },
@@ -2154,6 +2159,78 @@ class ReasoningIntegration:
         except Exception as e:
             logger.error(f"{LOG_PREFIX} Arena delegation failed: {e}")
             return None
+    
+    def _sanitize_context_for_json(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        BUG #4 FIX: Sanitize context dictionary to make it JSON serializable.
+        
+        The context may contain objects like PreprocessingResult that have
+        to_dict() methods. This function recursively converts such objects
+        to plain dictionaries.
+        
+        Args:
+            context: Original context dictionary
+            
+        Returns:
+            Sanitized context dictionary that is JSON serializable
+        """
+        if not context:
+            return {}
+        
+        def sanitize_value(value: Any) -> Any:
+            """Recursively sanitize a value for JSON serialization."""
+            # Handle None
+            if value is None:
+                return None
+            
+            # Handle primitives
+            if isinstance(value, (bool, int, float, str)):
+                return value
+            
+            # Handle objects with to_dict() method (e.g., PreprocessingResult)
+            if hasattr(value, 'to_dict') and callable(value.to_dict):
+                try:
+                    return value.to_dict()
+                except Exception as e:
+                    logger.warning(
+                        f"{LOG_PREFIX} Failed to serialize object with to_dict(): {e}"
+                    )
+                    return str(value)
+            
+            # Handle dataclasses with __dataclass_fields__
+            if hasattr(value, '__dataclass_fields__'):
+                try:
+                    import dataclasses
+                    return dataclasses.asdict(value)
+                except Exception as e:
+                    logger.warning(
+                        f"{LOG_PREFIX} Failed to serialize dataclass: {e}"
+                    )
+                    return str(value)
+            
+            # Handle dictionaries recursively
+            if isinstance(value, dict):
+                return {k: sanitize_value(v) for k, v in value.items()}
+            
+            # Handle lists and tuples recursively
+            if isinstance(value, (list, tuple)):
+                return [sanitize_value(item) for item in value]
+            
+            # Handle sets (convert to list)
+            if isinstance(value, (set, frozenset)):
+                return [sanitize_value(item) for item in value]
+            
+            # Handle Enum
+            if hasattr(value, 'value') and hasattr(value, 'name'):
+                return value.value
+            
+            # Fallback: convert to string
+            try:
+                return str(value)
+            except Exception:
+                return repr(value)
+        
+        return sanitize_value(context)
 
     # =========================================================================
     # Issue #5 FIX: Self-Referential Query Handling
