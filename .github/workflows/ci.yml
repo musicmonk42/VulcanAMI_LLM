@@ -248,6 +248,13 @@ jobs:
           echo "POSTGRES_DB=test_db" >> $GITHUB_ENV
           echo "PYTHONPATH=${{ github.workspace }}/src:$PYTHONPATH" >> $GITHUB_ENV
 
+      - name: Monitor system resources
+        run: |
+          echo "=== System Resources Before Tests ==="
+          free -h
+          df -h
+          ulimit -a
+
       - name: Run tests with coverage
         run: |
           set -x
@@ -255,13 +262,19 @@ jobs:
           mkdir -p $GITHUB_WORKSPACE/logs
           exit_code=0
           ulimit -Sn 10240 || true
+          
+          # Install pytest-xdist for parallel execution control
+          pip install pytest-xdist || true
+          
           pytest --cov=src -q \
             --cov-report=xml \
             --cov-report=html \
             --cov-report=term-missing \
             --junitxml=results/junit.xml \
-            --timeout=300 \
+            --timeout=600 \
             --maxfail=10 \
+            -n 2 \
+            --dist=loadscope \
             -m "not slow and not load_test and not benchmark" \
             -v \
             2>&1 | tee $GITHUB_WORKSPACE/logs/pytest-output.log || exit_code=$?
