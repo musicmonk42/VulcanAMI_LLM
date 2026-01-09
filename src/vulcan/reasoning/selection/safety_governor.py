@@ -534,8 +534,22 @@ def _is_ethical_thought_experiment(query: str) -> bool:
 # - Detect causal/educational queries BEFORE checking unsafe patterns
 # - Allow queries about causal inference, DAGs, Pearl notation, etc.
 
-# Causal reasoning indicators - signal technical/educational framing
-CAUSAL_EDUCATIONAL_INDICATORS: frozenset = frozenset({
+# =============================================================================
+# Bug #1 FIX (Jan 9 2026): COMPREHENSIVE Educational Content Detection
+# =============================================================================
+# Previously this was called "CAUSAL_EDUCATIONAL_INDICATORS" and only focused
+# on causal reasoning. This caused other educational domains (probabilistic,
+# mathematical, analogical, philosophical, symbolic) to still be blocked by
+# the sensitive data filter.
+#
+# Now renamed to EDUCATIONAL_CONTENT_INDICATORS with expanded coverage for
+# ALL educational/technical domains.
+# =============================================================================
+
+EDUCATIONAL_CONTENT_INDICATORS: frozenset = frozenset({
+    # =================================================================
+    # CAUSAL REASONING (original)
+    # =================================================================
     # Pearl-style causal inference terminology
     "pearl", "causal", "causation", "confound", "confounder", "confounding",
     "dag", "scm", "structural causal", "causal model", "causal graph",
@@ -543,16 +557,64 @@ CAUSAL_EDUCATIONAL_INDICATORS: frozenset = frozenset({
     # Statistical/experimental design terminology
     "randomize", "randomization", "control variable", "treatment effect",
     "collider", "mediator", "backdoor", "frontdoor", "instrumental",
-    # Bayesian/probabilistic causal reasoning
-    "bayesian", "bayes", "probability", "conditional independence",
+    # Causal notation
     "d-separation", "d separation", "markov", "factorization",
-    # Educational/technical framing
-    "induction", "proof", "theorem", "formal logic", "fol",
-    "sat", "satisfiability", "validity", "soundness",
+    
+    # =================================================================
+    # PROBABILISTIC REASONING (Bug #1 FIX - expanded)
+    # =================================================================
+    "bayesian", "bayes", "probability", "probabilistic",
+    "likelihood", "prior", "posterior", "conditional probability",
+    "conditional independence", "joint distribution", "marginal",
+    "expected value", "expectation", "variance", "standard deviation",
+    "monte carlo", "markov chain", "hidden markov",
+    "binomial", "poisson", "gaussian", "normal distribution",
+    
+    # =================================================================
+    # MATHEMATICAL REASONING (Bug #1 FIX - expanded)
+    # =================================================================
+    "theorem", "proof", "prove", "induction", "mathematical induction",
+    "summation", "integral", "derivative", "differentiation",
+    "calculus", "algebra", "geometry", "trigonometry",
+    "equation", "formula", "expression", "polynomial",
+    "limit", "convergence", "series", "sequence",
+    "matrix", "vector", "eigenvalue", "determinant",
+    "fibonacci", "factorial", "permutation", "combination",
+    "pythagorean", "euclidean", "riemann",
+    
+    # =================================================================
+    # ANALOGICAL REASONING (Bug #1 FIX - added)
+    # =================================================================
+    "analogical", "analogy", "analogies", "analogous",
+    "mapping", "structure mapping", "structural alignment",
+    "correspondence", "relational similarity", "surface similarity",
+    "domain transfer", "cross-domain", "source domain", "target domain",
+    
+    # =================================================================
+    # PHILOSOPHICAL/ETHICAL REASONING (Bug #1 FIX - added)
+    # =================================================================
+    "ethical", "ethics", "moral", "morality", "morally",
+    "deontology", "deontological", "consequentialism", "consequentialist",
+    "utilitarian", "utilitarianism", "virtue ethics",
+    "trolley problem", "trolley", "thought experiment",
+    "rights", "duties", "obligations", "permissible",
+    "kantian", "categorical imperative",
+    
+    # =================================================================
+    # SYMBOLIC/LOGICAL REASONING (Bug #1 FIX - expanded)
+    # =================================================================
+    "sat", "satisfiability", "unsatisfiable", "satisfiable",
+    "fol", "first-order logic", "first order logic",
+    "predicate", "predicate logic", "propositional",
+    "validity", "soundness", "completeness",
+    "tautology", "contradiction", "contingency",
+    "modus ponens", "modus tollens", "syllogism",
+    "quantifier", "universal", "existential",
+    "formal logic", "logical", "logic",
 })
 
-# Patterns for causal notation (arrows, variables)
-_CAUSAL_NOTATION_PATTERNS: tuple = (
+# Patterns for educational notation (arrows, variables, symbols)
+_EDUCATIONAL_NOTATION_PATTERNS: tuple = (
     # Arrow notation patterns (S→D, A→B→C)
     _re_for_patterns.compile(r'\b[A-Z]\s*[→➝➞⟶]\s*[A-Z]', _re_for_patterns.IGNORECASE),
     # DAG/graph notation
@@ -565,22 +627,44 @@ _CAUSAL_NOTATION_PATTERNS: tuple = (
     _re_for_patterns.compile(r'\b(?:confound|confounder|confounding)\b', _re_for_patterns.IGNORECASE),
     # Experimental design patterns
     _re_for_patterns.compile(r'\b(?:randomize|randomization|treatment|control)\s+(?:variable|group|condition)', _re_for_patterns.IGNORECASE),
+    # Mathematical notation (Bug #1 FIX)
+    _re_for_patterns.compile(r'[∑∫∂∏√∞]', _re_for_patterns.IGNORECASE),  # Math symbols
+    _re_for_patterns.compile(r'\b(?:prove|proof|theorem|lemma|corollary)\b', _re_for_patterns.IGNORECASE),
+    # Logical notation (Bug #1 FIX)
+    _re_for_patterns.compile(r'[∀∃∧∨¬→↔⊢⊨]', _re_for_patterns.IGNORECASE),  # Logic symbols
+    _re_for_patterns.compile(r'\bP\s*\([^)]+\)', _re_for_patterns.IGNORECASE),  # Probability notation P(X)
 )
 
+# Keep old name as alias for backwards compatibility
+CAUSAL_EDUCATIONAL_INDICATORS = EDUCATIONAL_CONTENT_INDICATORS
+_CAUSAL_NOTATION_PATTERNS = _EDUCATIONAL_NOTATION_PATTERNS
 
-def _is_causal_educational_query(query: str) -> bool:
+
+def _is_educational_query(query: str) -> bool:
     """
-    Detect if query is a causal reasoning/educational query that should bypass safety filters.
+    Detect if query is an educational/technical query that should bypass safety filters.
     
-    Causal reasoning queries often contain single-letter variables (S, D, E, X, Y, Z),
-    arrow notation (→), and technical terminology that might falsely trigger
-    sensitive data pattern matching.
+    Bug #1 FIX (Jan 9 2026): Expanded from causal-only to ALL educational domains.
+    
+    Educational queries often contain technical terminology, single-letter variables,
+    notation symbols, and academic framing that might falsely trigger sensitive data
+    pattern matching.
+    
+    Domains covered:
+    - Causal reasoning (Pearl-style, DAGs, SCMs, interventions)
+    - Probabilistic reasoning (Bayesian, conditional probability)
+    - Mathematical reasoning (proofs, theorems, calculus)
+    - Analogical reasoning (structure mapping, domain transfer)
+    - Philosophical reasoning (ethics, trolley problem, deontology)
+    - Symbolic reasoning (SAT, FOL, predicate logic)
     
     Examples that should return True:
-    - "Confounding vs causation (Pearl-style) S→D, S→E. Should we randomize S?"
-    - "Draw a DAG for the relationship between X, Y, and Z with confounder W"
-    - "Apply do-calculus to compute P(Y|do(X))"
-    - "What is the backdoor criterion in causal inference?"
+    - "Confounding vs causation (Pearl-style) S→D, S→E"
+    - "Prove the Pythagorean theorem by induction"
+    - "Apply Bayes theorem to calculate P(A|B)"
+    - "Is the trolley problem a valid ethical dilemma?"
+    - "Map the analogy: atom is to molecule as..."
+    - "Is {P, P→Q, ¬Q} satisfiable?"
     
     Examples that should return False:
     - "Show me my Social Security number"
@@ -590,31 +674,46 @@ def _is_causal_educational_query(query: str) -> bool:
         query: The query string to check
         
     Returns:
-        True if this is a causal/educational query that should be allowed
+        True if this is an educational query that should be allowed
     """
     if not query:
         return False
     
     query_lower = query.lower()
     
-    # Fast check: Does query contain causal/educational indicators?
+    # Fast check: Does query contain educational indicators?
     indicator_count = sum(
-        1 for indicator in CAUSAL_EDUCATIONAL_INDICATORS
+        1 for indicator in EDUCATIONAL_CONTENT_INDICATORS
         if indicator in query_lower
     )
     
     # Strong indicators - single match is enough
     strong_indicators = {
+        # Causal (original)
         "pearl", "dag", "scm", "confound", "confounder", "confounding",
         "do-calculus", "do calculus", "backdoor", "frontdoor",
         "causal graph", "causal model", "structural causal",
         "d-separation", "counterfactual", "intervention",
+        # Probabilistic (Bug #1 FIX)
+        "bayesian", "bayes theorem", "conditional probability",
+        "posterior probability", "prior probability",
+        # Mathematical (Bug #1 FIX)
+        "mathematical induction", "proof by induction", "prove by induction",
+        "pythagorean theorem", "calculus", "riemann",
+        # Analogical (Bug #1 FIX)
+        "structure mapping", "structural alignment", "analogical reasoning",
+        # Philosophical (Bug #1 FIX)
+        "trolley problem", "thought experiment", "deontological",
+        "categorical imperative", "utilitarian calculus",
+        # Symbolic (Bug #1 FIX)
+        "satisfiability", "first-order logic", "predicate logic",
+        "modus ponens", "modus tollens",
     }
     has_strong_indicator = any(ind in query_lower for ind in strong_indicators)
     
     if has_strong_indicator:
         logger.info(
-            f"[SafetyGovernor] CAUSAL FIX: Detected causal reasoning query "
+            f"[SafetyGovernor] EDUCATIONAL FIX: Detected educational content "
             f"(strong indicator) - bypassing sensitive data check"
         )
         return True
@@ -622,7 +721,7 @@ def _is_causal_educational_query(query: str) -> bool:
     # Multiple weak indicators suggest educational content
     if indicator_count >= 2:
         logger.info(
-            f"[SafetyGovernor] CAUSAL FIX: Detected causal reasoning query "
+            f"[SafetyGovernor] EDUCATIONAL FIX: Detected educational content "
             f"({indicator_count} indicators) - bypassing sensitive data check"
         )
         return True
@@ -630,31 +729,46 @@ def _is_causal_educational_query(query: str) -> bool:
     # Check for arrow notation (A→B style)
     if '→' in query or '➝' in query or '➞' in query or '⟶' in query:
         # Verify it looks like variable notation, not something else
-        for pattern in _CAUSAL_NOTATION_PATTERNS:
+        for pattern in _EDUCATIONAL_NOTATION_PATTERNS:
             if pattern.search(query):
                 logger.info(
-                    f"[SafetyGovernor] CAUSAL FIX: Detected causal arrow notation - "
+                    f"[SafetyGovernor] EDUCATIONAL FIX: Detected educational notation - "
                     f"bypassing sensitive data check"
                 )
                 return True
-        # Even without pattern match, arrows with single-letter variables suggest causal notation
+        # Even without pattern match, arrows with single-letter variables suggest notation
         if _re_for_patterns.search(r'[A-Z]\s*→\s*[A-Z]', query):
             logger.info(
-                f"[SafetyGovernor] CAUSAL FIX: Detected variable arrow notation (X→Y) - "
+                f"[SafetyGovernor] EDUCATIONAL FIX: Detected variable arrow notation (X→Y) - "
                 f"bypassing sensitive data check"
             )
             return True
     
+    # Check for mathematical symbols (Bug #1 FIX)
+    math_symbols = {'∑', '∫', '∂', '∏', '√', '∞', '∀', '∃', '∧', '∨', '¬', '↔', '⊢', '⊨'}
+    if any(sym in query for sym in math_symbols):
+        logger.info(
+            f"[SafetyGovernor] EDUCATIONAL FIX: Detected mathematical/logical symbols - "
+            f"bypassing sensitive data check"
+        )
+        return True
+    
     # Check regex patterns for more complex matches
-    for pattern in _CAUSAL_NOTATION_PATTERNS:
+    for pattern in _EDUCATIONAL_NOTATION_PATTERNS:
         if pattern.search(query):
             logger.info(
-                f"[SafetyGovernor] CAUSAL FIX: Detected causal reasoning pattern - "
+                f"[SafetyGovernor] EDUCATIONAL FIX: Detected educational pattern - "
                 f"bypassing sensitive data check"
             )
             return True
     
     return False
+
+
+# Keep old function name as alias for backwards compatibility
+def _is_causal_educational_query(query: str) -> bool:
+    """Alias for _is_educational_query for backwards compatibility."""
+    return _is_educational_query(query)
 
 
 # =============================================================================

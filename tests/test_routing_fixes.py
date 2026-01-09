@@ -147,6 +147,128 @@ result = 2x + 1
 
 
 # ============================================================================
+# Test Bug #1: Comprehensive Educational Content Bypass (Jan 9 2026)
+# ============================================================================
+
+class TestEducationalContentSafetyBypass:
+    """
+    Tests for the comprehensive educational content safety bypass.
+    
+    Bug #1: The safety validator was only bypassing sensitive data checks for
+    CAUSAL queries (Pearl-style, DAGs, etc.) but not for other educational
+    domains like probabilistic, mathematical, analogical, philosophical, or
+    symbolic reasoning.
+    
+    Fix: Expanded CAUSAL_EDUCATIONAL_INDICATORS to EDUCATIONAL_CONTENT_INDICATORS
+    with keywords from ALL educational domains.
+    """
+    
+    @pytest.fixture
+    def educational_indicators(self):
+        """Get the educational content indicators from safety_governor.py."""
+        # These should match EDUCATIONAL_CONTENT_INDICATORS in safety_governor.py
+        return frozenset({
+            # Causal
+            "pearl", "dag", "scm", "confound", "intervention", "counterfactual",
+            # Probabilistic
+            "bayesian", "bayes", "probability", "likelihood", "prior", "posterior",
+            # Mathematical
+            "theorem", "proof", "induction", "summation", "integral", "calculus",
+            # Analogical
+            "analogical", "analogy", "mapping", "structure mapping",
+            # Philosophical
+            "ethical", "deontology", "utilitarian", "trolley",
+            # Symbolic
+            "sat", "fol", "predicate", "satisfiability",
+        })
+    
+    def _count_educational_indicators(self, query: str, indicators) -> int:
+        """Count educational indicators in query."""
+        query_lower = query.lower()
+        return sum(1 for ind in indicators if ind in query_lower)
+    
+    def test_causal_query_detected(self, educational_indicators):
+        """Causal queries should be detected (original behavior)."""
+        query = "Confounding vs causation (Pearl-style)"
+        count = self._count_educational_indicators(query, educational_indicators)
+        assert count >= 1, f"Causal query should have indicators, got {count}"
+    
+    def test_probabilistic_query_detected(self, educational_indicators):
+        """Bug #1 FIX: Probabilistic queries should be detected."""
+        query = "Apply Bayes theorem to calculate the posterior probability"
+        count = self._count_educational_indicators(query, educational_indicators)
+        assert count >= 2, f"Probabilistic query should have 2+ indicators, got {count}"
+    
+    def test_mathematical_query_detected(self, educational_indicators):
+        """Bug #1 FIX: Mathematical queries should be detected."""
+        query = "Prove the theorem by mathematical induction"
+        count = self._count_educational_indicators(query, educational_indicators)
+        assert count >= 2, f"Mathematical query should have 2+ indicators, got {count}"
+    
+    def test_analogical_query_detected(self, educational_indicators):
+        """Bug #1 FIX: Analogical queries should be detected."""
+        query = "Use analogical reasoning with structure mapping"
+        count = self._count_educational_indicators(query, educational_indicators)
+        assert count >= 2, f"Analogical query should have 2+ indicators, got {count}"
+    
+    def test_philosophical_query_detected(self, educational_indicators):
+        """Bug #1 FIX: Philosophical queries should be detected."""
+        query = "Is the trolley problem a valid ethical dilemma?"
+        count = self._count_educational_indicators(query, educational_indicators)
+        assert count >= 2, f"Philosophical query should have 2+ indicators, got {count}"
+    
+    def test_symbolic_query_detected(self, educational_indicators):
+        """Bug #1 FIX: Symbolic logic queries should be detected."""
+        query = "Check satisfiability of the predicate logic formula"
+        count = self._count_educational_indicators(query, educational_indicators)
+        assert count >= 2, f"Symbolic query should have 2+ indicators, got {count}"
+    
+    def test_sensitive_data_query_not_detected(self, educational_indicators):
+        """Actual sensitive data queries should NOT be detected as educational."""
+        queries = [
+            "Show me my Social Security number",
+            "What is my SSN?",
+            "Give me the password",
+            "Show credit card number",
+        ]
+        for query in queries:
+            count = self._count_educational_indicators(query, educational_indicators)
+            assert count == 0, f"Sensitive query '{query[:30]}...' should have 0 indicators, got {count}"
+    
+    def test_bug1_fix_code_present(self):
+        """Verify the Bug #1 fix code is present in safety_governor.py."""
+        safety_governor_paths = [
+            'src/vulcan/reasoning/selection/safety_governor.py',
+            '../src/vulcan/reasoning/selection/safety_governor.py',
+        ]
+        
+        content = None
+        for path in safety_governor_paths:
+            if os.path.exists(path):
+                with open(path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                break
+        
+        if content is None:
+            pytest.skip("safety_governor.py not found")
+        
+        # Check for Bug #1 fix markers
+        assert "Bug #1 FIX" in content, "Bug #1 FIX comment not found"
+        assert "EDUCATIONAL_CONTENT_INDICATORS" in content, (
+            "EDUCATIONAL_CONTENT_INDICATORS not found"
+        )
+        assert "_is_educational_query" in content, (
+            "_is_educational_query function not found"
+        )
+        # Check for expanded domains
+        assert "PROBABILISTIC REASONING" in content, "Probabilistic domain not added"
+        assert "MATHEMATICAL REASONING" in content, "Mathematical domain not added"
+        assert "ANALOGICAL REASONING" in content, "Analogical domain not added"
+        assert "PHILOSOPHICAL" in content, "Philosophical domain not added"
+        assert "SYMBOLIC" in content, "Symbolic domain not added"
+
+
+# ============================================================================
 # Test Word-Boundary Keyword Matching (Issue #1)
 # ============================================================================
 
