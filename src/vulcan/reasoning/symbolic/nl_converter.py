@@ -423,9 +423,20 @@ class NaturalLanguageToLogicConverter:
             ),
             
             # ================================================================
-            # PRIORITY 75: Existential with action verb (less specific)
+            # PRIORITY 75: Universal/Existential with action verb (less specific)
             # ================================================================
             
+            # Universal with action verb: "Every X verbed Y" (e.g., "Every student passed the exam")
+            # BUG #12 FIX: Added to handle cases where the verb is not an auxiliary
+            PatternConfig(
+                pattern=re.compile(
+                    r'^every\s+(\w+)\s+(\w+(?:ed|s|es)?)\s+(?:the\s+)?(.+)$',
+                    re.I
+                ),
+                handler_name='_handle_universal_action',
+                description='Universal with action: Every X verbed Y',
+                priority=75
+            ),
             # Existential with action verb: "Some X verbed Y"
             PatternConfig(
                 pattern=re.compile(
@@ -555,6 +566,11 @@ class NaturalLanguageToLogicConverter:
         if not text:
             return None
         
+        # BUG #12 FIX: Strip common wrapper patterns before pattern matching
+        # Queries often arrive wrapped like: 'Sentence: "Every engineer..."'
+        # or 'Query: Every engineer...' - we need to extract the actual content
+        text = self._strip_wrapper_patterns(text)
+        
         # Check if already looks like formal logic (contains logic symbols)
         if self._is_formal_logic(text):
             logger.debug("[NLConverter] Note: Text already appears to be formal logic")
@@ -595,6 +611,77 @@ class NaturalLanguageToLogicConverter:
             f"[NLConverter] Note: No conversion pattern matched for: '{text[:50]}...'"
         )
         return None
+    
+    def _strip_wrapper_patterns(self, text: str) -> str:
+        """
+        Strip common wrapper patterns from text.
+        
+        BUG #12 FIX: Queries often arrive wrapped like:
+        - 'Sentence: "Every engineer reviewed a document"'
+        - 'Query: Every engineer reviewed a document'
+        - 'Claim: "All students passed"'
+        - '"Every engineer reviewed a document"'
+        
+        This method extracts the actual content to enable proper pattern matching.
+        
+        Args:
+            text: Text potentially wrapped in a pattern
+            
+        Returns:
+            Unwrapped text or original if no wrapper detected
+        """
+        original = text
+        
+        # Pattern 1: 'Label: "content"' - extract content from quotes after label
+        # Handles: 'Sentence: "Every engineer..."', 'Claim: "All students..."'
+        quoted_label_pattern = re.compile(
+            r'^(?:sentence|query|claim|statement|premise|example|text|input)\s*:\s*["\'](.+?)["\']',
+            re.I
+        )
+        match = quoted_label_pattern.match(text)
+        if match:
+            extracted = match.group(1).strip()
+            if extracted:
+                logger.debug(
+                    f"[NLConverter] Stripped wrapper: '{original[:30]}...' → '{extracted[:30]}...'"
+                )
+                return extracted
+        
+        # Pattern 2: 'Label: content' without quotes
+        # Handles: 'Query: Every engineer reviewed...'
+        label_pattern = re.compile(
+            r'^(?:sentence|query|claim|statement|premise|example|text|input)\s*:\s*(.+)$',
+            re.I
+        )
+        match = label_pattern.match(text)
+        if match:
+            extracted = match.group(1).strip()
+            # Remove outer quotes if present
+            if (extracted.startswith('"') and extracted.endswith('"')) or \
+               (extracted.startswith("'") and extracted.endswith("'")):
+                extracted = extracted[1:-1].strip()
+            if extracted:
+                logger.debug(
+                    f"[NLConverter] Stripped wrapper: '{original[:30]}...' → '{extracted[:30]}...'"
+                )
+                return extracted
+        
+        # Pattern 3: Just quoted text (no label)
+        # Handles: '"Every engineer reviewed a document"'
+        if (text.startswith('"') and text.endswith('"')) or \
+           (text.startswith("'") and text.endswith("'")):
+            extracted = text[1:-1].strip()
+            if extracted:
+                logger.debug(
+                    f"[NLConverter] Stripped quotes: '{original[:30]}...' → '{extracted[:30]}...'"
+                )
+                return extracted
+        
+        # Pattern 4: Remove trailing period if present (common in sentences)
+        if text.endswith('.') and not text.endswith('..'):
+            text = text[:-1].strip()
+        
+        return text
     
     def _is_formal_logic(self, text: str) -> bool:
         """
@@ -696,6 +783,47 @@ class NaturalLanguageToLogicConverter:
         predicate = self._phrase_to_predicate(object_phrase)
         
         return f"∃{var} {predicate}({var})"
+    
+    def _handle_universal_action(self, match: re.Match, text: str, _depth: int = 0) -> str:
+        """
+        Handle universal quantifier with action verb: Every X verbed Y.
+        
+        BUG #12 FIX: Added to handle cases like "Every student passed the exam"
+        where the verb is not an auxiliary (is/are/has/have/etc.).
+        
+        Examples:
+            "Every student passed the exam" -> ∀s Pass(s, exam)
+            "Every engineer reviewed a document" -> ∀e Review(e, document)
+        
+        Args:
+            match: Regex match object (groups: entity, verb, object)
+            text: Original text
+            
+        Returns:
+            Formal logic string
+        """
+        entity = match.group(1).lower()
+        verb = match.group(2).lower()
+        obj = match.group(3).strip().lower()
+        
+        # Remove trailing 's' if plural
+        if entity.endswith('s') and len(entity) > 1:
+            entity = entity[:-1]
+        
+        var = entity[0]
+        
+        # Normalize verb using the utility function
+        normalized_verb = normalize_verb(verb)
+        predicate = normalized_verb.capitalize()
+        
+        # Handle the object
+        if obj:
+            # Remove articles and clean up
+            obj = re.sub(r'^(?:a[n]?\s+|the\s+)', '', obj)
+            obj = obj.replace(' ', '_')
+            return f"∀{var} {predicate}({var}, {obj})"
+        else:
+            return f"∀{var} {predicate}({var})"
     
     def _handle_existential_action(self, match: re.Match, text: str, _depth: int = 0) -> str:
         """
