@@ -1005,7 +1005,12 @@ MATH_MULTISTEP_PATTERNS: Tuple[re.Pattern, ...] = (
         r"(?:first|then|next|finally|lastly)\s*,?\s*(?:show|prove|derive|calculate)",
         re.IGNORECASE,
     ),
-    re.compile(r"\([a-z]\)|[a-z]\)", re.IGNORECASE),  # (a), a)
+    # FIX: More restrictive pattern for single-letter labels like "(a)" or "a)"
+    # Previous pattern `\([a-z]\)|[a-z]\)` incorrectly matched words ending in ")"
+    # like "similarity)" causing ANALOGICAL queries to trigger MATH-FAST-PATH.
+    # New pattern requires the label to be at word boundary or start of line.
+    re.compile(r"(?:^|\s)\([a-z]\)(?:\s|$|[,:])", re.IGNORECASE),  # (a) with whitespace
+    re.compile(r"(?:^|\s)[a-z]\)(?:\s|$|[,:])", re.IGNORECASE),  # a) with whitespace
     re.compile(r"(?:i+v?|vi*)\)", re.IGNORECASE),  # Roman numerals: i), ii), iii), iv)
 )
 
@@ -2423,6 +2428,57 @@ class QueryAnalyzer:
         query_lower = query.lower()
 
         # =================================================================
+        # FIX: Check for CAUSAL queries BEFORE math detection
+        # =================================================================
+        # Causal inference queries like "Confounding vs causation (Pearl-style)"
+        # were incorrectly triggering MATH-FAST-PATH even though the classifier
+        # correctly identified them as CAUSAL with high confidence (0.80).
+        # The MATH-FAST-PATH was overriding the classifier's decision because
+        # it doesn't check for causal keywords.
+        # 
+        # Solution: Exclude causal queries from MATH-FAST-PATH using the same
+        # CAUSAL_KEYWORDS used by QueryClassifier.
+        # =================================================================
+        CAUSAL_KEYWORDS_LOCAL = frozenset([
+            "causal", "causation", "cause", "effect",
+            "confound", "confounder", "confounding",
+            "intervention", "do(", "counterfactual",
+            "randomize", "randomized", "rct",
+            "pearl", "dag", "backdoor", "frontdoor",
+            "collider", "observational", "experimental",
+        ])
+        causal_count = sum(1 for kw in CAUSAL_KEYWORDS_LOCAL if kw in query_lower)
+        if causal_count >= 2:  # Require at least 2 causal keywords to exclude
+            logger.info(
+                f"[QueryRouter] Causal query detected ({causal_count} keywords) - bypassing MATH-FAST-PATH"
+            )
+            return False
+
+        # =================================================================
+        # FIX: Check for ANALOGICAL queries BEFORE math detection
+        # =================================================================
+        # Analogical reasoning queries like "Structure mapping between domains"
+        # were incorrectly triggering MATH-FAST-PATH because of broad pattern
+        # matching (e.g., the regex for "(a)" matching "similarity)").
+        # 
+        # Solution: Exclude analogical queries from MATH-FAST-PATH using the same
+        # ANALOGICAL_KEYWORDS used by QueryClassifier.
+        # =================================================================
+        ANALOGICAL_KEYWORDS_LOCAL = frozenset([
+            "structure mapping", "structural alignment", "analogical",
+            "analogy", "analogies", "metaphor", "metaphors",
+            "mapping", "domain transfer", "cross-domain",
+            "source domain", "target domain", "relational similarity",
+            "surface similarity", "structural similarity",
+        ])
+        analogical_count = sum(1 for kw in ANALOGICAL_KEYWORDS_LOCAL if kw in query_lower)
+        if analogical_count >= 1:  # Require at least 1 analogical keyword to exclude
+            logger.info(
+                f"[QueryRouter] Analogical query detected ({analogical_count} keywords) - bypassing MATH-FAST-PATH"
+            )
+            return False
+
+        # =================================================================
         # FIX: Check for SELF-INTROSPECTION queries FIRST
         # =================================================================
         # Self-introspection queries like "what makes you difference from other ai"
@@ -2883,6 +2939,38 @@ class QueryAnalyzer:
             True if query is a simple factual lookup
         """
         query_lower = query.lower()
+
+        # =================================================================
+        # FIX: Exclude specialized domain queries BEFORE checking factual patterns
+        # =================================================================
+        # Queries containing causal, probabilistic, or analogical keywords should
+        # NOT be treated as simple factual lookups even if they start with
+        # "What is...". For example:
+        # - "What is the difference between confounding and causation?" → CAUSAL
+        # - "What is the probability P(A|B)?" → PROBABILISTIC
+        # - "What is structure mapping?" → ANALOGICAL
+        # =================================================================
+        CAUSAL_EXCLUSION_KEYWORDS = frozenset([
+            "causal", "causation", "confound", "confounding", "pearl",
+            "intervention", "counterfactual", "dag", "backdoor", "frontdoor",
+        ])
+        PROBABILISTIC_EXCLUSION_KEYWORDS = frozenset([
+            "probability", "bayes", "bayesian", "prior", "posterior",
+            "likelihood", "conditional", "p(",
+        ])
+        ANALOGICAL_EXCLUSION_KEYWORDS = frozenset([
+            "structure mapping", "analogical", "analogy", "metaphor",
+        ])
+        
+        has_causal = any(kw in query_lower for kw in CAUSAL_EXCLUSION_KEYWORDS)
+        has_probabilistic = any(kw in query_lower for kw in PROBABILISTIC_EXCLUSION_KEYWORDS)
+        has_analogical = any(kw in query_lower for kw in ANALOGICAL_EXCLUSION_KEYWORDS)
+        
+        if has_causal or has_probabilistic or has_analogical:
+            logger.debug(
+                f"[QueryRouter] NOT factual: causal={has_causal}, prob={has_probabilistic}, analog={has_analogical}"
+            )
+            return False
 
         # Check compiled regex patterns first (most specific)
         for pattern in FACTUAL_PATTERNS:
