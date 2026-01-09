@@ -131,22 +131,20 @@ RUN if [ -f requirements-hashed.txt ] && grep -qE '^[^#]' requirements-hashed.tx
         echo "File: requirements-hashed.txt ($(grep -cE '^[^#]' requirements-hashed.txt) non-comment lines)"; \
         if pip install --no-cache-dir --root-user-action=ignore --require-hashes -r requirements-hashed.txt; then \
             echo "HASHED_DEPS=ENFORCED"; \
+        elif [ "${REQUIRE_HASHES}" = "1" ]; then \
+            echo "ERROR: Hashed install failed and REQUIRE_HASHES=1 is set. Failing build." >&2; \
+            exit 1; \
         else \
-            if [ "${REQUIRE_HASHES}" = "1" ]; then \
-                echo "ERROR: Hashed install failed and REQUIRE_HASHES=1 is set. Failing build." >&2; \
-                exit 1; \
-            fi; \
             echo "=== WARNING: Hashed install failed, falling back to unhashed install ==="; \
             echo "This may happen due to platform/architecture differences or hash mismatches."; \
             echo "For full supply chain security, regenerate requirements-hashed.txt on target platform."; \
             pip install --no-cache-dir --root-user-action=ignore -r requirements.txt; \
             echo "HASHED_DEPS=FALLBACK_UNHASHED"; \
         fi; \
+    elif [ "${REQUIRE_HASHES}" = "1" ]; then \
+        echo "ERROR: requirements-hashed.txt not found or empty, and REQUIRE_HASHES=1 is set. Failing build." >&2; \
+        exit 1; \
     else \
-        if [ "${REQUIRE_HASHES}" = "1" ]; then \
-            echo "ERROR: requirements-hashed.txt not found or empty, and REQUIRE_HASHES=1 is set. Failing build." >&2; \
-            exit 1; \
-        fi; \
         echo "=== WARNING: requirements-hashed.txt not found or empty ==="; \
         echo "Using unhashed install (NOT RECOMMENDED FOR PRODUCTION)"; \
         echo "Generate with: pip-compile --generate-hashes requirements.txt"; \
