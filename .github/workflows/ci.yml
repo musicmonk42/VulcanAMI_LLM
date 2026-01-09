@@ -407,12 +407,12 @@ jobs:
           POSTGRES_HOST: localhost
           MINIO_ENDPOINT: http://localhost:9000
           # Configure test mode to prevent hanging on missing services
-          CI: true
-          SKIP_LOCAL_LLM: true
-          SKIP_OPENAI: true
-          REASONING_MOCK_MODE: true
-          ARENA_ENABLED: false
-          TOOL_MONITOR_ENABLED: false
+          CI: 'true'
+          SKIP_LOCAL_LLM: 'true'
+          SKIP_OPENAI: 'true'
+          REASONING_MOCK_MODE: 'true'
+          ARENA_ENABLED: 'false'
+          TOOL_MONITOR_ENABLED: 'false'
         run: |
           set -x
           mkdir -p $GITHUB_WORKSPACE/logs
