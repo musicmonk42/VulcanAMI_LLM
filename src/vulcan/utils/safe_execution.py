@@ -21,10 +21,57 @@ Example:
 """
 
 import logging
+import re
 import threading
 from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
+
+
+def _preprocess_math_code(code: str) -> str:
+    """
+    Preprocess mathematical code to fix common syntax issues.
+    
+    Bug #2 FIX (Jan 9 2026): Added as safety net for implicit multiplication.
+    
+    This handles cases where LLM-generated or template code contains:
+    - Implicit multiplication: 2k → 2*k, 3n → 3*n
+    - Digit followed by parenthesis: 2(x+1) → 2*(x+1)
+    - Unicode minus: − (U+2212) → - (U+002D ASCII)
+    - Unicode math italic letters: 𝑘, 𝑛, 𝑥, 𝑦, 𝑧 → k, n, x, y, z
+    
+    This is applied as a safety net in execute() to catch any code that
+    wasn't preprocessed by mathematical_computation.py._clean_code().
+    
+    Args:
+        code: Python code string to preprocess
+        
+    Returns:
+        Preprocessed code with valid Python syntax
+    """
+    if not code:
+        return code
+    
+    # Unicode normalization for mathematical symbols
+    code = code.replace('−', '-')  # Unicode minus → ASCII minus (U+2212 → U+002D)
+    code = code.replace('𝑘', 'k')  # Math italic k → ASCII k
+    code = code.replace('𝑛', 'n')  # Math italic n → ASCII n
+    code = code.replace('𝑥', 'x')  # Math italic x → ASCII x
+    code = code.replace('𝑦', 'y')  # Math italic y → ASCII y
+    code = code.replace('𝑧', 'z')  # Math italic z → ASCII z
+    
+    # Add implicit multiplication operator
+    # Pattern: digit followed by letter (2k → 2*k)
+    code = re.sub(r'(\d)([a-zA-Z])', r'\1*\2', code)
+    
+    # Pattern: digit followed by opening parenthesis (2(x+1) → 2*(x+1))
+    code = re.sub(r'(\d)\(', r'\1*(', code)
+    
+    # Pattern: closing paren followed by opening paren ()(x+1) → )*(x+1))
+    # This handles cases like (k+1)(k+2)
+    code = re.sub(r'\)\(', r')*(', code)
+    
+    return code
 
 # Try to import RestrictedPython
 try:
@@ -337,6 +384,10 @@ class SafeCodeExecutor:
         logger.debug(f"[{exec_id}] Executing code ({len(code)} chars)")
 
         try:
+            # Bug #2 FIX: Preprocess code to fix implicit multiplication and unicode issues
+            # This is a safety net in case code wasn't preprocessed by mathematical_computation.py
+            code = _preprocess_math_code(code)
+            
             # Create fresh namespace for this execution
             execution_namespace = self.safe_namespace.copy()
 
