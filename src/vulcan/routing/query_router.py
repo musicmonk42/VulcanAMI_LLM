@@ -1010,6 +1010,47 @@ MATH_MULTISTEP_PATTERNS: Tuple[re.Pattern, ...] = (
 )
 
 # ============================================================
+# FIX: Short keywords that need word-boundary matching
+# ============================================================
+# These short keywords (<=4 chars) can accidentally match as substrings
+# of common words. For example:
+# - "iff" matches "difference" → WRONG (math fast-path on self-introspection)
+# - "let" matches "outlet" → WRONG
+# - "bra" matches "algebra" → WRONG (but "algebraic" is math-related anyway)
+#
+# Solution: Use word-boundary regex matching for these short keywords
+# to prevent false positives from substring matching.
+# ============================================================
+MATH_SHORT_KEYWORDS_NEEDING_BOUNDARY: frozenset = frozenset([
+    "iff",      # if and only if - matches "diff" in "difference"
+    "let",      # let x = ... - matches "outlet", "delete"
+    "bra",      # bra-ket notation - matches "algebra", "brace"
+    "ket",      # bra-ket notation - matches "market", "racket"
+    "ring",     # algebraic ring - matches "string", "during"
+    "mean",     # statistical mean - matches "meantime", "meaning"
+    "curl",     # vector calculus curl - matches "curly"
+    "trace",    # matrix trace - matches "retrace"
+    "given",    # given that... - matches "forgiven"
+    "hence",    # hence... - matches rare false positives
+    "thus",     # thus... - matches "enthusiasm"
+    "gauge",    # gauge theory - matches "language"
+])
+
+# Pre-compiled regex patterns for word-boundary matching of short keywords
+# Using \b (word boundary) to ensure we match whole words only
+MATH_SHORT_KEYWORD_PATTERNS: Tuple[re.Pattern, ...] = tuple(
+    re.compile(r'\b' + re.escape(kw) + r'\b', re.IGNORECASE)
+    for kw in MATH_SHORT_KEYWORDS_NEEDING_BOUNDARY
+)
+
+# Pre-filtered mathematical keywords (excludes short keywords that need boundary matching)
+# This avoids repeated set membership checks in the hot path
+MATH_KEYWORDS_REGULAR: Tuple[str, ...] = tuple(
+    kw for kw in MATHEMATICAL_KEYWORDS 
+    if kw not in MATH_SHORT_KEYWORDS_NEEDING_BOUNDARY
+)
+
+# ============================================================
 # CONSTANTS - Explicit Mathematical Intent Detection
 # ============================================================
 # Note: Ethical Override of Computational Requests
@@ -2381,14 +2422,49 @@ class QueryAnalyzer:
 
         query_lower = query.lower()
 
-        # Count mathematical keyword matches
-        math_keyword_count = sum(1 for kw in MATHEMATICAL_KEYWORDS if kw in query_lower)
+        # =================================================================
+        # FIX: Check for SELF-INTROSPECTION queries FIRST
+        # =================================================================
+        # Self-introspection queries like "what makes you difference from other ai"
+        # should NOT trigger MATH-FAST-PATH, even if they accidentally match
+        # mathematical keywords due to substring matching (e.g., "iff" in "difference").
+        # Check self-introspection BEFORE counting math keywords.
+        # =================================================================
+        if self._is_self_introspection_query(query):
+            logger.info(
+                "[QueryRouter] Self-introspection query detected - bypassing MATH-FAST-PATH"
+            )
+            return False
+
+        # =================================================================
+        # FIX: Use word-boundary matching for short keywords
+        # =================================================================
+        # Short keywords like "iff", "let", "bra" can match as substrings of
+        # common words (e.g., "iff" in "difference"). Use regex word boundaries
+        # for these to prevent false positives.
+        # =================================================================
+        
+        # Count matches from short keywords using word-boundary regex
+        short_keyword_count = sum(
+            1 for pattern in MATH_SHORT_KEYWORD_PATTERNS 
+            if pattern.search(query_lower)
+        )
+        
+        # Count matches from regular keywords (pre-filtered at module level)
+        # PERFORMANCE FIX: Use pre-filtered MATH_KEYWORDS_REGULAR instead of
+        # checking set membership on every call
+        regular_keyword_count = sum(
+            1 for kw in MATH_KEYWORDS_REGULAR if kw in query_lower
+        )
+        
+        math_keyword_count = short_keyword_count + regular_keyword_count
 
         # ENHANCED: Lowered threshold - ANY math keyword activates modules
         # Previously required 2+ keywords, now 1 is sufficient
         if math_keyword_count >= 1:
             logger.debug(
-                f"[QueryRouter] Mathematical query detected: {math_keyword_count} keyword(s) found"
+                f"[QueryRouter] Mathematical query detected: {math_keyword_count} keyword(s) found "
+                f"(regular={regular_keyword_count}, short_boundary={short_keyword_count})"
             )
             return True
 
@@ -3343,7 +3419,11 @@ class QueryAnalyzer:
             # The classifier may mark self-awareness questions like "Do you want to be conscious?"
             # as CONVERSATIONAL with skip_reasoning=True, but these should route to philosophical reasoning
             # NOTE: Self-introspection check comes first, so this only triggers for non-self-introspection queries
-            elif self._is_philosophical_query(query):
+            # 
+            # FIX: Also check if query is CREATIVE FIRST - creative queries should NOT be
+            # overridden to philosophical even if they contain self-awareness keywords.
+            # Example: "write a poem and self awareness for an ai" is CREATIVE, not PHILOSOPHICAL
+            elif self._is_philosophical_query(query) and not self._is_creative_query(query):
                 logger.info(
                     f"[QueryRouter] {query_id}: Overriding classifier ({classification.category}) "
                     f"to PHILOSOPHICAL due to self-awareness/ethical keywords"

@@ -217,6 +217,20 @@ UNVERIFIED_QUALITY_PENALTY = 0.7  # Reduce to 70% of claimed confidence
 FALLBACK_QUALITY_PENALTY = 0.3  # Reduce to 30% of quality
 
 # ==============================================================================
+# Semantic Context Keywords for Ethics/Philosophy Detection (Issue #3 Fix)
+# ==============================================================================
+# Keywords indicating ethics/philosophy context.
+# Used to prevent routing ethics queries to mathematical engine based solely
+# on symbol detection. When 2+ of these keywords are present, the query is
+# considered to have an ethics/philosophy context.
+ETHICS_PHILOSOPHY_KEYWORDS: Tuple[str, ...] = (
+    'ethics', 'ethical', 'policy', 'moral', 'morality', 'philosophy',
+    'philosophical', 'value', 'values', 'constraint', 'constraints',
+    'multimodal reasoning', 'cross-constraints', 'cross-domain',
+    'reasoning about', 'ethical implications', 'policy implications',
+)
+
+# ==============================================================================
 # QueryRouter Tool Selection
 # ==============================================================================
 # Default available tools when not specified in class instance.
@@ -3460,16 +3474,48 @@ class ToolSelector:
         Math symbols: ∑ ∫ ∂ ∇ ∏ √ ≤ ≥ ≠ ≈ ± × ÷ ∞
         Logic symbols: → ∧ ∨ ¬ ∀ ∃ ⊢ ⊨ ↔ ⇒ ⇔
         
+        FIX (Issue #3): Added semantic context check to prevent routing ethics/philosophical
+        queries to mathematical engine just because they contain mathematical notation.
+        Example: "Multimodal Reasoning (cross-constraints) MM1 — Math + logic + ethics + policy"
+        contains mathematical notation but is fundamentally an ethics/policy question.
+        
         Args:
             query: The query text
             
         Returns:
-            True if query contains math symbols (not logic symbols)
+            True if query contains math symbols AND is not semantically ethics/philosophical
         """
         if not query or not isinstance(query, str):
             return False
         
         query_lower = query.lower()
+        
+        # =================================================================
+        # FIX (Issue #3): Check semantic context BEFORE symbol detection
+        # =================================================================
+        # Queries about ethics, policy, philosophy, or cross-domain reasoning
+        # should NOT be routed to mathematical engine even if they contain
+        # mathematical symbols or notation. The presence of symbols in an
+        # academic/philosophical context doesn't make it a math problem.
+        #
+        # Example that was broken:
+        #   "Multimodal Reasoning (cross-constraints) MM1 — Math + logic + ethics + policy"
+        #   - Contains mathematical notation (𝐸, 𝑢(𝑡), Greek letters)
+        #   - BUT is fundamentally about ethics/policy reasoning
+        #   - Should route to world_model/philosophical, NOT mathematical
+        # Uses module-level ETHICS_PHILOSOPHY_KEYWORDS for better performance.
+        # =================================================================
+        
+        # Count ethics/philosophy keywords using module-level constant
+        ethics_count = sum(1 for kw in ETHICS_PHILOSOPHY_KEYWORDS if kw in query_lower)
+        
+        # If query has 2+ ethics/philosophy keywords, it's likely NOT a pure math problem
+        if ethics_count >= 2:
+            logger.debug(
+                f"[ToolSelector] Query has {ethics_count} ethics/philosophy keywords - "
+                f"NOT detecting as math despite symbols"
+            )
+            return False
         
         # Pure math operators (NOT logic)
         math_symbols = ['∑', '∫', '∂', '∇', '∏', '√', '≤', '≥', '≠', '≈', '±', '×', '÷', '∞']
