@@ -482,45 +482,43 @@ except Exception as e:
             )()
 
 
-# Language Reasoning
-try:
-    from src.vulcan.reasoning.language_reasoning import (
-        LanguageReasoning,
-        LanguageReasoningConfig,
-    )
+# Language Reasoning - Inline implementation
+# Note: The external language_reasoning module was removed. This inline
+# implementation provides the necessary functionality for token generation.
 
-    logger.info("✓ LanguageReasoning loaded successfully")
-except Exception as e:
-    logger.warning(f"LanguageReasoning import failed: {e}, using fallback")
 
-    @dataclass
-    class LanguageReasoningConfig:
-        temperature: float = 0.7
-        top_k: int = 50
-        top_p: float = 0.9
+@dataclass
+class LanguageReasoningConfig:
+    """Configuration for language reasoning generation."""
+    temperature: float = 0.7
+    top_k: int = 50
+    top_p: float = 0.9
 
-    class LanguageReasoning:
-        def __init__(
-            self, model: Any, config: Optional[LanguageReasoningConfig] = None, **kwargs
-        ):
-            self.model = model
-            self.config = config or LanguageReasoningConfig()
 
-        def generate(
-            self,
-            hidden_state: Any,
-            generated_tokens: List[int],
-            context: Optional[Dict] = None,
-            strategy: Optional[str] = None,
-        ) -> Dict[str, Any]:
-            logits = self.model.get_logits(hidden_state, generated_tokens)
-            token = self.model.generate_token(logits)
-            return {
-                "token": token,
-                "token_id": token,
-                "strategy": strategy or "greedy",
-                "confidence": 0.85,
-            }
+class LanguageReasoning:
+    """Language reasoning for token generation."""
+    
+    def __init__(
+        self, model: Any, config: Optional[LanguageReasoningConfig] = None, **kwargs
+    ):
+        self.model = model
+        self.config = config or LanguageReasoningConfig()
+
+    def generate(
+        self,
+        hidden_state: Any,
+        generated_tokens: List[int],
+        context: Optional[Dict] = None,
+        strategy: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        logits = self.model.get_logits(hidden_state, generated_tokens)
+        token = self.model.generate_token(logits)
+        return {
+            "token": token,
+            "token_id": token,
+            "strategy": strategy or "greedy",
+            "confidence": 0.85,
+        }
 
 
 # Training

@@ -1763,3 +1763,95 @@ except ImportError as e:
     create_math_learning_integration = None
     MATH_ERROR_PENALTIES = {}
     MATH_VERIFICATION_REWARD = 0.015
+
+
+# =============================================================================
+# Singleton Learning System Getter
+# =============================================================================
+# This provides a module-level singleton for the UnifiedLearningSystem.
+# Used by system_observer.py and other components that need learning integration.
+
+_learning_system_instance: Optional[UnifiedLearningSystem] = None
+_learning_system_lock = threading.Lock()
+
+
+def get_learning_system() -> Optional[UnifiedLearningSystem]:
+    """
+    Get or create the singleton UnifiedLearningSystem instance.
+    
+    This function provides a centralized way to access the learning system
+    from anywhere in the codebase. It ensures only one instance exists.
+    
+    Returns:
+        The UnifiedLearningSystem singleton instance, or None if 
+        initialization fails (e.g., torch not available).
+    
+    Example:
+        from vulcan.learning import get_learning_system
+        
+        learning = get_learning_system()
+        if learning:
+            learning.process_outcome(outcome_data)
+    """
+    global _learning_system_instance
+    
+    # Fast path: return existing instance
+    if _learning_system_instance is not None:
+        return _learning_system_instance
+    
+    # Slow path: create instance with lock
+    with _learning_system_lock:
+        # Double-check after acquiring lock
+        if _learning_system_instance is not None:
+            return _learning_system_instance
+        
+        try:
+            _learning_system_instance = UnifiedLearningSystem()
+            logger.info("UnifiedLearningSystem singleton initialized via get_learning_system()")
+            return _learning_system_instance
+        except Exception as e:
+            logger.warning(f"Failed to initialize UnifiedLearningSystem singleton: {e}")
+            return None
+
+
+def set_learning_system(instance: UnifiedLearningSystem) -> None:
+    """
+    Set the singleton UnifiedLearningSystem instance.
+    
+    This allows external code (e.g., full_platform.py) to set a pre-configured
+    instance as the singleton, which will be returned by get_learning_system().
+    
+    Args:
+        instance: The UnifiedLearningSystem instance to use as the singleton.
+    """
+    global _learning_system_instance
+    with _learning_system_lock:
+        _learning_system_instance = instance
+        logger.info("UnifiedLearningSystem singleton set via set_learning_system()")
+
+
+def reset_learning_system() -> None:
+    """
+    Reset the singleton UnifiedLearningSystem instance.
+    
+    This is primarily used for testing to ensure a fresh instance.
+    It will shutdown the existing instance if one exists.
+    """
+    global _learning_system_instance
+    with _learning_system_lock:
+        if _learning_system_instance is not None:
+            try:
+                if hasattr(_learning_system_instance, 'shutdown'):
+                    _learning_system_instance.shutdown()
+            except Exception as e:
+                logger.warning(f"Error shutting down learning system during reset: {e}")
+            _learning_system_instance = None
+            logger.info("UnifiedLearningSystem singleton reset")
+
+
+# Add singleton functions to exports
+__all__.extend([
+    "get_learning_system",
+    "set_learning_system", 
+    "reset_learning_system",
+])
