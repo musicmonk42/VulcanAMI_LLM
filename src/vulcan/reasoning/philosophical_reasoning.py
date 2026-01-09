@@ -2679,10 +2679,24 @@ Dominance relations found:
             },
         }
         
+        # BUG #7 FIX: Reduce confidence when output doesn't match query type
+        # If we didn't find any actions but are analyzing an "ethical" query,
+        # our output may be incomplete/wrong
+        actions = analysis['query_components']['actions']
+        confidence = CONFIDENCE_STRONG_ANALYSIS
+        
+        if not actions:
+            # No actions found - this might not be an ethical dilemma
+            confidence = min(confidence, 0.5)
+            logger.info(
+                "[PhilosophicalReasoner] BUG #7 FIX: Reduced confidence to 0.5 "
+                "because no actions were found in general ethical analysis"
+            )
+        
         steps.append(self._create_step(
             chain_id, "general_analysis", ReasoningType.PHILOSOPHICAL,
             query, analysis,
-            CONFIDENCE_STRONG_ANALYSIS,
+            confidence,
             f"Analyzed using {framework.value} framework"
         ))
         
@@ -2699,11 +2713,11 @@ Query components:
         
         return ReasoningResult(
             conclusion=analysis,
-            confidence=CONFIDENCE_STRONG_ANALYSIS,
+            confidence=confidence,
             reasoning_type=ReasoningType.PHILOSOPHICAL,
             evidence=steps,
             explanation=explanation,
-            uncertainty=1.0 - CONFIDENCE_STRONG_ANALYSIS,
+            uncertainty=1.0 - confidence,
             reasoning_chain=self._build_chain(chain_id, steps, query, analysis),
             metadata={'method': 'general_analysis'},
         )

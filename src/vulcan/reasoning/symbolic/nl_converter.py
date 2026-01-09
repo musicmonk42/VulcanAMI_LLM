@@ -1033,25 +1033,62 @@ class NaturalLanguageToLogicConverter:
         """
         Extract a simple predicate from text as fallback.
         
+        BUG #3 FIX: Made more conservative to avoid generating garbage FOL
+        like "Reasoning(language, ambiguity)". Now only generates predicates
+        for clearly structured sentences.
+        
         Args:
             text: Text to extract from
             
         Returns:
-            Simple predicate or None
+            Simple predicate or None if text doesn't have clear structure
         """
+        # BUG #3 FIX: Return None for common non-logic queries
+        # These phrases should not be converted to predicates
+        non_logic_phrases = [
+            'what', 'how', 'why', 'when', 'where', 'who',
+            'explain', 'describe', 'tell me', 'help me',
+            'write', 'create', 'generate', 'make',
+            'reasoning', 'ambiguity', 'language', 'context',
+        ]
+        text_lower = text.lower()
+        if any(phrase in text_lower for phrase in non_logic_phrases):
+            logger.debug(
+                f"[NLConverter] BUG #3 FIX: Rejecting non-logic text: '{text[:50]}...'"
+            )
+            return None
+        
         words = text.split()
-        if len(words) >= 2:
-            # Look for "X verbs Y" pattern
-            for i, word in enumerate(words[:-1]):
-                next_word = words[i + 1] if i + 1 < len(words) else None
-                if next_word and self._looks_like_verb(next_word):
-                    subject = word.lower()
-                    verb = next_word.capitalize()
-                    if len(words) > i + 2:
-                        obj = words[i + 2].lower()
-                        return f"{verb}({subject}, {obj})"
-                    else:
-                        return f"{verb}({subject})"
+        
+        # BUG #3 FIX: Require at least 3 words for predicate extraction
+        # Single or two-word phrases shouldn't become predicates
+        if len(words) < 3:
+            return None
+        
+        # BUG #3 FIX: Look for clear subject-verb-object patterns only
+        for i, word in enumerate(words[:-1]):
+            next_word = words[i + 1] if i + 1 < len(words) else None
+            if next_word and self._looks_like_verb(next_word):
+                subject = word.lower()
+                verb = next_word.capitalize()
+                
+                # BUG #3 FIX: Validate subject looks like a noun
+                # Reject if subject is a common non-noun word
+                invalid_subjects = {'the', 'a', 'an', 'is', 'are', 'was', 'were', 
+                                   'has', 'have', 'had', 'do', 'does', 'did',
+                                   'can', 'could', 'will', 'would', 'should',
+                                   'may', 'might', 'must', 'be', 'been', 'being'}
+                if subject in invalid_subjects:
+                    continue
+                
+                if len(words) > i + 2:
+                    obj = words[i + 2].lower()
+                    # BUG #3 FIX: Validate object also looks reasonable
+                    if obj in invalid_subjects or len(obj) < 2:
+                        continue
+                    return f"{verb}({subject}, {obj})"
+                else:
+                    return f"{verb}({subject})"
         
         return None
     
