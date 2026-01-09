@@ -1192,6 +1192,7 @@ def wire_world_model_components(
     Args:
         deps: The EnhancedCollectiveDeps instance to populate
         world_model: The WorldModel instance containing initialized meta-reasoning components
+            (type is Any to avoid circular imports with world_model_core)
         
     Returns:
         The deps object with meta-reasoning components wired from WorldModel
@@ -1206,6 +1207,8 @@ def wire_world_model_components(
         return deps
     
     # Map of deps field names to WorldModel attribute names
+    # Note: Some names differ between deps and WorldModel (e.g., counterfactual_objectives
+    # vs counterfactual_objective_reasoner) due to historical naming conventions
     component_mapping = {
         # Meta-reasoning components
         "internal_critic": "internal_critic",
@@ -1215,6 +1218,7 @@ def wire_world_model_components(
         "value_evolution_tracker": "value_evolution_tracker",
         "validation_tracker": "validation_tracker",
         "transparency_interface": "transparency_interface",
+        # Note: deps uses "counterfactual_objectives", WorldModel uses "counterfactual_objective_reasoner"
         "counterfactual_objectives": "counterfactual_objective_reasoner",
         "goal_conflict_detector": "goal_conflict_detector",
         "objective_negotiator": "objective_negotiator",
