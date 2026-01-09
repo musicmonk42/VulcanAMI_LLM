@@ -1115,7 +1115,7 @@ result = simplify(integral)
                 # Convert to SymPy format (− → -, 2k → 2*k)
                 expr = expr.replace('−', '-')
                 expr = re.sub(r'(\d)([a-z])', r'\1*\2', expr)  # 2k → 2*k
-                logger.info(f"[MathTool] Bug #2 FIX: Matched ∑(expr) from k=a to b pattern: expr={expr}")
+                logger.info(f"[MathTool] Bug #2 FIX: Matched ∑(expr) from {index}={lower} to {upper} pattern: expr={expr}")
                 return self._templates.summation(expr, index, lower, upper)
             
             # Pattern 2: sum from k=lower to upper of expression
