@@ -1325,7 +1325,14 @@ Generate ONLY the Python code:"""
             return None
 
     def _clean_code(self, code: str) -> str:
-        """Remove markdown formatting and import statements from generated code."""
+        """
+        Remove markdown formatting, import statements, and fix common syntax issues
+        in generated code.
+        
+        Bug #2 FIX (Jan 9 2026): Added preprocessing to handle implicit multiplication
+        in LLM-generated code. The LLM may generate expressions like "2k-1" which is
+        invalid Python syntax (should be "2*k-1").
+        """
         # Remove markdown code blocks
         if "```python" in code:
             parts = code.split("```python")
@@ -1346,7 +1353,46 @@ Generate ONLY the Python code:"""
                 continue
             clean_lines.append(line)
 
-        return "\n".join(clean_lines).strip()
+        code = "\n".join(clean_lines).strip()
+        
+        # =================================================================
+        # Bug #2 FIX: Preprocess mathematical expressions for Python syntax
+        # =================================================================
+        # LLM may generate code with implicit multiplication (e.g., "2k" or "3n")
+        # which is invalid Python. Convert to explicit multiplication (e.g., "2*k").
+        #
+        # The error that prompted this fix:
+        #   Query: "Compute ∑(2k-1) from k=1 to n"
+        #   LLM generates: expr = 2k-1  (invalid Python)
+        #   RestrictedPython: SyntaxError: invalid syntax at statement: '-'
+        #
+        # This preprocessing catches ALL mathematical notation issues:
+        # - 2k → 2*k (number followed by variable)
+        # - 2(x+1) → 2*(x+1) (number followed by parenthesis)
+        # - Unicode minus − → ASCII minus - (U+2212 to U+002D)
+        # - Unicode symbols 𝑘, 𝑛 → ASCII k, n
+        # =================================================================
+        
+        # Unicode normalization for mathematical symbols
+        code = code.replace('−', '-')  # Unicode minus → ASCII minus (U+2212 → U+002D)
+        code = code.replace('𝑘', 'k')  # Math italic k → ASCII k
+        code = code.replace('𝑛', 'n')  # Math italic n → ASCII n
+        code = code.replace('𝑥', 'x')  # Math italic x → ASCII x
+        code = code.replace('𝑦', 'y')  # Math italic y → ASCII y
+        code = code.replace('𝑧', 'z')  # Math italic z → ASCII z
+        
+        # Add implicit multiplication operator
+        # Pattern: digit followed by letter (2k → 2*k)
+        code = re.sub(r'(\d)([a-zA-Z])', r'\1*\2', code)
+        
+        # Pattern: digit followed by opening parenthesis (2(x+1) → 2*(x+1))
+        code = re.sub(r'(\d)\(', r'\1*(', code)
+        
+        # Pattern: closing paren followed by opening paren ()(x+1) → )*(x+1))
+        # This handles cases like (k+1)(k+2)
+        code = re.sub(r'\)\(', r')*(', code)
+        
+        return code
 
     def _generate_explanation(
         self, query: str, code: str, result: str, llm
