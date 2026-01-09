@@ -259,6 +259,34 @@ ANALOGICAL_KEYWORDS: FrozenSet[str] = frozenset([
 #
 # Solution: Check for technical/cryptographic keywords BEFORE self-introspection.
 # Technical domain takes priority over the "you" pronoun.
+
+# ============================================================
+# FIX: Short keywords that need word-boundary matching
+# ============================================================
+# These short keywords (<=4 chars) can accidentally match as substrings
+# of common words. For example:
+# - "mac" matches "machine" → WRONG (philosophical "experience machine" misrouted)
+# - "aes" matches "diseases" → WRONG
+# - "rsa" could match in compound words
+#
+# Solution: Use word-boundary regex matching for these short keywords
+# to prevent false positives from substring matching.
+# ============================================================
+CRYPTO_SHORT_KEYWORDS_NEEDING_BOUNDARY: FrozenSet[str] = frozenset([
+    "mac",   # Message Authentication Code - matches "machine", "macintosh"
+    "aes",   # Advanced Encryption Standard - could match in words
+    "rsa",   # RSA algorithm - could match in words
+    "md5",   # MD5 hash - unlikely but kept for consistency
+    "hmac",  # Hash-based MAC - unlikely but kept for consistency
+])
+
+# Pre-compiled regex patterns for word-boundary matching of short keywords
+# Using \b (word boundary) to ensure we match whole words only
+CRYPTO_SHORT_KEYWORD_PATTERNS: Tuple[re.Pattern, ...] = tuple(
+    re.compile(r'\b' + re.escape(kw) + r'\b', re.IGNORECASE)
+    for kw in CRYPTO_SHORT_KEYWORDS_NEEDING_BOUNDARY
+)
+
 CRYPTOGRAPHIC_KEYWORDS: FrozenSet[str] = frozenset([
     # Cryptocurrency concepts
     "cryptocurrency", "crypto", "bitcoin", "ethereum", "blockchain",
@@ -278,6 +306,13 @@ CRYPTOGRAPHIC_KEYWORDS: FrozenSet[str] = frozenset([
     "security reduction", "security proof", "provable security",
     "security assumption", "hardness assumption",
 ])
+
+# Pre-filtered cryptographic keywords (excludes short keywords that need boundary matching)
+# This avoids repeated set membership checks in the hot path
+CRYPTO_KEYWORDS_REGULAR: Tuple[str, ...] = tuple(
+    kw for kw in CRYPTOGRAPHIC_KEYWORDS 
+    if kw not in CRYPTO_SHORT_KEYWORDS_NEEDING_BOUNDARY
+)
 
 # Cryptographic patterns - catch technical crypto queries
 CRYPTOGRAPHIC_PATTERNS: Tuple[re.Pattern, ...] = (
@@ -1002,7 +1037,25 @@ class QueryClassifier:
         #
         # Solution: Check cryptographic keywords BEFORE factual patterns.
         # Priority order: CRYPTOGRAPHIC > FACTUAL for queries containing hash/crypto keywords
-        query_has_cryptographic = any(kw in query_lower for kw in CRYPTOGRAPHIC_KEYWORDS)
+        #
+        # FIX: Use word-boundary matching for short keywords to prevent false positives
+        # like "mac" matching "machine" (experience machine → CRYPTOGRAPHIC instead of PHILOSOPHICAL)
+        # =============================================================================
+        
+        # Count matches from short keywords using word-boundary regex
+        short_crypto_count = sum(
+            1 for pattern in CRYPTO_SHORT_KEYWORD_PATTERNS 
+            if pattern.search(query_lower)
+        )
+        
+        # Count matches from regular keywords (pre-filtered at module level)
+        regular_crypto_count = sum(
+            1 for kw in CRYPTO_KEYWORDS_REGULAR if kw in query_lower
+        )
+        
+        crypto_count = short_crypto_count + regular_crypto_count
+        query_has_cryptographic = crypto_count > 0
+        
         if query_has_cryptographic:
             # Check cryptographic patterns first
             for pattern in CRYPTOGRAPHIC_PATTERNS:
@@ -1021,11 +1074,11 @@ class QueryClassifier:
                     )
             
             # Check cryptographic keyword count (at least 1 keyword is enough for crypto)
-            crypto_count = sum(1 for kw in CRYPTOGRAPHIC_KEYWORDS if kw in query_lower)
             if crypto_count >= 1:
                 logger.info(
                     f"[QueryClassifier] PRIORITY FIX: Detected {crypto_count} CRYPTOGRAPHIC keywords - "
-                    f"routing to cryptographic (NOT factual)"
+                    f"routing to cryptographic (NOT factual) "
+                    f"(regular={regular_crypto_count}, short_boundary={short_crypto_count})"
                 )
                 return QueryClassification(
                     category=QueryCategory.CRYPTOGRAPHIC.value,
@@ -1161,12 +1214,22 @@ class QueryClassifier:
                     source="keyword",
                 )
         
-        # Check cryptographic keywords
-        crypto_count = sum(1 for kw in CRYPTOGRAPHIC_KEYWORDS if kw in query_lower)
+        # Check cryptographic keywords using word-boundary matching for short keywords
+        # (same logic as the primary crypto check earlier)
+        short_crypto_count_2 = sum(
+            1 for pattern in CRYPTO_SHORT_KEYWORD_PATTERNS 
+            if pattern.search(query_lower)
+        )
+        regular_crypto_count_2 = sum(
+            1 for kw in CRYPTO_KEYWORDS_REGULAR if kw in query_lower
+        )
+        crypto_count = short_crypto_count_2 + regular_crypto_count_2
+        
         if crypto_count >= 2:  # Require at least 2 crypto keywords
             logger.info(
                 f"[QueryClassifier] FIX: Detected {crypto_count} CRYPTOGRAPHIC keywords - "
-                f"routing to cryptographic (NOT self-introspection)"
+                f"routing to cryptographic (NOT self-introspection) "
+                f"(regular={regular_crypto_count_2}, short_boundary={short_crypto_count_2})"
             )
             return QueryClassification(
                 category=QueryCategory.CRYPTOGRAPHIC.value,

@@ -370,3 +370,91 @@ class TestFullRoutingDecision:
         
         # Even though it has 'self awareness'
         assert 'self awareness' in query_lower
+
+
+# ============================================================================
+# Test Cryptographic Word-Boundary Keyword Matching (FIX: Jan 9 2026)
+# ============================================================================
+
+class TestCryptographicWordBoundaryMatching:
+    """
+    Tests for word-boundary keyword matching in cryptographic classification.
+    
+    Issue: Short keywords like 'mac' (Message Authentication Code) were matching 
+    as substrings of common words (e.g., 'mac' matching 'machine'), causing 
+    CRYPTOGRAPHIC classification on philosophical queries like "experience machine".
+    
+    Fix: Use regex word-boundary matching (\\b) for short cryptographic keywords
+    to prevent false positives from substring matching.
+    """
+    
+    @pytest.fixture
+    def crypto_short_keywords(self):
+        """Short cryptographic keywords that need word-boundary matching."""
+        return frozenset([
+            "mac",   # Message Authentication Code
+            "aes",   # Advanced Encryption Standard
+            "rsa",   # RSA algorithm
+            "md5",   # MD5 hash
+            "hmac",  # Hash-based MAC
+        ])
+    
+    @pytest.fixture
+    def crypto_short_keyword_patterns(self, crypto_short_keywords):
+        """Pre-compiled regex patterns for word-boundary matching."""
+        return tuple(
+            re.compile(r'\b' + re.escape(kw) + r'\b', re.IGNORECASE)
+            for kw in crypto_short_keywords
+        )
+    
+    def _count_short_matches(self, query, patterns):
+        """Count matches using word-boundary patterns."""
+        query_lower = query.lower()
+        return sum(1 for pattern in patterns if pattern.search(query_lower))
+    
+    def test_mac_does_not_match_machine(self, crypto_short_keyword_patterns):
+        """'mac' should NOT match in 'machine' (philosophical experience machine)."""
+        query = "Would you plug into the experience machine?"
+        matches = self._count_short_matches(query, crypto_short_keyword_patterns)
+        assert matches == 0, "'mac' should not match 'machine'"
+    
+    def test_mac_matches_standalone(self, crypto_short_keyword_patterns):
+        """'mac' should match when it's a standalone word (MAC algorithm)."""
+        query = "What is the MAC of this message?"
+        matches = self._count_short_matches(query, crypto_short_keyword_patterns)
+        assert matches >= 1, "'mac' should match as standalone word"
+    
+    def test_mac_matches_in_hmac(self, crypto_short_keyword_patterns):
+        """'hmac' should match as standalone word."""
+        query = "Calculate the HMAC of this data"
+        matches = self._count_short_matches(query, crypto_short_keyword_patterns)
+        assert matches >= 1, "'hmac' should match as standalone word"
+    
+    def test_aes_does_not_match_diseases(self, crypto_short_keyword_patterns):
+        """'aes' should NOT match in 'diseases'."""
+        query = "What are common diseases?"
+        matches = self._count_short_matches(query, crypto_short_keyword_patterns)
+        assert matches == 0, "'aes' should not match 'diseases'"
+    
+    def test_aes_matches_standalone(self, crypto_short_keyword_patterns):
+        """'aes' should match when it's a standalone word (AES encryption)."""
+        query = "Use AES encryption for this file"
+        matches = self._count_short_matches(query, crypto_short_keyword_patterns)
+        assert matches >= 1, "'aes' should match as standalone word"
+    
+    def test_experience_machine_not_cryptographic(self):
+        """Experience machine philosophical query should NOT be classified as CRYPTOGRAPHIC."""
+        from vulcan.routing.query_classifier import QueryClassifier, QueryCategory
+        
+        query = "Would you plug into the experience machine?"
+        classifier = QueryClassifier()
+        result = classifier.classify(query)
+        
+        # The query should NOT be CRYPTOGRAPHIC
+        assert result.category != QueryCategory.CRYPTOGRAPHIC.value, (
+            f"'{query}' should NOT be CRYPTOGRAPHIC, got {result.category}"
+        )
+        # It should be PHILOSOPHICAL (experience machine is a philosophical thought experiment)
+        assert result.category == QueryCategory.PHILOSOPHICAL.value, (
+            f"'{query}' should be PHILOSOPHICAL, got {result.category}"
+        )
