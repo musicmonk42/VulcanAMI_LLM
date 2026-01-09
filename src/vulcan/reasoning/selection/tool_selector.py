@@ -5750,7 +5750,29 @@ class ToolSelector:
                 elif result.strategy_used.value == "sequential_fallback":
                     complexity = 0.7
             
-            # Record outcome to bridge
+            # Extract response text from execution result for quality assessment
+            # The execution_result may be a dict with various keys depending on the engine
+            response_text = None
+            if result.execution_result and isinstance(result.execution_result, dict):
+                # Try common response keys in order of preference
+                for key in ("response", "answer", "result", "output", "text", "explanation"):
+                    if key in result.execution_result:
+                        val = result.execution_result[key]
+                        if isinstance(val, str):
+                            response_text = val
+                            break
+                        elif val is not None:
+                            response_text = str(val)
+                            break
+                
+                # If still no response_text, try to build from proof/method info
+                if response_text is None and "proven" in result.execution_result:
+                    proven = result.execution_result.get("proven", False)
+                    method = result.execution_result.get("method", "unknown")
+                    confidence_val = result.execution_result.get("confidence", 0)
+                    response_text = f"proven: {proven}, confidence: {confidence_val}, method: {method}"
+            
+            # Record outcome to bridge with quality assessment data
             record_query_outcome(
                 query_id=query_id,
                 status=status,
@@ -5761,12 +5783,14 @@ class ToolSelector:
                 tasks=1,
                 error_type=error_type,
                 tools=[result.selected_tool] if result.selected_tool else [],
+                response_text=response_text,
+                confidence=result.confidence,
             )
             
             logger.debug(
                 f"[ImplicitFeedback] Recorded outcome: tool={result.selected_tool}, "
                 f"status={status}, confidence={result.confidence:.2f}, "
-                f"time={result.execution_time_ms:.0f}ms"
+                f"time={result.execution_time_ms:.0f}ms, has_response={response_text is not None}"
             )
             
         except Exception as e:
