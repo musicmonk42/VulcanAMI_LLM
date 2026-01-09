@@ -1801,6 +1801,23 @@ class AgentTask:
     source_agent: Optional[str] = None
     target_agent: Optional[str] = None
 
+    @property
+    def tool_name(self) -> str:
+        """
+        Get the primary tool name for this task.
+        
+        Returns the first tool from parameters['tools'] if available,
+        otherwise falls back to the capability field.
+        
+        This property provides backward compatibility for code that expects
+        a tool_name attribute on AgentTask objects.
+        """
+        tools = self.parameters.get("tools", [])
+        if tools and isinstance(tools, list) and len(tools) > 0:
+            return str(tools[0])
+        # Fall back to capability if no tools specified
+        return self.capability
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
