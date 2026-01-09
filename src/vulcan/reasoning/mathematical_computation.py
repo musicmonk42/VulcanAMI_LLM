@@ -37,6 +37,21 @@ DEFAULT_OPENAI_MODEL = "gpt-3.5-turbo"
 # Maximum attributes to log when debugging unknown LLM interface
 DEBUG_LOG_MAX_ATTRS = 10
 
+# ============================================================================
+# CONSTANTS - Explicit Mathematical Notation Detection (Issue #1 Fix)
+# ============================================================================
+# Symbols and keywords that indicate explicit mathematical content.
+# When present, these bypass logic pattern rejection because they're
+# clearly mathematical expressions, not logic problems.
+
+EXPLICIT_MATH_SYMBOLS: Tuple[str, ...] = ('∑', '∫', '∏', '∂', '∇', '√')
+
+EXPLICIT_MATH_KEYWORDS: Tuple[str, ...] = (
+    'compute exactly', 'calculate exactly', 'evaluate exactly',
+    'compute the sum', 'calculate the sum', 'evaluate the sum',
+    'summation', 'sigma notation',
+)
+
 
 # ============================================================================
 # ENUMS AND DATA STRUCTURES
@@ -951,18 +966,12 @@ result = simplify(integral)
         #   - Contains "verify" → Was being rejected as logic pattern
         #
         # Fix: Detect explicit mathematical notation and bypass logic rejection.
+        # Uses module-level constants EXPLICIT_MATH_SYMBOLS and EXPLICIT_MATH_KEYWORDS
+        # for better performance (avoid recreating lists on every call).
         # =================================================================
-        explicit_math_symbols = ['∑', '∫', '∏', '∂', '∇', '√']
-        explicit_math_keywords = [
-            'compute exactly', 'calculate exactly', 'evaluate exactly',
-            'compute the sum', 'calculate the sum', 'evaluate the sum',
-            'find the integral', 'compute the integral',
-            'summation', 'sigma notation',
-        ]
-        
         has_explicit_math = (
-            any(sym in query for sym in explicit_math_symbols) or
-            any(kw in query_lower for kw in explicit_math_keywords)
+            any(sym in query for sym in EXPLICIT_MATH_SYMBOLS) or
+            any(kw in query_lower for kw in EXPLICIT_MATH_KEYWORDS)
         )
         
         if has_explicit_math:

@@ -1043,6 +1043,13 @@ MATH_SHORT_KEYWORD_PATTERNS: Tuple[re.Pattern, ...] = tuple(
     for kw in MATH_SHORT_KEYWORDS_NEEDING_BOUNDARY
 )
 
+# Pre-filtered mathematical keywords (excludes short keywords that need boundary matching)
+# This avoids repeated set membership checks in the hot path
+MATH_KEYWORDS_REGULAR: Tuple[str, ...] = tuple(
+    kw for kw in MATHEMATICAL_KEYWORDS 
+    if kw not in MATH_SHORT_KEYWORDS_NEEDING_BOUNDARY
+)
+
 # ============================================================
 # CONSTANTS - Explicit Mathematical Intent Detection
 # ============================================================
@@ -2443,11 +2450,11 @@ class QueryAnalyzer:
             if pattern.search(query_lower)
         )
         
-        # Count matches from regular keywords (excluding short keywords that need boundary matching)
-        # Use simple substring matching only for keywords NOT in the short keyword set
+        # Count matches from regular keywords (pre-filtered at module level)
+        # PERFORMANCE FIX: Use pre-filtered MATH_KEYWORDS_REGULAR instead of
+        # checking set membership on every call
         regular_keyword_count = sum(
-            1 for kw in MATHEMATICAL_KEYWORDS 
-            if kw not in MATH_SHORT_KEYWORDS_NEEDING_BOUNDARY and kw in query_lower
+            1 for kw in MATH_KEYWORDS_REGULAR if kw in query_lower
         )
         
         math_keyword_count = short_keyword_count + regular_keyword_count

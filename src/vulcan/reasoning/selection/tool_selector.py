@@ -217,6 +217,20 @@ UNVERIFIED_QUALITY_PENALTY = 0.7  # Reduce to 70% of claimed confidence
 FALLBACK_QUALITY_PENALTY = 0.3  # Reduce to 30% of quality
 
 # ==============================================================================
+# Semantic Context Keywords for Ethics/Philosophy Detection (Issue #3 Fix)
+# ==============================================================================
+# Keywords indicating ethics/philosophy context.
+# Used to prevent routing ethics queries to mathematical engine based solely
+# on symbol detection. When 2+ of these keywords are present, the query is
+# considered to have an ethics/philosophy context.
+ETHICS_PHILOSOPHY_KEYWORDS: Tuple[str, ...] = (
+    'ethics', 'ethical', 'policy', 'moral', 'morality', 'philosophy',
+    'philosophical', 'value', 'values', 'constraint', 'constraints',
+    'multimodal reasoning', 'cross-constraints', 'cross-domain',
+    'reasoning about', 'ethical implications', 'policy implications',
+)
+
+# ==============================================================================
 # QueryRouter Tool Selection
 # ==============================================================================
 # Default available tools when not specified in class instance.
@@ -3489,16 +3503,11 @@ class ToolSelector:
         #   - Contains mathematical notation (𝐸, 𝑢(𝑡), Greek letters)
         #   - BUT is fundamentally about ethics/policy reasoning
         #   - Should route to world_model/philosophical, NOT mathematical
+        # Uses module-level ETHICS_PHILOSOPHY_KEYWORDS for better performance.
         # =================================================================
-        ethics_philosophy_keywords = [
-            'ethics', 'ethical', 'policy', 'moral', 'morality', 'philosophy',
-            'philosophical', 'value', 'values', 'constraint', 'constraints',
-            'multimodal reasoning', 'cross-constraints', 'cross-domain',
-            'reasoning about', 'ethical implications', 'policy implications',
-        ]
         
-        # Count ethics/philosophy keywords
-        ethics_count = sum(1 for kw in ethics_philosophy_keywords if kw in query_lower)
+        # Count ethics/philosophy keywords using module-level constant
+        ethics_count = sum(1 for kw in ETHICS_PHILOSOPHY_KEYWORDS if kw in query_lower)
         
         # If query has 2+ ethics/philosophy keywords, it's likely NOT a pure math problem
         if ethics_count >= 2:
