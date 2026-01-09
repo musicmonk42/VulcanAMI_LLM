@@ -42,6 +42,11 @@ WEIGHT_PENALTY_OVERRIDE = 0.5      # Multiply reward by 0.5 if tools were overri
 WEIGHT_PENALTY_FALLBACK = 0.3      # Multiply reward by 0.3 if fallback was used
 WEIGHT_PENALTY_UNVERIFIED = 0.7    # Multiply reward by 0.7 if high confidence but unverified
 
+# BUG #3 FIX: Threshold below which tool confidence is considered "low"
+# If tool returns confidence below this AND LLM fallback was needed,
+# the tool is penalized instead of rewarded (it failed, LLM saved it)
+LOW_CONFIDENCE_THRESHOLD = 0.3
+
 # Note: Tool Weight Death Spiral Prevention
 # These constants prevent tools from accumulating unbounded negative weights.
 # Without bounds, tools can become unusable due to accumulated failures.
@@ -781,7 +786,7 @@ class UnifiedLearningSystem:
                     
                     # BUG #3 FIX: If tool had LOW confidence but OpenAI fallback saved the day,
                     # apply NEGATIVE weight to the tool (it failed, OpenAI succeeded)
-                    if llm_fallback_used and tool_confidence < 0.3:
+                    if llm_fallback_used and tool_confidence < LOW_CONFIDENCE_THRESHOLD:
                         # Tool returned low confidence, LLM fallback was needed
                         # This is a FAILURE for the tool - apply negative weight
                         weight_delta = WEIGHT_ADJUSTMENT_FAILURE  # -0.005

@@ -181,6 +181,26 @@ from vulcan.utils_main import (
     find_available_port,
 )
 
+# SystemObserver: World Model awareness of platform activity
+# BUG #3 FIX: Wire up SystemObserver so world model knows what the platform does
+try:
+    from vulcan.reasoning.reasoning_integration import (
+        observe_query_start,
+        observe_engine_result,
+        observe_outcome,
+        observe_validation_failure,
+        observe_error,
+    )
+    SYSTEM_OBSERVER_AVAILABLE = True
+except ImportError:
+    SYSTEM_OBSERVER_AVAILABLE = False
+    # Define no-op functions as fallbacks
+    def observe_query_start(*args, **kwargs): pass
+    def observe_engine_result(*args, **kwargs): pass
+    def observe_outcome(*args, **kwargs): pass
+    def observe_validation_failure(*args, **kwargs): pass
+    def observe_error(*args, **kwargs): pass
+
 # LLM: Mock LLM, Hybrid executor, OpenAI client
 from vulcan.llm import (
     MockGraphixVulcanLLM,
@@ -5483,6 +5503,18 @@ async def unified_chat(request: UnifiedChatRequest):
                     f"[VULCAN/v1/chat] Query routed: id={routing_plan.query_id}, "
                     f"type={routing_plan.query_type.value}, tasks={len(routing_plan.agent_tasks)}"
                 )
+                
+                # BUG #3 FIX: Notify world model of query start
+                # This makes the world model aware of each query entering the system
+                observe_query_start(
+                    query_id=routing_plan.query_id,
+                    query=user_message,
+                    classification={
+                        'category': routing_plan.query_type.value,
+                        'complexity': routing_plan.complexity_score,
+                        'tools': [t.tool_name for t in routing_plan.agent_tasks] if routing_plan.agent_tasks else [],
+                    }
+                )
 
                 # PERFORMANCE FIX: Use fire-and-forget for governance logging
                 # This prevents blocking the request while waiting for SQLite I/O
@@ -6517,6 +6549,17 @@ async def unified_chat(request: UnifiedChatRequest):
                 f"[VULCAN/v1/chat] Agent reasoning injected into context: "
                 f"type={_get_reasoning_attr(agent_reasoning_output, 'reasoning_type')}"
             )
+            
+            # BUG #3 FIX: Notify world model of engine result
+            # This makes the world model aware of reasoning engine outcomes
+            _engine_confidence = _get_reasoning_attr(agent_reasoning_output, "confidence")
+            observe_engine_result(
+                query_id=routing_plan.query_id if routing_plan else "unknown",
+                engine_name=str(_get_reasoning_attr(agent_reasoning_output, "reasoning_type")),
+                result=reasoning_results["agent_reasoning"],
+                success=_engine_confidence > 0.15 if isinstance(_engine_confidence, (int, float)) else False,
+                execution_time_ms=(time.time() - start_time) * 1000
+            )
 
         # ================================================================
         # STEP 6.6: FALLBACK - Direct Reasoning Invocation (GraphixArena Pattern)
@@ -7386,6 +7429,20 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
         
         # Add transparency to metadata
         metadata["transparency"] = transparency
+        
+        # BUG #3 FIX: Notify world model of query outcome
+        # This makes the world model aware of how each query was resolved
+        observe_outcome(
+            query_id=query_id,
+            response={
+                'source': response_source,
+                'confidence': best_confidence,
+                'response_time_ms': latency_ms,
+                'used_openai_fallback': transparency.get('used_openai_fallback', False),
+                'reasoning_available': transparency.get('reasoning_available', False),
+            },
+            user_feedback=None  # Feedback comes later via /feedback endpoint
+        )
 
         return {
             "response": response_text,
