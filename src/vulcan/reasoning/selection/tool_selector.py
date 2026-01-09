@@ -5765,12 +5765,24 @@ class ToolSelector:
                             response_text = str(val)
                             break
                 
-                # If still no response_text, try to build from proof/method info
-                if response_text is None and "proven" in result.execution_result:
-                    proven = result.execution_result.get("proven", False)
-                    method = result.execution_result.get("method", "unknown")
-                    confidence_val = result.execution_result.get("confidence", 0)
-                    response_text = f"proven: {proven}, confidence: {confidence_val}, method: {method}"
+                # Only build diagnostic response_text when there's an error to report
+                # This enables quality assessment to detect parse errors and failures.
+                # We DON'T build it for successful results (proven: True) because those
+                # would be detected as raw data dumps. Successful results without
+                # explanation text should be left as response_text=None ("unknown" quality).
+                if response_text is None:
+                    error_msg = result.execution_result.get("error", "")
+                    proven = result.execution_result.get("proven")
+                    
+                    # Only create diagnostic string if:
+                    # 1. There's an explicit error message, OR
+                    # 2. proven is explicitly False (not just missing)
+                    if error_msg:
+                        response_text = f"Error: {error_msg}"
+                    elif proven is False:  # Explicit False, not None
+                        confidence_val = result.execution_result.get("confidence", 0)
+                        method = result.execution_result.get("method", "unknown")
+                        response_text = f"Failed to prove. confidence: {confidence_val}, method: {method}"
             
             # Record outcome to bridge with quality assessment data
             record_query_outcome(

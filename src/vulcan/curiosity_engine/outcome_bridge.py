@@ -190,17 +190,39 @@ ANSWER_QUALITY_FAILURE_PATTERNS = frozenset({
     "query type not recognized",
     "no matching handler",
     "fallback response",
+    # Parse error patterns - symbolic engine failures
+    "parse error",
+    "parser failed",
+    "unexpected token",
+    "advanced parser failed",
+    "standard parser failed",
+    # NL to Logic conversion failures
+    "nl conversion failed",
+    "nl to logic conversion",
+    "conversion still failed",
+    # General parsing failures
+    "failed to parse",
+    "syntax error",
+    "malformed",
+    # Proof failure patterns (from tool_selector diagnostic strings)
+    "failed to prove",
+    "error:",
 })
 
 # Patterns indicating raw data dumps (not user-facing)
+# NOTE: We removed "confidence: 0." patterns because they cause false positives
+# (e.g. "confidence: 0.85" contains "confidence: 0." as substring).
+# Low confidence is now detected via the explicit proven: false check instead.
 RAW_DATA_DUMP_PATTERNS = frozenset({
     "proven:",
-    "confidence: 0.",
-    "confidence:0.",
     "proof:",
     "method:",
     "applicable:",
     "result_dict:",
+    # Error result patterns
+    "error:",
+    "'error':",
+    "validation:",
 })
 
 # Number of raw data patterns required to classify as a dump
@@ -288,6 +310,26 @@ def assess_answer_quality(
     if raw_pattern_count >= RAW_DATA_PATTERN_THRESHOLD:
         # Multiple raw data patterns suggest a dump, not a user-facing answer
         return "failed"
+    
+    # Check for explicit failure indicators in structured responses
+    # "proven: false" with low confidence is a failed response
+    if "proven: false" in response_lower or "proven:false" in response_lower:
+        # If confidence is provided and low, it's clearly a failure
+        if confidence is not None and confidence < 0.5:
+            return "failed"
+        # Try to extract confidence from response text if not provided
+        # Pattern: "confidence: X.XX" or "confidence:X.XX"
+        import re
+        conf_match = re.search(r'confidence[:\s]+([0-9.]+)', response_lower)
+        if conf_match:
+            try:
+                extracted_conf = float(conf_match.group(1))
+                if extracted_conf < 0.5:
+                    return "failed"
+            except ValueError:
+                pass
+        # Even without explicit confidence, proven: false is a partial success at best
+        return "partial"
     
     # Check for misclassification patterns
     for pattern in MISCLASSIFICATION_PATTERNS:
