@@ -784,6 +784,10 @@ class TestSelfIntrospectionDomainOverride:
     engine instead. world_model can still observe but doesn't block.
     """
     
+    # Minimum number of domain keywords required to trigger domain routing
+    # This threshold ensures single false matches don't cause routing errors
+    DOMAIN_KEYWORD_THRESHOLD = 2
+    
     @pytest.fixture
     def domain_keywords(self):
         """Domain keyword sets matching reasoning_integration.py."""
@@ -792,11 +796,11 @@ class TestSelfIntrospectionDomainOverride:
                 'causal', 'causation', 'confound', 'confounder', 'confounding',
                 'intervention', 'counterfactual', 'randomize', 'randomized',
                 'pearl', 'dag', 'backdoor', 'frontdoor', 'collider',
-                'do(', 'do-calculus', 'rct', 'observational', 'experimental',
+                'do-calculus', 'rct', 'observational', 'experimental',
             ]),
             'analogical': frozenset([
                 'analogical', 'analogy', 'analogies', 'analogous',
-                'structure mapping', 'structural alignment', 'mapping',
+                'structure mapping', 'structural alignment',
                 'domain transfer', 'cross-domain', 'source domain', 'target domain',
                 'relational similarity', 'surface similarity', 'structural similarity',
                 's→t', 'domain s', 'domain t', 'deep structure',
@@ -804,7 +808,7 @@ class TestSelfIntrospectionDomainOverride:
             'probabilistic': frozenset([
                 'bayes', 'bayesian', 'probability', 'probabilistic',
                 'likelihood', 'prior', 'posterior', 'conditional probability',
-                'p(', 'joint distribution', 'marginal', 'independence',
+                'joint distribution', 'marginal', 'independence',
             ]),
         }
     
@@ -815,7 +819,7 @@ class TestSelfIntrospectionDomainOverride:
         detected_count = 0
         for domain, keywords in domain_keywords.items():
             count = sum(1 for kw in keywords if kw in query_lower)
-            if count >= 2:  # Require 2+ keywords for domain detection
+            if count >= self.DOMAIN_KEYWORD_THRESHOLD:
                 if count > detected_count:
                     detected_domain = domain
                     detected_count = count

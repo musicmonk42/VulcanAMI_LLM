@@ -1397,16 +1397,18 @@ class ReasoningIntegration:
                     query_lower = query.lower()
                     
                     # Domain keyword sets for specialized routing
+                    # Note: These keywords are consistent with CAUSAL_KEYWORDS in query_classifier.py
+                    # The threshold of 2+ keywords ensures single false matches don't trigger routing
                     DOMAIN_ROUTING_KEYWORDS = {
                         'causal': frozenset([
                             'causal', 'causation', 'confound', 'confounder', 'confounding',
                             'intervention', 'counterfactual', 'randomize', 'randomized',
                             'pearl', 'dag', 'backdoor', 'frontdoor', 'collider',
-                            'do(', 'do-calculus', 'rct', 'observational', 'experimental',
+                            'do-calculus', 'rct', 'observational', 'experimental',
                         ]),
                         'analogical': frozenset([
                             'analogical', 'analogy', 'analogies', 'analogous',
-                            'structure mapping', 'structural alignment', 'mapping',
+                            'structure mapping', 'structural alignment',
                             'domain transfer', 'cross-domain', 'source domain', 'target domain',
                             'relational similarity', 'surface similarity', 'structural similarity',
                             's→t', 'domain s', 'domain t', 'deep structure',
@@ -1414,7 +1416,7 @@ class ReasoningIntegration:
                         'probabilistic': frozenset([
                             'bayes', 'bayesian', 'probability', 'probabilistic',
                             'likelihood', 'prior', 'posterior', 'conditional probability',
-                            'p(', 'joint distribution', 'marginal', 'independence',
+                            'joint distribution', 'marginal', 'independence',
                         ]),
                     }
                     
