@@ -1864,6 +1864,28 @@ class PhilosophicalReasoner(AbstractReasoner):
                 'causal_predictions': {},  # FIX #4: Add causal predictions
             }
             
+            # BUG #13 FIX: For self-introspection queries, skip ethical dilemma phases
+            # Self-introspection doesn't need causal predictions, ethical boundaries, goal conflicts, etc.
+            # It just needs the self-understanding data which is fetched separately.
+            if analysis_type == "self_introspection":
+                logger.info("[PhilosophicalReasoner] BUG #13 FIX: Skipping ethical dilemma phases for self-introspection")
+                # Only get basic perspective from MotivationalIntrospection
+                if hasattr(self.world_model, 'motivational_introspection'):
+                    mi = self.world_model.motivational_introspection
+                    if mi and hasattr(mi, 'introspect_current_objective'):
+                        try:
+                            introspection = mi.introspect_current_objective()
+                            result['perspective']['motivational'] = {
+                                'current_objectives': str(introspection) if introspection else "No current objectives",
+                                'analysis': "Self-introspection completed via World Model"
+                            }
+                        except Exception as e:
+                            logger.debug(f"[MotivationalIntrospection] error: {e}")
+                
+                result['analysis_type'] = 'self_introspection'
+                logger.info("[PhilosophicalReasoner] Self-introspection consultation complete (skipped 6-phase template)")
+                return result
+            
             # FIX #4: Extract possible actions from the query for causal prediction
             actions = self._extract_actions(query)
             logger.info(f"[PhilosophicalReasoner] Extracted {len(actions)} possible actions: {actions}")
