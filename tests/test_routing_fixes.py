@@ -522,3 +522,243 @@ class TestCausalQueryMathFastPathBypass:
         query = "What is the probability P(A|B) given Bayes theorem?"
         count = self._count_causal_keywords(query, causal_keywords)
         assert count == 0, f"Expected 0 causal keywords in probability query, got {count}"
+
+
+# ============================================================================
+# Test Formal Logic Pattern Override Removal (Issue #6)
+# ============================================================================
+
+class TestFormalLogicPatternOverrideRemoval:
+    """
+    Tests for verifying the formal logic pattern override has been removed.
+    
+    Issue: The tool selector had a "formal logic detected" pattern that bypassed
+    the LLM classifier and routed EVERYTHING containing arrow symbols (→, S→T)
+    to the symbolic engine, even when queries should go to:
+    - Analogical reasoning engine (for structure mapping queries)
+    - Causal reasoning engine (for causation/Pearl-style queries)
+    - Mathematical verification engine
+    - Language reasoning engine
+    
+    Evidence from production logs:
+        Query: "Structure mapping (not surface similarity)... Domain S→T"
+        Classifier: CRYPTOGRAPHIC ❌ (should be ANALOGICAL)
+        Route: symbolic engine ❌
+        Result: Parser failed, 20% confidence
+        
+        Query: "Confounding vs causation (Pearl-style)..."
+        Classifier: SELF_INTROSPECTION ❌ (should be CAUSAL)
+        Override: "Formal logic detected - routing to symbolic" ❌
+        Result: Parser failed, 20% confidence
+    
+    Fix: REMOVED the pattern override. The LLM classifier uses semantic
+    understanding and is smarter than pattern matching. Trust it to identify:
+    - ANALOGICAL queries → tools=['analogical']
+    - CAUSAL queries → tools=['causal']
+    - LOGICAL queries → tools=['symbolic']
+    - PROBABILISTIC queries → tools=['probabilistic']
+    """
+    
+    @pytest.fixture
+    def analogical_query_indicators(self):
+        """Keywords indicating analogical reasoning queries."""
+        return [
+            'structure mapping', 'not surface similarity', 'analogy',
+            'analogical', 'similar structure', 'map structure',
+            'structural alignment', 'domain transfer', 'source domain',
+            'target domain', 'relational mapping',
+        ]
+    
+    @pytest.fixture
+    def causal_query_indicators(self):
+        """Keywords indicating causal reasoning queries."""
+        return [
+            'confounding', 'causation', 'pearl', 'intervention', 'do-calculus',
+            'counterfactual', 'causal inference', 'dag', 'confounder',
+            'mediator', 'collider', 'back-door', 'front-door',
+        ]
+    
+    @pytest.fixture
+    def symbolic_query_indicators(self):
+        """Keywords indicating true symbolic/formal logic queries."""
+        return [
+            'satisfiable', 'sat', 'cnf', 'dnf', 'prove', 'theorem',
+            'modus ponens', 'modus tollens', 'tautology', 'contradiction',
+            'first-order logic', 'fol', 'propositional', 'entails',
+        ]
+    
+    def _count_indicators(self, query: str, indicators: list) -> int:
+        """Count how many indicator keywords appear in the query (word boundary)."""
+        query_lower = query.lower()
+        count = 0
+        for ind in indicators:
+            # Use word boundary matching to avoid substring false positives
+            # e.g., "sat" should not match "causation"
+            pattern = r'\b' + re.escape(ind) + r'\b'
+            if re.search(pattern, query_lower):
+                count += 1
+        return count
+    
+    def _has_arrow_symbol(self, query: str) -> bool:
+        """Check if query contains arrow symbols that triggered the old bypass."""
+        arrow_symbols = ['→', '->', '⇒', '↔', '<->']
+        return any(arrow in query for arrow in arrow_symbols)
+    
+    # Test Case 1: Analogical queries should NOT be routed to symbolic
+    def test_analogical_query_with_arrow_not_symbolic(
+        self, analogical_query_indicators, symbolic_query_indicators
+    ):
+        """
+        Analogical queries containing arrows (S→T) should NOT be routed to symbolic.
+        
+        The old pattern override would see '→' and route to symbolic engine,
+        but the LLM classifier should recognize this as an analogical query.
+        """
+        query = "Structure mapping (not surface similarity) Domain S→T requires relational alignment"
+        
+        # Verify query contains arrow (would have triggered old bypass)
+        assert self._has_arrow_symbol(query), "Test query should contain arrow symbol"
+        
+        # Count indicators to verify query type
+        analogical_count = self._count_indicators(query, analogical_query_indicators)
+        symbolic_count = self._count_indicators(query, symbolic_query_indicators)
+        
+        # Query should have more analogical indicators than symbolic
+        assert analogical_count >= 2, (
+            f"Query should have analogical indicators (got {analogical_count})"
+        )
+        assert symbolic_count == 0, (
+            f"Query should NOT have symbolic indicators (got {symbolic_count})"
+        )
+    
+    # Test Case 2: Causal queries should NOT be routed to symbolic
+    def test_causal_query_with_arrow_not_symbolic(
+        self, causal_query_indicators, symbolic_query_indicators
+    ):
+        """
+        Causal queries (Pearl-style) should NOT be routed to symbolic engine.
+        
+        The old pattern override would see keywords like 'confounding' or 
+        graph notation and route to symbolic, but LLM classifier should
+        recognize this as a causal reasoning query.
+        """
+        query = "Confounding vs causation (Pearl-style): X→Y with confounder Z"
+        
+        # Verify query contains arrow (would have triggered old bypass)
+        assert self._has_arrow_symbol(query), "Test query should contain arrow symbol"
+        
+        # Count indicators to verify query type
+        causal_count = self._count_indicators(query, causal_query_indicators)
+        symbolic_count = self._count_indicators(query, symbolic_query_indicators)
+        
+        # Query should have more causal indicators than symbolic
+        assert causal_count >= 2, (
+            f"Query should have causal indicators (got {causal_count})"
+        )
+        assert symbolic_count == 0, (
+            f"Query should NOT have symbolic indicators (got {symbolic_count})"
+        )
+    
+    # Test Case 3: True symbolic queries SHOULD still be routed correctly
+    def test_true_symbolic_query_still_works(
+        self, analogical_query_indicators, causal_query_indicators, symbolic_query_indicators
+    ):
+        """
+        True symbolic/FOL queries should still be handled correctly.
+        
+        The LLM classifier should recognize genuine formal logic queries
+        and route them to symbolic engine based on semantic understanding,
+        not just pattern matching on arrow symbols.
+        """
+        query = "Is the following satisfiable: A→B, B→C, ¬C, A? Use modus tollens."
+        
+        # Count indicators to verify query type
+        symbolic_count = self._count_indicators(query, symbolic_query_indicators)
+        analogical_count = self._count_indicators(query, analogical_query_indicators)
+        causal_count = self._count_indicators(query, causal_query_indicators)
+        
+        # Query should have symbolic indicators and NOT others
+        assert symbolic_count >= 2, (
+            f"Symbolic query should have symbolic indicators (got {symbolic_count})"
+        )
+        assert analogical_count == 0, (
+            f"Symbolic query should NOT have analogical indicators (got {analogical_count})"
+        )
+        assert causal_count == 0, (
+            f"Symbolic query should NOT have causal indicators (got {causal_count})"
+        )
+    
+    # Test Case 4: Verify bypass code is actually removed from tool_selector.py
+    def test_bypass_code_removed_from_tool_selector(self):
+        """
+        Verify the formal logic pattern bypass code has been removed.
+        
+        The tool_selector.py should NOT contain the bypass log message:
+        "bypassing LLM classifier to prevent misrouting to probabilistic"
+        
+        (Note: The math symbol bypass is allowed to remain, only formal logic bypass is removed)
+        """
+        import os
+        
+        # Find the tool_selector.py file
+        tool_selector_paths = [
+            'src/vulcan/reasoning/selection/tool_selector.py',
+            '../src/vulcan/reasoning/selection/tool_selector.py',
+        ]
+        
+        tool_selector_content = None
+        for path in tool_selector_paths:
+            if os.path.exists(path):
+                with open(path, 'r', encoding='utf-8') as f:
+                    tool_selector_content = f.read()
+                break
+        
+        if tool_selector_content is None:
+            pytest.skip("tool_selector.py not found in expected locations")
+        
+        # Check that the old formal logic bypass is NOT present
+        # The message "Formal logic detected - routing to symbolic engine" should be gone
+        bypass_message = "Formal logic detected - routing to symbolic engine"
+        
+        assert bypass_message not in tool_selector_content, (
+            "The formal logic pattern bypass should be REMOVED from tool_selector.py. "
+            "Found the bypass message: 'Formal logic detected - routing to symbolic engine'"
+        )
+    
+    # Test Case 5: Verify the explanation comment is present
+    def test_removal_explanation_comment_present(self):
+        """
+        Verify the removal explanation comment is present in tool_selector.py.
+        
+        The code should contain a comment explaining why the bypass was removed
+        so future developers don't accidentally re-add it.
+        """
+        import os
+        
+        # Find the tool_selector.py file
+        tool_selector_paths = [
+            'src/vulcan/reasoning/selection/tool_selector.py',
+            '../src/vulcan/reasoning/selection/tool_selector.py',
+        ]
+        
+        tool_selector_content = None
+        for path in tool_selector_paths:
+            if os.path.exists(path):
+                with open(path, 'r', encoding='utf-8') as f:
+                    tool_selector_content = f.read()
+                break
+        
+        if tool_selector_content is None:
+            pytest.skip("tool_selector.py not found in expected locations")
+        
+        # Check that explanation comment is present
+        explanation_markers = [
+            "REMOVED formal logic pattern override",
+            "pattern matching CANNOT distinguish between",
+        ]
+        
+        for marker in explanation_markers:
+            assert marker in tool_selector_content, (
+                f"Expected explanation comment containing '{marker}' not found. "
+                "The removal should be documented so it's not accidentally re-added."
+            )

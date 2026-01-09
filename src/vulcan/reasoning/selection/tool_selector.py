@@ -4050,42 +4050,40 @@ class ToolSelector:
                     )
 
             # ================================================================
-            # Early detection of formal logic queries
-            # Route SAT/FOL/theorem proving queries to symbolic engine BEFORE
-            # the LLM classifier, which often misroutes them to probabilistic.
-            #
-            # CRITICAL: Skip this if delegation is active (world model already decided)
+            # Note: REMOVED formal logic pattern override (Jan 9 2026)
             # ================================================================
+            # The previous code here bypassed the LLM classifier when "formal logic"
+            # patterns were detected, routing everything to symbolic engine.
+            # 
+            # This was WRONG because pattern matching CANNOT distinguish between:
+            # - "Map structure S→T" (analogical reasoning)
+            # - "Prove S→T→C" (symbolic reasoning)
+            # - "Confounding vs causation" (causal reasoning)
+            # 
+            # Evidence from production logs:
+            #   Query: "Structure mapping (not surface similarity)... Domain S→T"
+            #   Classifier: CRYPTOGRAPHIC ❌ (should be ANALOGICAL)
+            #   Route: symbolic engine ❌
+            #   Result: Parser failed, 20% confidence
+            #
+            #   Query: "Confounding vs causation (Pearl-style)..."
+            #   Classifier: SELF_INTROSPECTION ❌ (should be CAUSAL)
+            #   Override: "Formal logic detected - routing to symbolic" ❌
+            #   Result: Parser failed, 20% confidence
+            #
+            # The LLM classifier uses semantic understanding and is smarter than
+            # pattern matching. Trust it to identify the correct reasoning type:
+            # - ANALOGICAL queries → tools=['analogical']
+            # - CAUSAL queries → tools=['causal']
+            # - LOGICAL queries → tools=['symbolic']
+            # - PROBABILISTIC queries → tools=['probabilistic']
+            #
+            # The override has been REMOVED. The LLM classifier path below
+            # will now handle all queries without bypass.
+            # ================================================================
+
             if hasattr(request, 'problem') and request.problem and not delegation_active:
                 problem_text = str(request.problem)
-                if self._detect_formal_logic(problem_text):
-                    logger.info(
-                        f"[ToolSelector] Formal logic detected - routing to symbolic engine "
-                        f"(bypassing LLM classifier to prevent misrouting to probabilistic)"
-                    )
-                    # Execute with symbolic engine directly
-                    candidates = [
-                        {'tool': 'symbolic', 'utility': 0.95, 'source': 'formal_logic_detection'},
-                    ]
-                    
-                    features = self._extract_features(request)
-                    request.features = features
-                    
-                    strategy = self._select_strategy(request, candidates)
-                    execution_result = self._execute_portfolio(request, candidates, strategy)
-                    final_result = self._postprocess_result(request, execution_result, start_time)
-                    
-                    if self.config.get("learning_enabled"):
-                        self._update_learning(request, final_result)
-                    
-                    if self.config.get("cache_enabled"):
-                        self._cache_result(request, final_result)
-                    
-                    self._update_statistics(final_result)
-                    
-                    logger.info(f"[ToolSelector] Executed formal logic query with symbolic engine")
-                    return final_result
-                
                 # ================================================================
                 # Early detection of mathematical symbols
                 # Route math queries with ∑, ∫, etc. to mathematical engine BEFORE
