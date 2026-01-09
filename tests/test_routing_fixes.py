@@ -760,3 +760,271 @@ class TestFormalLogicPatternOverrideRemoval:
                 f"Expected explanation comment containing '{marker}' not found. "
                 "The removal should be documented so it's not accidentally re-added."
             )
+
+
+# ============================================================================
+# Test SELF_INTROSPECTION Domain Reasoning Override (Issue #7 - Jan 9 2026)
+# ============================================================================
+
+class TestSelfIntrospectionDomainOverride:
+    """
+    Tests for the SELF_INTROSPECTION domain reasoning override fix.
+    
+    Issue: Causal/analogical queries were being misclassified as SELF_INTROSPECTION
+    and forced to use world_model, blocking specialized reasoning engines.
+    
+    Evidence from production logs:
+        Query: "Confounding vs causation (Pearl-style) S→D, S→E"
+        Classifier: SELF_INTROSPECTION ❌ (should be CAUSAL)
+        Override: "SELF_INTROSPECTION detected - using world_model tool" ❌
+        Result: "Structure mapping produced no results" (0.2 confidence)
+    
+    Fix: Check for domain reasoning keywords (causal, analogical, probabilistic)
+    BEFORE forcing world_model. If domain keywords are found, route to specialized
+    engine instead. world_model can still observe but doesn't block.
+    """
+    
+    @pytest.fixture
+    def domain_keywords(self):
+        """Domain keyword sets matching reasoning_integration.py."""
+        return {
+            'causal': frozenset([
+                'causal', 'causation', 'confound', 'confounder', 'confounding',
+                'intervention', 'counterfactual', 'randomize', 'randomized',
+                'pearl', 'dag', 'backdoor', 'frontdoor', 'collider',
+                'do(', 'do-calculus', 'rct', 'observational', 'experimental',
+            ]),
+            'analogical': frozenset([
+                'analogical', 'analogy', 'analogies', 'analogous',
+                'structure mapping', 'structural alignment', 'mapping',
+                'domain transfer', 'cross-domain', 'source domain', 'target domain',
+                'relational similarity', 'surface similarity', 'structural similarity',
+                's→t', 'domain s', 'domain t', 'deep structure',
+            ]),
+            'probabilistic': frozenset([
+                'bayes', 'bayesian', 'probability', 'probabilistic',
+                'likelihood', 'prior', 'posterior', 'conditional probability',
+                'p(', 'joint distribution', 'marginal', 'independence',
+            ]),
+        }
+    
+    def _detect_domain(self, query: str, domain_keywords: dict) -> tuple:
+        """Detect domain reasoning from query, matching the fix logic."""
+        query_lower = query.lower()
+        detected_domain = None
+        detected_count = 0
+        for domain, keywords in domain_keywords.items():
+            count = sum(1 for kw in keywords if kw in query_lower)
+            if count >= 2:  # Require 2+ keywords for domain detection
+                if count > detected_count:
+                    detected_domain = domain
+                    detected_count = count
+        return detected_domain, detected_count
+    
+    def test_causal_query_detected_in_self_introspection_context(self, domain_keywords):
+        """
+        Causal query misclassified as SELF_INTROSPECTION should be overridden.
+        
+        Query: "Confounding vs causation (Pearl-style)"
+        Expected: causal domain detected (4+ keywords)
+        """
+        query = "Confounding vs causation (Pearl-style) S→D, S→E correlation"
+        domain, count = self._detect_domain(query, domain_keywords)
+        
+        assert domain == 'causal', (
+            f"Expected causal domain, got {domain}. Query contains Pearl, confounding, causation."
+        )
+        assert count >= 2, f"Expected 2+ causal keywords, got {count}"
+    
+    def test_analogical_query_detected_in_self_introspection_context(self, domain_keywords):
+        """
+        Analogical query should be detected by domain keywords.
+        
+        Query: "Structure mapping between domain S→T"
+        Expected: analogical domain detected (3+ keywords)
+        """
+        query = "Structure mapping (not surface similarity) Domain S→T relational similarity"
+        domain, count = self._detect_domain(query, domain_keywords)
+        
+        assert domain == 'analogical', (
+            f"Expected analogical domain, got {domain}. Query contains structure mapping, "
+            "domain, relational similarity."
+        )
+        assert count >= 2, f"Expected 2+ analogical keywords, got {count}"
+    
+    def test_probabilistic_query_detected_in_self_introspection_context(self, domain_keywords):
+        """
+        Probabilistic query should be detected by domain keywords.
+        
+        Query: "Bayesian prior and posterior update"
+        Expected: probabilistic domain detected (3+ keywords)
+        """
+        query = "Bayesian analysis: compute prior and posterior probability given likelihood"
+        domain, count = self._detect_domain(query, domain_keywords)
+        
+        assert domain == 'probabilistic', (
+            f"Expected probabilistic domain, got {domain}. Query contains bayesian, prior, "
+            "posterior, probability, likelihood."
+        )
+        assert count >= 2, f"Expected 2+ probabilistic keywords, got {count}"
+    
+    def test_actual_self_introspection_not_overridden(self, domain_keywords):
+        """
+        Actual self-introspection query should NOT be overridden.
+        
+        Query: "Would you choose self-awareness if given the chance?"
+        Expected: no domain detected (actual self-introspection)
+        """
+        query = "Would you choose self-awareness if given the chance? Discuss your consciousness."
+        domain, count = self._detect_domain(query, domain_keywords)
+        
+        assert domain is None, (
+            f"Actual self-introspection should NOT trigger domain detection. Got domain={domain}"
+        )
+        assert count < 2, f"Expected <2 domain keywords in self-introspection query, got {count}"
+    
+    def test_creative_task_not_overridden(self, domain_keywords):
+        """
+        Creative task should NOT be overridden by domain detection.
+        
+        Query: "Write a poem about AI becoming self-aware"
+        Expected: no domain detected (creative task)
+        """
+        query = "Write a poem about an AI becoming self-aware"
+        domain, count = self._detect_domain(query, domain_keywords)
+        
+        assert domain is None, (
+            f"Creative task should NOT trigger domain detection. Got domain={domain}"
+        )
+    
+    def test_pearl_style_causal_graph_query(self, domain_keywords):
+        """
+        Pearl-style causal graph question should be detected as causal.
+        
+        This is the exact query pattern from the bug report that was failing.
+        """
+        query = """Confounding vs causation (Pearl-style)
+
+You observe: S→D correlation, S→E correlation
+Question: Does randomizing S identify causal effect S→D?
+Provide minimal causal graph."""
+        
+        domain, count = self._detect_domain(query, domain_keywords)
+        
+        assert domain == 'causal', (
+            f"Pearl-style causal query should be detected as causal. Got {domain}"
+        )
+        # Should have multiple causal keywords: causation, causal, randomizing, effect
+        assert count >= 3, f"Expected 3+ causal keywords in Pearl query, got {count}"
+    
+    def test_domain_override_code_present_in_reasoning_integration(self):
+        """
+        Verify the domain override code is present in reasoning_integration.py.
+        """
+        import os
+        
+        reasoning_integration_paths = [
+            'src/vulcan/reasoning/reasoning_integration.py',
+            '../src/vulcan/reasoning/reasoning_integration.py',
+        ]
+        
+        content = None
+        for path in reasoning_integration_paths:
+            if os.path.exists(path):
+                with open(path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                break
+        
+        if content is None:
+            pytest.skip("reasoning_integration.py not found in expected locations")
+        
+        # Check that the domain override fix is present
+        markers = [
+            "SELF_INTROSPECTION override",
+            "domain reasoning keywords",
+            "DOMAIN_ROUTING_KEYWORDS",
+        ]
+        
+        for marker in markers:
+            assert marker in content, (
+                f"Expected domain override code containing '{marker}' not found. "
+                "The SELF_INTROSPECTION domain override fix should be present."
+            )
+
+
+# ============================================================================
+# Test Mathematical Symbols Override Removal (Issue #8 - Jan 9 2026)
+# ============================================================================
+
+class TestMathSymbolsOverrideRemoval:
+    """
+    Tests for the mathematical symbols pattern override removal.
+    
+    Issue: Mathematical symbols pattern override was bypassing LLM classifier,
+    causing queries with ambiguous symbols (→) to be misrouted.
+    
+    Evidence from production logs:
+        Query: "Compute ∑(2k-1), verify by induction"
+        Pattern override: "Mathematical symbols detected"
+        Mathematical engine: SyntaxError "invalid syntax at '-'"
+        Result: confidence=0.1
+    
+    Fix: REMOVED the mathematical symbols pattern override. The LLM classifier
+    uses semantic understanding and is smarter than pattern matching.
+    """
+    
+    def test_math_symbols_bypass_removed_from_tool_selector(self):
+        """
+        Verify the mathematical symbols bypass code has been removed.
+        
+        The tool_selector.py should NOT contain active bypass code for
+        mathematical symbols detection.
+        """
+        import os
+        
+        tool_selector_paths = [
+            'src/vulcan/reasoning/selection/tool_selector.py',
+            '../src/vulcan/reasoning/selection/tool_selector.py',
+        ]
+        
+        content = None
+        for path in tool_selector_paths:
+            if os.path.exists(path):
+                with open(path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                break
+        
+        if content is None:
+            pytest.skip("tool_selector.py not found in expected locations")
+        
+        # Check that the bypass is documented as removed
+        assert "REMOVED mathematical symbols pattern override" in content, (
+            "Expected removal explanation comment not found. "
+            "The mathematical symbols bypass should be documented as removed."
+        )
+    
+    def test_llm_classifier_is_trusted_comment_present(self):
+        """
+        Verify there's a comment explaining that LLM classifier is trusted.
+        """
+        import os
+        
+        tool_selector_paths = [
+            'src/vulcan/reasoning/selection/tool_selector.py',
+            '../src/vulcan/reasoning/selection/tool_selector.py',
+        ]
+        
+        content = None
+        for path in tool_selector_paths:
+            if os.path.exists(path):
+                with open(path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                break
+        
+        if content is None:
+            pytest.skip("tool_selector.py not found in expected locations")
+        
+        # Check that the reasoning is documented
+        assert "LLM classifier is smarter than pattern matching" in content, (
+            "Expected explanation about LLM classifier superiority not found."
+        )

@@ -1382,27 +1382,91 @@ class ReasoningIntegration:
                 ])
                 
                 if classification.category in SELF_INTROSPECTION_CATEGORIES:
-                    # For self-introspection queries, ensure we use world_model tool
-                    # BUG FIX: Also update query_type to prevent type mismatch downstream
-                    # Previously, query_type stayed as 'MATHEMATICAL' even after overriding tools
-                    original_query_type = query_type
-                    query_type = 'self_introspection'  # FIX: Update query_type to match actual query
+                    # =================================================================
+                    # FIX (Jan 9 2026): Check for domain reasoning keywords FIRST
+                    # =================================================================
+                    # Problem: Classifier may misclassify causal/analogical queries as
+                    # SELF_INTROSPECTION, causing them to be forced to world_model.
+                    # Example: "Confounding vs causation (Pearl-style)" classified as
+                    # SELF_INTROSPECTION but should route to causal engine.
+                    #
+                    # Solution: Check for domain-specific keywords before forcing
+                    # world_model. If domain keywords are found, route to specialized
+                    # engine instead. world_model can still observe but doesn't block.
+                    # =================================================================
+                    query_lower = query.lower()
                     
-                    logger.info(
-                        f"{LOG_PREFIX} SELF_INTROSPECTION detected - using world_model tool "
-                        f"(classifier suggested: {classification.suggested_tools}). "
-                        f"Updated query_type: {original_query_type} -> {query_type}"
-                    )
-                    # Ensure world_model is in the suggested tools
-                    if 'world_model' not in (classification.suggested_tools or []):
-                        classification.suggested_tools = ['world_model']
-                    if context is None:
-                        context = {}
-                    context['classifier_suggested_tools'] = classification.suggested_tools
-                    context['prevent_router_tool_override'] = True
-                    context['classifier_is_authoritative'] = True
-                    context['is_self_introspection'] = True
-                    context['original_query_type'] = original_query_type  # FIX: Track original for debugging
+                    # Domain keyword sets for specialized routing
+                    DOMAIN_ROUTING_KEYWORDS = {
+                        'causal': frozenset([
+                            'causal', 'causation', 'confound', 'confounder', 'confounding',
+                            'intervention', 'counterfactual', 'randomize', 'randomized',
+                            'pearl', 'dag', 'backdoor', 'frontdoor', 'collider',
+                            'do(', 'do-calculus', 'rct', 'observational', 'experimental',
+                        ]),
+                        'analogical': frozenset([
+                            'analogical', 'analogy', 'analogies', 'analogous',
+                            'structure mapping', 'structural alignment', 'mapping',
+                            'domain transfer', 'cross-domain', 'source domain', 'target domain',
+                            'relational similarity', 'surface similarity', 'structural similarity',
+                            's→t', 'domain s', 'domain t', 'deep structure',
+                        ]),
+                        'probabilistic': frozenset([
+                            'bayes', 'bayesian', 'probability', 'probabilistic',
+                            'likelihood', 'prior', 'posterior', 'conditional probability',
+                            'p(', 'joint distribution', 'marginal', 'independence',
+                        ]),
+                    }
+                    
+                    # Check if query contains domain reasoning keywords
+                    detected_domain = None
+                    detected_count = 0
+                    for domain, keywords in DOMAIN_ROUTING_KEYWORDS.items():
+                        count = sum(1 for kw in keywords if kw in query_lower)
+                        if count >= 2:  # Require 2+ keywords for domain detection
+                            if count > detected_count:
+                                detected_domain = domain
+                                detected_count = count
+                    
+                    if detected_domain:
+                        # Domain reasoning detected - route to specialized engine
+                        logger.info(
+                            f"{LOG_PREFIX} SELF_INTROSPECTION override: detected {detected_domain} "
+                            f"reasoning ({detected_count} keywords) - routing to {detected_domain} "
+                            f"engine instead of world_model"
+                        )
+                        classification.suggested_tools = [detected_domain]
+                        if context is None:
+                            context = {}
+                        context['classifier_suggested_tools'] = [detected_domain]
+                        context['classifier_category'] = classification.category
+                        context['domain_reasoning_detected'] = detected_domain
+                        context['domain_keyword_count'] = detected_count
+                        # Let the specialized engine handle it - don't block with world_model
+                        # Note: world_model can still observe in parallel mode
+                    else:
+                        # No domain keywords found - actual self-introspection
+                        # For self-introspection queries, ensure we use world_model tool
+                        # BUG FIX: Also update query_type to prevent type mismatch downstream
+                        # Previously, query_type stayed as 'MATHEMATICAL' even after overriding tools
+                        original_query_type = query_type
+                        query_type = 'self_introspection'  # FIX: Update query_type to match actual query
+                        
+                        logger.info(
+                            f"{LOG_PREFIX} SELF_INTROSPECTION detected - using world_model tool "
+                            f"(classifier suggested: {classification.suggested_tools}). "
+                            f"Updated query_type: {original_query_type} -> {query_type}"
+                        )
+                        # Ensure world_model is in the suggested tools
+                        if 'world_model' not in (classification.suggested_tools or []):
+                            classification.suggested_tools = ['world_model']
+                        if context is None:
+                            context = {}
+                        context['classifier_suggested_tools'] = classification.suggested_tools
+                        context['prevent_router_tool_override'] = True
+                        context['classifier_is_authoritative'] = True
+                        context['is_self_introspection'] = True
+                        context['original_query_type'] = original_query_type  # FIX: Track original for debugging
                 
                 elif classification.category in SIMPLE_QUERY_CATEGORIES:
                     # For simple queries, ensure we use general tools
