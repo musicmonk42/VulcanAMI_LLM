@@ -162,36 +162,41 @@ class Lexer:
         # Replace || with a placeholder since it's not a standard FOL operator
         result = result.replace('||', ' CONCAT ')
         
-        # Step 4: Handle commas in natural language context
-        # Keep commas only when they appear between logical expressions
-        # Remove commas that appear in prose (after lowercase words, before 'and', etc.)
-        # 
+        # Step 4: Handle commas in logical expression context
+        # In FOL, commas are commonly used to separate premises in sequent notation:
+        # Example: "A → B, A ⊢ B" means "Given A→B and A, prove B"
+        # Example: "P, Q → R" means "P and (Q → R)" or premises P, Q implying R
+        #
+        # We need to:
+        # 1. Keep commas inside function arguments: f(a, b, c)
+        # 2. Convert premise-separating commas to conjunction (AND)
+        #
+        # Detection: If comma is NOT inside parentheses and separates logical expressions,
+        # treat it as AND.
+        #
         # Note: Be careful NOT to remove commas inside function arguments!
         # Example: and(m, f) - the comma separates function arguments
-        # The heuristic: commas inside parentheses are function arguments, keep them.
-        #
-        # Pattern: comma followed by lowercase word ONLY when NOT inside parens
-        # We approximate this by checking if there's an unmatched open paren before the comma.
-        # For simple cases, we use a negative lookbehind for opening paren.
-        # Pattern: comma NOT preceded by word char + open paren, followed by lowercase word
-        # Actually, simpler: only apply NL comma removal if we're likely in prose context
-        # (i.e., no parentheses on the current line segment)
-        #
-        # New approach: Don't remove commas if the text looks like function call syntax
-        # Function calls have the pattern: identifier(args...)
-        # Note: This pattern is simplified and may not handle deeply nested parens,
-        # but for most FOL function-style syntax (implies(A, B), and(x, y)), it works.
-        # The key insight is we're just detecting IF there's function syntax, not parsing it.
         #
         # FUNCTION_CALL_WITH_ARGS_PATTERN matches: word(anything_without_rparen,
         # Examples: "func(a, b)", "implies(A, B)", "and(x, y)"
-        # This detects function syntax to preserve commas as argument separators.
         FUNCTION_CALL_WITH_ARGS_PATTERN = r'\w+\s*\([^)]*,'
         has_function_syntax = bool(re.search(FUNCTION_CALL_WITH_ARGS_PATTERN, result))
+        
         if not has_function_syntax:
-            result = re.sub(r',\s+([a-z])', r' \1', result)
-            # Pattern: comma followed by 'and', 'or', 'but' (NL conjunctions)
-            result = re.sub(r',\s+(and|or|but)\s+', r' \1 ', result)
+            # Check if this looks like premise-separated logic (e.g., "A → B, A")
+            # Pattern: formula, formula where formulas contain logical operators
+            # Note: Unicode logical operators are safe in character classes without escaping
+            PREMISE_SEPARATOR_PATTERN = r'([A-Z][^,]*(?:[→⇒]|->|[∧∨⊢])[^,]*),\s*([A-Z])'
+            if re.search(PREMISE_SEPARATOR_PATTERN, result):
+                # Replace comma with AND (∧) for premise separation
+                # But only for commas that separate logical expressions
+                result = re.sub(r',\s*(?=[A-Z])', ' ∧ ', result)
+                logger.debug(f"Converted premise-separating commas to AND: {result}")
+            else:
+                # Original behavior for natural language
+                result = re.sub(r',\s+([a-z])', r' \1', result)
+                # Pattern: comma followed by 'and', 'or', 'but' (NL conjunctions)
+                result = re.sub(r',\s+(and|or|but)\s+', r' \1 ', result)
         
         # Step 5: Check if this looks like natural language prose
         # If it has multiple lines with non-formula content, try to extract formulas

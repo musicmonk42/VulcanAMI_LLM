@@ -202,10 +202,10 @@ result = selector.select(
 
 **Example:**
 ```python
-from vulcan.reasoning import language_reasoning
+from vulcan.reasoning import SymbolicReasoner
 
-engine = language_reasoning.LanguageReasoningEngine()
-result = engine.reason({
+reasoner = SymbolicReasoner()
+result = reasoner.reason({
     'query': 'If all humans are mortal, and Socrates is human, is Socrates mortal?',
     'context': {}
 })

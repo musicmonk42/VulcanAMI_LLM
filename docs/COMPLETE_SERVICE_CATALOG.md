@@ -29690,46 +29690,6 @@ Uses ensemble variance as uncertainty ...
   - Generate context key
 - ... and 29 more functions
 
-### `src/vulcan/reasoning/language_reasoning.py`
-
-**Classes (2):**
-
-- **`LanguageReasoningConfig`** (line 58)
-- **`LanguageReasoning`** (line 163)
-  - Neural language generation as a reasoning mode.
-  - Methods: 7
-    - `__init__(self, model, config, safety, world_model, reranker, bias_hook, mask_hook, random_seed)`
-    - `generate(self, hidden_state, generated_tokens, context, strategy)`
-    - `_get_logits_safe(self, hidden_state, tokens)`
-    - `_build_candidate_list(self, logits, limit)`
-    - `_beam_search(self, hidden_state, generated_tokens, logits, effective_top_k, entropy_val)`
-    - ... and 2 more methods
-
-**Functions (13):**
-
-- `_softmax(logits)` (line 85)
-- `_entropy(probs, eps)` (line 94)
-- `_apply_top_k(logits, k)` (line 98)
-- `_apply_top_p(logits, top_p)` (line 108)
-- `_apply_repetition_penalty(logits, generated, penalty, window)` (line 126)
-- `_sample_index(filtered_logits, temperature)` (line 146)
-- `__init__(self, model, config, safety, world_model, reranker, bias_hook, mask_hook, random_seed)` (line 168)
-  - Args:
-    model: object exposing get_logits(hidden_state, tokens_so_far)
-    saf...
-- `generate(self, hidden_state, generated_tokens, context, strategy)` (line 207)
-  - Generate next token with reasoning trace.
-
-Args:
-    hidden_state: last hidden s...
-- `_get_logits_safe(self, hidden_state, tokens)` (line 338)
-- `_build_candidate_list(self, logits, limit)` (line 362)
-- `_beam_search(self, hidden_state, generated_tokens, logits, effective_top_k, entropy_val)` (line 374)
-  - Simplified local beam search over a single step expansion.
-- Select top beam_wid...
-- `_validate_token(self, token_id, context)` (line 414)
-- `_empty_fallback(self)` (line 447)
-
 ### `src/vulcan/reasoning/multimodal_reasoning.py`
 
 **Classes (15):**

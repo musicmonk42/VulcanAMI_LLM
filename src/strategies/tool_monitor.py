@@ -7,6 +7,7 @@ health, and resource usage with real-time tracking and trend analysis.
 
 import json
 import logging
+import os
 import threading
 import time
 from collections import defaultdict, deque
@@ -19,6 +20,10 @@ import numpy as np
 import psutil
 
 logger = logging.getLogger(__name__)
+
+# Environment variable to control monitoring (default: enabled)
+# Set TOOL_MONITOR_ENABLED=false to disable monitoring for resource-constrained environments
+TOOL_MONITOR_ENABLED = os.getenv("TOOL_MONITOR_ENABLED", "true").lower() in ("true", "1", "yes")
 
 
 class MetricType(Enum):
@@ -325,12 +330,17 @@ class ToolMonitor:
         # Resource monitoring
         self.process = psutil.Process()
 
-        # EMERGENCY STABILIZATION: Disable monitoring thread to reduce CPU overhead
-        # Set monitoring flag to False and skip thread creation entirely
-        # FIX MINOR-6: Use WARNING level to make it clear this is intentionally disabled
-        self.monitoring = False
-        self.monitor_thread = None  # Thread not created - no zombie thread
-        logger.warning("ToolMonitor monitoring thread disabled for emergency stabilization")
+        # Monitoring control via environment variable (default: enabled)
+        # Set TOOL_MONITOR_ENABLED=false to disable for resource-constrained environments
+        if TOOL_MONITOR_ENABLED:
+            self.monitoring = True
+            self.monitor_thread = threading.Thread(target=self._monitoring_loop, daemon=True)
+            self.monitor_thread.start()
+            logger.info("ToolMonitor monitoring thread enabled")
+        else:
+            self.monitoring = False
+            self.monitor_thread = None
+            logger.info("ToolMonitor monitoring disabled via TOOL_MONITOR_ENABLED=false")
 
         # Alert thresholds
         self.thresholds = {
@@ -608,12 +618,21 @@ class ToolMonitor:
 
     def _monitoring_loop(self):
         """Background monitoring loop"""
-
-        # EMERGENCY STABILIZATION: Disable polling to reduce CPU overhead
-        # This loop now exits immediately to stop resource monitoring
-        # FIX MINOR-6: Use WARNING level for consistency
-        logger.warning("ToolMonitor monitoring loop disabled for emergency stabilization")
-        return
+        
+        # Check if monitoring is enabled
+        if not self.monitoring:
+            logger.debug("ToolMonitor monitoring loop not started (monitoring disabled)")
+            return
+            
+        logger.info("ToolMonitor monitoring loop started")
+        
+        while self.monitoring:
+            try:
+                self._update_resource_metrics()
+                time.sleep(self.monitoring_interval)
+            except Exception as e:
+                logger.error(f"Error in monitoring loop: {e}")
+                time.sleep(self.monitoring_interval)
 
     def _update_resource_metrics(self):
         """Update system resource metrics"""

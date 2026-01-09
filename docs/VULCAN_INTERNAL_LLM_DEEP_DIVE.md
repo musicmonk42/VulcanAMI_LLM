@@ -194,7 +194,7 @@ The GraphixVulcanLLM is the **main entry point** and orchestrator for the entire
 | `CognitiveLoop` | `src/integration/cognitive_loop.py` | Main generation loop |
 | `HierarchicalContext` | `src/context/hierarchical_context.py` | Memory management |
 | `CausalContext` | `src/context/causal_context.py` | Causal reasoning context |
-| `LanguageReasoning` | `src/vulcan/reasoning/language_reasoning.py` | Language-based reasoning |
+| `SymbolicReasoner` | `src/vulcan/reasoning/symbolic/reasoner.py` | Symbolic/language-based reasoning |
 | `ExplainableGeneration` | `src/generation/explainable_generation.py` | Explanation generation |
 | `GovernedTrainer` | `src/training/governed_trainer.py` | Training with governance |
 | `SelfImprovingTraining` | `src/training/self_improving_training.py` | Autonomous improvement |

@@ -659,22 +659,58 @@ class WarmStartPool:
 
                     elif hasattr(tool_instance, "config"):
                         # Config-based tool without name attribute
+                        # Check if class accepts config parameter
                         config = getattr(tool_instance, "config", {})
-
-                        def factory(n=tool_name, c=config, cls=tool_class):
-                            return cls(n, c)
+                        
+                        # Try to determine if class takes (name, config) or just (config)
+                        sig = inspect.signature(tool_class.__init__)
+                        params = list(sig.parameters.keys())
+                        
+                        # Check if 'config' is a parameter and there are no other required params
+                        # A param is required if it has no default value and isn't self/cls
+                        required_params = [
+                            p for p, v in sig.parameters.items()
+                            if p not in ('self', 'cls') 
+                            and v.default == inspect.Parameter.empty
+                        ]
+                        
+                        if 'config' in params and required_params == ['config']:
+                            def factory(c=config, cls=tool_class):
+                                return cls(config=c)
+                        else:
+                            # Fallback to (name, config) pattern
+                            def factory(n=tool_name, c=config, cls=tool_class):
+                                return cls(n, c)
 
                     else:
                         # Default: try no-arg constructor or use instance as singleton
                         # This handles classes like MathematicalComputationTool that have
                         # self.name but don't take name as a constructor argument
                         try:
-                            # Try creating with no args to test
+                            # First try: no-arg constructor
                             tool_class()
 
                             def factory(cls=tool_class):
                                 return cls()
 
+                        except TypeError:
+                            # TypeError often means missing required args
+                            # Try with empty config dict (common pattern for reasoning tools)
+                            try:
+                                tool_class(config={})
+                                
+                                def factory(cls=tool_class):
+                                    return cls(config={})
+                                    
+                                logger.debug(f"Factory for {tool_name} created with empty config")
+                            except Exception:
+                                # Can't instantiate - use as singleton (not ideal but safe)
+                                logger.warning(
+                                    f"Using {tool_name} as singleton - factory creation failed"
+                                )
+
+                                def factory(inst=tool_instance):
+                                    return inst
                         except Exception:
                             # Can't instantiate - use as singleton (not ideal but safe)
                             logger.warning(

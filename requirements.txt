@@ -57,6 +57,9 @@ cached-property==1.5.2
 cachetools==5.5.0
 # captum 0.7.0 is compatible with numpy 2.x (required for interpretability features)
 captum==0.7.0
+# SHAP and LIME for model interpretability (explainability features)
+shap>=0.42.0
+lime>=0.2.0.1
 catalogue==2.0.10
 causal-learn==0.1.4.3
 Cerberus==1.3.7
