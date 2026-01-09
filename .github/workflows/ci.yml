@@ -247,6 +247,14 @@ jobs:
           echo "POSTGRES_PASSWORD=test_password" >> $GITHUB_ENV
           echo "POSTGRES_DB=test_db" >> $GITHUB_ENV
           echo "PYTHONPATH=${{ github.workspace }}/src:$PYTHONPATH" >> $GITHUB_ENV
+          # Configure test mode to prevent hanging on missing services
+          echo "CI=true" >> $GITHUB_ENV
+          echo "SKIP_LOCAL_LLM=true" >> $GITHUB_ENV
+          echo "SKIP_OPENAI=true" >> $GITHUB_ENV
+          echo "REASONING_MOCK_MODE=true" >> $GITHUB_ENV
+          echo "ARENA_ENABLED=false" >> $GITHUB_ENV
+          echo "TOOL_MONITOR_ENABLED=false" >> $GITHUB_ENV
+          echo "MINIO_ENDPOINT=http://localhost:9000" >> $GITHUB_ENV
 
       - name: Monitor system resources
         run: |
@@ -398,6 +406,13 @@ jobs:
           REDIS_HOST: localhost
           POSTGRES_HOST: localhost
           MINIO_ENDPOINT: http://localhost:9000
+          # Configure test mode to prevent hanging on missing services
+          CI: true
+          SKIP_LOCAL_LLM: true
+          SKIP_OPENAI: true
+          REASONING_MOCK_MODE: true
+          ARENA_ENABLED: false
+          TOOL_MONITOR_ENABLED: false
         run: |
           set -x
           mkdir -p $GITHUB_WORKSPACE/logs
@@ -603,6 +618,13 @@ jobs:
       PERF_MAX_P95_REGRESSION_PCT: '25'
       PERF_MAX_RPS_REGRESSION_PCT: '25'
       PERF_OUTPUT_DIR: 'perf'
+      # Configure test mode to prevent hanging on missing services
+      CI: 'true'
+      SKIP_LOCAL_LLM: 'true'
+      SKIP_OPENAI: 'true'
+      REASONING_MOCK_MODE: 'true'
+      ARENA_ENABLED: 'false'
+      TOOL_MONITOR_ENABLED: 'false'
 
     steps:
       - name: Checkout code
