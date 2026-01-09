@@ -1696,6 +1696,7 @@ class GraphixArena:
                     query_id=_query_id,
                     engine_name=integration_result.reasoning_strategy or query_type,
                     result=result,
+                    # Note: 0.15 is consistent with MIN_REASONING_CONFIDENCE_THRESHOLD in main.py
                     success=integration_result.confidence > 0.15 if integration_result.confidence else False,
                     execution_time_ms=0  # No timing available here
                 )

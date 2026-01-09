@@ -6557,6 +6557,7 @@ async def unified_chat(request: UnifiedChatRequest):
                 query_id=routing_plan.query_id if routing_plan else "unknown",
                 engine_name=str(_get_reasoning_attr(agent_reasoning_output, "reasoning_type")),
                 result=reasoning_results["agent_reasoning"],
+                # Note: 0.15 is consistent with MIN_REASONING_CONFIDENCE_THRESHOLD (defined later in function)
                 success=_engine_confidence > 0.15 if isinstance(_engine_confidence, (int, float)) else False,
                 execution_time_ms=(time.time() - start_time) * 1000
             )
