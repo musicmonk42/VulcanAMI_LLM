@@ -222,7 +222,8 @@ RAW_DATA_DUMP_PATTERNS = frozenset({
     "method:",
     "applicable:",
     "result_dict:",
-    "'error':",  # Dict key format (different from "error:" failure pattern)
+    "'error':",   # Single quote dict key format
+    '"error":',   # Double quote dict key format
     "validation:",
 })
 
