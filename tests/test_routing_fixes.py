@@ -7,8 +7,10 @@ These tests verify fixes for the following issues:
 3. Symbol detection overriding semantic understanding for ethics queries
 4. Creative queries being overridden to philosophical
 5. Agent pool ignoring reasoning integration's tool corrections
+6. Formal logic pattern override bypassing LLM classifier for analogical/causal queries
 """
 
+import os
 import re
 import pytest
 
@@ -698,8 +700,6 @@ class TestFormalLogicPatternOverrideRemoval:
         
         (Note: The math symbol bypass is allowed to remain, only formal logic bypass is removed)
         """
-        import os
-        
         # Find the tool_selector.py file
         tool_selector_paths = [
             'src/vulcan/reasoning/selection/tool_selector.py',
@@ -733,8 +733,6 @@ class TestFormalLogicPatternOverrideRemoval:
         The code should contain a comment explaining why the bypass was removed
         so future developers don't accidentally re-add it.
         """
-        import os
-        
         # Find the tool_selector.py file
         tool_selector_paths = [
             'src/vulcan/reasoning/selection/tool_selector.py',
