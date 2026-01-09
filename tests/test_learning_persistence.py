@@ -228,6 +228,9 @@ class TestSaveState:
         # Clear cache to force new load
         persistence._cached_state = None
         
+        # Reset throttle timer to allow immediate second save
+        persistence._last_disk_save_time = 0.0
+        
         # Second save - should create backup
         state2 = {"tool_weights": {"v2": 0.2}, "concept_library": {}, "contraindications": {}, "metadata": {}}
         persistence.save_state(state2)
@@ -348,15 +351,15 @@ class TestValidation:
 
     def test_negative_weight_floored_on_save(self, persistence):
         """BUG #1 TEST: Weights too negative should be floored to prevent death spiral."""
-        # Attempt to save a weight that would cause death spiral (adjustment < -0.9)
+        # Attempt to save a weight that would cause death spiral (adjustment < -0.5)
         extreme_negative_weights = {"tool": -0.95}  # Would make absolute weight = 0.05
         
         result = persistence.update_tool_weights(extreme_negative_weights)
         assert result is True
         
-        # Should be floored to MIN_TOOL_WEIGHT_VALUE (-0.9)
+        # Should be floored to MIN_TOOL_WEIGHT_VALUE (-0.5)
         loaded = persistence.get_tool_weights()
-        assert loaded["tool"] == -0.9  # Floored to prevent death spiral
+        assert loaded["tool"] == -0.5  # Floored to prevent death spiral
 
     def test_moderate_negative_weight_preserved(self, persistence):
         """BUG #1 TEST: Moderate negative weights should be preserved (they're valid adjustments)."""

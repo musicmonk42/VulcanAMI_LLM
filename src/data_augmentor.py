@@ -499,10 +499,12 @@ class DataAugmentor:
             Augmented proposal
 
         Raises:
-            ValueError: If complexity out of range
+            ValueError: If base graph is invalid or complexity out of range
         """
-        # PERFORMANCE FIX: Use helper to normalize and validate graph
-        base_graph = self.validator.ensure_valid_graph(base_graph, self.validator)
+        # Validate base graph - raise error for invalid input
+        valid, error = self.validator.validate_graph(base_graph)
+        if not valid:
+            raise ValueError(f"Invalid base graph: {error}")
 
         if not (1 <= complexity <= MAX_COMPLEXITY):
             raise ValueError(f"Complexity must be 1-{MAX_COMPLEXITY}, got {complexity}")
