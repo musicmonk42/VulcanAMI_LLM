@@ -2262,7 +2262,7 @@ def main() -> int:
         print(f"  Local LLM: {total_local_usage} calls ({100-openai_percentage:.1f}%)")
         print(f"  OpenAI Fallback: {total_openai_usage} calls ({openai_percentage:.1f}%)")
         
-        if total_timeouts > total_queries * 0.1:
+        if total_queries > 0 and total_timeouts > total_queries * 0.1:
             print(f"\n⚠️  WARNING: High timeout rate detected ({total_timeouts/total_queries*100:.1f}%)")
             print("   Consider increasing the --timeout parameter or investigating system performance.")
         
