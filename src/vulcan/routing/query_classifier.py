@@ -267,17 +267,13 @@ ANALOGICAL_KEYWORDS: FrozenSet[str] = frozenset([
 # of common words. For example:
 # - "mac" matches "machine" → WRONG (philosophical "experience machine" misrouted)
 # - "aes" matches "diseases" → WRONG
-# - "rsa" could match in compound words
 #
 # Solution: Use word-boundary regex matching for these short keywords
 # to prevent false positives from substring matching.
 # ============================================================
 CRYPTO_SHORT_KEYWORDS_NEEDING_BOUNDARY: FrozenSet[str] = frozenset([
     "mac",   # Message Authentication Code - matches "machine", "macintosh"
-    "aes",   # Advanced Encryption Standard - could match in words
-    "rsa",   # RSA algorithm - could match in words
-    "md5",   # MD5 hash - unlikely but kept for consistency
-    "hmac",  # Hash-based MAC - unlikely but kept for consistency
+    "aes",   # Advanced Encryption Standard - could match in words like "diseases"
 ])
 
 # Pre-compiled regex patterns for word-boundary matching of short keywords
@@ -978,6 +974,34 @@ class QueryClassifier:
         self._cache_result(query_hash, default_result)
         return default_result
     
+    def _count_crypto_keywords(self, query_lower: str) -> Tuple[int, int, int]:
+        """
+        Count cryptographic keywords using word-boundary matching for short keywords.
+        
+        This helper method eliminates duplicate keyword counting logic by providing
+        a centralized implementation that handles both short keywords (with word
+        boundaries) and regular keywords.
+        
+        Args:
+            query_lower: Lowercased query string to search
+            
+        Returns:
+            Tuple of (total_count, regular_count, short_boundary_count)
+        """
+        # Count matches from short keywords using word-boundary regex
+        short_crypto_count = sum(
+            1 for pattern in CRYPTO_SHORT_KEYWORD_PATTERNS 
+            if pattern.search(query_lower)
+        )
+        
+        # Count matches from regular keywords (pre-filtered at module level)
+        regular_crypto_count = sum(
+            1 for kw in CRYPTO_KEYWORDS_REGULAR if kw in query_lower
+        )
+        
+        total_count = short_crypto_count + regular_crypto_count
+        return total_count, regular_crypto_count, short_crypto_count
+    
     def _classify_by_keywords(
         self, query_lower: str, query_original: str
     ) -> Optional[QueryClassification]:
@@ -1042,18 +1066,8 @@ class QueryClassifier:
         # like "mac" matching "machine" (experience machine → CRYPTOGRAPHIC instead of PHILOSOPHICAL)
         # =============================================================================
         
-        # Count matches from short keywords using word-boundary regex
-        short_crypto_count = sum(
-            1 for pattern in CRYPTO_SHORT_KEYWORD_PATTERNS 
-            if pattern.search(query_lower)
-        )
-        
-        # Count matches from regular keywords (pre-filtered at module level)
-        regular_crypto_count = sum(
-            1 for kw in CRYPTO_KEYWORDS_REGULAR if kw in query_lower
-        )
-        
-        crypto_count = short_crypto_count + regular_crypto_count
+        # Use helper method to count crypto keywords with word-boundary matching
+        crypto_count, regular_crypto_count, short_crypto_count = self._count_crypto_keywords(query_lower)
         query_has_cryptographic = crypto_count > 0
         
         if query_has_cryptographic:
@@ -1214,16 +1228,8 @@ class QueryClassifier:
                     source="keyword",
                 )
         
-        # Check cryptographic keywords using word-boundary matching for short keywords
-        # (same logic as the primary crypto check earlier)
-        short_crypto_count_2 = sum(
-            1 for pattern in CRYPTO_SHORT_KEYWORD_PATTERNS 
-            if pattern.search(query_lower)
-        )
-        regular_crypto_count_2 = sum(
-            1 for kw in CRYPTO_KEYWORDS_REGULAR if kw in query_lower
-        )
-        crypto_count = short_crypto_count_2 + regular_crypto_count_2
+        # Check cryptographic keywords using word-boundary matching (reuse helper method)
+        crypto_count, regular_crypto_count_2, short_crypto_count_2 = self._count_crypto_keywords(query_lower)
         
         if crypto_count >= 2:  # Require at least 2 crypto keywords
             logger.info(
