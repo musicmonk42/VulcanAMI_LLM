@@ -2787,21 +2787,85 @@ creative generation to a more appropriate engine (language model).
         steps: List[ReasoningStep],
     ) -> ReasoningResult:
         """
-        BUG #5 FIX: Handle self-introspection queries using World Model.
+        BUG #5 & #9 FIX: Handle self-introspection queries using World Model.
         
         This method answers questions about VULCAN itself by consulting
         the World Model's get_self_understanding() API.
+        
+        BUG #9 FIX: Now directly calls get_self_understanding() to get
+        comprehensive self-awareness data including reasoning activity,
+        learning insights, and health metrics.
         """
-        # Consult World Model for self-understanding
+        # BUG #9 FIX: Try to get comprehensive self-understanding
+        self_knowledge = None
+        try:
+            from vulcan.world_model import get_self_understanding
+            if get_self_understanding is not None:
+                self_knowledge = get_self_understanding()
+                logger.info(
+                    f"[PhilosophicalReasoner] BUG #9 FIX: Got self-understanding from World Model: "
+                    f"health={self_knowledge.get('overall_health', 'unknown')}"
+                )
+        except ImportError:
+            logger.debug("[PhilosophicalReasoner] get_self_understanding not available")
+        except Exception as e:
+            logger.debug(f"[PhilosophicalReasoner] get_self_understanding error: {e}")
+        
+        # Also consult World Model for additional perspective
         self_understanding = self._consult_world_model(query, analysis_type="self_introspection")
         
         steps.append(self._create_step(
             chain_id, "self_introspection", ReasoningType.PHILOSOPHICAL,
-            query, {"consulted_world_model": True},
+            query, {"consulted_world_model": True, "got_self_knowledge": self_knowledge is not None},
             0.9, "Consulted World Model for self-understanding"
         ))
         
-        if self_understanding:
+        # BUG #9 FIX: Build comprehensive response using self_knowledge
+        if self_knowledge:
+            # Build explanation from actual self-awareness data
+            reasoning_activity = self_knowledge.get('reasoning_activity', {})
+            learning = self_knowledge.get('learning_insights', {})
+            health = self_knowledge.get('overall_health', 'unknown')
+            health_score = self_knowledge.get('health_score', 0.5)
+            
+            explanation = f"""Self-Introspection via World Model (BUG #9 FIX):
+
+VULCAN is a multi-agent reasoning system with the following current state:
+
+System Health: {health} (score: {health_score:.2f})
+
+Recent Activity:
+- Total queries processed: {reasoning_activity.get('total_queries', 'unknown')}
+- Average confidence: {reasoning_activity.get('avg_confidence', 0):.2f}
+- Engines used: {', '.join(reasoning_activity.get('engines_used', {}).keys()) or 'none recorded'}
+
+Learning Status:
+- Learning system available: {learning.get('available', False)}
+- Performance tracking active: {learning.get('learning_cycles', 0) > 0}
+
+This response comes from VULCAN's internal self-model via get_self_understanding().
+"""
+            return ReasoningResult(
+                conclusion={
+                    'type': 'self_introspection',
+                    'self_knowledge': self_knowledge,
+                    'self_understanding': self_understanding,
+                    'health': health,
+                    'health_score': health_score,
+                },
+                confidence=0.9,  # High confidence when using actual self-model
+                reasoning_type=ReasoningType.PHILOSOPHICAL,
+                evidence=steps,
+                explanation=explanation,
+                uncertainty=0.1,
+                reasoning_chain=self._build_chain(chain_id, steps, query, self_knowledge),
+                metadata={
+                    'method': 'world_model_introspection', 
+                    'world_model_consulted': True,
+                    'self_knowledge_available': True,
+                },
+            )
+        elif self_understanding:
             explanation = f"""Self-Introspection via World Model:
 
 {self_understanding.get('vulcan_perspective', 'VULCAN is a multi-agent reasoning system with specialized engines.')}
