@@ -266,6 +266,14 @@ try:
         get_failure_patterns_for_improvement,
         get_recent_outcomes,
         notify_meta_reasoning_of_event,
+        # NEW: Learning system integration API
+        get_learning_insights,
+        get_tool_performance_history,
+        # NEW: Memory integration API
+        get_memory_access,
+        store_meta_reasoning_insight,
+        retrieve_meta_reasoning_insights,
+        get_self_understanding,
     )
     _system_observer_available = True
 except ImportError as e:
@@ -280,6 +288,12 @@ except ImportError as e:
     get_failure_patterns_for_improvement = None
     get_recent_outcomes = None
     notify_meta_reasoning_of_event = None
+    get_learning_insights = None
+    get_tool_performance_history = None
+    get_memory_access = None
+    store_meta_reasoning_insight = None
+    retrieve_meta_reasoning_insights = None
+    get_self_understanding = None
     _system_observer_available = False
 
 # Try to import additional components if they exist
@@ -403,6 +417,14 @@ __all__ = [
     "get_failure_patterns_for_improvement",
     "get_recent_outcomes",
     "notify_meta_reasoning_of_event",
+    # Learning System Integration API (NEW)
+    "get_learning_insights",
+    "get_tool_performance_history",
+    # Memory Integration API (NEW)
+    "get_memory_access",
+    "store_meta_reasoning_insight",
+    "retrieve_meta_reasoning_insights",
+    "get_self_understanding",
 ]
 
 

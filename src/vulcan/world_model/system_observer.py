@@ -901,3 +901,345 @@ def notify_meta_reasoning_of_event(event_type: str, event_data: Dict[str, Any]) 
                     
     except Exception as e:
         logger.debug(f"Error notifying meta-reasoning of event: {e}")
+
+
+# =============================================================================
+# Learning System Integration API (BUG #3 FIX - Enhanced)
+# =============================================================================
+# These functions provide meta-reasoning access to the learning system's data.
+# This enables SelfImprovementDrive, InternalCritic, etc. to understand what
+# the system has learned and use that knowledge for self-improvement.
+
+def get_learning_insights() -> Dict[str, Any]:
+    """
+    Get insights from the learning system for meta-reasoning.
+    
+    This provides access to tool weight adjustments, which show what the
+    learning system has discovered about tool performance.
+    
+    Returns:
+        Dictionary with tool weights, trends, and recommendations
+    """
+    try:
+        from vulcan.learning import get_learning_system
+        learning = get_learning_system()
+        
+        if not learning:
+            return {'available': False, 'reason': 'Learning system not initialized'}
+        
+        # Get current tool weights
+        tool_weights = {}
+        if hasattr(learning, 'tool_weight_adjustments'):
+            tool_weights = dict(learning.tool_weight_adjustments)
+        
+        # Identify well-performing and poorly-performing tools
+        well_performing = {k: v for k, v in tool_weights.items() if v > 0.01}
+        poorly_performing = {k: v for k, v in tool_weights.items() if v < -0.01}
+        
+        # Get outcome history if available
+        recent_outcomes = []
+        if hasattr(learning, '_recent_outcomes'):
+            recent_outcomes = list(learning._recent_outcomes)[-20:]
+        
+        return {
+            'available': True,
+            'tool_weights': tool_weights,
+            'well_performing_tools': well_performing,
+            'poorly_performing_tools': poorly_performing,
+            'recent_outcomes': recent_outcomes,
+            'recommendations': _generate_learning_recommendations(tool_weights),
+        }
+        
+    except Exception as e:
+        logger.debug(f"Error getting learning insights: {e}")
+        return {'available': False, 'reason': str(e)}
+
+
+def _generate_learning_recommendations(tool_weights: Dict[str, float]) -> List[str]:
+    """Generate recommendations based on learning data."""
+    recommendations = []
+    
+    for tool, weight in tool_weights.items():
+        if weight < -0.05:
+            recommendations.append(
+                f"Tool '{tool}' has accumulated negative weight ({weight:.3f}). "
+                f"Consider investigating why it's failing."
+            )
+        elif weight > 0.05:
+            recommendations.append(
+                f"Tool '{tool}' is performing well ({weight:.3f}). "
+                f"Prioritize for similar queries."
+            )
+    
+    if not recommendations:
+        recommendations.append("No significant learning patterns detected yet.")
+    
+    return recommendations
+
+
+def get_tool_performance_history(tool_name: str) -> Dict[str, Any]:
+    """
+    Get detailed performance history for a specific tool.
+    
+    This enables meta-reasoning to understand WHY a tool is performing
+    well or poorly, not just THAT it is.
+    
+    Args:
+        tool_name: Name of the tool to analyze
+        
+    Returns:
+        Dictionary with performance metrics and history
+    """
+    result = {
+        'tool': tool_name,
+        'weight_adjustment': 0.0,
+        'recent_executions': [],
+        'success_rate': 0.0,
+        'avg_confidence': 0.0,
+    }
+    
+    # Get weight from learning system
+    try:
+        from vulcan.learning import get_learning_system
+        learning = get_learning_system()
+        if learning and hasattr(learning, 'get_tool_weight_adjustment'):
+            result['weight_adjustment'] = learning.get_tool_weight_adjustment(tool_name)
+    except Exception as e:
+        logger.debug(f"Error getting tool weight: {e}")
+    
+    # Get execution history from SystemObserver
+    observer = get_system_observer()
+    if observer:
+        executions = [
+            e for e in observer.engine_history
+            if e.event_type == EventType.ENGINE_RESULT
+            and e.data.get('engine') == tool_name
+        ][-50:]  # Last 50 executions
+        
+        if executions:
+            successes = sum(1 for e in executions if e.data.get('success', False))
+            confidences = [e.data.get('confidence', 0.0) for e in executions]
+            
+            result['recent_executions'] = len(executions)
+            result['success_rate'] = successes / len(executions)
+            result['avg_confidence'] = sum(confidences) / len(confidences) if confidences else 0.0
+    
+    return result
+
+
+# =============================================================================
+# Memory Integration API (NEW - Meta-reasoning memory access)
+# =============================================================================
+# These functions provide meta-reasoning components with access to the memory
+# system, enabling them to store and retrieve learned patterns, insights, and
+# self-improvement history.
+
+def get_memory_access() -> Optional[Any]:
+    """
+    Get access to the memory system for meta-reasoning components.
+    
+    This allows MotivationalIntrospection, SelfImprovementDrive, InternalCritic
+    to store and retrieve their own memories about past performance, insights,
+    and self-improvement attempts.
+    
+    Returns:
+        Memory system instance or None if unavailable
+    """
+    observer = get_system_observer()
+    if not observer or not observer.world_model:
+        return None
+    
+    wm = observer.world_model
+    
+    # Try to get hierarchical memory from world model
+    if hasattr(wm, 'long_term_memory') and wm.long_term_memory:
+        return wm.long_term_memory
+    
+    # Try to get from agent pool if world model doesn't have it
+    try:
+        from vulcan.orchestrator.agent_pool import get_global_agent_pool
+        pool = get_global_agent_pool()
+        if pool and hasattr(pool, 'long_term_memory'):
+            return pool.long_term_memory
+    except Exception:
+        pass
+    
+    return None
+
+
+def store_meta_reasoning_insight(
+    insight_type: str,
+    content: Dict[str, Any],
+    importance: float = 0.5
+) -> bool:
+    """
+    Store an insight from meta-reasoning for future reference.
+    
+    This allows meta-reasoning to remember what it has learned about itself,
+    including:
+    - Patterns of failure that it identified
+    - Self-improvement attempts and their outcomes
+    - Strategies that worked or didn't work
+    
+    Args:
+        insight_type: Type of insight ('failure_pattern', 'improvement_success', etc.)
+        content: The insight data to store
+        importance: How important this insight is (0.0 to 1.0)
+        
+    Returns:
+        True if stored successfully, False otherwise
+    """
+    memory = get_memory_access()
+    if not memory:
+        logger.debug("Memory not available for storing insight")
+        return False
+    
+    try:
+        # Create a memory entry
+        from vulcan.memory import Memory, MemoryType
+        
+        memory_entry = Memory(
+            content=content,
+            memory_type=MemoryType.SEMANTIC,
+            importance=importance,
+            metadata={
+                'source': 'meta_reasoning',
+                'insight_type': insight_type,
+                'timestamp': time.time(),
+            }
+        )
+        
+        if hasattr(memory, 'store'):
+            memory.store(memory_entry)
+            logger.debug(f"Stored meta-reasoning insight: {insight_type}")
+            return True
+            
+    except Exception as e:
+        logger.debug(f"Error storing insight: {e}")
+    
+    return False
+
+
+def retrieve_meta_reasoning_insights(
+    insight_type: Optional[str] = None,
+    limit: int = 10
+) -> List[Dict[str, Any]]:
+    """
+    Retrieve stored insights from meta-reasoning.
+    
+    This allows meta-reasoning to recall what it has learned about itself,
+    enabling continuous self-improvement.
+    
+    Args:
+        insight_type: Filter by insight type, or None for all
+        limit: Maximum number of insights to retrieve
+        
+    Returns:
+        List of stored insights
+    """
+    memory = get_memory_access()
+    if not memory:
+        return []
+    
+    try:
+        from vulcan.memory import MemoryQuery
+        
+        # Build query
+        query = MemoryQuery(
+            query_type="semantic",
+            filters={'source': 'meta_reasoning'},
+            limit=limit
+        )
+        
+        if insight_type:
+            query.filters['insight_type'] = insight_type
+        
+        if hasattr(memory, 'query'):
+            results = memory.query(query)
+            if results:
+                return [
+                    {
+                        'type': r.metadata.get('insight_type'),
+                        'content': r.content,
+                        'timestamp': r.metadata.get('timestamp'),
+                        'importance': r.importance,
+                    }
+                    for r in results
+                ]
+                
+    except Exception as e:
+        logger.debug(f"Error retrieving insights: {e}")
+    
+    return []
+
+
+def get_self_understanding() -> Dict[str, Any]:
+    """
+    Get a comprehensive self-understanding summary for meta-reasoning.
+    
+    This combines data from:
+    - SystemObserver (recent reasoning activity)
+    - Learning system (tool weights, performance trends)
+    - Memory system (stored insights)
+    
+    This is the primary API for meta-reasoning to understand "who am I
+    and how am I doing?".
+    
+    Returns:
+        Dictionary with comprehensive self-understanding data
+    """
+    understanding = {
+        'timestamp': time.time(),
+        'reasoning_activity': {},
+        'learning_insights': {},
+        'stored_insights': [],
+        'overall_health': 'unknown',
+    }
+    
+    # Get reasoning activity summary
+    activity = get_recent_reasoning_activity(limit=100)
+    if activity:
+        engines_used = {}
+        for a in activity:
+            engine = a.get('engine', 'unknown')
+            if engine not in engines_used:
+                engines_used[engine] = {'count': 0, 'successes': 0, 'confidences': []}
+            engines_used[engine]['count'] += 1
+            if a.get('success'):
+                engines_used[engine]['successes'] += 1
+            engines_used[engine]['confidences'].append(a.get('confidence', 0))
+        
+        understanding['reasoning_activity'] = {
+            'total_queries': len(activity),
+            'engines_used': engines_used,
+            'avg_confidence': sum(a.get('confidence', 0) for a in activity) / len(activity) if activity else 0,
+        }
+    
+    # Get learning insights
+    understanding['learning_insights'] = get_learning_insights()
+    
+    # Get stored meta-reasoning insights
+    understanding['stored_insights'] = retrieve_meta_reasoning_insights(limit=20)
+    
+    # Calculate overall health
+    health_score = 0.5  # Neutral starting point
+    
+    if understanding['reasoning_activity'].get('avg_confidence', 0) > 0.5:
+        health_score += 0.2
+    elif understanding['reasoning_activity'].get('avg_confidence', 0) < 0.3:
+        health_score -= 0.2
+    
+    learning = understanding['learning_insights']
+    if learning.get('available') and learning.get('poorly_performing_tools'):
+        health_score -= 0.1 * len(learning['poorly_performing_tools'])
+    
+    if health_score >= 0.7:
+        understanding['overall_health'] = 'good'
+    elif health_score >= 0.4:
+        understanding['overall_health'] = 'moderate'
+    else:
+        understanding['overall_health'] = 'needs_attention'
+    
+    understanding['health_score'] = max(0.0, min(1.0, health_score))
+    
+    return understanding
