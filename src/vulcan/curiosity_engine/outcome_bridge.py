@@ -79,6 +79,7 @@ Error Handling:
 import asyncio
 import logging
 import os
+import re
 import sqlite3
 import statistics as stats_module
 import tempfile
@@ -213,15 +214,15 @@ ANSWER_QUALITY_FAILURE_PATTERNS = frozenset({
 # NOTE: We removed "confidence: 0." patterns because they cause false positives
 # (e.g. "confidence: 0.85" contains "confidence: 0." as substring).
 # Low confidence is now detected via the explicit proven: false check instead.
+# NOTE: "error:" is in ANSWER_QUALITY_FAILURE_PATTERNS (immediate fail)
+# so we don't need it here for the 2+ pattern threshold check.
 RAW_DATA_DUMP_PATTERNS = frozenset({
     "proven:",
     "proof:",
     "method:",
     "applicable:",
     "result_dict:",
-    # Error result patterns
-    "error:",
-    "'error':",
+    "'error':",  # Dict key format (different from "error:" failure pattern)
     "validation:",
 })
 
@@ -319,8 +320,8 @@ def assess_answer_quality(
             return "failed"
         # Try to extract confidence from response text if not provided
         # Pattern: "confidence: X.XX" or "confidence:X.XX"
-        import re
-        conf_match = re.search(r'confidence[:\s]+([0-9.]+)', response_lower)
+        # Use \d+(?:\.\d+)? to match valid decimal numbers only
+        conf_match = re.search(r'confidence[:\s]+(\d+(?:\.\d+)?)', response_lower)
         if conf_match:
             try:
                 extracted_conf = float(conf_match.group(1))
