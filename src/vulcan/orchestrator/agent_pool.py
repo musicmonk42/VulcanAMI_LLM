@@ -3900,6 +3900,20 @@ class AgentPoolManager:
             "cryptographic": ReasoningType.SYMBOLIC,
             "cryptographic_task": ReasoningType.SYMBOLIC,
             "crypto": ReasoningType.SYMBOLIC,  # Shorthand
+            # Bug #3 FIX: Add creative task type mappings
+            # Creative queries like "write a poem" should route to PHILOSOPHICAL reasoning
+            # (which can handle creative/imaginative content) instead of falling back to SYMBOLIC
+            # which produces literal/technical responses inappropriate for creative requests.
+            "creative": ReasoningType.PHILOSOPHICAL,  # Creative -> philosophical reasoning
+            "creative_task": ReasoningType.PHILOSOPHICAL,  # Creative tasks use philosophical
+            "poetry": ReasoningType.PHILOSOPHICAL,  # Poetry requests
+            "poetry_task": ReasoningType.PHILOSOPHICAL,  # Poetry tasks
+            "writing": ReasoningType.PHILOSOPHICAL,  # Writing tasks
+            "writing_task": ReasoningType.PHILOSOPHICAL,  # Writing tasks
+            "artistic": ReasoningType.PHILOSOPHICAL,  # Artistic content
+            "artistic_task": ReasoningType.PHILOSOPHICAL,  # Artistic tasks
+            "imaginative": ReasoningType.PHILOSOPHICAL,  # Imaginative content
+            "imaginative_task": ReasoningType.PHILOSOPHICAL,  # Imaginative tasks
         }
         
         # Note: Default to SYMBOLIC instead of UNKNOWN for unrecognized task types

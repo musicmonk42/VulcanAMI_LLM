@@ -293,7 +293,9 @@ class PortfolioExecutor:
     # to ensure all query types route through VULCAN reasoning, not OpenAI directly.
     TOOL_FALLBACKS: Dict[str, List[str]] = {
         'philosophical': ['world_model', 'symbolic'],  # Philosophical → world_model (mode='philosophical')
-        'creative': ['world_model', 'symbolic'],  # Creative → world_model (mode='creative')
+        # Bug #3 FIX: Creative should fallback to philosophical (generates content), not world_model
+        # world_model only handles self-introspection metadata, philosophical generates creative conclusions
+        'creative': ['philosophical', 'symbolic'],  # Creative → philosophical (generates creative content)
         'cryptographic': ['symbolic', 'mathematical'],  # Crypto falls back to symbolic
         'analogical': ['symbolic', 'probabilistic'],  # Analogical falls back to symbolic
         'causal': ['probabilistic', 'symbolic'],  # Causal falls back to probabilistic

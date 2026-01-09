@@ -200,6 +200,20 @@ def extract_math_expression(query: str) -> Optional[str]:
             logger.debug(f"[MathTool] Note: Extracted via Unicode pattern: {extracted}")
             return extracted
     
+    # Bug #2 FIX: Pattern 1a - ∑(expression) from index=lower to upper
+    # Matches: "∑(2k-1) from k=1 to n"
+    sum_from_pattern = r'∑\s*\(([^)]+)\)\s+from\s+(\w+)\s*=\s*(\d+)\s+to\s+(\w+)'
+    match = re.search(sum_from_pattern, query, re.IGNORECASE)
+    if match:
+        expr, index, lower, upper = match.groups()
+        # Convert expression to SymPy-compatible format
+        expr_clean = expr.strip()
+        expr_clean = expr_clean.replace('−', '-')  # Unicode minus to ASCII
+        expr_clean = re.sub(r'(\d)([a-z])', r'\1*\2', expr_clean)  # 2k → 2*k
+        result = f"summation({expr_clean}, ({index}, {lower}, {upper}))"
+        logger.debug(f"[MathTool] Bug #2 FIX: Converted ∑(expr) from pattern to: {result}")
+        return result
+    
     # Note: Pattern 1b - Natural language sum/product
     # Matches: "sum from k=1 to n of (2k-1)"
     natural_sum_pattern = r'(?:sum(?:mation)?|product)\s+(?:from\s+)?(\w+)\s*=\s*(\d+)\s+to\s+(\w+)\s+(?:of\s+)?(.+?)(?:\.|$|Then|Task)'
@@ -1088,6 +1102,20 @@ result = simplify(integral)
                 # Convert to SymPy format (k → k, − → -)
                 expr = expr.replace('−', '-')
                 expr = re.sub(r'(\d)([a-z])', r'\1*\2', expr)  # 2k → 2*k
+                return self._templates.summation(expr, index, lower, upper)
+            
+            # Bug #2 FIX Pattern 1.5: ∑(expression) from index=lower to upper
+            # Handles queries like: "Compute ∑(2k-1) from k=1 to n"
+            sum_match1_5 = re.search(r'∑\s*\(([^)]+)\)\s+from\s+(\w+)\s*=\s*(\d+)\s+to\s+(\w+)', query, re.IGNORECASE)
+            if sum_match1_5:
+                expr = sum_match1_5.group(1).strip()  # e.g., "2k-1"
+                index = sum_match1_5.group(2)  # e.g., "k"
+                lower = sum_match1_5.group(3)  # e.g., "1"
+                upper = sum_match1_5.group(4)  # e.g., "n"
+                # Convert to SymPy format (− → -, 2k → 2*k)
+                expr = expr.replace('−', '-')
+                expr = re.sub(r'(\d)([a-z])', r'\1*\2', expr)  # 2k → 2*k
+                logger.info(f"[MathTool] Bug #2 FIX: Matched ∑(expr) from {index}={lower} to {upper} pattern: expr={expr}")
                 return self._templates.summation(expr, index, lower, upper)
             
             # Pattern 2: sum from k=lower to upper of expression
