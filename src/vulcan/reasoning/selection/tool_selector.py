@@ -4598,17 +4598,20 @@ class ToolSelector:
                         return final_result
 
             # ================================================================
-            # Note: Check if QueryRouter already selected tools
-            # If routing_plan.tools is provided for a typed fast-path (e.g., MATH-FAST-PATH),
-            # use those tools directly instead of running SemanticBoost/bandit selection.
-            # This prevents ToolSelector from overriding the router's intelligent selection.
+            # BUG #6 FIX: Router suggestions should be INPUT to selection, not override
             # ================================================================
+            # Previously: Router pre-selected tools completely bypassed SemanticBoost
+            # Now: Router suggestions are HIGH-WEIGHT candidates that still go through
+            # the normal selection flow (SemanticBoost, bandit, etc.)
+            # 
+            # Priority order (BUG #6 FIX):
+            # 1. SemanticBoost (learned from success patterns) - HIGHEST
+            # 2. LLM Classifier (understands query semantics)
+            # 3. Router keywords (suggestion only, not override) - LOWEST
+            # ================================================================
+            router_suggestions = []
             if hasattr(request, 'context') and isinstance(request.context, dict):
                 # Try multiple sources for router-selected tools:
-                # 1. routing_plan.tools (from QueryRouter's RoutingPlan)
-                # 2. routing_plan_tools (directly set)
-                # 3. selected_tools (alternative key)
-                # 4. routing_plan dict with 'tools' key
                 routing_plan = request.context.get('routing_plan', {})
                 routing_tools = None
                 task_type = request.context.get('task_type') or request.context.get('query_type')
@@ -4619,11 +4622,10 @@ class ToolSelector:
                     logger.debug(f"[ToolSelector] Found tools in routing_plan dict: {routing_tools}")
                 
                 # Source 2: Direct routing_plan_tools, router_tools, or selected_tools keys
-                # FIX #2: Added 'router_tools' which is set by reasoning_integration.py
                 if not routing_tools:
                     routing_tools = (
                         request.context.get('routing_plan_tools') or 
-                        request.context.get('router_tools') or  # FIX #2: Check for router_tools key
+                        request.context.get('router_tools') or
                         request.context.get('selected_tools')
                     )
                 
@@ -4636,43 +4638,20 @@ class ToolSelector:
                     routing_tools = routing_plan.selected_tools
                 
                 if routing_tools and isinstance(routing_tools, (list, tuple)) and len(routing_tools) > 0:
-                    # Router has already made a selection - use it directly
-                    logger.info(
-                        f"[ToolSelector] Using QueryRouter's pre-selected tools: {routing_tools} "
-                        f"for task_type={task_type} (bypassing SemanticBoost/bandit selection)"
-                    )
-                    # Filter to only include available tools (using constant)
+                    # BUG #6 FIX: Store router suggestions as hints, don't bypass selection
                     available_tools = getattr(self, 'available_tools', None) or DEFAULT_AVAILABLE_TOOLS
-                    valid_routing_tools = [t for t in routing_tools if t in available_tools]
+                    router_suggestions = [t for t in routing_tools if t in available_tools]
                     
-                    if valid_routing_tools:
-                        # Execute with router's selected tools directly
-                        # Create candidates from router's selection
-                        candidates = [
-                            {'tool': tool, 'utility': 1.0 - (i * 0.1), 'source': 'query_router'}
-                            for i, tool in enumerate(valid_routing_tools)
-                        ]
-                        
-                        # Skip to execution with these candidates
-                        features = self._extract_features(request)
-                        request.features = features
-                        
-                        strategy = self._select_strategy(request, candidates)
-                        execution_result = self._execute_portfolio(request, candidates, strategy)
-                        final_result = self._postprocess_result(request, execution_result, start_time)
-                        
-                        # Update learning with router attribution
-                        if self.config.get("learning_enabled"):
-                            self._update_learning(request, final_result)
-                        
-                        # Cache result
-                        if self.config.get("cache_enabled"):
-                            self._cache_result(request, final_result)
-                        
-                        self._update_statistics(final_result)
-                        
-                        logger.info(f"[ToolSelector] Executed with router's tools: {valid_routing_tools}")
-                        return final_result
+                    if router_suggestions:
+                        logger.info(
+                            f"[ToolSelector] BUG #6 FIX: Router suggests tools: {router_suggestions} "
+                            f"for task_type={task_type} (will be used as weighted hints, not bypassing selection)"
+                        )
+                        # Store in context for use during candidate generation
+                        if not hasattr(request, 'context') or not isinstance(request.context, dict):
+                            request.context = {}
+                        request.context['router_suggestions'] = router_suggestions
+                        request.context['router_suggestion_boost'] = 0.3  # Moderate boost, not override
 
             # Step 1: Admission control
             admitted, admission_info = self._check_admission(request)
@@ -5156,6 +5135,24 @@ class ToolSelector:
                     "cost": cost_dist,
                     "prior": prior,
                 })
+            
+            # BUG #6 FIX: Apply router suggestion boost (as ONE input, not override)
+            # This gives router suggestions a moderate boost, but SemanticBoost results
+            # still have priority if they score higher
+            if hasattr(request, 'context') and isinstance(request.context, dict):
+                router_suggestions = request.context.get('router_suggestions', [])
+                router_boost = request.context.get('router_suggestion_boost', 0.2)
+                
+                if router_suggestions:
+                    for candidate in candidates:
+                        if candidate['tool'] in router_suggestions:
+                            original_utility = candidate['utility']
+                            candidate['utility'] += router_boost
+                            candidate['router_boosted'] = True
+                            logger.debug(
+                                f"[ToolSelector] BUG #6 FIX: Router boost applied to {candidate['tool']}: "
+                                f"{original_utility:.3f} -> {candidate['utility']:.3f}"
+                            )
             
             candidates.sort(key=lambda x: x["utility"], reverse=True)
             
