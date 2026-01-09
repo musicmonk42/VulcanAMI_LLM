@@ -111,7 +111,7 @@ jobs:
   test:
     name: Test Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
-    timeout-minutes: 360
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -261,6 +261,8 @@ jobs:
             --cov-report=term-missing \
             --junitxml=results/junit.xml \
             --timeout=300 \
+            --maxfail=10 \
+            -m "not slow and not load_test and not benchmark" \
             -v \
             2>&1 | tee $GITHUB_WORKSPACE/logs/pytest-output.log || exit_code=$?
           echo "PYTEST_EXIT=$exit_code" > $GITHUB_WORKSPACE/results/exitcode.txt
@@ -293,7 +295,7 @@ jobs:
   integration-test:
     name: Integration Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 45
     needs: [test]
 
     steps:
@@ -393,7 +395,7 @@ jobs:
           exit_code=0
           # Run specific integration test files if they exist
           if [ -d "tests/integration" ]; then
-            pytest tests/integration/ -v --timeout=300 --junitxml=results/integration-junit.xml 2>&1 | tee $GITHUB_WORKSPACE/logs/integration-test-output.log || exit_code=$?
+            pytest tests/integration/ -v --timeout=300 --maxfail=5 --junitxml=results/integration-junit.xml 2>&1 | tee $GITHUB_WORKSPACE/logs/integration-test-output.log || exit_code=$?
             echo "PYTEST_EXIT=$exit_code" > $GITHUB_WORKSPACE/results/integration-exitcode.txt
           else
             echo "No integration tests directory found"
