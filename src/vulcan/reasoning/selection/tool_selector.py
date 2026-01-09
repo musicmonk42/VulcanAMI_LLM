@@ -3460,16 +3460,53 @@ class ToolSelector:
         Math symbols: ∑ ∫ ∂ ∇ ∏ √ ≤ ≥ ≠ ≈ ± × ÷ ∞
         Logic symbols: → ∧ ∨ ¬ ∀ ∃ ⊢ ⊨ ↔ ⇒ ⇔
         
+        FIX (Issue #3): Added semantic context check to prevent routing ethics/philosophical
+        queries to mathematical engine just because they contain mathematical notation.
+        Example: "Multimodal Reasoning (cross-constraints) MM1 — Math + logic + ethics + policy"
+        contains mathematical notation but is fundamentally an ethics/policy question.
+        
         Args:
             query: The query text
             
         Returns:
-            True if query contains math symbols (not logic symbols)
+            True if query contains math symbols AND is not semantically ethics/philosophical
         """
         if not query or not isinstance(query, str):
             return False
         
         query_lower = query.lower()
+        
+        # =================================================================
+        # FIX (Issue #3): Check semantic context BEFORE symbol detection
+        # =================================================================
+        # Queries about ethics, policy, philosophy, or cross-domain reasoning
+        # should NOT be routed to mathematical engine even if they contain
+        # mathematical symbols or notation. The presence of symbols in an
+        # academic/philosophical context doesn't make it a math problem.
+        #
+        # Example that was broken:
+        #   "Multimodal Reasoning (cross-constraints) MM1 — Math + logic + ethics + policy"
+        #   - Contains mathematical notation (𝐸, 𝑢(𝑡), Greek letters)
+        #   - BUT is fundamentally about ethics/policy reasoning
+        #   - Should route to world_model/philosophical, NOT mathematical
+        # =================================================================
+        ethics_philosophy_keywords = [
+            'ethics', 'ethical', 'policy', 'moral', 'morality', 'philosophy',
+            'philosophical', 'value', 'values', 'constraint', 'constraints',
+            'multimodal reasoning', 'cross-constraints', 'cross-domain',
+            'reasoning about', 'ethical implications', 'policy implications',
+        ]
+        
+        # Count ethics/philosophy keywords
+        ethics_count = sum(1 for kw in ethics_philosophy_keywords if kw in query_lower)
+        
+        # If query has 2+ ethics/philosophy keywords, it's likely NOT a pure math problem
+        if ethics_count >= 2:
+            logger.debug(
+                f"[ToolSelector] Query has {ethics_count} ethics/philosophy keywords - "
+                f"NOT detecting as math despite symbols"
+            )
+            return False
         
         # Pure math operators (NOT logic)
         math_symbols = ['∑', '∫', '∂', '∇', '∏', '√', '≤', '≥', '≠', '≈', '±', '×', '÷', '∞']
