@@ -260,6 +260,12 @@ try:
         EventType,
         get_system_observer,
         initialize_system_observer,
+        # BUG #3 FIX: Meta-reasoning integration API
+        get_recent_reasoning_activity,
+        get_reasoning_success_rates,
+        get_failure_patterns_for_improvement,
+        get_recent_outcomes,
+        notify_meta_reasoning_of_event,
     )
     _system_observer_available = True
 except ImportError as e:
@@ -269,6 +275,11 @@ except ImportError as e:
     EventType = None
     get_system_observer = None
     initialize_system_observer = None
+    get_recent_reasoning_activity = None
+    get_reasoning_success_rates = None
+    get_failure_patterns_for_improvement = None
+    get_recent_outcomes = None
+    notify_meta_reasoning_of_event = None
     _system_observer_available = False
 
 # Try to import additional components if they exist
@@ -386,6 +397,12 @@ __all__ = [
     "EventType",
     "get_system_observer",
     "initialize_system_observer",
+    # Meta-Reasoning Integration API (BUG #3 FIX)
+    "get_recent_reasoning_activity",
+    "get_reasoning_success_rates",
+    "get_failure_patterns_for_improvement",
+    "get_recent_outcomes",
+    "notify_meta_reasoning_of_event",
 ]
 
 

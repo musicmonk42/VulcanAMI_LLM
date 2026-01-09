@@ -316,6 +316,19 @@ class SystemObserver:
                 except Exception as e:
                     logger.debug(f"Could not update causal graph: {e}")
             
+            # BUG #3 FIX: Notify meta-reasoning of significant events
+            # This enables MotivationalIntrospection, SelfImprovementDrive, InternalCritic
+            # to be aware of what's happening in reasoning execution
+            if confidence < 0.3 or not success:
+                notify_meta_reasoning_of_event('engine_result', {
+                    'query_id': query_id,
+                    'engine': engine_name,
+                    'confidence': confidence,
+                    'success': success,
+                    'event_type': 'low_confidence' if confidence < 0.3 else 'failure',
+                    'execution_time_ms': execution_time_ms
+                })
+            
             logger.debug(
                 f"Engine result observed: {engine_name} "
                 f"(confidence={confidence:.2f}, success={success})"
@@ -395,6 +408,16 @@ class SystemObserver:
                     )
                 except Exception as e:
                     logger.debug(f"Could not update causal graph for validation failure: {e}")
+            
+            # BUG #3 FIX: Notify meta-reasoning of validation failure
+            # This is critical for SelfImprovementDrive to identify what needs fixing
+            notify_meta_reasoning_of_event('validation_failure', {
+                'query_id': query_id,
+                'engine': engine_name,
+                'query_type': query_type,
+                'reason': reason,
+                'query': query[:200] if query else '',
+            })
             
             logger.warning(
                 f"Validation failure observed: {engine_name} on {query_type} - {reason}"
@@ -695,3 +718,186 @@ def initialize_system_observer(world_model: "WorldModel") -> SystemObserver:
     _system_observer = SystemObserver(world_model)
     logger.info("Global SystemObserver initialized")
     return _system_observer
+
+
+# =============================================================================
+# Meta-Reasoning Integration API
+# =============================================================================
+# These functions provide access to reasoning execution data for meta-reasoning
+# components (MotivationalIntrospection, SelfImprovementDrive, InternalCritic, etc.)
+# This enables the "self" components to know what reasoning is happening.
+
+def get_recent_reasoning_activity(limit: int = 50) -> List[Dict[str, Any]]:
+    """
+    Get recent reasoning activity for meta-reasoning analysis.
+    
+    This is the primary API for meta-reasoning components to understand
+    what reasoning engines have been doing.
+    
+    Args:
+        limit: Maximum number of events to return
+        
+    Returns:
+        List of recent reasoning events with engine, confidence, success, etc.
+    """
+    observer = get_system_observer()
+    if not observer:
+        return []
+    
+    events = []
+    for event in list(observer.engine_history)[-limit:]:
+        if event.event_type in (EventType.ENGINE_RESULT, EventType.ENGINE_EXECUTION):
+            events.append({
+                'timestamp': event.timestamp,
+                'query_id': event.query_id,
+                'engine': event.data.get('engine'),
+                'confidence': event.data.get('confidence', 0.0),
+                'success': event.data.get('success', False),
+                'execution_time_ms': event.data.get('execution_time_ms', 0),
+                'reasoning_type': event.data.get('reasoning_type'),
+            })
+    
+    return events
+
+
+def get_reasoning_success_rates() -> Dict[str, Dict[str, float]]:
+    """
+    Get success rates by engine for meta-reasoning evaluation.
+    
+    Enables SelfImprovementDrive and InternalCritic to identify
+    which reasoning engines are performing poorly.
+    
+    Returns:
+        Dictionary mapping engine name to success metrics
+    """
+    observer = get_system_observer()
+    if not observer:
+        return {}
+    
+    engine_stats = {}
+    for event in observer.engine_history:
+        if event.event_type == EventType.ENGINE_RESULT:
+            engine = event.data.get('engine', 'unknown')
+            if engine not in engine_stats:
+                engine_stats[engine] = {'total': 0, 'successes': 0, 'confidences': []}
+            
+            engine_stats[engine]['total'] += 1
+            if event.data.get('success', False):
+                engine_stats[engine]['successes'] += 1
+            engine_stats[engine]['confidences'].append(event.data.get('confidence', 0.0))
+    
+    # Compute rates
+    result = {}
+    for engine, stats in engine_stats.items():
+        total = stats['total']
+        confidences = stats['confidences']
+        result[engine] = {
+            'success_rate': stats['successes'] / total if total > 0 else 0.0,
+            'avg_confidence': sum(confidences) / len(confidences) if confidences else 0.0,
+            'total_executions': total,
+        }
+    
+    return result
+
+
+def get_failure_patterns_for_improvement() -> List[Dict[str, Any]]:
+    """
+    Get validation failure patterns for self-improvement targeting.
+    
+    This helps SelfImprovementDrive identify what needs fixing.
+    
+    Returns:
+        List of failure patterns with engine, query_type, reason, count
+    """
+    observer = get_system_observer()
+    if not observer:
+        return []
+    
+    return observer.get_validation_failure_patterns()
+
+
+def get_recent_outcomes(limit: int = 20) -> List[Dict[str, Any]]:
+    """
+    Get recent query outcomes for meta-reasoning reflection.
+    
+    Enables MotivationalIntrospection to reflect on what happened.
+    
+    Args:
+        limit: Maximum outcomes to return
+        
+    Returns:
+        List of recent outcomes with source, confidence, user feedback
+    """
+    observer = get_system_observer()
+    if not observer:
+        return []
+    
+    outcomes = []
+    for event in list(observer.outcome_history)[-limit:]:
+        outcomes.append({
+            'timestamp': event.timestamp,
+            'query_id': event.query_id,
+            'source': event.data.get('source'),
+            'confidence': event.data.get('confidence', 0.0),
+            'response_time_ms': event.data.get('response_time_ms', 0),
+            'user_rating': event.data.get('user_rating'),
+            'user_satisfied': event.data.get('user_satisfied'),
+        })
+    
+    return outcomes
+
+
+def notify_meta_reasoning_of_event(event_type: str, event_data: Dict[str, Any]) -> None:
+    """
+    Notify meta-reasoning components of a significant event.
+    
+    This is called by SystemObserver when important events occur,
+    allowing meta-reasoning to react in real-time.
+    
+    Args:
+        event_type: Type of event ('low_confidence', 'failure', 'success_streak', etc.)
+        event_data: Event details
+    """
+    observer = get_system_observer()
+    if not observer or not observer.world_model:
+        return
+    
+    wm = observer.world_model
+    
+    try:
+        # Notify SelfImprovementDrive of potential improvement opportunities
+        if hasattr(wm, 'self_improvement_drive') and wm.self_improvement_drive:
+            if event_type in ('validation_failure', 'low_confidence', 'repeated_failure'):
+                # This could trigger improvement analysis
+                if hasattr(wm.self_improvement_drive, 'record_failure_event'):
+                    wm.self_improvement_drive.record_failure_event(event_data)
+        
+        # Notify InternalCritic for evaluation
+        if hasattr(wm, 'internal_critic') and wm.internal_critic:
+            if event_type in ('engine_result', 'outcome'):
+                if hasattr(wm.internal_critic, 'observe_execution'):
+                    wm.internal_critic.observe_execution(event_data)
+        
+        # Notify ValidationTracker
+        if hasattr(wm, 'validation_tracker') and wm.validation_tracker:
+            if event_type == 'validation_failure':
+                if hasattr(wm.validation_tracker, 'record_validation'):
+                    wm.validation_tracker.record_validation(
+                        proposal_id=event_data.get('query_id', 'unknown'),
+                        objective_scores={},
+                        validated=False,
+                        metadata=event_data
+                    )
+        
+        # Notify CuriosityRewardShaper of novel patterns
+        if hasattr(wm, 'curiosity_reward_shaper') and wm.curiosity_reward_shaper:
+            if event_type in ('novel_query_type', 'unusual_pattern'):
+                if hasattr(wm.curiosity_reward_shaper, 'update_novelty_estimates'):
+                    wm.curiosity_reward_shaper.update_novelty_estimates(
+                        state=event_data.get('state', {}),
+                        action=event_data.get('action', 'observe'),
+                        next_state=event_data.get('next_state', {})
+                    )
+                    
+    except Exception as e:
+        logger.debug(f"Error notifying meta-reasoning of event: {e}")

@@ -374,6 +374,12 @@ __all__ = [
     "get_reasoning_statistics",
     "shutdown_reasoning",
     "INTEGRATION_AVAILABLE",
+    # ===== SystemObserver Integration (BUG #3 FIX) =====
+    "observe_query_start",
+    "observe_engine_result",
+    "observe_outcome",
+    "observe_validation_failure",
+    "observe_error",
     # ===== Availability Flags =====
     "PROBABILISTIC_AVAILABLE",
     "CAUSAL_AVAILABLE",
@@ -544,6 +550,12 @@ try:
         get_reasoning_integration,
         get_reasoning_statistics,
         shutdown_reasoning,
+        # BUG #3 FIX: SystemObserver integration functions
+        observe_query_start,
+        observe_engine_result,
+        observe_outcome,
+        observe_validation_failure,
+        observe_error,
     )
 
     INTEGRATION_AVAILABLE = True
@@ -556,6 +568,12 @@ except ImportError as e:
     get_reasoning_integration = None
     get_reasoning_statistics = None
     shutdown_reasoning = None
+    # BUG #3 FIX: No-op fallbacks for observer functions
+    observe_query_start = None
+    observe_engine_result = None
+    observe_outcome = None
+    observe_validation_failure = None
+    observe_error = None
     INTEGRATION_AVAILABLE = False
 
 # ============================================================================
