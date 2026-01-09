@@ -666,7 +666,15 @@ class WarmStartPool:
                         sig = inspect.signature(tool_class.__init__)
                         params = list(sig.parameters.keys())
                         
-                        if 'config' in params and len(params) == 2:  # self, config
+                        # Check if 'config' is a parameter and there are no other required params
+                        # A param is required if it has no default value and isn't self/cls
+                        required_params = [
+                            p for p, v in sig.parameters.items()
+                            if p not in ('self', 'cls') 
+                            and v.default == inspect.Parameter.empty
+                        ]
+                        
+                        if 'config' in params and required_params == ['config']:
                             def factory(c=config, cls=tool_class):
                                 return cls(config=c)
                         else:
@@ -685,7 +693,7 @@ class WarmStartPool:
                             def factory(cls=tool_class):
                                 return cls()
 
-                        except TypeError as te:
+                        except TypeError:
                             # TypeError often means missing required args
                             # Try with empty config dict (common pattern for reasoning tools)
                             try:

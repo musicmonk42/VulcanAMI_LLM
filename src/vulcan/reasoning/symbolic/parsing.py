@@ -185,7 +185,8 @@ class Lexer:
         if not has_function_syntax:
             # Check if this looks like premise-separated logic (e.g., "A → B, A")
             # Pattern: formula, formula where formulas contain logical operators
-            PREMISE_SEPARATOR_PATTERN = r'([A-Z][^,]*(?:→|->|∧|∨|⊢|⇒)[^,]*),\s*([A-Z])'
+            # Note: Unicode logical operators are safe in character classes without escaping
+            PREMISE_SEPARATOR_PATTERN = r'([A-Z][^,]*(?:[→⇒]|->|[∧∨⊢])[^,]*),\s*([A-Z])'
             if re.search(PREMISE_SEPARATOR_PATTERN, result):
                 # Replace comma with AND (∧) for premise separation
                 # But only for commas that separate logical expressions
