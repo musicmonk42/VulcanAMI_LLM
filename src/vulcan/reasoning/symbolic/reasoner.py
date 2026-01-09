@@ -730,7 +730,10 @@ class SymbolicReasoner:
             }
         
         try:
+            # Track whether fallback parsing was used (indicates parse degradation)
+            self._last_parse_used_fallback = False
             query_clause = self.parse_formula(query_str)
+            used_fallback = getattr(self, '_last_parse_used_fallback', False)
 
             if isinstance(self.prover, ParallelProver):
                 proven, proof, confidence, method = self.prover.prove_parallel(
@@ -755,10 +758,19 @@ class SymbolicReasoner:
                     "applicable": True,
                 }
             
+            # BUG FIX: If fallback parsing was used, cap confidence at SYMBOLIC_PARSE_ERROR_CONFIDENCE
+            # Fallback parsing produces unreliable results - we shouldn't claim high confidence
+            if used_fallback and not result.get("proven"):
+                result["confidence"] = min(result.get("confidence", 0.0), SYMBOLIC_PARSE_ERROR_CONFIDENCE)
+                result["parse_quality"] = "fallback"
+                logger.debug(
+                    f"[SymbolicReasoner] Note: Capping confidence at {SYMBOLIC_PARSE_ERROR_CONFIDENCE} "
+                    f"due to fallback parsing"
+                )
             # Note: Boost confidence for applicable queries that succeed
             # If the query is in our domain (passed applicability check) and we got a result,
             # we should have high confidence - symbolic provers are deterministic
-            if result.get("applicable") and result.get("proven"):
+            elif result.get("applicable") and result.get("proven"):
                 # Proven results from symbolic reasoner should be high confidence
                 result["confidence"] = max(result.get("confidence", 0.0), SYMBOLIC_PROVEN_CONFIDENCE)
                 logger.debug(
@@ -1342,6 +1354,8 @@ class SymbolicReasoner:
                 logger.debug(f"[SymbolicReasoner] NL conversion failed: {nl_e}")
             
             # Fall back to simple parser as last resort
+            # NOTE: Set flag to indicate fallback was used - confidence should be lower
+            self._last_parse_used_fallback = True
             logger.warning(f"Advanced parser failed, trying fallback: {e}")
             return self._fallback_parse(formula_str)
 
