@@ -56,11 +56,10 @@ try:
 except ImportError as e:
     logger.warning(f"[PortfolioExecutor] MathematicalComputationTool not available: {e}")
 
-try:
-    from vulcan.reasoning.philosophical_reasoning import PhilosophicalReasoner
-    _AVAILABLE_ENGINES['philosophical'] = PhilosophicalReasoner
-except ImportError as e:
-    logger.warning(f"[PortfolioExecutor] PhilosophicalReasoner not available: {e}")
+# PHILOSOPHICAL REASONER REMOVED: Ethical reasoning now handled by World Model
+# The World Model has full meta-reasoning machinery for ethical reasoning.
+# Route 'philosophical' tool requests to 'world_model' with mode='philosophical'
+logger.info("[PortfolioExecutor] Philosophical reasoning: Routed to World Model")
 
 try:
     from vulcan.reasoning.analogical_reasoning import AnalogicalReasoningEngine
@@ -286,16 +285,16 @@ class PortfolioExecutor:
     # Note (Jan 7 2026): Tool Fallback Mapping
     # =============================================================================
     # If a requested tool isn't available, map it to an equivalent tool.
-    # This prevents "No valid tools found in ['philosophical']" errors when
-    # PhilosophicalReasoner fails to import but world_model is available.
+    # 
+    # PHILOSOPHICAL REASONER REMOVED: Ethical reasoning now handled by World Model
+    # Route 'philosophical' requests to 'world_model' with mode='philosophical'
     #
     # COMPREHENSIVE FIX (Jan 7 2026): Added 'creative' and 'general' tool mappings
     # to ensure all query types route through VULCAN reasoning, not OpenAI directly.
     TOOL_FALLBACKS: Dict[str, List[str]] = {
-        'philosophical': ['world_model', 'symbolic'],  # Philosophical → world_model (mode='philosophical')
-        # Bug #3 FIX: Creative should fallback to philosophical (generates content), not world_model
-        # world_model only handles self-introspection metadata, philosophical generates creative conclusions
-        'creative': ['philosophical', 'symbolic'],  # Creative → philosophical (generates creative content)
+        'philosophical': ['world_model', 'causal', 'analogical'],  # Philosophical → world_model (mode='philosophical')
+        # Creative should fallback to world_model (has _creative_reasoning method)
+        'creative': ['world_model', 'symbolic'],  # Creative → world_model (mode='creative')
         'cryptographic': ['symbolic', 'mathematical'],  # Crypto falls back to symbolic
         'analogical': ['symbolic', 'probabilistic'],  # Analogical falls back to symbolic
         'causal': ['probabilistic', 'symbolic'],  # Causal falls back to probabilistic

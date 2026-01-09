@@ -717,8 +717,8 @@ def _format_conclusion_for_user(conclusion: Any, reasoning_type: str = "") -> st
         # ======================================================================
         # Note (Jan 7 2026): Handle strings with embedded JSON/dict
         # ======================================================================
-        # Some reasoning engines (like PhilosophicalReasoner) return conclusions
-        # like "Some preamble text...\n{'type': 'moral_uncertainty_analysis', ...}"
+        # Some reasoning engines (like World Model in philosophical mode) return
+        # conclusions like "Some preamble text...\n{'type': 'moral_uncertainty_analysis', ...}"
         # We need to detect and format these embedded dicts properly.
         # ======================================================================
         
@@ -842,7 +842,7 @@ def _format_moral_uncertainty_result(conclusion: Dict[str, Any]) -> str:
     """
     Format a moral uncertainty analysis result for human-readable output.
     
-    This handles the output from PhilosophicalReasoner for queries like
+    This handles the output from World Model philosophical reasoning for queries like
     the trolley problem, producing a clear analysis instead of raw Python dicts.
     """
     lines = []

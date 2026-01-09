@@ -920,7 +920,7 @@ class AgentPoolManager:
         # Priority reasoning capabilities (from _initialize_agent_pool):
         # 1. PROBABILISTIC - ProbabilisticReasoner
         # 2. SYMBOLIC - SymbolicReasoner
-        # 3. PHILOSOPHICAL - PhilosophicalReasoner
+        # 3. PHILOSOPHICAL - World Model (mode='philosophical')
         # 4. MATHEMATICAL - MathematicalComputationTool
         # 5. CAUSAL - CausalReasoner
         # 6. ANALOGICAL - AnalogicalReasoningEngine
@@ -1426,7 +1426,7 @@ class AgentPoolManager:
         priority_reasoning_capabilities = [
             AgentCapability.PROBABILISTIC,   # ProbabilisticReasoner - WORKING
             AgentCapability.SYMBOLIC,         # SymbolicReasoner - WORKING
-            AgentCapability.PHILOSOPHICAL,    # PhilosophicalReasoner - WORKING
+            AgentCapability.PHILOSOPHICAL,    # World Model (mode='philosophical') - WORKING
             AgentCapability.MATHEMATICAL,     # MathematicalComputationTool
             AgentCapability.CAUSAL,           # CausalReasoner
             AgentCapability.ANALOGICAL,       # AnalogicalReasoningEngine

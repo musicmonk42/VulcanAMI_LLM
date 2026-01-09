@@ -203,18 +203,22 @@ except ImportError as e:
     MULTIMODAL_AVAILABLE = False
 
 # ============================================================================
-# Philosophical Reasoning - Ethical/deontic reasoning component
+# Philosophical Reasoning - DEPRECATED: Now handled by World Model
 # ============================================================================
-try:
-    from .philosophical_reasoning import PhilosophicalReasoner, is_philosophical_query
-
-    PHILOSOPHICAL_AVAILABLE = True
-    logger.info("Philosophical reasoning loaded successfully")
-except ImportError as e:
-    logger.warning(f"Philosophical reasoning import failed: {e}")
-    PhilosophicalReasoner = None
-    is_philosophical_query = None
-    PHILOSOPHICAL_AVAILABLE = False
+# The PhilosophicalReasoner wrapper has been removed. Ethical/philosophical
+# queries are now routed directly to the World Model which has:
+# - Causal prediction via predict_interventions()
+# - Multi-framework evaluation via InternalCritic
+# - Goal conflict detection via GoalConflictDetector
+# - Ethical boundary monitoring via EthicalBoundaryMonitor
+#
+# The wrapper added complexity without value - World Model already has
+# all the sophisticated machinery for ethical reasoning.
+# ============================================================================
+PhilosophicalReasoner = None  # Deprecated - use World Model
+is_philosophical_query = None  # Deprecated
+PHILOSOPHICAL_AVAILABLE = False  # Philosophical queries route to World Model
+logger.info("Philosophical reasoning: Routed to World Model (wrapper removed)")
 
 # ============================================================================
 # Note: Cryptographic Engine - Deterministic hash/encoding computations
@@ -333,8 +337,8 @@ __all__ = [
     "MultiModalReasoningEngine",
     "MultimodalReasoner",
     "CrossModalReasoner",  # ADDED: Export CrossModalReasoner
-    "PhilosophicalReasoner",  # FIX: Export PhilosophicalReasoner for ethical/deontic reasoning
-    "is_philosophical_query",  # FIX: Export helper function
+    "PhilosophicalReasoner",  # DEPRECATED: Returns None, use World Model
+    "is_philosophical_query",  # DEPRECATED: Returns None
     # ===== Note: Cryptographic Engine =====
     "CryptographicEngine",
     "CryptoOperation",
@@ -386,7 +390,7 @@ __all__ = [
     "SYMBOLIC_AVAILABLE",
     "ANALOGICAL_AVAILABLE",
     "MULTIMODAL_AVAILABLE",
-    "PHILOSOPHICAL_AVAILABLE",  # FIX: Add availability flag
+    "PHILOSOPHICAL_AVAILABLE",  # Deprecated - always False, use World Model
     "CRYPTOGRAPHIC_AVAILABLE",  # Note: Add availability flag
     "UNIFIED_AVAILABLE",
     "EXPLAINER_AVAILABLE",
@@ -430,7 +434,7 @@ def get_module_status() -> dict:
         "symbolic": SYMBOLIC_AVAILABLE,
         "analogical": ANALOGICAL_AVAILABLE,
         "multimodal": MULTIMODAL_AVAILABLE,
-        "philosophical": PHILOSOPHICAL_AVAILABLE,
+        "philosophical": False,  # Deprecated - use World Model for ethical reasoning
         "unified": UNIFIED_AVAILABLE,
         "explainer": EXPLAINER_AVAILABLE,
         "selection": SELECTION_AVAILABLE,
@@ -438,6 +442,7 @@ def get_module_status() -> dict:
         "mathematical_verification": MATHEMATICAL_VERIFICATION_AVAILABLE,
         "mathematical_computation": MATHEMATICAL_COMPUTATION_AVAILABLE,
         "language": language_available,  # Language reasoning via symbolic/unified
+        "world_model_ethical": True,  # NEW: World Model handles ethical reasoning
     }
 
 
@@ -668,8 +673,10 @@ def _build_reasoning_engines_registry():
     if MULTIMODAL_AVAILABLE and MultiModalReasoningEngine is not None:
         engines['multimodal'] = MultiModalReasoningEngine
         
-    if PHILOSOPHICAL_AVAILABLE and PhilosophicalReasoner is not None:
-        engines['philosophical'] = PhilosophicalReasoner
+    # PHILOSOPHICAL ENGINE REMOVED: Ethical reasoning now handled by World Model
+    # The World Model has: predict_interventions(), InternalCritic, GoalConflictDetector,
+    # EthicalBoundaryMonitor - all the machinery needed for ethical reasoning.
+    # Route 'philosophical' queries to 'world_model' instead.
         
     if MATHEMATICAL_COMPUTATION_AVAILABLE and MathematicalComputationTool is not None:
         engines['mathematical'] = MathematicalComputationTool
