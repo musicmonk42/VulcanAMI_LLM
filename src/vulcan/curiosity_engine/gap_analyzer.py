@@ -1520,14 +1520,20 @@ class GapAnalyzer:
             # quality_success_rate measures "answer was useful" not just "didn't crash"
             if stats.slow_routing_count > 0:
                 return True
-            # Use quality success rate if available, otherwise fall back to execution success rate
-            effective_success_rate = (
-                stats.quality_success_rate 
-                if stats.quality_success_rate > 0 
-                else stats.success_rate
-            )
-            if stats.total > 0 and effective_success_rate < 0.9:
-                return True
+            
+            # BUG #11 FIX: Distinguish between "no quality data" and "0% quality success"
+            # Previously, 0% quality success rate would fall back to execution success rate,
+            # hiding the fact that all quality assessments failed.
+            total_with_quality = stats.quality_good_count + stats.quality_failed_count
+            if total_with_quality > 0:
+                # Quality data exists - use quality_success_rate directly
+                # 0% quality success IS an anomaly (all answers were bad)
+                if stats.quality_success_rate < 0.9:
+                    return True
+            else:
+                # No quality data - fall back to execution success rate
+                if stats.total > 0 and stats.success_rate < 0.9:
+                    return True
                 
             return False
         except ImportError:
