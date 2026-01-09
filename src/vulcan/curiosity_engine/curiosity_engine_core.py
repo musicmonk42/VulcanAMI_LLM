@@ -1717,6 +1717,10 @@ class CuriosityEngine:
             return False
         
         # Check actual success rate from outcome bridge
+        # BUG #10 FIX: Use answer_quality instead of status to measure TRUE success
+        # The previous code used status=='success' which only measures "didn't crash"
+        # not "produced correct answer". This is the root cause of 0 experiments
+        # being generated despite obvious failures.
         try:
             from .outcome_bridge import get_recent_outcomes
             outcomes = get_recent_outcomes(minutes=10)
@@ -1725,8 +1729,25 @@ class CuriosityEngine:
                 # No data to verify - assume not resolved
                 return False
             
-            success_count = sum(1 for o in outcomes if o.get('status') == 'success')
-            success_rate = success_count / len(outcomes)
+            # BUG #10 FIX: Count quality-based success, not execution-based
+            # "good" quality = answer was actually useful
+            # status='success' just means "didn't crash" which is not meaningful
+            quality_success_count = sum(
+                1 for o in outcomes 
+                if o.get('answer_quality') == 'good'
+            )
+            total_with_quality = sum(
+                1 for o in outcomes 
+                if o.get('answer_quality') is not None
+            )
+            
+            if total_with_quality == 0:
+                # No quality data - fall back to status-based check
+                success_count = sum(1 for o in outcomes if o.get('status') == 'success')
+                success_rate = success_count / len(outcomes)
+            else:
+                # Use quality-based success rate (correct metric)
+                success_rate = quality_success_count / total_with_quality
             
             # Only consider resolved if success rate > 80%
             if success_rate < 0.8:

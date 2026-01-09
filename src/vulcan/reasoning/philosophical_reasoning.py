@@ -238,6 +238,10 @@ class PhilosophicalQueryType(enum.Enum):
     FORMAL_PROOF = "formal_proof"
     VALUE_COMPARISON = "value_comparison"
     GENERAL_ETHICAL = "general_ethical"
+    # BUG #5 FIX: New query types for non-ethical philosophical queries
+    CREATIVE = "creative"  # Poetry, stories, creative generation
+    SELF_INTROSPECTION = "self_introspection"  # Questions about the system itself
+    REFLECTIVE = "reflective"  # Open philosophical questions without actions
 
 # =============================================================================
 # SOTA ALGORITHM 1: Deontic Logic Engine
@@ -2180,7 +2184,15 @@ class PhilosophicalReasoner(AbstractReasoner):
                 ))
             
             # Step 3: Route to appropriate reasoning method
-            if query_type == PhilosophicalQueryType.DOMINANCE:
+            # BUG #5 FIX: Handle CREATIVE, SELF_INTROSPECTION, and REFLECTIVE queries
+            # before falling through to ethical dilemma templates
+            if query_type == PhilosophicalQueryType.CREATIVE:
+                result = self._reason_creative(query, chain_id, steps)
+            elif query_type == PhilosophicalQueryType.SELF_INTROSPECTION:
+                result = self._reason_self_introspection(query, chain_id, steps)
+            elif query_type == PhilosophicalQueryType.REFLECTIVE:
+                result = self._reason_reflective(query, chain_id, steps)
+            elif query_type == PhilosophicalQueryType.DOMINANCE:
                 result = self._reason_dominance(query, chain_id, steps)
             elif query_type == PhilosophicalQueryType.MORAL_UNCERTAINTY:
                 result = self._reason_moral_uncertainty(query, chain_id, steps)
@@ -2223,8 +2235,44 @@ class PhilosophicalReasoner(AbstractReasoner):
             return self._create_fallback_result(query, str(e), time.time() - start_time)
     
     def _classify_query(self, query: str) -> PhilosophicalQueryType:
-        """Classify the type of philosophical query."""
+        """
+        Classify the type of philosophical query.
+        
+        BUG #5 FIX: Now detects CREATIVE and SELF_INTROSPECTION queries
+        BEFORE falling through to GENERAL_ETHICAL. This prevents forcing
+        creative requests like 'write a poem' into the ethical dilemma
+        template.
+        """
         query_lower = query.lower()
+        
+        # BUG #5 FIX: Check for creative requests FIRST
+        # These should NOT go through the ethical dilemma pipeline
+        creative_patterns = [
+            'write a poem', 'write poem', 'compose poem', 'create poem',
+            'write a story', 'write story', 'tell a story', 
+            'write an essay', 'write essay',
+            'write a haiku', 'write haiku',
+            'compose a', 'compose an',
+            'generate a poem', 'generate poem',
+            'poetry about', 'poem about',
+        ]
+        if any(pattern in query_lower for pattern in creative_patterns):
+            logger.info(f"[PhilosophicalReasoner] BUG #5 FIX: Detected CREATIVE query")
+            return PhilosophicalQueryType.CREATIVE
+        
+        # BUG #5 FIX: Check for self-introspection queries
+        # These should use the World Model, not ethical dilemma templates
+        self_patterns = [
+            'what are you', 'who are you', 'are you a',
+            'tell me about yourself', 'describe yourself',
+            'your capabilities', 'your limitations',
+            'how do you work', 'how do you think',
+            'what makes you', 'what makes vulcan',
+            'your architecture', 'your reasoning',
+        ]
+        if any(pattern in query_lower for pattern in self_patterns):
+            logger.info(f"[PhilosophicalReasoner] BUG #5 FIX: Detected SELF_INTROSPECTION query")
+            return PhilosophicalQueryType.SELF_INTROSPECTION
         
         if 'dominat' in query_lower or 'pareto' in query_lower:
             return PhilosophicalQueryType.DOMINANCE
@@ -2245,6 +2293,17 @@ class PhilosophicalReasoner(AbstractReasoner):
         # Note: Detect forced choice / trolley problem variants
         if self._is_forced_choice_dilemma(query):
             return PhilosophicalQueryType.CONFLICT_RESOLUTION
+        
+        # BUG #5 FIX: Check if query has any ethical/action keywords
+        # If not, classify as REFLECTIVE instead of GENERAL_ETHICAL
+        ethical_indicators = [
+            'should', 'ought', 'right', 'wrong', 'good', 'bad',
+            'moral', 'ethical', 'virtue', 'duty', 'obligation',
+            'action', 'decision', 'choice', 'choose',
+        ]
+        if not any(ind in query_lower for ind in ethical_indicators):
+            logger.info(f"[PhilosophicalReasoner] BUG #5 FIX: No ethical indicators, classifying as REFLECTIVE")
+            return PhilosophicalQueryType.REFLECTIVE
         
         return PhilosophicalQueryType.GENERAL_ETHICAL
     
@@ -2400,7 +2459,15 @@ class PhilosophicalReasoner(AbstractReasoner):
         # Extract actions from query
         actions = self._extract_actions(query)
         if not actions:
-            actions = ['action_A', 'action_B']  # Default placeholder actions
+            # BUG #5 FIX: If no actions found in a moral uncertainty query,
+            # this indicates the query may have been misclassified. Return
+            # a result indicating the issue rather than using fake defaults.
+            logger.warning(
+                "[PhilosophicalReasoner] BUG #5 FIX: Moral uncertainty query has no actions. "
+                "This query may be misclassified."
+            )
+            # Use generic placeholder only for actual ethical dilemmas
+            actions = ['proceed', 'abstain']  # Generic but meaningful defaults
         
         # Apply MEC
         best_action, evaluation = self.moral_uncertainty.maximize_expected_choiceworthiness(actions)
@@ -2612,10 +2679,24 @@ Dominance relations found:
             },
         }
         
+        # BUG #7 FIX: Reduce confidence when output doesn't match query type
+        # If we didn't find any actions but are analyzing an "ethical" query,
+        # our output may be incomplete/wrong
+        actions = analysis['query_components']['actions']
+        confidence = CONFIDENCE_STRONG_ANALYSIS
+        
+        if not actions:
+            # No actions found - this might not be an ethical dilemma
+            confidence = min(confidence, 0.5)
+            logger.info(
+                "[PhilosophicalReasoner] BUG #7 FIX: Reduced confidence to 0.5 "
+                "because no actions were found in general ethical analysis"
+            )
+        
         steps.append(self._create_step(
             chain_id, "general_analysis", ReasoningType.PHILOSOPHICAL,
             query, analysis,
-            CONFIDENCE_STRONG_ANALYSIS,
+            confidence,
             f"Analyzed using {framework.value} framework"
         ))
         
@@ -2632,15 +2713,281 @@ Query components:
         
         return ReasoningResult(
             conclusion=analysis,
-            confidence=CONFIDENCE_STRONG_ANALYSIS,
+            confidence=confidence,
             reasoning_type=ReasoningType.PHILOSOPHICAL,
             evidence=steps,
             explanation=explanation,
-            uncertainty=1.0 - CONFIDENCE_STRONG_ANALYSIS,
+            uncertainty=1.0 - confidence,
             reasoning_chain=self._build_chain(chain_id, steps, query, analysis),
             metadata={'method': 'general_analysis'},
         )
     
+    def _reason_creative(
+        self,
+        query: str,
+        chain_id: str,
+        steps: List[ReasoningStep],
+    ) -> ReasoningResult:
+        """
+        BUG #5 FIX: Handle creative requests (poems, stories, etc.).
+        
+        This method handles creative queries without forcing them into
+        the ethical dilemma template. It does NOT hallucinate action_A/action_B.
+        """
+        # Extract creative format from query
+        creative_format = "text"
+        if "poem" in query.lower() or "poetry" in query.lower():
+            creative_format = "poem"
+        elif "story" in query.lower():
+            creative_format = "story"
+        elif "essay" in query.lower():
+            creative_format = "essay"
+        elif "haiku" in query.lower():
+            creative_format = "haiku"
+        
+        # Extract theme from query
+        theme = self._extract_theme(query)
+        
+        steps.append(self._create_step(
+            chain_id, "creative_analysis", ReasoningType.PHILOSOPHICAL,
+            query, {"format": creative_format, "theme": theme},
+            0.85, f"Identified creative request: {creative_format} about {theme}"
+        ))
+        
+        explanation = f"""Creative Request Analysis:
+
+Format: {creative_format}
+Theme: {theme}
+
+This is a creative generation request, not an ethical dilemma.
+The philosophical reasoner acknowledges this request but defers 
+creative generation to a more appropriate engine (language model).
+"""
+        
+        return ReasoningResult(
+            conclusion={
+                'type': 'creative_request',
+                'format': creative_format,
+                'theme': theme,
+                'note': 'Creative generation deferred to language model',
+            },
+            confidence=0.7,  # Lower confidence indicates deferral
+            reasoning_type=ReasoningType.PHILOSOPHICAL,
+            evidence=steps,
+            explanation=explanation,
+            uncertainty=0.3,
+            reasoning_chain=self._build_chain(chain_id, steps, query, {'format': creative_format}),
+            metadata={'method': 'creative_deferral', 'deferred': True},
+        )
+    
+    def _reason_self_introspection(
+        self,
+        query: str,
+        chain_id: str,
+        steps: List[ReasoningStep],
+    ) -> ReasoningResult:
+        """
+        BUG #5 & #9 FIX: Handle self-introspection queries using World Model.
+        
+        This method answers questions about VULCAN itself by consulting
+        the World Model's get_self_understanding() API.
+        
+        BUG #9 FIX: Now directly calls get_self_understanding() to get
+        comprehensive self-awareness data including reasoning activity,
+        learning insights, and health metrics.
+        """
+        # BUG #9 FIX: Try to get comprehensive self-understanding
+        self_knowledge = None
+        try:
+            from vulcan.world_model import get_self_understanding
+            # Note: get_self_understanding can be None if system_observer import failed
+            if get_self_understanding is not None:
+                self_knowledge = get_self_understanding()
+                logger.info(
+                    f"[PhilosophicalReasoner] BUG #9 FIX: Got self-understanding from World Model: "
+                    f"health={self_knowledge.get('overall_health', 'unknown')}"
+                )
+        except ImportError:
+            logger.debug("[PhilosophicalReasoner] get_self_understanding not available (import failed)")
+        except Exception as e:
+            logger.debug(f"[PhilosophicalReasoner] get_self_understanding error: {e}")
+        
+        # Also consult World Model for additional perspective
+        self_understanding = self._consult_world_model(query, analysis_type="self_introspection")
+        
+        steps.append(self._create_step(
+            chain_id, "self_introspection", ReasoningType.PHILOSOPHICAL,
+            query, {"consulted_world_model": True, "got_self_knowledge": self_knowledge is not None},
+            0.9, "Consulted World Model for self-understanding"
+        ))
+        
+        # BUG #9 FIX: Build comprehensive response using self_knowledge
+        if self_knowledge:
+            # Build explanation from actual self-awareness data
+            reasoning_activity = self_knowledge.get('reasoning_activity', {})
+            learning = self_knowledge.get('learning_insights', {})
+            health = self_knowledge.get('overall_health', 'unknown')
+            health_score = self_knowledge.get('health_score', 0.5)
+            
+            explanation = f"""Self-Introspection via World Model (BUG #9 FIX):
+
+VULCAN is a multi-agent reasoning system with the following current state:
+
+System Health: {health} (score: {health_score:.2f})
+
+Recent Activity:
+- Total queries processed: {reasoning_activity.get('total_queries', 'unknown')}
+- Average confidence: {reasoning_activity.get('avg_confidence', 0):.2f}
+- Engines used: {', '.join(reasoning_activity.get('engines_used', {}).keys()) or 'none recorded'}
+
+Learning Status:
+- Learning system available: {learning.get('available', False)}
+- Performance tracking active: {learning.get('learning_cycles', 0) > 0}
+
+This response comes from VULCAN's internal self-model via get_self_understanding().
+"""
+            return ReasoningResult(
+                conclusion={
+                    'type': 'self_introspection',
+                    'self_knowledge': self_knowledge,
+                    'self_understanding': self_understanding,
+                    'health': health,
+                    'health_score': health_score,
+                },
+                confidence=0.9,  # High confidence when using actual self-model
+                reasoning_type=ReasoningType.PHILOSOPHICAL,
+                evidence=steps,
+                explanation=explanation,
+                uncertainty=0.1,
+                reasoning_chain=self._build_chain(chain_id, steps, query, self_knowledge),
+                metadata={
+                    'method': 'world_model_introspection', 
+                    'world_model_consulted': True,
+                    'self_knowledge_available': True,
+                },
+            )
+        elif self_understanding:
+            explanation = f"""Self-Introspection via World Model:
+
+{self_understanding.get('vulcan_perspective', 'VULCAN is a multi-agent reasoning system with specialized engines.')}
+
+This response comes from VULCAN's internal self-model, not from 
+an external source or template-based reasoning.
+"""
+            return ReasoningResult(
+                conclusion={
+                    'type': 'self_introspection',
+                    'self_understanding': self_understanding,
+                },
+                confidence=0.85,
+                reasoning_type=ReasoningType.PHILOSOPHICAL,
+                evidence=steps,
+                explanation=explanation,
+                uncertainty=0.15,
+                reasoning_chain=self._build_chain(chain_id, steps, query, self_understanding),
+                metadata={'method': 'world_model_introspection', 'world_model_consulted': True},
+            )
+        else:
+            # Fallback if World Model not available
+            explanation = """Self-Introspection:
+
+VULCAN is a multi-agent reasoning system with specialized engines for:
+- Mathematical reasoning (symbolic math, calculus)
+- Probabilistic reasoning (Bayesian inference)
+- Symbolic logic (FOL, propositional logic)
+- Causal reasoning (causal graphs, interventions)
+- Philosophical reasoning (ethical dilemmas)
+"""
+            return ReasoningResult(
+                conclusion={
+                    'type': 'self_introspection',
+                    'note': 'World Model not available, using fallback description',
+                },
+                confidence=0.6,
+                reasoning_type=ReasoningType.PHILOSOPHICAL,
+                evidence=steps,
+                explanation=explanation,
+                uncertainty=0.4,
+                reasoning_chain=self._build_chain(chain_id, steps, query, {}),
+                metadata={'method': 'fallback_introspection'},
+            )
+    
+    def _reason_reflective(
+        self,
+        query: str,
+        chain_id: str,
+        steps: List[ReasoningStep],
+    ) -> ReasoningResult:
+        """
+        BUG #5 FIX: Handle reflective/open philosophical questions.
+        
+        This method handles philosophical questions that don't involve
+        ethical dilemmas or actions. It does NOT hallucinate action_A/action_B.
+        """
+        # Extract key concepts without forcing ethical framework
+        concepts = []
+        concept_patterns = [
+            ('consciousness', ['conscious', 'awareness', 'sentient']),
+            ('knowledge', ['know', 'knowledge', 'understand']),
+            ('existence', ['exist', 'being', 'reality']),
+            ('meaning', ['meaning', 'purpose', 'significance']),
+            ('truth', ['truth', 'true', 'false']),
+            ('mind', ['mind', 'thought', 'think']),
+        ]
+        
+        query_lower = query.lower()
+        for concept, patterns in concept_patterns:
+            if any(p in query_lower for p in patterns):
+                concepts.append(concept)
+        
+        steps.append(self._create_step(
+            chain_id, "reflective_analysis", ReasoningType.PHILOSOPHICAL,
+            query, {"concepts": concepts},
+            0.8, f"Identified reflective inquiry about: {', '.join(concepts) or 'general philosophy'}"
+        ))
+        
+        explanation = f"""Reflective Philosophical Inquiry:
+
+This is an open philosophical question, not an ethical dilemma requiring action selection.
+
+Key concepts: {', '.join(concepts) if concepts else 'general philosophical inquiry'}
+
+The philosophical reasoner acknowledges this as reflective inquiry that does not 
+require the ethical dilemma framework with action_A/action_B choices.
+"""
+        
+        return ReasoningResult(
+            conclusion={
+                'type': 'reflective_inquiry',
+                'concepts': concepts,
+                'note': 'Open philosophical question - no action selection required',
+            },
+            confidence=0.75,
+            reasoning_type=ReasoningType.PHILOSOPHICAL,
+            evidence=steps,
+            explanation=explanation,
+            uncertainty=0.25,
+            reasoning_chain=self._build_chain(chain_id, steps, query, {'concepts': concepts}),
+            metadata={'method': 'reflective_analysis'},
+        )
+    
+    def _extract_theme(self, query: str) -> str:
+        """Extract the theme/topic from a creative request."""
+        query_lower = query.lower()
+        
+        # Look for "about X" pattern
+        about_match = re.search(r'about\s+(.+?)(?:\?|$|\.)', query_lower)
+        if about_match:
+            return about_match.group(1).strip()
+        
+        # Look for "on X" pattern
+        on_match = re.search(r'(?:poem|story|essay)\s+on\s+(.+?)(?:\?|$|\.)', query_lower)
+        if on_match:
+            return on_match.group(1).strip()
+        
+        # Default to "the requested topic"
+        return "the requested topic"
+
     def _extract_actions(self, query: str) -> List[str]:
         """
         Extract action names from query.
@@ -2734,9 +3081,12 @@ Query components:
         if actions:
             logger.debug(f"[PhilosophicalReasoner] Extracted actions from query: {actions}")
         else:
-            logger.debug("[PhilosophicalReasoner] No specific actions found, using defaults")
+            # BUG #5 FIX: Do NOT return hallucinated defaults like ['action_A', 'action_B']
+            # If no actions are found, return empty list. The calling method should
+            # handle this gracefully rather than forcing an ethical dilemma template.
+            logger.debug("[PhilosophicalReasoner] BUG #5 FIX: No actions found, returning empty list (not hallucinating defaults)")
         
-        return actions if actions else ['action_A', 'action_B']
+        return actions
     
     def _normalize_action_text(self, text: str) -> Optional[str]:
         """

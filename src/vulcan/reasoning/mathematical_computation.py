@@ -1054,6 +1054,23 @@ result = simplify(integral)
                 )
                 return None
         
+        # =================================================================
+        # BUG #2 FIX: PRIORITY 0.5 - Simple arithmetic expressions
+        # =================================================================
+        # Before checking complex patterns, detect simple arithmetic like:
+        # - "What is 2+2?" -> 2+2
+        # - "3*4" -> 3*4  
+        # - "10/2" -> 10/2
+        # - "(2+3)*4" -> (2+3)*4
+        # These should generate straightforward evaluation code.
+        # =================================================================
+        simple_result = self._extract_simple_arithmetic(query)
+        if simple_result is not None:
+            logger.info(
+                f"[MathTool] Simple arithmetic detected: {simple_result}"
+            )
+            return f"result = {simple_result}"
+        
         # PRIORITY 1: Differential equations (must check BEFORE "solve"/"equation")
         # These patterns are very specific and should take precedence
         if any(kw in query_lower for kw in [
@@ -1422,6 +1439,86 @@ Brief explanation:"""
         except Exception as e:
             logger.warning(f"Explanation generation failed: {e}")
             return f"The computation was performed using SymPy. The result is: {result}"
+
+    def _extract_simple_arithmetic(self, query: str) -> Optional[str]:
+        """
+        BUG #2 FIX: Extract simple arithmetic expression from query.
+        
+        Returns the expression string if the query is simple arithmetic,
+        None otherwise. This is used by _generate_code to generate
+        straightforward evaluation code.
+        
+        Supported:
+        - Basic operations: +, -, *, /, **, %
+        - Parentheses: (2+3)*4
+        - Decimal numbers: 3.14 * 2
+        - "What is X" style questions
+        
+        Returns:
+            Expression string if valid arithmetic, None otherwise
+        """
+        # Extract mathematical expression from common question patterns
+        patterns = [
+            r'(?:what\s+is|calculate|compute|evaluate|solve)\s+(.+?)(?:\?|$)',
+            r'^([\d\.\s\+\-\*\/\%\^\(\)]+)$',  # Pure expression
+        ]
+        
+        expression = None
+        for pattern in patterns:
+            match = re.search(pattern, query.strip(), re.IGNORECASE)
+            if match:
+                expression = match.group(1).strip()
+                break
+        
+        if not expression:
+            # Try the whole query as an expression
+            expression = query.strip().rstrip('?')
+        
+        # Clean up the expression
+        expression = expression.strip()
+        
+        # Replace common mathematical notation
+        expression = expression.replace('^', '**')  # Caret for exponent
+        
+        # Security check: Only allow safe characters
+        allowed_pattern = r'^[\d\.\+\-\*\/\%\(\)\s]+$'
+        if not re.match(allowed_pattern, expression):
+            return None
+        
+        # Validate balanced parentheses
+        if expression.count('(') != expression.count(')'):
+            return None
+        
+        # Prevent empty or trivial expressions
+        if not expression or not any(c.isdigit() for c in expression):
+            return None
+        
+        # Make sure it has an operator (not just a number)
+        # Note: ** is checked via '*' being present twice consecutively
+        if not any(op in expression for op in ['+', '-', '*', '/', '%']):
+            return None
+        
+        # Validate operator positioning - prevent invalid patterns like '++', '--', '2+', '+3'
+        # Allow: leading minus for negative numbers, ** for exponentiation
+        expression_no_spaces = expression.replace(' ', '')
+        
+        # Check for invalid consecutive operators (except ** for exponentiation)
+        invalid_patterns = ['++', '+-', '+/', '+%', '-+', '--', '-/', '-%', 
+                           '/+', '/-', '//', '/%', '%+', '%-', '%/', '%%',
+                           '*+', '*-', '*/', '*%']  # Note: ** is valid (exponent)
+        for pattern in invalid_patterns:
+            if pattern in expression_no_spaces:
+                return None
+        
+        # Check for trailing operators
+        if expression_no_spaces and expression_no_spaces[-1] in '+-*/%':
+            return None
+        
+        # Check for operators at start (except leading minus for negative numbers)
+        if expression_no_spaces and expression_no_spaces[0] in '+*/%':
+            return None
+        
+        return expression
 
     def _try_simple_arithmetic(self, query: str) -> Optional[Union[int, float]]:
         """

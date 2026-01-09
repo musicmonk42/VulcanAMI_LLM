@@ -150,9 +150,11 @@ class Lexer:
         
         # Step 2: Handle function notation (SHA256, BLAKE2b, etc.)
         # Replace cryptographic function calls with placeholders to avoid parse errors
-        # Pattern matches: SHA256(x), BLAKE2b(y), H(x), etc.
-        # Note: [A-Z][A-Z0-9]* allows single letter functions (H) or multi-char (SHA256)
-        func_pattern = re.compile(r'[A-Z][A-Z0-9]*\([^)]*\)')
+        # FIX: Only match multi-character ALL-CAPS function names to avoid
+        # breaking single-letter predicates like P(x), Q(y), H(x).
+        # Pattern matches: SHA256(x), MD5(y), BLAKE2(z), etc.
+        # Must have at least 2 characters and be ALL-CAPS or CAPS with numbers
+        func_pattern = re.compile(r'[A-Z]{2,}[A-Z0-9]*\([^)]*\)')
         func_matches = func_pattern.findall(result)
         if func_matches:
             logger.debug(f"Lexer: Found function notation, replacing: {func_matches[:3]}")

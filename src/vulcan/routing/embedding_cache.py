@@ -278,10 +278,16 @@ class EmbeddingCache:
         Without normalization, "hello world" and "Hello World " would generate
         different cache keys despite being semantically identical queries.
 
+        BUG #8 FIX: Enhanced normalization to improve cache hit rate by
+        handling more common variations in query phrasing.
+
         Normalization steps:
         1. Strip leading/trailing whitespace
         2. Convert to lowercase for case-insensitive matching
         3. Collapse multiple whitespaces to single space
+        4. Remove common filler words/phrases that don't affect meaning
+        5. Normalize punctuation (remove trailing ?, !, .)
+        6. Normalize common contractions
 
         Note: This is ONLY used for cache key generation. The original text
         is still passed to the embedding model to preserve semantic nuances.
@@ -296,6 +302,38 @@ class EmbeddingCache:
         normalized = text.strip().lower()
         # Collapse multiple whitespaces to single space
         normalized = " ".join(normalized.split())
+        
+        # BUG #8 FIX: Remove trailing punctuation that doesn't affect meaning
+        normalized = normalized.rstrip('?!.')
+        
+        # BUG #8 FIX: Remove common filler phrases at start
+        filler_prefixes = [
+            'please ', 'can you ', 'could you ', 'would you ', 
+            'i want to ', 'i need to ', 'help me ', 'tell me ',
+            'what is ', 'what are ', 'how do i ', 'how can i ',
+        ]
+        for prefix in filler_prefixes:
+            if normalized.startswith(prefix):
+                normalized = normalized[len(prefix):]
+                break
+        
+        # BUG #8 FIX: Normalize common contractions
+        contractions = {
+            "what's": "what is",
+            "it's": "it is",
+            "don't": "do not",
+            "doesn't": "does not",
+            "can't": "cannot",
+            "won't": "will not",
+            "i'm": "i am",
+            "you're": "you are",
+        }
+        for contraction, expansion in contractions.items():
+            normalized = normalized.replace(contraction, expansion)
+        
+        # Final whitespace cleanup
+        normalized = " ".join(normalized.split()).strip()
+        
         return normalized
 
     @staticmethod
