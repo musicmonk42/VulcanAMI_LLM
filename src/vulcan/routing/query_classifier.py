@@ -1135,9 +1135,12 @@ class QueryClassifier:
             if pattern.search(query_original):
                 return QueryClassification(
                     category=QueryCategory.CREATIVE.value,
-                    complexity=0.6,  # Creative reasoning requires world_model
-                    suggested_tools=["world_model"],  # Route to world_model creative mode
-                    skip_reasoning=False,  # CRITICAL FIX: Use world_model reasoning
+                    complexity=0.6,  # Creative reasoning requires philosophical engine
+                    # Bug #3 FIX: Route to philosophical instead of world_model
+                    # world_model only handles self-introspection (who/what is VULCAN)
+                    # philosophical engine actually generates creative content
+                    suggested_tools=["philosophical"],
+                    skip_reasoning=False,  # Use philosophical reasoning for creative content
                     confidence=0.95,
                     source="keyword",
                 )
@@ -1148,8 +1151,11 @@ class QueryClassifier:
             return QueryClassification(
                 category=QueryCategory.CREATIVE.value,
                 complexity=0.6,
-                suggested_tools=["world_model"],  # Route to world_model creative mode
-                skip_reasoning=False,  # CRITICAL FIX: Use world_model reasoning
+                # Bug #3 FIX: Route to philosophical instead of world_model
+                # world_model only handles self-introspection (who/what is VULCAN)
+                # philosophical engine actually generates creative content
+                suggested_tools=["philosophical"],
+                skip_reasoning=False,  # Use philosophical reasoning for creative content
                 confidence=0.85,
                 source="keyword",
             )
