@@ -87,6 +87,10 @@ def _is_sklearn_available():
 
 logger = logging.getLogger(__name__)
 
+# Quality success threshold for anomaly detection
+# If quality success rate is below this threshold, it's considered an anomaly
+QUALITY_SUCCESS_THRESHOLD = 0.9  # 90%
+
 
 class GapType(Enum):
     """Types of knowledge gaps"""
@@ -1528,11 +1532,11 @@ class GapAnalyzer:
             if total_with_quality > 0:
                 # Quality data exists - use quality_success_rate directly
                 # 0% quality success IS an anomaly (all answers were bad)
-                if stats.quality_success_rate < 0.9:
+                if stats.quality_success_rate < QUALITY_SUCCESS_THRESHOLD:
                     return True
             else:
                 # No quality data - fall back to execution success rate
-                if stats.total > 0 and stats.success_rate < 0.9:
+                if stats.total > 0 and stats.success_rate < QUALITY_SUCCESS_THRESHOLD:
                     return True
                 
             return False

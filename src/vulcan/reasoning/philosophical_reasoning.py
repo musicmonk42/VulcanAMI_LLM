@@ -243,6 +243,13 @@ class PhilosophicalQueryType(enum.Enum):
     SELF_INTROSPECTION = "self_introspection"  # Questions about the system itself
     REFLECTIVE = "reflective"  # Open philosophical questions without actions
 
+
+# Analysis type constants for World Model consultation
+ANALYSIS_TYPE_ETHICAL_DILEMMA = "ethical_dilemma"
+ANALYSIS_TYPE_SELF_INTROSPECTION = "self_introspection"
+ANALYSIS_TYPE_VALUE_CONFLICT = "value_conflict"
+ANALYSIS_TYPE_FORCED_CHOICE = "forced_choice"
+
 # =============================================================================
 # SOTA ALGORITHM 1: Deontic Logic Engine
 # =============================================================================
@@ -1867,7 +1874,7 @@ class PhilosophicalReasoner(AbstractReasoner):
             # BUG #13 FIX: For self-introspection queries, skip ethical dilemma phases
             # Self-introspection doesn't need causal predictions, ethical boundaries, goal conflicts, etc.
             # It just needs the self-understanding data which is fetched separately.
-            if analysis_type == "self_introspection":
+            if analysis_type == ANALYSIS_TYPE_SELF_INTROSPECTION:
                 logger.info("[PhilosophicalReasoner] BUG #13 FIX: Skipping ethical dilemma phases for self-introspection")
                 # Only get basic perspective from MotivationalIntrospection
                 if hasattr(self.world_model, 'motivational_introspection'):
@@ -1882,7 +1889,7 @@ class PhilosophicalReasoner(AbstractReasoner):
                         except Exception as e:
                             logger.debug(f"[MotivationalIntrospection] error: {e}")
                 
-                result['analysis_type'] = 'self_introspection'
+                result['analysis_type'] = ANALYSIS_TYPE_SELF_INTROSPECTION
                 logger.info("[PhilosophicalReasoner] Self-introspection consultation complete (skipped 6-phase template)")
                 return result
             
@@ -2835,7 +2842,7 @@ creative generation to a more appropriate engine (language model).
             logger.debug(f"[PhilosophicalReasoner] get_self_understanding error: {e}")
         
         # Also consult World Model for additional perspective
-        self_understanding = self._consult_world_model(query, analysis_type="self_introspection")
+        self_understanding = self._consult_world_model(query, analysis_type=ANALYSIS_TYPE_SELF_INTROSPECTION)
         
         steps.append(self._create_step(
             chain_id, "self_introspection", ReasoningType.PHILOSOPHICAL,
