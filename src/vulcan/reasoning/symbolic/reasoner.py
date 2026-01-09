@@ -760,14 +760,15 @@ class SymbolicReasoner:
             
             # BUG FIX: If fallback parsing was used, cap confidence at SYMBOLIC_PARSE_ERROR_CONFIDENCE
             # Fallback parsing produces unreliable results - we shouldn't claim high confidence
-            if used_fallback and not result.get("proven"):
+            # regardless of whether the prover claims success
+            if used_fallback:
                 result["confidence"] = min(result.get("confidence", 0.0), SYMBOLIC_PARSE_ERROR_CONFIDENCE)
                 result["parse_quality"] = "fallback"
                 logger.debug(
                     f"[SymbolicReasoner] Note: Capping confidence at {SYMBOLIC_PARSE_ERROR_CONFIDENCE} "
-                    f"due to fallback parsing"
+                    f"due to fallback parsing (proven={result.get('proven')})"
                 )
-            # Note: Boost confidence for applicable queries that succeed
+            # Note: Only boost confidence if NOT using fallback parsing
             # If the query is in our domain (passed applicability check) and we got a result,
             # we should have high confidence - symbolic provers are deterministic
             elif result.get("applicable") and result.get("proven"):
