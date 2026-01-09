@@ -1420,37 +1420,47 @@ class TestCreativeAndPhilosophicalSelfIntrospectionOverride:
         )
     
     def test_creative_and_philosophical_fix_code_present(self):
-        """Verify the creative and philosophical fix code is present."""
+        """
+        Verify the creative and philosophical fix code is present.
+        
+        Bug #3 FIX (Jan 9 2026): The world_model stub was returning empty responses.
+        
+        CORRECT APPROACH: Implement world_model properly - don't route away from it!
+        
+        The fix is in tool_selector.py (WorldModelSelfModel._determine_aspect_and_query)
+        which now handles creative and philosophical queries with actual content generation.
+        """
         import os
         
-        reasoning_integration_paths = [
-            'src/vulcan/reasoning/reasoning_integration.py',
-            '../src/vulcan/reasoning/reasoning_integration.py',
+        # Bug #3 FIX is in tool_selector.py (WorldModelSelfModel implementation)
+        tool_selector_paths = [
+            'src/vulcan/reasoning/selection/tool_selector.py',
+            '../src/vulcan/reasoning/selection/tool_selector.py',
         ]
         
         content = None
-        for path in reasoning_integration_paths:
+        for path in tool_selector_paths:
             if os.path.exists(path):
                 with open(path, 'r', encoding='utf-8') as f:
                     content = f.read()
                 break
         
         if content is None:
-            pytest.skip("reasoning_integration.py not found in expected locations")
+            pytest.skip("tool_selector.py not found in expected locations")
         
-        # Check that the Bug #3 creative fix is present
+        # Check that the Bug #3 fix is present in world_model implementation
+        # The fix implements creative and philosophical handling IN world_model
+        # rather than routing away from it
         assert "Bug #3 FIX" in content, (
-            "Expected Bug #3 FIX comment not found in reasoning_integration.py"
+            "Expected Bug #3 FIX comment not found in tool_selector.py"
         )
-        assert "CREATIVE_MARKERS" in content, (
-            "Expected CREATIVE_MARKERS not found in reasoning_integration.py"
+        assert "_generate_creative_content" in content, (
+            "Expected _generate_creative_content method not found in tool_selector.py"
         )
-        assert "PHILOSOPHICAL_KEYWORDS" in content, (
-            "Expected PHILOSOPHICAL_KEYWORDS not found in reasoning_integration.py"
+        assert "_apply_philosophical_reasoning" in content, (
+            "Expected _apply_philosophical_reasoning method not found in tool_selector.py"
         )
-        assert "creative_task_detected" in content, (
-            "Expected creative_task_detected context flag not found"
-        )
-        assert "philosophical_self_reflection" in content, (
-            "Expected philosophical_self_reflection context flag not found"
+        # Check that world_model returns actual content, not empty responses
+        assert "_get_self_awareness_context" in content, (
+            "Expected _get_self_awareness_context method for live world_model integration"
         )

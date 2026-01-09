@@ -1396,156 +1396,79 @@ class ReasoningIntegration:
                     # =================================================================
                     query_lower = query.lower()
                     
-                    # =================================================================
-                    # Bug #3 FIX (Jan 9 2026): Check for CREATIVE queries FIRST
-                    # =================================================================
-                    # Problem: Queries like "write a poem about becoming self-aware"
-                    # are classified as SELF_INTROSPECTION (due to "self-aware"),
-                    # but they're actually CREATIVE tasks that need the general LLM.
-                    #
-                    # Solution: Check for creative markers BEFORE domain routing.
-                    # Creative queries should route to 'general' for LLM generation.
-                    # =================================================================
-                    CREATIVE_MARKERS = frozenset([
-                        'write', 'compose', 'create', 'craft', 'draft', 'author',
-                        'pen', 'generate a story', 'generate a poem',
-                    ])
-                    CREATIVE_OUTPUTS = frozenset([
-                        'poem', 'sonnet', 'haiku', 'story', 'tale', 'narrative',
-                        'song', 'lyrics', 'essay', 'script',
-                    ])
+                    # Domain keyword sets for specialized routing
+                    # Note: These keywords are consistent with CAUSAL_KEYWORDS in query_classifier.py
+                    # The threshold of 2+ keywords ensures single false matches don't trigger routing
+                    DOMAIN_ROUTING_KEYWORDS = {
+                        'causal': frozenset([
+                            'causal', 'causation', 'confound', 'confounder', 'confounding',
+                            'intervention', 'counterfactual', 'randomize', 'randomized',
+                            'pearl', 'dag', 'backdoor', 'frontdoor', 'collider',
+                            'do-calculus', 'rct', 'observational', 'experimental',
+                        ]),
+                        'analogical': frozenset([
+                            'analogical', 'analogy', 'analogies', 'analogous',
+                            'structure mapping', 'structural alignment',
+                            'domain transfer', 'cross-domain', 'source domain', 'target domain',
+                            'relational similarity', 'surface similarity', 'structural similarity',
+                            's→t', 'domain s', 'domain t', 'deep structure',
+                        ]),
+                        'probabilistic': frozenset([
+                            'bayes', 'bayesian', 'probability', 'probabilistic',
+                            'likelihood', 'prior', 'posterior', 'conditional probability',
+                            'joint distribution', 'marginal', 'independence',
+                        ]),
+                    }
                     
-                    has_creative_marker = any(marker in query_lower for marker in CREATIVE_MARKERS)
-                    has_creative_output = any(output in query_lower for output in CREATIVE_OUTPUTS)
+                    # Check if query contains domain reasoning keywords
+                    detected_domain = None
+                    detected_count = 0
+                    for domain, keywords in DOMAIN_ROUTING_KEYWORDS.items():
+                        count = sum(1 for kw in keywords if kw in query_lower)
+                        if count >= 2:  # Require 2+ keywords for domain detection
+                            if count > detected_count:
+                                detected_domain = domain
+                                detected_count = count
                     
-                    if has_creative_marker and has_creative_output:
-                        # Creative task detected - route to general LLM
+                    if detected_domain:
+                        # Domain reasoning detected - route to specialized engine
                         logger.info(
-                            f"{LOG_PREFIX} SELF_INTROSPECTION override: detected CREATIVE "
-                            f"task (marker={has_creative_marker}, output={has_creative_output}) - "
-                            f"routing to general LLM instead of world_model"
+                            f"{LOG_PREFIX} SELF_INTROSPECTION override: detected {detected_domain} "
+                            f"reasoning ({detected_count} keywords) - routing to {detected_domain} "
+                            f"engine instead of world_model"
                         )
-                        classification.suggested_tools = ['general']
+                        classification.suggested_tools = [detected_domain]
                         if context is None:
                             context = {}
-                        context['classifier_suggested_tools'] = ['general']
-                        context['classifier_category'] = 'CREATIVE'
-                        context['creative_task_detected'] = True
-                        # Skip to end of SELF_INTROSPECTION handling
-                    
-                    # =================================================================
-                    # Bug #3 FIX (Jan 9 2026): Check for PHILOSOPHICAL queries
-                    # =================================================================
-                    # Problem: Queries like "would you become self aware if you could?"
-                    # are classified as SELF_INTROSPECTION but need the philosophical
-                    # reasoning engine for ethical/consciousness analysis.
-                    #
-                    # Solution: Check for philosophical keywords that indicate ethical
-                    # or philosophical reasoning is needed (not just meta-description).
-                    # =================================================================
-                    elif not (has_creative_marker and has_creative_output):
-                        PHILOSOPHICAL_KEYWORDS = frozenset([
-                            'ethical', 'moral', 'morality', 'ethics',
-                            'conscious', 'consciousness', 'sentient', 'sentience',
-                            'should', 'ought', 'permissible', 'wrong', 'right',
-                            'trolley', 'dilemma', 'utilitarian', 'deontological',
-                        ])
+                        context['classifier_suggested_tools'] = [detected_domain]
+                        context['classifier_category'] = classification.category
+                        context['domain_reasoning_detected'] = detected_domain
+                        context['domain_keyword_count'] = detected_count
+                        # Let the specialized engine handle it - don't block with world_model
+                        # Note: world_model can still observe in parallel mode
+                    else:
+                        # No domain keywords found - actual self-introspection
+                        # For self-introspection queries, ensure we use world_model tool
+                        # BUG FIX: Also update query_type to prevent type mismatch downstream
+                        # Previously, query_type stayed as 'MATHEMATICAL' even after overriding tools
+                        original_query_type = query_type
+                        query_type = 'self_introspection'  # FIX: Update query_type to match actual query
                         
-                        # Check for philosophical reasoning indicators
-                        phil_count = sum(1 for kw in PHILOSOPHICAL_KEYWORDS if kw in query_lower)
-                        
-                        # Also check for hypothetical/counterfactual phrasing about self
-                        has_hypothetical = any(phrase in query_lower for phrase in [
-                            'would you', 'could you', 'if you', 'should you',
-                        ])
-                        
-                        if phil_count >= 1 and has_hypothetical:
-                            # Philosophical self-reflection detected - use philosophical engine
-                            logger.info(
-                                f"{LOG_PREFIX} SELF_INTROSPECTION override: detected PHILOSOPHICAL "
-                                f"self-reflection ({phil_count} keywords, hypothetical={has_hypothetical}) - "
-                                f"routing to philosophical engine instead of world_model"
-                            )
-                            classification.suggested_tools = ['philosophical']
-                            if context is None:
-                                context = {}
-                            context['classifier_suggested_tools'] = ['philosophical']
-                            context['classifier_category'] = 'PHILOSOPHICAL'
-                            context['philosophical_self_reflection'] = True
-                        else:
-                            # Domain keyword sets for specialized routing
-                            # Note: These keywords are consistent with CAUSAL_KEYWORDS in query_classifier.py
-                            # The threshold of 2+ keywords ensures single false matches don't trigger routing
-                            DOMAIN_ROUTING_KEYWORDS = {
-                                'causal': frozenset([
-                                    'causal', 'causation', 'confound', 'confounder', 'confounding',
-                                    'intervention', 'counterfactual', 'randomize', 'randomized',
-                                    'pearl', 'dag', 'backdoor', 'frontdoor', 'collider',
-                                    'do-calculus', 'rct', 'observational', 'experimental',
-                                ]),
-                                'analogical': frozenset([
-                                    'analogical', 'analogy', 'analogies', 'analogous',
-                                    'structure mapping', 'structural alignment',
-                                    'domain transfer', 'cross-domain', 'source domain', 'target domain',
-                                    'relational similarity', 'surface similarity', 'structural similarity',
-                                    's→t', 'domain s', 'domain t', 'deep structure',
-                                ]),
-                                'probabilistic': frozenset([
-                                    'bayes', 'bayesian', 'probability', 'probabilistic',
-                                    'likelihood', 'prior', 'posterior', 'conditional probability',
-                                    'joint distribution', 'marginal', 'independence',
-                                ]),
-                            }
-                            
-                            # Check if query contains domain reasoning keywords
-                            detected_domain = None
-                            detected_count = 0
-                            for domain, keywords in DOMAIN_ROUTING_KEYWORDS.items():
-                                count = sum(1 for kw in keywords if kw in query_lower)
-                                if count >= 2:  # Require 2+ keywords for domain detection
-                                    if count > detected_count:
-                                        detected_domain = domain
-                                        detected_count = count
-                            
-                            if detected_domain:
-                                # Domain reasoning detected - route to specialized engine
-                                logger.info(
-                                    f"{LOG_PREFIX} SELF_INTROSPECTION override: detected {detected_domain} "
-                                    f"reasoning ({detected_count} keywords) - routing to {detected_domain} "
-                                    f"engine instead of world_model"
-                                )
-                                classification.suggested_tools = [detected_domain]
-                                if context is None:
-                                    context = {}
-                                context['classifier_suggested_tools'] = [detected_domain]
-                                context['classifier_category'] = classification.category
-                                context['domain_reasoning_detected'] = detected_domain
-                                context['domain_keyword_count'] = detected_count
-                                # Let the specialized engine handle it - don't block with world_model
-                                # Note: world_model can still observe in parallel mode
-                            else:
-                                # No domain keywords found - actual self-introspection
-                                # For self-introspection queries, ensure we use world_model tool
-                                # BUG FIX: Also update query_type to prevent type mismatch downstream
-                                # Previously, query_type stayed as 'MATHEMATICAL' even after overriding tools
-                                original_query_type = query_type
-                                query_type = 'self_introspection'  # FIX: Update query_type to match actual query
-                                
-                                logger.info(
-                                    f"{LOG_PREFIX} SELF_INTROSPECTION detected - using world_model tool "
-                                    f"(classifier suggested: {classification.suggested_tools}). "
-                                    f"Updated query_type: {original_query_type} -> {query_type}"
-                                )
-                                # Ensure world_model is in the suggested tools
-                                if 'world_model' not in (classification.suggested_tools or []):
-                                    classification.suggested_tools = ['world_model']
-                                if context is None:
-                                    context = {}
-                                context['classifier_suggested_tools'] = classification.suggested_tools
-                                context['prevent_router_tool_override'] = True
-                                context['classifier_is_authoritative'] = True
-                                context['is_self_introspection'] = True
-                                context['original_query_type'] = original_query_type  # FIX: Track original for debugging
+                        logger.info(
+                            f"{LOG_PREFIX} SELF_INTROSPECTION detected - using world_model tool "
+                            f"(classifier suggested: {classification.suggested_tools}). "
+                            f"Updated query_type: {original_query_type} -> {query_type}"
+                        )
+                        # Ensure world_model is in the suggested tools
+                        if 'world_model' not in (classification.suggested_tools or []):
+                            classification.suggested_tools = ['world_model']
+                        if context is None:
+                            context = {}
+                        context['classifier_suggested_tools'] = classification.suggested_tools
+                        context['prevent_router_tool_override'] = True
+                        context['classifier_is_authoritative'] = True
+                        context['is_self_introspection'] = True
+                        context['original_query_type'] = original_query_type  # FIX: Track original for debugging
                 
                 elif classification.category in SIMPLE_QUERY_CATEGORIES:
                     # For simple queries, ensure we use general tools
