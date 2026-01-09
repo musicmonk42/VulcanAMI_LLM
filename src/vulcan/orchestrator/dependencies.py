@@ -359,6 +359,9 @@ class EnhancedCollectiveDeps:
     problem_executor: Any = None
     """ProblemExecutor - Executes problem decomposition plans"""
 
+    learning_system: Any = None
+    """UnifiedLearningSystem - Unified learning system for outcome recording and feedback"""
+
     # ========================================
     # META-REASONING SYSTEMS (Specific learning/reasoning sub-category)
     # ========================================
@@ -455,6 +458,7 @@ class EnhancedCollectiveDeps:
         "world_model": DependencyCategory.LEARNING,
         "experiment_generator": DependencyCategory.LEARNING,
         "problem_executor": DependencyCategory.LEARNING,
+        "learning_system": DependencyCategory.LEARNING,
         "self_improvement_drive": DependencyCategory.META_REASONING,
         "motivational_introspection": DependencyCategory.META_REASONING,
         "objective_hierarchy": DependencyCategory.META_REASONING,

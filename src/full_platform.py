@@ -1539,6 +1539,12 @@ async def _background_services_initialization(app: FastAPI, worker_id: int, logg
                     vulcan_deployment.learning_system = unified_learning
                     vulcan_module.app.state.learning_system = unified_learning
                     
+                    # BUG FIX: Also set learning_system on deps to fix the cryptographic fast-path crash
+                    # Error was: 'EnhancedCollectiveDeps' object has no attribute 'learning_system'
+                    if vulcan_deployment.collective and vulcan_deployment.collective.deps:
+                        vulcan_deployment.collective.deps.learning_system = unified_learning
+                        logger.info("✓ Learning system wired to EnhancedCollectiveDeps")
+                    
                     # Wire OutcomeBridge to UnifiedLearningSystem for feedback loop
                     try:
                         from vulcan.curiosity_engine.outcome_bridge import get_outcome_bridge

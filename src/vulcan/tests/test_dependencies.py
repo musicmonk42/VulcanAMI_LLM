@@ -262,6 +262,7 @@ class TestValidation(unittest.TestCase):
             resource_compute=Mock(),
             experiment_generator=Mock(),  # FIXED
             problem_executor=Mock(),  # FIXED
+            learning_system=Mock(),  # ADDED: Fix for cryptographic query crash
             # Mock all meta-reasoning components
             self_improvement_drive=Mock(),
             motivational_introspection=Mock(),
@@ -369,6 +370,7 @@ class TestValidation(unittest.TestCase):
             resource_compute=Mock(),
             experiment_generator=Mock(),  # FIXED
             problem_executor=Mock(),  # FIXED
+            learning_system=Mock(),  # ADDED: Fix for cryptographic query crash
             # Mock all meta-reasoning components
             self_improvement_drive=Mock(),
             motivational_introspection=Mock(),
@@ -588,6 +590,7 @@ class TestFactoryFunctions(unittest.TestCase):
             resource_compute=Mock(),
             experiment_generator=Mock(),  # FIXED
             problem_executor=Mock(),  # FIXED
+            learning_system=Mock(),  # ADDED: Fix for cryptographic query crash
             distributed=Mock(),  # ADDED MISSING
         )
 
