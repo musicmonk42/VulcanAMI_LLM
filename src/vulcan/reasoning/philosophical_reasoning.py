@@ -2800,6 +2800,7 @@ creative generation to a more appropriate engine (language model).
         self_knowledge = None
         try:
             from vulcan.world_model import get_self_understanding
+            # Note: get_self_understanding can be None if system_observer import failed
             if get_self_understanding is not None:
                 self_knowledge = get_self_understanding()
                 logger.info(
@@ -2807,7 +2808,7 @@ creative generation to a more appropriate engine (language model).
                     f"health={self_knowledge.get('overall_health', 'unknown')}"
                 )
         except ImportError:
-            logger.debug("[PhilosophicalReasoner] get_self_understanding not available")
+            logger.debug("[PhilosophicalReasoner] get_self_understanding not available (import failed)")
         except Exception as e:
             logger.debug(f"[PhilosophicalReasoner] get_self_understanding error: {e}")
         

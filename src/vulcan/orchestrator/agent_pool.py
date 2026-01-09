@@ -2834,10 +2834,14 @@ class AgentPoolManager:
             if query_len < MIN_REASONING_QUERY_LENGTH and is_reasoning_task:
                 # Check for actual truncation indicators
                 query_text = prompt if prompt else ""
+                # Code review fix: Fixed operator precedence issue
+                ends_mid_word = False
+                if query_len > 10:
+                    ends_mid_word = query_text[-1].isalnum() and " " not in query_text[-10:]
                 appears_truncated = (
                     query_text.endswith("...") or 
                     query_text.endswith("-") or
-                    (query_len > 0 and query_text[-1].isalnum() and " " not in query_text[-10:] if query_len > 10 else False)
+                    ends_mid_word
                 )
                 if appears_truncated:
                     logger.warning(
