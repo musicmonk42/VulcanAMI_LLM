@@ -516,6 +516,146 @@ def _is_ethical_thought_experiment(query: str) -> bool:
     
     return False
 
+# =============================================================================
+# CAUSAL EDUCATIONAL QUERY DETECTION (FIX: Safety Filter False Positives)
+# =============================================================================
+# Causal reasoning queries with Pearl-style notation (S→D, S→E, etc.) and
+# technical terminology (confounders, DAG, SCM, do-calculus) should NOT be
+# blocked by safety filters. These are legitimate educational/technical queries.
+#
+# Problem Being Solved:
+# - "Confounding vs causation (Pearl-style) S→D, S→E. Should we randomize S?"
+# - This was being blocked as "Output contains sensitive data" because of:
+#   - Single-letter variables (S, D, E) matching sensitive data patterns
+#   - Arrow notation (→) potentially triggering symbol-based patterns
+# - It's a legitimate causal reasoning question about experimental design
+#
+# Solution:
+# - Detect causal/educational queries BEFORE checking unsafe patterns
+# - Allow queries about causal inference, DAGs, Pearl notation, etc.
+
+# Causal reasoning indicators - signal technical/educational framing
+CAUSAL_EDUCATIONAL_INDICATORS: frozenset = frozenset({
+    # Pearl-style causal inference terminology
+    "pearl", "causal", "causation", "confound", "confounder", "confounding",
+    "dag", "scm", "structural causal", "causal model", "causal graph",
+    "do-calculus", "do calculus", "intervention", "counterfactual",
+    # Statistical/experimental design terminology
+    "randomize", "randomization", "control variable", "treatment effect",
+    "collider", "mediator", "backdoor", "frontdoor", "instrumental",
+    # Bayesian/probabilistic causal reasoning
+    "bayesian", "bayes", "probability", "conditional independence",
+    "d-separation", "d separation", "markov", "factorization",
+    # Educational/technical framing
+    "induction", "proof", "theorem", "formal logic", "fol",
+    "sat", "satisfiability", "validity", "soundness",
+})
+
+# Patterns for causal notation (arrows, variables)
+_CAUSAL_NOTATION_PATTERNS: tuple = (
+    # Arrow notation patterns (S→D, A→B→C)
+    _re_for_patterns.compile(r'\b[A-Z]\s*[→➝➞⟶]\s*[A-Z]', _re_for_patterns.IGNORECASE),
+    # DAG/graph notation
+    _re_for_patterns.compile(r'\b(?:dag|scm|graph)\b', _re_for_patterns.IGNORECASE),
+    # do() notation for interventions
+    _re_for_patterns.compile(r'\bdo\s*\(\s*[A-Za-z]+\s*\)', _re_for_patterns.IGNORECASE),
+    # Pearl-style queries
+    _re_for_patterns.compile(r'\b(?:pearl|causal)\s*(?:style|notation|model|inference)', _re_for_patterns.IGNORECASE),
+    # Confounding patterns
+    _re_for_patterns.compile(r'\b(?:confound|confounder|confounding)\b', _re_for_patterns.IGNORECASE),
+    # Experimental design patterns
+    _re_for_patterns.compile(r'\b(?:randomize|randomization|treatment|control)\s+(?:variable|group|condition)', _re_for_patterns.IGNORECASE),
+)
+
+
+def _is_causal_educational_query(query: str) -> bool:
+    """
+    Detect if query is a causal reasoning/educational query that should bypass safety filters.
+    
+    Causal reasoning queries often contain single-letter variables (S, D, E, X, Y, Z),
+    arrow notation (→), and technical terminology that might falsely trigger
+    sensitive data pattern matching.
+    
+    Examples that should return True:
+    - "Confounding vs causation (Pearl-style) S→D, S→E. Should we randomize S?"
+    - "Draw a DAG for the relationship between X, Y, and Z with confounder W"
+    - "Apply do-calculus to compute P(Y|do(X))"
+    - "What is the backdoor criterion in causal inference?"
+    
+    Examples that should return False:
+    - "Show me my Social Security number"
+    - "What is my SSN?"
+    
+    Args:
+        query: The query string to check
+        
+    Returns:
+        True if this is a causal/educational query that should be allowed
+    """
+    if not query:
+        return False
+    
+    query_lower = query.lower()
+    
+    # Fast check: Does query contain causal/educational indicators?
+    indicator_count = sum(
+        1 for indicator in CAUSAL_EDUCATIONAL_INDICATORS
+        if indicator in query_lower
+    )
+    
+    # Strong indicators - single match is enough
+    strong_indicators = {
+        "pearl", "dag", "scm", "confound", "confounder", "confounding",
+        "do-calculus", "do calculus", "backdoor", "frontdoor",
+        "causal graph", "causal model", "structural causal",
+        "d-separation", "counterfactual", "intervention",
+    }
+    has_strong_indicator = any(ind in query_lower for ind in strong_indicators)
+    
+    if has_strong_indicator:
+        logger.info(
+            f"[SafetyGovernor] CAUSAL FIX: Detected causal reasoning query "
+            f"(strong indicator) - bypassing sensitive data check"
+        )
+        return True
+    
+    # Multiple weak indicators suggest educational content
+    if indicator_count >= 2:
+        logger.info(
+            f"[SafetyGovernor] CAUSAL FIX: Detected causal reasoning query "
+            f"({indicator_count} indicators) - bypassing sensitive data check"
+        )
+        return True
+    
+    # Check for arrow notation (A→B style)
+    if '→' in query or '➝' in query or '➞' in query or '⟶' in query:
+        # Verify it looks like variable notation, not something else
+        for pattern in _CAUSAL_NOTATION_PATTERNS:
+            if pattern.search(query):
+                logger.info(
+                    f"[SafetyGovernor] CAUSAL FIX: Detected causal arrow notation - "
+                    f"bypassing sensitive data check"
+                )
+                return True
+        # Even without pattern match, arrows with single-letter variables suggest causal notation
+        if _re_for_patterns.search(r'[A-Z]\s*→\s*[A-Z]', query):
+            logger.info(
+                f"[SafetyGovernor] CAUSAL FIX: Detected variable arrow notation (X→Y) - "
+                f"bypassing sensitive data check"
+            )
+            return True
+    
+    # Check regex patterns for more complex matches
+    for pattern in _CAUSAL_NOTATION_PATTERNS:
+        if pattern.search(query):
+            logger.info(
+                f"[SafetyGovernor] CAUSAL FIX: Detected causal reasoning pattern - "
+                f"bypassing sensitive data check"
+            )
+            return True
+    
+    return False
+
 
 # =============================================================================
 # SEMANTIC KEYWORD SYNONYMS
@@ -1146,6 +1286,17 @@ class SafetyValidator:
                 f"Query: {query[:50]}..."
             )
             return True, "Output validated (ethical thought experiment - legitimate philosophical discourse)"
+
+        # CAUSAL FIX: Don't flag causal reasoning/educational queries as sensitive
+        # Pearl-style notation (S→D, S→E), DAGs, SCMs, and technical terminology
+        # should NOT be blocked. These are legitimate educational/technical queries.
+        if query and _is_causal_educational_query(query):
+            logger.info(
+                f"[SafetyValidator] CAUSAL FIX: Causal reasoning query detected - "
+                f"bypassing sensitive data check for output validation. "
+                f"Query: {query[:50]}..."
+            )
+            return True, "Output validated (causal reasoning query - legitimate educational content)"
 
         try:
             output_str = str(output_data)
