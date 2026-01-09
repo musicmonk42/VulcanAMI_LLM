@@ -4082,40 +4082,32 @@ class ToolSelector:
             # will now handle all queries without bypass.
             # ================================================================
 
-            if hasattr(request, 'problem') and request.problem and not delegation_active:
-                problem_text = str(request.problem)
-                # ================================================================
-                # Early detection of mathematical symbols
-                # Route math queries with ∑, ∫, etc. to mathematical engine BEFORE
-                # the LLM classifier, which might misroute them to symbolic.
-                # ================================================================
-                if self._detect_math_symbols(problem_text):
-                    logger.info(
-                        f"[ToolSelector] Mathematical symbols detected - routing to mathematical engine "
-                        f"(bypassing LLM classifier to prevent misrouting to symbolic)"
-                    )
-                    # Execute with mathematical engine directly
-                    candidates = [
-                        {'tool': 'mathematical', 'utility': 0.95, 'source': 'math_symbol_detection'},
-                    ]
-                    
-                    features = self._extract_features(request)
-                    request.features = features
-                    
-                    strategy = self._select_strategy(request, candidates)
-                    execution_result = self._execute_portfolio(request, candidates, strategy)
-                    final_result = self._postprocess_result(request, execution_result, start_time)
-                    
-                    if self.config.get("learning_enabled"):
-                        self._update_learning(request, final_result)
-                    
-                    if self.config.get("cache_enabled"):
-                        self._cache_result(request, final_result)
-                    
-                    self._update_statistics(final_result)
-                    
-                    logger.info(f"[ToolSelector] Executed math query with mathematical engine")
-                    return final_result
+            # ================================================================
+            # Note: REMOVED mathematical symbols pattern override (Jan 9 2026)
+            # ================================================================
+            # The mathematical symbols detection code has been REMOVED.
+            # 
+            # Problem: Symbols like "→" are ambiguous and appear in:
+            # - "Map structure S→T" (analogical reasoning)
+            # - "Intervention→outcome" (causal reasoning)  
+            # - "∑(2k-1)" (mathematical computation)
+            #
+            # Pattern matching CANNOT distinguish between these cases.
+            # The LLM classifier uses semantic understanding to identify
+            # the correct reasoning type based on query intent.
+            #
+            # Evidence from production logs:
+            #   Query: "Compute ∑(2k-1), verify by induction"
+            #   Pattern override: "Mathematical symbols detected"
+            #   Mathematical engine: SyntaxError "invalid syntax at '-'"
+            #   Result: confidence=0.1
+            #
+            # The LLM classifier is smarter than pattern matching. Trust it.
+            # Mathematical queries are correctly classified as MATHEMATICAL.
+            # The classifier path below handles all queries.
+            # ================================================================
+            # NOTE: The _detect_math_symbols() method still exists for other uses
+            # but it no longer bypasses the LLM classifier here.
 
             # ================================================================
             # Note: Check if QueryClassifier already suggested tools
