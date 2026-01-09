@@ -208,7 +208,7 @@ jobs:
           pip install -e .
           
           for i in 1 2 3; do
-            pip install --no-cache-dir pytest pytest-cov pytest-asyncio pytest-timeout mock hypothesis faker numpy python-dotenv scipy lz4 psutil && \
+            pip install --no-cache-dir pytest pytest-cov pytest-asyncio pytest-timeout pytest-xdist mock hypothesis faker numpy python-dotenv scipy lz4 psutil && \
             break || (echo "Retry $i/3: test dependencies install failed"; sleep $((i*10)))
           done
           for i in 1 2 3; do
@@ -248,6 +248,13 @@ jobs:
           echo "POSTGRES_DB=test_db" >> $GITHUB_ENV
           echo "PYTHONPATH=${{ github.workspace }}/src:$PYTHONPATH" >> $GITHUB_ENV
 
+      - name: Monitor system resources
+        run: |
+          echo "=== System Resources Before Tests ==="
+          free -h
+          df -h
+          ulimit -a
+
       - name: Run tests with coverage
         run: |
           set -x
@@ -255,13 +262,16 @@ jobs:
           mkdir -p $GITHUB_WORKSPACE/logs
           exit_code=0
           ulimit -Sn 10240 || true
+          
           pytest --cov=src -q \
             --cov-report=xml \
             --cov-report=html \
             --cov-report=term-missing \
             --junitxml=results/junit.xml \
-            --timeout=300 \
+            --timeout=600 \
             --maxfail=10 \
+            -n 2 \
+            --dist=loadscope \
             -m "not slow and not load_test and not benchmark" \
             -v \
             2>&1 | tee $GITHUB_WORKSPACE/logs/pytest-output.log || exit_code=$?
