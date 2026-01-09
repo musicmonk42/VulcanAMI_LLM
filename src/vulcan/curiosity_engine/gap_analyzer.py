@@ -1516,9 +1516,17 @@ class GapAnalyzer:
             stats = get_outcome_statistics()
             
             # Consider it anomalous if there are slow routing events or low success rate
+            # BUG #10 FIX: Prefer quality_success_rate over execution success_rate
+            # quality_success_rate measures "answer was useful" not just "didn't crash"
             if stats.slow_routing_count > 0:
                 return True
-            if stats.total > 0 and stats.success_rate < 0.9:
+            # Use quality success rate if available, otherwise fall back to execution success rate
+            effective_success_rate = (
+                stats.quality_success_rate 
+                if stats.quality_success_rate > 0 
+                else stats.success_rate
+            )
+            if stats.total > 0 and effective_success_rate < 0.9:
                 return True
                 
             return False
