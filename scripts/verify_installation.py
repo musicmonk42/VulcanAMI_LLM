@@ -40,11 +40,14 @@ Version: 1.0.0
 from __future__ import annotations
 
 import argparse
+import atexit
 import importlib
 import json
 import logging
 import os
+import signal
 import sys
+import threading
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -413,6 +416,38 @@ def main() -> int:
             except Exception:
                 pass
         logging.shutdown()
+        
+        # In verify-only mode, force exit after a short delay to handle
+        # any daemon threads that might be blocking normal shutdown.
+        # This prevents CI pipelines from hanging indefinitely.
+        # NOTE: os._exit() is intentionally used instead of sys.exit() because:
+        # 1. sys.exit() raises SystemExit which can be caught by threads
+        # 2. Some VULCAN modules start background threads during import
+        # 3. These threads may not respond to normal shutdown signals
+        # 4. The 2-second delay allows ample time for any critical cleanup
+        if args.verify_only:
+            def force_exit(code: int) -> None:
+                """Force exit after timeout to prevent hanging on daemon threads.
+                
+                Uses os._exit() to bypass Python's normal cleanup because:
+                - Background threads from imported modules may block sys.exit()
+                - In CI, a hung process causes timeouts and wastes resources
+                - The 2-second delay allows normal cleanup to complete first
+                """
+                time.sleep(2)  # Allow 2 seconds for normal cleanup
+                # Check if there are any non-daemon threads still running
+                active_threads = [t for t in threading.enumerate() 
+                                  if t.is_alive() and not t.daemon and t != threading.main_thread()]
+                if active_threads:
+                    # Use print since logging is already shut down
+                    print(f"Force exiting due to {len(active_threads)} active non-daemon threads", 
+                          file=sys.stderr)
+                os._exit(code)
+            
+            # Start force exit timer in a daemon thread
+            exit_timer = threading.Thread(target=force_exit, args=(exit_code,), daemon=True)
+            exit_timer.start()
+        
         return exit_code
 
     except KeyboardInterrupt:
