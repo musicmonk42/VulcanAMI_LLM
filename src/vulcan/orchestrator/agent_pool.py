@@ -3022,8 +3022,14 @@ class AgentPoolManager:
                                 )
                                 
                                 # FIX TASK 6: Validate reasoning result
-                                result_type = getattr(reasoning_result, 'reasoning_type', 'unknown')
-                                result_confidence = getattr(reasoning_result, 'confidence', 0.0)
+                                # BUG #3 FIX: Handle both dict and object results correctly
+                                # WorldModelToolWrapper returns dict with "confidence" key, not attribute
+                                if isinstance(reasoning_result, dict):
+                                    result_type = reasoning_result.get('reasoning_type', 'unknown')
+                                    result_confidence = reasoning_result.get('confidence', 0.0)
+                                else:
+                                    result_type = getattr(reasoning_result, 'reasoning_type', 'unknown')
+                                    result_confidence = getattr(reasoning_result, 'confidence', 0.0)
                                 
                                 logger.info(
                                     f"Agent {agent_id} reasoning execution complete: "

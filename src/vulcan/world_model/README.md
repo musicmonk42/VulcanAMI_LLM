@@ -1580,7 +1580,102 @@ ERROR: Improvement failed - gates did not pass
 
 **Pareto Frontier:** Set of non-dominated solutions in multi-objective optimization
 
+**SystemObserver:** Event tracking system connecting reasoning execution to meta-reasoning
+
 **Validation Pattern:** Learned correlation between features and approval/rejection
+
+---
+
+## SystemObserver Integration API
+
+The SystemObserver connects the reasoning integration layer to meta-reasoning components, enabling the platform's "self" to observe, learn from, and remember its experiences.
+
+### Event Tracking
+
+```python
+from vulcan.world_model import (
+    get_system_observer,
+    observe_query_start,
+    observe_engine_result,
+    observe_outcome,
+    observe_error,
+)
+
+# Automatically called by reasoning_integration.py during query processing
+observe_query_start(query_id, query, classification)
+observe_engine_result(query_id, engine_name, result, success, execution_time_ms)
+observe_outcome(query_id, response, user_feedback)
+```
+
+### Meta-Reasoning Integration
+
+```python
+from vulcan.world_model import (
+    get_recent_reasoning_activity,
+    get_reasoning_success_rates,
+    get_failure_patterns_for_improvement,
+    get_recent_outcomes,
+)
+
+# Get recent engine executions
+activity = get_recent_reasoning_activity(limit=50)
+
+# Get success rates by engine
+rates = get_reasoning_success_rates()
+
+# Get failure patterns for SelfImprovementDrive
+patterns = get_failure_patterns_for_improvement()
+```
+
+### Learning System Integration
+
+```python
+from vulcan.world_model import (
+    get_learning_insights,
+    get_tool_performance_history,
+)
+
+# Get tool weights, trends, recommendations
+insights = get_learning_insights()
+
+# Get detailed history for a specific tool
+history = get_tool_performance_history('mathematical')
+```
+
+### Memory Integration
+
+```python
+from vulcan.world_model import (
+    get_memory_access,
+    store_meta_reasoning_insight,
+    retrieve_meta_reasoning_insights,
+)
+
+# Store insights about self
+store_meta_reasoning_insight(
+    insight_type='failure_pattern',
+    content={'engine': 'mathematical', 'issue': 'syntax errors'},
+    importance=0.8
+)
+
+# Recall past learnings
+insights = retrieve_meta_reasoning_insights(insight_type='failure_pattern')
+```
+
+### Self-Understanding
+
+```python
+from vulcan.world_model import get_self_understanding
+
+# Comprehensive self-awareness summary
+understanding = get_self_understanding()
+# Returns:
+# - reasoning_activity: What engines are being used, success rates
+# - learning_insights: What the system has learned about tool performance  
+# - stored_insights: What meta-reasoning remembers about itself
+# - overall_health: Is the system performing well?
+# - health_score: 0.0 to 1.0 health metric
+```
 
 ---
 

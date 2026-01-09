@@ -399,6 +399,31 @@ except ImportError as e:
         f"⚠️ Reasoning integration not available: {e}. Tasks will use subprocess execution."
     )
 
+# ============================================================
+# SYSTEM OBSERVER INTEGRATION - BUG #3 FIX
+# ============================================================
+# Import SystemObserver functions to make world model aware of Arena activity
+# This ensures the world model knows about all reasoning executed via Arena
+try:
+    from vulcan.reasoning.reasoning_integration import (
+        observe_query_start,
+        observe_engine_result,
+        observe_outcome,
+        observe_error,
+    )
+    SYSTEM_OBSERVER_AVAILABLE = True
+    logger_init.info(
+        "✅ SystemObserver integration loaded - world model will receive Arena events"
+    )
+except ImportError:
+    SYSTEM_OBSERVER_AVAILABLE = False
+    # Define no-op functions as fallbacks
+    def observe_query_start(*args, **kwargs): pass
+    def observe_engine_result(*args, **kwargs): pass
+    def observe_outcome(*args, **kwargs): pass
+    def observe_error(*args, **kwargs): pass
+    logger_init.debug("⚠️ SystemObserver not available - world model will not receive Arena events")
+
 
 # Configure logging
 logging.basicConfig(
@@ -1649,7 +1674,7 @@ class GraphixArena:
                         )
                 
                 # Build result with reasoning output
-                return {
+                result = {
                     "status": "success",
                     "agent_id": agent_id,
                     "reasoning_invoked": True,
@@ -1664,10 +1689,32 @@ class GraphixArena:
                     ),
                 }
                 
+                # BUG #3 FIX: Notify world model of Arena reasoning execution
+                # This makes the world model aware of reasoning via Arena
+                _query_id = data.get("query_id", f"arena_{agent_id}_{int(time.time())}")
+                observe_engine_result(
+                    query_id=_query_id,
+                    engine_name=integration_result.reasoning_strategy or query_type,
+                    result=result,
+                    # Note: 0.15 is consistent with MIN_REASONING_CONFIDENCE_THRESHOLD in main.py
+                    success=integration_result.confidence > 0.15 if integration_result.confidence else False,
+                    execution_time_ms=0  # No timing available here
+                )
+                
+                return result
+                
             except Exception as reasoning_error:
                 logger.warning(
                     f"Reasoning integration failed for '{agent_id}': {reasoning_error}. "
                     f"Falling back to subprocess execution."
+                )
+                
+                # BUG #3 FIX: Notify world model of reasoning error
+                observe_error(
+                    query_id=data.get("query_id", f"arena_{agent_id}_{int(time.time())}"),
+                    error_type="reasoning_integration_failed",
+                    error_message=str(reasoning_error),
+                    component="graphix_arena._run_agent"
                 )
                 # Fall through to standard execution below
 

@@ -55,8 +55,11 @@ try:
         FORMAL_LOGIC_KEYWORDS,
         PROBABILITY_KEYWORDS,
         SELF_REFERENTIAL_KEYWORDS,
+        initialize_system_observer,
+        get_system_observer,
     )
     SHARED_CONSTANTS_AVAILABLE = True
+    SYSTEM_OBSERVER_IMPORTABLE = True
 except ImportError:
     # Fallback definitions if system_observer not available
     FORMAL_LOGIC_SYMBOLS = frozenset(['→', '∧', '∨', '¬', '∀', '∃', '⊢', '⊨', '↔', '⇒', '⇔'])
@@ -64,6 +67,9 @@ except ImportError:
     PROBABILITY_KEYWORDS = frozenset(['probability', 'likelihood', 'bayes', 'bayesian', 'posterior', 'prior', 'p(', 'conditional', 'expectation', 'marginal'])
     SELF_REFERENTIAL_KEYWORDS = frozenset(['you want', 'your goal', 'self-aware', 'you have', 'do you', 'are you', 'your capabilities', 'yourself', 'your purpose', 'your objectives'])
     SHARED_CONSTANTS_AVAILABLE = False
+    SYSTEM_OBSERVER_IMPORTABLE = False
+    initialize_system_observer = None  # type: ignore
+    get_system_observer = None  # type: ignore
 
 # Minimum observations needed for routing recommendations
 MIN_OBSERVATIONS_FOR_RECOMMENDATIONS = 5
@@ -2081,6 +2087,25 @@ class WorldModel:
         # Verify safety validator interface if available
         if self.safety_validator:
             self._verify_safety_validator_interface()
+
+        # =================================================================
+        # BUG #3 FIX: Initialize SystemObserver for query event tracking
+        # =================================================================
+        # The SystemObserver is the "nervous system" that connects query
+        # processing (via reasoning_integration.py) to the WorldModel's
+        # learning system. Without this initialization, observe_* functions
+        # in reasoning_integration.py will silently no-op.
+        # =================================================================
+        self.system_observer = None
+        if SYSTEM_OBSERVER_IMPORTABLE and initialize_system_observer is not None:
+            try:
+                self.system_observer = initialize_system_observer(self)
+                logger.info("✓ SystemObserver initialized - query event tracking active")
+            except Exception as e:
+                logger.warning(f"⚠ SystemObserver initialization failed: {e}")
+                self.system_observer = None
+        else:
+            logger.debug("⚠ SystemObserver not available - query events will not be tracked")
 
         self.components = [
             "causal_graph",

@@ -42,6 +42,11 @@ WEIGHT_PENALTY_OVERRIDE = 0.5      # Multiply reward by 0.5 if tools were overri
 WEIGHT_PENALTY_FALLBACK = 0.3      # Multiply reward by 0.3 if fallback was used
 WEIGHT_PENALTY_UNVERIFIED = 0.7    # Multiply reward by 0.7 if high confidence but unverified
 
+# BUG #3 FIX: Threshold below which tool confidence is considered "low"
+# If tool returns confidence below this AND LLM fallback was needed,
+# the tool is penalized instead of rewarded (it failed, LLM saved it)
+LOW_CONFIDENCE_THRESHOLD = 0.3
+
 # Note: Tool Weight Death Spiral Prevention
 # These constants prevent tools from accumulating unbounded negative weights.
 # Without bounds, tools can become unusable due to accumulated failures.
@@ -764,13 +769,38 @@ class UnifiedLearningSystem:
                 # Check for fallback tools
                 fallback_tools = {'world_model', 'general', 'meta_reasoning', 'openai_fallback'}
                 used_fallback = any(t.lower() in fallback_tools for t in tools)
+                
+                # BUG #3 FIX: Check if tool had low confidence but OpenAI fallback succeeded
+                # In this case, the tool FAILED (it returned low confidence) but the overall
+                # task succeeded because OpenAI saved it. The tool should be PENALIZED.
+                tool_confidence = outcome.get('tool_confidence', outcome.get('reasoning_confidence', 1.0))
+                llm_fallback_used = outcome.get('llm_fallback_used', False) or outcome.get('used_openai_fallback', False)
+                source = outcome.get('source', '')
+                
+                # If source indicates OpenAI was used OR llm_fallback flag is set, this was a fallback
+                if 'openai' in str(source).lower() or 'llm' in str(source).lower():
+                    llm_fallback_used = True
+                
                 if used_fallback:
                     original_delta = weight_delta
-                    weight_delta *= WEIGHT_PENALTY_FALLBACK
-                    logger.info(
-                        f"[Learning] GAP 10 FIX: Fallback penalty applied: "
-                        f"{original_delta:+.4f} * {WEIGHT_PENALTY_FALLBACK} = {weight_delta:+.4f}"
-                    )
+                    
+                    # BUG #3 FIX: If tool had LOW confidence but OpenAI fallback saved the day,
+                    # apply NEGATIVE weight to the tool (it failed, OpenAI succeeded)
+                    if llm_fallback_used and tool_confidence < LOW_CONFIDENCE_THRESHOLD:
+                        # Tool returned low confidence, LLM fallback was needed
+                        # This is a FAILURE for the tool - apply negative weight
+                        weight_delta = WEIGHT_ADJUSTMENT_FAILURE  # -0.005
+                        logger.warning(
+                            f"[Learning] BUG #3 FIX: Tool returned low confidence ({tool_confidence:.2f}) "
+                            f"and LLM fallback was used. Applying NEGATIVE weight: {weight_delta:+.4f}"
+                        )
+                    else:
+                        # Regular fallback penalty (multiplier)
+                        weight_delta *= WEIGHT_PENALTY_FALLBACK
+                        logger.info(
+                            f"[Learning] GAP 10 FIX: Fallback penalty applied: "
+                            f"{original_delta:+.4f} * {WEIGHT_PENALTY_FALLBACK} = {weight_delta:+.4f}"
+                        )
                 
                 # Check for unverified high confidence
                 confidence = outcome.get('confidence', 0)
