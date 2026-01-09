@@ -847,21 +847,14 @@ class UnifiedReasoner:
         except Exception as e:
             logger.warning(f"Error initializing mathematical computation tool: {e}")
 
-        # Initialize philosophical reasoner for ethical/deontic queries
-        # Note: Add PHILOSOPHICAL reasoning type to handle ethical queries that were returning UNKNOWN
-        try:
-            from .philosophical_reasoning import PhilosophicalReasoner
-            
-            philosophical_reasoner = PhilosophicalReasoner(
-                symbolic_reasoner=self.reasoners.get(ReasoningType.SYMBOLIC),
-                enable_learning=enable_learning,
-            )
-            self.reasoners[ReasoningType.PHILOSOPHICAL] = philosophical_reasoner
-            logger.info("Philosophical reasoner registered for ethical/deontic queries")
-        except ImportError as e:
-            logger.warning(f"Philosophical reasoner not available: {e}")
-        except Exception as e:
-            logger.warning(f"Error initializing philosophical reasoner: {e}")
+        # PHILOSOPHICAL REASONER REMOVED: Ethical reasoning now handled by World Model
+        # The World Model has full meta-reasoning machinery:
+        # - predict_interventions() for causal predictions
+        # - InternalCritic for multi-framework evaluation
+        # - GoalConflictDetector for dilemma analysis
+        # - EthicalBoundaryMonitor for ethical constraints
+        # Philosophical queries are routed to World Model via mode='philosophical'
+        logger.info("Philosophical reasoning: Routed to World Model (PhilosophicalReasoner removed)")
         
         # Note: Normalize enum keys to string keys for portfolio executor and warm pool
         tools_by_name = {k.value: v for k, v in self.reasoners.items()}
@@ -3364,8 +3357,8 @@ class UnifiedReasoner:
 
             elif task.task_type == ReasoningType.PHILOSOPHICAL:
                 # Note: Handle PHILOSOPHICAL reasoning type for ethical/deontic queries
-                # PhilosophicalReasoner.reason() expects (problem, context) signature
-                # where problem can be a string query or dict with 'query' key
+                # World Model.reason() expects query string and optional mode parameter
+                # Philosophical queries use mode='philosophical' for ethical reasoning
                 if hasattr(reasoner, "reason"):
                     # Build problem dict from task
                     problem = task.query if isinstance(task.query, dict) else {'query': str(task.query)}

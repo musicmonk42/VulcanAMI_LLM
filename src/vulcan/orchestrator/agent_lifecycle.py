@@ -100,7 +100,7 @@ class AgentCapability(Enum):
     # These map directly to reasoning engines registered in portfolio_executor.py
     PROBABILISTIC = "probabilistic"      # Maps to ProbabilisticReasoner
     SYMBOLIC = "symbolic"                # Maps to SymbolicReasoner
-    PHILOSOPHICAL = "philosophical"      # Maps to PhilosophicalReasoner
+    PHILOSOPHICAL = "philosophical"      # Maps to WorldModel (mode='philosophical')
     MATHEMATICAL = "mathematical"        # Maps to MathematicalComputationTool
     CAUSAL = "causal"                    # Maps to CausalReasoner
     ANALOGICAL = "analogical"            # Maps to AnalogicalReasoningEngine

@@ -3651,10 +3651,11 @@ class QueryAnalyzer:
                 plan.safety_passed = True
                 plan.detected_patterns.append(f"classifier_{classification.category.lower()}")
                 
-                # FIX: Override tools for PHILOSOPHICAL category to use proper reasoning tools
-                # instead of just ["general"]. Philosophical queries need symbolic and causal reasoning.
+                # Route PHILOSOPHICAL queries to world_model (has full meta-reasoning machinery)
+                # World Model provides: predict_interventions(), InternalCritic, GoalConflictDetector,
+                # EthicalBoundaryMonitor - everything needed for ethical reasoning.
                 if classification.category == "PHILOSOPHICAL":
-                    tools_to_use = ["philosophical", "symbolic", "causal"]
+                    tools_to_use = ["world_model", "causal", "analogical"]
                 else:
                     tools_to_use = classification.suggested_tools or ["general"]
                 
@@ -4105,11 +4106,11 @@ class QueryAnalyzer:
             
             # Note: Multi-tool configuration
             # PRIMARY: meta_reasoning - forms Vulcan's own position
-            # REFERENCE: philosophical - provides frameworks to consult
+            # REFERENCE: world_model (philosophical mode) - provides frameworks
             # ACCESS: world_model - provides self-state/representation
             primary_tools = ["meta_reasoning", "world_model"]
-            reference_tools = ["philosophical"]
-            all_tools = primary_tools + reference_tools
+            reference_tools = ["world_model"]  # World Model handles philosophical via mode='philosophical'
+            all_tools = primary_tools
             
             plan.agent_tasks = [
                 # PRIMARY TASK: Meta-reasoning to form Vulcan's position
@@ -4137,11 +4138,11 @@ class QueryAnalyzer:
                         },
                     },
                 ),
-                # REFERENCE TASK: Philosophical analysis (to be consulted, not just executed)
+                # REFERENCE TASK: World Model philosophical analysis (to be consulted)
                 AgentTask(
                     task_id=f"task_{uuid.uuid4().hex[:8]}_introspect_reference",
                     task_type="philosophical_reference_task",
-                    capability="philosophical",
+                    capability="world_model",  # Route to World Model
                     prompt=f"Provide philosophical frameworks relevant to: {query}",
                     priority=2,  # Lower priority - this is REFERENCE
                     timeout_seconds=15.0,
@@ -4149,6 +4150,7 @@ class QueryAnalyzer:
                         "is_self_introspection": True,
                         "is_reference": True,  # NOT primary - just a reference
                         "tools": reference_tools,
+                        "mode": "philosophical",  # World Model philosophical mode
                         "response_type": "philosophical_analysis",
                         "reference_mode": True,  # Indicates this should be consulted
                         "bug16_fix": True,
@@ -4212,24 +4214,27 @@ class QueryAnalyzer:
             plan.safety_passed = True
             plan.detected_patterns.append("philosophical_query")
 
+            # Route to world_model which has full meta-reasoning machinery:
+            # - predict_interventions() for causal predictions
+            # - InternalCritic for multi-framework evaluation
+            # - GoalConflictDetector for dilemma analysis
+            # - EthicalBoundaryMonitor for ethical constraints
             plan.agent_tasks = [
                 AgentTask(
                     task_id=f"task_{uuid.uuid4().hex[:8]}_philosophical",
-                    task_type="philosophical_task",  # FIX: Preserve philosophical type instead of general_task
-                    capability="philosophical",  # FIX: Use philosophical handler for proper routing
+                    task_type="philosophical_task",
+                    capability="world_model",  # Route to World Model for ethical reasoning
                     prompt=query,
                     priority=1,
                     timeout_seconds=PHILOSOPHICAL_TIMEOUT_SECONDS,
                     parameters={
                         "is_philosophical": True,
-                        # FIX TASK 7: Pass full query context in parameters
-                        # Agent pool extracts query from parameters["prompt"] or parameters["query"]
-                        "prompt": query,  # FIX: Explicitly include prompt in parameters
+                        "prompt": query,
                         "skip_heavy_analysis": True,
                         "skip_arena": True,
-                        # FIX: Add 'philosophical' tool for ethical/deontic reasoning
-                        "tools": ["philosophical", "symbolic", "causal"],
+                        "tools": ["world_model", "causal", "analogical"],
                         "response_type": "conversational",
+                        "mode": "philosophical",  # Tell World Model to use philosophical reasoning
                         "reasoning_context": {
                             "original_query": query,
                             "query_type": "philosophical",
@@ -4239,8 +4244,8 @@ class QueryAnalyzer:
                 )
             ]
 
-            plan.telemetry_data["selected_tools"] = ["philosophical", "symbolic", "causal"]  # FIX: Include philosophical tool
-            plan.telemetry_data["reasoning_strategy"] = "philosophical_reasoning"  # FIX: Use proper strategy name
+            plan.telemetry_data["selected_tools"] = ["world_model", "causal", "analogical"]
+            plan.telemetry_data["reasoning_strategy"] = "world_model_philosophical"
 
             logger.info(
                 f"[QueryRouter] {query_id}: PHILOSOPHICAL-FAST-PATH source={source}, "

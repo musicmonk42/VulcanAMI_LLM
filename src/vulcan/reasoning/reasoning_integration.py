@@ -358,6 +358,7 @@ class ReasoningStrategyType(Enum):
 
 
 # Maps query types to appropriate reasoning strategies
+# NOTE: 'philosophical' now routes to world_model which has full meta-reasoning machinery
 QUERY_TYPE_STRATEGY_MAP: Dict[str, str] = {
     "reasoning": "causal_reasoning",
     "execution": "planning",
@@ -365,8 +366,8 @@ QUERY_TYPE_STRATEGY_MAP: Dict[str, str] = {
     "planning": "deliberative",
     "learning": "meta_reasoning",
     "general": "direct",
-    "philosophical": "philosophical_reasoning",  # Note: Map philosophical queries to philosophical reasoning
-    "ethical": "philosophical_reasoning",        # Note: Map ethical queries to philosophical reasoning
+    "philosophical": "meta_reasoning",  # Route to World Model meta-reasoning
+    "ethical": "meta_reasoning",        # Route to World Model meta-reasoning
 }
 
 # ==================================================================
@@ -374,10 +375,11 @@ QUERY_TYPE_STRATEGY_MAP: Dict[str, str] = {
 # Production logs showed reasoning returning type=UNKNOWN with confidence=0.1
 # because the system didn't know how to map route types to reasoning types.
 # This mapping ensures proper reasoning type classification.
+# NOTE: 'philosophical' now maps to 'world_model' for ethical reasoning
 # ==================================================================
 ROUTE_TO_REASONING_TYPE: Dict[str, str] = {
     # Fast-path routes from query_router.py
-    "PHILOSOPHICAL-FAST-PATH": "philosophical",  # Philosophical queries use philosophical reasoning
+    "PHILOSOPHICAL-FAST-PATH": "world_model",    # Philosophical queries route to World Model
     "MATH-FAST-PATH": "mathematical",            # Math queries use mathematical reasoning
     "CAUSAL-PATH": "causal",                     # Causal queries use causal reasoning
     "IDENTITY-FAST-PATH": "symbolic",            # Identity queries use symbolic reasoning
@@ -385,7 +387,7 @@ ROUTE_TO_REASONING_TYPE: Dict[str, str] = {
     "FACTUAL-FAST-PATH": "probabilistic",        # Factual queries use probabilistic
     "ANALOGICAL-PATH": "analogical",             # Note: Added analogical fast-path
     # QueryType enum values from query_router.py
-    "philosophical": "philosophical",            # PHILOSOPHICAL query type
+    "philosophical": "world_model",              # PHILOSOPHICAL -> World Model
     "mathematical": "mathematical",              # MATHEMATICAL query type
     "causal": "causal",                          # CAUSAL query type
     "identity": "symbolic",                      # IDENTITY query type
@@ -396,6 +398,7 @@ ROUTE_TO_REASONING_TYPE: Dict[str, str] = {
     "execution": "symbolic",                     # Execution tasks
     "analogical": "analogical",                  # Note: Added analogical mapping
     "perception": "analogical",                  # Note: Perception often uses analogical reasoning
+    "ethical": "world_model",                    # Ethical queries -> World Model
     # Legacy/fallback mappings
     "HYBRID": "hybrid",
     "UNKNOWN": "hybrid",
@@ -2302,11 +2305,11 @@ class ReasoningIntegration:
             List of fallback tool names to try, in priority order
         """
         # Map query types to preferred fallback tools
-        # FIX #1: Include newly registered philosophical and mathematical engines
+        # NOTE: 'philosophical' engine removed - use 'world_model' for ethical reasoning
         query_type_fallbacks = {
-            # Ethical/philosophical queries → try philosophical engine first
-            'ethical': ['philosophical', 'world_model', 'analogical'],
-            'philosophical': ['world_model', 'analogical', 'probabilistic'],
+            # Ethical/philosophical queries → world_model is primary (has full meta-reasoning)
+            'ethical': ['world_model', 'analogical', 'causal'],
+            'philosophical': ['world_model', 'analogical', 'causal'],
             
             # Mathematical queries → try mathematical engine first
             'mathematical': ['symbolic', 'probabilistic'],
@@ -2325,7 +2328,7 @@ class ReasoningIntegration:
             'cryptographic': ['mathematical', 'symbolic'],
             
             # Self-introspection queries → world_model is primary
-            'self_introspection': ['philosophical', 'analogical'],
+            'self_introspection': ['world_model', 'analogical'],
             
             # General/reasoning queries → broad fallback
             'reasoning': ['world_model', 'probabilistic', 'analogical'],
@@ -2343,7 +2346,8 @@ class ReasoningIntegration:
         
         # Ensure we have the general-purpose fallbacks at the end
         # Use set for O(1) membership testing instead of O(n) list lookup
-        default_fallbacks = ['world_model', 'probabilistic', 'analogical', 'philosophical', 'mathematical']
+        # NOTE: 'philosophical' removed from defaults - world_model handles ethical reasoning
+        default_fallbacks = ['world_model', 'probabilistic', 'analogical', 'mathematical']
         existing_tools = set(fallback_list)
         for tool in default_fallbacks:
             if tool not in existing_tools:

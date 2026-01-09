@@ -3468,35 +3468,44 @@ class CryptographicToolWrapper:
 
 
 # ==============================================================================
-# FIX #1: PhilosophicalToolWrapper - Register philosophical reasoning engine
+# PhilosophicalToolWrapper - DEPRECATED: Now routes to World Model
 # ==============================================================================
+# PHILOSOPHICAL REASONER REMOVED: Ethical reasoning now handled by World Model
+# The World Model has full meta-reasoning machinery:
+# - predict_interventions() for causal predictions
+# - InternalCritic for multi-framework evaluation
+# - GoalConflictDetector for dilemma analysis
+# - EthicalBoundaryMonitor for ethical constraints
+#
+# This wrapper is kept for backward compatibility but delegates to World Model.
 class PhilosophicalToolWrapper:
     """
-    Wrapper for PhilosophicalReasoner that exposes reason() method.
+    DEPRECATED: Wrapper that delegates philosophical reasoning to World Model.
     
-    FIX #1: Missing Engine Registration
-    Evidence from logs: "Tool 'philosophical' not available, using fallback: world_model"
-    
-    The PhilosophicalReasoner performs ethical/deontic reasoning including:
-    - Standard deontic logic (SDL) with P(ermitted), O(bligatory), F(orbidden)
-    - Moral uncertainty handling using MEC-inspired heuristics
-    - Pareto dominance checking for ethical alternatives
-    - Trolley problem variants and ethical dilemma analysis
+    The PhilosophicalReasoner has been removed. This wrapper now routes
+    philosophical/ethical queries to World Model's _philosophical_reasoning method.
     """
     
-    def __init__(self, engine):
+    def __init__(self, engine=None):
         """
-        Initialize with a PhilosophicalReasoner instance.
-        
-        Args:
-            engine: PhilosophicalReasoner instance
+        Initialize wrapper. Engine parameter is ignored - uses World Model.
         """
-        self.engine = engine
+        self._world_model = None
         self.name = "philosophical"
+    
+    def _get_world_model(self):
+        """Lazy-load World Model."""
+        if self._world_model is None:
+            try:
+                from vulcan.world_model.world_model_core import WorldModel
+                self._world_model = WorldModel()
+            except ImportError:
+                logger.warning("[PhilosophicalToolWrapper] World Model not available")
+        return self._world_model
     
     def reason(self, problem: Any) -> Dict[str, Any]:
         """
-        Execute philosophical/ethical reasoning on the problem.
+        Execute philosophical/ethical reasoning via World Model.
         
         Args:
             problem: Dict with query, or string query
@@ -3510,56 +3519,47 @@ class PhilosophicalToolWrapper:
             # Extract query string from problem
             if isinstance(problem, str):
                 query = problem
-                context = None
             elif isinstance(problem, dict):
                 query = problem.get("query") or problem.get("text") or problem.get("problem", "")
-                context = problem.get("context")
             else:
                 query = str(problem)
-                context = None
             
-            logger.info(f"[PhilosophicalEngine] Analyzing ethical query: {query[:100]}...")
+            logger.info(f"[PhilosophicalToolWrapper] Routing to World Model: {query[:100]}...")
             
-            # Execute philosophical reasoning
-            if hasattr(self.engine, "reason"):
-                result = self.engine.reason(problem, context=context)
-            elif hasattr(self.engine, "analyze"):
-                result = self.engine.analyze(query, context=context)
-            elif hasattr(self.engine, "evaluate"):
-                result = self.engine.evaluate(query)
+            # Route to World Model's philosophical reasoning
+            world_model = self._get_world_model()
+            if world_model:
+                result = world_model.reason(query, mode='philosophical')
             else:
-                # Fallback if engine doesn't have expected methods
+                # Fallback if World Model not available
                 result = {
-                    "analysis": "Philosophical analysis requested",
-                    "query": query,
-                    "confidence": 0.5
+                    "response": "Philosophical analysis requested but World Model not available",
+                    "confidence": 0.3
                 }
             
             execution_time = (time.perf_counter() - start_time) * 1000
             
             # Extract confidence from result
-            confidence = 0.7
-            if isinstance(result, dict):
-                confidence = result.get("confidence", 0.7)
+            confidence = result.get("confidence", 0.7) if isinstance(result, dict) else 0.7
             
-            logger.info(f"[PhilosophicalEngine] Analysis complete: confidence={confidence:.3f}, time={execution_time:.0f}ms")
+            logger.info(f"[PhilosophicalToolWrapper] Analysis complete: confidence={confidence:.3f}, time={execution_time:.0f}ms")
             
             return {
                 "tool": self.name,
                 "result": result,
                 "confidence": confidence,
                 "execution_time_ms": execution_time,
-                "engine": "PhilosophicalReasoner",
+                "engine": "WorldModel.philosophical",
             }
             
         except Exception as e:
-            logger.error(f"[PhilosophicalEngine] Reasoning failed: {e}", exc_info=True)
+            logger.error(f"[PhilosophicalToolWrapper] Reasoning failed: {e}", exc_info=True)
             return {
                 "tool": self.name,
                 "result": None,
                 "confidence": 0.1,
                 "error": str(e),
-                "engine": "PhilosophicalReasoner",
+                "engine": "WorldModel.philosophical",
                 "execution_time_ms": (time.perf_counter() - start_time) * 1000,
             }
 
@@ -4245,20 +4245,17 @@ class ToolSelector:
             engines["cryptographic"] = None
         
         # ============================================================
-        # FIX #1: PHILOSOPHICAL ENGINE (Ethical/deontic reasoning)
         # ============================================================
-        # This enables routing of philosophical/ethical queries to the proper
-        # reasoning engine instead of falling back to world_model or LLM.
-        # Evidence from logs: "Tool 'philosophical' not available, using fallback: world_model"
+        # PHILOSOPHICAL ENGINE - Now routes to World Model
+        # ============================================================
+        # PhilosophicalReasoner has been removed. The PhilosophicalToolWrapper
+        # now delegates to World Model's _philosophical_reasoning method.
+        # World Model has full meta-reasoning machinery for ethical reasoning.
         try:
-            from ..philosophical_reasoning import PhilosophicalReasoner
-            engines["philosophical"] = PhilosophicalToolWrapper(PhilosophicalReasoner())
-            logger.info("[ToolSelector] PhilosophicalReasoner loaded successfully")
-        except ImportError as e:
-            logger.warning(f"[ToolSelector] PhilosophicalReasoner not available: {e}")
-            engines["philosophical"] = None
+            engines["philosophical"] = PhilosophicalToolWrapper()  # Delegates to World Model
+            logger.info("[ToolSelector] Philosophical reasoning: Routed to World Model")
         except Exception as e:
-            logger.error(f"[ToolSelector] PhilosophicalReasoner initialization failed: {e}")
+            logger.error(f"[ToolSelector] PhilosophicalToolWrapper initialization failed: {e}")
             engines["philosophical"] = None
         
         # ============================================================
