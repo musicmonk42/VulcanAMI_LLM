@@ -1177,6 +1177,86 @@ def create_self_improving_deps(
     return deps
 
 
+def wire_world_model_components(
+    deps: EnhancedCollectiveDeps, world_model: Any
+) -> EnhancedCollectiveDeps:
+    """
+    Wire WorldModel's meta-reasoning components to the orchestrator's deps.
+    
+    This function solves the architectural mismatch where:
+    - Meta-reasoning components are initialized in WorldModel (world_model_core.py)
+    - But the dependency validator checks deps.internal_critic, deps.preference_learner, etc.
+    - Without this wiring, components appear as "Missing/Not Initialized" even though
+      they are fully functional in WorldModel
+    
+    Args:
+        deps: The EnhancedCollectiveDeps instance to populate
+        world_model: The WorldModel instance containing initialized meta-reasoning components
+        
+    Returns:
+        The deps object with meta-reasoning components wired from WorldModel
+        
+    Example:
+        >>> from vulcan.orchestrator.dependencies import wire_world_model_components
+        >>> wire_world_model_components(deps, world_model)
+        >>> # Now deps.internal_critic, deps.preference_learner, etc. are populated
+    """
+    if world_model is None:
+        logger.debug("No WorldModel provided, skipping meta-reasoning component wiring")
+        return deps
+    
+    # Map of deps field names to WorldModel attribute names
+    component_mapping = {
+        # Meta-reasoning components
+        "internal_critic": "internal_critic",
+        "preference_learner": "preference_learner",
+        "ethical_boundary_monitor": "ethical_boundary_monitor",
+        "curiosity_reward_shaper": "curiosity_reward_shaper",
+        "value_evolution_tracker": "value_evolution_tracker",
+        "validation_tracker": "validation_tracker",
+        "transparency_interface": "transparency_interface",
+        "counterfactual_objectives": "counterfactual_objective_reasoner",
+        "goal_conflict_detector": "goal_conflict_detector",
+        "objective_negotiator": "objective_negotiator",
+        "objective_hierarchy": "objective_hierarchy",
+        "motivational_introspection": "motivational_introspection",
+        "self_improvement_drive": "self_improvement_drive",
+        # Also wire the world_model itself
+        "world_model": None,  # Special case - wire the world_model directly
+    }
+    
+    wired_count = 0
+    
+    for deps_field, wm_attr in component_mapping.items():
+        try:
+            # Special case: wire world_model directly
+            if deps_field == "world_model":
+                if getattr(deps, deps_field, None) is None:
+                    setattr(deps, deps_field, world_model)
+                    wired_count += 1
+                    logger.debug(f"✓ Wired world_model to deps")
+                continue
+            
+            # Get component from WorldModel
+            component = getattr(world_model, wm_attr, None)
+            
+            # Only wire if component exists in WorldModel and deps field is empty
+            if component is not None and getattr(deps, deps_field, None) is None:
+                setattr(deps, deps_field, component)
+                wired_count += 1
+                logger.debug(f"✓ Wired {deps_field} from WorldModel")
+                
+        except Exception as e:
+            logger.debug(f"Could not wire {deps_field}: {e}")
+    
+    if wired_count > 0:
+        logger.info(
+            f"✓ Wired {wired_count} meta-reasoning components from WorldModel to deps"
+        )
+    
+    return deps
+
+
 def validate_dependencies(
     deps: EnhancedCollectiveDeps, required_categories: Optional[List[str]] = None
 ) -> bool:
@@ -1322,6 +1402,7 @@ __all__ = [
     "create_minimal_deps",
     "create_full_deps",
     "create_self_improving_deps",
+    "wire_world_model_components",  # Added: Wire WorldModel components to deps
     "validate_dependencies",
     "print_dependency_report",
     "safe_print",

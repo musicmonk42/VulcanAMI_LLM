@@ -1850,6 +1850,22 @@ async def _background_services_initialization(app: FastAPI, worker_id: int, logg
 
                 await asyncio.sleep(0.05)  # Brief yield for health checks
 
+                # ================================================================
+                # Wire WorldModel's meta-reasoning components to orchestrator deps
+                # This fixes the architectural mismatch where components are initialized
+                # in WorldModel but the dependency validator checks deps
+                # ================================================================
+                try:
+                    world_model = vulcan_deployment.collective.deps.world_model
+                    if world_model:
+                        from vulcan.orchestrator.dependencies import wire_world_model_components
+                        wire_world_model_components(
+                            vulcan_deployment.collective.deps,
+                            world_model
+                        )
+                except Exception as wire_err:
+                    logger.debug(f"Could not wire WorldModel components to deps: {wire_err}")
+
                 # Start self-improvement drive if enabled (only if we hold the background task lock)
                 if vulcan_config.enable_self_improvement:
                     if getattr(app.state, 'background_tasks_initialized', False):
