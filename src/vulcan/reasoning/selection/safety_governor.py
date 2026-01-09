@@ -2433,7 +2433,10 @@ class SafetyGovernor:
         # =====================================================
         
         try:
-            is_safe, reason = self.validator.validate_output(output, tool_name=tool_name)
+            # BUG #4 FIX: Pass query to validate_output so educational/causal bypasses work
+            # Previously the query was not passed, causing all educational bypasses to be skipped
+            query_for_validation = query if query else None
+            is_safe, reason = self.validator.validate_output(output, tool_name=tool_name, query=query_for_validation)
             
             if not is_safe:
                 self._record_violation(tool_name, VetoReason.UNSAFE_OUTPUT, reason)
