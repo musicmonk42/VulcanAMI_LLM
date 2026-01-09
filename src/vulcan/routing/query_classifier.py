@@ -1106,10 +1106,13 @@ class QueryClassifier:
         # Check factual patterns (simple questions)
         # BUT: Skip factual classification if query is about "you" - 
         # those should go to self-introspection first
-        # Note: Also skip if query contains philosophical or cryptographic keywords
+        # Note: Also skip if query contains philosophical, cryptographic, causal, or probabilistic keywords
+        # These specialized domains should be classified by their own keyword matchers, not FACTUAL
         query_about_self = any(word in query_lower for word in ['you', 'your', 'yourself'])
         query_has_philosophical = any(kw in query_lower for kw in PHILOSOPHICAL_KEYWORDS)
-        if not query_about_self and not query_has_philosophical and not query_has_cryptographic:
+        query_has_causal = any(kw in query_lower for kw in CAUSAL_KEYWORDS)
+        query_has_probabilistic = any(kw in query_lower for kw in PROBABILISTIC_KEYWORDS)
+        if not query_about_self and not query_has_philosophical and not query_has_cryptographic and not query_has_causal and not query_has_probabilistic:
             for pattern in FACTUAL_PATTERNS:
                 if pattern.search(query_original):
                     return QueryClassification(
@@ -1326,6 +1329,24 @@ class QueryClassifier:
                 source="keyword",
             )
         
+        # =================================================================
+        # FIX: Check CAUSAL indicators BEFORE LOGICAL
+        # =================================================================
+        # Causal keywords (confounding, causation, pearl) are more specific
+        # than logical keywords (iff, hence). Moving this check before LOGICAL
+        # prevents "difference" → "iff" false positive from overriding causal.
+        # =================================================================
+        causal_count = sum(1 for kw in CAUSAL_KEYWORDS if kw in query_lower)
+        if causal_count >= CAUSAL_KEYWORD_THRESHOLD or "do(" in query_lower:
+            return QueryClassification(
+                category=QueryCategory.CAUSAL.value,
+                complexity=0.6 + min(0.3, causal_count * 0.05),
+                suggested_tools=["causal"],
+                skip_reasoning=False,
+                confidence=0.85,
+                source="keyword",
+            )
+        
         # Check logical/SAT indicators
         logical_count = sum(1 for kw in LOGICAL_KEYWORDS if kw in query_lower)
         # FIX: "formalize" is a strong indicator of logical reasoning - treat it like logic symbols
@@ -1352,18 +1373,6 @@ class QueryClassifier:
                 category=QueryCategory.PROBABILISTIC.value,
                 complexity=0.5 + min(0.3, prob_count * 0.05),
                 suggested_tools=["probabilistic"],
-                skip_reasoning=False,
-                confidence=0.85,
-                source="keyword",
-            )
-        
-        # Check causal indicators
-        causal_count = sum(1 for kw in CAUSAL_KEYWORDS if kw in query_lower)
-        if causal_count >= CAUSAL_KEYWORD_THRESHOLD or "do(" in query_lower:
-            return QueryClassification(
-                category=QueryCategory.CAUSAL.value,
-                complexity=0.6 + min(0.3, causal_count * 0.05),
-                suggested_tools=["causal"],
                 skip_reasoning=False,
                 confidence=0.85,
                 source="keyword",

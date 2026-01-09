@@ -1668,6 +1668,27 @@ class ReasoningIntegration:
         confidence = 0.7
         rationale = "Default reasoning strategy"
 
+        # =================================================================
+        # FIX: Use classifier suggested tools when ToolSelector unavailable
+        # =================================================================
+        # When ToolSelector is not available (e.g., numpy not installed),
+        # we should still respect the classifier's tool suggestions instead
+        # of falling back to generic ["general"] tools.
+        # 
+        # This ensures causal queries like "Confounding vs causation (Pearl-style)"
+        # get routed to causal tools as the classifier intended, rather than
+        # being downgraded to general tools.
+        # =================================================================
+        if context and context.get('classifier_suggested_tools'):
+            classifier_tools = context.get('classifier_suggested_tools')
+            if classifier_tools and classifier_tools != ["general"]:
+                selected_tools = classifier_tools
+                confidence = 0.85  # Higher confidence since classifier suggested these
+                rationale = f"Using classifier suggested tools: {classifier_tools}"
+                logger.info(
+                    f"{LOG_PREFIX} Using classifier suggested tools as fallback: {classifier_tools}"
+                )
+
         # Try to use ToolSelector if available
         if self._tool_selector is not None:
             try:

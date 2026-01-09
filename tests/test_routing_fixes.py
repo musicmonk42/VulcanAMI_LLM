@@ -457,3 +457,68 @@ class TestCryptographicWordBoundaryMatching:
         assert result.category == QueryCategory.PHILOSOPHICAL.value, (
             f"'{query}' should be PHILOSOPHICAL, got {result.category}"
         )
+
+
+# ============================================================================
+# Test Causal Query MATH-FAST-PATH Bypass (FIX: Jan 9 2026)
+# ============================================================================
+
+class TestCausalQueryMathFastPathBypass:
+    """
+    Tests for causal query detection to prevent MATH-FAST-PATH override.
+    
+    Issue: Causal queries like "Confounding vs causation (Pearl-style)" were being
+    misrouted to MATH-FAST-PATH even though the classifier correctly identified them
+    as CAUSAL with high confidence (0.80). The MATH-FAST-PATH was overriding the
+    classifier's decision.
+    
+    Fix: Add causal keyword detection to _is_mathematical_query() to bypass
+    MATH-FAST-PATH when 2+ causal keywords are present.
+    """
+    
+    @pytest.fixture
+    def causal_keywords(self):
+        """Causal keywords that should trigger bypass of MATH-FAST-PATH."""
+        return frozenset([
+            "causal", "causation", "cause", "effect",
+            "confound", "confounder", "confounding",
+            "intervention", "do(", "counterfactual",
+            "randomize", "randomized", "rct",
+            "pearl", "dag", "backdoor", "frontdoor",
+            "collider", "observational", "experimental",
+        ])
+    
+    def _count_causal_keywords(self, query, keywords):
+        """Count causal keywords in query."""
+        query_lower = query.lower()
+        return sum(1 for kw in keywords if kw in query_lower)
+    
+    def test_pearl_causal_query_has_multiple_keywords(self, causal_keywords):
+        """Confounding vs causation (Pearl-style) should have 2+ causal keywords."""
+        query = "Confounding vs causation (Pearl-style)"
+        count = self._count_causal_keywords(query, causal_keywords)
+        assert count >= 2, f"Expected >= 2 causal keywords, got {count}"
+    
+    def test_dag_backdoor_query_has_multiple_keywords(self, causal_keywords):
+        """DAG backdoor query should have multiple causal keywords."""
+        query = "Identify the backdoor path in the causal DAG"
+        count = self._count_causal_keywords(query, causal_keywords)
+        assert count >= 2, f"Expected >= 2 causal keywords, got {count}"
+    
+    def test_intervention_counterfactual_query(self, causal_keywords):
+        """Intervention and counterfactual query should have multiple causal keywords."""
+        query = "What is the counterfactual effect of the intervention?"
+        count = self._count_causal_keywords(query, causal_keywords)
+        assert count >= 2, f"Expected >= 2 causal keywords, got {count}"
+    
+    def test_pure_math_query_has_zero_causal_keywords(self, causal_keywords):
+        """Pure math query should NOT have causal keywords."""
+        query = "Calculate the derivative of x^2 + 3x + 1"
+        count = self._count_causal_keywords(query, causal_keywords)
+        assert count == 0, f"Expected 0 causal keywords, got {count}"
+    
+    def test_probability_query_has_zero_causal_keywords(self, causal_keywords):
+        """Probability query should NOT have causal keywords."""
+        query = "What is the probability P(A|B) given Bayes theorem?"
+        count = self._count_causal_keywords(query, causal_keywords)
+        assert count == 0, f"Expected 0 causal keywords in probability query, got {count}"
