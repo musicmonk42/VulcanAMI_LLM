@@ -217,8 +217,10 @@ STUCK_JOB_WARNING_THRESHOLD = 0.7  # 70% of timeout
 STUCK_JOB_CRITICAL_THRESHOLD = 0.9  # 90% of timeout
 
 # FIX TASK 6: Query length thresholds for reasoning validation
-# Short queries may indicate truncation and produce poor results
-MIN_REASONING_QUERY_LENGTH = 50  # Minimum chars for valid reasoning query
+# BUG #11 FIX: Reduced threshold from 50 to 15 chars
+# Short queries like "write a poem" are valid and should not trigger warnings
+# Only warn for extremely short queries that are likely truncation artifacts
+MIN_REASONING_QUERY_LENGTH = 15  # Minimum chars for valid reasoning query
 # Long queries should force reasoning even with general tools
 LONG_QUERY_REASONING_THRESHOLD = 500  # Chars above which reasoning is forced
 
@@ -2827,12 +2829,27 @@ class AgentPoolManager:
                 )
             
             # FIX TASK 1: Log query length for debugging truncation issues
+            # BUG #11 FIX: Only warn for extremely short queries that show actual truncation signs
+            # (e.g., ending mid-word, or < 15 chars which is too short to be intentional)
             if query_len < MIN_REASONING_QUERY_LENGTH and is_reasoning_task:
-                logger.warning(
-                    f"[AgentPool] SHORT QUERY detected for reasoning task: "
-                    f"query_len={query_len} chars (< {MIN_REASONING_QUERY_LENGTH}) - this may indicate truncation! "
-                    f"Check parameters keys: {list(parameters.keys())}"
+                # Check for actual truncation indicators
+                query_text = prompt if prompt else ""
+                appears_truncated = (
+                    query_text.endswith("...") or 
+                    query_text.endswith("-") or
+                    (query_len > 0 and query_text[-1].isalnum() and " " not in query_text[-10:] if query_len > 10 else False)
                 )
+                if appears_truncated:
+                    logger.warning(
+                        f"[AgentPool] Potentially truncated query for reasoning task: "
+                        f"query_len={query_len} chars - query may be incomplete. "
+                        f"Check parameters keys: {list(parameters.keys())}"
+                    )
+                else:
+                    logger.debug(
+                        f"[AgentPool] Short query ({query_len} chars) for reasoning task - "
+                        f"this is acceptable for simple requests"
+                    )
 
             # ============================================================
             # REASONING TASK EXECUTION - Invoke actual reasoning engines

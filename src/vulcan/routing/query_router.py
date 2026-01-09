@@ -1813,8 +1813,10 @@ class AgentTask:
         a tool_name attribute on AgentTask objects.
         """
         tools = self.parameters.get("tools", [])
-        if tools and isinstance(tools, list) and len(tools) > 0:
-            return str(tools[0])
+        if tools and isinstance(tools, list):
+            first_tool = tools[0] if tools else None
+            if first_tool is not None and first_tool != "":
+                return str(first_tool)
         # Fall back to capability if no tools specified
         return self.capability
 
