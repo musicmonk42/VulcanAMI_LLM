@@ -415,6 +415,9 @@ __all__ = [
 # ============================================================================
 def get_module_status() -> dict:
     """Get availability status of all reasoning components."""
+    # Note: "language" reasoning is provided by the symbolic reasoner
+    # which handles natural language parsing and logical formalization
+    language_available = SYMBOLIC_AVAILABLE or UNIFIED_AVAILABLE
     return {
         "probabilistic": PROBABILISTIC_AVAILABLE,
         "causal": CAUSAL_AVAILABLE,
@@ -428,6 +431,7 @@ def get_module_status() -> dict:
         "bandit": BANDIT_AVAILABLE,
         "mathematical_verification": MATHEMATICAL_VERIFICATION_AVAILABLE,
         "mathematical_computation": MATHEMATICAL_COMPUTATION_AVAILABLE,
+        "language": language_available,  # Language reasoning via symbolic/unified
     }
 
 

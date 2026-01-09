@@ -635,7 +635,10 @@ class TestExecuteGraph:
             await asyncio.sleep(1)
             return {"status": "completed"}
 
-        mock_components["runtime"].execute_graph = slow_execute
+        # Replace the runtime with a mock that has the slow execute method
+        mock_runtime = MagicMock()
+        mock_runtime.execute_graph = slow_execute
+        demo.runtime = mock_runtime
 
         result = await demo.execute_graph(mock_graph)
 
@@ -648,9 +651,11 @@ class TestExecuteGraph:
     ):
         """Test execution failure."""
         demo = EnhancedGraphixDemo(demo_config)
-        mock_components["runtime"].execute_graph.side_effect = Exception(
-            "Execution failed"
-        )
+        
+        # Replace the runtime with a mock that raises an exception
+        mock_runtime = MagicMock()
+        mock_runtime.execute_graph = AsyncMock(side_effect=Exception("Execution failed"))
+        demo.runtime = mock_runtime
 
         result = await demo.execute_graph(mock_graph)
 
@@ -789,7 +794,11 @@ class TestParallelExecution:
     ):
         """Test parallel execution with one failure."""
         demo = EnhancedGraphixDemo(demo_config)
-        mock_components["runtime"].execute_graph.side_effect = Exception("Exec failed")
+        
+        # Replace the runtime with a mock that raises an exception
+        mock_runtime = MagicMock()
+        mock_runtime.execute_graph = AsyncMock(side_effect=Exception("Exec failed"))
+        demo.runtime = mock_runtime
 
         results = await demo.run_parallel_steps(mock_graph)
 
