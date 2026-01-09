@@ -361,6 +361,9 @@ spec:
         {{- /* Prevents Orchestrator Panic during CPU-bound inference */}}
         - name: ZMQ_CONNECTION_TIMEOUT
           value: {{ .Values.performanceTuning.zmqConnectionTimeout | default 30000 | quote }}
+        {{- /* Tool Monitor Configuration */}}
+        - name: TOOL_MONITOR_ENABLED
+          value: {{ .Values.performanceTuning.toolMonitorEnabled | default true | quote }}
         {{- end }}
         {{- if .Values.hybridExecutor }}
         {{- /* Hybrid Executor Configuration (Note: Parallel LLM Execution) */}}

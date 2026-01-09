@@ -447,6 +447,9 @@ performanceTuning:
   # when transformer inference causes 1.1-3.9s/token latency
   # At 30-100 tokens per response, this allows reasoning to complete
   zmqConnectionTimeout: 120000
+  # Tool monitor enabled (default: true)
+  # Set to false to disable tool monitoring for resource-constrained environments
+  toolMonitorEnabled: true
 
 # Hybrid Output Configuration (VULCAN reasoning + OpenAI formatting)
 # Implements the hybrid output pattern where VULCAN does all reasoning,

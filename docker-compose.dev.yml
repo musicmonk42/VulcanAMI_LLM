@@ -416,6 +416,9 @@ services:
       # Hybrid Executor Timeout for parallel LLM execution (seconds)
       # Both local LLM and OpenAI run concurrently; first successful response wins
       - HYBRID_EXECUTOR_TIMEOUT=${HYBRID_EXECUTOR_TIMEOUT:-30.0}
+      # Tool Monitor Configuration
+      # Set to "false" to disable tool monitoring for resource-constrained environments
+      - TOOL_MONITOR_ENABLED=${TOOL_MONITOR_ENABLED:-true}
     ports:
       # NOTE: Port 8000 conflicts with api-gateway service if both run simultaneously.
       # Use profiles to avoid conflict:
