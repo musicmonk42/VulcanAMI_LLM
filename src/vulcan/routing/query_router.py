@@ -1814,7 +1814,7 @@ class AgentTask:
         """
         tools = self.parameters.get("tools", [])
         if tools and isinstance(tools, list):
-            first_tool = tools[0] if tools else None
+            first_tool = tools[0]
             if first_tool is not None and first_tool != "":
                 return str(first_tool)
         # Fall back to capability if no tools specified

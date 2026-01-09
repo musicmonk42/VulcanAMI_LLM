@@ -1494,7 +1494,28 @@ Brief explanation:"""
             return None
         
         # Make sure it has an operator (not just a number)
+        # Note: ** is checked via '*' being present twice consecutively
         if not any(op in expression for op in ['+', '-', '*', '/', '%']):
+            return None
+        
+        # Validate operator positioning - prevent invalid patterns like '++', '--', '2+', '+3'
+        # Allow: leading minus for negative numbers, ** for exponentiation
+        expression_no_spaces = expression.replace(' ', '')
+        
+        # Check for invalid consecutive operators (except ** for exponentiation)
+        invalid_patterns = ['++', '+-', '+/', '+%', '-+', '--', '-/', '-%', 
+                           '/+', '/-', '//', '/%', '%+', '%-', '%/', '%%',
+                           '*+', '*-', '*/', '*%']  # Note: ** is valid (exponent)
+        for pattern in invalid_patterns:
+            if pattern in expression_no_spaces:
+                return None
+        
+        # Check for trailing operators
+        if expression_no_spaces and expression_no_spaces[-1] in '+-*/%':
+            return None
+        
+        # Check for operators at start (except leading minus for negative numbers)
+        if expression_no_spaces and expression_no_spaces[0] in '+*/%':
             return None
         
         return expression
