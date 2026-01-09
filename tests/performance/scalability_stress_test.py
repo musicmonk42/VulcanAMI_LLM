@@ -2233,6 +2233,45 @@ def main() -> int:
         report = runner.generate_report(results)
         print(report)
 
+        # Print enhanced summary with timeout and OpenAI fallback statistics
+        print("\n" + "=" * 64)
+        print("ENHANCED DIAGNOSTICS SUMMARY")
+        print("=" * 64)
+        
+        total_time = sum(m.total_time_seconds for m in results)
+        total_queries = sum(m.total_queries for m in results)
+        total_timeouts = sum(m.timeout_queries for m in results)
+        total_errors = sum(m.error_queries for m in results)
+        
+        # Calculate OpenAI fallback usage across all scenarios
+        total_openai_usage = 0
+        total_local_usage = 0
+        for m in results:
+            lm = m.learning_metrics
+            total_openai_usage += lm.get("openai_fallback_usage", 0)
+            total_local_usage += lm.get("local_llm_usage", 0)
+        
+        total_llm_calls = total_openai_usage + total_local_usage
+        openai_percentage = (total_openai_usage / total_llm_calls * 100) if total_llm_calls > 0 else 0
+        
+        print(f"\nTotal Execution Time: {total_time:.1f}s ({total_time/60:.1f} minutes)")
+        print(f"Total Queries Executed: {total_queries}")
+        print(f"Queries Timed Out: {total_timeouts} ({total_timeouts/total_queries*100:.1f}%)" if total_queries > 0 else "Queries Timed Out: 0 (0.0%)")
+        print(f"Queries with Errors: {total_errors} ({total_errors/total_queries*100:.1f}%)" if total_queries > 0 else "Queries with Errors: 0 (0.0%)")
+        print(f"\nLLM Usage Statistics:")
+        print(f"  Local LLM: {total_local_usage} calls ({100-openai_percentage:.1f}%)")
+        print(f"  OpenAI Fallback: {total_openai_usage} calls ({openai_percentage:.1f}%)")
+        
+        if total_queries > 0 and total_timeouts > total_queries * 0.1:
+            print(f"\n⚠️  WARNING: High timeout rate detected ({total_timeouts/total_queries*100:.1f}%)")
+            print("   Consider increasing the --timeout parameter or investigating system performance.")
+        
+        if openai_percentage > 50 and total_llm_calls > 0:
+            print(f"\n⚠️  WARNING: High OpenAI fallback usage ({openai_percentage:.1f}%)")
+            print("   This may indicate issues with the local LLM or insufficient timeout values.")
+        
+        print("=" * 64 + "\n")
+
         # Save results
         runner.save_results(args.output, results)
 

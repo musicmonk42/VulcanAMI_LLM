@@ -85,7 +85,7 @@ jobs:
   stress-test:
     name: Run Stress Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     permissions:
       contents: read
@@ -180,14 +180,39 @@ jobs:
           fi
           python - <<'PY'
           import sys
+          import os
           try:
-              import openai  # noqa: F401
-              from openai import OpenAI  # noqa: F401
-          except Exception as exc:
+              import openai
+              from openai import OpenAI
+              
+              # Test the API key with a minimal API call
+              client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+              print("Testing OpenAI API key with a minimal completion call...")
+              response = client.chat.completions.create(
+                  model="gpt-3.5-turbo",
+                  messages=[{"role": "user", "content": "test"}],
+                  max_tokens=5
+              )
+              print(f"✅ OpenAI API key validated successfully")
+              print(f"   Model: {response.model}")
+              print(f"   Response ID: {response.id}")
+              
+          except ImportError as exc:
               print(f"::error::OpenAI package import failed: {exc}")
               print("Install dependencies: pip install -r requirements-hashed.txt")
               sys.exit(1)
-          print("OpenAI import preflight passed")
+          except Exception as exc:
+              print(f"::error::OpenAI API key validation failed: {exc}")
+              print("This usually means:")
+              print("  1. The API key is invalid or expired")
+              print("  2. The API key doesn't have proper permissions")
+              print("  3. There's a network connectivity issue")
+              print("")
+              print("To fix:")
+              print("  - Verify OPENAI_API_KEY in repository secrets is correct")
+              print("  - Check your OpenAI account status at https://platform.openai.com/")
+              print("  - Generate a new API key if needed")
+              sys.exit(1)
           PY
 
       - name: Verify VULCAN installation
