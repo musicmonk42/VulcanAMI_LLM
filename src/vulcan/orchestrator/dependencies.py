@@ -360,7 +360,7 @@ class EnhancedCollectiveDeps:
     """ProblemExecutor - Executes problem decomposition plans"""
 
     learning_system: Any = None
-    """UnifiedLearningSystem - Unified learning system for outcome recording and feedback"""
+    """UnifiedLearningSystem - Unified learning system for outcome recording, feedback, and integration with reasoning engines (e.g., cryptographic fast-path)"""
 
     # ========================================
     # META-REASONING SYSTEMS (Specific learning/reasoning sub-category)
