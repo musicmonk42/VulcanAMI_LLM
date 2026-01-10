@@ -2,39 +2,64 @@
 Reasoning integration subpackage for VULCAN.
 
 This package provides the integration layer between the query processing pipeline
-and the reasoning subsystem. It wires together ToolSelector, PortfolioExecutor,
-and reasoning strategies into a unified interface.
+and the reasoning subsystem.
 
-The package is organized into focused modules:
-    - types: Core dataclasses for results and statistics
-    - constants: Configuration constants and thresholds
-    - safety: Safety filtering and validation
-    - query_analysis: Query type detection and analysis
-    - tool_selection: Tool selector integration
-    - decomposition: Problem decomposition
-    - world_model_bridge: World model integration
-    - arena_delegation: Arena delegation logic
-    - statistics: Statistics tracking
-    - observer: SystemObserver integration
-    - orchestrator: Main ReasoningIntegration class
-
-Usage:
-    >>> from vulcan.reasoning.integration import apply_reasoning
-    >>> result = apply_reasoning(query="Explain X", query_type="reasoning")
+Refactored modules:
+    - types: Core dataclasses, enums, and constants ✅
+    - safety_checker: Safety validation and false positive detection ✅
+    - query_router: Query type routing and classification ✅
 
 Module: vulcan.reasoning.integration
 Author: Vulcan AI Team
 """
 
-# TODO: Complete refactoring - Currently re-exporting from parent module
-# This maintains backward compatibility while refactoring is in progress
+# Re-export types
+from .types import (
+    # Constants
+    LOG_PREFIX,
+    DEFAULT_MAX_WORKERS,
+    DEFAULT_TIME_BUDGET_MS,
+    DEFAULT_ENERGY_BUDGET_MJ,
+    DEFAULT_MIN_CONFIDENCE,
+    MAX_FALLBACK_ATTEMPTS,
+    MIN_CONFIDENCE_FLOOR,
+    CONFIDENCE_HIGH_THRESHOLD,
+    CONFIDENCE_GOOD_THRESHOLD,
+    CONFIDENCE_MEDIUM_THRESHOLD,
+    CONFIDENCE_LOW_THRESHOLD,
+    DECOMPOSITION_COMPLEXITY_THRESHOLD,
+    # Query Analysis Constants
+    ANALYSIS_INDICATORS,
+    ACTION_VERBS,
+    ETHICAL_ANALYSIS_INDICATORS,
+    PURE_ETHICAL_PHRASES,
+    # Enums
+    ReasoningStrategyType,
+    # Mappings
+    QUERY_TYPE_STRATEGY_MAP,
+    ROUTE_TO_REASONING_TYPE,
+    # Dataclasses
+    RoutingDecision,
+    ReasoningResult,
+    IntegrationStatistics,
+)
 
+# Re-export safety checker
+from .safety_checker import (
+    is_false_positive_safety_block,
+    is_result_safety_filtered,
+    get_safety_filtered_fallback_tools,
+)
+
+# Re-export query router
+from .query_router import (
+    get_reasoning_type_from_route,
+)
+
+# Re-export from parent module for full API (temporary during refactoring)
 try:
     from ..reasoning_integration import (
         ReasoningIntegration,
-        ReasoningResult,
-        IntegrationStatistics,
-        RoutingDecision,
         apply_reasoning,
         run_portfolio_reasoning,
         get_reasoning_integration,
@@ -52,9 +77,6 @@ except ImportError as e:
         f"Failed to import from parent reasoning_integration module: {e}"
     )
     ReasoningIntegration = None
-    ReasoningResult = None
-    IntegrationStatistics = None
-    RoutingDecision = None
     apply_reasoning = None
     run_portfolio_reasoning = None
     get_reasoning_integration = None
@@ -68,10 +90,37 @@ except ImportError as e:
 
 
 __all__ = [
-    "ReasoningIntegration",
+    # Types
+    "LOG_PREFIX",
+    "DEFAULT_MAX_WORKERS",
+    "DEFAULT_TIME_BUDGET_MS",
+    "DEFAULT_ENERGY_BUDGET_MJ",
+    "DEFAULT_MIN_CONFIDENCE",
+    "MAX_FALLBACK_ATTEMPTS",
+    "MIN_CONFIDENCE_FLOOR",
+    "CONFIDENCE_HIGH_THRESHOLD",
+    "CONFIDENCE_GOOD_THRESHOLD",
+    "CONFIDENCE_MEDIUM_THRESHOLD",
+    "CONFIDENCE_LOW_THRESHOLD",
+    "DECOMPOSITION_COMPLEXITY_THRESHOLD",
+    "ANALYSIS_INDICATORS",
+    "ACTION_VERBS",
+    "ETHICAL_ANALYSIS_INDICATORS",
+    "PURE_ETHICAL_PHRASES",
+    "ReasoningStrategyType",
+    "QUERY_TYPE_STRATEGY_MAP",
+    "ROUTE_TO_REASONING_TYPE",
+    "RoutingDecision",
     "ReasoningResult",
     "IntegrationStatistics",
-    "RoutingDecision",
+    # Safety checker
+    "is_false_positive_safety_block",
+    "is_result_safety_filtered",
+    "get_safety_filtered_fallback_tools",
+    # Query router
+    "get_reasoning_type_from_route",
+    # Main API (from parent)
+    "ReasoningIntegration",
     "apply_reasoning",
     "run_portfolio_reasoning",
     "get_reasoning_integration",
