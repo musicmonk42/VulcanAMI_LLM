@@ -230,13 +230,8 @@ def _load_reasoning_components() -> Dict[str, Any]:
         try:
             from vulcan.reasoning.analogical import AnalogicalReasoningEngine
             _REASONING_COMPONENTS["AnalogicalReasoningEngine"] = AnalogicalReasoningEngine
-        except ImportError:
-            # Fallback to old import path for backward compatibility
-            try:
-                from vulcan.reasoning.analogical_reasoning import AnalogicalReasoningEngine
-                _REASONING_COMPONENTS["AnalogicalReasoningEngine"] = AnalogicalReasoningEngine
-            except ImportError as e:
-                logger.warning(f"AnalogicalReasoningEngine not available: {e}")
+        except ImportError as e:
+            logger.warning(f"AnalogicalReasoningEngine not available: {e}")
         
         # Load MultiModalReasoningEngine
         try:

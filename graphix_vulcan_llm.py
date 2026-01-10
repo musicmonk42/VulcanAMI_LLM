@@ -686,7 +686,7 @@ except Exception as e:
 
 # Analogical Reasoning
 try:
-    from src.vulcan.reasoning.analogical_reasoning import AnalogicalReasoning
+    from src.vulcan.reasoning.analogical import AnalogicalReasoner as AnalogicalReasoning
     logger.info("✓ AnalogicalReasoning loaded successfully")
     HAS_ANALOGICAL_REASONING = True
 except Exception as e:

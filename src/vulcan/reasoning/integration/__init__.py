@@ -1,88 +1,66 @@
 """
 Reasoning integration subpackage for VULCAN.
 
-This package provides the integration layer between the query processing pipeline
-and the reasoning subsystem. It wires together ToolSelector, PortfolioExecutor,
-and reasoning strategies into a unified interface.
-
-The package is organized into focused modules:
-    - types: Core dataclasses for results and statistics
-    - constants: Configuration constants and thresholds
-    - safety: Safety filtering and validation
-    - query_analysis: Query type detection and analysis
-    - tool_selection: Tool selector integration
-    - decomposition: Problem decomposition
-    - world_model_bridge: World model integration
-    - arena_delegation: Arena delegation logic
-    - statistics: Statistics tracking
-    - observer: SystemObserver integration
-    - orchestrator: Main ReasoningIntegration class
-
-Usage:
-    >>> from vulcan.reasoning.integration import apply_reasoning
-    >>> result = apply_reasoning(query="Explain X", query_type="reasoning")
-
-Module: vulcan.reasoning.integration
-Author: Vulcan AI Team
+Re-exports all public API for the reasoning integration layer.
 """
 
-# TODO: Complete refactoring - Currently re-exporting from parent module
-# This maintains backward compatibility while refactoring is in progress
-
-try:
-    from ..reasoning_integration import (
-        ReasoningIntegration,
-        ReasoningResult,
-        IntegrationStatistics,
-        RoutingDecision,
-        apply_reasoning,
-        run_portfolio_reasoning,
-        get_reasoning_integration,
-        get_reasoning_statistics,
-        shutdown_reasoning,
-        observe_query_start,
-        observe_engine_result,
-        observe_outcome,
-        observe_validation_failure,
-        observe_error,
-    )
-except ImportError as e:
-    import logging
-    logging.getLogger(__name__).warning(
-        f"Failed to import from parent reasoning_integration module: {e}"
-    )
-    ReasoningIntegration = None
-    ReasoningResult = None
-    IntegrationStatistics = None
-    RoutingDecision = None
-    apply_reasoning = None
-    run_portfolio_reasoning = None
-    get_reasoning_integration = None
-    get_reasoning_statistics = None
-    shutdown_reasoning = None
-    observe_query_start = None
-    observe_engine_result = None
-    observe_outcome = None
-    observe_validation_failure = None
-    observe_error = None
-
+from .types import (
+    ReasoningStrategyType,
+    RoutingDecision,
+    ReasoningResult,
+    IntegrationStatistics,
+    DECOMPOSITION_COMPLEXITY_THRESHOLD,
+    LOG_PREFIX,
+    MAX_FALLBACK_ATTEMPTS,
+)
+from .safety_checker import (
+    is_false_positive_safety_block,
+    is_result_safety_filtered,
+    get_safety_filtered_fallback_tools,
+)
+from .query_router import get_reasoning_type_from_route
+from .orchestrator import ReasoningIntegration
+from .utils import (
+    get_reasoning_integration,
+    apply_reasoning,
+    run_portfolio_reasoning,
+    get_reasoning_statistics,
+    shutdown_reasoning,
+    observe_reasoning_selection,
+    observe_reasoning_execution,
+    observe_reasoning_success,
+    observe_reasoning_failure,
+    observe_reasoning_degradation,
+)
 
 __all__ = [
-    "ReasoningIntegration",
+    # Types
+    "ReasoningStrategyType",
+    "RoutingDecision",
     "ReasoningResult",
     "IntegrationStatistics",
-    "RoutingDecision",
+    # Constants
+    "DECOMPOSITION_COMPLEXITY_THRESHOLD",
+    "LOG_PREFIX",
+    "MAX_FALLBACK_ATTEMPTS",
+    # Safety checker
+    "is_false_positive_safety_block",
+    "is_result_safety_filtered",
+    "get_safety_filtered_fallback_tools",
+    # Query router
+    "get_reasoning_type_from_route",
+    # Main class
+    "ReasoningIntegration",
+    # Utilities
+    "get_reasoning_integration",
     "apply_reasoning",
     "run_portfolio_reasoning",
-    "get_reasoning_integration",
     "get_reasoning_statistics",
     "shutdown_reasoning",
-    "observe_query_start",
-    "observe_engine_result",
-    "observe_outcome",
-    "observe_validation_failure",
-    "observe_error",
+    # Observers
+    "observe_reasoning_selection",
+    "observe_reasoning_execution",
+    "observe_reasoning_success",
+    "observe_reasoning_failure",
+    "observe_reasoning_degradation",
 ]
-
-__version__ = "2.0.0"
-__author__ = "Vulcan AI Team"

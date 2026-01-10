@@ -170,7 +170,7 @@ def get_reasoning_integration():
         
         logger.info("[Singletons] Creating global ReasoningIntegration (ONCE)")
         try:
-            from vulcan.reasoning.reasoning_integration import ReasoningIntegration
+            from vulcan.reasoning.integration import ReasoningIntegration
             _reasoning_integration = ReasoningIntegration()
             logger.info("[Singletons] ✓ ReasoningIntegration created and cached")
             return _reasoning_integration

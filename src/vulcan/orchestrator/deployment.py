@@ -12,7 +12,7 @@
 # FIXED: Windows checkpoint file locking with atomic write pattern and retry logic
 # FIXED: Path handling in atomic_write_with_retry for proper directory creation and string conversion
 # FIXED: Windows checkpoint race during parallel tests with locking and step tracking
-# FIXED: Analogical reasoning import path (analogical_reasoning.py not analogical.py)
+# FIXED: Analogical reasoning now imports from modular analogical subpackage
 # FIXED: MultimodalProcessor import path (vulcan.processing not processing)
 # FIXED: Planning imports path (vulcan.planning not planning)
 # FIXED: Multimodal processor key alignment in _load_reasoners
@@ -375,9 +375,8 @@ class ProductionDeployment:
             logger.warning(f"Failed to load EnhancedCausalReasoning: {e}")
 
         # --- Load Analogical (Abstract) Reasoner ---
-        # FIXED: Import from analogical_reasoning not analogical
         try:
-            from vulcan.reasoning.analogical_reasoning import AnalogicalReasoner
+            from vulcan.reasoning.analogical import AnalogicalReasoner
 
             components["abstract"] = AnalogicalReasoner()
             logger.info("AnalogicalReasoner loaded")

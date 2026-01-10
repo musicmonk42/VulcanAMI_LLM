@@ -62,7 +62,7 @@ except ImportError as e:
 logger.info("[PortfolioExecutor] Philosophical reasoning: Routed to World Model")
 
 try:
-    from vulcan.reasoning.analogical_reasoning import AnalogicalReasoningEngine
+    from vulcan.reasoning.analogical import AnalogicalReasoningEngine
     _AVAILABLE_ENGINES['analogical'] = AnalogicalReasoningEngine
 except ImportError as e:
     logger.warning(f"[PortfolioExecutor] AnalogicalReasoningEngine not available: {e}")

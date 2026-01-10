@@ -4186,7 +4186,7 @@ class ToolSelector:
         # ANALOGICAL ENGINE (Pattern matching, analogy reasoning)
         # ============================================================
         try:
-            from ..analogical_reasoning import AnalogicalReasoner
+            from ..analogical import AnalogicalReasoner
             engines["analogical"] = AnalogicalToolWrapper(AnalogicalReasoner())
             logger.info("[ToolSelector] AnalogicalReasoner loaded successfully")
         except ImportError as e:
