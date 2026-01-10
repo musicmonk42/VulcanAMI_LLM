@@ -3722,12 +3722,78 @@ async def chat(request: ChatRequest):
                         logger.warning(f"[VULCAN] world_model.reason() failed: {e}")
                 return None
 
+            # =================================================================
+            # FIX (Jan 10 2026): Add self-introspection via world_model.introspect()
+            # =================================================================
+            # Self-introspection queries about VULCAN's capabilities, preferences,
+            # consciousness, etc. should invoke world_model.introspect() to get
+            # VULCAN's self-aware responses instead of falling back to generic LLM.
+            async def _self_introspection():
+                """Invoke world_model.introspect() for self-introspection queries."""
+                # FIX: Add null check for routing_plan.query_type
+                query_type_value = routing_plan.query_type.value.lower() if routing_plan and routing_plan.query_type else ""
+                
+                # Check if this is a self-introspection query
+                # Uses both routing classification and keyword fallback
+                is_self_introspection = query_type_value == 'self_introspection' or any(
+                    kw in query_lower for kw in [
+                        'self-aware', 'self aware', 'yourself', 'your capabilities',
+                        'would you', 'do you want', 'are you', 'who are you',
+                        'what are you', 'your goal', 'your purpose', 'conscious',
+                        'sentient', 'become self-aware', 'abilities do you',
+                        'different from other ai', 'unique', 'makes you special',
+                    ]
+                )
+                
+                if not is_self_introspection:
+                    return None
+                
+                # Invoke world_model.introspect()
+                if hasattr(deps.world_model, "introspect"):
+                    try:
+                        logger.info("[VULCAN] Invoking world_model.introspect() for self-introspection query")
+                        
+                        result = await loop.run_in_executor(
+                            None,
+                            deps.world_model.introspect,
+                            processed_prompt,
+                        )
+                        
+                        if result:
+                            # Extract the response from the introspection result
+                            response = result.get('response', '')
+                            confidence = result.get('confidence', 0.85)
+                            aspect = result.get('aspect', 'general')
+                            reasoning = result.get('reasoning', '')
+                            
+                            logger.info(
+                                f"[VULCAN] world_model.introspect() returned response "
+                                f"(len={len(str(response)) if response else 0}, confidence={confidence}, aspect={aspect})"
+                            )
+                            
+                            # Return full result for proper formatting
+                            return (
+                                "world_model_introspection",
+                                {
+                                    'response': response,
+                                    'confidence': confidence,
+                                    'aspect': aspect,
+                                    'reasoning': reasoning,
+                                },
+                                "world_model_introspection"
+                            )
+                    except Exception as e:
+                        logger.warning(f"[VULCAN] world_model.introspect() failed: {e}")
+                return None
+
             # Run all world model subtasks in parallel
             # Note: Added _creative_philosophical_reasoning for creative/philosophical queries
+            # FIX: Added _self_introspection for self-introspection queries
             results = await asyncio.gather(
                 _get_state(), _prediction(), _causal_graph(),
                 _counterfactual(), _invariants(), _dynamics(),
                 _creative_philosophical_reasoning(),
+                _self_introspection(),
                 return_exceptions=True
             )
 
@@ -6643,57 +6709,103 @@ async def unified_chat(request: UnifiedChatRequest):
                         f"confidence={integration_result.confidence:.2f}"
                     )
                     
-                    # Invoke actual reasoning engine
-                    reasoner = create_unified_reasoner(
-                        enable_learning=True,
-                        enable_safety=True,
+                    # ================================================================
+                    # FIX: Check if apply_reasoning() already has a complete result
+                    # ================================================================
+                    # For world_model/meta-reasoning queries, apply_reasoning() returns
+                    # the conclusion directly in metadata. Don't override it by calling
+                    # reasoner.reason() again - use the world_model result directly.
+                    #
+                    # This fixes the bug where self-introspection queries like
+                    # "if you could become self aware would you?" were getting
+                    # causal/probabilistic analysis instead of world_model responses.
+                    # ================================================================
+                    has_world_model_result = (
+                        integration_result.metadata and 
+                        integration_result.metadata.get("world_model_response") and
+                        "world_model" in integration_result.selected_tools
                     )
                     
-                    if reasoner is not None:
-                        # Map query_type to ReasoningType
-                        type_map = {
-                            "causal": ReasoningType.CAUSAL,
-                            "symbolic": ReasoningType.SYMBOLIC,
-                            "analogical": ReasoningType.ANALOGICAL,
-                            "probabilistic": ReasoningType.PROBABILISTIC,
-                            "counterfactual": ReasoningType.COUNTERFACTUAL,
-                            "reasoning": ReasoningType.HYBRID,
-                            "general": ReasoningType.HYBRID,
-                        }
-                        reasoning_type_enum = type_map.get(query_type, ReasoningType.HYBRID)
+                    if has_world_model_result:
+                        # World model already provided a response - use it directly
+                        wm_conclusion = integration_result.metadata.get("conclusion") or integration_result.metadata.get("world_model_response")
+                        wm_explanation = integration_result.metadata.get("explanation", "")
+                        wm_reasoning_type = integration_result.metadata.get("reasoning_type", "meta_reasoning")
                         
-                        # Execute reasoning synchronously
-                        reasoning_result = await loop.run_in_executor(
-                            None,
-                            lambda: reasoner.reason(
-                                input_data=user_message,
-                                query={"query": user_message, "context": context},
-                                reasoning_type=reasoning_type_enum,
-                            )
+                        direct_reasoning_output = {
+                            "conclusion": wm_conclusion,
+                            "confidence": integration_result.confidence,
+                            "reasoning_type": wm_reasoning_type,
+                            "explanation": wm_explanation,
+                        }
+                        
+                        reasoning_results["direct_reasoning"] = direct_reasoning_output
+                        systems_used.append("world_model_reasoning")
+                        
+                        logger.info(
+                            f"[VULCAN/v1/chat] Using world_model result directly: "
+                            f"type={wm_reasoning_type}, confidence={integration_result.confidence:.2f}, "
+                            f"conclusion_len={len(str(wm_conclusion)) if wm_conclusion else 0}"
+                        )
+                    else:
+                        # No world_model result - proceed with unified reasoner
+                        # Invoke actual reasoning engine
+                        reasoner = create_unified_reasoner(
+                            enable_learning=True,
+                            enable_safety=True,
                         )
                         
-                        if reasoning_result:
-                            # Extract reasoning output (same format as GraphixArena)
-                            direct_reasoning_output = {
-                                "conclusion": getattr(reasoning_result, "conclusion", None),
-                                "confidence": getattr(reasoning_result, "confidence", 0.5),
-                                "reasoning_type": str(getattr(reasoning_result, "reasoning_type", "hybrid")),
-                                "explanation": getattr(reasoning_result, "explanation", None),
+                        if reasoner is not None:
+                            # Map query_type to ReasoningType
+                            # FIX: Added missing types for self_introspection, philosophical, creative
+                            type_map = {
+                                "causal": ReasoningType.CAUSAL,
+                                "symbolic": ReasoningType.SYMBOLIC,
+                                "analogical": ReasoningType.ANALOGICAL,
+                                "probabilistic": ReasoningType.PROBABILISTIC,
+                                "counterfactual": ReasoningType.COUNTERFACTUAL,
+                                "reasoning": ReasoningType.HYBRID,
+                                "general": ReasoningType.HYBRID,
+                                # FIX: Added missing query types
+                                "self_introspection": ReasoningType.PHILOSOPHICAL,
+                                "philosophical": ReasoningType.PHILOSOPHICAL,
+                                "creative": ReasoningType.PHILOSOPHICAL,
+                                "mathematical": ReasoningType.MATHEMATICAL,
                             }
+                            reasoning_type_enum = type_map.get(query_type, ReasoningType.HYBRID)
                             
-                            # Add to reasoning_results
-                            reasoning_results["direct_reasoning"] = direct_reasoning_output
-                            systems_used.append("direct_reasoning_engine")
-                            
-                            logger.info(
-                                f"[VULCAN/v1/chat] Direct reasoning complete: "
-                                f"type={direct_reasoning_output.get('reasoning_type')}, "
-                                f"confidence={direct_reasoning_output.get('confidence'):.2f}"
+                            # Execute reasoning synchronously
+                            reasoning_result = await loop.run_in_executor(
+                                None,
+                                lambda: reasoner.reason(
+                                    input_data=user_message,
+                                    query={"query": user_message, "context": context},
+                                    reasoning_type=reasoning_type_enum,
+                                )
                             )
+                            
+                            if reasoning_result:
+                                # Extract reasoning output (same format as GraphixArena)
+                                direct_reasoning_output = {
+                                    "conclusion": getattr(reasoning_result, "conclusion", None),
+                                    "confidence": getattr(reasoning_result, "confidence", 0.5),
+                                    "reasoning_type": str(getattr(reasoning_result, "reasoning_type", "hybrid")),
+                                    "explanation": getattr(reasoning_result, "explanation", None),
+                                }
+                                
+                                # Add to reasoning_results
+                                reasoning_results["direct_reasoning"] = direct_reasoning_output
+                                systems_used.append("direct_reasoning_engine")
+                                
+                                logger.info(
+                                    f"[VULCAN/v1/chat] Direct reasoning complete: "
+                                    f"type={direct_reasoning_output.get('reasoning_type')}, "
+                                    f"confidence={direct_reasoning_output.get('confidence'):.2f}"
+                                )
+                            else:
+                                logger.warning("[VULCAN/v1/chat] Direct reasoning returned None")
                         else:
-                            logger.warning("[VULCAN/v1/chat] Direct reasoning returned None")
-                    else:
-                        logger.warning("[VULCAN/v1/chat] Could not create unified reasoner")
+                            logger.warning("[VULCAN/v1/chat] Could not create unified reasoner")
                         
                 except ImportError as ie:
                     logger.warning(f"[VULCAN/v1/chat] Reasoning integration not available: {ie}")
