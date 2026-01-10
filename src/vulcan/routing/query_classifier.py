@@ -1513,6 +1513,35 @@ class QueryClassifier:
                 source="keyword",
             )
         
+        # =====================================================================
+        # ISSUE #5 FIX: Check analogical indicators BEFORE mathematical
+        # =====================================================================
+        # Problem: Analogical queries like "Software development is like biological
+        # evolution" were being routed to mathematical/probabilistic engines due to
+        # broad pattern matching. Analogical reasoning should take precedence when
+        # strong analogical indicators are present.
+        #
+        # Check analogical indicators earlier to ensure proper routing
+        analog_count = sum(1 for kw in ANALOGICAL_KEYWORDS if kw in query_lower)
+        # Strong analogical indicators that should immediately route to analogical
+        strong_analog_indicators = {"is like", "is to", "analogy", "analogous", 
+                                     "metaphor", "structure mapping", "corresponds to"}
+        has_strong_analog = any(ind in query_lower for ind in strong_analog_indicators)
+        
+        if analog_count >= ANALOG_KEYWORD_THRESHOLD or has_strong_analog:
+            logger.info(
+                f"[QueryClassifier] ANALOGICAL classification - "
+                f"keywords={analog_count}, has_strong_indicator={has_strong_analog}"
+            )
+            return QueryClassification(
+                category=QueryCategory.ANALOGICAL.value,
+                complexity=0.5 + min(0.3, analog_count * 0.05),
+                suggested_tools=["analogical"],
+                skip_reasoning=False,
+                confidence=0.9 if has_strong_analog else 0.8,
+                source="keyword",
+            )
+        
         # Check mathematical indicators
         math_count = sum(1 for kw in MATHEMATICAL_KEYWORDS if kw in query_lower)
         
@@ -1547,18 +1576,6 @@ class QueryClassifier:
                 suggested_tools=["mathematical", "symbolic"],
                 skip_reasoning=False,
                 confidence=0.9 if has_math_symbols else 0.8,
-                source="keyword",
-            )
-        
-        # Check analogical indicators
-        analog_count = sum(1 for kw in ANALOGICAL_KEYWORDS if kw in query_lower)
-        if analog_count >= ANALOG_KEYWORD_THRESHOLD:
-            return QueryClassification(
-                category=QueryCategory.ANALOGICAL.value,
-                complexity=0.5 + min(0.3, analog_count * 0.05),
-                suggested_tools=["analogical"],
-                skip_reasoning=False,
-                confidence=0.8,
                 source="keyword",
             )
         
