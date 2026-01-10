@@ -352,7 +352,15 @@ def _is_false_positive_safety_block(query: str, safety_reason: str) -> bool:
 # - Result explanation mentions "safety", "filtered", "blocked"
 # ==============================================================================
 
-def _is_result_safety_filtered(result: Any) -> bool:
+# Constants for safety filter detection (module-level for maintainability)
+SAFETY_VIOLATION_TYPES = frozenset({'unsafe_output', 'sensitive_data', 'pii_exposure'})
+SAFETY_FILTER_PHRASES = frozenset({
+    'safety filter', 'safety violation', 'safety block',
+    'safety concern', 'filtered due to safety', 'blocked by safety'
+})
+
+
+def _is_result_safety_filtered(result) -> bool:
     """
     Detect if a SelectionResult was safety-filtered.
     
@@ -360,7 +368,7 @@ def _is_result_safety_filtered(result: Any) -> bool:
     that doesn't try incompatible tools (e.g., symbolic for English queries).
     
     Args:
-        result: SelectionResult or similar result object
+        result: SelectionResult or similar result object (using Any to avoid circular imports)
         
     Returns:
         True if the result indicates safety filtering
@@ -385,9 +393,9 @@ def _is_result_safety_filtered(result: Any) -> bool:
     if metadata.get('unsafe_output', False):
         return True
     
-    # Check violation_type
+    # Check violation_type against known safety violations
     violation_type = metadata.get('violation_type', '')
-    if violation_type in ('unsafe_output', 'sensitive_data', 'pii_exposure'):
+    if violation_type in SAFETY_VIOLATION_TYPES:
         return True
     
     # Check explanation text
@@ -397,9 +405,7 @@ def _is_result_safety_filtered(result: Any) -> bool:
     elif hasattr(result, 'result') and isinstance(result.result, dict):
         explanation = str(result.result.get('explanation', '')).lower()
     
-    safety_phrases = ['safety filter', 'safety violation', 'safety block', 
-                      'safety concern', 'filtered due to safety', 'blocked by safety']
-    if any(phrase in explanation for phrase in safety_phrases):
+    if any(phrase in explanation for phrase in SAFETY_FILTER_PHRASES):
         return True
     
     return False

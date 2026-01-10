@@ -125,7 +125,16 @@ MIN_ENSEMBLE_WEIGHT_FLOOR = 0.001
 # 4. The confidence is 0.0 and conclusion indicates inapplicability
 # ==============================================================================
 
-def _is_result_not_applicable(result: 'ReasoningResult') -> bool:
+# Constants for inapplicability detection (makes maintenance easier)
+INAPPLICABILITY_EXPLANATION_PHRASES = frozenset({
+    "not applicable",
+    "does not appear to",
+    "not a probability",
+    "not probabilistic",
+})
+
+
+def _is_result_not_applicable(result) -> bool:
     """
     Check if a reasoning result indicates the reasoner was not applicable.
     
@@ -135,7 +144,7 @@ def _is_result_not_applicable(result: 'ReasoningResult') -> bool:
     excluded from the ensemble calculation rather than dragging down confidence.
     
     Args:
-        result: ReasoningResult to check
+        result: ReasoningResult to check (using Any type to avoid circular imports)
         
     Returns:
         True if the result indicates the reasoner was not applicable
@@ -162,10 +171,9 @@ def _is_result_not_applicable(result: 'ReasoningResult') -> bool:
     # Confidence of 0.0 with specific explanations indicates inapplicability
     if result.confidence == 0.0:
         explanation_lower = (result.explanation or "").lower()
-        if "not applicable" in explanation_lower:
-            return True
-        if "does not appear to" in explanation_lower:
-            return True
+        for phrase in INAPPLICABILITY_EXPLANATION_PHRASES:
+            if phrase in explanation_lower:
+                return True
     
     return False
 

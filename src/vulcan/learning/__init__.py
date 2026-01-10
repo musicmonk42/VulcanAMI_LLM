@@ -590,13 +590,15 @@ class UnifiedLearningSystem:
             # - unsafe_output: True
             # - violation_type: "unsafe_output", "sensitive_data", etc.
             # ==============================================================================
+            # Use same constants as reasoning_integration for consistency
+            SAFETY_VIOLATION_TYPES = ('unsafe_output', 'sensitive_data', 'pii_exposure')
             metadata_str = str(metadata).lower()
             is_safety_filtered = (
                 metadata.get('safety_violation', False) or
                 metadata.get('safety_filtered', False) or
                 metadata.get('safety_blocked', False) or
                 metadata.get('unsafe_output', False) or
-                metadata.get('violation_type', '') in ('unsafe_output', 'sensitive_data', 'pii_exposure') or
+                metadata.get('violation_type', '') in SAFETY_VIOLATION_TYPES or
                 'safety violation' in metadata_str or
                 'safety filter' in metadata_str or
                 'safety block' in metadata_str
