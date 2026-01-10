@@ -4536,6 +4536,44 @@ class ToolSelector:
                         f"[ToolSelector] Using LLM classifier's suggested tools: {classifier_tools} "
                         f"for category={classifier_category} (LLM understands query intent)"
                     )
+                    
+                    # ================================================================
+                    # FIX (Jan 10 2026): Handle 'general' tool specially
+                    # ================================================================
+                    # 'general' is not a reasoning engine - it means "use LLM directly".
+                    # When classifier suggests ['general'], we should return immediately
+                    # with a high-confidence "skip reasoning" result. This fixes the bug
+                    # where CREATIVE queries with introspection themes (e.g., "write a 
+                    # poem about becoming self-aware") were being routed to symbolic
+                    # reasoning because 'general' is not in DEFAULT_AVAILABLE_TOOLS.
+                    # ================================================================
+                    if classifier_tools == ['general'] and classifier_category in (
+                        'CREATIVE', 'CONVERSATIONAL', 'FACTUAL', 'GREETING', 'CHITCHAT',
+                        'creative', 'conversational', 'factual', 'greeting', 'chitchat',
+                    ):
+                        logger.info(
+                            f"[ToolSelector] FIX: Classifier suggests ['general'] for "
+                            f"category={classifier_category} - returning early (no reasoning needed)"
+                        )
+                        # Return a result that indicates "use LLM directly, no reasoning"
+                        from vulcan.reasoning.selection.selection_types import SelectionResult
+                        return SelectionResult(
+                            selected_tools=['general'],
+                            execution_result={
+                                'tool': 'general',
+                                'skip_reasoning': True,
+                                'result': None,  # No reasoning result - use LLM
+                            },
+                            strategy='direct',
+                            confidence=0.85,
+                            metadata={
+                                'classifier_category': classifier_category,
+                                'classifier_tools': classifier_tools,
+                                'skip_reasoning': True,
+                                'fast_path': True,
+                            },
+                        )
+                    
                     # Filter to only include available tools
                     available_tools = getattr(self, 'available_tools', None) or DEFAULT_AVAILABLE_TOOLS
                     valid_classifier_tools = [t for t in classifier_tools if t in available_tools]
