@@ -1,3 +1,4 @@
+from typing import Any, Dict, List, Optional
 """
 Utility functions and conveniences for reasoning integration.
 
