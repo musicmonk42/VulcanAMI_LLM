@@ -32,12 +32,19 @@ from .types import (
     SemanticRelationType,
 )
 
-# Import other components from the original file for now
-# This maintains backward compatibility while we complete the refactoring
+# Semantic enrichment - extracted to separate module
+from .semantic_enricher import (
+    SemanticEnricher,
+    get_nlp,
+    SKLEARN_AVAILABLE,
+    SENTENCE_TRANSFORMERS_AVAILABLE,
+    SPACY_AVAILABLE,
+)
+
+# Import remaining components from the original file
+# These will be moved to their own modules in subsequent iterations
 try:
-    # These will be moved to their own modules in subsequent iterations
     from ..analogical_reasoning import (
-        SemanticEnricher,
         GoalRelevanceAnalyzer,
         AbstractReasoner,
         AnalogicalReasoner,
@@ -48,9 +55,6 @@ try:
         explain_analogy_differences,
         test_semantic_similarity,
         NETWORKX_AVAILABLE,
-        SKLEARN_AVAILABLE,
-        SPACY_AVAILABLE,
-        SENTENCE_TRANSFORMERS_AVAILABLE,
         TORCH_AVAILABLE,
     )
 except ImportError as e:
@@ -59,7 +63,6 @@ except ImportError as e:
     logging.getLogger(__name__).warning(
         f"Failed to import from parent analogical_reasoning module: {e}"
     )
-    SemanticEnricher = None
     GoalRelevanceAnalyzer = None
     AbstractReasoner = None
     AnalogicalReasoner = None
@@ -70,9 +73,6 @@ except ImportError as e:
     explain_analogy_differences = None
     test_semantic_similarity = None
     NETWORKX_AVAILABLE = False
-    SKLEARN_AVAILABLE = False
-    SPACY_AVAILABLE = False
-    SENTENCE_TRANSFORMERS_AVAILABLE = False
     TORCH_AVAILABLE = False
 
 
