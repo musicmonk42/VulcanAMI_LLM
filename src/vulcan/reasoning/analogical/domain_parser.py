@@ -514,3 +514,123 @@ def extract_domain_structure(text: str, domain_name: str) -> Dict:
         })
     
     return domain
+
+
+def extract_entities(structure: Dict) -> Set:
+    """
+    Extract entities from a domain structure.
+    
+    Args:
+        structure: Domain structure dict with 'entities' key
+        
+    Returns:
+        Set of Entity objects or entity names
+    """
+    from vulcan.reasoning.analogical.types import Entity
+    
+    entities = set()
+    
+    if "entities" in structure:
+        ents = structure["entities"]
+        if isinstance(ents, (list, set, tuple)):
+            for e in ents:
+                if isinstance(e, Entity):
+                    entities.add(e)
+                elif isinstance(e, dict):
+                    entities.add(
+                        Entity(
+                            name=e.get("name", str(e)),
+                            entity_type=e.get("type", "concept"),
+                            attributes=e.get("attributes", []),
+                        )
+                    )
+                else:
+                    entities.add(Entity(name=str(e), entity_type="concept"))
+    
+    return entities
+
+
+def extract_relations(structure: Dict) -> List:
+    """
+    Extract relations from a domain structure.
+    
+    Args:
+        structure: Domain structure dict with 'relations' key
+        
+    Returns:
+        List of Relation objects or tuples
+    """
+    from vulcan.reasoning.analogical.types import Relation
+    
+    relations = []
+    
+    if "relations" in structure:
+        rels = structure["relations"]
+        if isinstance(rels, (list, tuple)):
+            for r in rels:
+                if isinstance(r, Relation):
+                    relations.append(r)
+                elif isinstance(r, tuple) and len(r) >= 3:
+                    relations.append(r)
+                elif isinstance(r, dict):
+                    relations.append(
+                        Relation(
+                            source=r.get("source", ""),
+                            predicate=r.get("predicate", ""),
+                            target=r.get("target", ""),
+                        )
+                    )
+    
+    return relations
+
+
+def extract_attributes(structure: Dict) -> Dict[str, List]:
+    """
+    Extract attributes from a domain structure.
+    
+    Args:
+        structure: Domain structure dict with 'attributes' key
+        
+    Returns:
+        Dict mapping entity names to attribute lists
+    """
+    attributes = {}
+    
+    if "attributes" in structure:
+        attrs = structure["attributes"]
+        if isinstance(attrs, dict):
+            attributes = attrs
+    
+    return attributes
+
+
+def build_domain_graph(entities: Set, relations: List) -> Dict:
+    """
+    Build a graph representation of a domain.
+    
+    Args:
+        entities: Set of entities
+        relations: List of relations
+        
+    Returns:
+        Dict representing graph structure
+    """
+    graph = {"nodes": set(), "edges": []}
+    
+    # Add entities as nodes
+    for entity in entities:
+        if hasattr(entity, "name"):
+            graph["nodes"].add(entity.name)
+        else:
+            graph["nodes"].add(str(entity))
+    
+    # Add relations as edges
+    for relation in relations:
+        if hasattr(relation, "source") and hasattr(relation, "target"):
+            graph["edges"].append(
+                (relation.source, relation.predicate, relation.target)
+            )
+        elif isinstance(relation, tuple) and len(relation) >= 3:
+            graph["edges"].append(relation)
+    
+    return graph

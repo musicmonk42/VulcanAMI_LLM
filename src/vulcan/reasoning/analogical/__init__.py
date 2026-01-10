@@ -41,6 +41,9 @@ from .semantic_enricher import (
     SPACY_AVAILABLE,
 )
 
+# For backward compatibility - expose nlp as None initially
+nlp = None
+
 # Utility functions - extracted to separate module
 from .utils import (
     compute_conceptual_distance,
@@ -68,27 +71,25 @@ from .domain_parser import (
     extract_domain_structure,
 )
 
+# Base reasoner classes - extracted to separate module
+from .base_reasoner import (
+    AbstractReasoner,
+    AnalogicalReasoner,
+)
+
+# Analogical reasoning engine - extracted to separate module
+from .engine import (
+    AnalogicalReasoningEngine,
+)
+
 # Re-export NETWORKX_AVAILABLE for backward compatibility
 NETWORKX_AVAILABLE = UTILS_NETWORKX_AVAILABLE
 
-# Import remaining components from the original file
-# These will be moved to their own modules in subsequent iterations
+# Check for torch availability
 try:
-    from ..analogical_reasoning import (
-        AbstractReasoner,
-        AnalogicalReasoner,
-        AnalogicalReasoningEngine,
-        TORCH_AVAILABLE,
-    )
-except ImportError as e:
-    # Graceful degradation if parent module has issues
-    import logging
-    logging.getLogger(__name__).warning(
-        f"Failed to import from parent analogical_reasoning module: {e}"
-    )
-    AbstractReasoner = None
-    AnalogicalReasoner = None
-    AnalogicalReasoningEngine = None
+    import torch
+    TORCH_AVAILABLE = True
+except ImportError:
     TORCH_AVAILABLE = False
 
 
