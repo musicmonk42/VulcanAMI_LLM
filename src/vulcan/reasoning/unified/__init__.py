@@ -1,59 +1,109 @@
 """
-Unified reasoning subpackage for VULCAN.
+Unified Reasoning Package
 
-This package provides the main unified reasoning orchestrator that coordinates
-multiple reasoning paradigms (symbolic, causal, probabilistic, analogical, etc.)
-through adaptive strategy selection and portfolio execution.
+This package provides a unified interface for reasoning across multiple reasoning engines
+and strategies. It orchestrates probabilistic, symbolic, causal, and analogical reasoning
+with sophisticated tool selection, learning, and adaptation mechanisms.
 
-The package is organized into focused modules:
-    - types: Core dataclasses for reasoning tasks and plans
-    - config: Configuration constants and environment loading
-    - component_loader: Component initialization and dependency injection
-    - strategies: Reasoning strategy implementations
-    - cache: Result caching with LRU eviction
-    - orchestrator: Main UnifiedReasoner class
-    - multimodal_handler: Multimodal and counterfactual reasoning
-    - persistence: State persistence and model serialization
+Main Components:
+- UnifiedReasoner: Main orchestrator class
+- ReasoningTask, ReasoningPlan: Core data structures
+- ToolWeightManager: Weight management for ensemble reasoning
+- Strategy functions: Sequential, parallel, ensemble, adaptive, etc.
+
+Submodules:
+- types: Core dataclasses and types
+- config: Configuration constants
+- component_loader: Lazy component loading
+- cache: Tool weight management and query hashing
+- strategies: Reasoning execution strategies
+- orchestrator: Main UnifiedReasoner class
+- multimodal_handler: Multimodal reasoning methods
+- persistence: State save/load functionality
 
 Usage:
-    >>> from vulcan.reasoning.unified import UnifiedReasoner
-    >>> reasoner = UnifiedReasoner()
-    >>> result = reasoner.reason(query="What causes X?", strategy="causal")
-
-Module: vulcan.reasoning.unified
-Author: Vulcan AI Team
+    from vulcan.reasoning.unified import UnifiedReasoner
+    
+    reasoner = UnifiedReasoner(enable_learning=True)
+    result = reasoner.reason({"query": "What causes rain?"})
 """
 
-# TODO: Complete refactoring - Currently re-exporting from parent module
-# This maintains backward compatibility while refactoring is in progress
+# Import core types
+from .types import ReasoningTask, ReasoningPlan
 
-try:
-    from ..unified_reasoning import (
-        UnifiedReasoner,
-        ReasoningTask,
-        ReasoningPlan,
-        ToolWeightManager,
-        get_weight_manager,
-    )
-except ImportError as e:
-    import logging
-    logging.getLogger(__name__).warning(
-        f"Failed to import from parent unified_reasoning module: {e}"
-    )
-    UnifiedReasoner = None
-    ReasoningTask = None
-    ReasoningPlan = None
-    ToolWeightManager = None
-    get_weight_manager = None
+# Import configuration constants
+from .config import *
 
+# Import component loader functions
+from .component_loader import (
+    _load_reasoning_components,
+    _load_selection_components,
+    _load_optional_components,
+)
+
+# Import cache management
+from .cache import ToolWeightManager, compute_query_hash
+
+# Import strategy functions
+from .strategies import (
+    _sequential_reasoning,
+    _parallel_reasoning,
+    _ensemble_reasoning,
+    _adaptive_reasoning,
+    _hybrid_reasoning,
+    _hierarchical_reasoning,
+    _portfolio_reasoning,
+    _utility_based_reasoning,
+    _weighted_voting,
+    _combine_parallel_results,
+    _topological_sort,
+    _merge_dependency_results,
+)
+
+# Import main orchestrator
+from .orchestrator import UnifiedReasoner
+
+# Import multimodal methods
+from .multimodal_handler import (
+    reason_multimodal,
+    reason_counterfactual,
+    reason_by_analogy,
+)
+
+# Import persistence functions
+from .persistence import save_state, load_state
 
 __all__ = [
-    "UnifiedReasoner",
+    # Core types
     "ReasoningTask",
     "ReasoningPlan",
+    # Component loaders
+    "_load_reasoning_components",
+    "_load_selection_components",
+    "_load_optional_components",
+    # Cache management
     "ToolWeightManager",
-    "get_weight_manager",
+    "compute_query_hash",
+    # Strategy functions
+    "_sequential_reasoning",
+    "_parallel_reasoning",
+    "_ensemble_reasoning",
+    "_adaptive_reasoning",
+    "_hybrid_reasoning",
+    "_hierarchical_reasoning",
+    "_portfolio_reasoning",
+    "_utility_based_reasoning",
+    "_weighted_voting",
+    "_combine_parallel_results",
+    "_topological_sort",
+    "_merge_dependency_results",
+    # Main class
+    "UnifiedReasoner",
+    # Multimodal methods
+    "reason_multimodal",
+    "reason_counterfactual",
+    "reason_by_analogy",
+    # Persistence
+    "save_state",
+    "load_state",
 ]
-
-__version__ = "2.0.0"
-__author__ = "Vulcan AI Team"
