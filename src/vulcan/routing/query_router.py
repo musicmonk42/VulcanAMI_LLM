@@ -4564,7 +4564,7 @@ class QueryAnalyzer:
         # ================================================================
         reasoning_result = None
         try:
-            from vulcan.reasoning.reasoning_integration import apply_reasoning
+            from vulcan.reasoning.integration import apply_reasoning
 
             reasoning_result = apply_reasoning(
                 query=query,

@@ -184,7 +184,7 @@ from vulcan.utils_main import (
 # SystemObserver: World Model awareness of platform activity
 # BUG #3 FIX: Wire up SystemObserver so world model knows what the platform does
 try:
-    from vulcan.reasoning.reasoning_integration import (
+    from vulcan.reasoning.integration import (
         observe_query_start,
         observe_engine_result,
         observe_outcome,
@@ -1685,7 +1685,7 @@ async def lifespan(app: FastAPI):
     # PERFORMANCE FIX (Issue #55/#56): Preload ReasoningIntegration and embedding models at startup
     # This prevents the first query from taking 60+ seconds to load all models
     try:
-        from vulcan.reasoning.reasoning_integration import get_reasoning_integration
+        from vulcan.reasoning.integration import get_reasoning_integration
         reasoning_integration = get_reasoning_integration()
         # Force initialization of components (ToolSelector, PortfolioExecutor)
         reasoning_integration._init_components()
@@ -6692,7 +6692,7 @@ async def unified_chat(request: UnifiedChatRequest):
                     # NOTE: Imports are inside try-except intentionally because these modules
                     # may not be available in all deployments. If they're not available,
                     # we gracefully fall back to agent pool results (or no reasoning).
-                    from vulcan.reasoning.reasoning_integration import apply_reasoning
+                    from vulcan.reasoning.integration import apply_reasoning
                     from vulcan.reasoning import create_unified_reasoner, ReasoningType
                     
                     # FIX #1: Use router's complexity and type, not hardcoded defaults

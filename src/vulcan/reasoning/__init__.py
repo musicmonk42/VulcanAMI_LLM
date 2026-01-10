@@ -547,7 +547,7 @@ logger.info(
 # Reasoning Integration - Query Flow Integration (FIX: Wire into Query Flow)
 # ============================================================================
 try:
-    from .reasoning_integration import (
+    from .integration import (
         ReasoningIntegration,
         ReasoningResult as IntegrationReasoningResult,
         apply_reasoning,

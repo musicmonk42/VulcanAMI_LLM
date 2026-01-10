@@ -1,19 +1,333 @@
 """
-Tool selection and strategy determination logic.
+Selection strategies for reasoning integration.
 
-This module contains methods for:
-- Tool selection using ToolSelector
-- Strategy determination from query characteristics
-- Fallback tool selection
-- Tool combination logic
-
-Module: vulcan.reasoning.integration.selection_strategies
-Author: Vulcan AI Team
+Provides tool selection and strategy determination logic for the
+ReasoningIntegration orchestrator.
 """
 
-# NOTE: This is a STUB module during refactoring
-# Selection strategy methods are still in ReasoningIntegration class
-# in the parent reasoning_integration.py file
-# This will be properly extracted in subsequent commits
+import logging
+from typing import Any, Dict, List, Optional, Tuple
 
-__all__ = []
+from .types import (
+    ReasoningResult,
+    ReasoningStrategyType,
+    RoutingDecision,
+    IntegrationStatistics,
+    DECOMPOSITION_COMPLEXITY_THRESHOLD,
+    LOG_PREFIX,
+    MAX_FALLBACK_ATTEMPTS,
+)
+
+logger = logging.getLogger(__name__)
+
+
+class SelectionStrategies:
+    """Selection strategies for reasoning integration."""
+    
+    def __init__(self, integration):
+        """Initialize with reference to parent integration."""
+        self._integration = integration
+    
+    @staticmethod
+    def _process_with_decomposition(
+        self,
+        query: str,
+        query_type: str,
+        complexity: float,
+        context: Optional[Dict[str, Any]],
+    ) -> ReasoningResult:
+        """
+        Process a complex query using hierarchical problem decomposition.
+
+        This method is called for queries with complexity >= DECOMPOSITION_COMPLEXITY_THRESHOLD.
+        It breaks down the query into subproblems, applies tool selection to each,
+        and aggregates the results.
+
+        Processing Flow:
+            1. Convert query to ProblemGraph via QueryToProblemBridge
+            2. Decompose using ProblemDecomposer (strategies: exact, semantic, structural, etc.)
+            3. For each subproblem step, apply ToolSelector
+            4. Aggregate results and determine overall strategy
+
+        Args:
+            query: The user query text to process
+            query_type: Type of query (reasoning, execution, etc.)
+            complexity: Query complexity score (0.4 to 1.0)
+            context: Optional context dictionary
+
+        Returns:
+            ReasoningResult with selected tools, strategy, and decomposition metadata
+
+        Note:
+            Falls back to direct tool selection if decomposition fails.
+        """
+        decomposition_start = time.perf_counter()
+
+        try:
+            # Step 1: Convert query to ProblemGraph
+            query_analysis = {
+                'type': query_type,
+                'complexity': complexity,
+                'uncertainty': context.get('uncertainty', 0.0) if context else 0.0,
+                'requires_reasoning': query_type in ('reasoning', 'causal', 'planning'),
+            }
+
+            problem_graph = self._query_bridge.convert_to_problem_graph(
+                query=query,
+                query_analysis=query_analysis,
+                tool_selection=None,  # Will be determined per subproblem
+            )
+
+            if problem_graph is None:
+                logger.warning(
+                    f"{LOG_PREFIX} Query bridge returned None, falling back to direct selection"
+                )
+                return self._select_with_tool_selector(query, query_type, complexity, context)
+
+            # Step 2: Decompose the problem
+            decomposition_plan = self._problem_decomposer.decompose_novel_problem(problem_graph)
+
+            if decomposition_plan is None or len(decomposition_plan.steps) == 0:
+                logger.warning(
+                    f"{LOG_PREFIX} Decomposition returned empty plan, falling back to direct selection"
+                )
+                return self._select_with_tool_selector(query, query_type, complexity, context)
+
+            logger.info(
+                f"{LOG_PREFIX} Decomposed into {len(decomposition_plan.steps)} steps, "
+                f"confidence={decomposition_plan.confidence:.2f}"
+            )
+
+            # Step 3: Select tools ONCE based on ORIGINAL query
+            # Note: Previously, step descriptions (~28 chars like "Step 1: Parse constraints")
+            # were passed to ToolSelector instead of the original query (e.g., 507 chars).
+            # This caused semantic matching to fail because it was matching against
+            # short step descriptions instead of the actual user query.
+            # 
+            # The fix: Select tools once based on the original query, then apply those
+            # tools to each decomposed step.
+            logger.info(
+                f"{LOG_PREFIX} Selecting tools based on original query "
+                f"(length={len(query)} chars)"
+            )
+            
+            primary_result = self._select_with_tool_selector(
+                query=query,  # Use ORIGINAL query, not step descriptions
+                query_type=query_type,
+                complexity=complexity,
+                context=context,
+            )
+            
+            # The tools selected for the original query apply to all steps
+            all_tools: set = set(primary_result.selected_tools)
+            step_results: List[Dict[str, Any]] = []
+
+            # Record step metadata (without re-running tool selection per step)
+            for step in decomposition_plan.steps:
+                # Extract step description for metadata only
+                if hasattr(step, 'description'):
+                    step_description = step.description
+                elif hasattr(step, 'to_dict'):
+                    step_dict = step.to_dict()
+                    step_description = step_dict.get('description', str(step))
+                else:
+                    step_description = str(step)
+
+                # Extract step complexity for metadata
+                if hasattr(step, 'estimated_complexity'):
+                    step_complexity = step.estimated_complexity
+                elif hasattr(step, 'complexity'):
+                    step_complexity = step.complexity
+                else:
+                    step_complexity = complexity * 0.5  # Default to half of parent
+
+                # Ensure step_complexity is within bounds
+                step_complexity = max(0.1, min(1.0, step_complexity))
+
+                # Record step metadata - tools are inherited from primary selection
+                step_results.append({
+                    'step_id': getattr(step, 'step_id', f'step_{len(step_results)}'),
+                    'description': step_description[:100],  # Truncate for metadata
+                    'tools': primary_result.selected_tools,  # Inherited from primary
+                    'strategy': primary_result.reasoning_strategy,
+                    'confidence': primary_result.confidence,
+                    'step_complexity': step_complexity,
+                })
+
+            # Step 4: Determine overall strategy based on decomposition
+            if decomposition_plan.strategy:
+                strategy_name = getattr(decomposition_plan.strategy, 'name', 'hierarchical')
+            else:
+                strategy_name = 'hierarchical_decomposition'
+
+            # Calculate overall confidence
+            # Use the primary tool selection confidence combined with decomposition confidence
+            num_steps = len(step_results)
+            overall_confidence = (decomposition_plan.confidence * 0.4) + (primary_result.confidence * 0.6)
+
+            decomposition_time_ms = (time.perf_counter() - decomposition_start) * 1000
+
+            logger.info(
+                f"{LOG_PREFIX} Decomposition complete: "
+                f"tools={list(all_tools)}, strategy={strategy_name}, "
+                f"confidence={overall_confidence:.2f}, time={decomposition_time_ms:.1f}ms"
+            )
+
+            return ReasoningResult(
+                selected_tools=list(all_tools) if all_tools else ["general"],
+                reasoning_strategy=strategy_name,
+                confidence=overall_confidence,
+                rationale=f"Hierarchical decomposition into {num_steps} subproblems",
+                metadata={
+                    "query_type": query_type,
+                    "complexity": complexity,
+                    "decomposition_path": True,
+                    "decomposition_steps": num_steps,
+                    "step_results": step_results,
+                    "decomposition_confidence": decomposition_plan.confidence,
+                    "decomposition_time_ms": decomposition_time_ms,
+                    "tool_selector_available": self._tool_selector is not None,
+                    "problem_decomposer_available": self._problem_decomposer is not None,
+                },
+            )
+
+        except Exception as e:
+            logger.error(
+                f"{LOG_PREFIX} Decomposition processing failed: {e}, "
+                f"falling back to direct selection",
+                exc_info=True
+            )
+            # Graceful degradation: fall back to direct tool selection
+            return self._select_with_tool_selector(query, query_type, complexity, context)
+
+    @staticmethod
+    def _get_fallback_tools(
+        self,
+        query_type: str,
+        original_tool: str,
+        failed_tools: List[str],
+    ) -> List[str]:
+        """
+        Get appropriate fallback tools based on query type and failed tools.
+        
+        FIX #4: Improved Fallback Logic
+        ===============================
+        Instead of a fixed fallback list, select tools based on query characteristics.
+        This ensures queries are routed to the most appropriate alternative engine
+        before falling back to LLM (Arena delegation).
+        
+        Priority:
+        1. Query-type specific alternatives (e.g., philosophical for ethical queries)
+        2. General-purpose fallbacks (world_model for meta-queries, probabilistic)
+        3. The fallback list is filtered to exclude already-failed tools
+        
+        Args:
+            query_type: Type of query (reasoning, ethical, mathematical, etc.)
+            original_tool: The tool that originally failed
+            failed_tools: List of tools that have already been tried and failed
+            
+        Returns:
+            List of fallback tool names to try, in priority order
+        """
+        # Map query types to preferred fallback tools
+        # NOTE: 'philosophical' engine removed - use 'world_model' for ethical reasoning
+        query_type_fallbacks = {
+            # Ethical/philosophical queries → world_model is primary (has full meta-reasoning)
+            'ethical': ['world_model', 'analogical', 'causal'],
+            'philosophical': ['world_model', 'analogical', 'causal'],
+            
+            # Mathematical queries → try mathematical engine first
+            'mathematical': ['symbolic', 'probabilistic'],
+            'symbolic': ['mathematical', 'probabilistic'],
+            
+            # Causal queries → try related engines
+            'causal': ['probabilistic', 'analogical', 'world_model'],
+            
+            # Analogical queries → try related engines  
+            'analogical': ['causal', 'world_model', 'probabilistic'],
+            
+            # Probabilistic queries → try related engines
+            'probabilistic': ['mathematical', 'causal', 'analogical'],
+            
+            # Cryptographic queries → try mathematical fallback
+            'cryptographic': ['mathematical', 'symbolic'],
+            
+            # Self-introspection queries → world_model is primary
+            'self_introspection': ['world_model', 'analogical'],
+            
+            # General/reasoning queries → broad fallback
+            'reasoning': ['world_model', 'probabilistic', 'analogical'],
+            'general': ['world_model', 'probabilistic', 'analogical'],
+        }
+        
+        # Normalize query type
+        query_type_lower = query_type.lower() if query_type else 'general'
+        
+        # Get type-specific fallbacks, or default to general
+        fallback_list = query_type_fallbacks.get(
+            query_type_lower,
+            ['world_model', 'probabilistic', 'analogical']
+        ).copy()  # Copy to avoid modifying the dict value
+        
+        # Ensure we have the general-purpose fallbacks at the end
+        # Use set for O(1) membership testing instead of O(n) list lookup
+        # NOTE: 'philosophical' removed from defaults - world_model handles ethical reasoning
+        default_fallbacks = ['world_model', 'probabilistic', 'analogical', 'mathematical']
+        existing_tools = set(fallback_list)
+        for tool in default_fallbacks:
+            if tool not in existing_tools:
+                fallback_list.append(tool)
+                existing_tools.add(tool)
+        
+        # Filter out the tools that have already failed
+        failed_set = set(failed_tools) | {original_tool}
+        fallback_list = [t for t in fallback_list if t not in failed_set]
+        
+        # Limit to top 3 fallbacks to prevent excessive retries
+        fallback_list = fallback_list[:3]
+        
+        logger.debug(
+            f"{LOG_PREFIX} FIX#4: Selected fallback tools for query_type='{query_type}', "
+            f"original_tool='{original_tool}': {fallback_list}"
+        )
+        
+        return fallback_list
+
+    @staticmethod
+    def _determine_strategy_from_query(
+        self,
+        query_type: str,
+        complexity: float
+    ) -> str:
+        """
+        Determine reasoning strategy based on query characteristics.
+
+        This method implements the fallback strategy selection logic when
+        the ToolSelector is unavailable or doesn't provide a strategy.
+
+        Args:
+            query_type: Type of query (reasoning, perception, planning, etc.)
+            complexity: Query complexity (0.0 to 1.0)
+
+        Returns:
+            Strategy name string
+        """
+        # High complexity reasoning queries use causal reasoning
+        if query_type == "reasoning" and complexity > CAUSAL_REASONING_THRESHOLD:
+            return ReasoningStrategyType.CAUSAL_REASONING.value
+
+        # Execution tasks use planning
+        if query_type == "execution":
+            return ReasoningStrategyType.PLANNING.value
+
+        # Medium-high complexity uses probabilistic reasoning
+        if complexity > PROBABILISTIC_REASONING_THRESHOLD:
+            return ReasoningStrategyType.PROBABILISTIC_REASONING.value
+
+        # Query type specific strategies
+        type_strategy = QUERY_TYPE_STRATEGY_MAP.get(query_type)
+        if type_strategy:
+            return type_strategy
+
+        # Default to direct for simple queries
+        return ReasoningStrategyType.DIRECT.value

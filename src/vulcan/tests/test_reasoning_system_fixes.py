@@ -383,7 +383,7 @@ class TestWorldModelIntrospection:
         """
         # Import the detection function
         try:
-            from vulcan.reasoning.reasoning_integration import (
+            from vulcan.reasoning.integration import (
                 ReasoningIntegration,
             )
             integration = ReasoningIntegration()
@@ -409,7 +409,7 @@ class TestWorldModelIntrospection:
         Verify non-self queries are not incorrectly classified.
         """
         try:
-            from vulcan.reasoning.reasoning_integration import (
+            from vulcan.reasoning.integration import (
                 ReasoningIntegration,
             )
             integration = ReasoningIntegration()
@@ -614,7 +614,7 @@ class TestCreativeVsSelfReferentialDetection:
         about its own capabilities.
         """
         try:
-            from vulcan.reasoning.reasoning_integration import (
+            from vulcan.reasoning.integration import (
                 ReasoningIntegration,
             )
             integration = ReasoningIntegration()
@@ -650,7 +650,7 @@ class TestCreativeVsSelfReferentialDetection:
         self-awareness - NOT creative writing requests.
         """
         try:
-            from vulcan.reasoning.reasoning_integration import (
+            from vulcan.reasoning.integration import (
                 ReasoningIntegration,
             )
             integration = ReasoningIntegration()
@@ -681,7 +681,7 @@ class TestCreativeVsSelfReferentialDetection:
         be detected as self-referential.
         """
         try:
-            from vulcan.reasoning.reasoning_integration import (
+            from vulcan.reasoning.integration import (
                 ReasoningIntegration,
             )
             integration = ReasoningIntegration()
@@ -709,7 +709,7 @@ class TestCreativeVsSelfReferentialDetection:
         Test edge cases: empty queries, None, etc.
         """
         try:
-            from vulcan.reasoning.reasoning_integration import (
+            from vulcan.reasoning.integration import (
                 ReasoningIntegration,
             )
             integration = ReasoningIntegration()
@@ -735,7 +735,7 @@ class TestCreativeVsSelfReferentialDetection:
         'rewording' should NOT match 'word' if that were a creative indicator.
         """
         try:
-            from vulcan.reasoning.reasoning_integration import (
+            from vulcan.reasoning.integration import (
                 ReasoningIntegration,
             )
             integration = ReasoningIntegration()
