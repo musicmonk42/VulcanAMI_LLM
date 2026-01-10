@@ -41,6 +41,19 @@ from .semantic_enricher import (
     SPACY_AVAILABLE,
 )
 
+# Utility functions - extracted to separate module
+from .utils import (
+    compute_conceptual_distance,
+    find_conceptual_path,
+    cluster_analogies,
+    explain_analogy_differences,
+    test_semantic_similarity,
+    NETWORKX_AVAILABLE as UTILS_NETWORKX_AVAILABLE,
+)
+
+# Re-export NETWORKX_AVAILABLE for backward compatibility
+NETWORKX_AVAILABLE = UTILS_NETWORKX_AVAILABLE
+
 # Import remaining components from the original file
 # These will be moved to their own modules in subsequent iterations
 try:
@@ -49,12 +62,6 @@ try:
         AbstractReasoner,
         AnalogicalReasoner,
         AnalogicalReasoningEngine,
-        compute_conceptual_distance,
-        find_conceptual_path,
-        cluster_analogies,
-        explain_analogy_differences,
-        test_semantic_similarity,
-        NETWORKX_AVAILABLE,
         TORCH_AVAILABLE,
     )
 except ImportError as e:
@@ -67,12 +74,6 @@ except ImportError as e:
     AbstractReasoner = None
     AnalogicalReasoner = None
     AnalogicalReasoningEngine = None
-    compute_conceptual_distance = None
-    find_conceptual_path = None
-    cluster_analogies = None
-    explain_analogy_differences = None
-    test_semantic_similarity = None
-    NETWORKX_AVAILABLE = False
     TORCH_AVAILABLE = False
 
 
