@@ -648,6 +648,9 @@ SELF_INTROSPECTION_PATTERNS: Tuple[re.Pattern, ...] = (
     re.compile(r"\bwhat\s+(features?|capabilities?)\s+(do\s+you|are\s+unique)", re.IGNORECASE),
     re.compile(r"\bwhat\s+can\s+you\s+do\b", re.IGNORECASE),
     re.compile(r"\bwhat\s+are\s+you\s+capable\s+of\b", re.IGNORECASE),
+    # FIX (Jan 10 2026): Added patterns for abilities/capabilities questions
+    re.compile(r"\bwhat\s+abilities\s+do\s+you\s+have\b", re.IGNORECASE),
+    re.compile(r"\b(abilities|capabilities)\s+(?:do\s+)?you\s+have\b.*\b(no\s+other|unique|other\s+ai)", re.IGNORECASE),
     
     # Motivational questions
     re.compile(r"\b(why|what)\b.*\b(you|your)\b.*\b(goal|purpose|motivation|trying|want)", re.IGNORECASE),
