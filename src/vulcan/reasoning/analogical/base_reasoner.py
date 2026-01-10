@@ -461,7 +461,24 @@ class AnalogicalReasoner(AbstractReasoner):
             cache_key = f"{source_domain}:{target_problem}:{mapping_type.value}"
             if cache_key in self.analogy_cache:
                 self.stats["cache_hits"] += 1
+                self.stats["total_mappings"] += 1  # Count cache hits as mappings
                 return self.analogy_cache[cache_key]
+
+        # Validate source domain
+        if isinstance(source_domain, str) and source_domain not in self.domain_knowledge:
+            # Check if it's a description vs unknown domain
+            if len(source_domain) < 50:  # Likely a domain name
+                return {
+                    "found": False,
+                    "mapping": None,
+                    "confidence": 0.0,
+                    "explanation": f"Unknown source domain: {source_domain}",
+                    "reason": f"Unknown source domain: {source_domain}",
+                    "mapping_type": mapping_type.value,
+                    "score": 0.0,
+                    "mappings": {},
+                    "solution": None,
+                }
 
         # Prepare source and target structures
         source_struct = self._prepare_structure(source_domain)
@@ -483,13 +500,18 @@ class AnalogicalReasoner(AbstractReasoner):
         else:
             mapping = self.structure_mapper.structural_mapping(source_struct, target_struct)
 
-        # Build result
+        # Build result with backward compatibility
         result = {
             "found": len(mapping.entity_mappings) > 0,
             "mapping": mapping,
             "confidence": mapping.confidence,
             "explanation": self._generate_explanation(mapping),
             "mapping_type": mapping_type.value,
+            # Backward compatibility fields
+            "score": mapping.mapping_score,
+            "mappings": mapping.entity_mappings,
+            "solution": mapping.entity_mappings if len(mapping.entity_mappings) > 0 else None,
+            "reason": "No analogical mapping found." if len(mapping.entity_mappings) == 0 else None,
         }
 
         # Update statistics
@@ -523,17 +545,27 @@ class AnalogicalReasoner(AbstractReasoner):
         if isinstance(domain, str):
             # Check if it's a known domain name
             if domain in self.domain_knowledge:
-                return self.domain_knowledge[domain]["structure"]
+                struct = self.domain_knowledge[domain]["structure"]
             else:
                 # Parse as natural language description
                 from vulcan.reasoning.analogical.domain_parser import (
                     extract_domain_structure,
                 )
-                return extract_domain_structure(domain, domain)
+                struct = extract_domain_structure(domain, domain)
         elif isinstance(domain, dict):
-            return domain
+            struct = domain
         else:
-            return {"entities": [], "relations": [], "attributes": {}}
+            struct = {}
+        
+        # Ensure all required keys are present
+        if "entities" not in struct:
+            struct["entities"] = []
+        if "relations" not in struct:
+            struct["relations"] = []
+        if "attributes" not in struct:
+            struct["attributes"] = {}
+            
+        return struct
 
     def _structural_mapping(
         self, 

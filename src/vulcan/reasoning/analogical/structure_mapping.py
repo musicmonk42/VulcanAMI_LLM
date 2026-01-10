@@ -768,9 +768,30 @@ class StructureMappingEngine:
             >>> assert 0 <= sim <= 1
         """
         try:
-            # Handle empty domains
-            if not source or not target:
+            # Handle truly empty dicts - they're identical
+            if not source and not target:
+                return 1.0
+            
+            # One empty, one not - different
+            if (not source) or (not target):
                 return 0.0
+            
+            # Handle dicts without entities/relations keys (treat as raw data dicts)
+            has_structure_keys_source = "entities" in source or "relations" in source
+            has_structure_keys_target = "entities" in target or "relations" in target
+            
+            # If neither has structure keys, they're not comparable domain structures
+            if not has_structure_keys_source and not has_structure_keys_target:
+                # Compare as raw dicts - no overlap means dissimilar
+                source_keys = set(source.keys())
+                target_keys = set(target.keys())
+                if not source_keys and not target_keys:
+                    return 1.0  # Both empty
+                if not source_keys or not target_keys:
+                    return 0.0  # One empty
+                intersection = len(source_keys & target_keys)
+                union = len(source_keys | target_keys)
+                return float(intersection / union) if union > 0 else 0.0
             
             source_entities = source.get("entities", [])
             source_relations = source.get("relations", [])
@@ -801,6 +822,200 @@ class StructureMappingEngine:
             
         except Exception as e:
             logger.warning(f"Structural similarity computation failed: {e}")
+            return 0.0
+    
+    def _compute_surface_similarity(self, source: Dict, target: Dict) -> float:
+        """
+        Compute surface-level similarity between source and target domains.
+        
+        This method computes similarity based on surface-level features:
+        - Attribute overlap
+        - Label similarity
+        - Type matching
+        
+        Args:
+            source: Source domain dictionary with 'entities' and 'relations'
+            target: Target domain dictionary with 'entities' and 'relations'
+            
+        Returns:
+            Surface similarity score between 0 and 1.
+            
+        Examples:
+            >>> engine = StructureMappingEngine(enricher, analyzer)
+            >>> sim = engine._compute_surface_similarity(source, target)
+            >>> assert 0 <= sim <= 1
+        """
+        try:
+            # Handle truly empty dicts - they're identical
+            if not source and not target:
+                return 1.0
+            
+            # One empty, one not - different
+            if (not source) or (not target):
+                return 0.0
+            
+            # Handle dicts without entities keys (treat as raw data dicts)
+            has_entities_source = "entities" in source
+            has_entities_target = "entities" in target
+            
+            # If neither has entities keys, compare as raw dicts
+            if not has_entities_source and not has_entities_target:
+                source_keys = set(source.keys())
+                target_keys = set(target.keys())
+                if not source_keys and not target_keys:
+                    return 1.0
+                if not source_keys or not target_keys:
+                    return 0.0
+                intersection = len(source_keys & target_keys)
+                union = len(source_keys | target_keys)
+                return float(intersection / union) if union > 0 else 0.0
+            
+            source_entities = source.get("entities", [])
+            target_entities = target.get("entities", [])
+            
+            # Handle empty entity sets
+            if not source_entities and not target_entities:
+                return 1.0
+            
+            if not source_entities or not target_entities:
+                return 0.0
+            
+            # Compute attribute overlap
+            source_attrs = set()
+            for entity in source_entities:
+                if hasattr(entity, 'attributes'):
+                    source_attrs.update(entity.attributes.keys())
+                elif isinstance(entity, dict):
+                    source_attrs.update(entity.get('attributes', {}).keys())
+            
+            target_attrs = set()
+            for entity in target_entities:
+                if hasattr(entity, 'attributes'):
+                    target_attrs.update(entity.attributes.keys())
+                elif isinstance(entity, dict):
+                    target_attrs.update(entity.get('attributes', {}).keys())
+            
+            # Jaccard similarity for attributes
+            if not source_attrs and not target_attrs:
+                attr_sim = 1.0
+            elif not source_attrs or not target_attrs:
+                attr_sim = 0.0
+            else:
+                intersection = len(source_attrs & target_attrs)
+                union = len(source_attrs | target_attrs)
+                attr_sim = intersection / union if union > 0 else 0.0
+            
+            # Entity count similarity
+            count_sim = 1.0 - abs(
+                len(source_entities) - len(target_entities)
+            ) / max(len(source_entities), len(target_entities), 1)
+            
+            # Combine similarities
+            surface_similarity = (attr_sim + count_sim) / 2.0
+            
+            return float(np.clip(surface_similarity, 0.0, 1.0))
+            
+        except Exception as e:
+            logger.warning(f"Surface similarity computation failed: {e}")
+            return 0.0
+    
+    def _compute_semantic_similarity(self, source: Dict, target: Dict) -> float:
+        """
+        Compute semantic similarity between source and target domains.
+        
+        Uses semantic embeddings to compare meaning rather than just structure.
+        Falls back to label-based similarity when embeddings unavailable.
+        
+        Args:
+            source: Source domain dictionary with 'entities' and 'relations'
+            target: Target domain dictionary with 'entities' and 'relations'
+            
+        Returns:
+            Semantic similarity score between 0 and 1.
+            
+        Examples:
+            >>> engine = StructureMappingEngine(enricher, analyzer)
+            >>> sim = engine._compute_semantic_similarity(source, target)
+            >>> assert 0 <= sim <= 1
+        """
+        try:
+            # Handle truly empty dicts - they're identical
+            if not source and not target:
+                return 1.0
+            
+            # One empty, one not - different
+            if (not source) or (not target):
+                return 0.0
+            
+            # Handle dicts without entities keys (treat as raw data dicts)
+            has_entities_source = "entities" in source
+            has_entities_target = "entities" in target
+            
+            # If neither has entities keys, compare as raw dicts
+            if not has_entities_source and not has_entities_target:
+                source_keys = set(source.keys())
+                target_keys = set(target.keys())
+                if not source_keys and not target_keys:
+                    return 1.0
+                if not source_keys or not target_keys:
+                    return 0.0
+                intersection = len(source_keys & target_keys)
+                union = len(source_keys | target_keys)
+                return float(intersection / union) if union > 0 else 0.0
+            
+            source_entities = source.get("entities", [])
+            target_entities = target.get("entities", [])
+            
+            # Handle empty entity sets
+            if not source_entities and not target_entities:
+                return 1.0
+            
+            if not source_entities or not target_entities:
+                return 0.0
+            
+            # Use semantic enricher if available
+            if hasattr(self, 'semantic_enricher') and self.semantic_enricher:
+                try:
+                    similarities = []
+                    for s_entity in source_entities:
+                        for t_entity in target_entities:
+                            # Get entity names
+                            s_name = s_entity.name if hasattr(s_entity, 'name') else str(s_entity)
+                            t_name = t_entity.name if hasattr(t_entity, 'name') else str(t_entity)
+                            
+                            # Compute semantic similarity via enricher
+                            sim = self.semantic_enricher.compute_semantic_similarity(s_name, t_name)
+                            similarities.append(sim)
+                    
+                    if similarities:
+                        return float(np.mean(similarities))
+                except Exception as e:
+                    logger.debug(f"Semantic enricher similarity failed: {e}")
+            
+            # Fallback to simple label-based similarity
+            source_labels = set()
+            for entity in source_entities:
+                label = entity.name if hasattr(entity, 'name') else str(entity)
+                source_labels.add(label.lower())
+            
+            target_labels = set()
+            for entity in target_entities:
+                label = entity.name if hasattr(entity, 'name') else str(entity)
+                target_labels.add(label.lower())
+            
+            # Jaccard similarity for labels
+            if not source_labels or not target_labels:
+                return 0.0
+            
+            intersection = len(source_labels & target_labels)
+            union = len(source_labels | target_labels)
+            
+            semantic_similarity = intersection / union if union > 0 else 0.0
+            
+            return float(np.clip(semantic_similarity, 0.0, 1.0))
+            
+        except Exception as e:
+            logger.warning(f"Semantic similarity computation failed: {e}")
             return 0.0
 
 
