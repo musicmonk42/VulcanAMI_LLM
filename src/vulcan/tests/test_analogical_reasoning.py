@@ -1,5 +1,5 @@
 """
-Comprehensive test suite for analogical_reasoning.py
+Comprehensive test suite for analogical reasoning.
 
 Tests cover:
 - Core functionality
@@ -12,7 +12,7 @@ Tests cover:
 FIXED VERSION - All platform compatibility issues resolved
 """
 
-from vulcan.reasoning.analogical_reasoning import (
+from vulcan.reasoning.analogical import (
     AnalogicalMapping,
     AnalogicalReasoner,
     AnalogicalReasoningEngine,
@@ -974,23 +974,23 @@ class TestSpacyModelLoading:
         """Test that spaCy model loading doesn't produce warnings when models are available"""
         # This test verifies that the fix allows loading of available models
         # The actual model loading happens at module import time
-        from vulcan.reasoning import analogical_reasoning
+        from vulcan.reasoning import analogical
 
         # Check if spaCy is available
-        assert isinstance(analogical_reasoning.SPACY_AVAILABLE, bool)
+        assert isinstance(analogical.SPACY_AVAILABLE, bool)
 
-        if analogical_reasoning.SPACY_AVAILABLE:
+        if analogical.SPACY_AVAILABLE:
             # If spaCy is available, the fix should have tried loading models
             # nlp may be None if no models are installed, but that's acceptable
             # The important thing is SPACY_AVAILABLE=True means spacy module exists
             pass  # No failure means the import succeeded
         else:
             # If spaCy is not available, nlp must be None
-            assert analogical_reasoning.nlp is None
+            assert analogical.nlp is None
 
     def test_semantic_enricher_with_spacy(self):
         """Test that SemanticEnricher works with or without spaCy"""
-        from vulcan.reasoning.analogical_reasoning import SemanticEnricher
+        from vulcan.reasoning.analogical import SemanticEnricher
 
         enricher = SemanticEnricher()
 
