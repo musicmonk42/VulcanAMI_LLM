@@ -8,6 +8,11 @@ Refactored modules:
     - types: Core dataclasses, enums, and constants ✅
     - safety_checker: Safety validation and false positive detection ✅
     - query_router: Query type routing and classification ✅
+    - orchestrator: Main ReasoningIntegration class ✅ (stub - delegates to parent)
+    - component_init: Component initialization methods ✅ (stub)
+    - selection_strategies: Tool selection logic ✅ (stub)
+    - query_analysis: Query analysis methods ✅ (stub)
+    - utils: Convenience functions and observers ✅ (stub - delegates to parent)
 
 Module: vulcan.reasoning.integration
 Author: Vulcan AI Team
@@ -56,37 +61,24 @@ from .query_router import (
     get_reasoning_type_from_route,
 )
 
-# Re-export from parent module for full API (temporary during refactoring)
-try:
-    from ..reasoning_integration import (
-        ReasoningIntegration,
-        apply_reasoning,
-        run_portfolio_reasoning,
-        get_reasoning_integration,
-        get_reasoning_statistics,
-        shutdown_reasoning,
-        observe_query_start,
-        observe_engine_result,
-        observe_outcome,
-        observe_validation_failure,
-        observe_error,
-    )
-except ImportError as e:
-    import logging
-    logging.getLogger(__name__).warning(
-        f"Failed to import from parent reasoning_integration module: {e}"
-    )
-    ReasoningIntegration = None
-    apply_reasoning = None
-    run_portfolio_reasoning = None
-    get_reasoning_integration = None
-    get_reasoning_statistics = None
-    shutdown_reasoning = None
-    observe_query_start = None
-    observe_engine_result = None
-    observe_outcome = None
-    observe_validation_failure = None
-    observe_error = None
+# Re-export orchestrator (stub - currently delegates to parent)
+from .orchestrator import (
+    ReasoningIntegration,
+)
+
+# Re-export utils (stub - currently delegates to parent)
+from .utils import (
+    apply_reasoning,
+    run_portfolio_reasoning,
+    get_reasoning_integration,
+    get_reasoning_statistics,
+    shutdown_reasoning,
+    observe_query_start,
+    observe_engine_result,
+    observe_outcome,
+    observe_validation_failure,
+    observe_error,
+)
 
 
 __all__ = [
@@ -119,8 +111,9 @@ __all__ = [
     "get_safety_filtered_fallback_tools",
     # Query router
     "get_reasoning_type_from_route",
-    # Main API (from parent)
+    # Orchestrator
     "ReasoningIntegration",
+    # Utils
     "apply_reasoning",
     "run_portfolio_reasoning",
     "get_reasoning_integration",
