@@ -247,3 +247,60 @@ __all__ = [
     "observe_validation_failure",
     "observe_error",
 ]
+
+
+def observe_reasoning_selection(query: str, tools: List[str], strategy: str) -> None:
+    """
+    Observe and log reasoning selection event.
+    
+    Args:
+        query: The query being processed
+        tools: List of selected tools
+        strategy: Selected reasoning strategy
+    """
+    logger.info(f"Reasoning selection: strategy={strategy}, tools={tools}")
+
+
+def observe_reasoning_execution(query: str, tools: List[str], duration_ms: float) -> None:
+    """
+    Observe and log reasoning execution event.
+    
+    Args:
+        query: The query being processed
+        tools: List of tools executed
+        duration_ms: Execution duration in milliseconds
+    """
+    logger.info(f"Reasoning execution: tools={tools}, duration={duration_ms:.2f}ms")
+
+
+def observe_reasoning_success(query: str, result: Any) -> None:
+    """
+    Observe and log reasoning success event.
+    
+    Args:
+        query: The query that was processed
+        result: The successful result
+    """
+    logger.info("Reasoning success")
+
+
+def observe_reasoning_failure(query: str, error: str) -> None:
+    """
+    Observe and log reasoning failure event.
+    
+    Args:
+        query: The query that failed
+        error: Error message
+    """
+    logger.warning(f"Reasoning failure: {error}")
+
+
+def observe_reasoning_degradation(query: str, reason: str) -> None:
+    """
+    Observe and log reasoning degradation event.
+    
+    Args:
+        query: The query being processed
+        reason: Reason for degradation
+    """
+    logger.warning(f"Reasoning degradation: {reason}")
