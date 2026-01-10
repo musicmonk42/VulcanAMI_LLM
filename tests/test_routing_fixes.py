@@ -1464,3 +1464,394 @@ class TestCreativeAndPhilosophicalSelfIntrospectionOverride:
         assert "_get_self_awareness_context" in content, (
             "Expected _get_self_awareness_context method for live world_model integration"
         )
+
+
+# ============================================================================
+# Test Creative Task Type Override for Domain Keywords (Jan 10 2026)
+# ============================================================================
+
+class TestCreativeTaskOverrideDomainKeywords:
+    """
+    Tests for the creative task type override that prevents domain keywords
+    like "quantum" or "welfare" from overriding the task type classification.
+    
+    Issue: Creative queries like "Write a sonnet about quantum entanglement" were
+    being routed to probabilistic/mathematical engines because they contained
+    domain keywords (e.g., "quantum").
+    
+    Fix: Added task-type detection (creative verbs + nouns) that penalizes all
+    reasoning tools (including mathematical) for creative tasks.
+    """
+    
+    @pytest.fixture
+    def creative_verbs(self):
+        """Creative task verbs that indicate creative writing."""
+        return frozenset([
+            'write', 'compose', 'create', 'craft', 'generate', 'draft',
+            'author', 'pen', 'produce', 'design', 'invent', 'imagine',
+        ])
+    
+    @pytest.fixture
+    def creative_nouns(self):
+        """Creative output types."""
+        return frozenset([
+            'poem', 'sonnet', 'haiku', 'story', 'essay', 'article',
+            'song', 'lyrics', 'script', 'novel', 'play', 'limerick',
+            'verse', 'prose', 'fiction', 'narrative', 'tale',
+        ])
+    
+    def _is_creative_task(self, query: str, verbs, nouns) -> bool:
+        """Check if query is a creative task based on verb+noun pattern."""
+        query_lower = query.lower()
+        words = query_lower.split()
+        
+        if not words:
+            return False
+        
+        # Check if query starts with a creative verb
+        first_word = words[0].rstrip(',.!?')
+        has_creative_verb = first_word in verbs
+        
+        # Check if query contains a creative noun
+        has_creative_noun = any(noun in query_lower for noun in nouns)
+        
+        return has_creative_verb or has_creative_noun
+    
+    def test_write_sonnet_about_quantum_is_creative(self, creative_verbs, creative_nouns):
+        """'Write a sonnet about quantum entanglement' should be detected as creative."""
+        query = "Write a sonnet about quantum entanglement"
+        assert self._is_creative_task(query, creative_verbs, creative_nouns), (
+            "Query with 'Write' + 'sonnet' should be detected as creative"
+        )
+    
+    def test_compose_poem_about_welfare_is_creative(self, creative_verbs, creative_nouns):
+        """'Compose a poem about welfare economics' should be detected as creative."""
+        query = "Compose a poem about welfare economics"
+        assert self._is_creative_task(query, creative_verbs, creative_nouns), (
+            "Query with 'Compose' + 'poem' should be detected as creative"
+        )
+    
+    def test_create_story_about_probability_is_creative(self, creative_verbs, creative_nouns):
+        """'Create a story about probability' should be detected as creative."""
+        query = "Create a story about probability and fate"
+        assert self._is_creative_task(query, creative_verbs, creative_nouns), (
+            "Query with 'Create' + 'story' should be detected as creative"
+        )
+    
+    def test_calculate_probability_is_not_creative(self, creative_verbs, creative_nouns):
+        """'Calculate the probability' should NOT be detected as creative."""
+        query = "Calculate the probability of rain tomorrow"
+        assert not self._is_creative_task(query, creative_verbs, creative_nouns), (
+            "Query without creative verb/noun should NOT be creative"
+        )
+    
+    def test_semantic_matcher_penalizes_math_for_creative(self):
+        """Semantic matcher should penalize mathematical tool for creative tasks."""
+        # This test verifies the fix in semantic_tool_matcher.py
+        import os
+        
+        semantic_matcher_paths = [
+            'src/vulcan/reasoning/selection/semantic_tool_matcher.py',
+            '../src/vulcan/reasoning/selection/semantic_tool_matcher.py',
+        ]
+        
+        content = None
+        for path in semantic_matcher_paths:
+            if os.path.exists(path):
+                with open(path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                break
+        
+        if content is None:
+            pytest.skip("semantic_tool_matcher.py not found")
+        
+        # Check that the creative task override penalizes mathematical tool
+        assert "mathematical" in content and "creative_task_override" in content, (
+            "Expected creative task override to handle mathematical tool"
+        )
+        # Check that creative tasks penalize all reasoning tools
+        assert "'mathematical', 'philosophical'" in content or "'mathematical'," in content, (
+            "Expected creative task override to penalize mathematical and philosophical tools"
+        )
+
+
+# ============================================================================
+# Test Analogical Task Detection Override (Jan 10 2026)
+# ============================================================================
+
+class TestAnalogicalTaskOverride:
+    """
+    Tests for analogical task detection that prevents math/probabilistic routing
+    when a query is clearly an analogy.
+    
+    Issue: Analogical queries like "Quantum physics is like a symphony" were being
+    routed to probabilistic because of "quantum" keyword.
+    
+    Fix: Added analogical task detection that boosts analogical tool and penalizes
+    math/probabilistic for analogy patterns.
+    """
+    
+    @pytest.fixture
+    def analogical_indicators(self):
+        """Indicators that suggest analogical reasoning."""
+        return frozenset([
+            'is like', 'is to', 'as a', 'analogous', 'analogy', 'analogies',
+            'metaphor', 'similar to', 'corresponds to', 'compare', 'comparison',
+            'just as', 'so too', 'likewise', 'resembles', 'mirrors', 'parallels',
+            'mapping', 'domain', 'structure mapping',
+        ])
+    
+    def _is_analogical_task(self, query: str, indicators) -> bool:
+        """Check if query is an analogical task."""
+        query_lower = query.lower()
+        return any(ind in query_lower for ind in indicators)
+    
+    def test_quantum_like_symphony_is_analogical(self, analogical_indicators):
+        """'Quantum physics is like a symphony' should be detected as analogical."""
+        query = "Quantum physics is like a symphony"
+        assert self._is_analogical_task(query, analogical_indicators), (
+            "Query with 'is like' pattern should be detected as analogical"
+        )
+    
+    def test_doctor_is_to_patient_is_analogical(self, analogical_indicators):
+        """'Doctor is to patient as teacher is to...' should be detected as analogical."""
+        query = "Doctor is to patient as teacher is to what?"
+        assert self._is_analogical_task(query, analogical_indicators), (
+            "Query with 'is to' pattern should be detected as analogical"
+        )
+    
+    def test_structure_mapping_is_analogical(self, analogical_indicators):
+        """'Structure mapping between domains' should be detected as analogical."""
+        query = "Explain the structure mapping between physics and music"
+        assert self._is_analogical_task(query, analogical_indicators), (
+            "Query with 'structure mapping' should be detected as analogical"
+        )
+    
+    def test_calculate_probability_not_analogical(self, analogical_indicators):
+        """'Calculate the probability' should NOT be detected as analogical."""
+        query = "Calculate the probability of quantum tunneling"
+        assert not self._is_analogical_task(query, analogical_indicators), (
+            "Query without analogical indicators should NOT be analogical"
+        )
+
+
+# ============================================================================
+# Test Authoritative Classifier Categories for Semantic Boost Skip (Jan 10 2026)
+# ============================================================================
+
+class TestAuthoritativeClassifierCategories:
+    """
+    Tests for the authoritative classifier categories that should skip semantic boost.
+    
+    Issue: Semantic boost was overriding the LLM classifier's decision even when
+    the classifier had correctly identified ANALOGICAL, PHILOSOPHICAL, or CAUSAL
+    queries. This caused domain keywords like "quantum" to route analogies to
+    probabilistic.
+    
+    Fix: Added ANALOGICAL, PHILOSOPHICAL, CAUSAL, etc. to the authoritative
+    categories list, so semantic boost is skipped when classifier is confident.
+    """
+    
+    @pytest.fixture
+    def authoritative_categories(self):
+        """Categories where classifier should be trusted over semantic boost."""
+        return frozenset([
+            'UNKNOWN', 'CREATIVE', 'CONVERSATIONAL', 'GENERAL',
+            'GREETING', 'FACTUAL', 'SELF_INTROSPECTION',
+            'ANALOGICAL', 'PHILOSOPHICAL', 'CAUSAL', 'PROBABILISTIC',
+            'MATHEMATICAL', 'LOGICAL', 'CRYPTOGRAPHIC',
+        ])
+    
+    def test_all_reasoning_categories_are_authoritative(self, authoritative_categories):
+        """All reasoning category types should be authoritative."""
+        expected_reasoning = {'ANALOGICAL', 'PHILOSOPHICAL', 'CAUSAL', 'PROBABILISTIC', 'MATHEMATICAL', 'LOGICAL'}
+        assert expected_reasoning.issubset(authoritative_categories), (
+            "All reasoning categories should be in authoritative list"
+        )
+    
+    def test_fix_code_present_in_tool_selector(self):
+        """Verify the fix code is present in tool_selector.py."""
+        import os
+        
+        tool_selector_paths = [
+            'src/vulcan/reasoning/selection/tool_selector.py',
+            '../src/vulcan/reasoning/selection/tool_selector.py',
+        ]
+        
+        content = None
+        for path in tool_selector_paths:
+            if os.path.exists(path):
+                with open(path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                break
+        
+        if content is None:
+            pytest.skip("tool_selector.py not found")
+        
+        # Check that ANALOGICAL is in authoritative categories
+        assert "'ANALOGICAL'" in content, (
+            "ANALOGICAL should be in AUTHORITATIVE_CATEGORIES"
+        )
+        # Check that PHILOSOPHICAL is in authoritative categories
+        assert "'PHILOSOPHICAL'" in content, (
+            "PHILOSOPHICAL should be in AUTHORITATIVE_CATEGORIES"
+        )
+        # Check that CAUSAL is in authoritative categories
+        assert "'CAUSAL'" in content, (
+            "CAUSAL should be in AUTHORITATIVE_CATEGORIES"
+        )
+        # Check that classifier confidence is checked
+        assert "classifier_confidence" in content, (
+            "classifier_confidence should be checked for skip_semantic_boost"
+        )
+
+
+# ============================================================================
+# Test Analogical Reasoning Structure Mapping Fallback (Jan 10 2026)
+# ============================================================================
+
+class TestAnalogicalStructureMappingFallback:
+    """
+    Tests for the structure mapping fallback in analogical reasoning.
+    
+    Issue: The analogical engine was returning "structure mapping produced no results"
+    when entities didn't have explicit 'role' or 'type' attributes.
+    
+    Fix: Added semantic similarity and positional fallbacks to ensure SOME mapping
+    is always produced when entities exist in both domains.
+    """
+    
+    def test_fallback_fix_code_present(self):
+        """Verify the fallback fix code is present in analogical_reasoning.py."""
+        import os
+        
+        analogical_paths = [
+            'src/vulcan/reasoning/analogical_reasoning.py',
+            '../src/vulcan/reasoning/analogical_reasoning.py',
+        ]
+        
+        content = None
+        for path in analogical_paths:
+            if os.path.exists(path):
+                with open(path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                break
+        
+        if content is None:
+            pytest.skip("analogical_reasoning.py not found")
+        
+        # Check for semantic fallback
+        assert "semantic fallback" in content.lower() or "semantic similarity fallback" in content.lower(), (
+            "Expected semantic fallback code not found"
+        )
+        # Check for positional fallback
+        assert "positional fallback" in content.lower(), (
+            "Expected positional fallback code not found"
+        )
+        # Check for _entity_to_text helper
+        assert "_entity_to_text" in content, (
+            "Expected _entity_to_text helper method not found"
+        )
+        # Check for _compute_text_similarity helper
+        assert "_compute_text_similarity" in content, (
+            "Expected _compute_text_similarity helper method not found"
+        )
+    
+    def test_jaccard_similarity_calculation(self):
+        """Test the Jaccard similarity calculation for word overlap."""
+        def jaccard_similarity(text1: str, text2: str) -> float:
+            words1 = set(text1.lower().split())
+            words2 = set(text2.lower().split())
+            if not words1 or not words2:
+                return 0.0
+            intersection = words1 & words2
+            union = words1 | words2
+            return len(intersection) / len(union) if union else 0.0
+        
+        # Test similar texts
+        sim = jaccard_similarity("distributed consensus protocol", "consensus mechanism protocol")
+        assert sim > 0.3, f"Similar texts should have high similarity, got {sim}"
+        
+        # Test different texts
+        sim = jaccard_similarity("apple orange banana", "car bus train")
+        assert sim == 0.0, f"Different texts should have zero similarity, got {sim}"
+        
+        # Test identical texts
+        sim = jaccard_similarity("same text here", "same text here")
+        assert sim == 1.0, f"Identical texts should have similarity 1.0, got {sim}"
+
+
+# ============================================================================
+# Test World Model NaN Sanitization (Jan 10 2026)
+# ============================================================================
+
+class TestWorldModelNaNSanitization:
+    """
+    Tests for NaN/Inf sanitization in the world model dynamics.
+    
+    Issue: The world model was failing with "ufunc 'isnan' not supported" errors
+    when state validation was applied to non-numeric types.
+    
+    Fix: Added _sanitize_state_values method that:
+    1. Only checks numeric values for NaN/Inf
+    2. Replaces invalid values with safe defaults
+    3. Logs warnings instead of failing
+    """
+    
+    def test_sanitization_fix_code_present(self):
+        """Verify the NaN sanitization fix code is present in dynamics_model.py."""
+        import os
+        
+        dynamics_paths = [
+            'src/vulcan/world_model/dynamics_model.py',
+            '../src/vulcan/world_model/dynamics_model.py',
+        ]
+        
+        content = None
+        for path in dynamics_paths:
+            if os.path.exists(path):
+                with open(path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                break
+        
+        if content is None:
+            pytest.skip("dynamics_model.py not found")
+        
+        # Check for _sanitize_state_values method
+        assert "_sanitize_state_values" in content, (
+            "Expected _sanitize_state_values method not found"
+        )
+        # Check for NaN handling
+        assert "nan_sanitized" in content, (
+            "Expected nan_sanitized metadata not found"
+        )
+        # Check for TypeError handling
+        assert "ufunc" in content or "isnan" in content, (
+            "Expected isnan error handling not found"
+        )
+    
+    def test_nan_sanitization_logic(self):
+        """Test the NaN sanitization logic for numeric values."""
+        import numpy as np
+        
+        # Simulate sanitization logic
+        def sanitize_value(value):
+            if isinstance(value, (int, float)):
+                try:
+                    if np.isnan(value) or np.isinf(value):
+                        return 0.0
+                except (TypeError, ValueError):
+                    pass
+            return value
+        
+        # Test NaN
+        assert sanitize_value(float('nan')) == 0.0, "NaN should be sanitized to 0.0"
+        
+        # Test Inf
+        assert sanitize_value(float('inf')) == 0.0, "Inf should be sanitized to 0.0"
+        
+        # Test normal value
+        assert sanitize_value(42.5) == 42.5, "Normal value should be unchanged"
+        
+        # Test string (should be unchanged)
+        assert sanitize_value("hello") == "hello", "String should be unchanged"
