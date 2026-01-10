@@ -6870,15 +6870,53 @@ async def unified_chat(request: UnifiedChatRequest):
             unified_confidence = unified.get("confidence", 0.0) if isinstance(unified, dict) else 0.0
             unified_conclusion = unified.get("conclusion") if isinstance(unified, dict) else None
             
+            # FIX ISSUE #1: Extract world_model response from metadata
+            # When reasoning_type is PHILOSOPHICAL or tool is world_model, extract the response
+            unified_reasoning_type = unified.get("reasoning_type", "") if isinstance(unified, dict) else ""
+            if unified_reasoning_type in ("PHILOSOPHICAL", "philosophical", "world_model"):
+                # Check for response in metadata first
+                metadata_conclusion = unified.get("metadata", {}).get("conclusion") if isinstance(unified, dict) else None
+                response_conclusion = unified.get("response") if isinstance(unified, dict) else None
+                if metadata_conclusion:
+                    unified_conclusion = metadata_conclusion
+                    logger.info(f"[VULCAN] FIX #1: Extracted world_model conclusion from metadata")
+                elif response_conclusion:
+                    unified_conclusion = response_conclusion
+                    logger.info(f"[VULCAN] FIX #1: Extracted world_model response field")
+            
             # Check agent reasoning 
             agent = reasoning_results.get("agent_reasoning", {})
             agent_confidence = agent.get("confidence", 0.0) if isinstance(agent, dict) else 0.0
             agent_conclusion = agent.get("conclusion") if isinstance(agent, dict) else None
             
+            # FIX ISSUE #1: Extract world_model response from agent_reasoning metadata
+            agent_reasoning_type = agent.get("reasoning_type", "") if isinstance(agent, dict) else ""
+            if agent_reasoning_type in ("PHILOSOPHICAL", "philosophical", "world_model"):
+                metadata_conclusion = agent.get("metadata", {}).get("conclusion") if isinstance(agent, dict) else None
+                response_conclusion = agent.get("response") if isinstance(agent, dict) else None
+                if metadata_conclusion:
+                    agent_conclusion = metadata_conclusion
+                    logger.info(f"[VULCAN] FIX #1: Extracted world_model conclusion from agent metadata")
+                elif response_conclusion:
+                    agent_conclusion = response_conclusion
+                    logger.info(f"[VULCAN] FIX #1: Extracted world_model response from agent")
+            
             # Check direct reasoning
             direct = reasoning_results.get("direct_reasoning", {})
             direct_confidence = direct.get("confidence", 0.0) if isinstance(direct, dict) else 0.0
             direct_conclusion = direct.get("conclusion") if isinstance(direct, dict) else None
+            
+            # FIX ISSUE #1: Extract world_model response from direct_reasoning metadata
+            direct_reasoning_type = direct.get("reasoning_type", "") if isinstance(direct, dict) else ""
+            if direct_reasoning_type in ("PHILOSOPHICAL", "philosophical", "world_model"):
+                metadata_conclusion = direct.get("metadata", {}).get("conclusion") if isinstance(direct, dict) else None
+                response_conclusion = direct.get("response") if isinstance(direct, dict) else None
+                if metadata_conclusion:
+                    direct_conclusion = metadata_conclusion
+                    logger.info(f"[VULCAN] FIX #1: Extracted world_model conclusion from direct metadata")
+                elif response_conclusion:
+                    direct_conclusion = response_conclusion
+                    logger.info(f"[VULCAN] FIX #1: Extracted world_model response from direct")
             
             # CRITICAL LOGGING: Log what we extracted from each source
             logger.info(

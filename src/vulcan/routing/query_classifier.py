@@ -1481,51 +1481,22 @@ class QueryClassifier:
                     source="keyword",
                 )
         
-        # Check logical/SAT indicators
-        # IMPORTANT: This now comes AFTER philosophical check
-        logical_count = sum(1 for kw in LOGICAL_KEYWORDS if kw in query_lower)
-        # FIX: "formalize" is a strong indicator of logical reasoning - treat it like logic symbols
-        # Similar to how "bayes" is a strong indicator for probabilistic reasoning
-        # Use module-level constant STRONG_LOGICAL_INDICATORS for maintainability
-        has_strong_logical_indicator = any(
-            indicator in query_lower 
-            for indicator in STRONG_LOGICAL_INDICATORS
-        )
-        if logical_count >= LOGICAL_KEYWORD_THRESHOLD or has_strong_logical_indicator or any(sym in query_lower for sym in ['∧', '∨', '→', '¬', '⊢', '⊨']):
-            return QueryClassification(
-                category=QueryCategory.LOGICAL.value,
-                complexity=0.7 + min(0.2, logical_count * 0.05),
-                suggested_tools=["symbolic"],
-                skip_reasoning=False,
-                confidence=0.9,
-                source="keyword",
-            )
-        
-        # Check probabilistic/Bayesian indicators
-        prob_count = sum(1 for kw in PROBABILISTIC_KEYWORDS if kw in query_lower)
-        if prob_count >= PROBABILISTIC_KEYWORD_THRESHOLD or "p(" in query_lower or ("bayes" in query_lower):
-            return QueryClassification(
-                category=QueryCategory.PROBABILISTIC.value,
-                complexity=0.5 + min(0.3, prob_count * 0.05),
-                suggested_tools=["probabilistic"],
-                skip_reasoning=False,
-                confidence=0.85,
-                source="keyword",
-            )
-        
         # =====================================================================
-        # BUG #5 FIX: ANALOGICAL should take priority when explicit domain mapping requested
+        # FIX ISSUE #3: ANALOGICAL HIGH-PRIORITY CHECK - MUST RUN BEFORE SYMBOLIC
         # =====================================================================
-        # Queries like "Map Domain S (software) to Domain T (biology)" should be
-        # routed to analogical reasoning, even if they contain keywords that might
-        # trigger other categories (like "domain", "control", "competing").
+        # Problem: Queries with "Domain S" AND "Domain T" structure + "Map the deep structure S→T"
+        # were being classified as SYMBOLIC (confidence 20%) instead of ANALOGICAL because symbolic
+        # engine's "logical constraint" keyword detection triggered on the Domain S/T structure first.
         #
-        # Priority check: If both "domain s" and "domain t" are mentioned, OR
-        # if "structure mapping" is explicitly requested, route to ANALOGICAL.
+        # Solution: Check for ANALOGICAL patterns (domain mapping) BEFORE symbolic keyword matching.
+        # This is a high-priority check that catches explicit cross-domain mapping queries.
+        # =====================================================================
+        
+        # FIX ISSUE #3: Priority check for explicit domain mapping (Domain S/T pattern)
         if re.search(r'domain\s+[st].*domain\s+[st]', query_lower, re.IGNORECASE):
             logger.info(
-                f"[QueryClassifier] BUG #5 FIX: Explicit domain mapping (S/T) detected - "
-                f"routing to ANALOGICAL"
+                f"[QueryClassifier] FIX ISSUE #3: Explicit domain mapping (S/T) detected - "
+                f"routing to ANALOGICAL (NOT symbolic)"
             )
             return QueryClassification(
                 category=QueryCategory.ANALOGICAL.value,
@@ -1536,11 +1507,11 @@ class QueryClassifier:
                 source="explicit_domain_mapping",
             )
         
-        # BUG #5 FIX: Check for structure mapping patterns
-        if 'map.*structure' in query_lower or 'structure.*mapping' in query_lower:
+        # FIX ISSUE #3: Check for structure mapping patterns
+        if re.search(r'map.*structure|structure.*mapping', query_lower, re.IGNORECASE):
             logger.info(
-                f"[QueryClassifier] BUG #5 FIX: Structure mapping pattern detected - "
-                f"routing to ANALOGICAL"
+                f"[QueryClassifier] FIX ISSUE #3: Structure mapping pattern detected - "
+                f"routing to ANALOGICAL (NOT symbolic)"
             )
             return QueryClassification(
                 category=QueryCategory.ANALOGICAL.value,
@@ -1552,14 +1523,10 @@ class QueryClassifier:
             )
         
         # =====================================================================
-        # ISSUE #5 FIX: Check analogical indicators BEFORE mathematical
+        # Fallback ANALOGICAL check (keyword-based, lower priority)
         # =====================================================================
-        # Problem: Analogical queries like "Software development is like biological
-        # evolution" were being routed to mathematical/probabilistic engines due to
-        # broad pattern matching. Analogical reasoning should take precedence when
-        # strong analogical indicators are present.
-        #
-        # Check analogical indicators earlier to ensure proper routing
+        # This catches analogical queries that didn't match the high-priority patterns above
+        # but have enough analogical keywords to warrant analogical classification.
         analog_count = sum(1 for kw in ANALOGICAL_KEYWORDS if kw in query_lower)
         # Strong analogical indicators that should immediately route to analogical
         strong_analog_indicators = {"is like", "is to", "analogy", "analogous", 

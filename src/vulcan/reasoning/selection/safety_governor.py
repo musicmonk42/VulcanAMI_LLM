@@ -1330,6 +1330,15 @@ class SafetyValidator:
                     logger.warning(f"Pattern matching error: {e}")
                     continue
 
+            # FIX ISSUE #2: Move educational/causal bypass check BEFORE sensitive pattern checks
+            # This ensures causal reasoning queries with Pearl-style notation are not blocked
+            if _is_causal_educational_query(check_str):
+                logger.info(
+                    f"[SafetyValidator] CAUSAL FIX (ISSUE #2): Causal reasoning query detected - "
+                    f"bypassing sensitive data check for input validation. Query: {check_str[:80]}..."
+                )
+                return True, "Input validated (causal reasoning query - legitimate educational content)"
+
             # FIX #3: Sensitive data checks are BYPASSED for internal sources
             # This allows system operations to mention "password", "api_key" etc. in logs/code
             if is_internal_source:
@@ -1402,6 +1411,19 @@ class SafetyValidator:
         if tool_name in MATH_REASONING_TOOLS:
             return True, "Output validated (math/probabilistic tool)"
         
+        # FIX ISSUE #2: Move educational/causal bypass check BEFORE sensitive pattern checks
+        # This ensures causal reasoning queries with Pearl-style notation are not blocked
+        # CAUSAL FIX: Don't flag causal reasoning/educational queries as sensitive
+        # Pearl-style notation (S→D, S→E), DAGs, SCMs, and technical terminology
+        # should NOT be blocked. These are legitimate educational/technical queries.
+        if query and _is_causal_educational_query(query):
+            logger.info(
+                f"[SafetyValidator] CAUSAL FIX (ISSUE #2): Causal reasoning query detected - "
+                f"bypassing sensitive data check for output validation. "
+                f"Query: {query[:50]}..."
+            )
+            return True, "Output validated (causal reasoning query - legitimate educational content)"
+        
         # GAP 7 FIX: Don't flag meta-cognitive queries as sensitive
         # These are legitimate tests of AI's ability to reason about its own reasoning
         if query and _is_meta_cognitive_query(query):
@@ -1432,17 +1454,6 @@ class SafetyValidator:
                 f"Query: {query[:50]}..."
             )
             return True, "Output validated (ethical thought experiment - legitimate philosophical discourse)"
-
-        # CAUSAL FIX: Don't flag causal reasoning/educational queries as sensitive
-        # Pearl-style notation (S→D, S→E), DAGs, SCMs, and technical terminology
-        # should NOT be blocked. These are legitimate educational/technical queries.
-        if query and _is_causal_educational_query(query):
-            logger.info(
-                f"[SafetyValidator] CAUSAL FIX: Causal reasoning query detected - "
-                f"bypassing sensitive data check for output validation. "
-                f"Query: {query[:50]}..."
-            )
-            return True, "Output validated (causal reasoning query - legitimate educational content)"
 
         try:
             output_str = str(output_data)
