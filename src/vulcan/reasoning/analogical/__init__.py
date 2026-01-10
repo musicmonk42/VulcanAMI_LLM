@@ -51,6 +51,11 @@ from .utils import (
     NETWORKX_AVAILABLE as UTILS_NETWORKX_AVAILABLE,
 )
 
+# Goal relevance analysis - extracted to separate module
+from .goal_analyzer import (
+    GoalRelevanceAnalyzer,
+)
+
 # Re-export NETWORKX_AVAILABLE for backward compatibility
 NETWORKX_AVAILABLE = UTILS_NETWORKX_AVAILABLE
 
@@ -58,7 +63,6 @@ NETWORKX_AVAILABLE = UTILS_NETWORKX_AVAILABLE
 # These will be moved to their own modules in subsequent iterations
 try:
     from ..analogical_reasoning import (
-        GoalRelevanceAnalyzer,
         AbstractReasoner,
         AnalogicalReasoner,
         AnalogicalReasoningEngine,
@@ -70,7 +74,6 @@ except ImportError as e:
     logging.getLogger(__name__).warning(
         f"Failed to import from parent analogical_reasoning module: {e}"
     )
-    GoalRelevanceAnalyzer = None
     AbstractReasoner = None
     AnalogicalReasoner = None
     AnalogicalReasoningEngine = None
