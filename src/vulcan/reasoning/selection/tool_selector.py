@@ -4556,16 +4556,19 @@ class ToolSelector:
                             f"category={classifier_category} - returning early (no reasoning needed)"
                         )
                         # Return a result that indicates "use LLM directly, no reasoning"
-                        from vulcan.reasoning.selection.selection_types import SelectionResult
                         return SelectionResult(
-                            selected_tools=['general'],
+                            selected_tool='general',
                             execution_result={
                                 'tool': 'general',
                                 'skip_reasoning': True,
                                 'result': None,  # No reasoning result - use LLM
                             },
-                            strategy='direct',
                             confidence=0.85,
+                            calibrated_confidence=0.85,
+                            execution_time_ms=0.0,
+                            energy_used_mj=0.0,
+                            strategy_used=ExecutionStrategy.SINGLE,
+                            all_results={'general': {'skip_reasoning': True}},
                             metadata={
                                 'classifier_category': classifier_category,
                                 'classifier_tools': classifier_tools,
