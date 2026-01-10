@@ -2747,10 +2747,22 @@ class AgentPoolManager:
                 is_reasoning_task = True
             
             # TASK 6 FIX: Check if query is self-introspection and force reasoning
+            # NOTE (Jan 10 2026 FIX): Do NOT override for CREATIVE tasks!
+            # Creative queries like "write a poem about if you became self aware" should
+            # NOT be forced to world_model. The creative writing intent has higher priority
+            # than the self-introspection keywords appearing as subject matter.
             query_text = parameters.get("query") or parameters.get("prompt") or ""
-            if isinstance(query_text, str) and not is_reasoning_task:
+            is_creative_task = (
+                normalized_task_type == "creative" or
+                task_type == "creative_task" or
+                "creative" in (graph.get("detected_patterns", []) or [])
+            )
+            
+            if isinstance(query_text, str) and not is_reasoning_task and not is_creative_task:
                 query_lower = query_text.lower()
                 # Self-introspection keywords that should always invoke reasoning
+                # BUT only if the query is DIRECTLY asking Vulcan about itself,
+                # not if these keywords appear in the context of creative writing
                 self_introspection_keywords = [
                     "would you", "do you", "are you", "can you",
                     "self-aware", "self aware", "consciousness", "sentient",
@@ -2764,6 +2776,12 @@ class AgentPoolManager:
                         f"[AgentPool] Task {task_id}: Self-introspection query detected, "
                         f"forcing reasoning with tools={selected_tools}"
                     )
+            elif is_creative_task:
+                # Log that we're NOT overriding for creative tasks
+                logger.info(
+                    f"[AgentPool] Task {task_id}: Creative task detected, "
+                    f"NOT forcing world_model (keeping tools={selected_tools})"
+                )
 
             # ==================================================================
             # FIX TASK 2: Invoke reasoning for complex queries even when tools=["general"]

@@ -1856,6 +1856,9 @@ class ReasoningIntegration:
         reasoning_strategy = ReasoningStrategyType.DEFAULT.value
         confidence = 0.7
         rationale = "Default reasoning strategy"
+        
+        # FIX (Jan 10 2026): Store SelectionResult for metadata extraction
+        selection_result = None
 
         # =================================================================
         # FIX: Use classifier suggested tools when ToolSelector unavailable
@@ -1934,6 +1937,39 @@ class ReasoningIntegration:
 
                 # Execute selection
                 result = self._tool_selector.select_and_execute(request)
+                
+                # FIX (Jan 10 2026): Store result for metadata extraction
+                selection_result = result
+                
+                # ================================================================
+                # FIX (Jan 10 2026): Handle 'skip_reasoning' result from ToolSelector
+                # ================================================================
+                # When ToolSelector detects a query category (like CREATIVE) that should
+                # bypass reasoning, it returns a result with skip_reasoning=True.
+                # We should return immediately with high confidence to let LLM handle it.
+                # ================================================================
+                if hasattr(result, 'metadata') and result.metadata:
+                    if result.metadata.get('skip_reasoning'):
+                        logger.info(
+                            f"{LOG_PREFIX} FIX: ToolSelector returned skip_reasoning=True - "
+                            f"bypassing reasoning for category={result.metadata.get('classifier_category')}"
+                        )
+                        with self._stats_lock:
+                            self._stats.fast_path_count += 1
+                        
+                        return ReasoningResult(
+                            selected_tools=['general'],
+                            reasoning_strategy=ReasoningStrategyType.DIRECT.value,
+                            confidence=0.85,
+                            rationale=f"Query category '{result.metadata.get('classifier_category')}' - bypassing reasoning",
+                            metadata={
+                                "fast_path": True,
+                                "skip_reasoning": True,
+                                "classifier_category": result.metadata.get('classifier_category'),
+                                "query_type": query_type,
+                                "complexity": complexity,
+                            },
+                        )
 
                 # Extract tools from result
                 # NOTE: SelectionResult has 'selected_tool' (singular) and 'all_results'
@@ -2203,6 +2239,49 @@ class ReasoningIntegration:
                 "very_low"
             ),
         }
+        
+        # ======================================================================
+        # FIX (Jan 10 2026): Propagate self_referential flag from context
+        # ======================================================================
+        # When LLM classifier identifies a query as SELF_INTROSPECTION, it sets
+        # context['is_self_introspection'] = True. This flag needs to be propagated
+        # to result metadata so downstream code (agent_pool.py) can detect world
+        # model results and skip redundant UnifiedReasoner invocation.
+        #
+        # Without this fix, world_model results with 0.90 confidence were being
+        # overridden by UnifiedReasoner (which falls back to probabilistic 0.0)
+        # because agent_pool.py checks metadata.get("self_referential", False).
+        # ======================================================================
+        if context:
+            if context.get('is_self_introspection'):
+                result_metadata["self_referential"] = True
+                # Also check if world_model tool is selected - if so, include response
+                if "world_model" in selected_tools:
+                    result_metadata["ethical_query"] = context.get('is_ethical_query', False)
+                    # Include world_model response content for downstream use
+                    # selection_result is the SelectionResult from tool_selector
+                    # which contains execution_result with the actual world_model response
+                    if selection_result is not None and hasattr(selection_result, 'execution_result'):
+                        exec_result = selection_result.execution_result
+                        if isinstance(exec_result, dict):
+                            # WorldModelToolWrapper returns: {tool, result, aspect, confidence, ...}
+                            wm_response = exec_result.get('result')
+                            if wm_response:
+                                result_metadata["world_model_response"] = wm_response
+                                result_metadata["conclusion"] = wm_response.get('response', '') if isinstance(wm_response, dict) else str(wm_response)
+                            result_metadata["aspect"] = exec_result.get('aspect', 'general')
+                    logger.info(
+                        f"{LOG_PREFIX} FIX: Propagated self_referential=True to metadata "
+                        f"for world_model result (confidence={confidence:.2f})"
+                    )
+            # Also propagate ethical_query flag if set
+            elif context.get('is_ethical_query'):
+                result_metadata["ethical_query"] = True
+                if "world_model" in selected_tools:
+                    logger.info(
+                        f"{LOG_PREFIX} FIX: Propagated ethical_query=True to metadata "
+                        f"for world_model result (confidence={confidence:.2f})"
+                    )
         
         # Note: If primary engine failed, make it clear in the result
         if primary_engine_failed:
