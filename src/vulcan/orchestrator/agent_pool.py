@@ -3375,13 +3375,60 @@ class AgentPoolManager:
             }
             
             # Add reasoning-specific results if available
+            # FIX: Extract conclusion from multiple possible sources
             if reasoning_result is not None:
+                # Try to extract conclusion - handle both object and dict formats
+                conclusion = None
+                confidence = None
+                reasoning_type_str = "unknown"
+                explanation = None
+                
+                # Case 1: ReasoningResult object (has attributes)
+                if hasattr(reasoning_result, "conclusion"):
+                    conclusion = getattr(reasoning_result, "conclusion", None)
+                    confidence = getattr(reasoning_result, "confidence", None)
+                    reasoning_type_obj = getattr(reasoning_result, "reasoning_type", None)
+                    reasoning_type_str = str(reasoning_type_obj) if reasoning_type_obj else "unknown"
+                    explanation = getattr(reasoning_result, "explanation", None)
+                    
+                    # Also check metadata for world_model response
+                    if hasattr(reasoning_result, "metadata") and reasoning_result.metadata:
+                        if conclusion is None:
+                            conclusion = reasoning_result.metadata.get("world_model_response") or reasoning_result.metadata.get("conclusion")
+                        if explanation is None:
+                            explanation = reasoning_result.metadata.get("explanation")
+                
+                # Case 2: Dictionary format (from world_model or other tools)
+                elif isinstance(reasoning_result, dict):
+                    conclusion = reasoning_result.get("conclusion") or reasoning_result.get("response")
+                    confidence = reasoning_result.get("confidence")
+                    reasoning_type_str = str(reasoning_result.get("reasoning_type", "unknown"))
+                    explanation = reasoning_result.get("explanation")
+                
+                # Log what we extracted for debugging
+                conclusion_preview = str(conclusion)[:100] if conclusion else "None"
+                logger.info(
+                    f"[AgentPool] Reasoning output extracted: "
+                    f"has_conclusion={conclusion is not None}, "
+                    f"conclusion_preview='{conclusion_preview}', "
+                    f"confidence={confidence}, "
+                    f"type={reasoning_type_str}"
+                )
+                
                 result["reasoning_output"] = {
-                    "conclusion": getattr(reasoning_result, "conclusion", None),
-                    "confidence": getattr(reasoning_result, "confidence", None),
-                    "reasoning_type": str(getattr(reasoning_result, "reasoning_type", "unknown")),
-                    "explanation": getattr(reasoning_result, "explanation", None),
+                    "conclusion": conclusion,
+                    "confidence": confidence,
+                    "reasoning_type": reasoning_type_str,
+                    "explanation": explanation,
                 }
+                
+                # CRITICAL FIX: Warn if we have high confidence but no conclusion
+                if confidence is not None and confidence >= 0.5 and conclusion is None:
+                    logger.warning(
+                        f"[AgentPool] BUG DETECTED: Reasoning has high confidence ({confidence:.2f}) "
+                        f"but conclusion is None! This indicates content loss. "
+                        f"task={task_id}, reasoning_result_type={type(reasoning_result).__name__}"
+                    )
 
             # Update agent metadata
             metadata.record_task_completion(success=True, duration_s=duration)
