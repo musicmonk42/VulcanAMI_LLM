@@ -4704,7 +4704,9 @@ class ToolSelector:
                 classifier_category = request.context.get('classifier_category')
                 classifier_is_authoritative = request.context.get('classifier_is_authoritative', False)
                 prevent_router_override = request.context.get('prevent_router_tool_override', False)
-                classifier_confidence = request.context.get('classifier_confidence', 0.0)
+                # Note: Default to None to distinguish "not provided" from "provided as 0.0"
+                # This allows the confidence check to be skipped when no confidence is available
+                classifier_confidence = request.context.get('classifier_confidence')
                 
                 # For these categories, the LLM's language understanding is more reliable
                 # than semantic embedding similarity. Normalize to uppercase for comparison.
@@ -4718,6 +4720,10 @@ class ToolSelector:
                     'MATHEMATICAL', 'LOGICAL', 'CRYPTOGRAPHIC',
                 ])
                 
+                # Threshold for confidence-based semantic boost skip
+                # When classifier confidence is at or above this threshold, trust the classifier
+                CONFIDENCE_THRESHOLD_FOR_SKIP = 0.8
+                
                 # Normalize category to uppercase for comparison
                 category_upper = classifier_category.upper() if classifier_category else None
                 
@@ -4725,20 +4731,25 @@ class ToolSelector:
                 # 1. Category is in authoritative list, OR
                 # 2. Classifier explicitly marked as authoritative, OR
                 # 3. Router override is prevented, OR
-                # 4. Classifier confidence is high (>= 0.8)
+                # 4. Classifier confidence is high (>= threshold) - only check if confidence was provided
+                confidence_is_high = (
+                    classifier_confidence is not None and 
+                    classifier_confidence >= CONFIDENCE_THRESHOLD_FOR_SKIP
+                )
                 should_skip = (
                     category_upper in AUTHORITATIVE_CATEGORIES or
                     classifier_is_authoritative or
                     prevent_router_override or
-                    classifier_confidence >= 0.8
+                    confidence_is_high
                 )
                 
                 if should_skip:
                     skip_semantic_boost = True
                     prior_context['skip_semantic_boost'] = True
+                    conf_str = f"{classifier_confidence:.2f}" if classifier_confidence is not None else "N/A"
                     logger.info(
                         f"[ToolSelector] Skipping SemanticBoost: LLM classifier is authoritative "
-                        f"for category={classifier_category} (confidence={classifier_confidence:.2f})"
+                        f"for category={classifier_category} (confidence={conf_str})"
                     )
             
             # Extract query text from problem for semantic matching (if not skipping)

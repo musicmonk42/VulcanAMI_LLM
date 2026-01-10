@@ -1366,7 +1366,10 @@ class SemanticToolMatcher:
             'dilemma', 'trolley', 'virtue', 'justice', 'fairness', 'value',
             'hedonism', 'utilitarian', 'deontological', 'thought experiment',
         }
-        is_philosophical_context = sum(1 for ind in PHILOSOPHICAL_CONTEXT_INDICATORS if ind in query_lower) >= 2
+        # Threshold for philosophical context detection - require at least 2 indicators
+        # to avoid false positives from single keyword matches
+        PHILOSOPHICAL_CONTEXT_THRESHOLD = 2
+        is_philosophical_context = sum(1 for ind in PHILOSOPHICAL_CONTEXT_INDICATORS if ind in query_lower) >= PHILOSOPHICAL_CONTEXT_THRESHOLD
         
         if is_creative_task:
             logger.debug(
