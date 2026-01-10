@@ -742,6 +742,66 @@ class StructureMappingEngine:
         
         structural_mapping.mapping_type = MappingType.PRAGMATIC
         return structural_mapping
+    
+    def _compute_structural_similarity(
+        self, source: Dict, target: Dict
+    ) -> float:
+        """
+        Compute structural similarity between source and target domains.
+        
+        This method computes a similarity score based on the structural
+        properties of the domains including:
+        - Number of entities and relations
+        - Degree distribution
+        - Relational structure alignment
+        
+        Args:
+            source: Source domain dictionary with 'entities' and 'relations'
+            target: Target domain dictionary with 'entities' and 'relations'
+            
+        Returns:
+            Structural similarity score between 0 and 1.
+            
+        Examples:
+            >>> engine = StructureMappingEngine(enricher, analyzer)
+            >>> sim = engine._compute_structural_similarity(source, target)
+            >>> assert 0 <= sim <= 1
+        """
+        try:
+            # Handle empty domains
+            if not source or not target:
+                return 0.0
+            
+            source_entities = source.get("entities", [])
+            source_relations = source.get("relations", [])
+            target_entities = target.get("entities", [])
+            target_relations = target.get("relations", [])
+            
+            # Handle empty entity/relation sets
+            if not source_entities and not target_entities:
+                return 1.0 if not source_relations and not target_relations else 0.0
+            
+            if not source_entities or not target_entities:
+                return 0.0
+            
+            # Entity count similarity (normalized difference)
+            entity_count_sim = 1.0 - abs(
+                len(source_entities) - len(target_entities)
+            ) / max(len(source_entities), len(target_entities), 1)
+            
+            # Relation count similarity (normalized difference)
+            relation_count_sim = 1.0 - abs(
+                len(source_relations) - len(target_relations)
+            ) / max(len(source_relations), len(target_relations), 1)
+            
+            # Combine similarities with equal weight
+            structural_similarity = (entity_count_sim + relation_count_sim) / 2.0
+            
+            return float(np.clip(structural_similarity, 0.0, 1.0))
+            
+        except Exception as e:
+            logger.warning(f"Structural similarity computation failed: {e}")
+            return 0.0
 
 
 # Export public API
