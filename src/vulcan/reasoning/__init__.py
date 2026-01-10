@@ -165,10 +165,10 @@ except Exception as e:
     SYMBOLIC_AVAILABLE = False
 
 # ============================================================================
-# Analogical Reasoning - Core component
+# Analogical Reasoning - Core component (refactored into subpackage)
 # ============================================================================
 try:
-    from .analogical_reasoning import (
+    from .analogical import (
         AnalogicalReasoner,
         AnalogicalReasoningEngine,
         Entity,
