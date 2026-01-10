@@ -3190,8 +3190,8 @@ class AgentPoolManager:
                         try:
                             rt_module = __import__(f'{path_prefix}.reasoning.reasoning_types', fromlist=['ReasoningType'])
                             ReasoningType_local = getattr(rt_module, 'ReasoningType', None)
-                            ur_module = __import__(f'{path_prefix}.reasoning.unified_reasoning', fromlist=['ReasoningStrategy'])
-                            ReasoningStrategy_local = getattr(ur_module, 'ReasoningStrategy', None)
+                            # ReasoningStrategy is also in reasoning_types
+                            ReasoningStrategy_local = getattr(rt_module, 'ReasoningStrategy', None)
                             if ReasoningType_local and ReasoningStrategy_local:
                                 break
                         except ImportError:
@@ -3204,7 +3204,7 @@ class AgentPoolManager:
                     def _create_fallback_reasoner():
                         for path_prefix in REASONING_IMPORT_PATHS:
                             try:
-                                ur_module = __import__(f'{path_prefix}.reasoning.unified_reasoning', fromlist=['UnifiedReasoner'])
+                                ur_module = __import__(f'{path_prefix}.reasoning.unified', fromlist=['UnifiedReasoner'])
                                 DirectUnifiedReasoner = getattr(ur_module, 'UnifiedReasoner')
                                 return DirectUnifiedReasoner()
                             except ImportError:

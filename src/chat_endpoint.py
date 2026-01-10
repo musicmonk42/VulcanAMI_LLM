@@ -65,7 +65,7 @@ def _get_unified_reasoner():
     global UnifiedReasoner
     if UnifiedReasoner is None:
         try:
-            from src.vulcan.reasoning.unified_reasoning import (
+            from src.vulcan.reasoning.unified import (
                 UnifiedReasoner as UR,
             )
 

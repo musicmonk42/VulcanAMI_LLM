@@ -121,7 +121,7 @@ except ImportError:
 # Without this, the learning system updates weights in its own dictionary,
 # but the reasoning ensemble reads from a separate ToolWeightManager instance.
 try:
-    from ..reasoning.unified_reasoning import get_weight_manager
+    from ..reasoning.unified.cache import get_weight_manager
     WEIGHT_MANAGER_AVAILABLE = True
 except ImportError:
     WEIGHT_MANAGER_AVAILABLE = False

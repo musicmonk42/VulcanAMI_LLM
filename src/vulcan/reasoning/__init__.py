@@ -247,7 +247,7 @@ except ImportError as e:
 # Unified Reasoner - Main orchestrator (critical)
 # ============================================================================
 try:
-    from .unified_reasoning import UnifiedReasoner
+    from .unified import UnifiedReasoner
 
     UNIFIED_AVAILABLE = True
 except ImportError as e:

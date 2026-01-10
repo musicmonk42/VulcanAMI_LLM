@@ -13,8 +13,8 @@ import pytest
 # Import from reasoning_types module
 from vulcan.reasoning.reasoning_types import ReasoningResult, ReasoningType
 
-# CORRECT IMPORTS based on actual unified_reasoning.py
-from vulcan.reasoning.unified_reasoning import ReasoningStrategy, UnifiedReasoner
+# CORRECT IMPORTS based on actual unified package
+from vulcan.reasoning.unified import ReasoningStrategy, UnifiedReasoner
 
 
 class TestUnifiedReasoningIntegration:

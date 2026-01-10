@@ -42,22 +42,25 @@ from .component_loader import (
 )
 
 # Import cache management
-from .cache import ToolWeightManager, compute_query_hash
+from .cache import ToolWeightManager, compute_query_hash, get_weight_manager
+
+# Re-export ReasoningStrategy for backward compatibility
+from ..reasoning_types import ReasoningStrategy
 
 # Import strategy functions
 from .strategies import (
-    _sequential_reasoning,
-    _parallel_reasoning,
-    _ensemble_reasoning,
-    _adaptive_reasoning,
-    _hybrid_reasoning,
-    _hierarchical_reasoning,
-    _portfolio_reasoning,
-    _utility_based_reasoning,
-    _weighted_voting,
-    _combine_parallel_results,
-    _topological_sort,
-    _merge_dependency_results,
+    execute_sequential_reasoning as _sequential_reasoning,
+    execute_parallel_reasoning as _parallel_reasoning,
+    execute_ensemble_reasoning as _ensemble_reasoning,
+    execute_adaptive_reasoning as _adaptive_reasoning,
+    execute_hybrid_reasoning as _hybrid_reasoning,
+    execute_hierarchical_reasoning as _hierarchical_reasoning,
+    execute_portfolio_reasoning as _portfolio_reasoning,
+    execute_utility_based_reasoning as _utility_based_reasoning,
+    weighted_voting as _weighted_voting,
+    combine_parallel_results as _combine_parallel_results,
+    topological_sort as _topological_sort,
+    merge_dependency_results as _merge_dependency_results,
 )
 
 # Import main orchestrator
@@ -77,6 +80,7 @@ __all__ = [
     # Core types
     "ReasoningTask",
     "ReasoningPlan",
+    "ReasoningStrategy",  # Re-exported from reasoning_types for backward compatibility
     # Component loaders
     "_load_reasoning_components",
     "_load_selection_components",
@@ -84,6 +88,7 @@ __all__ = [
     # Cache management
     "ToolWeightManager",
     "compute_query_hash",
+    "get_weight_manager",
     # Strategy functions
     "_sequential_reasoning",
     "_parallel_reasoning",

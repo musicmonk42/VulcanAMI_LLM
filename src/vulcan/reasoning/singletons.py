@@ -253,7 +253,7 @@ def get_unified_reasoner(
         
         logger.info("[Singletons] Creating global UnifiedReasoner (ONCE)")
         try:
-            from vulcan.reasoning.unified_reasoning import UnifiedReasoner
+            from vulcan.reasoning.unified import UnifiedReasoner
             _unified_reasoner = UnifiedReasoner(
                 enable_learning=enable_learning,
                 enable_safety=enable_safety,

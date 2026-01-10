@@ -95,7 +95,7 @@ logger = logging.getLogger("GraphAPIServer")
 
 # Vulcan reasoning imports (after logger initialization)
 try:
-    from src.vulcan.reasoning.unified_reasoning import UnifiedReasoner
+    from src.vulcan.reasoning.unified import UnifiedReasoner
     from src.vulcan.reasoning.reasoning_types import ReasoningType, ReasoningResult
 
     REASONING_AVAILABLE = True
@@ -103,7 +103,7 @@ try:
 except ImportError:
     try:
         # Try without src. prefix
-        from vulcan.reasoning.unified_reasoning import UnifiedReasoner
+        from vulcan.reasoning.unified import UnifiedReasoner
         from vulcan.reasoning.reasoning_types import ReasoningType, ReasoningResult
 
         REASONING_AVAILABLE = True
