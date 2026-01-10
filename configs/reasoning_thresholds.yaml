@@ -1,0 +1,83 @@
+# Reasoning Confidence Thresholds Configuration
+# This file centralizes all confidence threshold configurations for the VULCAN reasoning system.
+#
+# Thresholds determine when to trust internal reasoning vs. when to use fallback mechanisms
+# (LLM polishing, warnings, etc.)
+#
+# IMPORTANT: All thresholds should be aligned with MIN_REASONING_CONFIDENCE = 0.5
+# from hybrid_executor.py (line 2460). Results below 0.5 should NOT be trusted
+# without clear "low confidence" warnings or LLM fallback.
+
+# Core confidence thresholds for reasoning results
+confidence_thresholds:
+  # High quality result - use with full confidence
+  # Results at this level are considered highly reliable
+  high: 0.7
+  
+  # Good result - use normally without warnings
+  # This is the standard threshold for production use
+  good: 0.6
+  
+  # Minimum threshold for trusting internal reasoning
+  # Results below this should trigger LLM fallback or clear warnings
+  # ALIGNED with MIN_REASONING_CONFIDENCE from hybrid_executor.py
+  minimum_trust: 0.5
+  
+  # Medium confidence - results require tentative flag and user notification
+  # Use with caution and clear communication to users
+  # NOTE: This was previously 0.3, causing bypass of safety checks
+  medium: 0.5
+  
+  # Low confidence floor - absolute minimum before rejection
+  # Results below this should be rejected or heavily qualified
+  low: 0.15
+
+# Fallback behavior configuration
+fallback_behavior:
+  # Enable LLM fallback when confidence < minimum_trust
+  enable_llm_fallback: true
+  
+  # Maximum fallback attempts before giving up
+  max_attempts: 2
+  
+  # Minimum confidence floor when all attempts fail
+  # This prevents total query refusal but results should be heavily qualified
+  absolute_minimum: 0.15
+  
+  # Enable tentative flag for results between medium and good thresholds
+  enable_tentative_flag: true
+  
+  # Warn user for results between low and medium thresholds
+  warn_on_low_confidence: true
+
+# Strategy selection thresholds
+strategy_selection:
+  # Use fast path for queries below this complexity
+  fast_path_complexity: 0.3
+  
+  # Use FAST mode for queries below this complexity
+  low_complexity: 0.4
+
+# Production vs Development mode
+# In production, stricter thresholds should be enforced
+mode:
+  # Set to 'production' or 'development'
+  environment: production
+  
+  # In production mode, raise minimum_trust to 0.5 (if not already)
+  # In development mode, allow lower thresholds for experimentation
+  enforce_production_standards: true
+
+# User communication settings
+user_communication:
+  # Show confidence scores to users
+  show_confidence: true
+  
+  # Add disclaimer for tentative results
+  add_tentative_disclaimer: true
+  
+  # Disclaimer text for low confidence results
+  low_confidence_message: "Note: This response has lower confidence. Please verify independently."
+  
+  # Disclaimer text for tentative results
+  tentative_message: "Note: This is a tentative answer based on internal reasoning."
