@@ -432,6 +432,19 @@ PHILOSOPHICAL_KEYWORDS: FrozenSet[str] = frozenset([
     "conflict between", "conflicting values", "value conflict",
 ])
 
+# ==============================================================================
+# PRIORITY FIX: Ethical content indicators for trolley problem detection
+# ==============================================================================
+# These indicators detect ethical dilemmas that should be classified as
+# PHILOSOPHICAL even if they have logical structure (if-then, therefore).
+# This list is checked BEFORE logical keywords to ensure ethical queries
+# are not misrouted to the SAT solver.
+ETHICAL_CONTENT_INDICATORS: FrozenSet[str] = frozenset([
+    'trolley', 'dilemma', 'permissible', 'should i', 'right or wrong',
+    'harm', 'innocent', 'moral', 'ethical', 'self-aware', 'consciousness',
+    'runaway', 'heading toward', 'five people', 'one person', 'sacrifice'
+])
+
 # Philosophical/ethical patterns - catch philosophical queries before short query bypass
 # Note: "This sentence is false" must be classified as PHILOSOPHICAL, not CONVERSATIONAL
 PHILOSOPHICAL_PATTERNS: Tuple[re.Pattern, ...] = (
@@ -1377,13 +1390,9 @@ class QueryClassifier:
             pattern.search(query_original) for pattern in PHILOSOPHICAL_PATTERNS
         )
         
-        # Ethical content indicators (more specific than general philosophical)
-        ethical_indicators = [
-            'trolley', 'dilemma', 'permissible', 'should i', 'right or wrong',
-            'harm', 'innocent', 'moral', 'ethical', 'self-aware', 'consciousness',
-            'runaway', 'heading toward', 'five people', 'one person'
-        ]
-        has_ethical_content = any(indicator in query_lower for indicator in ethical_indicators)
+        # Ethical content indicators - use module-level constant for efficiency
+        # This checks for trolley problem and similar ethical dilemma indicators
+        has_ethical_content = any(indicator in query_lower for indicator in ETHICAL_CONTENT_INDICATORS)
         
         # Route to PHILOSOPHICAL if:
         # 1. Has enough philosophical keywords (threshold met), OR
