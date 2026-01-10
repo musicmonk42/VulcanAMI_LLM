@@ -715,6 +715,9 @@ def _is_educational_query(query: str) -> bool:
         "do-calculus", "do calculus", "backdoor", "frontdoor",
         "causal graph", "causal model", "structural causal",
         "d-separation", "counterfactual", "intervention",
+        # BUG #2 FIX: Added more causal patterns
+        "randomize", "randomization", "treatment effect",
+        "observational", "experiment 1", "experiment 2", "experiment 3",
         # Medical/health causality (EXPANDED for supplement/exercise queries)
         "causal relationship", "causal effect", "causally",
         "correlation vs causation", "correlation versus causation",

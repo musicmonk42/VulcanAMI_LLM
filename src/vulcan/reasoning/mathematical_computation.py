@@ -160,6 +160,16 @@ def extract_math_expression(query: str) -> Optional[str]:
     if not query or not query.strip():
         return None
     
+    # BUG #1 FIX: Preprocessing step - collapse multi-line Unicode math expressions
+    # Multi-line Unicode expressions like:
+    #   ∑_{k=1}^n
+    #   (2k−1)
+    # Need to be collapsed into single line: ∑_{k=1}^n (2k−1)
+    # This handles fragmented math expressions that span multiple lines
+    query = query.replace('\n', ' ').replace('\r', ' ')
+    # Collapse multiple spaces
+    query = re.sub(r'\s+', ' ', query)
+    
     # Note: Pattern 0 - Check for "Compute exactly:" pattern first
     # This catches: "Compute exactly: ∑(k=1 to n)(2k−1)"
     compute_exact_pattern = r'(?:Compute|Calculate|Evaluate|Find|Solve)\s+(?:exactly|precisely)?\s*:?\s*(.+?)(?:\.|$|Then|Task|Verify)'
@@ -521,13 +531,22 @@ class CodeTemplates:
     def integration(expression: str = "x**2", variable: str = "x", 
                    bounds: Optional[Tuple[str, str]] = None) -> str:
         """Generate integration code."""
+        # BUG #8 FIX: Define common variables in preamble
+        # When processing queries with mathematical components (integral ∫u(t)²dt),
+        # ensure all variables are defined to avoid "name 'x' is not defined" errors
         if bounds:
             return f"""# Definite Integration
+# BUG #8 FIX: Define common variables
+x, t, u, E = symbols('x t u E')
+E_safe = Symbol('E_safe', positive=True)
 {variable} = Symbol('{variable}')
 f = {expression}
 result = integrate(f, ({variable}, {bounds[0]}, {bounds[1]}))
 """
         return f"""# Indefinite Integration
+# BUG #8 FIX: Define common variables
+x, t, u, E = symbols('x t u E')
+E_safe = Symbol('E_safe', positive=True)
 {variable} = Symbol('{variable}')
 f = {expression}
 result = integrate(f, {variable})
@@ -1109,15 +1128,22 @@ result = simplify(integral)
             # Note: `re` module is imported at top of file
             
             # Try to extract expression and bounds
-            # Pattern 1: ∑_{k=lower}^{upper} (expression)
-            sum_match = re.search(r'[∑]\s*_?\{?(\w+)\s*=\s*(\d+)\s*\}?\s*\^?\{?(\w+)\}?\s*\(?([^)]+)\)?', query)
+            # BUG #1 FIX: Updated pattern to handle fragmented multi-line Unicode
+            # Handles multi-line expressions like:
+            #   ∑_{k=1}^n
+            #   (2k−1)
+            # Pattern captures: (index, lower, upper, expression)
+            sum_pattern = r'∑[\s\n]*_?[\s\n]*\{?[\s\n]*([\w𝑘𝑛]+)[\s\n]*=[\s\n]*(\d+)[\s\n]*\}?[\s\n]*\^?[\s\n]*\{?[\s\n]*([\w𝑛]+)[\s\n]*\}?[\s\n]*\(?([^)\n]+)\)?'
+            sum_match = re.search(sum_pattern, query)
             if sum_match:
-                index = sum_match.group(1)  # e.g., "k"
+                index = sum_match.group(1).replace('𝑘', 'k').replace('𝑛', 'n')  # e.g., "k"
                 lower = sum_match.group(2)  # e.g., "1"
-                upper = sum_match.group(3)  # e.g., "n"
+                upper = sum_match.group(3).replace('𝑛', 'n')  # e.g., "n"
                 expr = sum_match.group(4).strip()  # e.g., "2k-1"
-                # Convert to SymPy format (k → k, − → -)
-                expr = expr.replace('−', '-')
+                # BUG #1 FIX: Convert Unicode characters to ASCII
+                expr = expr.replace('−', '-')  # Unicode minus
+                expr = expr.replace('𝑘', 'k')  # Math italic k
+                expr = expr.replace('𝑛', 'n')  # Math italic n
                 expr = re.sub(r'(\d)([a-z])', r'\1*\2', expr)  # 2k → 2*k
                 return self._templates.summation(expr, index, lower, upper)
             
@@ -1390,13 +1416,28 @@ Generate ONLY the Python code:"""
         # - Unicode symbols 𝑘, 𝑛 → ASCII k, n
         # =================================================================
         
+        # =================================================================
+        # BUG #1 FIX: Comprehensive Unicode normalization
+        # =================================================================
         # Unicode normalization for mathematical symbols
         code = code.replace('−', '-')  # Unicode minus → ASCII minus (U+2212 → U+002D)
+        code = code.replace('×', '*')  # Unicode multiplication → ASCII asterisk
+        code = code.replace('÷', '/')  # Unicode division → ASCII slash
+        code = code.replace('–', '-')  # En dash → ASCII minus
+        code = code.replace('—', '-')  # Em dash → ASCII minus
+        
+        # Math italic variables → ASCII variables
         code = code.replace('𝑘', 'k')  # Math italic k → ASCII k
         code = code.replace('𝑛', 'n')  # Math italic n → ASCII n
         code = code.replace('𝑥', 'x')  # Math italic x → ASCII x
         code = code.replace('𝑦', 'y')  # Math italic y → ASCII y
         code = code.replace('𝑧', 'z')  # Math italic z → ASCII z
+        code = code.replace('𝑖', 'i')  # Math italic i → ASCII i
+        code = code.replace('𝑗', 'j')  # Math italic j → ASCII j
+        code = code.replace('𝑡', 't')  # Math italic t → ASCII t
+        code = code.replace('𝑢', 'u')  # Math italic u → ASCII u
+        code = code.replace('𝑣', 'v')  # Math italic v → ASCII v
+        code = code.replace('𝑤', 'w')  # Math italic w → ASCII w
         
         # Add implicit multiplication operator
         # Pattern: digit followed by letter (2k → 2*k)

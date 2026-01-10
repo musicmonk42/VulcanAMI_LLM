@@ -2661,9 +2661,20 @@ class WorldModelToolWrapper:
             # Notify world model about this self-introspection event (lifecycle hook)
             self._notify_world_model_of_introspection(aspect, result)
             
+            # BUG #3 FIX: Extract and propagate response text as conclusion
+            # The result dict may contain a nested "response" field that needs to be
+            # extracted and returned as the top-level "conclusion" for the final output.
+            # This ensures self-introspection queries return actual answers, not empty responses.
+            response_text = ""
+            if isinstance(result, dict):
+                response_text = result.get("response", "")
+            elif isinstance(result, str):
+                response_text = result
+            
             return {
                 "tool": self.name,
                 "result": result,
+                "conclusion": response_text,  # BUG #3 FIX: Propagate response as conclusion
                 "aspect": aspect,
                 "confidence": 0.9,  # High confidence for self-knowledge
                 "reasoning_type": "introspective",

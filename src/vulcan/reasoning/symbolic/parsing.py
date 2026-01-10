@@ -265,8 +265,15 @@ class Lexer:
             "iff": TokenType.IFF,
             "∀": TokenType.FORALL,
             "forall": TokenType.FORALL,
+            # BUG #7 FIX: Add natural language quantifier conversions
+            "every": TokenType.FORALL,
+            "all": TokenType.FORALL,
+            "each": TokenType.FORALL,
             "∃": TokenType.EXISTS,
             "exists": TokenType.EXISTS,
+            # BUG #7 FIX: Add natural language quantifier conversions
+            "some": TokenType.EXISTS,
+            "one": TokenType.EXISTS,  # "one document" → ∃
             "(": TokenType.LPAREN,
             ")": TokenType.RPAREN,
             ",": TokenType.COMMA,
