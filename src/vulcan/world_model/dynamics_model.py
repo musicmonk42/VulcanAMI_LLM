@@ -1763,6 +1763,16 @@ class DynamicsModel:
             if state is None:
                 return {"status": "error", "message": "Invalid observation format"}
 
+            # =================================================================
+            # FIX (Jan 10 2026): Sanitize NaN/Inf values BEFORE validation
+            # =================================================================
+            # The "ufunc 'isnan' not supported" error occurs when NaN check is
+            # applied to non-numeric types. This fix:
+            # 1. Only checks numeric values for NaN/Inf
+            # 2. Replaces NaN/Inf with safe defaults instead of failing
+            # 3. Logs warnings but continues processing
+            state = self._sanitize_state_values(state)
+
             # SAFETY: Validate state
             if validator:
                 try:
@@ -1781,6 +1791,14 @@ class DynamicsModel:
                             )
                             self.safety_corrections["state"] += 1
                             state = self._apply_state_corrections(state, state_check)
+                except TypeError as e:
+                    # FIX: Handle "ufunc 'isnan' not supported" errors gracefully
+                    if "isnan" in str(e) or "ufunc" in str(e):
+                        logger.warning(
+                            f"State validation skipped due to non-numeric type: {e}"
+                        )
+                    else:
+                        logger.error(f"State validation error: {e}")
                 except Exception as e:
                     logger.error(f"State validation error: {e}")
 
@@ -1998,6 +2016,78 @@ class DynamicsModel:
             },
             timestamp=state.timestamp,
         )
+
+    def _sanitize_state_values(self, state: State) -> State:
+        """
+        Sanitize NaN/Inf values in state to prevent validation errors.
+        
+        FIX (Jan 10 2026): This method addresses the "ufunc 'isnan' not supported"
+        error by:
+        1. Only checking numeric values for NaN/Inf
+        2. Replacing invalid values with safe defaults
+        3. Logging warnings instead of failing
+        
+        Args:
+            state: State object to sanitize
+            
+        Returns:
+            Sanitized State object
+        """
+        sanitized_variables = {}
+        sanitized_count = 0
+        
+        for var_name, value in state.variables.items():
+            # Handle numeric scalars
+            if isinstance(value, (int, float)):
+                try:
+                    if np.isnan(value) or np.isinf(value):
+                        logger.warning(
+                            f"[DynamicsModel] FIX: Sanitized NaN/Inf in variable '{var_name}'"
+                        )
+                        sanitized_variables[var_name] = 0.0
+                        sanitized_count += 1
+                    else:
+                        sanitized_variables[var_name] = value
+                except (TypeError, ValueError):
+                    # Can't check this type - keep as-is
+                    sanitized_variables[var_name] = value
+            
+            # Handle numpy arrays
+            elif isinstance(value, np.ndarray):
+                # Only sanitize numeric arrays
+                if np.issubdtype(value.dtype, np.number):
+                    try:
+                        # Replace NaN with 0 and Inf with large finite values
+                        mask_nan = np.isnan(value)
+                        mask_inf = np.isinf(value)
+                        if np.any(mask_nan) or np.any(mask_inf):
+                            sanitized_value = value.copy()
+                            sanitized_value[mask_nan] = 0.0
+                            sanitized_value[mask_inf] = np.sign(value[mask_inf]) * 1e10
+                            logger.warning(
+                                f"[DynamicsModel] FIX: Sanitized {np.sum(mask_nan)} NaN and "
+                                f"{np.sum(mask_inf)} Inf values in array variable '{var_name}'"
+                            )
+                            sanitized_variables[var_name] = sanitized_value
+                            sanitized_count += 1
+                        else:
+                            sanitized_variables[var_name] = value
+                    except (TypeError, ValueError):
+                        sanitized_variables[var_name] = value
+                else:
+                    # Non-numeric array - keep as-is
+                    sanitized_variables[var_name] = value
+            
+            # Non-numeric types - keep as-is (strings, objects, etc.)
+            else:
+                sanitized_variables[var_name] = value
+        
+        if sanitized_count > 0:
+            state.variables = sanitized_variables
+            state.metadata["nan_sanitized"] = True
+            state.metadata["nan_sanitized_count"] = sanitized_count
+        
+        return state
 
     def _apply_state_corrections(
         self, state: State, validation: Dict[str, Any]

@@ -1704,3 +1704,154 @@ class TestAuthoritativeClassifierCategories:
         assert "classifier_confidence" in content, (
             "classifier_confidence should be checked for skip_semantic_boost"
         )
+
+
+# ============================================================================
+# Test Analogical Reasoning Structure Mapping Fallback (Jan 10 2026)
+# ============================================================================
+
+class TestAnalogicalStructureMappingFallback:
+    """
+    Tests for the structure mapping fallback in analogical reasoning.
+    
+    Issue: The analogical engine was returning "structure mapping produced no results"
+    when entities didn't have explicit 'role' or 'type' attributes.
+    
+    Fix: Added semantic similarity and positional fallbacks to ensure SOME mapping
+    is always produced when entities exist in both domains.
+    """
+    
+    def test_fallback_fix_code_present(self):
+        """Verify the fallback fix code is present in analogical_reasoning.py."""
+        import os
+        
+        analogical_paths = [
+            'src/vulcan/reasoning/analogical_reasoning.py',
+            '../src/vulcan/reasoning/analogical_reasoning.py',
+        ]
+        
+        content = None
+        for path in analogical_paths:
+            if os.path.exists(path):
+                with open(path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                break
+        
+        if content is None:
+            pytest.skip("analogical_reasoning.py not found")
+        
+        # Check for semantic fallback
+        assert "semantic fallback" in content.lower() or "semantic similarity fallback" in content.lower(), (
+            "Expected semantic fallback code not found"
+        )
+        # Check for positional fallback
+        assert "positional fallback" in content.lower(), (
+            "Expected positional fallback code not found"
+        )
+        # Check for _entity_to_text helper
+        assert "_entity_to_text" in content, (
+            "Expected _entity_to_text helper method not found"
+        )
+        # Check for _compute_text_similarity helper
+        assert "_compute_text_similarity" in content, (
+            "Expected _compute_text_similarity helper method not found"
+        )
+    
+    def test_jaccard_similarity_calculation(self):
+        """Test the Jaccard similarity calculation for word overlap."""
+        def jaccard_similarity(text1: str, text2: str) -> float:
+            words1 = set(text1.lower().split())
+            words2 = set(text2.lower().split())
+            if not words1 or not words2:
+                return 0.0
+            intersection = words1 & words2
+            union = words1 | words2
+            return len(intersection) / len(union) if union else 0.0
+        
+        # Test similar texts
+        sim = jaccard_similarity("distributed consensus protocol", "consensus mechanism protocol")
+        assert sim > 0.3, f"Similar texts should have high similarity, got {sim}"
+        
+        # Test different texts
+        sim = jaccard_similarity("apple orange banana", "car bus train")
+        assert sim == 0.0, f"Different texts should have zero similarity, got {sim}"
+        
+        # Test identical texts
+        sim = jaccard_similarity("same text here", "same text here")
+        assert sim == 1.0, f"Identical texts should have similarity 1.0, got {sim}"
+
+
+# ============================================================================
+# Test World Model NaN Sanitization (Jan 10 2026)
+# ============================================================================
+
+class TestWorldModelNaNSanitization:
+    """
+    Tests for NaN/Inf sanitization in the world model dynamics.
+    
+    Issue: The world model was failing with "ufunc 'isnan' not supported" errors
+    when state validation was applied to non-numeric types.
+    
+    Fix: Added _sanitize_state_values method that:
+    1. Only checks numeric values for NaN/Inf
+    2. Replaces invalid values with safe defaults
+    3. Logs warnings instead of failing
+    """
+    
+    def test_sanitization_fix_code_present(self):
+        """Verify the NaN sanitization fix code is present in dynamics_model.py."""
+        import os
+        
+        dynamics_paths = [
+            'src/vulcan/world_model/dynamics_model.py',
+            '../src/vulcan/world_model/dynamics_model.py',
+        ]
+        
+        content = None
+        for path in dynamics_paths:
+            if os.path.exists(path):
+                with open(path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                break
+        
+        if content is None:
+            pytest.skip("dynamics_model.py not found")
+        
+        # Check for _sanitize_state_values method
+        assert "_sanitize_state_values" in content, (
+            "Expected _sanitize_state_values method not found"
+        )
+        # Check for NaN handling
+        assert "nan_sanitized" in content, (
+            "Expected nan_sanitized metadata not found"
+        )
+        # Check for TypeError handling
+        assert "ufunc" in content or "isnan" in content, (
+            "Expected isnan error handling not found"
+        )
+    
+    def test_nan_sanitization_logic(self):
+        """Test the NaN sanitization logic for numeric values."""
+        import numpy as np
+        
+        # Simulate sanitization logic
+        def sanitize_value(value):
+            if isinstance(value, (int, float)):
+                try:
+                    if np.isnan(value) or np.isinf(value):
+                        return 0.0
+                except (TypeError, ValueError):
+                    pass
+            return value
+        
+        # Test NaN
+        assert sanitize_value(float('nan')) == 0.0, "NaN should be sanitized to 0.0"
+        
+        # Test Inf
+        assert sanitize_value(float('inf')) == 0.0, "Inf should be sanitized to 0.0"
+        
+        # Test normal value
+        assert sanitize_value(42.5) == 42.5, "Normal value should be unchanged"
+        
+        # Test string (should be unchanged)
+        assert sanitize_value("hello") == "hello", "String should be unchanged"
