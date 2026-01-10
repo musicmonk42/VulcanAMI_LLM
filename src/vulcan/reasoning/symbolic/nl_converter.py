@@ -411,6 +411,16 @@ class NaturalLanguageToLogicConverter:
                 description='Existential: There exists X such that Y',
                 priority=80
             ),
+            # BUG #7 FIX: Existential with "one": "There exists one X that Y"
+            PatternConfig(
+                pattern=re.compile(
+                    r'^there\s+(?:exists?|is|are)\s+one\s+(\w+)\s+(?:such\s+that|that|which|who)\s+(.+)$',
+                    re.I
+                ),
+                handler_name='_handle_existential_detailed',
+                description='Existential: There exists one X that Y',
+                priority=80
+            ),
             # Universal negation: "No X does Y" or "No X is Y"
             PatternConfig(
                 pattern=re.compile(

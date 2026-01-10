@@ -712,6 +712,14 @@ class SymbolicReasoner:
                 - applicable: bool (Note - whether query was applicable for symbolic reasoning)
                 - validation: str (Note - 'PASSED' if model validated, 'FAILED' if not)
         """
+        # BUG #10 FIX: Check if query asks for FOL formalization
+        # Queries like "formalize in first-order logic" should generate FOL translations
+        # instead of returning generic "Proven: True" results
+        query_lower = query_str.lower()
+        if ('first-order logic' in query_lower or 'fol' in query_lower) and \
+           any(kw in query_lower for kw in ['formalize', 'formalization', 'translate', 'convert', 'express']):
+            return self._handle_fol_formalization(query_str)
+        
         # Note: Check applicability before attempting to parse
         # This prevents parse errors like "Unexpected token 'the'" on natural language
         if check_applicability and not self.is_symbolic_query(query_str):
@@ -807,6 +815,93 @@ class SymbolicReasoner:
             # The query looked like it was in our domain but failed to parse
             return {"proven": False, "confidence": SYMBOLIC_PARSE_ERROR_CONFIDENCE, "proof": None, "error": str(e), "applicable": True}
 
+    def _handle_fol_formalization(self, query: str) -> Dict[str, Any]:
+        """
+        BUG #10 FIX: Handle queries asking for FOL formalization.
+        
+        Instead of returning generic "Proven: True", this generates actual
+        FOL translations of the statements in the query.
+        
+        Args:
+            query: The query asking for formalization
+            
+        Returns:
+            Dict with FOL formalizations and high confidence
+        """
+        logger.info(f"[SymbolicReasoner] BUG #10 FIX: Detected FOL formalization request")
+        
+        try:
+            # Use NL converter to generate FOL formalization
+            fol_result = self.nl_converter.convert(query)
+            
+            if fol_result and fol_result.get("success"):
+                return {
+                    "proven": True,
+                    "confidence": 0.85,
+                    "fol_formalization": fol_result.get("formula", ""),
+                    "explanation": f"FOL formalization: {fol_result.get('formula', '')}",
+                    "applicable": True,
+                    "method": "fol_formalization",
+                }
+            else:
+                # Fallback: Try to extract statements and formalize them manually
+                formalizations = self._generate_fol_translations(query)
+                return {
+                    "proven": True,
+                    "confidence": 0.70,
+                    "fol_formalizations": formalizations,
+                    "explanation": f"Generated {len(formalizations)} FOL formalizations",
+                    "applicable": True,
+                    "method": "fol_formalization",
+                }
+        except Exception as e:
+            logger.error(f"[SymbolicReasoner] FOL formalization failed: {e}")
+            return {
+                "proven": False,
+                "confidence": 0.30,
+                "error": str(e),
+                "applicable": True,
+                "method": "fol_formalization",
+            }
+    
+    def _generate_fol_translations(self, query: str) -> List[str]:
+        """
+        BUG #10 FIX: Generate FOL translations from natural language statements.
+        
+        This is a simplified formalization that extracts key statements and
+        converts them to FOL format.
+        
+        Args:
+            query: The query containing statements to formalize
+            
+        Returns:
+            List of FOL formalization strings
+        """
+        formalizations = []
+        
+        # Extract sentences from query
+        # Remove formalization instruction
+        for remove in ['formalize', 'in first-order logic', 'in fol', 'convert to', 'express in']:
+            query = re.sub(remove, '', query, flags=re.IGNORECASE)
+        
+        # Split into statements
+        statements = [s.strip() for s in re.split(r'[.;]', query) if s.strip()]
+        
+        for statement in statements:
+            try:
+                # Try to convert using NL converter
+                result = self.nl_converter.convert(statement)
+                if result and result.get("success"):
+                    formalizations.append(result.get("formula", statement))
+                else:
+                    # Add as-is with note
+                    formalizations.append(f"# Unable to formalize: {statement}")
+            except Exception as e:
+                logger.debug(f"Could not formalize statement: {statement}, error: {e}")
+                formalizations.append(f"# Unable to formalize: {statement}")
+        
+        return formalizations if formalizations else ["# No formalizations generated"]
+    
     def _validate_proof_result(self, result: Dict[str, Any], query_str: str) -> bool:
         """
         Note: Validate that proof result is internally consistent.
