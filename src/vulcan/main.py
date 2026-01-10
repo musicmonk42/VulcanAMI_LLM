@@ -3730,9 +3730,11 @@ async def chat(request: ChatRequest):
             # VULCAN's self-aware responses instead of falling back to generic LLM.
             async def _self_introspection():
                 """Invoke world_model.introspect() for self-introspection queries."""
-                query_type_value = routing_plan.query_type.value.lower() if routing_plan else ""
+                # FIX: Add null check for routing_plan.query_type
+                query_type_value = routing_plan.query_type.value.lower() if routing_plan and routing_plan.query_type else ""
                 
                 # Check if this is a self-introspection query
+                # Uses both routing classification and keyword fallback
                 is_self_introspection = query_type_value == 'self_introspection' or any(
                     kw in query_lower for kw in [
                         'self-aware', 'self aware', 'yourself', 'your capabilities',
