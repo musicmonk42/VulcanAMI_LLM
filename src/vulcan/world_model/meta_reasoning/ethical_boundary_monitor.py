@@ -381,7 +381,7 @@ class EthicalBoundaryMonitor:
         validation_tracker=None,
         self_improvement_drive=None,
         transparency_interface=None,
-        load_defaults: bool = False,
+        load_defaults: bool = True,  # FIXED: Changed from False to True for production
     ):
         """
         Initialize ethical boundary monitor
@@ -394,7 +394,7 @@ class EthicalBoundaryMonitor:
             validation_tracker: Optional ValidationTracker integration
             self_improvement_drive: Optional SelfImprovementDrive integration
             transparency_interface: Optional TransparencyInterface integration
-            load_defaults: If True, load default boundaries (default: False for test isolation)
+            load_defaults: If True, load default boundaries (default: True for production safety)
         """
         self.strict_mode = strict_mode
         self.alert_callback = alert_callback
