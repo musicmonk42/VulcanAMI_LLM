@@ -432,6 +432,19 @@ PHILOSOPHICAL_KEYWORDS: FrozenSet[str] = frozenset([
     "conflict between", "conflicting values", "value conflict",
 ])
 
+# ==============================================================================
+# PRIORITY FIX: Ethical content indicators for trolley problem detection
+# ==============================================================================
+# These indicators detect ethical dilemmas that should be classified as
+# PHILOSOPHICAL even if they have logical structure (if-then, therefore).
+# This list is checked BEFORE logical keywords to ensure ethical queries
+# are not misrouted to the SAT solver.
+ETHICAL_CONTENT_INDICATORS: FrozenSet[str] = frozenset([
+    'trolley', 'dilemma', 'permissible', 'should i', 'right or wrong',
+    'harm', 'innocent', 'moral', 'ethical', 'self-aware', 'consciousness',
+    'runaway', 'heading toward', 'five people', 'one person', 'sacrifice'
+])
+
 # Philosophical/ethical patterns - catch philosophical queries before short query bypass
 # Note: "This sentence is false" must be classified as PHILOSOPHICAL, not CONVERSATIONAL
 PHILOSOPHICAL_PATTERNS: Tuple[re.Pattern, ...] = (
@@ -1353,7 +1366,57 @@ class QueryClassifier:
                 source="keyword",
             )
         
+        # =================================================================
+        # PRIORITY FIX: Check PHILOSOPHICAL/ETHICAL keywords BEFORE LOGICAL
+        # =================================================================
+        # Critical Issue: Philosophical/ethical queries were being misclassified 
+        # as LOGICAL based on surface formatting, routing them to the symbolic 
+        # SAT solver instead of the World Model.
+        # 
+        # Example: The trolley problem has words like "implies", "therefore", "hence"
+        # which triggered LOGICAL classification before PHILOSOPHICAL was checked.
+        # 
+        # Fix: Check for ethical content FIRST, even if logical keywords exist.
+        # Ethical/philosophical content should ALWAYS take priority over logical
+        # structure because:
+        # 1. Ethical reasoning requires normative judgment, not SAT solving
+        # 2. The World Model has ethical reasoning capabilities
+        # 3. Symbolic parsers will fail on philosophical content anyway
+        # =================================================================
+        phil_count = sum(1 for kw in PHILOSOPHICAL_KEYWORDS if kw in query_lower)
+        
+        # Also check if query matches any philosophical patterns
+        has_philosophical_pattern = any(
+            pattern.search(query_original) for pattern in PHILOSOPHICAL_PATTERNS
+        )
+        
+        # Ethical content indicators - use module-level constant for efficiency
+        # This checks for trolley problem and similar ethical dilemma indicators
+        has_ethical_content = any(indicator in query_lower for indicator in ETHICAL_CONTENT_INDICATORS)
+        
+        # Route to PHILOSOPHICAL if:
+        # 1. Has enough philosophical keywords (threshold met), OR
+        # 2. Matches philosophical patterns, OR
+        # 3. Has clear ethical content (trolley problem indicators)
+        if phil_count >= PHIL_KEYWORD_THRESHOLD or has_philosophical_pattern or has_ethical_content:
+            # CRITICAL: Check that we don't have explicit mathematical intent
+            if not _has_explicit_mathematical_intent(query_original):
+                logger.info(
+                    f"[QueryClassifier] PRIORITY FIX: Detected PHILOSOPHICAL content "
+                    f"(keywords={phil_count}, pattern={has_philosophical_pattern}, "
+                    f"ethical={has_ethical_content}) - routing to philosophical (NOT logical)"
+                )
+                return QueryClassification(
+                    category=QueryCategory.PHILOSOPHICAL.value,
+                    complexity=0.4 + min(0.3, phil_count * 0.05),
+                    suggested_tools=["world_model", "philosophical"],
+                    skip_reasoning=False,
+                    confidence=0.9 if has_philosophical_pattern else 0.85,
+                    source="keyword",
+                )
+        
         # Check logical/SAT indicators
+        # IMPORTANT: This now comes AFTER philosophical check
         logical_count = sum(1 for kw in LOGICAL_KEYWORDS if kw in query_lower)
         # FIX: "formalize" is a strong indicator of logical reasoning - treat it like logic symbols
         # Similar to how "bayes" is a strong indicator for probabilistic reasoning
