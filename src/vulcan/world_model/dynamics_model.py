@@ -2040,7 +2040,8 @@ class DynamicsModel:
             # Handle numeric scalars
             if isinstance(value, (int, float)):
                 try:
-                    if np.isnan(value) or np.isinf(value):
+                    # Use np.isfinite for efficiency (checks both NaN and Inf in one call)
+                    if not np.isfinite(value):
                         logger.warning(
                             f"[DynamicsModel] FIX: Sanitized NaN/Inf in variable '{var_name}'"
                         )
@@ -2057,13 +2058,17 @@ class DynamicsModel:
                 # Only sanitize numeric arrays
                 if np.issubdtype(value.dtype, np.number):
                     try:
-                        # Replace NaN with 0 and Inf with large finite values
-                        mask_nan = np.isnan(value)
-                        mask_inf = np.isinf(value)
-                        if np.any(mask_nan) or np.any(mask_inf):
+                        # Use np.isfinite for efficiency (checks both NaN and Inf)
+                        mask_invalid = ~np.isfinite(value)
+                        if np.any(mask_invalid):
                             sanitized_value = value.copy()
+                            # Replace NaN with 0 and Inf with large finite values
+                            # Need separate masks for proper Inf sign handling
+                            mask_nan = np.isnan(value)
+                            mask_inf = np.isinf(value)
                             sanitized_value[mask_nan] = 0.0
-                            sanitized_value[mask_inf] = np.sign(value[mask_inf]) * 1e10
+                            if np.any(mask_inf):
+                                sanitized_value[mask_inf] = np.sign(value[mask_inf]) * 1e10
                             logger.warning(
                                 f"[DynamicsModel] FIX: Sanitized {np.sum(mask_nan)} NaN and "
                                 f"{np.sum(mask_inf)} Inf values in array variable '{var_name}'"

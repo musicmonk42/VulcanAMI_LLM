@@ -1021,6 +1021,14 @@ class AbstractReasoner:
 
 class AnalogicalReasoner(AbstractReasoner):
     """Enhanced analogical reasoning with advanced semantic understanding"""
+    
+    # =================================================================
+    # Constants for structure mapping (FIX Jan 10 2026)
+    # =================================================================
+    # Minimum semantic similarity required for a match (prevents weak mappings)
+    SEMANTIC_SIMILARITY_THRESHOLD = 0.3
+    # Small epsilon for numerical stability in cosine similarity calculation
+    COSINE_SIMILARITY_EPSILON = 1e-8
 
     def __init__(self, enable_caching: bool = True, enable_learning: bool = True):
         super().__init__()
@@ -2974,7 +2982,7 @@ class AnalogicalReasoningEngine(AnalogicalReasoner):
                     # Compute semantic similarity
                     similarity = self._compute_text_similarity(src_text, tgt_text)
                     
-                    if similarity > best_similarity and similarity > 0.3:  # Minimum threshold
+                    if similarity > best_similarity and similarity > self.SEMANTIC_SIMILARITY_THRESHOLD:
                         best_similarity = similarity
                         best_match = tgt_name
                 
@@ -3036,7 +3044,7 @@ class AnalogicalReasoningEngine(AnalogicalReasoner):
                 emb1 = self.semantic_engine.get_embedding(text1)
                 emb2 = self.semantic_engine.get_embedding(text2)
                 if emb1 is not None and emb2 is not None:
-                    return float(np.dot(emb1, emb2) / (np.linalg.norm(emb1) * np.linalg.norm(emb2) + 1e-8))
+                    return float(np.dot(emb1, emb2) / (np.linalg.norm(emb1) * np.linalg.norm(emb2) + self.COSINE_SIMILARITY_EPSILON))
             except Exception:
                 pass
         
