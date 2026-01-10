@@ -18,7 +18,7 @@ CRITICAL NOTES:
 - The force_shutdown_reasoner function makes ALL threads daemon immediately to prevent hangs
 """
 
-from vulcan.reasoning.unified_reasoning import (
+from vulcan.reasoning.unified import (
     ReasoningPlan,
     ReasoningStrategy,
     ReasoningTask,

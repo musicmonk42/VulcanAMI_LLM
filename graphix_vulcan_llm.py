@@ -590,7 +590,7 @@ except Exception as e:
 
 # Unified Reasoning System
 try:
-    from src.vulcan.reasoning.unified_reasoning import UnifiedReasoner
+    from src.vulcan.reasoning.unified import UnifiedReasoner
     logger.info("✓ UnifiedReasoner loaded successfully")
     HAS_UNIFIED_REASONING = True
 except Exception as e:

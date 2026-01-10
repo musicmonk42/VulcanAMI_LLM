@@ -210,7 +210,7 @@ class ContinualLearner:
         # =================================================================
         try:
             # Import weight manager for tool weight adjustments
-            from vulcan.reasoning.unified_reasoning import get_weight_manager
+            from vulcan.reasoning.unified.cache import get_weight_manager
             weight_manager = get_weight_manager()
             
             for tool in tools:
