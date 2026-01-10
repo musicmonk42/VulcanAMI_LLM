@@ -13,24 +13,16 @@ The UnifiedReasoner class provides:
 - Resource cleanup and graceful shutdown
 
 Industry Standards:
-- Complete type annotations with TYPE_CHECKING pattern
+- Complete type annotations with proper imports
 - Thread-safe operations with RLock synchronization
 - Google-style docstrings with examples
 - Professional error handling and logging
 - Proper resource management with timeout-based shutdown
+
+Author: VulcanAMI Team
+Version: 2.0 (Post-refactoring)
 """
 
-"""
-Enhanced Unified reasoning interface that orchestrates all reasoning types
-with advanced tool selection, utility-based decisions, and portfolio strategies
-Fixed version with proper resource management, thread safety, and error handling.
-CRITICAL FIX: Shutdown no longer creates new ThreadPoolExecutors during cleanup.
-ULTRA FIX: All threads are now daemon mode by default to prevent hanging.
-MEGA FIX: Cleanup intervals configured at TOP LEVEL (0.05 seconds) to prevent test hangs.
-NUCLEAR FIX: Monkey-patches SelectionCache.__init__ to force short cleanup_interval everywhere.
-ULTIMATE FIX: Monkey-patch applied at import time, shutdown waits for threads properly.
-PRODUCTION FIX: Skips heavy UnifiedRuntime initialization during tests to prevent segfaults.
-"""
 import hashlib
 import logging
 import os
@@ -41,515 +33,66 @@ import time
 import uuid
 from collections import defaultdict, deque
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
-from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
+
 import numpy as np
-from .reasoning_explainer import ReasoningExplainer, SafetyAwareReasoning
-from .reasoning_types import (
+
+# Import from unified submodules
+from .cache import ToolWeightManager, compute_query_hash
+from .component_loader import (
+    _load_reasoning_components,
+    _load_selection_components,
+    _load_optional_components,
+)
+from .config import (
+    CACHE_HASH_LENGTH,
+    CACHE_MAX_AGE_SECONDS,
+    CONFIDENCE_FLOOR_ANALOGICAL_DEFAULT,
+    CONFIDENCE_FLOOR_CAUSAL_DEFAULT,
+    CONFIDENCE_FLOOR_CAUSAL_WITH_RESULT,
+    CONFIDENCE_FLOOR_DEFAULT,
+    CONFIDENCE_FLOOR_NO_RESULT,
+    CONFIDENCE_FLOOR_SYMBOLIC_DEFAULT,
+    CONFIDENCE_FLOOR_SYMBOLIC_HAS_PROOF,
+    CONFIDENCE_FLOOR_SYMBOLIC_PROVEN,
+    INAPPLICABILITY_EXPLANATION_PHRASES,
+    MATH_ACCURACY_PENALTY,
+    MATH_ACCURACY_REWARD,
+    MATH_ERROR_CONFIDENCE_PENALTY,
+    MATH_VERIFICATION_CONFIDENCE_BOOST,
+    MATH_WEIGHT_ADJUSTMENT_PENALTY,
+    NUMERICAL_RESULT_KEYS,
+)
+from .types import ReasoningPlan, ReasoningTask
+
+# Import from parent reasoning module
+from ..reasoning_explainer import ReasoningExplainer, SafetyAwareReasoning
+from ..reasoning_types import (
     ReasoningChain,
     ReasoningResult,
     ReasoningStep,
+    ReasoningStrategy,
     ReasoningType,
-    ReasoningStrategy,  # CIRCULAR IMPORT FIX: Moved here from local definition
 )
+
 logger = logging.getLogger(__name__)
-CACHE_HASH_LENGTH = 32
-CACHE_MAX_AGE_SECONDS = 300.0
-def _compute_query_hash(query_data: Any) -> str:
-    """
-    Compute a consistent hash for query data.
-    Note: Extracted into helper function to ensure consistent
-    hash computation across cache key generation and cache validation.
-    Args:
-        query_data: The query data to hash (string, dict, or other)
-    Returns:
-        First CACHE_HASH_LENGTH chars of SHA-256 hex digest
-    """
-    query_str = str(query_data) if not isinstance(query_data, str) else query_data
-    return hashlib.sha256(query_str.encode('utf-8')).hexdigest()[:CACHE_HASH_LENGTH]
-MATH_VERIFICATION_CONFIDENCE_BOOST = 1.1  # Boost confidence when verified correct
-MATH_ERROR_CONFIDENCE_PENALTY = 0.5  # Reduce confidence when error detected
-MATH_ACCURACY_REWARD = 0.015  # Bonus for mathematically correct results
-MATH_ACCURACY_PENALTY = -0.01  # Penalty for mathematical errors
-MATH_WEIGHT_ADJUSTMENT_PENALTY = -0.01  # Adjustment to tool weights on error
-NUMERICAL_RESULT_KEYS = ('probability', 'result', 'value', 'posterior', 'answer')
-CONFIDENCE_FLOOR_SYMBOLIC_PROVEN = 0.6  # High confidence when proof is found
-CONFIDENCE_FLOOR_SYMBOLIC_HAS_PROOF = 0.4  # Medium confidence when proof object exists
-CONFIDENCE_FLOOR_SYMBOLIC_DEFAULT = 0.2  # Minimum floor for symbolic reasoning
-CONFIDENCE_FLOOR_CAUSAL_WITH_RESULT = 0.3  # Confidence for successful causal analysis
-CONFIDENCE_FLOOR_CAUSAL_DEFAULT = 0.15  # Minimum floor for causal reasoning
-CONFIDENCE_FLOOR_ANALOGICAL_DEFAULT = 0.15  # Minimum floor for analogical reasoning
-CONFIDENCE_FLOOR_DEFAULT = 0.2  # Generic minimum floor for other reasoners
-CONFIDENCE_FLOOR_NO_RESULT = 0.1  # Floor when reasoner returns empty/null result
-MIN_ENSEMBLE_WEIGHT_FLOOR = 0.001
-INAPPLICABILITY_EXPLANATION_PHRASES = frozenset({
-    "not applicable",
-    "does not appear to",
-    "not a probability",
-    "not probabilistic",
-})
-def _is_result_not_applicable(result) -> bool:
-    """
-    Check if a reasoning result indicates the reasoner was not applicable.
-    FIX Issue A: This prevents non-applicable reasoners from contaminating
-    ensemble confidence scores. When a reasoner returns "not applicable"
-    (e.g., probabilistic reasoner on a philosophical query), it should be
-    excluded from the ensemble calculation rather than dragging down confidence.
-    ENHANCED: Now also checks for:
-    - "uninformative" reason in metadata/conclusion
-    - 50/50 probability (0.5 confidence with "uninformative" indicator)
-    - Very low confidence (< 0.15) with non-UNKNOWN type
-    Args:
-        result: ReasoningResult to check (using Any type to avoid circular imports)
-    Returns:
-        True if the result indicates the reasoner was not applicable
-    """
-    if result is None:
-        return True
-    if isinstance(result.conclusion, dict):
-        if result.conclusion.get("not_applicable", False):
-            return True
-        if result.conclusion.get("applicable") is False:
-            return True
-        if result.conclusion.get("reason") == "uninformative":
-            return True
-        if result.conclusion.get("uninformative", False):
-            return True
-    if hasattr(result, "metadata") and isinstance(result.metadata, dict):
-        if result.metadata.get("uninformative_result", False):
-            return True
-        if result.metadata.get("gate_check") == "failed":
-            return True
-        if result.metadata.get("methodology_check") == "failed":
-            return True
-        if result.metadata.get("reason") == "uninformative":
-            return True
-    if result.confidence == 0.0:
-        explanation_lower = (result.explanation or "").lower()
-        for phrase in INAPPLICABILITY_EXPLANATION_PHRASES:
-            if phrase in explanation_lower:
-                return True
-    if result.confidence == 0.5:
-        explanation_lower = (result.explanation or "").lower()
-        if any(phrase in explanation_lower for phrase in ["uninformative", "50/50", "no data", "cannot determine"]):
-            return True
-    if result.confidence < 0.15:
-        reasoning_type = getattr(result, 'reasoning_type', None)
-        if reasoning_type and reasoning_type != ReasoningType.UNKNOWN:
-            logger.debug(
-                f"[_is_result_not_applicable] Marking result as not applicable: "
-                f"very low confidence ({result.confidence:.2f}) for {reasoning_type}"
-            )
-            return True
-    return False
-PROBLEM_TYPE_BAYESIAN = 'bayesian'
-UNKNOWN_TYPE_FALLBACK_ORDER = (
-    'SYMBOLIC',       # Best for general language/text queries
-    'PROBABILISTIC',  # Good for uncertainty handling
-    'CAUSAL',         # Good for cause-effect questions
-    'PHILOSOPHICAL',  # Note: Added for ethical/deontic reasoning (permissibility, obligation, etc.)
-)
-MATH_EXPRESSION_PATTERN = re.compile(r'[\d]+\s*[\+\-\*\/\^\%]\s*[\d]+')
-MATH_QUERY_PATTERN = re.compile(
-    r'(what\s+is|calculate|compute|solve|evaluate)\s+[\d]+\s*[\+\-\*\/\^\%]',
-    re.IGNORECASE
-)
-CREATIVE_TASK_KEYWORDS = (
-    'poem', 'sonnet', 'haiku', 'verse', 'stanza', 'poetry', 'limerick',
-    'story', 'tale', 'narrative', 'fiction', 'novel',
-    'song', 'lyrics', 'ballad', 'melody',
-    'script', 'screenplay', 'dialogue', 'monologue',
-    'compose', 'craft', 'author',
-    'creative writing', 'creative', 'artistic', 'imaginative',
-)
-MAX_CREATIVE_CHECK_LENGTH = 2000
-import re
-_CREATIVE_KEYWORD_PATTERNS = {}
-for _kw in CREATIVE_TASK_KEYWORDS:
-    _CREATIVE_KEYWORD_PATTERNS[_kw] = re.compile(r'\b' + re.escape(_kw) + r'\b', re.IGNORECASE)
-def _is_creative_task(task: 'ReasoningTask') -> bool:
-    """
-    Detect if a task is creative (P0.2 FIX).
-    Creative tasks like writing poems, sonnets, stories should not have their
-    output filtered based on confidence scores because:
-    1. Creative output quality is subjective, not measurable by confidence
-    2. OpenAI fallback responses handle creative tasks well
-    3. Low confidence from fallback shouldn't block creative generation
-    Args:
-        task: The reasoning task to check
-    Returns:
-        True if the task is creative, False otherwise
-    """
-    if task.metadata and task.metadata.get('is_creative', False):
-        return True
-    if task.query and isinstance(task.query, dict):
-        if task.query.get('is_creative', False):
-            return True
-        if task.query.get('creative', False):
-            return True
-    text_to_check = ""
-    if task.input_data:
-        input_str = str(task.input_data)[:MAX_CREATIVE_CHECK_LENGTH]
-        text_to_check += input_str.lower()
-    if task.query:
-        query_str = str(task.query)[:MAX_CREATIVE_CHECK_LENGTH]
-        text_to_check += " " + query_str.lower()
-    for keyword in CREATIVE_TASK_KEYWORDS:
-        pattern = _CREATIVE_KEYWORD_PATTERNS.get(keyword)
-        if pattern and pattern.search(text_to_check):
-            return True
-    return False
+
+
 def _is_test_environment() -> bool:
     """
-    Determine if running in test environment.
-    Note: Default to PRODUCTION for safety.
-    Only return True if explicitly in test mode via environment or explicit test framework.
-    PRINCIPLE: Safety-first - default to production mode when uncertain.
-    FIX: Added detection for pytest being imported without PYTEST_CURRENT_TEST.
-    This helps detect test runs that didn't set the env var properly.
+    Check if we're running in a test environment.
+    
+    Returns:
+        True if running under pytest or unittest.
     """
-    import sys
-    explicit_test_indicators = [
-        os.getenv("PYTEST_CURRENT_TEST") is not None,  # pytest sets this during test execution
-        os.getenv("VULCAN_TEST_MODE", "").lower() == "true",
-        os.getenv("VULCAN_ENV", "").lower() == "test",
-    ]
-    if any(explicit_test_indicators):
-        logger.debug("Test environment detected via explicit indicator")
-        return True
-    if "pytest" in sys.modules or "_pytest" in sys.modules:
-        try:
-            import traceback
-            for frame in traceback.extract_stack():
-                if '/pytest' in frame.filename or 'test_' in frame.filename:
-                    logger.debug("Test environment detected via pytest in call stack")
-                    return True
-        except Exception:
-            pass
-        pytest_worker = os.getenv("PYTEST_XDIST_WORKER") is not None
-        if pytest_worker:
-            logger.debug("Test environment detected via pytest-xdist worker")
-            return True
-    explicit_prod_indicators = [
-        os.getenv("VULCAN_PRODUCTION", "").lower() == "true",
-        os.getenv("VULCAN_FORCE_PRODUCTION_REASONING", "").lower() == "true",
-        os.getenv("VULCAN_ENV", "").lower() == "production",
-        os.getenv("ENVIRONMENT", "").lower() in ("production", "prod"),
-    ]
-    if any(explicit_prod_indicators):
-        logger.debug("Production environment detected via explicit indicator")
-        return False
-    logger.debug(
-        "No explicit environment indicator found. "
-        "Defaulting to PRODUCTION mode for safety."
+    return (
+        "pytest" in str(os.getenv("_", ""))
+        or "pytest" in str(os.getenv("PYTEST_CURRENT_TEST", ""))
+        or "unittest" in str(os.getenv("_", ""))
     )
-    return False
-class ToolWeightManager:
-    """Singleton manager for tool weights shared between Learning and Ensemble.
-    Note: Learning system was updating tool weights in its own dictionary,
-    but Ensemble was reading from a separate dictionary. Weights never propagated.
-    This singleton ensures both systems use the same weight storage.
-    """
-    _instance = None
-    _lock = threading.Lock()
-    def __new__(cls):
-        if cls._instance is None:
-            with cls._lock:
-                if cls._instance is None:
-                    cls._instance = super().__new__(cls)
-                    cls._instance._weights: Dict[str, float] = {}
-                    cls._instance._update_lock = threading.RLock()
-        return cls._instance
-    def get_weight(self, tool: str, default: float = 1.0) -> float:
-        """Get weight for a single tool.
-        Note: Return default weight (1.0) for tools that haven't been
-        seen before, rather than 0.0 which causes all weights to be zero.
-        This ensures ensemble weighting works correctly even before learning
-        has had time to adjust weights.
-        Args:
-            tool: Tool name
-            default: Default weight for unseen tools (1.0 = neutral weight)
-        Returns:
-            Weight value (default 1.0 if tool not in weights)
-        """
-        with self._update_lock:
-            return self._weights.get(tool, default)
-    def set_weight(self, tool: str, value: float) -> None:
-        """Set absolute weight value for a tool.
-        Note: Floor weight at a minimum positive value to prevent
-        the "death spiral" where accumulated penalties cause tools to have
-        zero or negative weights, breaking the ensemble calculations.
-        """
-        with self._update_lock:
-            if value < 0.1:
-                logger.warning(
-                    f"[WeightManager] Flooring negative/low weight for '{tool}': "
-                    f"{value:.4f} -> 0.1"
-                )
-                value = 0.1
-            self._weights[tool] = value
-            logger.debug(f"[WeightManager] {tool} = {value:.4f}")
-    def adjust_weight(self, tool: str, delta: float) -> None:
-        """Adjust weight by delta (used by Learning system).
-        Note: Initialize from 1.0 (neutral weight) instead of 0.0
-        so that tools start with sensible weights before learning adjusts them.
-        Note: Floor the result at 0.1 to prevent death spiral.
-        """
-        with self._update_lock:
-            current = self._weights.get(tool, 1.0)
-            new_weight = current + delta
-            if new_weight < 0.1:
-                logger.warning(
-                    f"[WeightManager] Flooring weight after adjustment for '{tool}': "
-                    f"{current:.4f} + {delta:.4f} = {new_weight:.4f} -> 0.1"
-                )
-                new_weight = 0.1
-            self._weights[tool] = new_weight
-            logger.info(f"[WeightManager] {tool}: {current:.4f} → {self._weights[tool]:.4f}")
-    def get_all_weights(self, tools: List[str]) -> Dict[str, float]:
-        """Get weights for multiple tools (used by Ensemble).
-        Note: Returns normalized weights with default value of 1.0 for
-        unseen tools, rather than 0.01. This ensures ensemble weighting works
-        correctly even before learning has adjusted weights.
-        Returns normalized weights.
-        """
-        with self._update_lock:
-            weights = {t: self._weights.get(t, 1.0) for t in tools}
-            total = sum(weights.values())
-            if total > 0:
-                weights = {k: v / total for k, v in weights.items()}
-            else:
-                n = len(tools)
-                if n > 0:
-                    weights = {t: 1.0 / n for t in tools}
-            return weights
-    def get_raw_weights(self) -> Dict[str, float]:
-        """Get raw (non-normalized) weights for debugging."""
-        with self._update_lock:
-            return self._weights.copy()
-_weight_manager: Optional[ToolWeightManager] = None
-_weight_manager_lock = threading.Lock()
-def get_weight_manager() -> ToolWeightManager:
-    """Get the singleton ToolWeightManager instance.
-    Note: Uses double-checked locking to ensure thread-safe singleton.
-    The ToolWeightManager class also uses __new__ for singleton pattern,
-    but this accessor adds an additional layer of protection against race
-    conditions when multiple threads call get_weight_manager() simultaneously.
-    Usage in Learning system:
-        from vulcan.reasoning.unified_reasoning import get_weight_manager
-        get_weight_manager().adjust_weight("causal", 0.01)
-    Usage in Ensemble:
-        from vulcan.reasoning.unified_reasoning import get_weight_manager
-        weights = get_weight_manager().get_all_weights(["causal", "symbolic"])
-    """
-    global _weight_manager
-    if _weight_manager is None:
-        with _weight_manager_lock:
-            if _weight_manager is None:
-                _weight_manager = ToolWeightManager()
-    return _weight_manager
-_SELECTION_COMPONENTS = None
-_REASONING_COMPONENTS = None
-_OPTIONAL_COMPONENTS = None
-def _load_selection_components():
-    """Lazy load selection components to avoid circular imports"""
-    global _SELECTION_COMPONENTS
-    if _SELECTION_COMPONENTS is not None:
-        return _SELECTION_COMPONENTS
-    try:
-        from vulcan.reasoning.selection import (
-            ContextMode,
-            CostComponent,
-            ExecutionMonitor,
-            ExecutionStrategy,
-            PortfolioExecutor,
-            SafetyGovernor,
-            SelectionCache,
-            SelectionMode,
-            SelectionRequest,
-            SelectionResult,
-            StochasticCostModel,
-            ToolSelector,
-            UtilityContext,
-            UtilityModel,
-            WarmStartPool,
-        )
-        if not hasattr(SelectionCache, "_original_init_patched"):
-            original_init = SelectionCache.__init__
-            def patched_init(self_cache, config_arg=None):
-                """Patched __init__ that forces cleanup_interval to 0.05 seconds"""
-                config_arg = config_arg or {}
-                config_arg["cleanup_interval"] = 0.05
-                for sub_key in [
-                    "feature_cache_config",
-                    "selection_cache_config",
-                    "result_cache_config",
-                ]:
-                    if sub_key not in config_arg:
-                        config_arg[sub_key] = {}
-                    config_arg[sub_key]["cleanup_interval"] = 0.05
-                config_arg.setdefault("enable_warming", False)
-                config_arg.setdefault("enable_disk_cache", False)
-                original_init(self_cache, config_arg)
-            SelectionCache.__init__ = patched_init
-            SelectionCache._original_init_patched = True
-            logger.info("Applied nuclear monkey-patch to SelectionCache.__init__")
-        try:
-            from vulcan.reasoning.selection.confidence_calibration import (
-                CalibratedDecisionMaker,
-            )
-        except Exception:
-            CalibratedDecisionMaker = None
-        _SELECTION_COMPONENTS = {
-            "ToolSelector": ToolSelector,
-            "SelectionRequest": SelectionRequest,
-            "SelectionResult": SelectionResult,
-            "SelectionMode": SelectionMode,
-            "UtilityModel": UtilityModel,
-            "UtilityContext": UtilityContext,
-            "ContextMode": ContextMode,
-            "PortfolioExecutor": PortfolioExecutor,
-            "ExecutionStrategy": ExecutionStrategy,
-            "ExecutionMonitor": ExecutionMonitor,
-            "SafetyGovernor": SafetyGovernor,
-            "SelectionCache": SelectionCache,
-            "WarmStartPool": WarmStartPool,
-            "StochasticCostModel": StochasticCostModel,
-            "CostComponent": CostComponent,
-            "CalibratedDecisionMaker": CalibratedDecisionMaker,
-        }
-        return _SELECTION_COMPONENTS
-    except ImportError as e:
-        logger.warning(f"Selection components not available: {e}")
-        return {}
-def _load_reasoning_components():
-    """Lazy load reasoning components to avoid circular imports"""
-    global _REASONING_COMPONENTS
-    if _REASONING_COMPONENTS is not None:
-        return _REASONING_COMPONENTS
-    _REASONING_COMPONENTS = {}
-    try:
-        from vulcan.reasoning.probabilistic_reasoning import ProbabilisticReasoner
-        _REASONING_COMPONENTS["ProbabilisticReasoner"] = ProbabilisticReasoner
-    except ImportError as e:
-        logger.warning(f"ProbabilisticReasoner not available: {e}")
-    try:
-        from vulcan.reasoning.symbolic import SymbolicReasoner
-        _REASONING_COMPONENTS["SymbolicReasoner"] = SymbolicReasoner
-    except ImportError as e:
-        logger.warning(f"SymbolicReasoner not available: {e}")
-    try:
-        from vulcan.reasoning.causal_reasoning import CausalReasoner
-        _REASONING_COMPONENTS["CausalReasoner"] = CausalReasoner
-    except ImportError as e:
-        logger.warning(f"CausalReasoner not available: {e}")
-    try:
-        from vulcan.reasoning.causal_reasoning import CounterfactualReasoner
-        _REASONING_COMPONENTS["CounterfactualReasoner"] = CounterfactualReasoner
-    except ImportError as e:
-        logger.warning(f"CounterfactualReasoner not available: {e}")
-    try:
-        from vulcan.reasoning.analogical_reasoning import AnalogicalReasoningEngine
-        _REASONING_COMPONENTS["AnalogicalReasoningEngine"] = AnalogicalReasoningEngine
-    except ImportError as e:
-        logger.warning(f"AnalogicalReasoningEngine not available: {e}")
-    try:
-        from vulcan.reasoning.multimodal_reasoning import MultiModalReasoningEngine
-        _REASONING_COMPONENTS["MultiModalReasoningEngine"] = MultiModalReasoningEngine
-    except ImportError as e:
-        logger.warning(f"MultiModalReasoningEngine not available: {e}")
-    try:
-        from vulcan.reasoning.multimodal_reasoning import CrossModalReasoner
-        _REASONING_COMPONENTS["CrossModalReasoner"] = CrossModalReasoner
-    except ImportError as e:
-        logger.warning(f"CrossModalReasoner not available: {e}")
-    try:
-        from vulcan.reasoning.reasoning_types import AbstractReasoner
-        _REASONING_COMPONENTS["AbstractReasoner"] = AbstractReasoner
-    except ImportError as e:
-        logger.warning(f"AbstractReasoner not available: {e}")
-    try:
-        from vulcan.reasoning.multimodal_reasoning import ModalityType
-        _REASONING_COMPONENTS["ModalityType"] = ModalityType
-    except ImportError as e:
-        logger.warning(f"ModalityType not available: {e}")
-    return _REASONING_COMPONENTS
-def _load_optional_components():
-    """Lazy load optional components"""
-    global _OPTIONAL_COMPONENTS
-    components = {}
-    try:
-        from vulcan.processing import MultimodalProcessor
-        components["MultimodalProcessor"] = MultimodalProcessor
-    except ImportError:
-        logger.debug("MultimodalProcessor not available")
-    try:
-        from vulcan.learning import ContinualLearner
-        components["ContinualLearner"] = ContinualLearner
-    except ImportError:
-        logger.debug("ContinualLearner not available")
-    try:
-        from unified_runtime import UnifiedRuntime
-        components["UnifiedRuntime"] = UnifiedRuntime
-    except ImportError:
-        logger.debug("UnifiedRuntime not available")
-    try:
-        from vulcan.safety import SafetyValidator
-        components["SafetyValidator"] = SafetyValidator
-    except ImportError:
-        logger.debug("SafetyValidator not available")
-    try:
-        from vulcan.reasoning.mathematical_verification import (
-            MathematicalVerificationEngine,
-            MathVerificationStatus,
-            BayesianProblem,
-        )
-        components["MathematicalVerificationEngine"] = MathematicalVerificationEngine
-        components["MathVerificationStatus"] = MathVerificationStatus
-        components["BayesianProblem"] = BayesianProblem
-        logger.info("MathematicalVerificationEngine loaded for calculation validation")
-    except ImportError as e:
-        logger.debug(f"MathematicalVerificationEngine not available: {e}")
-    _OPTIONAL_COMPONENTS = components
-    return components
-@dataclass
-class ReasoningTask:
-    """Represents a reasoning task"""
-    task_id: str
-    task_type: ReasoningType
-    input_data: Any
-    query: Dict[str, Any]
-    constraints: Dict[str, Any] = field(default_factory=dict)
-    priority: int = 0
-    deadline: Optional[float] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    features: Optional[np.ndarray] = None
-    utility_context: Optional[Any] = None
-@dataclass
-class ReasoningPlan:
-    """Execution plan for reasoning"""
-    plan_id: str
-    tasks: List[ReasoningTask]
-    strategy: ReasoningStrategy
-    dependencies: Dict[str, List[str]]
-    estimated_time: float
-    estimated_cost: float
-    confidence_threshold: float = 0.5
-    execution_strategy: Optional[Any] = None
-    selected_tools: Optional[List[str]] = None
-class UnifiedReasoner:
 
-# Import from sibling modules
-from .types import ReasoningTask, ReasoningPlan
-from .config import *
-from .component_loader import (_load_reasoning_components,
-                              _load_selection_components,
-                              _load_optional_components)
-from .cache import ToolWeightManager, compute_query_hash
-from .strategies import *
 
 class UnifiedReasoner:
     """Enhanced unified interface with production tool selection and portfolio strategies"""
