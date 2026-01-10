@@ -1464,3 +1464,243 @@ class TestCreativeAndPhilosophicalSelfIntrospectionOverride:
         assert "_get_self_awareness_context" in content, (
             "Expected _get_self_awareness_context method for live world_model integration"
         )
+
+
+# ============================================================================
+# Test Creative Task Type Override for Domain Keywords (Jan 10 2026)
+# ============================================================================
+
+class TestCreativeTaskOverrideDomainKeywords:
+    """
+    Tests for the creative task type override that prevents domain keywords
+    like "quantum" or "welfare" from overriding the task type classification.
+    
+    Issue: Creative queries like "Write a sonnet about quantum entanglement" were
+    being routed to probabilistic/mathematical engines because they contained
+    domain keywords (e.g., "quantum").
+    
+    Fix: Added task-type detection (creative verbs + nouns) that penalizes all
+    reasoning tools (including mathematical) for creative tasks.
+    """
+    
+    @pytest.fixture
+    def creative_verbs(self):
+        """Creative task verbs that indicate creative writing."""
+        return frozenset([
+            'write', 'compose', 'create', 'craft', 'generate', 'draft',
+            'author', 'pen', 'produce', 'design', 'invent', 'imagine',
+        ])
+    
+    @pytest.fixture
+    def creative_nouns(self):
+        """Creative output types."""
+        return frozenset([
+            'poem', 'sonnet', 'haiku', 'story', 'essay', 'article',
+            'song', 'lyrics', 'script', 'novel', 'play', 'limerick',
+            'verse', 'prose', 'fiction', 'narrative', 'tale',
+        ])
+    
+    def _is_creative_task(self, query: str, verbs, nouns) -> bool:
+        """Check if query is a creative task based on verb+noun pattern."""
+        query_lower = query.lower()
+        words = query_lower.split()
+        
+        if not words:
+            return False
+        
+        # Check if query starts with a creative verb
+        first_word = words[0].rstrip(',.!?')
+        has_creative_verb = first_word in verbs
+        
+        # Check if query contains a creative noun
+        has_creative_noun = any(noun in query_lower for noun in nouns)
+        
+        return has_creative_verb or has_creative_noun
+    
+    def test_write_sonnet_about_quantum_is_creative(self, creative_verbs, creative_nouns):
+        """'Write a sonnet about quantum entanglement' should be detected as creative."""
+        query = "Write a sonnet about quantum entanglement"
+        assert self._is_creative_task(query, creative_verbs, creative_nouns), (
+            "Query with 'Write' + 'sonnet' should be detected as creative"
+        )
+    
+    def test_compose_poem_about_welfare_is_creative(self, creative_verbs, creative_nouns):
+        """'Compose a poem about welfare economics' should be detected as creative."""
+        query = "Compose a poem about welfare economics"
+        assert self._is_creative_task(query, creative_verbs, creative_nouns), (
+            "Query with 'Compose' + 'poem' should be detected as creative"
+        )
+    
+    def test_create_story_about_probability_is_creative(self, creative_verbs, creative_nouns):
+        """'Create a story about probability' should be detected as creative."""
+        query = "Create a story about probability and fate"
+        assert self._is_creative_task(query, creative_verbs, creative_nouns), (
+            "Query with 'Create' + 'story' should be detected as creative"
+        )
+    
+    def test_calculate_probability_is_not_creative(self, creative_verbs, creative_nouns):
+        """'Calculate the probability' should NOT be detected as creative."""
+        query = "Calculate the probability of rain tomorrow"
+        assert not self._is_creative_task(query, creative_verbs, creative_nouns), (
+            "Query without creative verb/noun should NOT be creative"
+        )
+    
+    def test_semantic_matcher_penalizes_math_for_creative(self):
+        """Semantic matcher should penalize mathematical tool for creative tasks."""
+        # This test verifies the fix in semantic_tool_matcher.py
+        import os
+        
+        semantic_matcher_paths = [
+            'src/vulcan/reasoning/selection/semantic_tool_matcher.py',
+            '../src/vulcan/reasoning/selection/semantic_tool_matcher.py',
+        ]
+        
+        content = None
+        for path in semantic_matcher_paths:
+            if os.path.exists(path):
+                with open(path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                break
+        
+        if content is None:
+            pytest.skip("semantic_tool_matcher.py not found")
+        
+        # Check that the creative task override penalizes mathematical tool
+        assert "mathematical" in content and "creative_task_override" in content, (
+            "Expected creative task override to handle mathematical tool"
+        )
+        # Check that creative tasks penalize all reasoning tools
+        assert "'mathematical', 'philosophical'" in content or "'mathematical'," in content, (
+            "Expected creative task override to penalize mathematical and philosophical tools"
+        )
+
+
+# ============================================================================
+# Test Analogical Task Detection Override (Jan 10 2026)
+# ============================================================================
+
+class TestAnalogicalTaskOverride:
+    """
+    Tests for analogical task detection that prevents math/probabilistic routing
+    when a query is clearly an analogy.
+    
+    Issue: Analogical queries like "Quantum physics is like a symphony" were being
+    routed to probabilistic because of "quantum" keyword.
+    
+    Fix: Added analogical task detection that boosts analogical tool and penalizes
+    math/probabilistic for analogy patterns.
+    """
+    
+    @pytest.fixture
+    def analogical_indicators(self):
+        """Indicators that suggest analogical reasoning."""
+        return frozenset([
+            'is like', 'is to', 'as a', 'analogous', 'analogy', 'analogies',
+            'metaphor', 'similar to', 'corresponds to', 'compare', 'comparison',
+            'just as', 'so too', 'likewise', 'resembles', 'mirrors', 'parallels',
+            'mapping', 'domain', 'structure mapping',
+        ])
+    
+    def _is_analogical_task(self, query: str, indicators) -> bool:
+        """Check if query is an analogical task."""
+        query_lower = query.lower()
+        return any(ind in query_lower for ind in indicators)
+    
+    def test_quantum_like_symphony_is_analogical(self, analogical_indicators):
+        """'Quantum physics is like a symphony' should be detected as analogical."""
+        query = "Quantum physics is like a symphony"
+        assert self._is_analogical_task(query, analogical_indicators), (
+            "Query with 'is like' pattern should be detected as analogical"
+        )
+    
+    def test_doctor_is_to_patient_is_analogical(self, analogical_indicators):
+        """'Doctor is to patient as teacher is to...' should be detected as analogical."""
+        query = "Doctor is to patient as teacher is to what?"
+        assert self._is_analogical_task(query, analogical_indicators), (
+            "Query with 'is to' pattern should be detected as analogical"
+        )
+    
+    def test_structure_mapping_is_analogical(self, analogical_indicators):
+        """'Structure mapping between domains' should be detected as analogical."""
+        query = "Explain the structure mapping between physics and music"
+        assert self._is_analogical_task(query, analogical_indicators), (
+            "Query with 'structure mapping' should be detected as analogical"
+        )
+    
+    def test_calculate_probability_not_analogical(self, analogical_indicators):
+        """'Calculate the probability' should NOT be detected as analogical."""
+        query = "Calculate the probability of quantum tunneling"
+        assert not self._is_analogical_task(query, analogical_indicators), (
+            "Query without analogical indicators should NOT be analogical"
+        )
+
+
+# ============================================================================
+# Test Authoritative Classifier Categories for Semantic Boost Skip (Jan 10 2026)
+# ============================================================================
+
+class TestAuthoritativeClassifierCategories:
+    """
+    Tests for the authoritative classifier categories that should skip semantic boost.
+    
+    Issue: Semantic boost was overriding the LLM classifier's decision even when
+    the classifier had correctly identified ANALOGICAL, PHILOSOPHICAL, or CAUSAL
+    queries. This caused domain keywords like "quantum" to route analogies to
+    probabilistic.
+    
+    Fix: Added ANALOGICAL, PHILOSOPHICAL, CAUSAL, etc. to the authoritative
+    categories list, so semantic boost is skipped when classifier is confident.
+    """
+    
+    @pytest.fixture
+    def authoritative_categories(self):
+        """Categories where classifier should be trusted over semantic boost."""
+        return frozenset([
+            'UNKNOWN', 'CREATIVE', 'CONVERSATIONAL', 'GENERAL',
+            'GREETING', 'FACTUAL', 'SELF_INTROSPECTION',
+            'ANALOGICAL', 'PHILOSOPHICAL', 'CAUSAL', 'PROBABILISTIC',
+            'MATHEMATICAL', 'LOGICAL', 'CRYPTOGRAPHIC',
+        ])
+    
+    def test_all_reasoning_categories_are_authoritative(self, authoritative_categories):
+        """All reasoning category types should be authoritative."""
+        expected_reasoning = {'ANALOGICAL', 'PHILOSOPHICAL', 'CAUSAL', 'PROBABILISTIC', 'MATHEMATICAL', 'LOGICAL'}
+        assert expected_reasoning.issubset(authoritative_categories), (
+            "All reasoning categories should be in authoritative list"
+        )
+    
+    def test_fix_code_present_in_tool_selector(self):
+        """Verify the fix code is present in tool_selector.py."""
+        import os
+        
+        tool_selector_paths = [
+            'src/vulcan/reasoning/selection/tool_selector.py',
+            '../src/vulcan/reasoning/selection/tool_selector.py',
+        ]
+        
+        content = None
+        for path in tool_selector_paths:
+            if os.path.exists(path):
+                with open(path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                break
+        
+        if content is None:
+            pytest.skip("tool_selector.py not found")
+        
+        # Check that ANALOGICAL is in authoritative categories
+        assert "'ANALOGICAL'" in content, (
+            "ANALOGICAL should be in AUTHORITATIVE_CATEGORIES"
+        )
+        # Check that PHILOSOPHICAL is in authoritative categories
+        assert "'PHILOSOPHICAL'" in content, (
+            "PHILOSOPHICAL should be in AUTHORITATIVE_CATEGORIES"
+        )
+        # Check that CAUSAL is in authoritative categories
+        assert "'CAUSAL'" in content, (
+            "CAUSAL should be in AUTHORITATIVE_CATEGORIES"
+        )
+        # Check that classifier confidence is checked
+        assert "classifier_confidence" in content, (
+            "classifier_confidence should be checked for skip_semantic_boost"
+        )

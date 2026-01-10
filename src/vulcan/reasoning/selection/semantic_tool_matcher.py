@@ -1341,6 +1341,33 @@ class SemanticToolMatcher:
                     f"quantifier+verb pattern suggests NLP parsing task: {query_lower[:50]}..."
                 )
         
+        # =====================================================================
+        # FIX: Analogical task detection to prevent math routing
+        # Problem: "Quantum physics is like..." analogical queries were routing to
+        #          probabilistic due to "quantum" keyword. But these are analogies.
+        # Fix: Detect analogical patterns that indicate reasoning by comparison/mapping.
+        # =====================================================================
+        ANALOGICAL_TASK_INDICATORS = {
+            'is like', 'is to', 'as a', 'analogous', 'analogy', 'analogies',
+            'metaphor', 'similar to', 'corresponds to', 'compare', 'comparison',
+            'just as', 'so too', 'likewise', 'resembles', 'mirrors', 'parallels',
+            'mapping', 'domain', 'structure mapping',
+        }
+        is_analogical_task = any(ind in query_lower for ind in ANALOGICAL_TASK_INDICATORS)
+        
+        # =====================================================================
+        # FIX: Philosophical/ethical task detection to prevent math routing
+        # Problem: Questions about "welfare optimization" might route to math instead
+        #          of philosophical when the context is ethical reasoning.
+        # Fix: Detect philosophical/ethical context that should override math routing.
+        # =====================================================================
+        PHILOSOPHICAL_CONTEXT_INDICATORS = {
+            'should', 'ought', 'ethical', 'moral', 'permissible', 'right or wrong',
+            'dilemma', 'trolley', 'virtue', 'justice', 'fairness', 'value',
+            'hedonism', 'utilitarian', 'deontological', 'thought experiment',
+        }
+        is_philosophical_context = sum(1 for ind in PHILOSOPHICAL_CONTEXT_INDICATORS if ind in query_lower) >= 2
+        
         if is_creative_task:
             logger.debug(
                 f"[SemanticToolMatcher] Note: Detected CREATIVE task - "
@@ -1351,6 +1378,18 @@ class SemanticToolMatcher:
             logger.debug(
                 f"[SemanticToolMatcher] Note: Detected MATHEMATICAL task - "
                 f"task type overrides ethical keywords for query: {query_lower[:50]}..."
+            )
+        
+        if is_analogical_task:
+            logger.debug(
+                f"[SemanticToolMatcher] FIX: Detected ANALOGICAL task - "
+                f"analogy pattern overrides domain keywords for query: {query_lower[:50]}..."
+            )
+        
+        if is_philosophical_context:
+            logger.debug(
+                f"[SemanticToolMatcher] FIX: Detected PHILOSOPHICAL context - "
+                f"ethical reasoning overrides math keywords for query: {query_lower[:50]}..."
             )
 
         # Note: Pre-compute query embedding ONCE before the tool loop
@@ -1403,14 +1442,16 @@ class SemanticToolMatcher:
             # =====================================================================
             # Note: Creative task type overrides domain-based routing
             # "Write a sonnet about quantum" should go to general/creative, not symbolic
+            # "Write a poem about welfare" should NOT route to philosophical/mathematical
             # =====================================================================
             if is_creative_task:
                 if tool_name == 'general':
                     # Boost general tool significantly for creative tasks
                     keyword_boost = max(keyword_boost, 0.7)
                     keyword_matches.append('creative_task_override')
-                elif tool_name in ('symbolic', 'probabilistic', 'causal'):
-                    # Penalize reasoning tools for creative tasks
+                elif tool_name in ('symbolic', 'probabilistic', 'causal', 'mathematical', 'philosophical'):
+                    # Penalize all reasoning tools for creative tasks - creative writing
+                    # should be handled by general LLM, not by reasoning engines
                     keyword_boost = max(0.0, keyword_boost - 0.4)
             
             # =====================================================================
@@ -1445,6 +1486,32 @@ class SemanticToolMatcher:
                     # Penalize symbolic for NLP tasks (unless it's a syllogism)
                     if 'mortal' not in query_lower and 'therefore' not in query_lower:
                         keyword_boost = max(0.0, keyword_boost - 0.3)
+            
+            # =====================================================================
+            # FIX: Analogical task overrides math/probabilistic routing
+            # "Quantum physics is like a symphony" should go to analogical, not probabilistic
+            # =====================================================================
+            if is_analogical_task:
+                if tool_name == 'analogical':
+                    # Boost analogical tool significantly for analogy tasks
+                    keyword_boost = max(keyword_boost, 0.7)
+                    keyword_matches.append('analogical_task_override')
+                elif tool_name in ('mathematical', 'probabilistic', 'symbolic'):
+                    # Penalize math/probabilistic for analogical queries
+                    keyword_boost = max(0.0, keyword_boost - 0.3)
+            
+            # =====================================================================
+            # FIX: Philosophical context overrides math routing
+            # "Welfare optimization" in ethical context should go to philosophical
+            # =====================================================================
+            if is_philosophical_context and not is_math_task:
+                # Only apply if user didn't explicitly request math computation
+                if tool_name == 'philosophical':
+                    keyword_boost = max(keyword_boost, 0.6)
+                    keyword_matches.append('philosophical_context_override')
+                elif tool_name == 'mathematical':
+                    # Penalize mathematical for philosophical queries
+                    keyword_boost = max(0.0, keyword_boost - 0.25)
 
             # 2. Embedding similarity (now uses pre-computed query embedding)
             similarity_score = 0.0

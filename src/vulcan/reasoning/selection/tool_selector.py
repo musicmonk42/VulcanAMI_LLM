@@ -4686,9 +4686,16 @@ class ToolSelector:
             
             # ================================================================
             # Note: Skip SemanticBoost if LLM classifier is authoritative
-            # When classifier identifies UNKNOWN, CREATIVE, CONVERSATIONAL, or GENERAL queries,
-            # its tool selection is authoritative and should not be overridden by
-            # semantic matching (which uses embeddings, not language understanding).
+            # When classifier identifies category with high confidence, its tool selection
+            # is authoritative and should not be overridden by semantic matching
+            # (which uses embeddings, not language understanding).
+            #
+            # FIX: Added ANALOGICAL, PHILOSOPHICAL, CAUSAL categories to prevent
+            # semantic boost from overriding the classifier's decision. The classifier
+            # uses keyword patterns and language understanding to identify these categories,
+            # which is more reliable than embedding similarity for distinguishing between:
+            # - "Quantum physics is like a symphony" (ANALOGICAL - uses "quantum" but is analogy)
+            # - "Calculate quantum probability" (PROBABILISTIC - actual math query)
             # ================================================================
             skip_semantic_boost = False
             classifier_category = None
@@ -4697,23 +4704,41 @@ class ToolSelector:
                 classifier_category = request.context.get('classifier_category')
                 classifier_is_authoritative = request.context.get('classifier_is_authoritative', False)
                 prevent_router_override = request.context.get('prevent_router_tool_override', False)
+                classifier_confidence = request.context.get('classifier_confidence', 0.0)
                 
                 # For these categories, the LLM's language understanding is more reliable
                 # than semantic embedding similarity. Normalize to uppercase for comparison.
+                # FIX: Added ANALOGICAL, PHILOSOPHICAL, CAUSAL, PROBABILISTIC to prevent
+                # domain keywords (quantum, welfare) from overriding correct classification.
                 AUTHORITATIVE_CATEGORIES = frozenset([
                     'UNKNOWN', 'CREATIVE', 'CONVERSATIONAL', 'GENERAL',
-                    'GREETING', 'FACTUAL',
+                    'GREETING', 'FACTUAL', 'SELF_INTROSPECTION',
+                    # FIX: These categories should also be authoritative when classifier is confident
+                    'ANALOGICAL', 'PHILOSOPHICAL', 'CAUSAL', 'PROBABILISTIC',
+                    'MATHEMATICAL', 'LOGICAL', 'CRYPTOGRAPHIC',
                 ])
                 
                 # Normalize category to uppercase for comparison
                 category_upper = classifier_category.upper() if classifier_category else None
                 
-                if category_upper in AUTHORITATIVE_CATEGORIES or classifier_is_authoritative or prevent_router_override:
+                # Skip semantic boost if:
+                # 1. Category is in authoritative list, OR
+                # 2. Classifier explicitly marked as authoritative, OR
+                # 3. Router override is prevented, OR
+                # 4. Classifier confidence is high (>= 0.8)
+                should_skip = (
+                    category_upper in AUTHORITATIVE_CATEGORIES or
+                    classifier_is_authoritative or
+                    prevent_router_override or
+                    classifier_confidence >= 0.8
+                )
+                
+                if should_skip:
                     skip_semantic_boost = True
                     prior_context['skip_semantic_boost'] = True
                     logger.info(
                         f"[ToolSelector] Skipping SemanticBoost: LLM classifier is authoritative "
-                        f"for category={classifier_category}"
+                        f"for category={classifier_category} (confidence={classifier_confidence:.2f})"
                     )
             
             # Extract query text from problem for semantic matching (if not skipping)
