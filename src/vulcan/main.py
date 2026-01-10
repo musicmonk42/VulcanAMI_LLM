@@ -6605,16 +6605,34 @@ async def unified_chat(request: UnifiedChatRequest):
         if agent_reasoning_output:
             # Add agent-based reasoning as a distinct category (merges with existing results)
             # Note: Use helper to handle both dict and ReasoningResult objects
+            extracted_conclusion = _get_reasoning_attr(agent_reasoning_output, "conclusion")
+            extracted_confidence = _get_reasoning_attr(agent_reasoning_output, "confidence")
+            extracted_type = _get_reasoning_attr(agent_reasoning_output, "reasoning_type")
+            extracted_explanation = _get_reasoning_attr(agent_reasoning_output, "explanation")
+            
             reasoning_results["agent_reasoning"] = {
-                "conclusion": _get_reasoning_attr(agent_reasoning_output, "conclusion"),
-                "confidence": _get_reasoning_attr(agent_reasoning_output, "confidence"),
-                "reasoning_type": _get_reasoning_attr(agent_reasoning_output, "reasoning_type"),
-                "explanation": _get_reasoning_attr(agent_reasoning_output, "explanation"),
+                "conclusion": extracted_conclusion,
+                "confidence": extracted_confidence,
+                "reasoning_type": extracted_type,
+                "explanation": extracted_explanation,
             }
+            
+            # CRITICAL LOGGING: Trace content extraction
+            conclusion_preview = str(extracted_conclusion)[:100] if extracted_conclusion else "None"
             logger.info(
                 f"[VULCAN/v1/chat] Agent reasoning injected into context: "
-                f"type={_get_reasoning_attr(agent_reasoning_output, 'reasoning_type')}"
+                f"type={extracted_type}, confidence={extracted_confidence}, "
+                f"has_conclusion={extracted_conclusion is not None}, "
+                f"conclusion_preview='{conclusion_preview}'"
             )
+            
+            # CRITICAL FIX: Warn if we have high confidence but no conclusion
+            if extracted_confidence is not None and extracted_confidence >= 0.5 and extracted_conclusion is None:
+                logger.warning(
+                    f"[VULCAN/v1/chat] BUG DETECTED: Agent reasoning has high confidence "
+                    f"({extracted_confidence:.2f}) but conclusion is None! This indicates content loss. "
+                    f"agent_reasoning_output_type={type(agent_reasoning_output).__name__}"
+                )
             
             # BUG #3 FIX: Notify world model of engine result
             # This makes the world model aware of reasoning engine outcomes
@@ -6742,11 +6760,23 @@ async def unified_chat(request: UnifiedChatRequest):
                         reasoning_results["direct_reasoning"] = direct_reasoning_output
                         systems_used.append("world_model_reasoning")
                         
+                        # CRITICAL LOGGING: Trace content extraction
+                        conclusion_preview = str(wm_conclusion)[:100] if wm_conclusion else "None"
                         logger.info(
                             f"[VULCAN/v1/chat] Using world_model result directly: "
                             f"type={wm_reasoning_type}, confidence={integration_result.confidence:.2f}, "
-                            f"conclusion_len={len(str(wm_conclusion)) if wm_conclusion else 0}"
+                            f"has_conclusion={wm_conclusion is not None}, "
+                            f"conclusion_preview='{conclusion_preview}'"
                         )
+                        
+                        # CRITICAL FIX: Warn if we have high confidence but no conclusion
+                        if integration_result.confidence >= 0.5 and wm_conclusion is None:
+                            logger.warning(
+                                f"[VULCAN/v1/chat] BUG DETECTED: World model has high confidence "
+                                f"({integration_result.confidence:.2f}) but conclusion is None! "
+                                f"This indicates content loss in world_model → reasoning_integration path. "
+                                f"integration_result_metadata_keys={list(integration_result.metadata.keys()) if integration_result.metadata else []}"
+                            )
                     else:
                         # No world_model result - proceed with unified reasoner
                         # Invoke actual reasoning engine
@@ -6849,6 +6879,14 @@ async def unified_chat(request: UnifiedChatRequest):
             direct = reasoning_results.get("direct_reasoning", {})
             direct_confidence = direct.get("confidence", 0.0) if isinstance(direct, dict) else 0.0
             direct_conclusion = direct.get("conclusion") if isinstance(direct, dict) else None
+            
+            # CRITICAL LOGGING: Log what we extracted from each source
+            logger.info(
+                f"[VULCAN/v1/chat] Reasoning results extraction: "
+                f"unified(conf={unified_confidence:.2f}, has_conclusion={unified_conclusion is not None}), "
+                f"agent(conf={agent_confidence:.2f}, has_conclusion={agent_conclusion is not None}), "
+                f"direct(conf={direct_confidence:.2f}, has_conclusion={direct_conclusion is not None})"
+            )
             
             # Find best reasoning result
             best_confidence = max(unified_confidence, agent_confidence, direct_confidence)
