@@ -185,23 +185,89 @@ class UpdateDependencyGraph:
     def get_execution_order(
         self, required_updates: Set[UpdateType]
     ) -> List[List[UpdateType]]:
-        """Get execution order respecting dependencies"""
+        """Get execution order respecting dependencies.
+        
+        FIX #10: Only check for dependencies that are IN the required_updates set.
+        Previously, if STRUCTURAL was requested but its dependencies (CAUSAL, INVARIANT)
+        weren't also requested AND their dependencies weren't satisfied, the algorithm
+        would fail with "Cannot resolve dependencies".
+        
+        Now: Only consider dependencies that are part of the requested update set.
+        Dependencies outside the set are assumed to be already satisfied or not needed.
+        
+        Args:
+            required_updates: Set of UpdateType values to execute
+            
+        Returns:
+            List of update groups, each group can run in parallel
+        """
         executed = set()
         execution_groups = []
 
         remaining = required_updates.copy()
+        
+        # Track iteration count to prevent infinite loops
+        max_iterations = len(remaining) * 2 + 1
+        iteration_count = 0
 
         while remaining:
+            iteration_count += 1
+            if iteration_count > max_iterations:
+                # Safety limit reached - return what we have in safe order
+                logger.warning(
+                    f"[DependencyGraph] Reached iteration limit resolving {remaining}. "
+                    "Using fallback order."
+                )
+                # Return remaining items in a deterministic order as single-item groups
+                for update in sorted(remaining, key=lambda x: x.value):
+                    execution_groups.append([update])
+                break
+            
             # Find updates whose dependencies are satisfied
+            # FIX: Only check dependencies that are IN the required_updates set
             ready = []
             for update in remaining:
                 deps = self.get_dependencies(update)
-                if deps.issubset(executed):
+                # Only consider deps that are part of required_updates
+                relevant_deps = deps.intersection(required_updates)
+                if relevant_deps.issubset(executed):
                     ready.append(update)
 
             if not ready:
                 # Circular dependency or error
-                logger.error(f"Cannot resolve dependencies for {remaining}")
+                # FIX: Instead of just logging and breaking, provide a fallback order
+                logger.warning(
+                    f"[DependencyGraph] Cannot resolve dependencies for {remaining}. "
+                    "This may indicate circular dependencies or missing prerequisites. "
+                    "Using fallback: STRUCTURAL → CAUSAL → INVARIANT order."
+                )
+                
+                # Fallback: return remaining in a safe, deterministic order
+                # Priority order based on typical dependency chain:
+                # 1. Things with no dependencies first
+                # 2. Then intermediate dependencies
+                # 3. Then things that depend on everything else
+                fallback_order = [
+                    UpdateType.INTERVENTION,
+                    UpdateType.CORRELATION,
+                    UpdateType.DYNAMICS,
+                    UpdateType.CONFIDENCE,
+                    UpdateType.DISTRIBUTION,
+                    UpdateType.CAUSAL,
+                    UpdateType.INVARIANT,
+                    UpdateType.STRUCTURAL,
+                ]
+                
+                for update in fallback_order:
+                    if update in remaining:
+                        execution_groups.append([update])
+                        remaining.discard(update)
+                
+                # Any remaining updates not in fallback_order
+                for update in list(remaining):
+                    execution_groups.append([update])
+                    remaining.discard(update)
+                
                 break
 
             # Group updates that can run in parallel

@@ -143,6 +143,11 @@ def _is_result_not_applicable(result) -> bool:
     (e.g., probabilistic reasoner on a philosophical query), it should be
     excluded from the ensemble calculation rather than dragging down confidence.
     
+    ENHANCED: Now also checks for:
+    - "uninformative" reason in metadata/conclusion
+    - 50/50 probability (0.5 confidence with "uninformative" indicator)
+    - Very low confidence (< 0.15) with non-UNKNOWN type
+    
     Args:
         result: ReasoningResult to check (using Any type to avoid circular imports)
         
@@ -158,6 +163,11 @@ def _is_result_not_applicable(result) -> bool:
             return True
         if result.conclusion.get("applicable") is False:
             return True
+        # ENHANCED: Check for "uninformative" reason in conclusion
+        if result.conclusion.get("reason") == "uninformative":
+            return True
+        if result.conclusion.get("uninformative", False):
+            return True
     
     # Check metadata for uninformative/failed indicators
     if hasattr(result, "metadata") and isinstance(result.metadata, dict):
@@ -167,6 +177,9 @@ def _is_result_not_applicable(result) -> bool:
             return True
         if result.metadata.get("methodology_check") == "failed":
             return True
+        # ENHANCED: Check for "reason: uninformative" in metadata
+        if result.metadata.get("reason") == "uninformative":
+            return True
     
     # Confidence of 0.0 with specific explanations indicates inapplicability
     if result.confidence == 0.0:
@@ -174,6 +187,26 @@ def _is_result_not_applicable(result) -> bool:
         for phrase in INAPPLICABILITY_EXPLANATION_PHRASES:
             if phrase in explanation_lower:
                 return True
+    
+    # ENHANCED: 50/50 probability (0.5 confidence) often indicates "uninformative"
+    # This is the probabilistic equivalent of "I don't know"
+    # Only mark as not applicable if there's an additional indicator
+    if result.confidence == 0.5:
+        explanation_lower = (result.explanation or "").lower()
+        if any(phrase in explanation_lower for phrase in ["uninformative", "50/50", "no data", "cannot determine"]):
+            return True
+    
+    # ENHANCED: Very low confidence (< 0.15) with non-UNKNOWN type indicates
+    # the reasoner tried but couldn't contribute meaningfully
+    # Exclude from ensemble to prevent dragging down better results
+    if result.confidence < 0.15:
+        reasoning_type = getattr(result, 'reasoning_type', None)
+        if reasoning_type and reasoning_type != ReasoningType.UNKNOWN:
+            logger.debug(
+                f"[_is_result_not_applicable] Marking result as not applicable: "
+                f"very low confidence ({result.confidence:.2f}) for {reasoning_type}"
+            )
+            return True
     
     return False
 
@@ -3259,37 +3292,84 @@ class UnifiedReasoner:
                 # ==============================================================================
                 # FIX Issue B: Handle PHILOSOPHICAL reasoning type
                 # ==============================================================================
-                # PHILOSOPHICAL type should route to World Model (via SYMBOLIC reasoner)
-                # or use a dedicated philosophical reasoning approach. Previously, this would
-                # hit the "else" branch and return empty result with 10% confidence, even
-                # when World Model returned 80%+ confidence for philosophical queries.
+                # PHILOSOPHICAL type should route to World Model for ethical reasoning.
+                # The World Model has dedicated philosophical_reasoning() method with:
+                # - Multi-framework ethical analysis (deontological, utilitarian, virtue ethics)
+                # - GoalConflictDetector for dilemma analysis
+                # - InternalCritic for multi-framework evaluation
+                #
+                # CRITICAL: Do NOT route to SYMBOLIC reasoner - that's a SAT solver which will
+                # fail on philosophical queries with parse errors.
                 # ==============================================================================
                 logger.info(
                     f"[UnifiedReasoner] FIX Issue B: PHILOSOPHICAL type detected for task {task.task_id}, "
-                    "routing to SYMBOLIC reasoner (World Model pathway)"
+                    "routing to World Model for ethical reasoning"
                 )
                 
-                # Try SYMBOLIC first (World Model route)
-                if ReasoningType.SYMBOLIC in self.reasoners:
-                    fallback_task = ReasoningTask(
-                        task_id=task.task_id,
-                        task_type=ReasoningType.SYMBOLIC,
-                        input_data=task.input_data,
-                        query=task.query,
-                        constraints=task.constraints,
-                        utility_context=task.utility_context,
-                    )
-                    result = self._execute_reasoner(
-                        self.reasoners[ReasoningType.SYMBOLIC], fallback_task
-                    )
-                    # Update result to reflect PHILOSOPHICAL reasoning type
-                    result.reasoning_type = ReasoningType.PHILOSOPHICAL
-                    return result
+                # Try to get World Model for philosophical reasoning
+                world_model = None
+                try:
+                    # Try singleton pattern first
+                    from vulcan.reasoning.singletons import get_world_model
+                    world_model = get_world_model()
+                except ImportError:
+                    logger.debug("World Model singleton not available")
+                except Exception as e:
+                    logger.debug(f"Failed to get World Model from singleton: {e}")
                 
-                # Fallback to PROBABILISTIC if SYMBOLIC not available
+                # Fallback: try to import directly
+                if world_model is None:
+                    try:
+                        from vulcan.world_model.world_model_core import WorldModel
+                        world_model = WorldModel()
+                    except ImportError:
+                        logger.debug("WorldModel not available for direct import")
+                    except Exception as e:
+                        logger.debug(f"Failed to instantiate WorldModel: {e}")
+                
+                # If we have World Model, use it for philosophical reasoning
+                if world_model is not None and hasattr(world_model, 'reason'):
+                    try:
+                        # Extract query string
+                        if isinstance(task.input_data, str):
+                            query_str = task.input_data
+                        elif isinstance(task.input_data, dict):
+                            query_str = task.input_data.get('query') or task.input_data.get('text') or str(task.input_data)
+                        elif isinstance(task.query, dict):
+                            query_str = task.query.get('query') or task.query.get('text') or str(task.query)
+                        else:
+                            query_str = str(task.query) if task.query else str(task.input_data)
+                        
+                        # Call World Model with philosophical mode
+                        wm_result = world_model.reason(query_str, mode='philosophical')
+                        
+                        if isinstance(wm_result, dict):
+                            return ReasoningResult(
+                                conclusion=wm_result.get('response', wm_result),
+                                confidence=max(0.35, wm_result.get('confidence', 0.80)),
+                                reasoning_type=ReasoningType.PHILOSOPHICAL,
+                                explanation=f"Philosophical reasoning via World Model",
+                                metadata={
+                                    'reasoning_trace': wm_result.get('reasoning_trace', {}),
+                                    'mode': 'philosophical',
+                                    'source': 'world_model'
+                                }
+                            )
+                        else:
+                            return ReasoningResult(
+                                conclusion=wm_result,
+                                confidence=0.80,
+                                reasoning_type=ReasoningType.PHILOSOPHICAL,
+                                explanation="Philosophical reasoning via World Model"
+                            )
+                    except Exception as e:
+                        logger.warning(f"World Model philosophical reasoning failed: {e}")
+                
+                # Fallback: Use PROBABILISTIC reasoner with philosophical framing
+                # Note: Do NOT use SYMBOLIC - that's a SAT solver which fails on philosophical queries
                 if ReasoningType.PROBABILISTIC in self.reasoners:
                     logger.warning(
-                        "[UnifiedReasoner] SYMBOLIC not available for PHILOSOPHICAL, "
+                        "[UnifiedReasoner] World Model not available for PHILOSOPHICAL, "
                         "falling back to PROBABILISTIC"
                     )
                     fallback_task = ReasoningTask(

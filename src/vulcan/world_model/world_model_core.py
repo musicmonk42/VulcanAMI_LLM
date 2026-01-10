@@ -575,10 +575,26 @@ class ObservationProcessor:
                     return False, f"Variable {var_name} failed validation"
 
         # Check for NaN or infinite values
+        # FIX: Only check numeric types to avoid "ufunc 'isnan' not supported" error
         for var_name, value in observation.variables.items():
+            # Only check for NaN/inf on numeric types (int, float, np.number)
             if isinstance(value, (int, float)):
-                if np.isnan(value) or np.isinf(value):
-                    return False, f"Variable {var_name} has invalid numeric value"
+                try:
+                    if np.isnan(value) or np.isinf(value):
+                        return False, f"Variable {var_name} has invalid numeric value"
+                except (TypeError, ValueError):
+                    # Can't check NaN on this type - skip
+                    pass
+            elif isinstance(value, np.ndarray):
+                # For arrays, check if it's a numeric dtype before calling isnan
+                if np.issubdtype(value.dtype, np.number):
+                    try:
+                        if np.any(np.isnan(value)) or np.any(np.isinf(value)):
+                            return False, f"Variable {var_name} has invalid numeric values in array"
+                    except (TypeError, ValueError):
+                        # Can't check NaN on this array type - skip
+                        pass
+            # For non-numeric types (strings, objects, etc.), skip NaN check
 
         # Safety validation
         if self.safety_validator:

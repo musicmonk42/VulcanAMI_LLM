@@ -170,16 +170,21 @@ class ContinualLearner:
         This method is called by the UnifiedLearningSystem when an outcome
         is recorded via the OutcomeBridge.
         
+        FIX #8: Now properly penalizes tools for failures (timeout, safety_filtered,
+        low_confidence) instead of rewarding all outcomes equally.
+        
         Args:
             outcome: Dictionary containing query outcome data:
                 - query_id: Unique query identifier
-                - status: Query status ("success", "error", "timeout")
+                - status: Query status ("success", "error", "timeout", "safety_filtered")
                 - routing_ms: Time spent routing
                 - total_ms: Total processing time
                 - complexity: Query complexity score
                 - query_type: Type of query
                 - tools: List of tools used
                 - timestamp: Time of the outcome
+                - confidence: Result confidence (optional)
+                - quality: Result quality ("good", "poor", "failed") (optional)
         """
         query_id = outcome.get('query_id', 'unknown')
         logger.info(f"[ContinualLearner] Learning from: {query_id}")
@@ -187,12 +192,75 @@ class ContinualLearner:
         # Track tool success rates
         tools = outcome.get('tools', [])
         status = outcome.get('status', 'unknown')
+        confidence = outcome.get('confidence', 0.5)
+        quality = outcome.get('quality', 'unknown')
+        
         for tool in tools:
             if tool not in self.tool_success_rates:
                 self.tool_success_rates[tool] = {'success': 0, 'total': 0}
             self.tool_success_rates[tool]['total'] += 1
             if status == 'success':
                 self.tool_success_rates[tool]['success'] += 1
+        
+        # =================================================================
+        # FIX #8: Update tool weights based on actual outcome quality
+        # =================================================================
+        # Previously: All outcomes were treated equally, even failures.
+        # Now: Penalize tools for failures, reward for successes.
+        # =================================================================
+        try:
+            # Import weight manager for tool weight adjustments
+            from vulcan.reasoning.unified_reasoning import get_weight_manager
+            weight_manager = get_weight_manager()
+            
+            for tool in tools:
+                adjustment = 0.0
+                
+                # Determine weight adjustment based on outcome
+                if status == 'safety_filtered':
+                    # PENALIZE for safety filtering
+                    adjustment = -0.005
+                    logger.info(f"[ContinualLearner] Tool {tool} penalized for safety filtering")
+                    
+                elif status == 'timeout':
+                    # PENALIZE for timeout
+                    adjustment = -0.010
+                    logger.info(f"[ContinualLearner] Tool {tool} penalized for timeout")
+                    
+                elif status == 'error':
+                    # PENALIZE for errors
+                    adjustment = -0.010
+                    logger.info(f"[ContinualLearner] Tool {tool} penalized for error")
+                    
+                elif quality == 'failed':
+                    # PENALIZE for failed quality
+                    adjustment = -0.010
+                    logger.info(f"[ContinualLearner] Tool {tool} penalized for failed quality")
+                    
+                elif status == 'low_confidence' or confidence < 0.3:
+                    # PENALIZE for low confidence
+                    adjustment = -0.003
+                    logger.info(f"[ContinualLearner] Tool {tool} penalized for low confidence")
+                    
+                elif status == 'success' and (quality == 'good' or confidence >= 0.70):
+                    # REWARD for good success
+                    adjustment = +0.010
+                    logger.info(f"[ContinualLearner] Tool {tool} rewarded for good result")
+                    
+                elif status == 'success' and confidence >= 0.50:
+                    # Moderate reward for moderate success
+                    adjustment = +0.005
+                    logger.info(f"[ContinualLearner] Tool {tool} moderately rewarded")
+                    
+                # No adjustment for mediocre results (keeps weight stable)
+                
+                if adjustment != 0.0:
+                    weight_manager.adjust_weight(tool, adjustment)
+                    
+        except ImportError:
+            logger.debug("[ContinualLearner] Weight manager not available for weight updates")
+        except Exception as e:
+            logger.warning(f"[ContinualLearner] Failed to update tool weights: {e}")
         
         # Detect slow routing patterns
         routing_ms = outcome.get('routing_ms', 0)
