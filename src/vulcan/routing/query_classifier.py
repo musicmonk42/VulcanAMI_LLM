@@ -603,13 +603,13 @@ CREATIVE_WITH_INTROSPECTIVE_THEME_PATTERNS: Tuple[re.Pattern, ...] = (
     re.compile(r"^write\s+(me\s+)?(a\s+)?essay\b", re.IGNORECASE),
     re.compile(r"^compose\s+(me\s+)?(a\s+)?poem\b", re.IGNORECASE),
     re.compile(r"^create\s+(me\s+)?(a\s+)?poem\b", re.IGNORECASE),
-    # "poem about the minute you become self-aware" (anywhere in query)
-    re.compile(r"\bpoem\b.*\b(self-?aware|conscious|sentient|aware)\b", re.IGNORECASE),
-    re.compile(r"\bstory\b.*\b(self-?aware|conscious|sentient|aware)\b", re.IGNORECASE),
-    re.compile(r"\bessay\b.*\b(self-?aware|conscious|sentient|aware)\b", re.IGNORECASE),
-    # Creative about AI consciousness themes
-    re.compile(r"\b(write|compose|create|draft)\b.*\b(self-?aware|conscious|sentient)\b", re.IGNORECASE),
-    re.compile(r"\b(self-?aware|conscious|sentient)\b.*\b(poem|story|essay|song|narrative)\b", re.IGNORECASE),
+    # Consolidated pattern: "[creative type] about [AI themes]" (anywhere in query)
+    # Matches: "poem about self-awareness", "story about consciousness", etc.
+    re.compile(r"\b(poem|story|essay)\b.*\b(self-?aware|conscious|sentient|aware)\b", re.IGNORECASE),
+    # Creative verbs with AI consciousness themes (consistent with above - includes 'aware')
+    re.compile(r"\b(write|compose|create|draft)\b.*\b(self-?aware|conscious|sentient|aware)\b", re.IGNORECASE),
+    # Reverse order: AI themes followed by creative type
+    re.compile(r"\b(self-?aware|conscious|sentient|aware)\b.*\b(poem|story|essay|song|narrative)\b", re.IGNORECASE),
 )
 
 # Conversational patterns - complexity 0.1, skip reasoning
