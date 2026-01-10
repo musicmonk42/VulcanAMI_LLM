@@ -1250,6 +1250,9 @@ class ReasoningIntegration:
             is_self_ref = self._is_self_referential(query)
             is_ethical = self._is_ethical_query(query)
             
+            # Initialize wm_result to None - will be populated if world_model is consulted
+            wm_result = None
+            
             if is_self_ref or is_ethical:
                 # Handle overlap: prioritize self-referential if both
                 query_type_label = 'self-referential' if is_self_ref else 'ethical'
@@ -2250,6 +2253,7 @@ class ReasoningIntegration:
         
         # ======================================================================
         # FIX (Jan 10 2026): Propagate self_referential flag from context
+        # BUG FIX: Also propagate world_model result content when ToolSelector unavailable
         # ======================================================================
         # When LLM classifier identifies a query as SELF_INTROSPECTION, it sets
         # context['is_self_introspection'] = True. This flag needs to be propagated
@@ -2259,6 +2263,11 @@ class ReasoningIntegration:
         # Without this fix, world_model results with 0.90 confidence were being
         # overridden by UnifiedReasoner (which falls back to probabilistic 0.0)
         # because agent_pool.py checks metadata.get("self_referential", False).
+        #
+        # CRITICAL BUG FIX (Jan 10 2026): When ToolSelector is unavailable (missing numpy),
+        # the world_model response was being lost even though _consult_world_model_introspection()
+        # was called and returned a result. The fallback path would suggest world_model tools
+        # but wouldn't include the actual response content. This caused "confidence without conclusion" bugs.
         # ======================================================================
         if context:
             if context.get('is_self_introspection'):
@@ -2266,9 +2275,9 @@ class ReasoningIntegration:
                 # Also check if world_model tool is selected - if so, include response
                 if "world_model" in selected_tools:
                     result_metadata["ethical_query"] = context.get('is_ethical_query', False)
-                    # Include world_model response content for downstream use
-                    # selection_result is the SelectionResult from tool_selector
-                    # which contains execution_result with the actual world_model response
+                    
+                    # Try to extract from selection_result first (when ToolSelector available)
+                    world_model_content_added = False
                     if selection_result is not None and hasattr(selection_result, 'execution_result'):
                         exec_result = selection_result.execution_result
                         if isinstance(exec_result, dict):
@@ -2277,11 +2286,37 @@ class ReasoningIntegration:
                             if wm_response:
                                 result_metadata["world_model_response"] = wm_response
                                 result_metadata["conclusion"] = wm_response.get('response', '') if isinstance(wm_response, dict) else str(wm_response)
+                                world_model_content_added = True
                             result_metadata["aspect"] = exec_result.get('aspect', 'general')
-                    logger.info(
-                        f"{LOG_PREFIX} FIX: Propagated self_referential=True to metadata "
-                        f"for world_model result (confidence={confidence:.2f})"
-                    )
+                    
+                    # CRITICAL FIX: If selection_result is None (ToolSelector unavailable),
+                    # check if we have a world_model result from earlier _consult_world_model_introspection() call
+                    if not world_model_content_added and wm_result is not None:
+                        # wm_result is from _consult_world_model_introspection() at line 1259
+                        # It has the format: {response, confidence, reasoning, aspect}
+                        world_model_response = wm_result.get('response', '')
+                        if world_model_response:
+                            result_metadata["world_model_response"] = world_model_response
+                            result_metadata["conclusion"] = world_model_response
+                            result_metadata["explanation"] = wm_result.get('reasoning', '')
+                            result_metadata["aspect"] = wm_result.get('aspect', 'general')
+                            world_model_content_added = True
+                            logger.info(
+                                f"{LOG_PREFIX} CRITICAL FIX: Extracted world_model content from wm_result "
+                                f"(fallback path, ToolSelector unavailable). Content length: {len(str(world_model_response))}"
+                            )
+                    
+                    if world_model_content_added:
+                        logger.info(
+                            f"{LOG_PREFIX} FIX: Propagated self_referential=True with world_model content to metadata "
+                            f"(confidence={confidence:.2f})"
+                        )
+                    else:
+                        logger.warning(
+                            f"{LOG_PREFIX} WARNING: world_model selected but no content available in metadata! "
+                            f"This will cause 'high confidence without conclusion' bug. "
+                            f"selection_result={selection_result is not None}, wm_result_available={'wm_result' in locals()}"
+                        )
             # Also propagate ethical_query flag if set
             elif context.get('is_ethical_query'):
                 result_metadata["ethical_query"] = True
