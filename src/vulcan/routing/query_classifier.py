@@ -1514,6 +1514,44 @@ class QueryClassifier:
             )
         
         # =====================================================================
+        # BUG #5 FIX: ANALOGICAL should take priority when explicit domain mapping requested
+        # =====================================================================
+        # Queries like "Map Domain S (software) to Domain T (biology)" should be
+        # routed to analogical reasoning, even if they contain keywords that might
+        # trigger other categories (like "domain", "control", "competing").
+        #
+        # Priority check: If both "domain s" and "domain t" are mentioned, OR
+        # if "structure mapping" is explicitly requested, route to ANALOGICAL.
+        if re.search(r'domain\s+[st].*domain\s+[st]', query_lower, re.IGNORECASE):
+            logger.info(
+                f"[QueryClassifier] BUG #5 FIX: Explicit domain mapping (S/T) detected - "
+                f"routing to ANALOGICAL"
+            )
+            return QueryClassification(
+                category=QueryCategory.ANALOGICAL.value,
+                complexity=0.6,
+                suggested_tools=["analogical"],
+                skip_reasoning=False,
+                confidence=0.95,  # High confidence for explicit domain mapping
+                source="explicit_domain_mapping",
+            )
+        
+        # BUG #5 FIX: Check for structure mapping patterns
+        if 'map.*structure' in query_lower or 'structure.*mapping' in query_lower:
+            logger.info(
+                f"[QueryClassifier] BUG #5 FIX: Structure mapping pattern detected - "
+                f"routing to ANALOGICAL"
+            )
+            return QueryClassification(
+                category=QueryCategory.ANALOGICAL.value,
+                complexity=0.6,
+                suggested_tools=["analogical"],
+                skip_reasoning=False,
+                confidence=0.95,
+                source="structure_mapping",
+            )
+        
+        # =====================================================================
         # ISSUE #5 FIX: Check analogical indicators BEFORE mathematical
         # =====================================================================
         # Problem: Analogical queries like "Software development is like biological
@@ -1544,6 +1582,36 @@ class QueryClassifier:
         
         # Check mathematical indicators
         math_count = sum(1 for kw in MATHEMATICAL_KEYWORDS if kw in query_lower)
+        
+        # =====================================================================
+        # BUG #9 FIX: Check for CONSTRAINT SATISFACTION / GRID NAVIGATION
+        # =====================================================================
+        # Queries about robot navigation, pathfinding, grid problems should NOT
+        # be classified as philosophical even if they contain "constraints", "safety", "rules".
+        # These are constraint satisfaction problems (CSP) that should route to
+        # MATHEMATICAL or SYMBOLIC reasoning.
+        grid_patterns = [
+            r'\bgrid\b', r'\bnavigate\b', r'\bpath\b', r'\breachable\b', r'\bmoves?\b',
+            r'up\s*/\s*down\s*/\s*left\s*/\s*right',
+            r'coordinates?', r'\(\s*\d+\s*,\s*\d+\s*\)',  # (x, y) notation
+            r'\brobot\b.*\bmove\b', r'\brobot\b.*\bposition\b',
+            r'\bred\s+zones?\b', r'\bobstacles?\b', r'\bblocked\b',
+        ]
+        has_grid_pattern = any(re.search(p, query_lower) for p in grid_patterns)
+        
+        if has_grid_pattern:
+            logger.info(
+                f"[QueryClassifier] BUG #9 FIX: Grid navigation/CSP detected - "
+                f"routing to MATHEMATICAL (constraint satisfaction)"
+            )
+            return QueryClassification(
+                category=QueryCategory.MATHEMATICAL.value,
+                complexity=0.5,
+                suggested_tools=["mathematical", "symbolic"],
+                skip_reasoning=False,
+                confidence=0.90,
+                source="grid_navigation_csp",
+            )
         
         # =====================================================================
         # Note: Check for mathematical SYMBOLS first

@@ -347,8 +347,19 @@ class PortfolioExecutor:
 
         try:
             if not monitor:
+                # BUG #6 FIX: Increase timeout for philosophical tools
+                # Philosophical reasoning takes longer (15-20s) than the default 5s timeout
+                time_budget = constraints.get("time_budget_ms", 5000)
+                if any(tool in ['philosophical', 'world_model'] for tool in tool_names):
+                    # Use higher timeout for philosophical/world_model tools
+                    time_budget = max(time_budget, 30000)  # BUG #6 FIX: 30 second timeout
+                    logger.info(
+                        f"[PortfolioExecutor] BUG #6 FIX: Using extended timeout "
+                        f"({time_budget}ms) for philosophical reasoning"
+                    )
+                
                 monitor = ExecutionMonitor(
-                    constraints.get("time_budget_ms", 5000),
+                    time_budget,
                     constraints.get("energy_budget_mj", 1000),
                     constraints.get("min_confidence", 0.5),
                 )

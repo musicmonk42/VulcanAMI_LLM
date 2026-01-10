@@ -531,13 +531,22 @@ class CodeTemplates:
     def integration(expression: str = "x**2", variable: str = "x", 
                    bounds: Optional[Tuple[str, str]] = None) -> str:
         """Generate integration code."""
+        # BUG #8 FIX: Define common variables in preamble
+        # When processing queries with mathematical components (integral ∫u(t)²dt),
+        # ensure all variables are defined to avoid "name 'x' is not defined" errors
         if bounds:
             return f"""# Definite Integration
+# BUG #8 FIX: Define common variables
+x, t, u, E = symbols('x t u E')
+E_safe = Symbol('E_safe', positive=True)
 {variable} = Symbol('{variable}')
 f = {expression}
 result = integrate(f, ({variable}, {bounds[0]}, {bounds[1]}))
 """
         return f"""# Indefinite Integration
+# BUG #8 FIX: Define common variables
+x, t, u, E = symbols('x t u E')
+E_safe = Symbol('E_safe', positive=True)
 {variable} = Symbol('{variable}')
 f = {expression}
 result = integrate(f, {variable})
