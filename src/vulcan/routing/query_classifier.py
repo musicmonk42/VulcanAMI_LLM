@@ -582,6 +582,36 @@ CREATIVE_KEYWORDS: FrozenSet[str] = frozenset([
     "paragraph", "paragraphs", "draft", "letter",
 ])
 
+# =============================================================================
+# FIX: Creative writing with introspective themes
+# =============================================================================
+# Problem: Queries like "write a poem about the minute you become self-aware" 
+# were being misclassified as SELF_INTROSPECTION because they contain 
+# introspection keywords ("self-aware", "become", "you"). But these are actually
+# CREATIVE writing requests about an AI/consciousness theme.
+#
+# Solution: Add explicit patterns that detect creative writing requests EVEN IF
+# they mention self-awareness, consciousness, or AI-related themes. These patterns
+# take precedence over self-introspection patterns.
+#
+# Key insight: If the query asks to "write", "compose", "create" a poem/story/essay,
+# it's a creative request regardless of the subject matter.
+CREATIVE_WITH_INTROSPECTIVE_THEME_PATTERNS: Tuple[re.Pattern, ...] = (
+    # "write a poem about [anything including self-awareness]"
+    re.compile(r"^write\s+(me\s+)?(a\s+)?poem\b", re.IGNORECASE),
+    re.compile(r"^write\s+(me\s+)?(a\s+)?story\b", re.IGNORECASE),
+    re.compile(r"^write\s+(me\s+)?(a\s+)?essay\b", re.IGNORECASE),
+    re.compile(r"^compose\s+(me\s+)?(a\s+)?poem\b", re.IGNORECASE),
+    re.compile(r"^create\s+(me\s+)?(a\s+)?poem\b", re.IGNORECASE),
+    # "poem about the minute you become self-aware" (anywhere in query)
+    re.compile(r"\bpoem\b.*\b(self-?aware|conscious|sentient|aware)\b", re.IGNORECASE),
+    re.compile(r"\bstory\b.*\b(self-?aware|conscious|sentient|aware)\b", re.IGNORECASE),
+    re.compile(r"\bessay\b.*\b(self-?aware|conscious|sentient|aware)\b", re.IGNORECASE),
+    # Creative about AI consciousness themes
+    re.compile(r"\b(write|compose|create|draft)\b.*\b(self-?aware|conscious|sentient)\b", re.IGNORECASE),
+    re.compile(r"\b(self-?aware|conscious|sentient)\b.*\b(poem|story|essay|song|narrative)\b", re.IGNORECASE),
+)
+
 # Conversational patterns - complexity 0.1, skip reasoning
 # FIX: Expanded patterns to catch more casual queries like "what about dogs"
 # NOTE: Patterns are designed to be specific to avoid conflicting with FACTUAL_PATTERNS
@@ -1138,6 +1168,29 @@ class QueryClassifier:
                     )
         
         # =============================================================================
+        # FIX: Check creative writing with introspective themes FIRST
+        # =============================================================================
+        # Problem: "write a poem about the minute you become self-aware" was being
+        # misclassified as SELF_INTROSPECTION because it contains "self-aware".
+        # Solution: Check for creative writing patterns (poem, story, essay) combined
+        # with introspective themes and route to CREATIVE, not SELF_INTROSPECTION.
+        # This must come BEFORE regular creative patterns and BEFORE self-introspection.
+        for pattern in CREATIVE_WITH_INTROSPECTIVE_THEME_PATTERNS:
+            if pattern.search(query_original):
+                logger.info(
+                    f"[QueryClassifier] FIX: Detected creative writing with introspective theme - "
+                    f"routing to CREATIVE (NOT self-introspection)"
+                )
+                return QueryClassification(
+                    category=QueryCategory.CREATIVE.value,
+                    complexity=0.6,  # Creative reasoning requires philosophical engine
+                    suggested_tools=["philosophical"],
+                    skip_reasoning=False,  # Use philosophical reasoning for creative content
+                    confidence=0.95,
+                    source="keyword",
+                )
+        
+        # =============================================================================
         # Note: Creative patterns route to world_model
         # =============================================================================
         # Creative queries like "write a story about..." should go through VULCAN's
@@ -1306,6 +1359,11 @@ class QueryClassifier:
         # =============================================================================
         # Questions about Vulcan's capabilities, goals, limitations should route to
         # World Model's SelfModel, NOT to ProbabilisticEngine or other reasoning tools.
+        # 
+        # NOTE: This check MUST come AFTER creative patterns check. If a query contains
+        # both creative keywords (poem, story, write) AND introspection keywords (self-aware),
+        # it should be classified as CREATIVE, not SELF_INTROSPECTION.
+        # Example: "write a poem about the minute you become self-aware" -> CREATIVE
         for pattern in SELF_INTROSPECTION_PATTERNS:
             if pattern.search(query_original):
                 return QueryClassification(
@@ -1318,17 +1376,22 @@ class QueryClassifier:
                 )
         
         # Check self-introspection keywords (questions about "you" with certain keywords)
+        # FIX: Exclude queries that contain creative writing keywords to prevent
+        # misclassification of creative prompts with AI/self-awareness themes
         if any(word in query_lower for word in ['you', 'your', 'yourself']):
-            introspection_count = sum(1 for kw in SELF_INTROSPECTION_KEYWORDS if kw in query_lower)
-            if introspection_count >= 1:
-                return QueryClassification(
-                    category=QueryCategory.SELF_INTROSPECTION.value,
-                    complexity=0.3,
-                    suggested_tools=["world_model"],
-                    skip_reasoning=False,
-                    confidence=0.8,
-                    source="keyword",
-                )
+            # Check if query is about creative writing - don't classify as introspection
+            has_creative_keywords = any(kw in query_lower for kw in CREATIVE_KEYWORDS)
+            if not has_creative_keywords:
+                introspection_count = sum(1 for kw in SELF_INTROSPECTION_KEYWORDS if kw in query_lower)
+                if introspection_count >= 1:
+                    return QueryClassification(
+                        category=QueryCategory.SELF_INTROSPECTION.value,
+                        complexity=0.3,
+                        suggested_tools=["world_model"],
+                        skip_reasoning=False,
+                        confidence=0.8,
+                        source="keyword",
+                    )
         
         # =============================================================================
         # SPECULATION FIX: Check speculation/counterfactual patterns
