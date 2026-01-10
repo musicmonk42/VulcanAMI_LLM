@@ -265,6 +265,82 @@ def _lazy_import_world_model_router():
     return True
 
 
+# =============================================================================
+# Null Object Implementations for Meta-Reasoning Components
+# =============================================================================
+# These replace MagicMock with proper null objects that have defined behavior
+# and explicit warnings when used. This prevents silent failures.
+
+
+class NullObjectiveHierarchy:
+    """
+    Null object implementation for ObjectiveHierarchy.
+    Used when meta-reasoning components fail to import.
+    
+    This provides explicit warnings instead of silently swallowing method calls.
+    """
+    
+    def __init__(self, *args, **kwargs):
+        logger.warning(
+            "Using NullObjectiveHierarchy - meta-reasoning not available. "
+            "Objectives will not be tracked. This is a fallback implementation."
+        )
+        self.objectives = {}
+        
+    def add_objective(self, *args, **kwargs):
+        logger.debug("NullObjectiveHierarchy.add_objective called - no-op")
+        return False
+        
+    def get_priority_order(self, *args, **kwargs):
+        logger.debug("NullObjectiveHierarchy.get_priority_order called - returning empty list")
+        return []
+        
+    def get_dependencies(self, *args, **kwargs):
+        logger.debug("NullObjectiveHierarchy.get_dependencies called - returning empty set")
+        return set()
+        
+    def check_consistency(self, *args, **kwargs):
+        logger.debug("NullObjectiveHierarchy.check_consistency called - returning empty dict")
+        return {"conflicts": [], "cycles": []}
+
+
+class NullMotivationalIntrospection:
+    """
+    Null object implementation for MotivationalIntrospection.
+    Used when meta-reasoning components fail to import.
+    """
+    
+    def __init__(self, *args, **kwargs):
+        logger.warning(
+            "Using NullMotivationalIntrospection - meta-reasoning not available. "
+            "Motivational drives will not be tracked. This is a fallback implementation."
+        )
+        
+    def __getattr__(self, name):
+        logger.debug(f"NullMotivationalIntrospection.{name} called - no-op")
+        return lambda *args, **kwargs: None
+
+
+class NullMetaReasoningComponent:
+    """
+    Generic null object for other meta-reasoning components.
+    """
+    
+    def __init__(self, component_name="Unknown", *args, **kwargs):
+        self.component_name = component_name
+        logger.warning(
+            f"Using Null{component_name} - meta-reasoning not available. "
+            f"This is a fallback implementation."
+        )
+        
+    def __getattr__(self, name):
+        logger.debug(f"Null{self.component_name}.{name} called - no-op")
+        return lambda *args, **kwargs: None
+        
+    def __call__(self, *args, **kwargs):
+        return None
+
+
 def _lazy_import_meta_reasoning():
     global MotivationalIntrospection, ObjectiveHierarchy, CounterfactualObjectiveReasoner, GoalConflictDetector, ObjectiveNegotiator, ValidationTracker, TransparencyInterface, SelfImprovementDrive, TriggerType, ImprovementObjective, InternalCritic, CuriosityRewardShaper, EthicalBoundaryMonitor, PreferenceLearner, ValueEvolutionTracker
     if MotivationalIntrospection is None:
@@ -291,22 +367,23 @@ def _lazy_import_meta_reasoning():
             logger.info("Meta-reasoning components lazy loaded successfully (full integration)")
         except ImportError as e:
             logger.warning(f"Meta-reasoning component unavailable: {e}")
-            MotivationalIntrospection = MagicMock()
-            ObjectiveHierarchy = MagicMock()
-            CounterfactualObjectiveReasoner = MagicMock()
-            GoalConflictDetector = MagicMock()
-            ObjectiveNegotiator = MagicMock()
-            ValidationTracker = MagicMock()
-            TransparencyInterface = MagicMock()
-            SelfImprovementDrive = MagicMock()
-            TriggerType = MagicMock()
-            ImprovementObjective = MagicMock()
-            # Note: Mock additional components
-            InternalCritic = MagicMock()
-            CuriosityRewardShaper = MagicMock()
-            EthicalBoundaryMonitor = MagicMock()
-            PreferenceLearner = MagicMock()
-            ValueEvolutionTracker = MagicMock()
+            logger.warning("Falling back to null object implementations with explicit warnings")
+            MotivationalIntrospection = NullMotivationalIntrospection
+            ObjectiveHierarchy = NullObjectiveHierarchy
+            CounterfactualObjectiveReasoner = lambda *a, **k: NullMetaReasoningComponent("CounterfactualObjectiveReasoner")
+            GoalConflictDetector = lambda *a, **k: NullMetaReasoningComponent("GoalConflictDetector")
+            ObjectiveNegotiator = lambda *a, **k: NullMetaReasoningComponent("ObjectiveNegotiator")
+            ValidationTracker = lambda *a, **k: NullMetaReasoningComponent("ValidationTracker")
+            TransparencyInterface = lambda *a, **k: NullMetaReasoningComponent("TransparencyInterface")
+            SelfImprovementDrive = lambda *a, **k: NullMetaReasoningComponent("SelfImprovementDrive")
+            TriggerType = NullMetaReasoningComponent("TriggerType")
+            ImprovementObjective = NullMetaReasoningComponent("ImprovementObjective")
+            # Note: Null object implementations for additional components
+            InternalCritic = lambda *a, **k: NullMetaReasoningComponent("InternalCritic")
+            CuriosityRewardShaper = lambda *a, **k: NullMetaReasoningComponent("CuriosityRewardShaper")
+            EthicalBoundaryMonitor = lambda *a, **k: NullMetaReasoningComponent("EthicalBoundaryMonitor")
+            PreferenceLearner = lambda *a, **k: NullMetaReasoningComponent("PreferenceLearner")
+            ValueEvolutionTracker = lambda *a, **k: NullMetaReasoningComponent("ValueEvolutionTracker")
             return False
     return True
 
