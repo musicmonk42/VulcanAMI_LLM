@@ -56,6 +56,11 @@ from .goal_analyzer import (
     GoalRelevanceAnalyzer,
 )
 
+# Structure mapping algorithms - extracted to separate module
+from .structure_mapping import (
+    StructureMappingEngine,
+)
+
 # Re-export NETWORKX_AVAILABLE for backward compatibility
 NETWORKX_AVAILABLE = UTILS_NETWORKX_AVAILABLE
 
@@ -90,6 +95,7 @@ __all__ = [
     # Classes  
     "SemanticEnricher",
     "GoalRelevanceAnalyzer",
+    "StructureMappingEngine",
     "AbstractReasoner",
     "AnalogicalReasoner",
     "AnalogicalReasoningEngine",
