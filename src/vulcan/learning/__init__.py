@@ -576,6 +576,42 @@ class UnifiedLearningSystem:
                 )
                 is_explicit_error = True  # Ensure parse errors are treated as failures
             
+            # ==============================================================================
+            # FIX Issue E: Detect safety-filtered outputs
+            # ==============================================================================
+            # When the SafetyGovernor blocks an output (e.g., "unsafe_output", "sensitive_data"),
+            # the tool's reasoning may have been correct, but the output was filtered.
+            # This should NOT be rewarded as a success - the user experience was poor.
+            #
+            # Safety filter indicators in metadata:
+            # - safety_violation: True/string describing violation
+            # - safety_filtered: True
+            # - safety_blocked: True  
+            # - unsafe_output: True
+            # - violation_type: "unsafe_output", "sensitive_data", etc.
+            # ==============================================================================
+            # Use same constants as reasoning_integration for consistency
+            SAFETY_VIOLATION_TYPES = ('unsafe_output', 'sensitive_data', 'pii_exposure')
+            metadata_str = str(metadata).lower()
+            is_safety_filtered = (
+                metadata.get('safety_violation', False) or
+                metadata.get('safety_filtered', False) or
+                metadata.get('safety_blocked', False) or
+                metadata.get('unsafe_output', False) or
+                metadata.get('violation_type', '') in SAFETY_VIOLATION_TYPES or
+                'safety violation' in metadata_str or
+                'safety filter' in metadata_str or
+                'safety block' in metadata_str
+            )
+            
+            if is_safety_filtered:
+                logger.warning(
+                    f"[Learning] FIX Issue E: Safety-filtered output detected. "
+                    f"Tool produced output that was blocked by safety governor. "
+                    f"Treating as FAILURE to prevent rewarding poor user experiences."
+                )
+                is_explicit_error = True  # Treat safety-filtered as failure
+            
             # Note: Detect general uninformative results (wrong tool selection)
             # This prevents tools from accumulating positive weights when they were
             # selected incorrectly (e.g., "analogical" for SAT problems).

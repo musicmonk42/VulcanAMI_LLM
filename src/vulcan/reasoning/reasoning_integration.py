@@ -338,6 +338,126 @@ def _is_false_positive_safety_block(query: str, safety_reason: str) -> bool:
     return False
 
 
+# ==============================================================================
+# FIX Issue D: Detect safety-filtered results for improved fallback logic
+# ==============================================================================
+# When a tool's output is safety-filtered, the fallback logic should NOT try
+# incompatible tools. For example, if world_model output for "what makes you
+# different" is safety-filtered, falling back to symbolic reasoner (which tries
+# to parse English as logic) is wrong.
+#
+# Safety-filtered indicators:
+# - Result metadata contains safety_violation, safety_filtered, unsafe_output
+# - Result has very low confidence (0.0-0.1) with safety-related metadata
+# - Result explanation mentions "safety", "filtered", "blocked"
+# ==============================================================================
+
+# Constants for safety filter detection (module-level for maintainability)
+SAFETY_VIOLATION_TYPES = frozenset({'unsafe_output', 'sensitive_data', 'pii_exposure'})
+SAFETY_FILTER_PHRASES = frozenset({
+    'safety filter', 'safety violation', 'safety block',
+    'safety concern', 'filtered due to safety', 'blocked by safety'
+})
+
+
+def _is_result_safety_filtered(result) -> bool:
+    """
+    Detect if a SelectionResult was safety-filtered.
+    
+    FIX Issue D: When safety-filtered, we need smart fallback selection
+    that doesn't try incompatible tools (e.g., symbolic for English queries).
+    
+    Args:
+        result: SelectionResult or similar result object (using Any to avoid circular imports)
+        
+    Returns:
+        True if the result indicates safety filtering
+    """
+    if result is None:
+        return False
+    
+    # Check result metadata
+    metadata = {}
+    if hasattr(result, 'metadata') and isinstance(result.metadata, dict):
+        metadata = result.metadata
+    elif hasattr(result, 'result') and isinstance(result.result, dict):
+        metadata = result.result.get('metadata', {})
+    
+    # Check for safety-filtered indicators
+    if metadata.get('safety_filtered', False):
+        return True
+    if metadata.get('safety_violation', False):
+        return True
+    if metadata.get('safety_blocked', False):
+        return True
+    if metadata.get('unsafe_output', False):
+        return True
+    
+    # Check violation_type against known safety violations
+    violation_type = metadata.get('violation_type', '')
+    if violation_type in SAFETY_VIOLATION_TYPES:
+        return True
+    
+    # Check explanation text
+    explanation = ''
+    if hasattr(result, 'explanation') and result.explanation:
+        explanation = str(result.explanation).lower()
+    elif hasattr(result, 'result') and isinstance(result.result, dict):
+        explanation = str(result.result.get('explanation', '')).lower()
+    
+    if any(phrase in explanation for phrase in SAFETY_FILTER_PHRASES):
+        return True
+    
+    return False
+
+
+def _get_safety_filtered_fallback_tools(query_type: str, original_tool: str) -> list:
+    """
+    Get appropriate fallback tools when a result was safety-filtered.
+    
+    FIX Issue D: When safety-filtered, don't fall back to incompatible tools.
+    For self-description queries that were safety-filtered, don't try symbolic
+    (which parses English as logic). Instead try semantically similar tools.
+    
+    Args:
+        query_type: Type of query (ethical, self_introspection, etc.)
+        original_tool: The tool whose output was safety-filtered
+        
+    Returns:
+        List of appropriate fallback tools for safety-filtered queries
+    """
+    query_type_lower = (query_type or '').lower()
+    
+    # Safety-filtered fallbacks should:
+    # 1. NOT include symbolic (can't parse English)
+    # 2. Prefer world_model and analogical (can handle natural language)
+    # 3. Include general as last resort for LLM synthesis
+    
+    # Query-specific safety fallbacks (NO symbolic!)
+    safety_fallbacks = {
+        # Self-introspection blocked by safety → try analogical (can reason by comparison)
+        'self_introspection': ['analogical', 'world_model', 'general'],
+        
+        # Ethical/philosophical blocked → try analogical reasoning
+        'ethical': ['analogical', 'world_model', 'general'],
+        'philosophical': ['analogical', 'world_model', 'general'],
+        
+        # Capability description blocked → try analogical
+        'capabilities': ['analogical', 'general'],
+        
+        # General self-description blocked
+        'identity': ['analogical', 'world_model', 'general'],
+    }
+    
+    # Get type-specific fallbacks
+    fallbacks = safety_fallbacks.get(query_type_lower, ['analogical', 'world_model', 'general'])
+    
+    # Filter out the original tool
+    fallbacks = [t for t in fallbacks if t != original_tool]
+    
+    return fallbacks[:3]  # Limit to 3 fallbacks
+
+
 class ReasoningStrategyType(Enum):
     """
     Enumeration of available reasoning strategies.
@@ -1889,22 +2009,46 @@ class ReasoningIntegration:
                             f"(attempt {attempt_number}/{MAX_FALLBACK_ATTEMPTS})"
                         )
                         
-                        # FIX #4: Improved fallback logic - try alternative engines before LLM
-                        # =====================================================================
-                        # Instead of a fixed list, select fallback tools based on query type
-                        # and the original tool that failed. This ensures queries get routed
-                        # to the most appropriate alternative engine.
+                        # ==============================================================
+                        # FIX Issue D: Improved fallback logic for safety-filtered outputs
+                        # ==============================================================
+                        # When output is SAFETY-FILTERED (vs just low confidence), we need
+                        # to use different fallback tools. Safety-filtered means the tool
+                        # DID reason correctly but output was blocked - falling back to
+                        # incompatible tools (like symbolic for English) is wrong.
                         #
-                        # Priority order:
-                        # 1. Query-type specific fallbacks (e.g., philosophical for ethical queries)
-                        # 2. General-purpose fallbacks (world_model, probabilistic)
-                        # 3. Arena delegation (LLM) as last resort
-                        # =====================================================================
-                        fallback_tools = self._get_fallback_tools(
-                            query_type=query_type,
-                            original_tool=original_tool,
-                            failed_tools=selected_tools
-                        )
+                        # Detection: Check if result indicates safety filtering
+                        # Fallback: Use _get_safety_filtered_fallback_tools() which
+                        #           excludes incompatible tools like symbolic
+                        # ==============================================================
+                        is_safety_filtered = _is_result_safety_filtered(result)
+                        
+                        if is_safety_filtered:
+                            logger.info(
+                                f"{LOG_PREFIX} FIX Issue D: Safety-filtered output detected. "
+                                f"Using safety-aware fallback selection (excluding incompatible tools)"
+                            )
+                            fallback_tools = _get_safety_filtered_fallback_tools(
+                                query_type=query_type,
+                                original_tool=original_tool
+                            )
+                        else:
+                            # FIX #4: Regular fallback logic - try alternative engines before LLM
+                            # =====================================================================
+                            # Instead of a fixed list, select fallback tools based on query type
+                            # and the original tool that failed. This ensures queries get routed
+                            # to the most appropriate alternative engine.
+                            #
+                            # Priority order:
+                            # 1. Query-type specific fallbacks (e.g., philosophical for ethical queries)
+                            # 2. General-purpose fallbacks (world_model, probabilistic)
+                            # 3. Arena delegation (LLM) as last resort
+                            # =====================================================================
+                            fallback_tools = self._get_fallback_tools(
+                                query_type=query_type,
+                                original_tool=original_tool,
+                                failed_tools=selected_tools
+                            )
                         
                         for fallback_tool in fallback_tools:
                             try:

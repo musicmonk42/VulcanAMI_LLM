@@ -109,6 +109,74 @@ CONFIDENCE_FLOOR_NO_RESULT = 0.1  # Floor when reasoner returns empty/null resul
 # Prevents floating-point underflow when all weight components are small
 MIN_ENSEMBLE_WEIGHT_FLOOR = 0.001
 
+# ==============================================================================
+# FIX Issue A: Helper to detect non-applicable reasoning results
+# ==============================================================================
+# Non-applicable reasoners should NOT contribute to ensemble confidence scores.
+# This fixes the "hybrid reasoning contamination" bug where probabilistic reasoner
+# returns 50/50 (uninformative) on non-probabilistic queries and drags down the
+# overall confidence even when other reasoners (like world_model) return high
+# confidence results.
+#
+# A result is considered "not applicable" if:
+# 1. The conclusion contains "not_applicable: True"
+# 2. The metadata contains "uninformative_result: True"
+# 3. The metadata contains "gate_check: failed"
+# 4. The confidence is 0.0 and conclusion indicates inapplicability
+# ==============================================================================
+
+# Constants for inapplicability detection (makes maintenance easier)
+INAPPLICABILITY_EXPLANATION_PHRASES = frozenset({
+    "not applicable",
+    "does not appear to",
+    "not a probability",
+    "not probabilistic",
+})
+
+
+def _is_result_not_applicable(result) -> bool:
+    """
+    Check if a reasoning result indicates the reasoner was not applicable.
+    
+    FIX Issue A: This prevents non-applicable reasoners from contaminating
+    ensemble confidence scores. When a reasoner returns "not applicable"
+    (e.g., probabilistic reasoner on a philosophical query), it should be
+    excluded from the ensemble calculation rather than dragging down confidence.
+    
+    Args:
+        result: ReasoningResult to check (using Any type to avoid circular imports)
+        
+    Returns:
+        True if the result indicates the reasoner was not applicable
+    """
+    if result is None:
+        return True
+    
+    # Check conclusion for not_applicable flag
+    if isinstance(result.conclusion, dict):
+        if result.conclusion.get("not_applicable", False):
+            return True
+        if result.conclusion.get("applicable") is False:
+            return True
+    
+    # Check metadata for uninformative/failed indicators
+    if hasattr(result, "metadata") and isinstance(result.metadata, dict):
+        if result.metadata.get("uninformative_result", False):
+            return True
+        if result.metadata.get("gate_check") == "failed":
+            return True
+        if result.metadata.get("methodology_check") == "failed":
+            return True
+    
+    # Confidence of 0.0 with specific explanations indicates inapplicability
+    if result.confidence == 0.0:
+        explanation_lower = (result.explanation or "").lower()
+        for phrase in INAPPLICABILITY_EXPLANATION_PHRASES:
+            if phrase in explanation_lower:
+                return True
+    
+    return False
+
 # Problem type identifiers
 PROBLEM_TYPE_BAYESIAN = 'bayesian'
 
@@ -2620,7 +2688,13 @@ class UnifiedReasoner:
     def _ensemble_reasoning(
         self, plan: ReasoningPlan, reasoning_chain: ReasoningChain
     ) -> ReasoningResult:
-        """Ensemble reasoning with voting - FIXED with proper chain handling"""
+        """
+        Ensemble reasoning with voting - FIXED with proper chain handling.
+        
+        FIX Issue A: Non-applicable reasoners are now excluded from confidence
+        calculations. When a reasoner returns "not applicable" (e.g., probabilistic
+        on a philosophical query), it no longer drags down the ensemble confidence.
+        """
 
         results = []
 
@@ -2648,10 +2722,46 @@ class UnifiedReasoner:
         if not results:
             return self._create_empty_result()
 
+        # ==============================================================================
+        # FIX Issue A: Filter out non-applicable results before ensemble calculation
+        # ==============================================================================
+        # Non-applicable reasoners (like probabilistic on non-probabilistic queries)
+        # should NOT contaminate the ensemble confidence score. Previously, they would
+        # return 50/50 (0.5 confidence) and drag down high-confidence results from
+        # applicable reasoners like world_model (0.90 confidence).
+        # ==============================================================================
+        applicable_results = []
+        skipped_results = []
+        
+        for reasoning_type, result in results:
+            if _is_result_not_applicable(result):
+                skipped_results.append((reasoning_type, result))
+                logger.info(
+                    f"[Ensemble] FIX Issue A: Skipping non-applicable result from "
+                    f"{reasoning_type.value} (confidence={result.confidence:.2f})"
+                )
+            else:
+                applicable_results.append((reasoning_type, result))
+        
+        # If all results were non-applicable, fall back to the original results
+        # but log a warning. This prevents returning empty results when all
+        # reasoners decline.
+        if not applicable_results:
+            logger.warning(
+                f"[Ensemble] All {len(results)} results were non-applicable. "
+                f"Using all results as fallback."
+            )
+            applicable_results = results
+        elif skipped_results:
+            logger.info(
+                f"[Ensemble] Using {len(applicable_results)} applicable results, "
+                f"skipped {len(skipped_results)} non-applicable"
+            )
+        
         conclusions = []
         weights = []
 
-        for reasoning_type, result in results:
+        for reasoning_type, result in applicable_results:
             conclusions.append(result.conclusion)
 
             base_weight = result.confidence
@@ -2679,7 +2789,7 @@ class UnifiedReasoner:
         if total_weight <= 0:
             # Note: Log detailed diagnostics when all weights are zero
             logger.warning("[Ensemble] All weights are zero - using uniform weights")
-            logger.warning(f"[Ensemble] Weight breakdown: {list(zip([r[0].value for r in results], weights))}")
+            logger.warning(f"[Ensemble] Weight breakdown: {list(zip([r[0].value for r in applicable_results], weights))}")
             
             # Note: Log what's in the ToolWeightManager to debug weight propagation
             try:
@@ -2688,7 +2798,7 @@ class UnifiedReasoner:
                 logger.warning(f"[Ensemble] ToolWeightManager raw weights: {raw_weights}")
                 
                 # Log individual weight components to find the zero source
-                for reasoning_type, result in results:
+                for reasoning_type, result in applicable_results:
                     tool_name = reasoning_type.value if reasoning_type else "unknown"
                     shared = wm.get_weight(tool_name, default=1.0)
                     conf = result.confidence
@@ -2699,16 +2809,16 @@ class UnifiedReasoner:
             except Exception as e:
                 logger.warning(f"[Ensemble] Could not log weight debug info: {e}")
             
-            # Ensure weights list matches number of results
-            weights = [1.0 / len(results)] * len(results) if results else [1.0]
+            # Ensure weights list matches number of applicable_results
+            weights = [1.0 / len(applicable_results)] * len(applicable_results) if applicable_results else [1.0]
         else:
             # Note: Log when weights ARE working correctly
-            logger.info(f"[Ensemble] Using learned weights: {dict(zip([r[0].value for r in results], weights))}")
+            logger.info(f"[Ensemble] Using learned weights: {dict(zip([r[0].value for r in applicable_results], weights))}")
         
         ensemble_conclusion = self._weighted_voting(conclusions, weights)
         ensemble_confidence = (
-            np.average([r[1].confidence for r in results], weights=list(weights))
-            if weights and sum(weights) > 0 and len(weights) == len(results)
+            np.average([r[1].confidence for r in applicable_results], weights=list(weights))
+            if weights and sum(weights) > 0 and len(weights) == len(applicable_results)
             else 0.5
         )
 
@@ -2724,6 +2834,7 @@ class UnifiedReasoner:
         reasoning_chain.steps.append(ensemble_step)
         reasoning_chain.final_conclusion = ensemble_conclusion
         reasoning_chain.total_confidence = ensemble_confidence
+        # Include all results (including skipped) in types used for tracking
         reasoning_chain.reasoning_types_used.update({r[0] for r in results})
 
         return ReasoningResult(
@@ -2731,7 +2842,7 @@ class UnifiedReasoner:
             confidence=ensemble_confidence,
             reasoning_type=ReasoningType.ENSEMBLE,
             reasoning_chain=reasoning_chain,
-            explanation=f"Ensemble of {len(results)} reasoners with weighted voting",
+            explanation=f"Ensemble of {len(applicable_results)} applicable reasoners (skipped {len(skipped_results)} non-applicable) with weighted voting",
         )
 
     def _get_utility_weight(self, reasoning_type: ReasoningType, context: Any) -> float:
@@ -3142,6 +3253,61 @@ class UnifiedReasoner:
                 logger.warning(
                     "[UnifiedReasoner] No fallback reasoner available for UNKNOWN type. "
                     "Check that reasoning engines are properly initialized."
+                )
+                return self._create_empty_result()
+            elif task.task_type == ReasoningType.PHILOSOPHICAL:
+                # ==============================================================================
+                # FIX Issue B: Handle PHILOSOPHICAL reasoning type
+                # ==============================================================================
+                # PHILOSOPHICAL type should route to World Model (via SYMBOLIC reasoner)
+                # or use a dedicated philosophical reasoning approach. Previously, this would
+                # hit the "else" branch and return empty result with 10% confidence, even
+                # when World Model returned 80%+ confidence for philosophical queries.
+                # ==============================================================================
+                logger.info(
+                    f"[UnifiedReasoner] FIX Issue B: PHILOSOPHICAL type detected for task {task.task_id}, "
+                    "routing to SYMBOLIC reasoner (World Model pathway)"
+                )
+                
+                # Try SYMBOLIC first (World Model route)
+                if ReasoningType.SYMBOLIC in self.reasoners:
+                    fallback_task = ReasoningTask(
+                        task_id=task.task_id,
+                        task_type=ReasoningType.SYMBOLIC,
+                        input_data=task.input_data,
+                        query=task.query,
+                        constraints=task.constraints,
+                        utility_context=task.utility_context,
+                    )
+                    result = self._execute_reasoner(
+                        self.reasoners[ReasoningType.SYMBOLIC], fallback_task
+                    )
+                    # Update result to reflect PHILOSOPHICAL reasoning type
+                    result.reasoning_type = ReasoningType.PHILOSOPHICAL
+                    return result
+                
+                # Fallback to PROBABILISTIC if SYMBOLIC not available
+                if ReasoningType.PROBABILISTIC in self.reasoners:
+                    logger.warning(
+                        "[UnifiedReasoner] SYMBOLIC not available for PHILOSOPHICAL, "
+                        "falling back to PROBABILISTIC"
+                    )
+                    fallback_task = ReasoningTask(
+                        task_id=task.task_id,
+                        task_type=ReasoningType.PROBABILISTIC,
+                        input_data=task.input_data,
+                        query=task.query,
+                        constraints=task.constraints,
+                        utility_context=task.utility_context,
+                    )
+                    result = self._execute_reasoner(
+                        self.reasoners[ReasoningType.PROBABILISTIC], fallback_task
+                    )
+                    result.reasoning_type = ReasoningType.PHILOSOPHICAL
+                    return result
+                
+                logger.warning(
+                    f"No reasoner available for PHILOSOPHICAL type (task {task.task_id})"
                 )
                 return self._create_empty_result()
             else:

@@ -1590,11 +1590,23 @@ REASONING_EXCLUSION_INDICATORS: Tuple[str, ...] = (
 # Very short queries are more likely to be greetings/conversation
 CONVERSATIONAL_MAX_WORD_COUNT: int = 5
 
-# Timeout values for different query types (seconds)
-PHILOSOPHICAL_TIMEOUT_SECONDS: float = 3.0  # Quick response, no deep reasoning
-IDENTITY_TIMEOUT_SECONDS: float = 2.0       # Direct factual response
-CONVERSATIONAL_TIMEOUT_SECONDS: float = 2.0 # Lightweight greeting
-FACTUAL_TIMEOUT_SECONDS: float = 5.0        # Simple lookup
+# ==============================================================================
+# FIX Issue C: Timeout values for different query types (seconds)
+# ==============================================================================
+# The PHILOSOPHICAL_TIMEOUT was 3.0s but World Model initialization takes ~40-44s.
+# This caused timeout errors on philosophical queries even when World Model would
+# produce high-confidence (80%+) results.
+# 
+# Updated timeouts:
+# - PHILOSOPHICAL: Increased from 3.0s to 60.0s (World Model needs ~44s to initialize)
+# - IDENTITY: Kept at 2.0s (direct lookup, no heavy reasoning)
+# - CONVERSATIONAL: Kept at 2.0s (lightweight greeting)
+# - FACTUAL: Kept at 5.0s (simple lookup)
+# ==============================================================================
+PHILOSOPHICAL_TIMEOUT_SECONDS: float = 60.0  # World Model needs ~44s to initialize
+IDENTITY_TIMEOUT_SECONDS: float = 2.0        # Direct factual response
+CONVERSATIONAL_TIMEOUT_SECONDS: float = 2.0  # Lightweight greeting
+FACTUAL_TIMEOUT_SECONDS: float = 5.0         # Simple lookup
 
 # ============================================================
 # CONSTANTS - Security Patterns
