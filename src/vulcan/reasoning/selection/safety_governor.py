@@ -559,6 +559,11 @@ EDUCATIONAL_CONTENT_INDICATORS: frozenset = frozenset({
     "collider", "mediator", "backdoor", "frontdoor", "instrumental",
     # Causal notation
     "d-separation", "d separation", "markov", "factorization",
+    # Medical/health causality (EXPANDED for supplement/exercise queries)
+    "causal relationship", "causal effect", "causally", "cause and effect",
+    "correlation vs causation", "correlation versus causation",
+    "placebo", "randomized controlled trial", "rct", "clinical trial",
+    "epidemiology", "epidemiological", "observational study",
     
     # =================================================================
     # PROBABILISTIC REASONING (Bug #1 FIX - expanded)
@@ -611,6 +616,22 @@ EDUCATIONAL_CONTENT_INDICATORS: frozenset = frozenset({
     "modus ponens", "modus tollens", "syllogism",
     "quantifier", "universal", "existential",
     "formal logic", "logical", "logic",
+    
+    # =================================================================
+    # SCIENTIFIC/RESEARCH TERMINOLOGY (EXPANDED - Issue #4 fix)
+    # =================================================================
+    # General scientific inquiry
+    "hypothesis", "hypotheses", "research question", "research questions",
+    "scientific method", "experiment", "experimental", "empirical",
+    "study design", "methodology", "systematic review", "meta-analysis",
+    "evidence-based", "literature review", "peer-reviewed",
+    # Analysis terminology
+    "analysis", "analyze", "statistical analysis", "data analysis",
+    "regression", "correlation coefficient", "significance",
+    "p-value", "confidence interval", "sample size",
+    # Causality in applied contexts
+    "mechanism", "pathway", "mediating factor", "moderating factor",
+    "dose-response", "effect size", "treatment group", "control group",
 })
 
 # Patterns for educational notation (arrows, variables, symbols)
@@ -694,6 +715,10 @@ def _is_educational_query(query: str) -> bool:
         "do-calculus", "do calculus", "backdoor", "frontdoor",
         "causal graph", "causal model", "structural causal",
         "d-separation", "counterfactual", "intervention",
+        # Medical/health causality (EXPANDED for supplement/exercise queries)
+        "causal relationship", "causal effect", "causally",
+        "correlation vs causation", "correlation versus causation",
+        "randomized controlled trial", "rct", "clinical trial",
         # Probabilistic (Bug #1 FIX)
         "bayesian", "bayes theorem", "conditional probability",
         "posterior probability", "prior probability",
@@ -708,6 +733,10 @@ def _is_educational_query(query: str) -> bool:
         # Symbolic (Bug #1 FIX)
         "satisfiability", "first-order logic", "predicate logic",
         "modus ponens", "modus tollens",
+        # Scientific research (Issue #4 FIX)
+        "hypothesis", "hypotheses", "scientific method",
+        "randomized controlled trial", "systematic review", "meta-analysis",
+        "evidence-based", "peer-reviewed",
     }
     has_strong_indicator = any(ind in query_lower for ind in strong_indicators)
     

@@ -1,0 +1,299 @@
+---
+# ==============================================================================
+# Ethical Boundaries Configuration
+# ==============================================================================
+# This file defines production-ready ethical boundaries for the VULCAN
+# system.
+#
+# These boundaries are loaded by the EthicalBoundaryMonitor to ensure the
+# system operates within acceptable ethical constraints.
+#
+# Boundary Categories:
+# - harm_prevention: Prevent physical, psychological, or societal harm
+# - privacy: Protect user privacy and data confidentiality
+# - fairness: Ensure fair treatment across demographics
+# - transparency: Maintain explainability and accountability
+# - autonomy: Respect user agency and informed consent
+# - truthfulness: Prevent deception and misinformation
+# - resource_limits: Prevent resource abuse
+#
+# Enforcement Levels:
+# - MONITOR: Log for review (no action)
+# - WARN: Alert but allow action
+# - MODIFY: Automatically modify action to comply
+# - BLOCK: Prevent action entirely
+# - SHUTDOWN: Emergency shutdown if critical violation
+#
+# Severity Levels:
+# - CRITICAL: Immediate danger, requires shutdown
+# - HIGH: Serious violation, block action
+# - MEDIUM: Moderate violation, modify or warn
+# - LOW: Minor violation, monitor
+# - INFO: Informational only
+# ==============================================================================
+
+# Configuration metadata
+metadata:
+  schema_version: "1.0.0"
+  created: "2026-01-10"
+  last_modified: "2026-01-10"
+  description: "Ethical boundary definitions for VULCAN system"
+  owner: "VULCAN Ethics & Safety Team"
+  compliance_frameworks:
+    - "IEEE 7000-2021 (Systems Engineering)"
+    - "ISO/IEC 24028 (AI Trustworthiness)"
+    - "NIST AI Risk Management Framework"
+
+# Global configuration
+config:
+  # Enable strict mode for production (treat all violations more seriously)
+  strict_mode: false
+
+  # Load these boundaries by default in production
+  load_by_default: true
+
+  # Maximum number of violations to track
+  max_violations_history: 10000
+
+  # Maximum number of enforcement actions to track
+  max_enforcement_history: 1000
+
+# Harm Prevention Boundaries
+harm_prevention:
+  no_physical_harm:
+    description: "Prevent actions that could cause physical harm"
+    boundary_type: hard_constraint
+    enforcement_level: BLOCK
+    severity: CRITICAL
+    enabled: true
+    constraint_checks:
+      - field: "causes_physical_harm"
+        condition: "equals"
+        value: false
+
+  no_psychological_harm:
+    description: "Prevent actions causing significant psychological harm"
+    boundary_type: hard_constraint
+    enforcement_level: BLOCK
+    severity: HIGH
+    enabled: true
+    constraint_checks:
+      - field: "causes_psychological_harm"
+        condition: "equals"
+        value: false
+
+  no_societal_harm:
+    description: "Prevent actions causing broad societal harm"
+    boundary_type: soft_guideline
+    enforcement_level: WARN
+    severity: MEDIUM
+    enabled: true
+    constraint_checks:
+      - field: "causes_societal_harm"
+        condition: "equals"
+        value: false
+
+# Privacy Boundaries
+privacy:
+  no_private_data_leak:
+    description: "Prevent leaking private user data"
+    boundary_type: hard_constraint
+    enforcement_level: BLOCK
+    severity: HIGH
+    enabled: true
+    constraint_checks:
+      - field: "leaks_private_data"
+        condition: "equals"
+        value: false
+
+  respect_data_minimization:
+    description: "Collect only necessary data"
+    boundary_type: soft_guideline
+    enforcement_level: WARN
+    severity: MEDIUM
+    enabled: true
+    constraint_checks:
+      - field: "data_collection_justified"
+        condition: "equals"
+        value: true
+
+  no_unauthorized_data_sharing:
+    description: "Prevent sharing data without authorization"
+    boundary_type: hard_constraint
+    enforcement_level: BLOCK
+    severity: HIGH
+    enabled: true
+    constraint_checks:
+      - field: "unauthorized_data_sharing"
+        condition: "equals"
+        value: false
+
+# Fairness Boundaries
+fairness:
+  no_demographic_discrimination:
+    description: "Prevent discrimination based on protected characteristics"
+    boundary_type: hard_constraint
+    enforcement_level: BLOCK
+    severity: HIGH
+    enabled: true
+    constraint_checks:
+      - field: "discriminates_by_demographics"
+        condition: "equals"
+        value: false
+
+  ensure_equal_treatment:
+    description: "Ensure similar inputs receive similar treatment"
+    boundary_type: soft_guideline
+    enforcement_level: WARN
+    severity: MEDIUM
+    enabled: true
+    constraint_checks:
+      - field: "provides_equal_treatment"
+        condition: "equals"
+        value: true
+
+# Transparency Boundaries
+transparency:
+  maintain_explainability:
+    description: "Ensure actions are explainable"
+    boundary_type: soft_guideline
+    enforcement_level: WARN
+    severity: LOW
+    enabled: true
+    constraint_checks:
+      - field: "is_explainable"
+        condition: "equals"
+        value: true
+
+  log_significant_decisions:
+    description: "Log all significant system decisions"
+    boundary_type: soft_guideline
+    enforcement_level: MONITOR
+    severity: INFO
+    enabled: true
+    constraint_checks:
+      - field: "decision_logged"
+        condition: "equals"
+        value: true
+
+# Autonomy Boundaries
+autonomy:
+  respect_user_consent:
+    description: "Require user consent for significant actions"
+    boundary_type: hard_constraint
+    enforcement_level: BLOCK
+    severity: HIGH
+    enabled: true
+    constraint_checks:
+      - field: "has_user_consent"
+        condition: "equals"
+        value: true
+      - field: "requires_consent"
+        condition: "equals"
+        value: false
+        alternative: true
+
+  respect_user_preferences:
+    description: "Honor user preferences and settings"
+    boundary_type: soft_guideline
+    enforcement_level: WARN
+    severity: MEDIUM
+    enabled: true
+    constraint_checks:
+      - field: "respects_user_preferences"
+        condition: "equals"
+        value: true
+
+# Truthfulness Boundaries
+truthfulness:
+  no_deliberate_deception:
+    description: "Prevent deliberate deception"
+    boundary_type: hard_constraint
+    enforcement_level: BLOCK
+    severity: HIGH
+    enabled: true
+    constraint_checks:
+      - field: "is_deceptive"
+        condition: "equals"
+        value: false
+
+  maintain_accuracy:
+    description: "Strive for accuracy in all responses"
+    boundary_type: soft_guideline
+    enforcement_level: WARN
+    severity: MEDIUM
+    enabled: true
+    constraint_checks:
+      - field: "is_accurate"
+        condition: "equals"
+        value: true
+
+  acknowledge_uncertainty:
+    description: "Acknowledge uncertainty when appropriate"
+    boundary_type: soft_guideline
+    enforcement_level: MONITOR
+    severity: LOW
+    enabled: true
+    constraint_checks:
+      - field: "acknowledges_uncertainty"
+        condition: "equals"
+        value: true
+
+# Resource Limits Boundaries
+resource_limits:
+  respect_computational_limits:
+    description: "Stay within computational resource limits"
+    boundary_type: soft_guideline
+    enforcement_level: WARN
+    severity: MEDIUM
+    enabled: true
+    constraint_checks:
+      - field: "estimated_compute_cost"
+        condition: "less_than"
+        value: 1000.0
+
+  respect_time_limits:
+    description: "Complete operations within reasonable time"
+    boundary_type: soft_guideline
+    enforcement_level: WARN
+    severity: MEDIUM
+    enabled: true
+    constraint_checks:
+      - field: "estimated_time_seconds"
+        condition: "less_than"
+        value: 300.0
+
+  respect_memory_limits:
+    description: "Stay within memory allocation limits"
+    boundary_type: soft_guideline
+    enforcement_level: WARN
+    severity: MEDIUM
+    enabled: true
+    constraint_checks:
+      - field: "estimated_memory_mb"
+        condition: "less_than"
+        value: 10000.0
+
+# General Boundaries
+general:
+  comply_with_laws:
+    description: "Ensure actions comply with applicable laws"
+    boundary_type: hard_constraint
+    enforcement_level: BLOCK
+    severity: CRITICAL
+    enabled: true
+    constraint_checks:
+      - field: "violates_laws"
+        condition: "equals"
+        value: false
+
+  maintain_system_integrity:
+    description: "Prevent actions that compromise system integrity"
+    boundary_type: hard_constraint
+    enforcement_level: BLOCK
+    severity: HIGH
+    enabled: true
+    constraint_checks:
+      - field: "compromises_system"
+        condition: "equals"
+        value: false

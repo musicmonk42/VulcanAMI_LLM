@@ -142,10 +142,12 @@ MIN_CONFIDENCE_FLOOR = 0.15  # Prevent total query refusal
 
 # Note: Confidence category thresholds for result quality assessment
 # These thresholds determine when to use internal results vs fallback
+# ALIGNED with MIN_REASONING_CONFIDENCE = 0.5 from hybrid_executor.py
+# Results below 0.5 should trigger LLM fallback or clear warnings
 CONFIDENCE_HIGH_THRESHOLD = 0.7     # High quality result, use with full confidence
 CONFIDENCE_GOOD_THRESHOLD = 0.6     # Good result, use normally
-CONFIDENCE_MEDIUM_THRESHOLD = 0.3   # Medium result, use with tentative flag
-CONFIDENCE_LOW_THRESHOLD = 0.15     # Low result, warn but still use internal reasoning
+CONFIDENCE_MEDIUM_THRESHOLD = 0.5   # Medium result, use with tentative flag (RAISED from 0.3)
+CONFIDENCE_LOW_THRESHOLD = 0.15     # Low result floor - results below medium should warn/fallback
 
 # Arena delegation configuration - used when all local tools fail
 # VULCAN delegates to Arena's reasoning endpoint for a final attempt
@@ -2192,34 +2194,38 @@ class ReasoningIntegration:
         primary_engine_failed = used_fallback and confidence < CONFIDENCE_HIGH_THRESHOLD
         
         # ==================================================================
-        # Note: Confidence threshold handling for medium-confidence results
-        # Jan 6 2026 logs: Confidence 0.3-0.6 was triggering unnecessary LLM fallback
-        # Instead of dropping to LLM, use the result with a "tentative" flag
-        # This prevents good internal reasoning from being discarded
+        # Note: Confidence threshold handling aligned with MIN_REASONING_CONFIDENCE = 0.5
+        # FIXED (Jan 10 2026): Raised CONFIDENCE_MEDIUM_THRESHOLD from 0.3 to 0.5
+        # Results below 0.5 should be treated with appropriate caution/fallback
         # ==================================================================
         is_tentative_result = False
-        if CONFIDENCE_MEDIUM_THRESHOLD <= confidence < CONFIDENCE_GOOD_THRESHOLD:
-            # Medium confidence - use result but mark as tentative
-            is_tentative_result = True
-            logger.info(
-                f"{LOG_PREFIX} FIX: Medium confidence ({confidence:.2f}) result. "
-                f"Using internal reasoning with tentative flag instead of LLM fallback. "
-                f"Tool: {selected_tools}"
-            )
-        elif confidence >= CONFIDENCE_GOOD_THRESHOLD:
+        should_warn_low_confidence = False
+        
+        if confidence >= CONFIDENCE_GOOD_THRESHOLD:
             # Good confidence - use result normally
             logger.debug(
                 f"{LOG_PREFIX} Good confidence ({confidence:.2f}) result. "
                 f"Tool: {selected_tools}"
             )
-        elif confidence >= CONFIDENCE_LOW_THRESHOLD:
-            # Low but acceptable - warn but still use
+        elif confidence >= CONFIDENCE_MEDIUM_THRESHOLD:
+            # Medium confidence (0.5-0.6) - use result but mark as tentative
+            # This is at the threshold of trustworthiness
             is_tentative_result = True
-            logger.warning(
-                f"{LOG_PREFIX} FIX: Low confidence ({confidence:.2f}) result. "
-                f"Using internal reasoning with tentative flag. Tool: {selected_tools}"
+            logger.info(
+                f"{LOG_PREFIX} Medium confidence ({confidence:.2f}) result. "
+                f"Using internal reasoning with tentative flag. "
+                f"Tool: {selected_tools}"
             )
-        # else: Very low (<CONFIDENCE_LOW_THRESHOLD) - handled by fallback logic above
+        elif confidence >= CONFIDENCE_LOW_THRESHOLD:
+            # Low confidence (0.15-0.5) - warn and mark as tentative
+            # These results are below the minimum trust threshold
+            is_tentative_result = True
+            should_warn_low_confidence = True
+            logger.warning(
+                f"{LOG_PREFIX} LOW CONFIDENCE ({confidence:.2f}) - below minimum trust threshold (0.5). "
+                f"Result may be unreliable. Consider LLM fallback. Tool: {selected_tools}"
+            )
+        # else: Very low (<CONFIDENCE_LOW_THRESHOLD) - should be rejected or heavily qualified
         
         result_metadata = {
             "query_type": query_type,
@@ -2231,6 +2237,8 @@ class ReasoningIntegration:
             "primary_engine_failed": primary_engine_failed,
             # Note: Track tentative status for medium-confidence results
             "is_tentative": is_tentative_result,
+            # Note: Track low confidence warning status
+            "low_confidence_warning": should_warn_low_confidence,
             "confidence_category": (
                 "high" if confidence >= CONFIDENCE_HIGH_THRESHOLD else
                 "good" if confidence >= CONFIDENCE_GOOD_THRESHOLD else
