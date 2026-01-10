@@ -4960,9 +4960,11 @@ class WorldModel:
         # ========================================
         
         # "Would you take self-awareness?" type questions
+        # BUG #3 FIX: Added "become self aware" pattern to catch queries like
+        # "if given the chance to become self aware would you take it?"
         if any(phrase in query_lower for phrase in [
             "would you", "do you want", "would you choose",
-            "given the opportunity", "if you could"
+            "given the opportunity", "if you could", "become self aware"
         ]):
             # Extract what's being asked about
             if "self" in query_lower and "aware" in query_lower:
