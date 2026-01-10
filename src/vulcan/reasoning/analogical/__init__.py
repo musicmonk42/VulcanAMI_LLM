@@ -61,6 +61,13 @@ from .structure_mapping import (
     StructureMappingEngine,
 )
 
+# Domain parsing - extracted to separate module
+from .domain_parser import (
+    parse_domains_from_query,
+    infer_domains_from_content,
+    extract_domain_structure,
+)
+
 # Re-export NETWORKX_AVAILABLE for backward compatibility
 NETWORKX_AVAILABLE = UTILS_NETWORKX_AVAILABLE
 
@@ -105,6 +112,9 @@ __all__ = [
     "cluster_analogies",
     "explain_analogy_differences",
     "test_semantic_similarity",
+    "parse_domains_from_query",
+    "infer_domains_from_content",
+    "extract_domain_structure",
     # Availability flags
     "NETWORKX_AVAILABLE",
     "SKLEARN_AVAILABLE",
