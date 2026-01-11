@@ -199,8 +199,14 @@ class SubsystemManager:
         """
         Activate reasoning subsystems.
         
+        Activates symbolic, probabilistic, causal, analogical, and cross-modal
+        reasoning components. These subsystems provide the core cognitive
+        capabilities for problem-solving and inference.
+        
+        P3 Fix: Issue #16 - Add comprehensive docstring.
+        
         Returns:
-            Number of subsystems activated
+            Number of subsystems successfully activated
         """
         configs = [
             SubsystemConfig("symbolic", "Symbolic Reasoning"),
@@ -219,8 +225,14 @@ class SubsystemManager:
         """
         Activate memory subsystems.
         
+        Activates long-term memory (vector index), episodic/autobiographical
+        memory, and compressed memory persistence. These provide storage and
+        retrieval for learned experiences and knowledge.
+        
+        P3 Fix: Issue #16 - Add comprehensive docstring.
+        
         Returns:
-            Number of subsystems activated
+            Number of subsystems successfully activated
         """
         configs = [
             SubsystemConfig("ltm", "Long-term Memory (Vector Index)"),
@@ -430,10 +442,16 @@ class SubsystemManager:
     
     def get_summary(self) -> Dict[str, Any]:
         """
-        Get activation summary.
+        Get activation summary with statistics.
+        
+        Provides comprehensive status including activated subsystems,
+        failures, and total available dependencies. Used for logging
+        and monitoring startup health.
+        
+        P3 Fix: Issue #16 - Add comprehensive docstring.
         
         Returns:
-            Dictionary with activation statistics
+            Dictionary with activation statistics and lists
         """
         try:
             deps_status = self.deployment.collective.deps.get_status()
@@ -453,7 +471,15 @@ class SubsystemManager:
         }
     
     def log_summary(self) -> None:
-        """Log activation summary."""
+        """
+        Log activation summary with emoji indicators.
+        
+        Outputs a summary of subsystem activation status and logs any
+        failures with warning level. Used at the end of subsystem
+        initialization to provide visibility into system state.
+        
+        P3 Fix: Issue #16 - Add comprehensive docstring.
+        """
         summary = self.get_summary()
         logger.info(
             f"📊 Subsystems: {summary['available']}/{summary['total']} active, "

@@ -266,12 +266,20 @@ class StartupManager:
                 )
     
     def _ensure_directories(self) -> None:
-        """Ensure required directories exist."""
+        """
+        Ensure required persistence directories exist.
+        
+        Creates data, config, and checkpoint directories with proper
+        permissions. Failures are logged as warnings but don't prevent
+        startup since directories may be created on-demand later.
+        
+        P3 Fix: Issue #16 - Add comprehensive docstring.
+        """
         try:
             Path(DEFAULT_DATA_DIR).mkdir(parents=True, exist_ok=True)
             Path(DEFAULT_CONFIG_DIR).mkdir(parents=True, exist_ok=True)
             Path(DEFAULT_CHECKPOINT_DIR).mkdir(parents=True, exist_ok=True)
-            logger.debug("✓ Persistence directories ensured")
+            logger.debug(f"{LogEmoji.SUCCESS} Persistence directories ensured")
         except Exception as e:
             logger.warning(f"Could not ensure directories: {e}")
     
@@ -372,7 +380,18 @@ class StartupManager:
             logger.warning(f"Failed to set default executor: {e}")
     
     def _get_checkpoint_path(self) -> Optional[str]:
-        """Get checkpoint path if it exists and is valid."""
+        """
+        Get checkpoint path if it exists and is valid.
+        
+        Validates that the checkpoint file exists and is not empty before
+        returning the path. Returns None if checkpoint is invalid or missing,
+        allowing the system to start fresh.
+        
+        P3 Fix: Issue #16 - Add comprehensive docstring.
+        
+        Returns:
+            Valid checkpoint path or None if invalid/missing
+        """
         if not self.settings.checkpoint_path:
             return None
         
@@ -476,7 +495,14 @@ class StartupManager:
             self.app.state.knowledge_distiller = None
     
     def _register_worker_redis(self) -> None:
-        """Register worker in Redis if available."""
+        """
+        Register worker metadata in Redis if available.
+        
+        Stores worker information with a TTL for automatic cleanup of stale
+        entries. This enables multi-instance coordination and worker discovery.
+        
+        P3 Fix: Issue #16 - Add comprehensive docstring.
+        """
         if not self.redis_client:
             return
         
@@ -492,7 +518,7 @@ class StartupManager:
                 REDIS_WORKER_TTL_SECONDS,
                 msgpack.packb(worker_metadata, use_bin_type=True),
             )
-            logger.debug(f"✓ Worker {self.worker_id} registered in Redis")
+            logger.debug(f"{LogEmoji.SUCCESS} Worker {self.worker_id} registered in Redis")
         except Exception as e:
             logger.error(f"Failed to register in Redis: {e}")
     
@@ -844,7 +870,14 @@ class StartupManager:
                 raise RuntimeError(f"Critical phase {meta.name} failed") from e
     
     def _start_memory_guard(self) -> None:
-        """Start memory guard for automatic GC."""
+        """
+        Start memory guard for automatic garbage collection.
+        
+        Monitors memory usage and triggers GC when threshold is exceeded.
+        Helps prevent OOM conditions in long-running processes.
+        
+        P3 Fix: Issue #16 - Add comprehensive docstring.
+        """
         try:
             from vulcan.monitoring.memory_guard import start_memory_guard
             memory_guard = start_memory_guard(
@@ -853,14 +886,22 @@ class StartupManager:
             )
             if memory_guard:
                 logger.debug(
-                    f"✓ MemoryGuard started "
+                    f"{LogEmoji.SUCCESS} MemoryGuard started "
                     f"(threshold={MEMORY_GUARD_THRESHOLD_PERCENT}%)"
                 )
         except Exception as e:
             logger.debug(f"MemoryGuard startup failed: {e}")
     
     def _start_self_optimizer(self) -> None:
-        """Start self-optimizer if available."""
+        """
+        Start self-optimizer for autonomous performance tuning.
+        
+        Monitors latency and memory metrics, automatically adjusting
+        system parameters to meet SLO targets. Optional component that
+        gracefully degrades if unavailable.
+        
+        P3 Fix: Issue #16 - Add comprehensive docstring.
+        """
         try:
             from vulcan.monitoring.self_optimizer import (
                 SELF_OPTIMIZER_AVAILABLE,
@@ -879,7 +920,7 @@ class StartupManager:
             )
             self.app.state.self_optimizer.start()
             logger.debug(
-                f"✓ SelfOptimizer started "
+                f"{LogEmoji.SUCCESS} SelfOptimizer started "
                 f"(target_latency={SELF_OPTIMIZER_TARGET_LATENCY_MS}ms)"
             )
         except Exception as e:
