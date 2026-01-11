@@ -22,7 +22,7 @@ import logging
 import uuid
 from collections import defaultdict, deque
 from concurrent.futures import TimeoutError
-from typing import Any, Dict, List, TYPE_CHECKING
+from typing import Any, Dict, List, Tuple, TYPE_CHECKING
 
 import numpy as np
 
@@ -34,6 +34,9 @@ from ..reasoning_types import (
     ReasoningStep,
     ReasoningType,
 )
+
+# Use existing planning module for plan optimization
+from vulcan.planning import Plan, PlanStep
 
 if TYPE_CHECKING:
     from .orchestrator import UnifiedReasoner
@@ -1069,61 +1072,173 @@ def topological_sort(
     tasks: List[ReasoningTask], dependencies: Dict[str, List[str]]
 ) -> List[ReasoningTask]:
     """
-    Topological sort of tasks based on dependencies.
+    Topological sort of tasks based on dependencies using Kahn's algorithm.
     
-    Uses Kahn's algorithm (BFS with in-degree tracking) to sort tasks.
-    Detects cycles and returns original order if cycle found.
+    This function sorts reasoning tasks in an order such that for every
+    dependency from task A to task B, task A comes before task B in the
+    sorted output. Uses Kahn's algorithm with O(V+E) time complexity.
     
     Args:
-        tasks: List of ReasoningTask objects
-        dependencies: Dict mapping task_id → list of parent task_ids
+        tasks: List of ReasoningTask objects to sort. Each task must have
+            a unique task_id attribute.
+        dependencies: Dict mapping task_id → list of prerequisite task_ids.
+            For example, {"t2": ["t1"]} means task t2 depends on task t1.
+            Empty dict {} means no dependencies (all tasks are independent).
         
     Returns:
-        List of tasks in topological order.
+        List of tasks in topological order. If a cycle is detected,
+        returns the original order with an error logged.
+        
+    Raises:
+        No exceptions are raised; errors are logged and original order returned.
         
     Examples:
-        >>> tasks = [task1, task2, task3]
-        >>> deps = {"task2": ["task1"], "task3": ["task2"]}
+        >>> from vulcan.reasoning.unified.types import ReasoningTask
+        >>> from vulcan.reasoning.reasoning_types import ReasoningType
+        >>> tasks = [
+        ...     ReasoningTask(task_id="t1", task_type=ReasoningType.PROBABILISTIC, input_data="", query={}),
+        ...     ReasoningTask(task_id="t2", task_type=ReasoningType.SYMBOLIC, input_data="", query={}),
+        ...     ReasoningTask(task_id="t3", task_type=ReasoningType.CAUSAL, input_data="", query={}),
+        ... ]
+        >>> deps = {"t2": ["t1"], "t3": ["t2"]}  # t1 → t2 → t3
         >>> sorted_tasks = topological_sort(tasks, deps)
-        [task1, task2, task3]
+        >>> [t.task_id for t in sorted_tasks]
+        ['t1', 't2', 't3']
+        
+        >>> # No dependencies - order preserved
+        >>> sorted_tasks = topological_sort(tasks, {})
+        >>> len(sorted_tasks) == 3
+        True
+    
+    Algorithm:
+        Uses Kahn's algorithm (BFS-based topological sort):
+        1. Build adjacency list and compute in-degrees
+        2. Initialize queue with nodes having in-degree 0
+        3. Process queue: for each node, add to result and decrement
+           in-degrees of neighbors
+        4. If result size != input size, a cycle exists
     
     Note:
-        Returns original order if cycle detected.
-        Uses deque for efficient BFS queue operations.
+        - Returns original order if cycle detected (with error logged).
+        - Uses deque for efficient O(1) queue operations.
+        - For Plan-based ordering with PlanStep objects, consider using
+          Plan.optimize() from vulcan.planning instead.
+        
+    See Also:
+        - :class:`vulcan.planning.Plan`: Plan.optimize() for PlanStep ordering
+        - :func:`execute_hierarchical_reasoning`: Uses this for task ordering
     """
     try:
-        task_lookup = {t.task_id: t for t in tasks}
-        adj = {t.task_id: [] for t in tasks}
-        in_degree = {t.task_id: 0 for t in tasks}
+        # Build lookup table for O(1) task retrieval
+        task_lookup: Dict[str, ReasoningTask] = {t.task_id: t for t in tasks}
+        
+        # Build adjacency list (parent -> children)
+        adj: Dict[str, List[str]] = {t.task_id: [] for t in tasks}
+        
+        # Track in-degree (number of prerequisites) for each task
+        in_degree: Dict[str, int] = {t.task_id: 0 for t in tasks}
 
+        # Build the graph from dependencies
         for child, parents in dependencies.items():
             for parent in parents:
                 if parent in adj and child in adj:
                     adj[parent].append(child)
                     in_degree[child] += 1
 
-        queue = deque([t_id for t_id, deg in in_degree.items() if deg == 0])
-        sorted_order = []
+        # Initialize queue with tasks that have no prerequisites (in-degree 0)
+        queue: deque = deque([t_id for t_id, deg in in_degree.items() if deg == 0])
+        sorted_order: List[ReasoningTask] = []
 
+        # Process queue using Kahn's algorithm
         while queue:
-            u = queue.popleft()
-            if u in task_lookup:
-                sorted_order.append(task_lookup[u])
+            current_id = queue.popleft()
+            if current_id in task_lookup:
+                sorted_order.append(task_lookup[current_id])
 
-            if u in adj:
-                for v in adj[u]:
-                    in_degree[v] -= 1
-                    if in_degree[v] == 0:
-                        queue.append(v)
+            # Decrement in-degree for all children
+            if current_id in adj:
+                for child_id in adj[current_id]:
+                    in_degree[child_id] -= 1
+                    if in_degree[child_id] == 0:
+                        queue.append(child_id)
 
+        # Check for cycles
         if len(sorted_order) == len(tasks):
             return sorted_order
         else:
-            logger.error("Cycle detected in task dependencies, cannot sort.")
+            logger.error(
+                f"Cycle detected in task dependencies, cannot sort. "
+                f"Got {len(sorted_order)} sorted tasks from {len(tasks)} total."
+            )
             return tasks
+            
     except Exception as e:
         logger.error(f"Topological sort failed: {e}")
         return tasks
+
+
+def topological_sort_using_plan(
+    tasks: List[ReasoningTask],
+    dependencies: Dict[str, List[str]],
+) -> List[ReasoningTask]:
+    """
+    Topological sort using Plan.optimize() from the planning module.
+    
+    This is an alternative implementation that converts ReasoningTasks to
+    PlanSteps, uses Plan.optimize() for sorting, and converts back.
+    
+    Args:
+        tasks: List of ReasoningTask objects to sort.
+        dependencies: Dict mapping task_id → list of prerequisite task_ids.
+        
+    Returns:
+        List of tasks in topological order.
+        
+    Note:
+        This function is provided for compatibility with the planning module.
+        For most use cases, the standard topological_sort() function is
+        more efficient as it avoids the conversion overhead.
+        
+    See Also:
+        - :func:`topological_sort`: Direct implementation without conversion
+    """
+    try:
+        # Create Plan object
+        plan = Plan(
+            plan_id=str(uuid.uuid4()),
+            goal="topological_sort",
+            context={},
+        )
+        
+        # Convert tasks to PlanSteps
+        task_lookup: Dict[str, ReasoningTask] = {t.task_id: t for t in tasks}
+        
+        for task in tasks:
+            step = PlanStep(
+                step_id=task.task_id,
+                action=getattr(task.task_type, 'value', str(task.task_type)) if task.task_type else "unknown",
+                resources={"compute": 1.0},
+                duration=1.0,
+                probability=1.0,
+                dependencies=dependencies.get(task.task_id, []),
+            )
+            plan.add_step(step)
+        
+        # Use Plan.optimize() for topological sort
+        plan.optimize()
+        
+        # Convert back to ReasoningTasks in sorted order
+        sorted_tasks: List[ReasoningTask] = []
+        for step in plan.steps:
+            if step.step_id in task_lookup:
+                sorted_tasks.append(task_lookup[step.step_id])
+        
+        return sorted_tasks
+        
+    except Exception as e:
+        logger.error(f"Plan-based topological sort failed: {e}")
+        # Fallback to direct implementation
+        return topological_sort(tasks, dependencies)
 
 
 def merge_dependency_results(

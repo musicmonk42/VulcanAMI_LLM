@@ -35,7 +35,7 @@ from collections import defaultdict, deque
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -64,12 +64,32 @@ from .config import (
     MATH_ERROR_CONFIDENCE_PENALTY,
     MATH_VERIFICATION_CONFIDENCE_BOOST,
     MATH_WEIGHT_ADJUSTMENT_PENALTY,
+    MIN_ENSEMBLE_WEIGHT_FLOOR,
     NUMERICAL_RESULT_KEYS,
     PROBLEM_TYPE_BAYESIAN,
     UNKNOWN_TYPE_FALLBACK_ORDER,
 )
 from .types import ReasoningPlan, ReasoningTask
-from .strategies import _is_result_not_applicable
+from .strategies import _is_result_not_applicable, topological_sort as _strategies_topological_sort
+
+# Use existing planning module for plan creation and optimization
+from vulcan.planning import (
+    Plan,
+    PlanStep,
+    PlanningMethod,
+    HierarchicalGoalSystem,
+    ResourceType,
+    OperationalMode,
+)
+
+# Use existing math verification
+from ..mathematical_verification import (
+    MathematicalVerificationEngine,
+    MathVerificationStatus,
+)
+
+# Use existing cost model
+from ..selection.cost_model import StochasticCostModel
 
 # Import from parent reasoning module
 from ..reasoning_explainer import ReasoningExplainer, SafetyAwareReasoning
@@ -1232,8 +1252,10 @@ class UnifiedReasoner:
             logger.error(f"Plan creation failed: {e}")
             tasks = [task]
 
-        estimated_time = self._estimate_plan_time(tasks)
-        estimated_cost = self._estimate_plan_cost(tasks)
+        # Use Plan class for optimized cost/duration estimation
+        estimated_time, estimated_cost = self._compute_plan_estimates_using_plan_class(
+            tasks, dependencies, task
+        )
 
         plan = ReasoningPlan(
             plan_id=str(uuid.uuid4()),
@@ -1371,45 +1393,249 @@ class UnifiedReasoner:
 
         return task
 
-    def _estimate_plan_time(self, tasks: List[ReasoningTask]) -> float:
-        """Estimate time for plan execution using cost model"""
+    def _reasoning_task_to_plan_step(
+        self,
+        task: ReasoningTask,
+        step_index: int,
+    ) -> PlanStep:
+        """
+        Convert ReasoningTask to PlanStep for use with Plan class.
+        
+        This adapter enables using the existing Plan class's optimize(), total_cost,
+        and expected_duration properties with ReasoningTask objects. It bridges
+        the gap between reasoning orchestration and goal planning domains.
+        
+        Args:
+            task: ReasoningTask to convert. Must have valid task_id and task_type.
+            step_index: Index for generating step_id (unused, task_id preferred).
+            
+        Returns:
+            PlanStep representation of the task with estimated resources and duration.
+            
+        Examples:
+            >>> task = ReasoningTask(
+            ...     task_id="t1",
+            ...     task_type=ReasoningType.SYMBOLIC,
+            ...     input_data="test",
+            ...     query={},
+            ... )
+            >>> step = reasoner._reasoning_task_to_plan_step(task, 0)
+            >>> step.step_id
+            't1'
+            >>> step.action
+            'symbolic'
+            
+        Note:
+            Resources are estimated from task constraints if available, otherwise
+            defaults to {"compute": 1.0}. Duration is estimated from cost_model
+            if available, otherwise defaults to 1.0 second.
+        """
+        # Estimate resources from task constraints or use defaults
+        resources: Dict[str, float] = {}
+        if task.constraints:
+            if "cpu" in task.constraints:
+                resources["cpu"] = float(task.constraints["cpu"])
+            if "memory" in task.constraints:
+                resources["memory"] = float(task.constraints["memory"])
+            if "energy_budget_mj" in task.constraints:
+                resources["energy"] = float(task.constraints["energy_budget_mj"])
+        if not resources:
+            resources = {"compute": 1.0}
+        
+        # Estimate duration from cost model if available
+        duration = 1.0  # Default 1 second
+        if self.cost_model is not None and task.features is not None:
+            try:
+                prediction = self.cost_model.predict_cost(
+                    str(task.task_type), task.features
+                )
+                if "time_ms" in prediction and "mean" in prediction["time_ms"]:
+                    duration = prediction["time_ms"]["mean"] / 1000  # Convert ms to seconds
+            except Exception as e:
+                logger.debug(f"Cost model prediction failed for task {task.task_id}: {e}")
+        
+        return PlanStep(
+            step_id=task.task_id,
+            action=getattr(task.task_type, 'value', str(task.task_type)) if task.task_type else "unknown",
+            resources=resources,
+            duration=duration,
+            probability=0.8,  # Default probability (can be refined based on historical data)
+            dependencies=[],  # Dependencies are set separately from the dependencies dict
+        )
 
+    def _compute_plan_estimates_using_plan_class(
+        self,
+        tasks: List[ReasoningTask],
+        dependencies: Dict[str, List[str]],
+        original_task: ReasoningTask,
+    ) -> Tuple[float, float]:
+        """
+        Use Plan class to compute optimized cost and duration estimates.
+        
+        This method creates a Plan object from ReasoningTasks, uses its
+        optimize() method for topological ordering, and extracts
+        total_cost and expected_duration properties. This approach
+        reuses the existing planning infrastructure instead of duplicating
+        estimation logic.
+        
+        Args:
+            tasks: List of ReasoningTask objects to estimate.
+            dependencies: Task dependency graph (task_id -> list of prerequisite task_ids).
+            original_task: Original task for context (goal extraction).
+            
+        Returns:
+            Tuple of (estimated_time, estimated_cost) where:
+                - estimated_time: Total expected duration in seconds
+                - estimated_cost: Total resource cost (arbitrary units)
+                
+        Examples:
+            >>> tasks = [task1, task2]
+            >>> deps = {"task2": ["task1"]}
+            >>> time, cost = reasoner._compute_plan_estimates_using_plan_class(
+            ...     tasks, deps, original_task
+            ... )
+            >>> isinstance(time, float) and isinstance(cost, float)
+            True
+            
+        Note:
+            Falls back to legacy estimation if Plan class fails.
+            The Plan.optimize() method uses Kahn's algorithm for topological sort.
+        """
+        try:
+            # Create Plan from tasks
+            goal = ""
+            if original_task.query:
+                goal = str(original_task.query.get("question", ""))
+            
+            plan = Plan(
+                plan_id=str(uuid.uuid4()),
+                goal=goal,
+                context=original_task.query or {},
+            )
+            
+            # Convert tasks to PlanSteps and add to plan
+            for i, task in enumerate(tasks):
+                step = self._reasoning_task_to_plan_step(task, i)
+                # Set dependencies from the dependencies dict
+                step.dependencies = dependencies.get(task.task_id, [])
+                plan.add_step(step)
+            
+            # Optimize step ordering using Plan.optimize() (topological sort)
+            plan.optimize()
+            
+            # Return Plan's computed estimates
+            return (plan.expected_duration, plan.total_cost)
+            
+        except Exception as e:
+            logger.warning(f"Plan class estimation failed, falling back to legacy: {e}")
+            # Fallback to legacy estimation for robustness
+            estimated_time = self._estimate_plan_time_legacy(tasks)
+            estimated_cost = self._estimate_plan_cost_legacy(tasks)
+            return (estimated_time, estimated_cost)
+
+    def _estimate_plan_time_legacy(self, tasks: List[ReasoningTask]) -> float:
+        """
+        Legacy time estimation for plan execution using cost model.
+        
+        .. deprecated::
+            Use :meth:`_compute_plan_estimates_using_plan_class` instead.
+            This method is retained for backward compatibility with existing tests.
+        
+        Args:
+            tasks: List of ReasoningTask objects to estimate time for.
+            
+        Returns:
+            Total estimated time in seconds (defaults to 1 second per task).
+            
+        Examples:
+            >>> tasks = [task1, task2, task3]
+            >>> time = reasoner._estimate_plan_time_legacy(tasks)
+            >>> time >= 3.0  # At least 1 second per task
+            True
+        """
         total_time = 0
 
         for task in tasks:
             try:
-                if self.cost_model and task.features is not None:
+                if self.cost_model is not None and task.features is not None:
                     prediction = self.cost_model.predict_cost(
                         str(task.task_type), task.features
                     )
                     total_time += prediction["time_ms"]["mean"]
                 else:
-                    total_time += 1000
+                    total_time += 1000  # Default 1000ms per task
             except Exception as e:
-                logger.warning(f"Time estimation failed: {e}")
+                logger.warning(f"Time estimation failed for task {task.task_id}: {e}")
                 total_time += 1000
 
-        return total_time / 1000
+        return total_time / 1000  # Convert to seconds
 
-    def _estimate_plan_cost(self, tasks: List[ReasoningTask]) -> float:
-        """Estimate total cost for plan execution"""
-
+    def _estimate_plan_cost_legacy(self, tasks: List[ReasoningTask]) -> float:
+        """
+        Legacy cost estimation for plan execution.
+        
+        .. deprecated::
+            Use :meth:`_compute_plan_estimates_using_plan_class` instead.
+            This method is retained for backward compatibility with existing tests.
+        
+        Args:
+            tasks: List of ReasoningTask objects to estimate cost for.
+            
+        Returns:
+            Total estimated cost in arbitrary units (defaults to 100 per task).
+            
+        Examples:
+            >>> tasks = [task1, task2, task3]
+            >>> cost = reasoner._estimate_plan_cost_legacy(tasks)
+            >>> cost >= 300  # At least 100 per task
+            True
+        """
         total_cost = 0
 
         for task in tasks:
             try:
-                if self.cost_model and task.features is not None:
+                if self.cost_model is not None and task.features is not None:
                     cost_estimate = self.cost_model.estimate_total_cost(
                         str(task.task_type), task.features
                     )
                     total_cost += cost_estimate
                 else:
-                    total_cost += 100
+                    total_cost += 100  # Default 100 units per task
             except Exception as e:
-                logger.warning(f"Cost estimation failed: {e}")
+                logger.warning(f"Cost estimation failed for task {task.task_id}: {e}")
                 total_cost += 100
 
         return total_cost
+
+    def _estimate_plan_time(self, tasks: List[ReasoningTask]) -> float:
+        """
+        Estimate time for plan execution.
+        
+        Delegates to :meth:`_estimate_plan_time_legacy` for backward compatibility.
+        New code should use :meth:`_compute_plan_estimates_using_plan_class`.
+        
+        Args:
+            tasks: List of ReasoningTask objects to estimate time for.
+            
+        Returns:
+            Total estimated time in seconds.
+        """
+        return self._estimate_plan_time_legacy(tasks)
+
+    def _estimate_plan_cost(self, tasks: List[ReasoningTask]) -> float:
+        """
+        Estimate total cost for plan execution.
+        
+        Delegates to :meth:`_estimate_plan_cost_legacy` for backward compatibility.
+        New code should use :meth:`_compute_plan_estimates_using_plan_class`.
+        
+        Args:
+            tasks: List of ReasoningTask objects to estimate cost for.
+            
+        Returns:
+            Total estimated cost in arbitrary units.
+        """
+        return self._estimate_plan_cost_legacy(tasks)
 
     def _record_execution(
         self,
@@ -3064,41 +3290,40 @@ class UnifiedReasoner:
     def _topological_sort(
         self, tasks: List[ReasoningTask], dependencies: Dict[str, List[str]]
     ) -> List[ReasoningTask]:
-        """Topological sort of tasks based on dependencies"""
-
-        try:
-            task_lookup = {t.task_id: t for t in tasks}
-            adj = {t.task_id: [] for t in tasks}
-            in_degree = {t.task_id: 0 for t in tasks}
-
-            for child, parents in dependencies.items():
-                for parent in parents:
-                    if parent in adj and child in adj:
-                        adj[parent].append(child)
-                        in_degree[child] += 1
-
-            queue = deque([t_id for t_id, deg in in_degree.items() if deg == 0])
-            sorted_order = []
-
-            while queue:
-                u = queue.popleft()
-                if u in task_lookup:
-                    sorted_order.append(task_lookup[u])
-
-                if u in adj:
-                    for v in adj[u]:
-                        in_degree[v] -= 1
-                        if in_degree[v] == 0:
-                            queue.append(v)
-
-            if len(sorted_order) == len(tasks):
-                return sorted_order
-            else:
-                logger.error("Cycle detected in task dependencies, cannot sort.")
-                return tasks
-        except Exception as e:
-            logger.error(f"Topological sort failed: {e}")
-            return tasks
+        """
+        Topological sort of tasks based on dependencies.
+        
+        Delegates to :func:`strategies.topological_sort` to avoid code duplication.
+        The strategies module implementation uses Kahn's algorithm for O(V+E)
+        time complexity where V is number of tasks and E is number of dependencies.
+        
+        Args:
+            tasks: List of ReasoningTask objects to sort.
+            dependencies: Dict mapping task_id -> list of prerequisite task_ids.
+                For example, {"t2": ["t1"], "t3": ["t1", "t2"]} means t2 depends
+                on t1, and t3 depends on both t1 and t2.
+            
+        Returns:
+            List of tasks in topological order. Tasks with no dependencies come
+            first, followed by tasks whose dependencies have been satisfied.
+            
+        Examples:
+            >>> tasks = [task1, task2, task3]  # task_ids: "t1", "t2", "t3"
+            >>> dependencies = {"t2": ["t1"], "t3": ["t2"]}
+            >>> sorted_tasks = reasoner._topological_sort(tasks, dependencies)
+            >>> [t.task_id for t in sorted_tasks]
+            ['t1', 't2', 't3']
+            
+        Note:
+            - Returns original order if cycle detected.
+            - For Plan-based ordering, use Plan.optimize() instead which
+              operates on PlanStep objects with embedded dependencies.
+            
+        See Also:
+            - :meth:`_compute_plan_estimates_using_plan_class`: Uses Plan.optimize()
+            - :func:`strategies.topological_sort`: The underlying implementation
+        """
+        return _strategies_topological_sort(tasks, dependencies)
 
     def _merge_dependency_results(
         self, original_input: Any, dep_results: List[ReasoningResult]
@@ -3868,8 +4093,14 @@ class UnifiedReasoner:
             explanation=f"Reasoning error: {error}",
         )
 
-    # State persistence methods (save_state, load_state) have been
-    # moved to persistence.py for separation of concerns.
+    # State persistence methods - imported from persistence.py for separation of concerns
+    from .persistence import save_state as save_state
+    from .persistence import load_state as load_state
+
+    # Multimodal reasoning methods - imported from multimodal_handler.py for separation of concerns
+    from .multimodal_handler import reason_multimodal as reason_multimodal
+    from .multimodal_handler import reason_counterfactual as reason_counterfactual
+    from .multimodal_handler import reason_by_analogy as reason_by_analogy
 
     def get_statistics(self) -> Dict[str, Any]:
         """Get comprehensive statistics"""
