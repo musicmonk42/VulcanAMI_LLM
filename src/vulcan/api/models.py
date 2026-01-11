@@ -94,6 +94,38 @@ class ExplainRequest(BaseModel):
     context: Dict[str, Any] = {}
 
 
+class FeedbackRequest(BaseModel):
+    """Request model for submitting feedback."""
+    feedback_type: str = Field(default="rating", description="Type of feedback: rating, correction, preference, thumbs")
+    query_id: str = Field(..., description="ID of the original query")
+    response_id: str = Field(..., description="ID of the response being rated")
+    reward_signal: float = Field(default=0.0, ge=-1.0, le=1.0, description="Reward signal from -1.0 to 1.0")
+    content: Optional[Any] = Field(default=None, description="Optional feedback content")
+    context: Optional[Dict[str, Any]] = Field(default=None, description="Optional context")
+
+
+class ThumbsFeedbackRequest(BaseModel):
+    """Request model for thumbs up/down feedback."""
+    query_id: str = Field(..., description="ID of the original query")
+    response_id: str = Field(..., description="ID of the response being rated")
+    is_positive: bool = Field(default=True, description="True for thumbs up, False for thumbs down")
+
+
+class UnifiedChatRequest(BaseModel):
+    """Request model for unified chat that leverages entire platform."""
+    message: str
+    max_tokens: int = 2000  # Increased for diagnostic purposes (was 1024)
+    history: List[Dict[str, str]] = []
+    # Conversation tracking - optional with auto-generation support
+    conversation_id: Optional[str] = None
+    # These are handled automatically but can be overridden
+    enable_reasoning: bool = True
+    enable_memory: bool = True
+    enable_safety: bool = True
+    enable_planning: bool = True
+    enable_causal: bool = True
+
+
 # ============================================================
 # RESPONSE MODELS
 # ============================================================
@@ -216,6 +248,9 @@ __all__ = [
     "ChatRequest",
     "ReasonRequest",
     "ExplainRequest",
+    "FeedbackRequest",
+    "ThumbsFeedbackRequest",
+    "UnifiedChatRequest",
     # Response models
     "StepResponse",
     "ChatMessage",

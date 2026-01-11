@@ -41,6 +41,20 @@ import logging
 from vulcan.server import create_app
 from vulcan.settings import Settings
 
+# ====================================================================
+# BACKWARD COMPATIBILITY EXPORTS
+# ====================================================================
+# These re-exports maintain compatibility with src/full_platform.py
+# which imports models and handlers directly from src.vulcan.main
+
+# Feedback models and handlers (used by full_platform.py proxy endpoints)
+from vulcan.api.models import FeedbackRequest, ThumbsFeedbackRequest, UnifiedChatRequest
+from vulcan.endpoints.feedback import (
+    submit_feedback,
+    submit_thumbs_feedback,
+    get_feedback_stats,
+)
+
 # Import all endpoint routers
 from vulcan.endpoints import (
     agents_router,
