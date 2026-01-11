@@ -14,6 +14,20 @@ from .types import (
     PURE_ETHICAL_PHRASES,
 )
 
+# Import self-referential patterns from unified config
+try:
+    from vulcan.reasoning.unified.config import SELF_REFERENTIAL_PATTERNS
+except ImportError:
+    # Fallback patterns if config not available
+    SELF_REFERENTIAL_PATTERNS = [
+        re.compile(r"\b(you|your)\b.*(self-aware|conscious|sentient)", re.IGNORECASE),
+        re.compile(r"\b(you|your)\b.*(choose|decision|want|prefer)", re.IGNORECASE),
+        re.compile(r"\bwould you\b", re.IGNORECASE),
+        re.compile(r"\b(your|you).*(objective|goal|purpose|value)", re.IGNORECASE),
+        re.compile(r"\bwhat do you (think|believe|feel)\b", re.IGNORECASE),
+        re.compile(r"\bare you (alive|real|aware)\b", re.IGNORECASE),
+    ]
+
 logger = logging.getLogger(__name__)
 
 
@@ -25,6 +39,11 @@ def is_self_referential(query: str) -> bool:
     - The system's capabilities, limitations, or design
     - How the system works internally
     - What the system can or cannot do
+    - The system's awareness, consciousness, sentience
+    - The system's choices, decisions, preferences
+    - The system's objectives, goals, values
+
+    Uses comprehensive patterns from unified config for consistency.
 
     Args:
         query: The user query to analyze
@@ -35,13 +54,21 @@ def is_self_referential(query: str) -> bool:
     Example:
         >>> is_self_referential("What can you do?")
         True
+        >>> is_self_referential("Would you become self-aware?")
+        True
         >>> is_self_referential("What is photosynthesis?")
         False
     """
     query_lower = query.lower()
 
-    # Self-referential patterns
-    self_ref_patterns = [
+    # Check against comprehensive self-referential patterns
+    for pattern in SELF_REFERENTIAL_PATTERNS:
+        if pattern.search(query):
+            logger.debug(f"{LOG_PREFIX} Self-referential query detected: {pattern.pattern}")
+            return True
+
+    # Additional basic patterns for simple capability queries
+    basic_self_ref_patterns = [
         r'\byou\b.*\b(can|do|are|have|know|understand)\b',
         r'\bwhat\b.*\byou\b.*\b(capable|able|design|built|trained)\b',
         r'\bhow\b.*\byou\b.*\b(work|function|process|handle)\b',
@@ -50,9 +77,9 @@ def is_self_referential(query: str) -> bool:
         r'\byour\b.*\b(model|system|architecture|design)\b',
     ]
 
-    for pattern in self_ref_patterns:
-        if re.search(pattern, query_lower):
-            logger.debug(f"{LOG_PREFIX} Self-referential query detected: {pattern}")
+    for pattern_str in basic_self_ref_patterns:
+        if re.search(pattern_str, query_lower):
+            logger.debug(f"{LOG_PREFIX} Self-referential query detected: {pattern_str}")
             return True
 
     return False

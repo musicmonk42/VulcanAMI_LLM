@@ -80,6 +80,14 @@ def _is_result_not_applicable(result: Any) -> bool:
     if result is None:
         return True
     
+    # Check for UNKNOWN type with error conclusion (indicates failure)
+    if hasattr(result, "reasoning_type") and result.reasoning_type == ReasoningType.UNKNOWN:
+        # UNKNOWN with error or very low confidence should be filtered
+        if isinstance(result.conclusion, dict) and result.conclusion.get("error"):
+            return True
+        if hasattr(result, "confidence") and result.confidence < 0.15:
+            return True
+    
     # Check conclusion for not_applicable flag
     if isinstance(result.conclusion, dict):
         if result.conclusion.get("not_applicable", False):
@@ -104,7 +112,7 @@ def _is_result_not_applicable(result: Any) -> bool:
             return True
     
     # Check for very low confidence (<0.15) which usually indicates non-applicability
-    # Note: UNKNOWN type is allowed low confidence for initialization
+    # Note: UNKNOWN type is allowed low confidence for initialization, but checked above
     if (
         hasattr(result, "confidence")
         and hasattr(result, "reasoning_type")
