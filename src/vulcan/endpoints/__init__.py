@@ -13,6 +13,7 @@ from vulcan.endpoints.memory import router as memory_router
 from vulcan.endpoints.monitoring import router as monitoring_router
 from vulcan.endpoints.planning import router as planning_router
 from vulcan.endpoints.reasoning import router as reasoning_router
+from vulcan.endpoints.feedback import router as feedback_router
 from vulcan.endpoints.self_improvement import router as self_improvement_router
 from vulcan.endpoints.status import router as status_router
 from vulcan.endpoints.unified_chat import router as unified_chat_router
@@ -29,4 +30,5 @@ __all__ = [
     "self_improvement_router",
     "status_router",
     "unified_chat_router",
+    "feedback_router",
 ]
