@@ -6,6 +6,100 @@ All magic numbers are extracted here with clear documentation.
 """
 
 # ============================================================
+# Deployment Mode Configuration (P2 Fix: Issue #9)
+# ============================================================
+
+class DeploymentMode:
+    """
+    Deployment mode constants for configuration profiles.
+    
+    Defines valid deployment modes and provides validation.
+    Each mode corresponds to a configuration profile with
+    different resource limits and feature flags.
+    """
+    
+    PRODUCTION = "production"
+    """Production mode: optimized for performance and stability"""
+    
+    TESTING = "testing"
+    """Testing mode: optimized for test execution and mocking"""
+    
+    DEVELOPMENT = "development"
+    """Development mode: verbose logging and debug features enabled"""
+    
+    VALID_MODES = {PRODUCTION, TESTING, DEVELOPMENT}
+    """Set of all valid deployment mode strings"""
+    
+    DEFAULT = DEVELOPMENT
+    """Default mode when invalid mode is specified"""
+    
+    @classmethod
+    def is_valid(cls, mode: str) -> bool:
+        """
+        Check if a deployment mode is valid.
+        
+        Args:
+            mode: Deployment mode string to validate
+            
+        Returns:
+            True if mode is valid, False otherwise
+        """
+        return mode in cls.VALID_MODES
+    
+    @classmethod
+    def normalize(cls, mode: str) -> str:
+        """
+        Normalize a deployment mode to valid value.
+        
+        If the mode is invalid, returns the default mode.
+        
+        Args:
+            mode: Deployment mode string to normalize
+            
+        Returns:
+            Normalized deployment mode string
+        """
+        return mode if cls.is_valid(mode) else cls.DEFAULT
+
+
+# ============================================================
+# Logging Emoji Constants (P3 Fix: Issue #15)
+# ============================================================
+
+class LogEmoji:
+    """
+    Standardized emoji constants for consistent logging.
+    
+    Provides visual indicators in logs for quick status recognition.
+    Use consistently across all logging statements.
+    """
+    
+    SUCCESS = "✓"
+    """Minor success indicator (e.g., component initialized)"""
+    
+    SUCCESS_MAJOR = "✅"
+    """Major success indicator (e.g., full startup complete)"""
+    
+    WARNING = "⚠️"
+    """Warning indicator for degraded state or recoverable issues"""
+    
+    ERROR = "❌"
+    """Error indicator for failures"""
+    
+    INFO = "ℹ️"
+    """Information indicator for status updates"""
+    
+    ROCKET = "🚀"
+    """Launch/start indicator for significant events"""
+    
+    CHART = "📊"
+    """Metrics/statistics indicator"""
+    
+    STOP = "🛑"
+    """Stop/shutdown indicator"""
+
+
+# ============================================================
 # Thread Pool Configuration
 # ============================================================
 
@@ -113,40 +207,3 @@ DEFAULT_CHECKPOINT_DIR = "checkpoints"
 
 LLM_CONFIG_PATH = "configs/llm_config.yaml"
 """Default path to LLM configuration file."""
-
-
-# ============================================================
-# Startup Phase Configuration
-# ============================================================
-
-class StartupPhaseConfig:
-    """Configuration metadata for startup phases."""
-    
-    # Phase timeout limits (seconds)
-    CONFIGURATION_TIMEOUT = 30
-    CORE_SERVICES_TIMEOUT = 60
-    REASONING_SYSTEMS_TIMEOUT = 120
-    MEMORY_SYSTEMS_TIMEOUT = 60
-    PRELOADING_TIMEOUT = 180
-    MONITORING_TIMEOUT = 30
-    
-    # Phase criticality (determines if failure stops startup)
-    CRITICAL_PHASES = {
-        "CONFIGURATION",
-        "CORE_SERVICES",
-    }
-    
-    # Phase parallel groups (can be initialized concurrently)
-    PARALLEL_GROUPS = {
-        "models": [
-            "bert_model",
-            "sentence_transformer",
-            "hierarchical_memory",
-            "unified_learning_system",
-        ],
-        "singletons": [
-            "reasoning_singletons",
-            "tool_selector",
-            "problem_decomposer",
-        ],
-    }

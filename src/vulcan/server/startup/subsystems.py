@@ -2,12 +2,20 @@
 Subsystem Management
 
 Manages activation and initialization of VULCAN-AGI subsystems
-with proper error isolation and status tracking.
+with proper error isolation, status tracking, and thread safety.
+
+This module provides a centralized manager for activating cognitive
+subsystems with:
+- Error isolation: failures don't cascade
+- Status tracking: all activations and failures are recorded
+- Thread safety: concurrent activations are synchronized
+- Flexible configuration: subsystems can be critical or optional
 """
 
 import logging
 from typing import Any, Optional, List, Dict, Callable
 from dataclasses import dataclass
+from threading import Lock
 
 
 logger = logging.getLogger(__name__)
@@ -34,10 +42,13 @@ class SubsystemConfig:
 
 class SubsystemManager:
     """
-    Manages subsystem activation with error isolation.
+    Manages subsystem activation with error isolation and thread safety.
     
     Activates subsystems in logical groups, tracks success/failure,
-    and provides detailed status reporting.
+    and provides detailed status reporting. All list modifications
+    are protected by locks for thread safety.
+    
+    P2 Fix: Issue #13 - Thread-safe list modifications.
     """
     
     def __init__(self, deployment: Any):
@@ -50,10 +61,13 @@ class SubsystemManager:
         self.deployment = deployment
         self.activated: List[str] = []
         self.failed: List[Dict[str, str]] = []
+        self._lock = Lock()  # P2 Fix: Issue #13 - Thread safety
     
     def _activate_single(self, config: SubsystemConfig) -> bool:
         """
         Activate a single subsystem with error handling.
+        
+        P2 Fix: Issue #13 - Thread-safe list modifications.
         
         Args:
             config: Subsystem configuration
@@ -73,10 +87,11 @@ class SubsystemManager:
             if not hasattr(deps, config.attr_name):
                 if config.critical:
                     logger.error(f"Critical subsystem {config.display_name} not found")
-                    self.failed.append({
-                        "name": config.display_name,
-                        "error": "Attribute not found"
-                    })
+                    with self._lock:  # P2 Fix: Issue #13
+                        self.failed.append({
+                            "name": config.display_name,
+                            "error": "Attribute not found"
+                        })
                     return False
                 logger.debug(f"{config.display_name} not available")
                 return False
@@ -85,10 +100,11 @@ class SubsystemManager:
             if subsystem is None:
                 if config.critical:
                     logger.error(f"Critical subsystem {config.display_name} is None")
-                    self.failed.append({
-                        "name": config.display_name,
-                        "error": "Subsystem is None"
-                    })
+                    with self._lock:  # P2 Fix: Issue #13
+                        self.failed.append({
+                            "name": config.display_name,
+                            "error": "Subsystem is None"
+                        })
                     return False
                 logger.debug(f"{config.display_name} is None")
                 return False
@@ -97,7 +113,8 @@ class SubsystemManager:
             if config.needs_init and hasattr(subsystem, "initialize"):
                 subsystem.initialize()
             
-            self.activated.append(config.display_name)
+            with self._lock:  # P2 Fix: Issue #13
+                self.activated.append(config.display_name)
             logger.debug(f"✓ {config.display_name} activated")
             return True
             
@@ -107,10 +124,11 @@ class SubsystemManager:
                     f"Critical subsystem {config.display_name} failed: {e}",
                     exc_info=True
                 )
-                self.failed.append({
-                    "name": config.display_name,
-                    "error": str(e)
-                })
+                with self._lock:  # P2 Fix: Issue #13
+                    self.failed.append({
+                        "name": config.display_name,
+                        "error": str(e)
+                    })
             else:
                 logger.warning(
                     f"Non-critical subsystem {config.display_name} failed: {e}",
@@ -122,17 +140,29 @@ class SubsystemManager:
         """
         Activate and scale agent pool.
         
+        P1 Fix: Issue #7 - Standardized error tracking.
+        
         Returns:
             True if successful, False otherwise
         """
         try:
             if not hasattr(self.deployment.collective, "agent_pool"):
-                logger.warning("Agent Pool not available - distributed processing disabled")
+                logger.debug("Agent Pool not available - distributed processing disabled")
+                with self._lock:
+                    self.failed.append({
+                        "name": "Agent Pool",
+                        "error": "Attribute not found"
+                    })
                 return False
             
             pool = self.deployment.collective.agent_pool
             if pool is None:
-                logger.warning("Agent Pool is None - distributed processing disabled")
+                logger.debug("Agent Pool is None - distributed processing disabled")
+                with self._lock:
+                    self.failed.append({
+                        "name": "Agent Pool",
+                        "error": "Agent Pool is None"
+                    })
                 return False
             
             pool_status = pool.get_pool_status()
@@ -151,12 +181,18 @@ class SubsystemManager:
                 
                 total_agents = pool.get_pool_status()["total_agents"]
             
-            self.activated.append("Agent Pool")
+            with self._lock:
+                self.activated.append("Agent Pool")
             logger.debug(f"✓ Agent Pool: {total_agents} agents ({idle_agents} idle)")
             return True
             
         except Exception as e:
             logger.warning(f"Agent Pool activation failed: {e}", exc_info=True)
+            with self._lock:
+                self.failed.append({
+                    "name": "Agent Pool",
+                    "error": str(e)
+                })
             return False
     
     def activate_reasoning_subsystems(self) -> int:
@@ -235,6 +271,8 @@ class SubsystemManager:
         """
         Activate world model and meta-reasoning components.
         
+        P1 Fix: Issue #7 - Standardized error tracking.
+        
         Args:
             app_state: FastAPI application state
             
@@ -244,11 +282,21 @@ class SubsystemManager:
         try:
             if not hasattr(self.deployment.collective.deps, "world_model"):
                 logger.debug("World Model not available")
+                with self._lock:
+                    self.failed.append({
+                        "name": "World Model",
+                        "error": "Attribute not found"
+                    })
                 return False
             
             world_model = self.deployment.collective.deps.world_model
             if world_model is None:
                 logger.debug("World Model is None")
+                with self._lock:
+                    self.failed.append({
+                        "name": "World Model", 
+                        "error": "World Model is None"
+                    })
                 return False
             
             # Check for meta-reasoning components
@@ -269,7 +317,8 @@ class SubsystemManager:
             except Exception as e:
                 logger.warning(f"SystemObserver initialization failed: {e}")
             
-            self.activated.append("World Model")
+            with self._lock:
+                self.activated.append("World Model")
             if sub_components:
                 logger.info(f"✓ World Model with {len(sub_components)} components: {', '.join(sub_components)}")
             else:
@@ -278,6 +327,11 @@ class SubsystemManager:
             
         except Exception as e:
             logger.warning(f"World Model activation failed: {e}", exc_info=True)
+            with self._lock:
+                self.failed.append({
+                    "name": "World Model",
+                    "error": str(e)
+                })
             return False
     
     def activate_planning_subsystems(self) -> int:

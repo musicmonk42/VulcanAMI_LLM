@@ -3,6 +3,13 @@ Startup Manager
 
 Orchestrates the VULCAN-AGI startup process through well-defined phases
 with proper error isolation, health validation, and status reporting.
+
+This module implements a robust phased initialization strategy with:
+- Dependency ordering: phases execute sequentially with proper dependencies
+- Error isolation: non-critical phase failures don't prevent startup
+- Health validation: comprehensive checks after initialization
+- Resource cleanup: guaranteed cleanup on failure or shutdown
+- Timeout enforcement: phases have configurable time limits
 """
 
 import asyncio
@@ -13,6 +20,8 @@ from pathlib import Path
 from threading import Thread
 from typing import Any, Optional, Dict, Callable
 from concurrent.futures import ThreadPoolExecutor
+
+from vulcan.server import state
 
 from .constants import (
     DEFAULT_THREAD_POOL_SIZE,
@@ -27,6 +36,8 @@ from .constants import (
     DEFAULT_DATA_DIR,
     DEFAULT_CONFIG_DIR,
     DEFAULT_CHECKPOINT_DIR,
+    DeploymentMode,
+    LogEmoji,
 )
 from .phases import StartupPhase, get_phase_metadata, is_critical_phase
 from .subsystems import SubsystemManager
@@ -73,10 +84,16 @@ class StartupManager:
     
     async def run_startup(self) -> None:
         """
-        Execute complete startup sequence.
+        Execute complete startup sequence with timeout enforcement.
+        
+        Implements robust error handling with guaranteed resource cleanup.
+        Each phase has a configurable timeout to prevent indefinite hangs.
+        If startup fails after executor creation, the executor is properly
+        cleaned up to prevent thread leaks.
         
         Raises:
             RuntimeError: If critical phase fails
+            asyncio.TimeoutError: If phase exceeds timeout limit
         """
         logger.info(
             f"Starting VULCAN-AGI worker {self.worker_id} "
@@ -84,23 +101,47 @@ class StartupManager:
         )
         
         try:
-            # Phase 1: Configuration
-            await self._phase_configuration()
+            # Phase 1: Configuration (P1 Fix: Issue #6 - timeout enforcement)
+            meta = get_phase_metadata(StartupPhase.CONFIGURATION)
+            await asyncio.wait_for(
+                self._phase_configuration(), 
+                timeout=meta.timeout_seconds
+            )
             
-            # Phase 2: Core Services
-            await self._phase_core_services()
+            # Phase 2: Core Services (P1 Fix: Issue #6 - timeout enforcement)
+            meta = get_phase_metadata(StartupPhase.CORE_SERVICES)
+            await asyncio.wait_for(
+                self._phase_core_services(), 
+                timeout=meta.timeout_seconds
+            )
             
-            # Phase 3: Reasoning Systems
-            await self._phase_reasoning_systems()
+            # Phase 3: Reasoning Systems (P1 Fix: Issue #6 - timeout enforcement)
+            meta = get_phase_metadata(StartupPhase.REASONING_SYSTEMS)
+            await asyncio.wait_for(
+                self._phase_reasoning_systems(), 
+                timeout=meta.timeout_seconds
+            )
             
-            # Phase 4: Memory Systems
-            await self._phase_memory_systems()
+            # Phase 4: Memory Systems (P1 Fix: Issue #6 - timeout enforcement)
+            meta = get_phase_metadata(StartupPhase.MEMORY_SYSTEMS)
+            await asyncio.wait_for(
+                self._phase_memory_systems(), 
+                timeout=meta.timeout_seconds
+            )
             
-            # Phase 5: Preloading
-            await self._phase_preloading()
+            # Phase 5: Preloading (P1 Fix: Issue #6 - timeout enforcement)
+            meta = get_phase_metadata(StartupPhase.PRELOADING)
+            await asyncio.wait_for(
+                self._phase_preloading(), 
+                timeout=meta.timeout_seconds
+            )
             
-            # Phase 6: Monitoring
-            await self._phase_monitoring()
+            # Phase 6: Monitoring (P1 Fix: Issue #6 - timeout enforcement)
+            meta = get_phase_metadata(StartupPhase.MONITORING)
+            await asyncio.wait_for(
+                self._phase_monitoring(), 
+                timeout=meta.timeout_seconds
+            )
             
             # Health validation
             await self._validate_health()
@@ -109,12 +150,34 @@ class StartupManager:
             elapsed = time.time() - self.startup_time
             logger.info(f"✅ VULCAN-AGI worker {self.worker_id} started in {elapsed:.2f}s")
             
+        except asyncio.TimeoutError as e:
+            logger.error(f"Startup phase timed out", exc_info=True)
+            # Clean up executor on failure (P0 Fix: Issue #3)
+            if self.executor:
+                try:
+                    self.executor.shutdown(wait=False, cancel_futures=True)
+                    logger.debug("Executor cleaned up after timeout")
+                except Exception as cleanup_error:
+                    logger.warning(f"Error cleaning up executor: {cleanup_error}")
+            raise RuntimeError("Startup phase timed out") from e
         except Exception as e:
             logger.error(f"Startup failed: {e}", exc_info=True)
+            # Clean up executor on failure (P0 Fix: Issue #3)
+            if self.executor:
+                try:
+                    self.executor.shutdown(wait=False, cancel_futures=True)
+                    logger.debug("Executor cleaned up after startup failure")
+                except Exception as cleanup_error:
+                    logger.warning(f"Error cleaning up executor: {cleanup_error}")
             raise
     
     async def _phase_configuration(self) -> None:
-        """Phase 1: Load configuration."""
+        """
+        Phase 1: Load configuration.
+        
+        Loads the appropriate configuration profile based on deployment mode
+        and applies sensible defaults for missing attributes.
+        """
         phase = StartupPhase.CONFIGURATION
         meta = get_phase_metadata(phase)
         
@@ -124,10 +187,8 @@ class StartupManager:
             # Import required modules
             from vulcan.config import get_config, AgentConfig
             
-            # Load configuration profile
-            profile_name = self.settings.deployment_mode
-            if profile_name not in ["production", "testing", "development"]:
-                profile_name = "development"
+            # Load configuration profile (P2 Fix: Issue #9 - use constants)
+            profile_name = DeploymentMode.normalize(self.settings.deployment_mode)
             
             config = get_config(profile_name)
             
@@ -148,7 +209,7 @@ class StartupManager:
             self._ensure_directories()
             
             self.phase_results[phase] = True
-            logger.info(f"✓ Configuration loaded ({profile_name} profile)")
+            logger.info(f"{LogEmoji.SUCCESS} Configuration loaded ({profile_name} profile)")
             
         except Exception as e:
             self.phase_results[phase] = False
@@ -281,7 +342,21 @@ class StartupManager:
                 raise RuntimeError(f"Critical phase {meta.name} failed") from e
     
     def _setup_thread_pool(self) -> None:
-        """Setup ThreadPoolExecutor for parallel tasks."""
+        """
+        Setup ThreadPoolExecutor for parallel cognitive tasks.
+        
+        Creates a thread pool with DEFAULT_THREAD_POOL_SIZE workers and sets it
+        as the default executor for the event loop. The executor is stored in
+        app.state for later cleanup during shutdown.
+        
+        The thread pool is used for CPU-bound operations that would otherwise
+        block the async event loop, such as model inference and reasoning tasks.
+        
+        P3 Fix: Issue #16 - Add comprehensive docstring.
+        
+        Raises:
+            No exceptions raised; failures are logged as warnings.
+        """
         try:
             loop = asyncio.get_event_loop()
             self.executor = ThreadPoolExecutor(
@@ -291,7 +366,7 @@ class StartupManager:
             loop.set_default_executor(self.executor)
             self.app.state.executor = self.executor
             logger.debug(
-                f"✓ ThreadPoolExecutor: {DEFAULT_THREAD_POOL_SIZE} workers"
+                f"{LogEmoji.SUCCESS} ThreadPoolExecutor: {DEFAULT_THREAD_POOL_SIZE} workers"
             )
         except Exception as e:
             logger.warning(f"Failed to set default executor: {e}")
@@ -422,19 +497,30 @@ class StartupManager:
             logger.error(f"Failed to register in Redis: {e}")
     
     def _start_rate_limit_cleanup(self) -> None:
-        """Start rate limit cleanup thread."""
+        """
+        Start rate limit cleanup thread with thread-safe synchronization.
+        
+        Uses a lock to prevent race conditions when multiple workers attempt
+        to start the cleanup thread simultaneously. Only one thread will be
+        started regardless of concurrency.
+        
+        P0 Fix: Issue #2 - Race condition prevention with lock
+        """
         try:
             from vulcan.api.rate_limiting import cleanup_rate_limits
             
-            # Get global thread reference
-            import vulcan.server.app as app_module
-            if not hasattr(app_module, 'rate_limit_cleanup_thread') or \
-               app_module.rate_limit_cleanup_thread is None or \
-               not app_module.rate_limit_cleanup_thread.is_alive():
-                thread = Thread(target=cleanup_rate_limits, daemon=True)
-                thread.start()
-                app_module.rate_limit_cleanup_thread = thread
-                logger.debug("✓ Rate limit cleanup thread started")
+            # Thread-safe check and start (P0 Fix: Issue #2)
+            with state.rate_limit_thread_lock:
+                if (state.rate_limit_cleanup_thread is None or 
+                    not state.rate_limit_cleanup_thread.is_alive()):
+                    thread = Thread(target=cleanup_rate_limits, daemon=True)
+                    thread.start()
+                    state.rate_limit_cleanup_thread = thread
+                    logger.debug("✓ Rate limit cleanup thread started")
+                else:
+                    logger.debug("Rate limit cleanup thread already running")
+        except ImportError as e:
+            logger.debug(f"Rate limiting module not available: {e}")
         except Exception as e:
             logger.warning(f"Rate limit cleanup thread failed: {e}")
     
@@ -466,7 +552,11 @@ class StartupManager:
                 raise RuntimeError(f"Critical phase {meta.name} failed") from e
     
     def _initialize_routing(self, deployment: Any, manager: SubsystemManager) -> None:
-        """Initialize query routing integration."""
+        """
+        Initialize query routing integration.
+        
+        P2 Fix: Issue #12 - Graceful degradation for missing dependencies.
+        """
         try:
             from vulcan.routing import (
                 initialize_routing_components,
@@ -477,18 +567,18 @@ class StartupManager:
             )
             
             routing_status = initialize_routing_components()
-            logger.debug("✓ Query routing initialized")
+            logger.debug(f"{LogEmoji.SUCCESS} Query routing initialized")
             
             # Connect agent pool to collaboration manager
             if COLLABORATION_AVAILABLE:
                 collab_manager = get_collaboration_manager()
                 if hasattr(deployment.collective, "agent_pool") and deployment.collective.agent_pool:
                     collab_manager.set_agent_pool(deployment.collective.agent_pool)
-                    logger.debug("✓ Agent collaboration connected")
+                    logger.debug(f"{LogEmoji.SUCCESS} Agent collaboration connected")
                 
                 telemetry_recorder = get_telemetry_recorder()
                 collab_manager.set_telemetry_recorder(telemetry_recorder)
-                logger.debug("✓ Telemetry recording enabled")
+                logger.debug(f"{LogEmoji.SUCCESS} Telemetry recording enabled")
             
             # Store routing components
             self.app.state.routing_status = routing_status
@@ -496,9 +586,16 @@ class StartupManager:
             self.app.state.governance_logger = get_governance_logger()
             
         except ImportError as e:
-            logger.debug(f"Query routing not available: {e}")
+            # P2 Fix: Issue #12 - Graceful degradation for optional dependencies
+            logger.warning(f"Query routing not available (optional dependency): {e}")
+            self.app.state.routing_status = {"available": False, "reason": f"Import failed: {str(e)}"}
+            self.app.state.telemetry_recorder = None
+            self.app.state.governance_logger = None
         except Exception as e:
             logger.warning(f"Query routing initialization failed: {e}", exc_info=True)
+            self.app.state.routing_status = {"available": False, "reason": f"Initialization failed: {str(e)}"}
+            self.app.state.telemetry_recorder = None
+            self.app.state.governance_logger = None
     
     async def _phase_memory_systems(self) -> None:
         """Phase 4: Initialize memory subsystems."""
@@ -612,7 +709,11 @@ class StartupManager:
             logger.debug(f"HTTP session initialization failed: {e}")
     
     async def _preload_bert_model(self) -> None:
-        """Preload BERT model if not skipped."""
+        """
+        Preload BERT model if not skipped.
+        
+        P2 Fix: Issue #10 - Log failures as warnings, not debug.
+        """
         try:
             from vulcan.simple_mode import SKIP_BERT_EMBEDDINGS
             if SKIP_BERT_EMBEDDINGS:
@@ -623,47 +724,63 @@ class StartupManager:
             transformer = GraphixTransformer.get_instance()
             if transformer and hasattr(transformer, 'model') and transformer.model is not None:
                 if hasattr(transformer.model, 'encode') or hasattr(transformer.model, '__call__'):
-                    logger.debug("✓ BERT model preloaded")
+                    logger.debug(f"{LogEmoji.SUCCESS} BERT model preloaded")
         except Exception as e:
-            logger.debug(f"BERT preload failed: {e}")
+            logger.warning(f"BERT preload failed: {e}")  # Changed from debug to warning
     
     async def _preload_model_registry(self) -> None:
-        """Preload SentenceTransformer via model registry."""
+        """
+        Preload SentenceTransformer via model registry.
+        
+        P2 Fix: Issue #10 - Log failures as warnings, not debug.
+        """
         try:
             from vulcan.models import model_registry
             model_registry.preload_all_models()
             stats = model_registry.get_cache_stats()
-            logger.debug(f"✓ Model registry: {stats['models_cached']} models")
+            logger.debug(f"{LogEmoji.SUCCESS} Model registry: {stats['models_cached']} models")
         except Exception as e:
-            logger.debug(f"Model registry preload failed: {e}")
+            logger.warning(f"Model registry preload failed: {e}")  # Changed from debug to warning
     
     async def _preload_hierarchical_memory(self) -> None:
-        """Preload HierarchicalMemory singleton."""
+        """
+        Preload HierarchicalMemory singleton.
+        
+        P2 Fix: Issue #10 - Log failures as warnings, not debug.
+        """
         try:
             from vulcan.reasoning.singletons import get_hierarchical_memory
             hierarchical_memory = get_hierarchical_memory()
             if hierarchical_memory:
-                logger.debug("✓ HierarchicalMemory preloaded")
+                logger.debug(f"{LogEmoji.SUCCESS} HierarchicalMemory preloaded")
         except Exception as e:
-            logger.debug(f"HierarchicalMemory preload failed: {e}")
+            logger.warning(f"HierarchicalMemory preload failed: {e}")  # Changed from debug to warning
     
     async def _preload_unified_learning_system(self) -> None:
-        """Preload UnifiedLearningSystem singleton."""
+        """
+        Preload UnifiedLearningSystem singleton.
+        
+        P2 Fix: Issue #10 - Log failures as warnings, not debug.
+        """
         try:
             from vulcan.reasoning.singletons import get_unified_learning_system
             learning_system = get_unified_learning_system()
             if learning_system:
-                logger.debug("✓ UnifiedLearningSystem preloaded")
+                logger.debug(f"{LogEmoji.SUCCESS} UnifiedLearningSystem preloaded")
         except Exception as e:
-            logger.debug(f"UnifiedLearningSystem preload failed: {e}")
+            logger.warning(f"UnifiedLearningSystem preload failed: {e}")  # Changed from debug to warning
     
     async def _preload_reasoning_singletons(self) -> None:
-        """Pre-warm all reasoning singletons."""
+        """
+        Pre-warm all reasoning singletons.
+        
+        P2 Fix: Issue #10 - Log failures as warnings, not debug.
+        """
         try:
             from vulcan.reasoning.singletons import prewarm_all
             prewarm_results = prewarm_all()
             success_count = sum(1 for v in prewarm_results.values() if v)
-            logger.debug(f"✓ Reasoning singletons: {success_count}/{len(prewarm_results)}")
+            logger.debug(f"{LogEmoji.SUCCESS} Reasoning singletons: {success_count}/{len(prewarm_results)}")
             
             # Validate ProblemDecomposer if available
             if prewarm_results.get('problem_decomposer'):
@@ -674,30 +791,34 @@ class StartupManager:
                     if decomposer:
                         validation = validate_decomposer_setup(decomposer)
                         if validation['valid']:
-                            logger.debug(f"✓ ProblemDecomposer validated")
+                            logger.debug(f"{LogEmoji.SUCCESS} ProblemDecomposer validated")
                 except Exception:
                     pass
         except Exception as e:
-            logger.debug(f"Reasoning singletons prewarm failed: {e}")
+            logger.warning(f"Reasoning singletons prewarm failed: {e}")  # Changed from debug to warning
     
     async def _preload_reasoning_integration(self) -> None:
-        """Preload ReasoningIntegration and ToolSelector."""
+        """
+        Preload ReasoningIntegration and ToolSelector.
+        
+        P2 Fix: Issue #10 - Log failures as warnings, not debug.
+        """
         try:
             from vulcan.reasoning.integration import get_reasoning_integration
             reasoning_integration = get_reasoning_integration()
             reasoning_integration._init_components()
-            logger.debug("✓ ReasoningIntegration preloaded")
+            logger.debug(f"{LogEmoji.SUCCESS} ReasoningIntegration preloaded")
             
             # Preload SemanticToolMatcher
             try:
                 from vulcan.reasoning.selection.semantic_tool_matcher import SemanticToolMatcher
                 SemanticToolMatcher._get_shared_model()
-                logger.debug("✓ SemanticToolMatcher preloaded")
+                logger.debug(f"{LogEmoji.SUCCESS} SemanticToolMatcher preloaded")
             except Exception:
                 pass
                 
         except Exception as e:
-            logger.debug(f"ReasoningIntegration preload failed: {e}")
+            logger.warning(f"ReasoningIntegration preload failed: {e}")  # Changed from debug to warning
     
     async def _phase_monitoring(self) -> None:
         """Phase 6: Start monitoring services."""
