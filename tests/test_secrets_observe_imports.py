@@ -17,7 +17,7 @@ from pathlib import Path
 def test_secrets_module_imported():
     """
     Verify that the secrets module is imported in unified_chat.py.
-    
+
     This test uses AST parsing to check for the presence of 'import secrets'
     in the imports section of the file.
     """
@@ -48,7 +48,7 @@ def test_secrets_module_imported():
 def test_secrets_token_urlsafe_usage():
     """
     Verify that secrets.token_urlsafe() is used in the file (confirming the need for secrets import).
-    
+
     This ensures that the usage pattern that requires the secrets import is still present.
     """
     unified_chat_file = Path("src/vulcan/endpoints/unified_chat.py")
@@ -71,7 +71,7 @@ def test_secrets_token_urlsafe_usage():
 def test_observe_query_start_imported():
     """
     Verify that observe_query_start is imported in unified_chat.py.
-    
+
     This test uses AST parsing to check for the import of observe_query_start
     from vulcan.reasoning.integration.utils.
     """
@@ -104,7 +104,7 @@ def test_observe_query_start_imported():
 def test_observe_query_start_usage():
     """
     Verify that observe_query_start() is called in the file (confirming the need for the import).
-    
+
     This ensures that the usage pattern that requires the observe_query_start import is still present.
     """
     unified_chat_file = Path("src/vulcan/endpoints/unified_chat.py")
