@@ -9,7 +9,10 @@ Security Features:
 - Blocks network operations
 - Blocks arbitrary imports
 - Blocks system command execution
+- Blocks class hierarchy traversal (prevents sandbox escape)
 - Allows only whitelisted mathematical operations
+- Enforces execution timeout (main thread only)
+- Rate-limits print output to prevent log flooding
 
 Example:
     >>> from vulcan.utils.safe_execution import execute_math_code
@@ -22,7 +25,9 @@ Example:
 
 import logging
 import re
+import signal
 import threading
+import unicodedata
 from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
@@ -33,12 +38,14 @@ def _preprocess_math_code(code: str) -> str:
     Preprocess mathematical code to fix common syntax issues.
     
     Bug #2 FIX (Jan 9 2026): Added as safety net for implicit multiplication.
+    Security FIX (Jan 11 2026): Added comprehensive Unicode normalization.
     
     This handles cases where LLM-generated or template code contains:
     - Implicit multiplication: 2k → 2*k, 3n → 3*n
     - Digit followed by parenthesis: 2(x+1) → 2*(x+1)
     - Unicode minus: − (U+2212) → - (U+002D ASCII)
-    - Unicode math italic letters: 𝑘, 𝑛, 𝑥, 𝑦, 𝑧 → k, n, x, y, z
+    - Unicode math italic letters: Full range of mathematical alphanumeric symbols
+    - Unicode mathematical operators: × → *, ÷ → /, etc.
     
     This is applied as a safety net in execute() to catch any code that
     wasn't preprocessed by mathematical_computation.py._clean_code().
@@ -52,15 +59,22 @@ def _preprocess_math_code(code: str) -> str:
     if not code:
         return code
     
-    # Unicode normalization for mathematical symbols
-    code = code.replace('−', '-')  # Unicode minus → ASCII minus (U+2212 → U+002D)
-    code = code.replace('𝑘', 'k')  # Math italic k → ASCII k
-    code = code.replace('𝑛', 'n')  # Math italic n → ASCII n
-    code = code.replace('𝑥', 'x')  # Math italic x → ASCII x
-    code = code.replace('𝑦', 'y')  # Math italic y → ASCII y
-    code = code.replace('𝑧', 'z')  # Math italic z → ASCII z
+    # Comprehensive Unicode normalization for mathematical alphanumeric symbols
+    # Unicode range: U+1D400–U+1D7FF (Mathematical Alphanumeric Symbols)
+    # First check if any math symbols exist to avoid unnecessary processing
+    has_math_symbols = any(0x1D400 <= ord(c) <= 0x1D7FF for c in code)
+    if has_math_symbols:
+        # Use NFKD normalization which handles all mathematical alphanumeric symbols
+        # This converts mathematical italic/bold/script letters to their ASCII equivalents
+        code = unicodedata.normalize('NFKD', code)
     
-    # Add implicit multiplication operator
+    # Replace mathematical operators
+    code = code.replace('×', '*')  # Multiplication sign
+    code = code.replace('÷', '/')  # Division sign
+    code = code.replace('−', '-')  # Unicode minus → ASCII minus (U+2212 → U+002D)
+    code = code.replace('√', 'sqrt')  # Square root (basic support)
+    
+    # Add implicit multiplication operator (after normalization)
     # Pattern: digit followed by letter (2k → 2*k)
     code = re.sub(r'(\d)([a-zA-Z])', r'\1*\2', code)
     
@@ -73,12 +87,132 @@ def _preprocess_math_code(code: str) -> str:
     
     return code
 
+
+# Maximum number of print calls allowed per execution (DoS protection)
+_MAX_PRINT_CALLS = 100
+# Maximum total output length from print (bytes)
+_MAX_PRINT_OUTPUT = 10000
+
+
+class _SafePrintCollector:
+    """
+    Rate-limited print collector for sandboxed code execution.
+    
+    SECURITY: This prevents log flooding DoS attacks and limits information disclosure
+    by rate-limiting print calls and total output size.
+    
+    RestrictedPython rewrites print(...) to:
+        _print = _print_(_getattr_)  # Create collector
+        _print._call_print(...)      # Each print statement
+    
+    This collector receives all print output and enforces limits.
+    """
+    
+    def __init__(self, _getattr_=None):
+        """
+        Initialize the print collector.
+        
+        Args:
+            _getattr_: The guarded getattr function (provided by RestrictedPython)
+        """
+        self._call_count = 0
+        self._total_output = 0
+        self._getattr_ = _getattr_
+        self.txt: list = []  # Collected text (for compatibility)
+    
+    def write(self, text: str) -> None:
+        """
+        Write text to the collector (called by print's file= argument).
+        
+        Args:
+            text: Text to write
+        """
+        if self._call_count > _MAX_PRINT_CALLS:
+            return  # Silently ignore after limit
+        
+        text_len = len(text) if text else 0
+        if self._total_output + text_len > _MAX_PRINT_OUTPUT:
+            return  # Silently ignore if would exceed limit
+        
+        self._total_output += text_len
+        self.txt.append(text)
+    
+    def __call__(self) -> str:
+        """
+        Return collected output (called to get final print result).
+        
+        Returns:
+            Collected text joined as a single string.
+        """
+        return ''.join(self.txt)
+    
+    def _call_print(self, *objects, **kwargs) -> None:
+        """
+        Handle a print call.
+        
+        This is called by RestrictedPython's rewritten print statements.
+        Implements rate-limiting and output size limiting.
+        
+        Args:
+            *objects: Objects to print
+            **kwargs: Keyword arguments (sep, end, file, flush)
+        """
+        self._call_count += 1
+        
+        # Rate limit: max calls per execution
+        if self._call_count > _MAX_PRINT_CALLS:
+            return  # Silently ignore after limit
+        
+        # Handle file= argument - block printing to arbitrary file objects
+        if kwargs.get('file', None) is not None:
+            logger.debug("[sandboxed print] Blocked print to file=...")
+            return
+        
+        # Estimate output size before constructing the full string
+        # This avoids unnecessary string operations for oversized output
+        sep = kwargs.get('sep', ' ')
+        end = kwargs.get('end', '\n')
+        
+        # Quick size estimate: sum of str lengths + separators
+        estimated_size = sum(len(str(obj)) for obj in objects)
+        estimated_size += len(sep) * max(0, len(objects) - 1) + len(end)
+        
+        # Size limit: max total output
+        if self._total_output + estimated_size > _MAX_PRINT_OUTPUT:
+            return  # Silently ignore if would exceed limit
+        
+        # Now construct the actual output string
+        output = sep.join(str(obj) for obj in objects) + end
+        self._total_output += len(output)
+        
+        # Write to our collector and log for debugging
+        self.txt.append(output)
+        logger.debug(f"[sandboxed print] {output.rstrip()}")
+
+
+def _create_safe_print_collector(_getattr_=None) -> _SafePrintCollector:
+    """
+    Factory function to create a rate-limited print collector.
+    
+    RestrictedPython calls this as: _print_(_getattr_) to create the collector.
+    
+    Args:
+        _getattr_: The guarded getattr function (may be None)
+        
+    Returns:
+        A fresh _SafePrintCollector instance with reset counters.
+    """
+    return _SafePrintCollector(_getattr_=_getattr_)
+
 # Try to import RestrictedPython
 try:
     from RestrictedPython import compile_restricted_exec
     from RestrictedPython.Guards import (
         guarded_iter_unpack_sequence,
-        safer_getattr,
+    )
+    from RestrictedPython.Eval import (
+        default_guarded_getiter,
+        default_guarded_getitem,
     )
 
     RESTRICTED_PYTHON_AVAILABLE = True
@@ -87,7 +221,102 @@ except ImportError:
     logger.warning("RestrictedPython not available. Safe code execution disabled.")
     compile_restricted_exec = None
     guarded_iter_unpack_sequence = None
-    safer_getattr = None
+    default_guarded_getiter = None
+    default_guarded_getitem = None
+
+
+# SECURITY: Blocked attributes that could be used to escape the sandbox
+# These allow traversal of the class hierarchy to access __globals__ and escape
+_BLOCKED_ATTRS = frozenset({
+    "__class__",
+    "__bases__",
+    "__subclasses__",
+    "__mro__",
+    "__globals__",
+    "__code__",
+    "__closure__",
+    "__func__",
+    "__self__",
+    "__dict__",
+    "__builtins__",
+    "__import__",
+    "__loader__",
+    "__spec__",
+    "__cached__",
+    "__file__",
+    "__name__",
+    "__qualname__",
+    "__module__",
+    "__annotations__",
+    "__wrapped__",
+    "gi_frame",
+    "gi_code",
+    "f_globals",
+    "f_locals",
+    "f_code",
+    "f_builtins",
+    "co_code",
+    "func_globals",
+    "func_code",
+})
+
+
+def _guarded_getattr(obj: Any, name: str, default: Any = None) -> Any:
+    """
+    Secure attribute access that prevents sandbox escape.
+    
+    SECURITY: This function blocks access to attributes that could be used
+    to traverse the class hierarchy and escape the RestrictedPython sandbox.
+    
+    The class hierarchy attack works by:
+    1. Access ().__class__ to get tuple class
+    2. Access __bases__ to get object class  
+    3. Access __subclasses__() to enumerate all classes
+    4. Find a class with __init__.__globals__ containing dangerous modules
+    5. Access sys, os, etc. through __globals__
+    
+    This guard blocks all such traversal attempts.
+    
+    Args:
+        obj: The object to access attribute on
+        name: The attribute name
+        default: Default value if attribute not found
+        
+    Returns:
+        The attribute value, or default if blocked/not found
+        
+    Raises:
+        AttributeError: If access to a blocked attribute is attempted
+    """
+    # Block dangerous attribute access
+    if name in _BLOCKED_ATTRS:
+        raise AttributeError(
+            f"Access to '{name}' is not allowed in sandboxed code"
+        )
+    
+    # Block dunder attributes that start and end with __
+    # Exception: Allow specific safe dunders needed for math operations
+    if name.startswith("__") and name.endswith("__"):
+        # Whitelist of safe dunder methods for mathematical operations
+        safe_dunders = {
+            "__add__", "__radd__", "__sub__", "__rsub__",
+            "__mul__", "__rmul__", "__truediv__", "__rtruediv__",
+            "__floordiv__", "__rfloordiv__", "__mod__", "__rmod__",
+            "__pow__", "__rpow__", "__neg__", "__pos__", "__abs__",
+            "__eq__", "__ne__", "__lt__", "__le__", "__gt__", "__ge__",
+            "__len__", "__iter__", "__next__", "__getitem__", "__setitem__",
+            "__contains__", "__hash__", "__str__", "__repr__", "__bool__",
+            "__int__", "__float__", "__complex__", "__round__",
+            "__enter__", "__exit__",  # Context managers (limited use)
+        }
+        if name not in safe_dunders:
+            raise AttributeError(
+                f"Access to '{name}' is not allowed in sandboxed code"
+            )
+    
+    # Use getattr - the third argument is the default if attribute doesn't exist
+    # If getattr raises AttributeError (which it shouldn't with 3 args), re-raise
+    return getattr(obj, name, default)
 
 # Try to import SymPy
 try:
@@ -129,6 +358,9 @@ class SafeCodeExecutor:
         >>> print(result['result'])  # x**3/3
     """
 
+    # Maximum execution count before reset (prevents unbounded integer growth)
+    _MAX_EXECUTION_COUNT = 2**31 - 1
+
     def __init__(self, timeout: int = 10):
         """
         Initialize with safe namespace containing allowed modules.
@@ -160,8 +392,12 @@ class SafeCodeExecutor:
             - No network operations
             - No system calls
             - No arbitrary imports
+            - No class hierarchy traversal (sandbox escape prevention)
+            - Rate-limited print to prevent log flooding DoS
+            - Dangerous SymPy features (Function, Lambda) removed
         """
         # Safe builtins (no file I/O, imports, etc.)
+        # Note: print is handled via _print_ RestrictedPython guard
         namespace: Dict[str, Any] = {
             "__builtins__": {
                 "abs": abs,
@@ -189,7 +425,6 @@ class SafeCodeExecutor:
                 "all": all,
                 "pow": pow,
                 "divmod": divmod,
-                "print": print,  # For debugging
                 "isinstance": isinstance,
                 "type": type,
                 "True": True,
@@ -204,17 +439,26 @@ class SafeCodeExecutor:
                 guarded_iter_unpack_sequence
             )
 
-        # Add safer_getattr to allow attribute access on safe objects
-        if safer_getattr is not None:
-            namespace["_getattr_"] = safer_getattr
+        # SECURITY: Use our hardened getattr guard instead of safer_getattr
+        # This prevents sandbox escape via class hierarchy traversal
+        namespace["_getattr_"] = _guarded_getattr
+        
+        # Add iteration guards required by RestrictedPython for loops
+        if default_guarded_getiter is not None:
+            namespace["_getiter_"] = default_guarded_getiter
+        if default_guarded_getitem is not None:
+            namespace["_getitem_"] = default_guarded_getitem
 
-        # Add SymPy functions if available - full access for symbolic math
+        # Add SymPy functions if available - curated safe subset for symbolic math
+        # SECURITY: Function and Lambda are NOT included as they can execute
+        # arbitrary Python code and bypass the sandbox
         if SYMPY_AVAILABLE and sp is not None:
             namespace.update(
                 {
-                    # Module reference
-                    "sp": sp,
-                    "sympy": sp,
+                    # SECURITY: Do NOT expose full module reference as it provides
+                    # access to dangerous features. Only expose whitelisted functions.
+                    # "sp": sp,  # REMOVED - too much access
+                    # "sympy": sp,  # REMOVED - too much access
                     # Symbols
                     "Symbol": sp.Symbol,
                     "symbols": sp.symbols,
@@ -308,8 +552,11 @@ class SafeCodeExecutor:
                     "Not": sp.Not,
                     # Special functions
                     "Piecewise": sp.Piecewise,
-                    "Function": sp.Function,
-                    "Lambda": sp.Lambda,
+                    # SECURITY: Function and Lambda REMOVED - they can execute
+                    # arbitrary Python code. Use sp.Function only in controlled
+                    # contexts where code is fully trusted.
+                    # "Function": sp.Function,  # SECURITY RISK - REMOVED
+                    # "Lambda": sp.Lambda,      # SECURITY RISK - REMOVED
                     # Assumptions (optional - may not exist in all SymPy versions)
                     "Assumptions": getattr(sp, "Assumptions", None),
                     "assuming": getattr(sp, "assuming", None),
@@ -360,6 +607,12 @@ class SafeCodeExecutor:
                 - 'error': str | None - Error message if failed
                 - 'namespace': Dict - The namespace after execution
 
+        Security Notes:
+            - Timeout is enforced via signal.SIGALRM (Unix only, main thread only)
+            - If timeout cannot be enforced (e.g., Windows, non-main thread),
+              execution proceeds without timeout protection
+            - All other sandbox protections remain active regardless
+
         Example:
             >>> executor = SafeCodeExecutor()
             >>> result = executor.execute('''
@@ -377,19 +630,40 @@ class SafeCodeExecutor:
                 "namespace": {},
             }
 
+        # Use provided timeout or default
+        effective_timeout = timeout if timeout is not None else self.timeout
+
         with self._lock:
-            self._execution_count += 1
+            # Use modulo to prevent unbounded integer growth (Issue 8)
+            self._execution_count = (
+                self._execution_count + 1
+            ) % self._MAX_EXECUTION_COUNT
             exec_id = self._execution_count
 
         logger.debug(f"[{exec_id}] Executing code ({len(code)} chars)")
+
+        # Timeout handler for signal-based timeout
+        def _timeout_handler(signum: int, frame: Any) -> None:
+            raise TimeoutError(f"Execution timed out after {effective_timeout} seconds")
+
+        # Track whether we set up timeout (for cleanup)
+        timeout_set = False
+        old_handler = None
 
         try:
             # Bug #2 FIX: Preprocess code to fix implicit multiplication and unicode issues
             # This is a safety net in case code wasn't preprocessed by mathematical_computation.py
             code = _preprocess_math_code(code)
             
-            # Create fresh namespace for this execution
+            # Create fresh namespace for this execution (each execution is isolated)
             execution_namespace = self.safe_namespace.copy()
+            
+            # SECURITY: Set up rate-limited print collector factory for this execution
+            # RestrictedPython rewrites print(...) to:
+            #   _print = _print_(_getattr_)  # Factory creates collector
+            #   _print._call_print(...)       # Each print call
+            # This prevents log flooding DoS attacks and state leakage between executions
+            execution_namespace["_print_"] = _create_safe_print_collector
 
             # Compile with RestrictedPython (blocks dangerous operations)
             byte_code = compile_restricted_exec(code)
@@ -403,6 +677,23 @@ class SafeCodeExecutor:
                     "error": error_msg,
                     "namespace": {},
                 }
+
+            # SECURITY: Set up timeout enforcement using signal.SIGALRM
+            # Note: This only works on Unix-like systems and in the main thread
+            # On Windows or non-main threads, we proceed without timeout protection
+            # but all other sandbox protections remain active
+            try:
+                if threading.current_thread() is threading.main_thread():
+                    old_handler = signal.signal(signal.SIGALRM, _timeout_handler)
+                    signal.alarm(effective_timeout)
+                    timeout_set = True
+                else:
+                    logger.debug(
+                        f"[{exec_id}] Timeout not enforced: not in main thread"
+                    )
+            except (ValueError, OSError, AttributeError) as e:
+                # signal.SIGALRM not available (Windows) or other signal issues
+                logger.debug(f"[{exec_id}] Timeout not enforced: {e}")
 
             # Execute the code
             # nosec B102: exec() is intentional here - code is pre-compiled with
@@ -430,6 +721,15 @@ class SafeCodeExecutor:
                 "namespace": execution_namespace,
             }
 
+        except TimeoutError as e:
+            error_msg = f"Timeout: {e}"
+            logger.warning(f"[{exec_id}] {error_msg}")
+            return {
+                "success": False,
+                "result": None,
+                "error": error_msg,
+                "namespace": {},
+            }
         except SyntaxError as e:
             error_msg = f"Syntax error: {e}"
             logger.warning(f"[{exec_id}] {error_msg}")
@@ -457,6 +757,16 @@ class SafeCodeExecutor:
                 "error": error_msg,
                 "namespace": {},
             }
+        except AttributeError as e:
+            # SECURITY: This catches blocked attribute access attempts
+            error_msg = f"Attribute error (possible sandbox violation): {e}"
+            logger.warning(f"[{exec_id}] {error_msg}")
+            return {
+                "success": False,
+                "result": None,
+                "error": error_msg,
+                "namespace": {},
+            }
         except Exception as e:
             error_msg = f"Execution failed: {type(e).__name__}: {e}"
             logger.error(f"[{exec_id}] {error_msg}")
@@ -466,6 +776,15 @@ class SafeCodeExecutor:
                 "error": error_msg,
                 "namespace": {},
             }
+        finally:
+            # SECURITY: Always cancel the timeout alarm
+            if timeout_set:
+                try:
+                    signal.alarm(0)
+                    if old_handler is not None:
+                        signal.signal(signal.SIGALRM, old_handler)
+                except (ValueError, OSError):
+                    pass  # Ignore errors during cleanup
 
 
 # Singleton instance

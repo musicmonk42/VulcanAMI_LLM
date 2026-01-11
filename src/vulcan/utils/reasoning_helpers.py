@@ -11,7 +11,7 @@ Author: VULCAN-AGI Team
 Version: 1.0.0
 """
 
-from typing import Any, Dict, Optional, TypeVar, Union
+from typing import Any, Dict, Optional, Type, TypeVar, Union
 
 # Type variable for generic return types
 T = TypeVar('T')
@@ -20,7 +20,8 @@ T = TypeVar('T')
 def _get_reasoning_attr(
     result: Optional[Union[Dict[str, Any], object]],
     attr: str,
-    default: Optional[T] = None
+    default: Optional[T] = None,
+    expected_type: Optional[Type[T]] = None
 ) -> Optional[T]:
     """
     Safely extract an attribute from a polymorphic reasoning result.
@@ -42,10 +43,17 @@ def _get_reasoning_attr(
             - None: Represents a failed or missing result
         attr: The attribute/key name to extract (e.g., "confidence", "conclusion")
         default: Default value to return if attribute not found (default: None)
+        expected_type: Optional type to validate the extracted value against.
+                      If provided and the value exists but has the wrong type,
+                      raises TypeError. This helps catch type mismatches early.
         
     Returns:
         The attribute value if found, otherwise the default value.
         Type matches the default parameter if provided.
+        
+    Raises:
+        TypeError: If expected_type is provided and the value exists but has
+                  an incompatible type. This catches data integrity issues early.
         
     Examples:
         Extract from dictionary result:
@@ -74,6 +82,11 @@ def _get_reasoning_attr(
         >>> _get_reasoning_attr(None, "any_attr", "default_value")
         'default_value'
         
+        Type validation:
+        >>> result = {"confidence": "not_a_number"}  # Wrong type!
+        >>> _get_reasoning_attr(result, "confidence", 0.0, expected_type=float)
+        TypeError: Attribute 'confidence' has wrong type: expected float, got str
+        
     Thread Safety:
         This function is thread-safe as it performs only read operations.
         
@@ -89,17 +102,36 @@ def _get_reasoning_attr(
     if result is None:
         return default
     
+    # Extract value based on result type
+    value: Any = None
+    found = False
+    
     # Handle dictionary results (most common case)
     if isinstance(result, dict):
-        return result.get(attr, default)
-    
+        if attr in result:
+            value = result[attr]
+            found = True
+        else:
+            value = default
     # Handle objects with attributes (dataclasses, named tuples, custom objects)
     # Use hasattr for safety to avoid AttributeError
-    if hasattr(result, attr):
-        return getattr(result, attr, default)
+    elif hasattr(result, attr):
+        value = getattr(result, attr, default)
+        found = True
+    else:
+        # Attribute not found in any supported structure
+        value = default
     
-    # Attribute not found in any supported structure
-    return default
+    # Type validation if expected_type is specified
+    if expected_type is not None and found and value is not None:
+        # Allow subclasses (isinstance check)
+        if not isinstance(value, expected_type):
+            raise TypeError(
+                f"Attribute '{attr}' has wrong type: "
+                f"expected {expected_type.__name__}, got {type(value).__name__}"
+            )
+    
+    return value
 
 
 # Module exports

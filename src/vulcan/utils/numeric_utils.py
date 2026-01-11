@@ -99,13 +99,33 @@ def safe_divide(numerator: float, denominator: float, default: float = 0.0) -> f
 
 
 def normalize_weights(weights: list, epsilon: float = DEFAULT_EPSILON) -> list:
-    """Normalize weights to sum to 1.0"""
+    """
+    Normalize weights to sum to 1.0.
+    
+    Args:
+        weights: List of numeric weights to normalize
+        epsilon: Minimum absolute total weight required (default 1e-9)
+        
+    Returns:
+        List of normalized weights that sum to 1.0
+        
+    Raises:
+        ValueError: If weights list is empty, all weights are negative,
+                   or total weight magnitude is too small to normalize safely
+    """
     if not weights:
         return []
 
     total = sum(weights)
-    if total <= epsilon:
-        raise ValueError(f"Cannot normalize: total weight {total} too small")
+    
+    # Check if all weights are non-positive (can't normalize to positive sum)
+    if all(w <= 0 for w in weights):
+        raise ValueError("Cannot normalize: all weights are non-positive")
+    
+    # Check if absolute sum is too small to normalize safely
+    # This prevents division by near-zero which causes numerical instability
+    if abs(total) <= epsilon:
+        raise ValueError(f"Cannot normalize: total weight {total} too small (abs <= {epsilon})")
 
     return [w / total for w in weights]
 
