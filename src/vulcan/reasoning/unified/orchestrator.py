@@ -176,6 +176,13 @@ def _is_creative_task(task: ReasoningTask) -> bool:
 
 class UnifiedReasoner:
     """Enhanced unified interface with production tool selection and portfolio strategies"""
+    
+    # Default tools for ensemble reasoning when no specific tools are selected
+    DEFAULT_ENSEMBLE_TOOLS = [
+        ReasoningType.PROBABILISTIC,
+        ReasoningType.SYMBOLIC,
+        ReasoningType.CAUSAL,
+    ]
 
     def __init__(
         self,
@@ -1443,6 +1450,23 @@ class UnifiedReasoner:
                 reasoning_type = self._determine_reasoning_type(input_data, query)
                 task.task_type = reasoning_type
 
+            # FIX: Extract selected_tools from query (set by QueryRouter)
+            # The QueryRouter passes selected tools in query dict, we need to extract them
+            # and make them available to the plan creation process
+            selected_tools_from_router = None
+            if query and isinstance(query, dict):
+                # Try multiple possible locations where selected_tools might be stored
+                selected_tools_from_router = (
+                    query.get('selected_tools') or
+                    query.get('parameters', {}).get('selected_tools') or
+                    constraints.get('selected_tools')
+                )
+                
+                if selected_tools_from_router:
+                    logger.info(
+                        f"[UnifiedReasoner] Extracted selected_tools from query: {selected_tools_from_router}"
+                    )
+
             if self.voi_gate and task.features is not None:
                 try:
                     should_gather, voi_action = self.voi_gate.should_probe_deeper(
@@ -1457,7 +1481,7 @@ class UnifiedReasoner:
                 except Exception as e:
                     logger.warning(f"VOI gate failed: {e}")
 
-            plan = self._create_optimized_plan(task, strategy)
+            plan = self._create_optimized_plan(task, strategy, selected_tools_from_router)
 
             if strategy in [
                 ReasoningStrategy.PORTFOLIO,
@@ -1466,11 +1490,13 @@ class UnifiedReasoner:
                 if self.tool_selector:
                     try:
                         selection_result = self._select_tools_for_plan(plan, task)
-                        plan.selected_tools = (
-                            selection_result.selected_tool
-                            if hasattr(selection_result, "selected_tool")
-                            else None
-                        )
+                        # Only override if tool_selector provides tools and none were set from router
+                        if not hasattr(plan, 'selected_tools') or not plan.selected_tools:
+                            plan.selected_tools = (
+                                selection_result.selected_tool
+                                if hasattr(selection_result, "selected_tool")
+                                else None
+                            )
                         plan.execution_strategy = (
                             selection_result.strategy_used
                             if hasattr(selection_result, "strategy_used")
@@ -1745,7 +1771,7 @@ class UnifiedReasoner:
             return None
 
     def _create_optimized_plan(
-        self, task: ReasoningTask, strategy: ReasoningStrategy
+        self, task: ReasoningTask, strategy: ReasoningStrategy, selected_tools_from_router: Optional[List[str]] = None
     ) -> ReasoningPlan:
         """Create execution plan optimized for utility"""
 
@@ -1753,6 +1779,9 @@ class UnifiedReasoner:
         if cache_key in self.plan_cache:
             cached_plan = self.plan_cache[cache_key]
             cached_plan.tasks = [task]
+            # FIX: Also set selected_tools in cached plan if provided
+            if selected_tools_from_router:
+                cached_plan.selected_tools = selected_tools_from_router
             return cached_plan
 
         tasks = []
@@ -1820,22 +1849,43 @@ class UnifiedReasoner:
                     tasks.append(sub_task)
 
             elif strategy == ReasoningStrategy.ENSEMBLE:
-                for reasoning_type in [
-                    ReasoningType.PROBABILISTIC,
-                    ReasoningType.SYMBOLIC,
-                    ReasoningType.CAUSAL,
-                    ReasoningType.SYMBOLIC,
-                ]:  # Added Language to default ensemble
-                    if reasoning_type in self.reasoners:
-                        sub_task = ReasoningTask(
-                            task_id=f"{task.task_id}_{reasoning_type.value}",
-                            task_type=reasoning_type,
-                            input_data=task.input_data,
-                            query=task.query,
-                            constraints=task.constraints,
-                            utility_context=task.utility_context,
-                        )
-                        tasks.append(sub_task)
+                # FIX: Use selected_tools from router if available, otherwise check plan
+                # Router tools take precedence as they come from query-specific routing decision
+                tools_to_use = []
+                
+                # Priority 1: Use tools from router (passed as parameter)
+                if selected_tools_from_router:
+                    logger.info(f"[Ensemble] Using tools from router: {selected_tools_from_router}")
+                    for tool_name in selected_tools_from_router:
+                        try:
+                            # Map tool name string to ReasoningType enum
+                            reasoning_type = self._map_tool_name_to_reasoning_type(tool_name)
+                            if reasoning_type and reasoning_type in self.reasoners:
+                                tools_to_use.append(reasoning_type)
+                            else:
+                                logger.warning(f"[Ensemble] Tool '{tool_name}' not available in self.reasoners")
+                        except Exception as e:
+                            logger.warning(f"[Ensemble] Failed to map tool '{tool_name}': {e}")
+                
+                # Fall back to default ensemble if no tools selected
+                if not tools_to_use:
+                    logger.info("[Ensemble] No selected_tools from router, using default ensemble types")
+                    # Use class constant for default ensemble tools
+                    tools_to_use = [rt for rt in self.DEFAULT_ENSEMBLE_TOOLS if rt in self.reasoners]
+                
+                # Create tasks for each tool
+                for reasoning_type in tools_to_use:
+                    sub_task = ReasoningTask(
+                        task_id=f"{task.task_id}_{reasoning_type.value}",
+                        task_type=reasoning_type,
+                        input_data=task.input_data,
+                        query=task.query,
+                        constraints=task.constraints,
+                        utility_context=task.utility_context,
+                    )
+                    tasks.append(sub_task)
+                
+                logger.info(f"[Ensemble] Created {len(tasks)} tasks for reasoning types: {[t.task_type.value for t in tasks]}")
 
             elif strategy == ReasoningStrategy.HIERARCHICAL:
                 if ReasoningType.PROBABILISTIC in self.reasoners:
@@ -1880,11 +1930,80 @@ class UnifiedReasoner:
             estimated_time=estimated_time,
             estimated_cost=estimated_cost,
             confidence_threshold=task.constraints.get("confidence_threshold", 0.5),
+            selected_tools=selected_tools_from_router,  # FIX: Store router's selected tools in plan
         )
 
         self.plan_cache[cache_key] = plan
 
         return plan
+
+    def _map_tool_name_to_reasoning_type(self, tool_name: str) -> Optional[ReasoningType]:
+        """
+        Map tool name string to ReasoningType enum.
+        
+        FIX: This mapping enables the orchestrator to convert query router's
+        selected tool names (strings) into ReasoningType enum values that can
+        be used to create and execute reasoning tasks.
+        
+        Args:
+            tool_name: Tool name string (e.g., 'mathematical', 'symbolic', 'probabilistic')
+            
+        Returns:
+            Corresponding ReasoningType enum value, or None if not found
+            
+        Examples:
+            >>> self._map_tool_name_to_reasoning_type('mathematical')
+            ReasoningType.MATHEMATICAL
+            >>> self._map_tool_name_to_reasoning_type('symbolic')
+            ReasoningType.SYMBOLIC
+        """
+        # Normalize tool name to lowercase for case-insensitive matching
+        tool_name_lower = tool_name.lower().strip()
+        
+        # Direct mapping of tool names to ReasoningType enum values
+        tool_mapping = {
+            'mathematical': ReasoningType.MATHEMATICAL,
+            'math': ReasoningType.MATHEMATICAL,
+            'mathematical_computation': ReasoningType.MATHEMATICAL,
+            
+            'symbolic': ReasoningType.SYMBOLIC,
+            'logic': ReasoningType.SYMBOLIC,
+            'symbolic_reasoning': ReasoningType.SYMBOLIC,
+            
+            'probabilistic': ReasoningType.PROBABILISTIC,
+            'probability': ReasoningType.PROBABILISTIC,
+            'probabilistic_reasoning': ReasoningType.PROBABILISTIC,
+            
+            'causal': ReasoningType.CAUSAL,
+            'cause': ReasoningType.CAUSAL,
+            'causal_reasoning': ReasoningType.CAUSAL,
+            
+            'analogical': ReasoningType.ANALOGICAL,
+            'analogy': ReasoningType.ANALOGICAL,
+            'analogical_reasoning': ReasoningType.ANALOGICAL,
+            
+            'multimodal': ReasoningType.MULTIMODAL,
+            'multi_modal': ReasoningType.MULTIMODAL,
+            
+            'philosophical': ReasoningType.PHILOSOPHICAL,
+            'philosophy': ReasoningType.PHILOSOPHICAL,
+            'ethical': ReasoningType.PHILOSOPHICAL,
+        }
+        
+        # Try exact match first
+        if tool_name_lower in tool_mapping:
+            return tool_mapping[tool_name_lower]
+        
+        # Try to match ReasoningType enum value directly
+        try:
+            for reasoning_type in ReasoningType:
+                if reasoning_type.value == tool_name_lower:
+                    return reasoning_type
+        except Exception as e:
+            logger.debug(f"Failed to match tool name '{tool_name}' to ReasoningType: {e}")
+        
+        logger.warning(f"[Orchestrator] Unknown tool name: '{tool_name}' - no ReasoningType mapping found")
+        return None
 
     def _select_portfolio_reasoners(self, task: ReasoningTask) -> List[ReasoningType]:
         """Select complementary reasoners for portfolio"""
