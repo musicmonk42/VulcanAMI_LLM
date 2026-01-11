@@ -306,8 +306,8 @@ class SelectionStrategies:
         """
         Determine reasoning strategy based on query characteristics.
 
-        This method implements the fallback strategy selection logic when
-        the ToolSelector is unavailable or doesn't provide a strategy.
+        This method delegates to the standalone determine_strategy_from_query function
+        to avoid code duplication.
 
         Args:
             query_type: Type of query (reasoning, perception, planning, etc.)
@@ -316,25 +316,7 @@ class SelectionStrategies:
         Returns:
             Strategy name string
         """
-        # High complexity reasoning queries use causal reasoning
-        if query_type == "reasoning" and complexity > CAUSAL_REASONING_THRESHOLD:
-            return ReasoningStrategyType.CAUSAL_REASONING.value
-
-        # Execution tasks use planning
-        if query_type == "execution":
-            return ReasoningStrategyType.PLANNING.value
-
-        # Medium-high complexity uses probabilistic reasoning
-        if complexity > PROBABILISTIC_REASONING_THRESHOLD:
-            return ReasoningStrategyType.PROBABILISTIC_REASONING.value
-
-        # Query type specific strategies
-        type_strategy = QUERY_TYPE_STRATEGY_MAP.get(query_type)
-        if type_strategy:
-            return type_strategy
-
-        # Default to direct for simple queries
-        return ReasoningStrategyType.DIRECT.value
+        return determine_strategy_from_query(query_type, complexity)
 
 
 def select_with_tool_selector(

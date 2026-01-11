@@ -425,7 +425,15 @@ class IntegrationStatistics:
     
     @property
     def success_rate(self) -> float:
-        """Calculate success rate of tool selections."""
+        """
+        Calculate success rate of apply_reasoning invocations.
+        
+        Returns the proportion of invocations that completed without errors.
+        A success rate of 1.0 means all invocations succeeded, 0.0 means all failed.
+        
+        Returns:
+            float: Success rate between 0.0 and 1.0
+        """
         if self.invocations == 0:
             return 0.0
         return (self.invocations - self.errors) / self.invocations

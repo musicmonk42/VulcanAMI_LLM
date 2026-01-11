@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 # Optional answer validator import
 try:
-    from vulcan.reasoning.validation.answer_validator import validate_reasoning_result
+    from vulcan.reasoning.answer_validator import validate_reasoning_result
     ANSWER_VALIDATOR_AVAILABLE = True
 except ImportError:
     ANSWER_VALIDATOR_AVAILABLE = False
