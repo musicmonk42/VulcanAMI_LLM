@@ -76,6 +76,12 @@ from vulcan.endpoints.feedback import (
     get_feedback_stats,        # GET /v1/feedback/stats handler
 )
 
+# Unified chat endpoint handler (used by full_platform.py proxy)
+# Location: Line 3454 in src/full_platform.py
+from vulcan.endpoints.unified_chat import (
+    unified_chat,              # POST /v1/chat handler
+)
+
 # Reasoning helpers (used by tests and external code)
 # Location: tests/test_reasoning_content_propagation.py:73
 from vulcan.utils.reasoning_helpers import (
