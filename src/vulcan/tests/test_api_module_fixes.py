@@ -112,8 +112,9 @@ def test_middleware_imported_in_api_init():
     REQUIREMENT: Issue #1 - Missing middleware exports
     VALIDATION: AST parsing to check import statements
     """
+    # Test is in src/vulcan/tests/, so go up one level to get to vulcan/
     project_root = Path(__file__).parent.parent
-    init_file = project_root / "src" / "vulcan" / "api" / "__init__.py"
+    init_file = project_root / "api" / "__init__.py"
     
     tree = parse_python_file(init_file)
     imported_names = extract_imported_names(tree)
@@ -137,8 +138,9 @@ def test_middleware_exported_in_api_init():
     REQUIREMENT: Issue #1 - Middleware exports
     VALIDATION: Check __all__ list includes middleware
     """
+    # Test is in src/vulcan/tests/, so go up one level to get to vulcan/
     project_root = Path(__file__).parent.parent
-    init_file = project_root / "src" / "vulcan" / "api" / "__init__.py"
+    init_file = project_root / "api" / "__init__.py"
     
     tree = parse_python_file(init_file)
     exports = extract_all_exports(tree)
@@ -530,8 +532,9 @@ def test_error_response_timestamp_uses_default_factory():
     REQUIREMENT: Issue #5 - Proper Pydantic default_factory usage
     VALIDATION: AST check for default_factory
     """
+    # Test is in src/vulcan/tests/, so go up one level to get to vulcan/
     project_root = Path(__file__).parent.parent
-    models_file = project_root / "src" / "vulcan" / "api" / "models.py"
+    models_file = project_root / "api" / "models.py"
     
     with open(models_file, encoding="utf-8") as f:
         content = f.read()
@@ -567,8 +570,9 @@ def test_unified_chat_has_detailed_initialization_checks():
     REQUIREMENT: Issue #6 - Detailed error messages for 503 errors
     VALIDATION: Check for comprehensive validation logic
     """
+    # Test is in src/vulcan/tests/, so go up one level to get to vulcan/
     project_root = Path(__file__).parent.parent
-    unified_chat_file = project_root / "src" / "vulcan" / "endpoints" / "unified_chat.py"
+    unified_chat_file = project_root / "endpoints" / "unified_chat.py"
     
     with open(unified_chat_file, encoding="utf-8") as f:
         content = f.read()
@@ -604,8 +608,9 @@ def test_initialization_error_messages_are_informative():
     REQUIREMENT: Issue #6 - Distinguish between different failure modes
     VALIDATION: Check for specific error messages
     """
+    # Test is in src/vulcan/tests/, so go up one level to get to vulcan/
     project_root = Path(__file__).parent.parent
-    unified_chat_file = project_root / "src" / "vulcan" / "endpoints" / "unified_chat.py"
+    unified_chat_file = project_root / "endpoints" / "unified_chat.py"
     
     with open(unified_chat_file, encoding="utf-8") as f:
         content = f.read()
