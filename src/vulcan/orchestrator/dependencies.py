@@ -1261,11 +1261,32 @@ def wire_world_model_components(
     return deps
 
 
+# ============================================================
+# DEPENDENCY ALIAS CONFIGURATION
+# ============================================================
+
+# Mapping of legacy/expected dependency names to their actual implementation names
+# This allows for backward compatibility when dependency names change during refactoring
+DEPENDENCY_ALIASES = {
+    DependencyCategory.LEARNING: {
+        "learning_system": "continual",  # learning_system is implemented as 'continual' (ContinualLearner)
+    }
+    # Add more aliases here as needed:
+    # DependencyCategory.REASONING: {
+    #     "old_name": "new_name",
+    # }
+}
+
+
 def validate_dependencies(
     deps: EnhancedCollectiveDeps, required_categories: Optional[List[str]] = None
 ) -> bool:
     """
-    Validate that dependencies meet requirements
+    Validate that dependencies meet requirements with support for aliased names.
+    
+    This function checks that all required dependencies are initialized, with support
+    for legacy/aliased dependency names. If a dependency is missing but an alias is
+    available, the validation will pass.
 
     Args:
         deps: Dependencies container to validate
@@ -1273,6 +1294,9 @@ def validate_dependencies(
 
     Returns:
         True if validation passes, False otherwise
+        
+    Note:
+        See DEPENDENCY_ALIASES for configured name mappings.
     """
     if required_categories is None:
         # Define core functional categories (excluding optional like DISTRIBUTED, META_REASONING)
@@ -1299,35 +1323,28 @@ def validate_dependencies(
             ]
             
             # ================================================================
-            # ARCHITECTURAL FIX: Handle 'continual' / 'learning_system' Alias
+            # DEPENDENCY ALIAS RESOLUTION
             # ================================================================
-            # ISSUE: After refactoring (PR #704), the dependency validation
-            #        expects 'learning_system' but the actual implementation
-            #        uses 'continual' (ContinualLearner class).
+            # Check if any missing dependencies have available aliases/substitutes.
+            # This handles cases where dependency names changed during refactoring
+            # but the validation still expects the old names.
             #
-            # ROOT CAUSE:
-            # - EnhancedCollectiveDeps defines both fields:
-            #   - continual: Any = None (actual implementation)
-            #   - learning_system: Any = None (legacy/placeholder)
-            # - Field mapping at line 455 categorizes learning_system as LEARNING
-            # - However, the factory functions only initialize 'continual'
-            # - This causes false "Missing critical dependencies" errors
-            #
-            # SOLUTION:
-            # Treat 'continual' as a valid substitute for 'learning_system'.
-            # If continual learner is available, consider learning_system satisfied.
-            #
-            # FUTURE: Consider deprecating 'learning_system' field in favor of
-            #         'continual' for consistency (breaking change in v3.0.0).
+            # Example: 'learning_system' was refactored to 'continual' but validation
+            # still checks for 'learning_system'. If 'continual' is available,
+            # consider 'learning_system' satisfied.
             # ================================================================
-            if category == DependencyCategory.LEARNING and "learning_system" in missing_initialized:
-                # Check if continual learner is available as substitute
-                if deps.continual is not None:
-                    missing_initialized.remove("learning_system")
-                    logger.debug(
-                        "Learning system validation: 'continual' (ContinualLearner) "
-                        "satisfies 'learning_system' requirement"
-                    )
+            if category in DEPENDENCY_ALIASES:
+                aliases = DEPENDENCY_ALIASES[category]
+                for missing_dep in list(missing_initialized):  # Create copy to allow removal
+                    if missing_dep in aliases:
+                        actual_dep_name = aliases[missing_dep]
+                        # Check if the actual implementation is available
+                        if hasattr(deps, actual_dep_name) and getattr(deps, actual_dep_name) is not None:
+                            missing_initialized.remove(missing_dep)
+                            logger.debug(
+                                f"Dependency '{missing_dep}' satisfied by alias '{actual_dep_name}' "
+                                f"in category '{category}'"
+                            )
             
             if missing_initialized:
                 logger.error(

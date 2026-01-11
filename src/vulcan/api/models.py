@@ -264,7 +264,7 @@ class UnifiedChatRequest(BaseModel):
         default=2000,
         ge=1,
         le=8000,
-        description="Maximum tokens in the response (increased from 1024 for diagnostic purposes)"
+        description="Maximum tokens in the response"
     )
     history: List[Dict[str, str]] = Field(
         default_factory=list,
