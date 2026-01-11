@@ -1877,7 +1877,9 @@ async def _background_services_initialization(app: FastAPI, worker_id: int, logg
                         from vulcan.world_model.system_observer import initialize_system_observer
                         system_observer = initialize_system_observer(world_model)
                         app.state.system_observer = system_observer
-                        vulcan_module.app.state.system_observer = system_observer
+                        # Safely attach to vulcan_module.app.state if it exists
+                        if hasattr(vulcan_module, 'app') and hasattr(vulcan_module.app, 'state'):
+                            vulcan_module.app.state.system_observer = system_observer
                         logger.info("✓ SystemObserver initialized - Platform events now feed World Model")
                 except ImportError as e:
                     logger.debug(f"SystemObserver not available: {e}")

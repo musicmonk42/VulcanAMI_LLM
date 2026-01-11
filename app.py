@@ -321,8 +321,7 @@ def _notify_system_observer(actor: Optional[str], event: str, meta: Optional[Dic
         if observer is None:
             return
         
-        # Create an observation for the world model
-        # Map registry events to SystemObserver event types
+        # Map registry events to domains for world model tracking
         event_lower = event.lower()
         
         # Determine event category for the world model
@@ -337,19 +336,30 @@ def _notify_system_observer(actor: Optional[str], event: str, meta: Optional[Dic
         else:
             domain = "registry_general"
         
-        # Use observe_outcome to record the event (registry events are outcomes)
-        # We treat registry operations as "outcomes" with confidence based on success
-        observer.observe_outcome(
-            query_id=f"registry_{int(time.time() * 1000)}",
-            response={
-                "source": "graphix_registry",
-                "event": event,
-                "actor": actor,
-                "domain": domain,
-                "confidence": 1.0,  # Registry events are deterministic
-            },
-            user_feedback=None
-        )
+        # Feed observation directly to world model if available
+        # This is the proper way to add registry events to the world model's awareness
+        if hasattr(observer, 'world_model') and observer.world_model:
+            try:
+                from vulcan.world_model.world_model_core import Observation
+                
+                obs = Observation(
+                    timestamp=time.time(),
+                    variables={
+                        'event_type': event,
+                        'actor': actor or 'system',
+                        'domain': domain,
+                        'success': True,  # Registry events that reach here succeeded
+                    },
+                    domain=f'registry_{domain}',
+                    metadata=meta or {}
+                )
+                observer.world_model.update_from_observation(obs)
+            except ImportError:
+                # Observation class not available, skip
+                pass
+            except Exception as obs_err:
+                logging.getLogger(__name__).debug(f"World model observation failed: {obs_err}")
+        
     except Exception as e:
         # Don't let observer errors break the registry
         logging.getLogger(__name__).debug(f"SystemObserver notification failed: {e}")
