@@ -21,6 +21,8 @@ import time
 
 from fastapi import APIRouter, HTTPException, Request
 
+from vulcan.endpoints.utils import require_deployment
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["self-improvement"])
@@ -54,10 +56,7 @@ async def start_self_improvement(request: Request) -> dict:
     """
     app = request.app
     
-    if not hasattr(app.state, "deployment"):
-        raise HTTPException(status_code=503, detail="System not initialized")
-
-    deployment = app.state.deployment
+    deployment = require_deployment(request)
 
     try:
         world_model = deployment.collective.deps.world_model
@@ -123,10 +122,7 @@ async def stop_self_improvement(request: Request) -> dict:
     """
     app = request.app
     
-    if not hasattr(app.state, "deployment"):
-        raise HTTPException(status_code=503, detail="System not initialized")
-
-    deployment = app.state.deployment
+    deployment = require_deployment(request)
 
     try:
         world_model = deployment.collective.deps.world_model
@@ -191,10 +187,7 @@ async def get_improvement_status(request: Request) -> dict:
     """
     app = request.app
     
-    if not hasattr(app.state, "deployment"):
-        raise HTTPException(status_code=503, detail="System not initialized")
-
-    deployment = app.state.deployment
+    deployment = require_deployment(request)
 
     try:
         world_model = deployment.collective.deps.world_model
@@ -259,10 +252,7 @@ async def report_error(request: Request) -> dict:
     """
     app = request.app
     
-    if not hasattr(app.state, "deployment"):
-        raise HTTPException(status_code=503, detail="System not initialized")
-
-    deployment = app.state.deployment
+    deployment = require_deployment(request)
 
     try:
         world_model = deployment.collective.deps.world_model
@@ -333,10 +323,7 @@ async def approve_improvement(request: Request) -> dict:
     """
     app = request.app
     
-    if not hasattr(app.state, "deployment"):
-        raise HTTPException(status_code=503, detail="System not initialized")
-
-    deployment = app.state.deployment
+    deployment = require_deployment(request)
 
     try:
         world_model = deployment.collective.deps.world_model
@@ -416,10 +403,7 @@ async def get_pending_approvals(request: Request) -> dict:
     """
     app = request.app
     
-    if not hasattr(app.state, "deployment"):
-        raise HTTPException(status_code=503, detail="System not initialized")
-
-    deployment = app.state.deployment
+    deployment = require_deployment(request)
 
     try:
         world_model = deployment.collective.deps.world_model
@@ -476,10 +460,7 @@ async def update_performance_metric(request: Request) -> dict:
     """
     app = request.app
     
-    if not hasattr(app.state, "deployment"):
-        raise HTTPException(status_code=503, detail="System not initialized")
-
-    deployment = app.state.deployment
+    deployment = require_deployment(request)
 
     try:
         world_model = deployment.collective.deps.world_model
