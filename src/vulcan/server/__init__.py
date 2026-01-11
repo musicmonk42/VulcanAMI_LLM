@@ -1,7 +1,9 @@
 """
 Vulcan Server Module
 
-This module contains the FastAPI app creation and server runner logic.
+FastAPI application creation and lifecycle management.
 """
 
-__all__ = []
+from vulcan.server.app import create_app, lifespan
+
+__all__ = ["create_app", "lifespan"]
