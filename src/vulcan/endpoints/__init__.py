@@ -5,6 +5,7 @@ This module contains all FastAPI endpoint handlers extracted from main.py.
 Each endpoint category is in its own file for better organization.
 """
 
+from vulcan.endpoints.chat import router as chat_router
 from vulcan.endpoints.config import router as config_router
 from vulcan.endpoints.execution import router as execution_router
 from vulcan.endpoints.health import router as health_router
@@ -16,6 +17,7 @@ from vulcan.endpoints.self_improvement import router as self_improvement_router
 from vulcan.endpoints.status import router as status_router
 
 __all__ = [
+    "chat_router",
     "config_router",
     "execution_router",
     "health_router",
