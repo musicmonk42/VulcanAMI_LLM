@@ -9,7 +9,14 @@ import logging
 import time
 from typing import Any, Dict, List, Optional
 
-from .types import ReasoningResult, ReasoningStrategyType, RoutingDecision, LOG_PREFIX
+from .types import (
+    ReasoningResult,
+    ReasoningStrategyType,
+    RoutingDecision,
+    LOG_PREFIX,
+    FAST_PATH_COMPLEXITY_THRESHOLD,
+    DECOMPOSITION_COMPLEXITY_THRESHOLD,
+)
 from .query_router import get_reasoning_type_from_route
 from .selection_strategies import (
     select_with_tool_selector,
@@ -23,9 +30,17 @@ from .query_analysis import (
     consult_world_model_introspection,
 )
 from .cross_domain import apply_cross_domain_transfer
-from .learning import learn_from_outcome
+from .learning import learn_from_outcome, learn_from_reasoning_outcome
 
 logger = logging.getLogger(__name__)
+
+# Optional answer validator import
+try:
+    from vulcan.reasoning.validation.answer_validator import validate_reasoning_result
+    ANSWER_VALIDATOR_AVAILABLE = True
+except ImportError:
+    ANSWER_VALIDATOR_AVAILABLE = False
+    validate_reasoning_result = None
 
 
 def apply_reasoning(

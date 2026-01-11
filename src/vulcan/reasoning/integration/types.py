@@ -383,6 +383,12 @@ class IntegrationStatistics:
     for observability and performance analysis.
     
     Attributes:
+        invocations: Total number of apply_reasoning invocations
+        tool_selections: Number of tool selection operations
+        portfolio_executions: Number of portfolio execution operations
+        errors: Total error count
+        fast_path_count: Number of queries that used the fast path
+        last_error: Last error message encountered (if any)
         total_queries: Total number of queries processed
         successful_selections: Number of successful tool selections
         failed_selections: Number of failed selections
@@ -395,12 +401,23 @@ class IntegrationStatistics:
         fallback_counts: Count of fallback attempts by reason
     """
     
+    # Core invocation metrics (used by orchestrator.py and apply_reasoning_impl.py)
+    invocations: int = 0
+    tool_selections: int = 0
+    portfolio_executions: int = 0
+    errors: int = 0
+    fast_path_count: int = 0
+    last_error: Optional[str] = None
+    
+    # Query processing metrics
     total_queries: int = 0
     successful_selections: int = 0
     failed_selections: int = 0
     tool_selector_hits: int = 0
     portfolio_executor_hits: int = 0
     avg_selection_time_ms: float = 0.0
+    
+    # Detailed tracking
     strategy_counts: Dict[str, int] = field(default_factory=dict)
     tool_counts: Dict[str, int] = field(default_factory=dict)
     error_counts: Dict[str, int] = field(default_factory=dict)
@@ -409,13 +426,19 @@ class IntegrationStatistics:
     @property
     def success_rate(self) -> float:
         """Calculate success rate of tool selections."""
-        if self.total_queries == 0:
+        if self.invocations == 0:
             return 0.0
-        return self.successful_selections / self.total_queries
+        return (self.invocations - self.errors) / self.invocations
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert statistics to dictionary for serialization."""
         return {
+            "invocations": self.invocations,
+            "tool_selections": self.tool_selections,
+            "portfolio_executions": self.portfolio_executions,
+            "errors": self.errors,
+            "fast_path_count": self.fast_path_count,
+            "last_error": self.last_error,
             "total_queries": self.total_queries,
             "successful_selections": self.successful_selections,
             "failed_selections": self.failed_selections,
