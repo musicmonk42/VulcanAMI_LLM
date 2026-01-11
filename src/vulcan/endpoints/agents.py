@@ -11,6 +11,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import Dict, Any, Optional, List
 import logging
+import secrets
 
 logger = logging.getLogger(__name__)
 
@@ -206,7 +207,3 @@ async def submit_job_to_pool(request: SubmitJobRequest):
             status_code=500,
             detail=f"Failed to submit job: {str(e)}"
         )
-
-
-# Import secrets for token generation
-import secrets

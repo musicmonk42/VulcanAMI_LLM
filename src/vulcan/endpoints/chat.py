@@ -1433,7 +1433,9 @@ async def chat(request: Request) -> Dict[str, Any]:
                 # Wait before checking (first attempt uses initial delay)
                 await asyncio.sleep(poll_delay)
                 
-                for job_id in submitted_jobs[:MAX_AGENT_REASONING_JOBS_TO_CHECK]:
+                # FIX: Check ALL submitted jobs, not just first 3
+                # This prevents silently dropping completed results from jobs 4+
+                for job_id in submitted_jobs:
                     try:
                         provenance = collective.agent_pool.get_job_provenance(job_id)
                         if provenance and provenance.get("status") == "success":
@@ -2177,9 +2179,11 @@ Based on your analysis through memory retrieval, multi-modal reasoning, causal m
         ]
     )
 
-    # Generate response_id for feedback tracking (UI thumbs buttons)
-    response_id = f"resp_{int(time.time())}_{secrets.token_hex(4)}"
-    query_id = routing_plan.query_id if routing_plan else f"q_{int(time.time())}"
+    # SECURITY FIX: Generate IDs with full cryptographic randomness
+    # Old format: f"resp_{int(time.time())}_{secrets.token_hex(4)}"
+    # This prevents timing attacks and ID enumeration
+    response_id = f"resp_{secrets.token_urlsafe(16)}"
+    query_id = routing_plan.query_id if routing_plan else f"q_{secrets.token_urlsafe(12)}"
 
     response_data = {
         "response": response_text,

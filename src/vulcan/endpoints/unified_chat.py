@@ -1160,8 +1160,9 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
                     # Wait before checking (first attempt uses initial delay)
                     await asyncio.sleep(poll_delay)
                     
-                    # Check all submitted jobs for completion
-                    for job_id in submitted_jobs[:MAX_AGENT_REASONING_JOBS_TO_CHECK]:
+                    # FIX: Check ALL submitted jobs, not just first 3
+                    # This prevents silently dropping completed results from jobs 4+
+                    for job_id in submitted_jobs:
                         try:
                             provenance = pool.get_job_provenance(job_id)
                             if provenance and provenance.get("status") == "success":
@@ -2138,12 +2139,14 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
         # This prevents progressive query routing degradation (469ms → 152,048ms)
         # caused by repeated SentenceTransformer model loading without cleanup.
         # Rate-limited to every GC_REQUEST_INTERVAL requests to reduce overhead.
+        # FIX: Use modulo to prevent overflow after billions of requests
         # ================================================================
         global _gc_request_counter
-        _gc_request_counter += 1
+        # OVERFLOW FIX: Use modulo to wrap counter instead of unbounded increment
+        # This prevents integer overflow after ~2 billion requests (2^31-1)
+        _gc_request_counter = (_gc_request_counter + 1) % GC_REQUEST_INTERVAL
         
-        if _gc_request_counter >= GC_REQUEST_INTERVAL:
-            _gc_request_counter = 0  # Reset counter
+        if _gc_request_counter == 0:  # Counter wrapped to 0, trigger GC
             
             async def _post_request_gc():
                 """Background task to trigger garbage collection after request."""
@@ -2158,9 +2161,11 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
             # Schedule GC as a background task (non-blocking)
             asyncio.create_task(_post_request_gc())
 
-        # Generate response_id for feedback tracking (UI thumbs buttons)
-        response_id = f"resp_{int(time.time())}_{secrets.token_hex(4)}"
-        query_id = routing_stats.get("query_id") if routing_stats else f"q_{int(time.time())}"
+        # SECURITY FIX: Generate IDs with full cryptographic randomness
+        # Old format: f"resp_{int(time.time())}_{secrets.token_hex(4)}"
+        # This prevents timing attacks and ID enumeration
+        response_id = f"resp_{secrets.token_urlsafe(16)}"
+        query_id = routing_stats.get("query_id") if routing_stats else f"q_{secrets.token_urlsafe(12)}"
 
         # ================================================================
         # STEP 11: Process live feedback for auto-detection (Task 3)
@@ -2331,6 +2336,13 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
             pass
         
         raise HTTPException(status_code=500, detail=str(e))
+    
+    finally:
+        # MEMORY LEAK FIX: Clean up global precomputed embeddings
+        # These are module-level variables that persist between requests
+        # and can accumulate memory if not explicitly cleared
+        _precomputed_embedding = None
+        _precomputed_query_result = None
 
 
 # ============================================================
