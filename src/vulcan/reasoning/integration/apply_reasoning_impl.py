@@ -690,6 +690,3 @@ def apply_reasoning(
             )
 
             return self._create_default_result(query_type, complexity)
-
-    # _select_with_tool_selector moved to selection_strategies.py
-    from .selection_strategies import select_with_tool_selector as _select_with_tool_selector
