@@ -28,6 +28,19 @@ except ImportError:
 
     WorldModel = MagicMock
 
+# Import metrics for self-improvement tracking
+try:
+    from vulcan.metrics import (
+        improvement_attempts,
+        improvement_successes,
+        improvement_failures,
+        improvement_cost,
+    )
+    METRICS_AVAILABLE = True
+except ImportError:
+    logger.info("Metrics module not available - self-improvement metrics disabled")
+    METRICS_AVAILABLE = False
+
 
 logger = logging.getLogger(__name__)
 
@@ -514,6 +527,18 @@ class VULCANAGICollective:
                 self.improvement_experiments_run += 1
                 if outcome.success:
                     self.improvement_successes += 1
+            
+            # Update Prometheus metrics
+            if METRICS_AVAILABLE:
+                improvement_attempts.labels(objective_type=objective_type).inc()
+                if outcome.success:
+                    improvement_successes.labels(objective_type=objective_type).inc()
+                else:
+                    improvement_failures.labels(objective_type=objective_type).inc()
+                
+                # Track cost if available
+                if hasattr(outcome, 'cost_actual') and outcome.cost_actual:
+                    improvement_cost.inc(outcome.cost_actual)
 
             logger.info(
                 f"✅ Improvement experiment completed: success={outcome.success}"
@@ -578,6 +603,18 @@ class VULCANAGICollective:
                 self.improvement_experiments_run += 1
                 if success:
                     self.improvement_successes += 1
+            
+            # Update Prometheus metrics
+            if METRICS_AVAILABLE:
+                improvement_attempts.labels(objective_type=objective_type).inc()
+                if success:
+                    improvement_successes.labels(objective_type=objective_type).inc()
+                else:
+                    improvement_failures.labels(objective_type=objective_type).inc()
+                
+                # Track cost if available in result
+                if isinstance(result, dict) and 'cost_usd' in result:
+                    improvement_cost.inc(result['cost_usd'])
 
             logger.info(
                 f"{'✅' if success else '❌'} Direct improvement completed: {objective_type}"

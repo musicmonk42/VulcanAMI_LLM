@@ -16,9 +16,10 @@ import time
 from typing import AsyncGenerator
 
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import StreamingResponse
 
 from vulcan.endpoints.utils import require_deployment
-from fastapi.responses import StreamingResponse
+from vulcan.metrics import step_counter, step_duration, active_requests, error_counter
 
 logger = logging.getLogger(__name__)
 
@@ -61,30 +62,10 @@ async def execute_step(request: Request) -> dict:
     if deployment is None:
         raise HTTPException(status_code=503, detail="System not initialized")
 
-    # Get settings and metrics
+    # Get settings
     settings = getattr(app.state, "settings", None)
-    
-    # Try to get Prometheus metrics
-    active_requests = None
-    step_duration = None
-    step_counter = None
-    error_counter = None
-    
-    try:
-        from prometheus_client import Counter, Gauge, Histogram
-        active_requests = Gauge("active_requests", "Active requests")
-        step_duration = Histogram("step_duration_seconds", "Step execution duration")
-        step_counter = Counter("steps_total", "Total steps executed")
-        error_counter = Counter("errors_total", "Total errors", ["error_type"])
-    except ImportError:
-        # FIX: Set to None to prevent NameError if Prometheus not available
-        active_requests = None
-        step_duration = None
-        step_counter = None
-        error_counter = None
 
-    if active_requests:
-        active_requests.inc()
+    active_requests.inc()
 
     try:
         # Get request body
@@ -96,19 +77,8 @@ async def execute_step(request: Request) -> dict:
 
         loop = asyncio.get_running_loop()
 
-        # Time the execution if metrics available
-        if step_duration:
-            with step_duration.time():
-                result = await asyncio.wait_for(
-                    loop.run_in_executor(
-                        None,
-                        deployment.step_with_monitoring,
-                        step_request.history,
-                        step_request.context,
-                    ),
-                    timeout=timeout,
-                )
-        else:
+        # Time the execution with metrics
+        with step_duration.time():
             result = await asyncio.wait_for(
                 loop.run_in_executor(
                     None,
@@ -119,13 +89,11 @@ async def execute_step(request: Request) -> dict:
                 timeout=timeout,
             )
 
-        if step_counter:
-            step_counter.inc()
+        step_counter.inc()
         return result
 
     except asyncio.TimeoutError:
-        if error_counter:
-            error_counter.labels(error_type="timeout").inc()
+        error_counter.labels(error_type="timeout").inc()
         timeout_val = step_request.timeout if 'step_request' in locals() else (getattr(settings, "max_execution_time_s", 30.0) if settings else 30.0)
         logger.error(f"Step execution timeout after {timeout_val}s")
         raise HTTPException(
@@ -133,14 +101,12 @@ async def execute_step(request: Request) -> dict:
         )
 
     except Exception as e:
-        if error_counter:
-            error_counter.labels(error_type="execution").inc()
+        error_counter.labels(error_type="execution").inc()
         logger.error(f"Step execution failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
     finally:
-        if active_requests:
-            active_requests.dec()
+        active_requests.dec()
 
 
 @router.get("/v1/stream")

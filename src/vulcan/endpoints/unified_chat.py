@@ -29,6 +29,7 @@ from vulcan.endpoints.chat_helpers import (
     HANDLED_DICT_RESULT_KEYS,
 )
 from vulcan.endpoints.utils import require_deployment
+from vulcan.metrics import error_counter
 
 logger = logging.getLogger(__name__)
 

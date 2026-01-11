@@ -22,6 +22,7 @@ import time
 from fastapi import APIRouter, HTTPException, Request
 
 from vulcan.endpoints.utils import require_deployment
+from vulcan.metrics import error_counter
 
 logger = logging.getLogger(__name__)
 
@@ -273,13 +274,8 @@ async def report_error(request: Request) -> dict:
             None, world_model.report_error, error, error_request.context
         )
 
-        # Update Prometheus metrics if available
-        try:
-            from prometheus_client import Counter
-            error_counter = Counter("errors_total", "Total errors", ["error_type"])
-            error_counter.labels(error_type=error_request.error_type).inc()
-        except ImportError:
-            pass
+        # Update Prometheus metrics
+        error_counter.labels(error_type=error_request.error_type).inc()
 
         logger.info(f"Error reported: {error_request.error_type} - {error_request.error_message}")
 
