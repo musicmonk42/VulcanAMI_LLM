@@ -41,6 +41,47 @@ import logging
 from vulcan.server import create_app
 from vulcan.settings import Settings
 
+# ====================================================================
+# BACKWARD COMPATIBILITY EXPORTS
+# ====================================================================
+# This section maintains backward compatibility with code that imports
+# directly from src.vulcan.main after the modular refactoring (PR #704).
+#
+# CONTEXT:
+# - Original main.py: 11,316 lines (monolithic)
+# - Refactored main.py: 222 lines (modular)
+# - Components extracted to 24 focused modules
+#
+# DEPENDENCIES:
+# The following imports are required by:
+# 1. src/full_platform.py - Proxy endpoints for feedback and chat
+# 2. tests/test_*.py - Test suites that import from main
+# 3. External integrations - Any code using the previous API surface
+#
+# MAINTENANCE:
+# When adding new exports, document the dependent code and reason.
+# Consider deprecation warnings for future major version updates.
+# ====================================================================
+
+# Feedback models and handlers (used by full_platform.py proxy endpoints)
+# Location: Lines 3602, 3660, 3700 in src/full_platform.py
+from vulcan.api.models import (
+    FeedbackRequest,           # RLHF feedback submission model
+    ThumbsFeedbackRequest,     # Simplified thumbs up/down model
+    UnifiedChatRequest,        # Full platform chat request model
+)
+from vulcan.endpoints.feedback import (
+    submit_feedback,           # POST /v1/feedback handler
+    submit_thumbs_feedback,    # POST /v1/feedback/thumbs handler
+    get_feedback_stats,        # GET /v1/feedback/stats handler
+)
+
+# Reasoning helpers (used by tests and external code)
+# Location: tests/test_reasoning_content_propagation.py:73
+from vulcan.utils.reasoning_helpers import (
+    _get_reasoning_attr,       # Safe attribute extraction from reasoning results
+)
+
 # Import all endpoint routers
 from vulcan.endpoints import (
     agents_router,
