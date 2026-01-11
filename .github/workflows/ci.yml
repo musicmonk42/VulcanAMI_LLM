@@ -278,7 +278,7 @@ jobs:
             --junitxml=results/junit.xml \
             --timeout=600 \
             --maxfail=10 \
-            -n 2 \
+            -n 1 \
             --dist=loadscope \
             -m "not slow and not load_test and not benchmark" \
             -v \
