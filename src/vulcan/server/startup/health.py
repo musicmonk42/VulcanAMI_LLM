@@ -190,6 +190,8 @@ class HealthCheck:
         """
         Check agent pool health.
         
+        P1 Fix: Issue #8 - Exception handling for status checks during shutdown.
+        
         Returns:
             ComponentHealth result for agent pool
         """
@@ -228,9 +230,18 @@ class HealthCheck:
                     message="Agent pool is None"
                 )
             
-            # Get pool status
-            pool_status = agent_pool.get_pool_status()
-            total_agents = pool_status.get("total_agents", 0)
+            # Get pool status with exception handling (P1 Fix: Issue #8)
+            try:
+                pool_status = agent_pool.get_pool_status()
+                total_agents = pool_status.get("total_agents", 0)
+            except Exception as status_error:
+                logger.warning(f"Could not get agent pool status: {status_error}")
+                return ComponentHealth(
+                    name="agent_pool",
+                    healthy=False,
+                    critical=False,
+                    message=f"Agent pool status unavailable: {str(status_error)}"
+                )
             
             return ComponentHealth(
                 name="agent_pool",

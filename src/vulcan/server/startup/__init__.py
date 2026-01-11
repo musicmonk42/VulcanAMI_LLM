@@ -17,6 +17,8 @@ from .constants import (
     SELF_OPTIMIZER_TARGET_LATENCY_MS,
     SELF_OPTIMIZER_TARGET_MEMORY_MB,
     SELF_OPTIMIZER_INTERVAL_SECONDS,
+    DeploymentMode,
+    LogEmoji,
 )
 
 __all__ = [
@@ -41,4 +43,6 @@ __all__ = [
     "SELF_OPTIMIZER_TARGET_LATENCY_MS",
     "SELF_OPTIMIZER_TARGET_MEMORY_MB",
     "SELF_OPTIMIZER_INTERVAL_SECONDS",
+    "DeploymentMode",
+    "LogEmoji",
 ]

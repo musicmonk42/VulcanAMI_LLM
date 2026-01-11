@@ -22,24 +22,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from vulcan.server.startup import StartupManager
+from vulcan.server import state
 
 logger = logging.getLogger(__name__)
-
-
-# ============================================================
-# Module-Level Globals (P0 Fix: Issue #3)
-# ============================================================
-# These must be declared at module level with proper types to avoid
-# UnboundLocalError when referenced in lifespan() function.
-
-_process_lock: Optional[Any] = None
-"""Process lock for split-brain prevention when Redis is unavailable."""
-
-rate_limit_cleanup_thread: Optional[Thread] = None
-"""Background thread for rate limit cleanup."""
-
-redis_client: Optional[Any] = None
-"""Redis client instance (may be None if Redis is not configured)."""
 
 
 @asynccontextmanager
@@ -49,13 +34,14 @@ async def lifespan(app: FastAPI):
     
     Delegates all initialization to StartupManager for modular,
     testable, and maintainable startup sequence.
-    """
-    global rate_limit_cleanup_thread, _process_lock, redis_client
     
+    Raises:
+        RuntimeError: If critical initialization fails or settings cannot be loaded
+    """
     worker_id = os.getpid()
     
     # ============================================================
-    # TEST MODE BYPASS (P1 Fix: Issue #8)
+    # TEST MODE BYPASS
     # ============================================================
     # If deployment exists in app.state, we're in test mode with mocks.
     # Skip all initialization and provide clean exception handling.
@@ -71,18 +57,53 @@ async def lifespan(app: FastAPI):
         return
 
     # ============================================================
-    # SPLIT-BRAIN PREVENTION (P0 Fix: Issue #3)
+    # SETTINGS INITIALIZATION (P0 Fix: Issue #1)
+    # ============================================================
+    # Load settings once with proper error handling. Do NOT retry on failure
+    # as the same error will likely occur again.
+    from vulcan.settings import Settings
+    
+    try:
+        settings = Settings()
+    except Exception as e:
+        logger.critical(f"Failed to initialize settings: {e}", exc_info=True)
+        raise RuntimeError("Startup aborted: Could not initialize Settings.") from e
+
+    # ============================================================
+    # REDIS INITIALIZATION (P0 Fix: Issue #4)
+    # ============================================================
+    # Initialize Redis client from settings BEFORE checking availability.
+    # This ensures the client is properly configured before use.
+    if settings.redis_url:
+        try:
+            import redis
+            state.redis_client = redis.Redis.from_url(
+                settings.redis_url,
+                decode_responses=False
+            )
+            # Verify connection with a ping
+            state.redis_client.ping()
+            logger.info(f"Redis connected: {settings.redis_url}")
+        except Exception as e:
+            logger.warning(f"Redis connection failed: {e}")
+            state.redis_client = None
+    else:
+        logger.info("Redis URL not configured - running in standalone mode")
+        state.redis_client = None
+
+    # ============================================================
+    # SPLIT-BRAIN PREVENTION (P0 Fix: Issue #5)
     # ============================================================
     # Acquire process lock when Redis is unavailable to ensure only
     # one orchestrator instance runs, preventing split-brain conditions.
-    if redis_client is None:
+    if state.redis_client is None:
         logger.warning(
             "Redis unavailable - acquiring process lock to prevent split-brain"
         )
         from vulcan.utils_main.process_lock import ProcessLock
         
-        _process_lock = ProcessLock()
-        if not _process_lock.acquire():
+        state.process_lock = ProcessLock()
+        if not state.process_lock.acquire():
             logger.critical(
                 "FATAL: Cannot acquire process lock. Another vulcan.orchestrator "
                 "instance is already running. Without Redis for state synchronization, "
@@ -100,21 +121,12 @@ async def lifespan(app: FastAPI):
     # ============================================================
     # STARTUP EXECUTION
     # ============================================================
-    # Import settings and create startup manager
-    from vulcan.settings import Settings
-    
-    try:
-        settings = Settings()
-    except Exception as e:
-        logger.error(f"Failed to initialize settings: {e}")
-        settings = Settings()
-    
     # Create startup manager with all required dependencies
     startup_manager = StartupManager(
         app=app,
         settings=settings,
-        redis_client=redis_client,
-        process_lock=_process_lock,
+        redis_client=state.redis_client,
+        process_lock=state.process_lock,
     )
     
     try:
