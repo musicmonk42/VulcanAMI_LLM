@@ -38,6 +38,19 @@ from sqlalchemy import select
 # ============================================================
 load_dotenv()
 
+# ============================================================
+# SystemObserver Integration (Platform-wide Awareness)
+# ============================================================
+# Import SystemObserver functions to provide platform-wide awareness
+# to the world model. This allows the world model to track events
+# from the Graphix Registry (agent registration, authentication, IR proposals).
+try:
+    from vulcan.world_model.system_observer import get_system_observer
+    SYSTEM_OBSERVER_AVAILABLE = True
+except ImportError:
+    SYSTEM_OBSERVER_AVAILABLE = False
+    get_system_observer = lambda: None
+
 APP_VERSION = (
     "1.3.0"  # Version bumped to reflect additional security & correctness hardening
 )
@@ -283,6 +296,73 @@ def log_audit(actor: Optional[str], event: str, meta: Optional[Dict[str, Any]] =
     db.session.commit()
     # Structured log
     audit_logger.info(json.dumps(record))
+    
+    # Notify SystemObserver of the event for platform-wide awareness
+    _notify_system_observer(actor, event, meta)
+
+
+def _notify_system_observer(actor: Optional[str], event: str, meta: Optional[Dict[str, Any]] = None):
+    """
+    Notify the SystemObserver of registry events for platform-wide awareness.
+    
+    This integration allows the world model to track events from the Graphix Registry,
+    including agent registration, authentication, and IR proposals.
+    
+    Args:
+        actor: The agent performing the action (may be None for system events)
+        event: Description of the event
+        meta: Additional metadata about the event
+    """
+    if not SYSTEM_OBSERVER_AVAILABLE:
+        return
+    
+    try:
+        observer = get_system_observer()
+        if observer is None:
+            return
+        
+        # Map registry events to domains for world model tracking
+        event_lower = event.lower()
+        
+        # Determine event category for the world model
+        if "login" in event_lower or "nonce" in event_lower or "auth" in event_lower:
+            domain = "authentication"
+        elif "bootstrap" in event_lower or "onboard" in event_lower or "register" in event_lower:
+            domain = "agent_management"
+        elif "ir" in event_lower or "proposal" in event_lower:
+            domain = "ir_proposals"
+        elif "audit" in event_lower or "log" in event_lower:
+            domain = "audit"
+        else:
+            domain = "registry_general"
+        
+        # Feed observation directly to world model if available
+        # This is the proper way to add registry events to the world model's awareness
+        if hasattr(observer, 'world_model') and observer.world_model:
+            try:
+                from vulcan.world_model.world_model_core import Observation
+                
+                obs = Observation(
+                    timestamp=time.time(),
+                    variables={
+                        'event_type': event,
+                        'actor': actor or 'system',
+                        'domain': domain,
+                        'success': True,  # Registry events that reach here succeeded
+                    },
+                    domain=f'registry_{domain}',
+                    metadata=meta or {}
+                )
+                observer.world_model.update_from_observation(obs)
+            except ImportError:
+                # Observation class not available, skip
+                pass
+            except Exception as obs_err:
+                logging.getLogger(__name__).debug(f"World model observation failed: {obs_err}")
+        
+    except Exception as e:
+        # Don't let observer errors break the registry
+        logging.getLogger(__name__).debug(f"SystemObserver notification failed: {e}")
 
 
 def response_ok(**kwargs):

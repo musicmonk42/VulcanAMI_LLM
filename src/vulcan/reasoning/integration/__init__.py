@@ -31,6 +31,12 @@ from .utils import (
     observe_reasoning_success,
     observe_reasoning_failure,
     observe_reasoning_degradation,
+    # SystemObserver integration functions
+    observe_query_start,
+    observe_engine_result,
+    observe_outcome,
+    observe_validation_failure,
+    observe_error,
 )
 
 __all__ = [
@@ -63,4 +69,10 @@ __all__ = [
     "observe_reasoning_success",
     "observe_reasoning_failure",
     "observe_reasoning_degradation",
+    # SystemObserver integration functions
+    "observe_query_start",
+    "observe_engine_result",
+    "observe_outcome",
+    "observe_validation_failure",
+    "observe_error",
 ]

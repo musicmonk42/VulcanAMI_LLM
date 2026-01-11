@@ -1866,6 +1866,28 @@ async def _background_services_initialization(app: FastAPI, worker_id: int, logg
                 except Exception as wire_err:
                     logger.debug(f"Could not wire WorldModel components to deps: {wire_err}")
 
+                # ================================================================
+                # Initialize SystemObserver for Platform-wide Awareness
+                # BUG #3 FIX: Wire up SystemObserver so world model knows what 
+                # the entire platform (Registry, Arena, VULCAN) does
+                # ================================================================
+                try:
+                    world_model = vulcan_deployment.collective.deps.world_model
+                    if world_model:
+                        from vulcan.world_model.system_observer import initialize_system_observer
+                        system_observer = initialize_system_observer(world_model)
+                        app.state.system_observer = system_observer
+                        # Safely attach to vulcan_module.app.state if it exists
+                        if hasattr(vulcan_module, 'app') and hasattr(vulcan_module.app, 'state'):
+                            vulcan_module.app.state.system_observer = system_observer
+                        logger.info("✓ SystemObserver initialized - Platform events now feed World Model")
+                except ImportError as e:
+                    logger.debug(f"SystemObserver not available: {e}")
+                    app.state.system_observer = None
+                except Exception as e:
+                    logger.warning(f"SystemObserver initialization failed: {e}")
+                    app.state.system_observer = None
+
                 # Start self-improvement drive if enabled (only if we hold the background task lock)
                 if vulcan_config.enable_self_improvement:
                     if getattr(app.state, 'background_tasks_initialized', False):
