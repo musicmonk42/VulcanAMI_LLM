@@ -1,31 +1,40 @@
 """
 Unified Reasoning Package
+=========================
 
 This package provides a unified interface for reasoning across multiple reasoning engines
 and strategies. It orchestrates probabilistic, symbolic, causal, and analogical reasoning
 with sophisticated tool selection, learning, and adaptation mechanisms.
 
 Main Components:
-- UnifiedReasoner: Main orchestrator class
-- ReasoningTask, ReasoningPlan: Core data structures
-- ToolWeightManager: Weight management for ensemble reasoning
-- Strategy functions: Sequential, parallel, ensemble, adaptive, etc.
+    - UnifiedReasoner: Main orchestrator class
+    - ReasoningTask, ReasoningPlan: Core data structures
+    - ToolWeightManager: Weight management for ensemble reasoning
+    - Strategy functions: Sequential, parallel, ensemble, adaptive, etc.
+
+Planning Integration:
+    The orchestrator integrates with vulcan.planning module for:
+    - Plan creation and optimization using Plan class
+    - Cost and duration estimation using Plan.total_cost and Plan.expected_duration
+    - Topological sorting using Plan.optimize()
 
 Submodules:
-- types: Core dataclasses and types
-- config: Configuration constants
-- component_loader: Lazy component loading
-- cache: Tool weight management and query hashing
-- strategies: Reasoning execution strategies
-- orchestrator: Main UnifiedReasoner class
-- multimodal_handler: Multimodal reasoning methods
-- persistence: State save/load functionality
+    - types: Core dataclasses and types
+    - config: Configuration constants
+    - component_loader: Lazy component loading
+    - cache: Tool weight management and query hashing
+    - strategies: Reasoning execution strategies
+    - orchestrator: Main UnifiedReasoner class
+    - multimodal_handler: Multimodal reasoning methods
+    - persistence: State save/load functionality
 
 Usage:
-    from vulcan.reasoning.unified import UnifiedReasoner
-    
-    reasoner = UnifiedReasoner(enable_learning=True)
-    result = reasoner.reason({"query": "What causes rain?"})
+    >>> from vulcan.reasoning.unified import UnifiedReasoner
+    >>> reasoner = UnifiedReasoner(enable_learning=True)
+    >>> result = reasoner.reason({"query": "What causes rain?"})
+
+Author: VulcanAMI Team
+Version: 2.1 (Planning integration)
 """
 
 # Import core types
@@ -60,6 +69,7 @@ from .strategies import (
     weighted_voting as _weighted_voting,
     combine_parallel_results as _combine_parallel_results,
     topological_sort as _topological_sort,
+    topological_sort_using_plan as _topological_sort_using_plan,
     merge_dependency_results as _merge_dependency_results,
 )
 
@@ -101,6 +111,7 @@ __all__ = [
     "_weighted_voting",
     "_combine_parallel_results",
     "_topological_sort",
+    "_topological_sort_using_plan",  # Alternative using Plan.optimize()
     "_merge_dependency_results",
     # Main class
     "UnifiedReasoner",
