@@ -14,6 +14,7 @@ import logging
 from fastapi import APIRouter, HTTPException, Request
 
 from vulcan.endpoints.utils import require_deployment
+from vulcan.metrics import error_counter
 
 logger = logging.getLogger(__name__)
 
@@ -52,15 +53,6 @@ async def create_plan(request: Request) -> dict:
     app = request.app
     
     deployment = require_deployment(request)
-
-    # Try to get error counter
-    error_counter = None
-    try:
-        from prometheus_client import Counter
-        error_counter = Counter("errors_total", "Total errors", ["error_type"])
-    except ImportError:
-        # FIX: Set to None to prevent NameError if Prometheus not available
-        error_counter = None
 
     try:
         planner = deployment.collective.deps.goal_system
@@ -105,7 +97,6 @@ async def create_plan(request: Request) -> dict:
     except HTTPException:
         raise
     except Exception as e:
-        if error_counter:
-            error_counter.labels(error_type="planning").inc()
+        error_counter.labels(error_type="planning").inc()
         logger.error(f"Planning failed: {e}", exc_info=True)
         raise HTTPException(status_code=503, detail=f"Planning service error: {str(e)}")

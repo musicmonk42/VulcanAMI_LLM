@@ -14,6 +14,7 @@ import logging
 from fastapi import APIRouter, HTTPException, Request
 
 from vulcan.endpoints.utils import require_deployment
+from vulcan.metrics import error_counter
 
 logger = logging.getLogger(__name__)
 
@@ -77,15 +78,6 @@ async def search_memory(request: Request) -> dict:
     
     deployment = require_deployment(request)
 
-    # Try to get error counter
-    error_counter = None
-    try:
-        from prometheus_client import Counter
-        error_counter = Counter("errors_total", "Total errors", ["error_type"])
-    except ImportError:
-        # FIX: Set to None to prevent NameError if Prometheus not available
-        error_counter = None
-
     try:
         memory = deployment.collective.deps.ltm
         processor = deployment.collective.deps.multimodal
@@ -136,7 +128,6 @@ async def search_memory(request: Request) -> dict:
     except HTTPException:
         raise
     except Exception as e:
-        if error_counter:
-            error_counter.labels(error_type="memory").inc()
+        error_counter.labels(error_type="memory").inc()
         logger.error(f"Memory search failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))

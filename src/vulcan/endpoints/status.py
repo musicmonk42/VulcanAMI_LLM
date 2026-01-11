@@ -22,6 +22,7 @@ from unittest.mock import MagicMock
 from fastapi import APIRouter, HTTPException, Request
 
 from vulcan.endpoints.utils import require_deployment
+from vulcan.metrics import error_counter
 
 logger = logging.getLogger(__name__)
 
@@ -97,14 +98,7 @@ async def system_status(request: Request) -> Dict[str, Any]:
         return status
 
     except Exception as e:
-        # Try to increment error counter if available
-        try:
-            from prometheus_client import Counter
-            error_counter = Counter("errors_total", "Total errors", ["error_type"])
-            error_counter.labels(error_type="status").inc()
-        except Exception:
-            pass
-        
+        error_counter.labels(error_type="status").inc()
         logger.error(f"Status retrieval failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -507,13 +501,6 @@ async def save_checkpoint(request: Request) -> Dict[str, str]:
     except HTTPException:
         raise
     except Exception as e:
-        # Try to increment error counter if available
-        try:
-            from prometheus_client import Counter
-            error_counter = Counter("errors_total", "Total errors", ["error_type"])
-            error_counter.labels(error_type="checkpoint").inc()
-        except Exception:
-            pass
-        
+        error_counter.labels(error_type="checkpoint").inc()
         logger.error(f"Checkpoint save failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
