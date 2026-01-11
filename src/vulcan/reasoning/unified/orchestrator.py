@@ -64,6 +64,7 @@ from .config import (
     MATH_ERROR_CONFIDENCE_PENALTY,
     MATH_VERIFICATION_CONFIDENCE_BOOST,
     MATH_WEIGHT_ADJUSTMENT_PENALTY,
+    MIN_ENSEMBLE_WEIGHT_FLOOR,
     NUMERICAL_RESULT_KEYS,
     PROBLEM_TYPE_BAYESIAN,
     UNKNOWN_TYPE_FALLBACK_ORDER,
@@ -4092,8 +4093,16 @@ class UnifiedReasoner:
             explanation=f"Reasoning error: {error}",
         )
 
-    # State persistence methods (save_state, load_state) have been
-    # moved to persistence.py for separation of concerns.
+    # State persistence methods - imported from persistence.py for separation of concerns
+    from .persistence import save_state, load_state
+    save_state = save_state
+    load_state = load_state
+
+    # Multimodal reasoning methods - imported from multimodal_handler.py for separation of concerns
+    from .multimodal_handler import reason_multimodal, reason_counterfactual, reason_by_analogy
+    reason_multimodal = reason_multimodal
+    reason_counterfactual = reason_counterfactual
+    reason_by_analogy = reason_by_analogy
 
     def get_statistics(self) -> Dict[str, Any]:
         """Get comprehensive statistics"""
