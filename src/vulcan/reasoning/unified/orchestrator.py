@@ -40,7 +40,7 @@ from typing import Any, Callable, Dict, List, Optional
 import numpy as np
 
 # Import from unified submodules
-from .cache import ToolWeightManager, compute_query_hash
+from .cache import ToolWeightManager, compute_query_hash as _compute_query_hash, get_weight_manager
 from .component_loader import (
     _load_reasoning_components,
     _load_selection_components,
@@ -57,6 +57,7 @@ from .config import (
     CONFIDENCE_FLOOR_SYMBOLIC_DEFAULT,
     CONFIDENCE_FLOOR_SYMBOLIC_HAS_PROOF,
     CONFIDENCE_FLOOR_SYMBOLIC_PROVEN,
+    CREATIVE_TASK_KEYWORDS,
     INAPPLICABILITY_EXPLANATION_PHRASES,
     MATH_ACCURACY_PENALTY,
     MATH_ACCURACY_REWARD,
@@ -64,8 +65,11 @@ from .config import (
     MATH_VERIFICATION_CONFIDENCE_BOOST,
     MATH_WEIGHT_ADJUSTMENT_PENALTY,
     NUMERICAL_RESULT_KEYS,
+    PROBLEM_TYPE_BAYESIAN,
+    UNKNOWN_TYPE_FALLBACK_ORDER,
 )
 from .types import ReasoningPlan, ReasoningTask
+from .strategies import _is_result_not_applicable
 
 # Import from parent reasoning module
 from ..reasoning_explainer import ReasoningExplainer, SafetyAwareReasoning
@@ -78,6 +82,15 @@ from ..reasoning_types import (
 )
 
 logger = logging.getLogger(__name__)
+
+# ==============================================================================
+# REGEX PATTERNS FOR MATHEMATICAL DETECTION
+# ==============================================================================
+# Pre-compiled regex patterns for mathematical expression detection
+# Used in _classify_reasoning_task() to identify mathematical queries
+
+MATH_EXPRESSION_PATTERN = re.compile(r'\d+\s*[+\-*/^]\s*\d+')
+MATH_QUERY_PATTERN = re.compile(r'(?:what\s+is|calculate|compute|evaluate)\s+\d+\s*[+\-*/^]\s*\d+', re.IGNORECASE)
 
 
 def _is_test_environment() -> bool:
@@ -92,6 +105,51 @@ def _is_test_environment() -> bool:
         or "pytest" in str(os.getenv("PYTEST_CURRENT_TEST", ""))
         or "unittest" in str(os.getenv("_", ""))
     )
+
+
+def _is_creative_task(task: ReasoningTask) -> bool:
+    """
+    Check if a task represents a creative task that should skip confidence filtering.
+    
+    Creative tasks (writing poems, stories, etc.) may have lower confidence scores
+    due to their subjective nature, but should not be filtered out.
+    
+    Args:
+        task: The reasoning task to check
+        
+    Returns:
+        True if the task is creative and should skip confidence filtering
+        
+    Examples:
+        >>> task = ReasoningTask(query="Write a poem about love")
+        >>> _is_creative_task(task)
+        True
+        
+        >>> task = ReasoningTask(query="Calculate 2+2")
+        >>> _is_creative_task(task)
+        False
+    """
+    # Extract query string from task
+    query_str = ""
+    if isinstance(task.query, str):
+        query_str = task.query.lower()
+    elif isinstance(task.query, dict):
+        query_str = str(task.query.get('query', '')).lower()
+        query_str += str(task.query.get('text', '')).lower()
+    
+    if isinstance(task.input_data, str):
+        query_str += task.input_data.lower()
+    
+    # Check for creative keywords
+    words = query_str.split()
+    if words:
+        first_word = words[0].rstrip(',.!?')
+        if first_word in CREATIVE_TASK_KEYWORDS:
+            return True
+    
+    # Check for creative noun indicators
+    creative_nouns = {'poem', 'sonnet', 'haiku', 'story', 'essay', 'song', 'lyrics', 'script', 'novel'}
+    return any(noun in query_str for noun in creative_nouns)
 
 
 class UnifiedReasoner:
