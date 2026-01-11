@@ -95,6 +95,50 @@ class StructuredQuery:
     original_text: str = ""
     confidence: float = 0.0
     
+    def __post_init__(self):
+        """Validate confidence is in valid range."""
+        if not isinstance(self.confidence, (int, float)):
+            raise TypeError(f"confidence must be a number, got {type(self.confidence).__name__}")
+        if not 0.0 <= self.confidence <= 1.0:
+            raise ValueError(f"confidence must be between 0.0 and 1.0, got {self.confidence}")
+    
+    def is_high_confidence(self, threshold: float = 0.7) -> bool:
+        """
+        Check if parsing confidence exceeds threshold.
+        
+        Args:
+            threshold: Minimum confidence level (default: 0.7)
+            
+        Returns:
+            True if confidence >= threshold, False otherwise
+        """
+        return self.confidence >= threshold
+    
+    def validate(self) -> bool:
+        """
+        Validate that the structured query is well-formed.
+        
+        Returns:
+            True if valid, False otherwise
+        """
+        # Check enums are valid
+        if not isinstance(self.intent, QueryIntent):
+            return False
+        if not isinstance(self.domain, QueryDomain):
+            return False
+        
+        # Check parameters is a dict
+        if not isinstance(self.parameters, dict):
+            return False
+        
+        # Check confidence is valid
+        if not isinstance(self.confidence, (int, float)):
+            return False
+        if not 0.0 <= self.confidence <= 1.0:
+            return False
+        
+        return True
+    
     @classmethod
     def from_json(cls, json_str: str, original_text: str = "") -> "StructuredQuery":
         """

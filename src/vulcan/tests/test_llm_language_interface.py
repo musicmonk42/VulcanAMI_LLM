@@ -145,6 +145,60 @@ class TestQueryParser:
         assert "analyze" in repr_str
         assert "logic" in repr_str
         assert "0.75" in repr_str
+    
+    def test_structured_query_validation(self):
+        """Test validation of StructuredQuery."""
+        query = StructuredQuery(
+            intent=QueryIntent.COMPUTE,
+            domain=QueryDomain.MATH,
+            parameters={"operation": "add"},
+            confidence=0.9
+        )
+        
+        assert query.validate() is True
+    
+    def test_structured_query_is_high_confidence(self):
+        """Test high confidence check."""
+        high_conf_query = StructuredQuery(
+            intent=QueryIntent.COMPUTE,
+            domain=QueryDomain.MATH,
+            confidence=0.85
+        )
+        
+        low_conf_query = StructuredQuery(
+            intent=QueryIntent.UNKNOWN,
+            domain=QueryDomain.GENERAL,
+            confidence=0.3
+        )
+        
+        assert high_conf_query.is_high_confidence() is True
+        assert low_conf_query.is_high_confidence() is False
+        assert low_conf_query.is_high_confidence(threshold=0.2) is True
+    
+    def test_structured_query_confidence_validation(self):
+        """Test that invalid confidence values are rejected."""
+        with pytest.raises(ValueError, match="confidence must be between 0.0 and 1.0"):
+            StructuredQuery(
+                intent=QueryIntent.COMPUTE,
+                domain=QueryDomain.MATH,
+                confidence=1.5  # Invalid: > 1.0
+            )
+        
+        with pytest.raises(ValueError, match="confidence must be between 0.0 and 1.0"):
+            StructuredQuery(
+                intent=QueryIntent.COMPUTE,
+                domain=QueryDomain.MATH,
+                confidence=-0.1  # Invalid: < 0.0
+            )
+    
+    def test_structured_query_confidence_type_validation(self):
+        """Test that non-numeric confidence values are rejected."""
+        with pytest.raises(TypeError, match="confidence must be a number"):
+            StructuredQuery(
+                intent=QueryIntent.COMPUTE,
+                domain=QueryDomain.MATH,
+                confidence="high"  # Invalid: not a number
+            )
 
 
 class TestLanguageInterfaceMethods:
@@ -359,8 +413,9 @@ class TestDeprecationWarnings:
             mock_call.return_value = "Test response"
             
             with pytest.warns(DeprecationWarning, match="Use execute_with_language_interface"):
+                loop = asyncio.get_running_loop()
                 await executor._execute_openai_first(
-                    loop=asyncio.get_event_loop(),
+                    loop=loop,
                     prompt="Test",
                     max_tokens=100,
                     temperature=0.7,
@@ -379,8 +434,9 @@ class TestDeprecationWarnings:
             mock_call.return_value = "Test response"
             
             with pytest.warns(DeprecationWarning, match="Use execute_with_language_interface"):
+                loop = asyncio.get_running_loop()
                 await executor._execute_openai_only(
-                    loop=asyncio.get_event_loop(),
+                    loop=loop,
                     prompt="Test",
                     max_tokens=100,
                     temperature=0.7,
