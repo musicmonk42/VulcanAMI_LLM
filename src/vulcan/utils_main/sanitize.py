@@ -23,6 +23,7 @@
 #     1.0.1 - Added comprehensive documentation and type hints
 # ============================================================
 
+import base64
 import datetime
 import logging
 from enum import Enum as EnumBase
@@ -59,6 +60,7 @@ def sanitize_payload(data: Any) -> Any:
     - Removes dictionary entries with None keys (which would cause serialization failure)
     - Recursively processes nested dicts and lists
     - Converts non-serializable values to strings
+    - Detects and warns about key collisions when converting non-string keys
     
     Args:
         data: The data to sanitize (dict, list, or any value)
@@ -75,11 +77,15 @@ def sanitize_payload(data: Any) -> Any:
     if isinstance(data, dict):
         # Filter out None keys and recursively sanitize values
         # Note: str(k) handles non-string keys (e.g., integers) for JSON compatibility
-        return {
-            str(k): sanitize_payload(v)
-            for k, v in data.items()
-            if k is not None  # Remove entries with None keys entirely
-        }
+        sanitized = {}
+        for k, v in data.items():
+            if k is None:
+                continue  # Remove entries with None keys entirely
+            str_key = str(k) if not isinstance(k, str) else k
+            if str_key in sanitized:
+                logger.warning(f"Key collision during sanitization: '{str_key}'")
+            sanitized[str_key] = sanitize_payload(v)
+        return sanitized
     elif isinstance(data, list):
         # Recursively sanitize list elements
         return [sanitize_payload(item) for item in data]
@@ -123,6 +129,17 @@ def deep_sanitize_for_json(data: Any, _depth: int = 0) -> Any:
     
     if isinstance(data, (str, int, float, bool)):
         return data
+    
+    # Handle bytes - try UTF-8 decode first, fall back to base64
+    if isinstance(data, bytes):
+        try:
+            return data.decode('utf-8')
+        except UnicodeDecodeError:
+            return base64.b64encode(data).decode('ascii')
+    
+    # Handle bytearray - convert to bytes first
+    if isinstance(data, bytearray):
+        return deep_sanitize_for_json(bytes(data), _depth)
     
     if isinstance(data, dict):
         result = {}

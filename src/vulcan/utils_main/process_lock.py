@@ -49,6 +49,42 @@ __author__ = "VULCAN-AGI Team"
 
 logger = logging.getLogger(__name__)
 
+
+# ============================================================
+# UTILITY FUNCTIONS
+# ============================================================
+
+
+def is_process_running(pid: int) -> bool:
+    """
+    Check if a process with given PID is running.
+    
+    Uses os.kill with signal 0 (null signal) to check process existence.
+    This is a standard Unix technique for checking if a process is alive.
+    
+    Args:
+        pid: Process ID to check
+        
+    Returns:
+        True if process exists and is running, False otherwise
+    """
+    if pid <= 0:
+        return False
+    try:
+        # Signal 0 doesn't send a signal but checks if process exists
+        os.kill(pid, 0)
+        return True
+    except ProcessLookupError:
+        # Process does not exist
+        return False
+    except PermissionError:
+        # Process exists but we don't have permission to signal it
+        return True
+    except OSError:
+        # Other OS errors - assume process doesn't exist
+        return False
+
+
 # ============================================================
 # PLATFORM-SPECIFIC IMPORTS
 # ============================================================
@@ -156,16 +192,53 @@ class ProcessLock:
             return True
             
         except (IOError, OSError) as e:
-            # Lock is held by another process - try to read existing PID for debugging
+            # Lock is held by another process - check if it's a stale lock
             existing_pid = None
             if self._lock_file:
                 try:
                     self._lock_file.seek(0)
-                    existing_pid = self._lock_file.read().strip()
-                except Exception:
+                    pid_str = self._lock_file.read().strip()
+                    if pid_str:
+                        existing_pid = int(pid_str)
+                except (ValueError, Exception):
                     pass
                 self._lock_file.close()
                 self._lock_file = None
+            
+            # Check if the process holding the lock is still running
+            if existing_pid and not is_process_running(existing_pid):
+                self._logger.warning(
+                    f"Detected stale lock file from PID {existing_pid} (process no longer running). "
+                    f"Removing stale lock and retrying acquisition."
+                )
+                try:
+                    os.remove(self.lock_path)
+                except OSError:
+                    pass  # File may have already been removed
+                
+                # Retry lock acquisition once after removing stale lock
+                try:
+                    self._lock_file = open(self.lock_path, "a+")
+                    self._lock_file.seek(0)
+                    fcntl.flock(self._lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    
+                    self._lock_file.truncate(0)
+                    self._lock_file.write(f"{os.getpid()}\n")
+                    self._lock_file.flush()
+                    
+                    self._locked = True
+                    self._logger.info(
+                        f"Process lock acquired after removing stale lock (PID: {os.getpid()}, file: {self.lock_path})"
+                    )
+                    return True
+                except (IOError, OSError) as retry_error:
+                    if self._lock_file:
+                        self._lock_file.close()
+                        self._lock_file = None
+                    self._logger.error(
+                        f"Failed to acquire lock even after removing stale lock: {retry_error}"
+                    )
+                    return False
             
             pid_info = f" (held by PID: {existing_pid})" if existing_pid else ""
             self._logger.error(
@@ -279,6 +352,7 @@ def create_and_acquire_lock(lock_path: str = None) -> Optional[ProcessLock]:
 __all__ = [
     "ProcessLock",
     "FCNTL_AVAILABLE",
+    "is_process_running",
     "get_process_lock",
     "set_process_lock",
     "create_and_acquire_lock",
