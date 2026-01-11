@@ -1174,6 +1174,175 @@ class HybridLLMExecutor:
         return error_text
 
     # ============================================================
+    # LANGUAGE INTERFACE METHODS (Parse IN, Format OUT)
+    # ============================================================
+
+    async def parse_natural_language_query(
+        self,
+        user_text: str,
+    ) -> "StructuredQuery":
+        """
+        Language interface IN: Convert natural language → structured query.
+        
+        This is the FIRST step - understanding what the user wants.
+        The LLM parses intent and extracts parameters, but does NOT answer.
+        
+        ARCHITECTURE:
+            This implements the "Language Interface IN" layer. The LLM's job is
+            ONLY to understand the user's intent and extract parameters. It does
+            NOT compute, reason, or answer. That's VULCAN's job.
+        
+        Args:
+            user_text: Raw user input like "What's the derivative of x²?"
+            
+        Returns:
+            StructuredQuery with parsed intent and parameters
+        """
+        # Import here to avoid circular dependency
+        from vulcan.llm.query_parser import QueryIntent, QueryDomain, StructuredQuery
+        
+        system_prompt = '''Parse user queries into structured format for a reasoning system.
+
+Output JSON only with these fields:
+- intent: compute|explain|search|analyze|plan|compare|unknown
+- domain: math|logic|causal|general|code
+- parameters: extracted values needed for computation
+- confidence: 0.0-1.0 how confident you are in the parsing
+
+Examples:
+Input: "What's 2 plus 2?"
+Output: {"intent": "compute", "domain": "math", "parameters": {"operation": "add", "operands": [2, 2]}, "confidence": 0.95}
+
+Input: "What's the derivative of x squared?"
+Output: {"intent": "compute", "domain": "math", "parameters": {"operation": "derivative", "expression": "x^2", "variable": "x"}, "confidence": 0.9}
+
+Input: "Explain why the sky is blue"
+Output: {"intent": "explain", "domain": "general", "parameters": {"topic": "sky color", "phenomenon": "blue sky"}, "confidence": 0.85}
+
+Output ONLY valid JSON, no other text.'''
+
+        loop = asyncio.get_running_loop()
+        
+        result = await self._call_openai(
+            loop=loop,
+            prompt=user_text,
+            max_tokens=200,
+            temperature=0.0,  # Deterministic parsing
+            system_prompt=system_prompt
+        )
+        
+        if result:
+            try:
+                return StructuredQuery.from_json(result, original_text=user_text)
+            except (json.JSONDecodeError, KeyError, ValueError) as e:
+                self.logger.warning(f"Failed to parse LLM output as StructuredQuery: {e}")
+        
+        # Fallback: return unknown query
+        return StructuredQuery(
+            intent=QueryIntent.UNKNOWN,
+            domain=QueryDomain.GENERAL,
+            parameters={"raw_text": user_text},
+            original_text=user_text,
+            confidence=0.0
+        )
+
+    async def execute_with_language_interface(
+        self,
+        user_text: str,
+        vulcan_reasoning_fn: Optional[Callable] = None,
+        max_tokens: int = 1000,
+    ) -> Dict[str, Any]:
+        """
+        Execute with proper language interface architecture.
+        
+        Three-step flow:
+        1. Language IN: Parse natural language → structured query
+        2. Reasoning: VULCAN computes (NO LLM answering)
+        3. Language OUT: Format result → natural language
+        
+        ARCHITECTURE:
+            This method enforces the correct LLM usage pattern:
+            - LLM parses user intent (Language IN)
+            - VULCAN reasoning engines compute the answer (NO LLM)
+            - LLM formats the result (Language OUT)
+            
+            The LLM NEVER answers questions directly. It only understands
+            questions and formats answers that VULCAN computed.
+        
+        Args:
+            user_text: Raw natural language input from user
+            vulcan_reasoning_fn: Async function that takes StructuredQuery and returns VulcanReasoningOutput
+            max_tokens: Max tokens for output formatting
+            
+        Returns:
+            Dict with formatted response and metadata
+        """
+        # Import here to avoid circular dependency
+        from vulcan.llm.query_parser import StructuredQuery
+        
+        systems_used = []
+        
+        # STEP 1: Language interface IN - Parse query
+        self.logger.info("[LangInterface] Step 1: Parsing natural language query")
+        structured_query = await self.parse_natural_language_query(user_text)
+        systems_used.append("llm_input_parsing")
+        
+        self.logger.info(
+            f"[LangInterface] Parsed: intent={structured_query.intent.value}, "
+            f"domain={structured_query.domain.value}, confidence={structured_query.confidence}"
+        )
+        
+        # STEP 2: VULCAN Reasoning - NO LLM here
+        reasoning_output = None
+        if vulcan_reasoning_fn:
+            self.logger.info("[LangInterface] Step 2: Executing VULCAN reasoning")
+            try:
+                reasoning_output = await vulcan_reasoning_fn(structured_query)
+                systems_used.append(reasoning_output.method_used if reasoning_output else "vulcan_reasoning")
+            except Exception as e:
+                self.logger.error(f"[LangInterface] VULCAN reasoning failed: {e}")
+                reasoning_output = VulcanReasoningOutput(
+                    query_id=hashlib.sha256(user_text.encode()).hexdigest()[:16],
+                    success=False,
+                    result=None,
+                    error=str(e),
+                    method_used="vulcan_error"
+                )
+        else:
+            # No reasoning function provided - create placeholder
+            reasoning_output = VulcanReasoningOutput(
+                query_id=hashlib.sha256(user_text.encode()).hexdigest()[:16],
+                success=False,
+                result=None,
+                error="No reasoning function configured",
+                method_used="none"
+            )
+            systems_used.append("no_reasoning_configured")
+        
+        # STEP 3: Language interface OUT - Format result
+        self.logger.info("[LangInterface] Step 3: Formatting output for user")
+        formatted_result = await self.format_output_for_user(
+            reasoning_output=reasoning_output.to_dict() if reasoning_output else {},
+            original_prompt=user_text,
+            max_tokens=max_tokens
+        )
+        systems_used.append("llm_output_formatting")
+        
+        return {
+            "text": formatted_result.get("text", ""),
+            "source": "vulcan_language_interface",
+            "systems_used": systems_used,
+            "structured_query": {
+                "intent": structured_query.intent.value,
+                "domain": structured_query.domain.value,
+                "parameters": structured_query.parameters,
+                "confidence": structured_query.confidence,
+            },
+            "reasoning_output": reasoning_output.to_dict() if reasoning_output else None,
+            "metadata": formatted_result.get("metadata", {}),
+        }
+
+    # ============================================================
     # EXECUTION MODE IMPLEMENTATIONS
     # ============================================================
 
@@ -1348,6 +1517,9 @@ class HybridLLMExecutor:
         conversation_history: Optional[List[Dict[str, str]]] = None
     ) -> Dict[str, Any]:
         """
+        DEPRECATED: This method allows LLM to answer directly, bypassing VULCAN reasoning.
+        Use execute_with_language_interface() instead for proper architecture.
+        
         OpenAI-first mode with internal LLM fallback.
         
         ARCHITECTURE:
@@ -1358,6 +1530,14 @@ class HybridLLMExecutor:
         - OpenAI provides faster/higher-quality responses
         - Internal LLM serves as backup when OpenAI is down
         """
+        import warnings
+        warnings.warn(
+            "_execute_openai_first allows LLM to bypass VULCAN reasoning. "
+            "Use execute_with_language_interface() for proper architecture.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        
         systems_used = []
         
         # Step 1: Try OpenAI for language generation
@@ -1705,6 +1885,9 @@ class HybridLLMExecutor:
         conversation_history: Optional[List[Dict[str, str]]] = None
     ) -> Dict[str, Any]:
         """
+        DEPRECATED: This method allows LLM to answer directly, bypassing VULCAN reasoning.
+        Use execute_with_language_interface() instead for proper architecture.
+        
         OpenAI-only mode for fast language generation.
         
         FIX: Local LLM (GraphixVulcanLLM) times out (~120s) on CPU - this mode
@@ -1719,6 +1902,14 @@ class HybridLLMExecutor:
         Only the LANGUAGE OUTPUT step is affected - OpenAI formats the reasoning
         results into natural language for the user.
         """
+        import warnings
+        warnings.warn(
+            "_execute_openai_only allows LLM to bypass VULCAN reasoning. "
+            "Use execute_with_language_interface() for proper architecture.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        
         systems_used = []
         
         try:
