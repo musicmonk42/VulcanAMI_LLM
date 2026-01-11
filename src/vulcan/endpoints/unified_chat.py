@@ -9,6 +9,7 @@ import asyncio
 import gc
 import logging
 import os
+import secrets
 import time
 from typing import Any, Dict, List, Optional
 
@@ -31,6 +32,7 @@ from vulcan.endpoints.chat_helpers import (
 )
 from vulcan.endpoints.utils import require_deployment
 from vulcan.metrics import error_counter
+from vulcan.reasoning.integration.utils import observe_query_start
 
 logger = logging.getLogger(__name__)
 
