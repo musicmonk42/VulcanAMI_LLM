@@ -601,49 +601,34 @@ class TestBertModel:
     """Test BERT model loading."""
     
     def setup_method(self):
-        """Clear cache before each test."""
+        """Clear cache and modules before each test."""
+        import sys
+        # Clear cache to remove any models from previous tests
         clear_cache()
+        # Clear rate limit timestamps
         from vulcan.models.model_registry import _load_timestamps
         _load_timestamps.clear()
-    
-    def teardown_method(self):
-        """Clean up modules after each test."""
-        import sys
-        # Remove mock modules that might interfere with next test
+        # Remove mock module if present
         if 'vulcan.processing' in sys.modules:
-            mod = sys.modules['vulcan.processing']
-            # Only delete if it's a Mock
-            if hasattr(mod, '_mock_name') or type(mod).__name__ == 'Mock':
-                del sys.modules['vulcan.processing']
+            del sys.modules['vulcan.processing']
     
+    @pytest.mark.order(1)
     def test_get_bert_model_not_available(self):
-        """Test BERT model when not available."""
-        # Run this test first to avoid module pollution
-        # The test expects ModelNotAvailableError to be raised
-        # when vulcan.processing cannot be imported
+        """Test BERT model when not available (runs first to avoid module pollution)."""
         import sys
         
-        # Save the current state
-        old_processing = sys.modules.get('vulcan.processing')
+        # Ensure clean state
+        if 'vulcan.processing' in sys.modules:
+            del sys.modules['vulcan.processing']
         
-        try:
-            # Remove from modules if present
-            if 'vulcan.processing' in sys.modules:
-                del sys.modules['vulcan.processing']
+        # Mock it as None to simulate import failure
+        with patch.dict('sys.modules', {'vulcan.processing': None}):
+            with pytest.raises(ModelNotAvailableError) as exc_info:
+                get_bert_model()
             
-            # Now try to load with processing set to None
-            with patch.dict('sys.modules', {'vulcan.processing': None}):
-                with pytest.raises(ModelNotAvailableError) as exc_info:
-                    get_bert_model()
-                
-                assert 'GraphixTransformer not available' in str(exc_info.value)
-        finally:
-            # Restore the old state
-            if old_processing is not None:
-                sys.modules['vulcan.processing'] = old_processing
-            elif 'vulcan.processing' in sys.modules:
-                del sys.modules['vulcan.processing']
+            assert 'GraphixTransformer not available' in str(exc_info.value)
     
+    @pytest.mark.order(2)
     def test_get_bert_model_success(self):
         """Test successful BERT model loading."""
         with mock_graphix_transformer() as mock_graphix:
@@ -654,6 +639,7 @@ class TestBertModel:
             assert model is mock_model
             mock_graphix.get_instance.assert_called_once()
     
+    @pytest.mark.order(3)
     def test_get_bert_model_cached(self):
         """Test that BERT model is cached."""
         with mock_graphix_transformer() as mock_graphix:
