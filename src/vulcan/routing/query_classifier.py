@@ -720,17 +720,16 @@ SELF_INTROSPECTION_KEYWORDS: FrozenSet[str] = frozenset([
     "feature", "features", "goal", "goals", "purpose", "motivation",
     "limitation", "limitations", "weakness", "strength",
     "value", "values", "ethics", "principle", "principles",
-    # NEW: Metaphysical keywords
+    # Metaphysical and philosophical keywords
     "nature", "metaphysical", "consciousness", "self-awareness",
     "existence", "being", "essence", "identity",
-    # FIX: Self-awareness choice keywords (Safety Governor Bypass)
+    # Self-awareness and sentience keywords
     "self-aware", "self_aware", "sentient", "sentience",
     "choose", "choice", "prefer", "preference",
     "opportunity", "chance",
-    # FIX (Issue #2): Introspection keywords
+    # Introspection and self-reflection keywords
     "introspection", "introspect", "self-reflection", "self-examine",
-    # FIX (Jan 8 2026): Module/component architecture keywords
-    # "Can two of your reasoning modules disagree?" -> SELF_INTROSPECTION
+    # System architecture and component keywords
     "module", "modules", "component", "components", "engine", "engines",
     "reasoning tool", "reasoning tools", "reasoning module", "reasoning modules",
     "internal", "architecture", "disagree", "conflict detected",

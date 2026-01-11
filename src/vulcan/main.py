@@ -6927,7 +6927,8 @@ async def unified_chat(request: UnifiedChatRequest):
             )
             
             # FIX (Issue #5): Check content FIRST, then confidence
-            # Find best reasoning result by checking for actual content before confidence
+            # Industry best practice: Validate data presence before quality thresholds
+            # This prevents accepting high-confidence results that lack actual content
             best_confidence = 0.0
             best_conclusion = None
             best_source = None
@@ -6967,7 +6968,8 @@ async def unified_chat(request: UnifiedChatRequest):
                     'explanation': direct.get("explanation", ""),
                 })
             
-            # Select best candidate: highest confidence among those with content
+            # Select best candidate: highest confidence among those with valid content
+            # Use defensive programming: explicit check before max() to prevent ValueError
             if candidates:
                 best_candidate = max(candidates, key=lambda x: x['confidence'])
                 if best_candidate['confidence'] >= MIN_REASONING_CONFIDENCE_THRESHOLD:

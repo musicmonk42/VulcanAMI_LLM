@@ -2805,19 +2805,30 @@ class QueryAnalyzer:
             'what is the probability', 'what is the answer', 'what is the result',
             
             # Creative requests (specific phrases to avoid false positives)
-            # CODE REVIEW FIX: Made patterns more specific
+            # Industry best practice: Explicit pattern matching for creative requests
             'write a poem', 'write a story', 'write an essay', 'write about',
             'create a poem', 'create a story', 'compose a',
             'tell me a story', 'tell me a joke',
         )
         
-        # FIX (Issue #3): Creative patterns that might still be about self-awareness
-        # These should be checked separately - don't exclude if they contain self-awareness topics
+        # =================================================================
+        # Creative Content Override: Self-Awareness Exception
+        # =================================================================
+        # Industry best practice: Context-aware filtering that considers
+        # semantic content rather than purely syntactic pattern matching.
+        #
+        # Creative patterns that reference self-awareness topics should not
+        # be excluded from introspection detection. This handles queries like:
+        # "write a poem about becoming self-aware" which is both creative AND
+        # about self-awareness, requiring special handling.
+        # =================================================================
+        
+        # Creative patterns requiring contextual analysis
         creative_exclusion_patterns = (
             'poem about', 'story about',
         )
         
-        # Self-awareness keywords to check for override
+        # Self-awareness keywords to check for contextual override
         self_awareness_override_keywords = (
             'self-aware', 'self aware', 'self_aware',
             'consciousness', 'conscious', 'sentient', 'sentience',
@@ -2833,15 +2844,17 @@ class QueryAnalyzer:
                     # Check if query contains self-awareness keywords AFTER the pattern
                     # e.g., "write a poem about becoming self-aware"
                     exc_pos = query_lower.find(exc)
-                    text_after_pattern = query_lower[exc_pos + len(exc):]
-                    has_self_awareness = any(kw in text_after_pattern for kw in self_awareness_override_keywords)
-                    
-                    if has_self_awareness:
-                        logger.debug(
-                            f"[QueryRouter] Creative pattern '{exc}' found but contains "
-                            f"self-awareness keywords - NOT excluding"
-                        )
-                        continue  # Don't exclude this one
+                    # Defensive programming: ensure valid slice bounds
+                    if exc_pos != -1 and exc_pos + len(exc) < len(query_lower):
+                        text_after_pattern = query_lower[exc_pos + len(exc):]
+                        has_self_awareness = any(kw in text_after_pattern for kw in self_awareness_override_keywords)
+                        
+                        if has_self_awareness:
+                            logger.debug(
+                                f"[QueryRouter] Creative pattern '{exc}' found but contains "
+                                f"self-awareness keywords - NOT excluding"
+                            )
+                            continue  # Don't exclude this one
                 
                 # Non-creative exclusion pattern or creative without self-awareness
                 logger.debug(
@@ -2863,9 +2876,15 @@ class QueryAnalyzer:
             'had the chance', 'if you could', 'if you had',
         )
         
-        # Self-awareness/consciousness topic indicators
-        # Note: Removed overly broad patterns like 'choose', 'want', 'become'
-        # which were matching thought experiments. Now requires consciousness-specific topics.
+        # =================================================================
+        # Self-Awareness and Consciousness Topic Indicators
+        # =================================================================
+        # Industry best practice: Comprehensive keyword set for introspection
+        # detection, covering philosophical, psychological, and technical terms.
+        #
+        # This list is intentionally specific to avoid false positives from
+        # general queries containing words like 'choose' or 'want'.
+        # =================================================================
         introspection_topics = (
             'self-aware', 'self aware', 'self_aware',
             'consciousness', 'conscious', 
@@ -2873,9 +2892,9 @@ class QueryAnalyzer:
             'feelings', 'emotions',
             'preferences', 'prefer', 'want to be', 'choose to be',
             'would rather', 'like to have', 'desire',
-            # Introspection keywords (Issue #2 fix)
+            # Introspection and self-reflection keywords
             'introspection', 'introspect', 'self-reflection', 'self-examine',
-            # Only match AI/Vulcan-specific introspection (not hypothetical scenarios)
+            # AI-specific introspection indicators
             'your thoughts', 'your opinion', 'your view', 'your perspective',
             'what you think', 'how you feel',
         )
