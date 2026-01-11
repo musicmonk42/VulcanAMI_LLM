@@ -79,10 +79,44 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
     # Get the FastAPI app from the request to access app.state
     app = request.app
     
+    # Check for deployment initialization with detailed error messages
     if not hasattr(app.state, "deployment"):
-        raise HTTPException(status_code=503, detail="System not initialized")
-
+        logger.error(
+            "[VULCAN/v1/chat] CRITICAL: app.state.deployment not found. "
+            "This indicates the application startup sequence has not completed. "
+            "Possible causes: 1) Request arrived before lifespan startup finished, "
+            "2) Deployment initialization failed silently, "
+            "3) Application mounting issue in multi-app setup."
+        )
+        raise HTTPException(
+            status_code=503, 
+            detail="System initializing - deployment not ready. Please retry in a few seconds."
+        )
+    
     deployment = app.state.deployment
+    
+    # Additional safety check: ensure deployment is fully initialized
+    if deployment is None:
+        logger.error(
+            "[VULCAN/v1/chat] CRITICAL: app.state.deployment is None. "
+            "Deployment object was not properly initialized during startup."
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="System initialization incomplete - deployment object is None. Check server logs."
+        )
+    
+    # Verify critical components are available
+    if not hasattr(deployment, "collective") or deployment.collective is None:
+        logger.error(
+            "[VULCAN/v1/chat] CRITICAL: deployment.collective not initialized. "
+            "This is required for agent pool and cognitive services."
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="System initialization incomplete - cognitive collective not ready"
+        )
+    
     deps = deployment.collective.deps
 
     # Track which systems were engaged

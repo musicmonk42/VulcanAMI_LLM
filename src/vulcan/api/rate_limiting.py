@@ -27,6 +27,7 @@ logger = logging.getLogger(__name__)
 rate_limit_storage: Dict[str, List[float]] = {}
 rate_limit_lock = threading.RLock()
 rate_limit_cleanup_thread: Optional[threading.Thread] = None
+rate_limit_cleanup_stop_event = threading.Event()  # Stop signal for graceful shutdown
 
 
 # ============================================================
@@ -48,9 +49,14 @@ def cleanup_rate_limits(
         cleanup_interval: Seconds between cleanup runs
         window_seconds: Rate limit window size in seconds
     """
-    while True:
+    while not rate_limit_cleanup_stop_event.is_set():
         try:
-            time.sleep(cleanup_interval)
+            # Use wait() instead of sleep() for immediate response to stop signal
+            if rate_limit_cleanup_stop_event.wait(timeout=cleanup_interval):
+                # Stop event was set, exit gracefully
+                logger.info("Rate limit cleanup thread stopping gracefully")
+                break
+                
             current_time = time.time()
             window_start = current_time - window_seconds
 
@@ -87,6 +93,9 @@ def start_rate_limit_cleanup(
         logger.debug("Rate limit cleanup thread already running")
         return rate_limit_cleanup_thread
     
+    # Clear stop event in case it was set previously
+    rate_limit_cleanup_stop_event.clear()
+    
     rate_limit_cleanup_thread = threading.Thread(
         target=cleanup_rate_limits,
         args=(cleanup_interval, window_seconds),
@@ -97,6 +106,37 @@ def start_rate_limit_cleanup(
     logger.info("Rate limit cleanup thread started")
     
     return rate_limit_cleanup_thread
+
+
+def stop_rate_limit_cleanup(timeout: float = 5.0) -> bool:
+    """
+    Stop the rate limit cleanup background thread gracefully.
+    
+    Args:
+        timeout: Maximum seconds to wait for thread to stop
+        
+    Returns:
+        True if thread stopped successfully, False otherwise
+    """
+    global rate_limit_cleanup_thread
+    
+    if rate_limit_cleanup_thread is None or not rate_limit_cleanup_thread.is_alive():
+        logger.debug("Rate limit cleanup thread not running")
+        return True
+    
+    # Signal the thread to stop
+    rate_limit_cleanup_stop_event.set()
+    
+    # Wait for thread to finish
+    rate_limit_cleanup_thread.join(timeout=timeout)
+    
+    if rate_limit_cleanup_thread.is_alive():
+        logger.warning(f"Rate limit cleanup thread did not stop within {timeout}s")
+        return False
+    
+    logger.info("Rate limit cleanup thread stopped successfully")
+    rate_limit_cleanup_thread = None
+    return True
 
 
 def check_rate_limit(
@@ -190,8 +230,10 @@ __all__ = [
     "rate_limit_storage",
     "rate_limit_lock",
     "rate_limit_cleanup_thread",
+    "rate_limit_cleanup_stop_event",
     "cleanup_rate_limits",
     "start_rate_limit_cleanup",
+    "stop_rate_limit_cleanup",
     "check_rate_limit",
     "get_client_id_from_request",
     "clear_rate_limits",
