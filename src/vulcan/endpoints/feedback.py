@@ -63,7 +63,10 @@ async def submit_feedback(request: Request, app):
             human_preference = request.context.get("preferred_response") if request.context else None
             
             feedback = FeedbackData(
-                feedback_id=f"fb_{int(time.time())}_{secrets.token_hex(4)}",
+                # SECURITY FIX: Use full cryptographic randomness instead of predictable time prefix
+                # Old: f"fb_{int(time.time())}_{secrets.token_hex(4)}"
+                # This prevents timing attacks and ID enumeration
+                feedback_id=f"fb_{secrets.token_urlsafe(16)}",
                 timestamp=time.time(),
                 feedback_type=request.feedback_type,
                 content=request.content,

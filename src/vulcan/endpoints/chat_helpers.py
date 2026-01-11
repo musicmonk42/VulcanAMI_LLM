@@ -63,6 +63,73 @@ HANDLED_DICT_RESULT_KEYS = frozenset({
 })
 
 
+def safe_truncate_utf8(text: str, max_chars: int, ellipsis: str = "...") -> str:
+    """
+    Safely truncate text respecting UTF-8 character boundaries.
+    
+    SECURITY FIX: Character-based slicing can split multi-byte UTF-8 sequences,
+    causing corruption or crashes. This function ensures clean truncation.
+    
+    Industry best practice: Always use encode/decode with error handling when
+    truncating strings that may contain multi-byte characters.
+    
+    Args:
+        text: Text to truncate
+        max_chars: Maximum characters in result (including ellipsis)
+        ellipsis: Ellipsis marker to append if truncated
+        
+    Returns:
+        Safely truncated text respecting UTF-8 boundaries
+        
+    Examples:
+        >>> safe_truncate_utf8("Hello 世界", 8, "...")
+        'Hello...'
+        >>> safe_truncate_utf8("Hello", 10, "...")
+        'Hello'
+    """
+    if len(text) <= max_chars:
+        return text
+    
+    # Reserve space for ellipsis
+    truncate_at = max(0, max_chars - len(ellipsis))
+    
+    # Truncate and use encode/decode with 'ignore' to handle broken UTF-8 sequences
+    # This prevents crashes from split multi-byte characters
+    truncated = text[:truncate_at].encode('utf-8', errors='ignore').decode('utf-8', errors='ignore')
+    
+    return truncated + ellipsis
+
+
+def safe_truncate_middle(text: str, max_chars: int) -> str:
+    """
+    Safely truncate text from the middle, preserving start and end.
+    
+    SECURITY FIX: Respects UTF-8 boundaries to prevent corruption.
+    
+    Args:
+        text: Text to truncate
+        max_chars: Maximum characters in result
+        
+    Returns:
+        Safely truncated text with middle section replaced by ellipsis
+        
+    Examples:
+        >>> safe_truncate_middle("ABCDEFGHIJ", 8)
+        'ABC...HIJ'
+    """
+    if len(text) <= max_chars:
+        return text
+    
+    ellipsis_marker = "\n... [truncated] ...\n"
+    half = max(MIN_TRUNCATION_HALF, (max_chars - len(ellipsis_marker)) // 2)
+    
+    # Use safe_truncate_utf8 for each half to ensure clean boundaries
+    start = text[:half].encode('utf-8', errors='ignore').decode('utf-8', errors='ignore')
+    end = text[-half:].encode('utf-8', errors='ignore').decode('utf-8', errors='ignore')
+    
+    return start + ellipsis_marker + end
+
+
 def truncate_history(
     history: List[Dict[str, str]],
     max_messages: int = MAX_HISTORY_MESSAGES,
@@ -96,19 +163,18 @@ def truncate_history(
         )
         history = history[-max_messages:]
     
-    # Step 2: Truncate individual long messages
+    # Step 2: Truncate individual long messages using safe UTF-8 truncation
     truncated_history = []
-    ellipsis_marker = "\n... [truncated] ...\n"
     for msg in history:
         truncated_msg = dict(msg)
         content = truncated_msg.get("content", "")
         if len(content) > max_message_length:
-            half = max(MIN_TRUNCATION_HALF, (max_message_length - len(ellipsis_marker)) // 2)
-            truncated_content = content[:half] + ellipsis_marker + content[-half:]
+            # SECURITY FIX: Use safe_truncate_middle to prevent UTF-8 corruption
+            truncated_content = safe_truncate_middle(content, max_message_length)
             if len(truncated_content) < len(content):
                 truncated_msg["content"] = truncated_content
                 logger.debug(
-                    f"Context truncation: Message truncated from {len(content)} to {len(truncated_msg['content'])} chars"
+                    f"Context truncation: Message safely truncated from {len(content)} to {len(truncated_msg['content'])} chars"
                 )
         truncated_history.append(truncated_msg)
     

@@ -77,7 +77,11 @@ async def execute_step(request: Request) -> dict:
         step_counter = Counter("steps_total", "Total steps executed")
         error_counter = Counter("errors_total", "Total errors", ["error_type"])
     except ImportError:
-        pass
+        # FIX: Set to None to prevent NameError if Prometheus not available
+        active_requests = None
+        step_duration = None
+        step_counter = None
+        error_counter = None
 
     if active_requests:
         active_requests.inc()

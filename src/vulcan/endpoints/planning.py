@@ -59,7 +59,8 @@ async def create_plan(request: Request) -> dict:
         from prometheus_client import Counter
         error_counter = Counter("errors_total", "Total errors", ["error_type"])
     except ImportError:
-        pass
+        # FIX: Set to None to prevent NameError if Prometheus not available
+        error_counter = None
 
     try:
         planner = deployment.collective.deps.goal_system
