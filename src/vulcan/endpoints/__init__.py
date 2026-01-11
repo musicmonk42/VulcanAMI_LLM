@@ -11,6 +11,7 @@ from vulcan.endpoints.health import router as health_router
 from vulcan.endpoints.memory import router as memory_router
 from vulcan.endpoints.monitoring import router as monitoring_router
 from vulcan.endpoints.planning import router as planning_router
+from vulcan.endpoints.reasoning import router as reasoning_router
 from vulcan.endpoints.self_improvement import router as self_improvement_router
 from vulcan.endpoints.status import router as status_router
 
@@ -21,6 +22,7 @@ __all__ = [
     "memory_router",
     "monitoring_router",
     "planning_router",
+    "reasoning_router",
     "self_improvement_router",
     "status_router",
 ]
