@@ -10,7 +10,9 @@ import secrets
 import time
 from typing import Any, Dict
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
+
+from vulcan.endpoints.utils import require_deployment
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +21,7 @@ router = APIRouter()
 
 
 @router.post("/v1/feedback")
-async def submit_feedback(request, app):
+async def submit_feedback(request: Request, app):
     """
     Submit human feedback for RLHF learning.
     
@@ -40,11 +42,9 @@ async def submit_feedback(request, app):
         >>> response = await submit_feedback(feedback_request, app)
         >>> print(response["feedback_id"])
     """
-    if not hasattr(app.state, "deployment"):
-        raise HTTPException(status_code=503, detail="System not initialized")
+    deployment = require_deployment(request)
 
     try:
-        deployment = app.state.deployment
         
         # FIX MAJOR-4: Use deps.continual instead of deps.learning
         learning_system = None

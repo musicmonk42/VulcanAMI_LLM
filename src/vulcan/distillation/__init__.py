@@ -48,6 +48,7 @@
 
 import logging
 import sys
+import threading
 from typing import Any, Dict, List, Optional, Tuple
 
 # Module metadata
@@ -125,6 +126,7 @@ except ImportError as e:
 
 # Global knowledge distiller instance (initialized later with local LLM)
 _knowledge_distiller: Optional["OpenAIKnowledgeDistiller"] = None
+_distiller_lock = threading.Lock()
 
 
 def get_knowledge_distiller() -> Optional["OpenAIKnowledgeDistiller"]:
@@ -142,7 +144,9 @@ def initialize_knowledge_distiller(
     **kwargs,
 ) -> "OpenAIKnowledgeDistiller":
     """
-    Initialize the global knowledge distiller.
+    Initialize the global knowledge distiller with thread-safe singleton pattern.
+    
+    Uses double-checked locking for thread safety without unnecessary lock contention.
     
     Args:
         local_llm: Reference to Vulcan's local LLM (optional)
@@ -153,19 +157,33 @@ def initialize_knowledge_distiller(
     """
     global _knowledge_distiller
     
-    if OpenAIKnowledgeDistiller is None:
-        raise ImportError("OpenAIKnowledgeDistiller is not available")
+    # First check without lock (fast path)
+    if _knowledge_distiller is not None:
+        logger.warning("Knowledge distiller already initialized, returning existing instance")
+        return _knowledge_distiller
     
-    _knowledge_distiller = OpenAIKnowledgeDistiller(local_llm=local_llm, **kwargs)
-    logger.info("Knowledge distiller initialized")
-    return _knowledge_distiller
+    # Acquire lock for initialization
+    with _distiller_lock:
+        # Double-check after acquiring lock (prevents race condition)
+        if _knowledge_distiller is not None:
+            logger.warning("Knowledge distiller already initialized, returning existing instance")
+            return _knowledge_distiller
+        
+        if OpenAIKnowledgeDistiller is None:
+            raise ImportError("OpenAIKnowledgeDistiller is not available")
+        
+        _knowledge_distiller = OpenAIKnowledgeDistiller(local_llm=local_llm, **kwargs)
+        logger.info("Knowledge distiller initialized")
+        return _knowledge_distiller
 
 
 def reset_knowledge_distiller() -> None:
-    """Reset the global knowledge distiller."""
+    """Reset the global knowledge distiller (thread-safe)."""
     global _knowledge_distiller
-    _knowledge_distiller = None
-    logger.debug("Knowledge distiller reset")
+    
+    with _distiller_lock:
+        _knowledge_distiller = None
+        logger.debug("Knowledge distiller reset")
 
 
 # ============================================================

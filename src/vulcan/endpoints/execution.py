@@ -16,6 +16,8 @@ import time
 from typing import AsyncGenerator
 
 from fastapi import APIRouter, HTTPException, Request
+
+from vulcan.endpoints.utils import require_deployment
 from fastapi.responses import StreamingResponse
 
 logger = logging.getLogger(__name__)
@@ -55,10 +57,7 @@ async def execute_step(request: Request) -> dict:
     """
     app = request.app
     
-    if not hasattr(app.state, "deployment"):
-        raise HTTPException(status_code=503, detail="System not initialized")
-
-    deployment = app.state.deployment
+    deployment = require_deployment(request)
     if deployment is None:
         raise HTTPException(status_code=503, detail="System not initialized")
 
@@ -173,10 +172,7 @@ async def stream_execution(request: Request) -> StreamingResponse:
     """
     app = request.app
     
-    if not hasattr(app.state, "deployment"):
-        raise HTTPException(status_code=503, detail="System not initialized")
-
-    deployment = app.state.deployment
+    deployment = require_deployment(request)
     settings = getattr(app.state, "settings", None)
     max_memory_mb = getattr(settings, "max_memory_mb", 2000) if settings else 2000
 

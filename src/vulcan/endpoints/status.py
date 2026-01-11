@@ -21,6 +21,8 @@ from unittest.mock import MagicMock
 
 from fastapi import APIRouter, HTTPException, Request
 
+from vulcan.endpoints.utils import require_deployment
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["status"])
@@ -50,10 +52,7 @@ async def system_status(request: Request) -> Dict[str, Any]:
     """
     app = request.app
     
-    if not hasattr(app.state, "deployment"):
-        raise HTTPException(status_code=503, detail="System not initialized")
-
-    deployment = app.state.deployment
+    deployment = require_deployment(request)
     settings = getattr(app.state, "settings", None)
 
     try:
@@ -140,10 +139,7 @@ async def cognitive_status(request: Request) -> Dict[str, Any]:
     """
     app = request.app
     
-    if not hasattr(app.state, "deployment") or app.state.deployment is None:
-        raise HTTPException(status_code=503, detail="VULCAN deployment not initialized")
-
-    deployment = app.state.deployment
+    deployment = require_deployment(request)
     deps = deployment.collective.deps
 
     cognitive_systems = {
@@ -494,10 +490,7 @@ async def save_checkpoint(request: Request) -> Dict[str, str]:
     """
     app = request.app
     
-    if not hasattr(app.state, "deployment"):
-        raise HTTPException(status_code=503, detail="System not initialized")
-
-    deployment = app.state.deployment
+    deployment = require_deployment(request)
 
     try:
         checkpoint_path = f"manual_checkpoint_{int(time.time())}.pkl"

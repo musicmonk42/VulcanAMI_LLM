@@ -14,17 +14,21 @@
 #     - Passwords and credentials
 #     - Bearer tokens and JWTs
 #     - Connection strings
+#     - Encoded secrets (base64, hex, URL-encoded)
 #
 # VERSION HISTORY:
 #     1.0.0 - Extracted from main.py for modular architecture
+#     1.1.0 - Added encoded secrets detection (base64, hex, URL-encoded)
 # ============================================================
 
+import base64
 import logging
 import re
+import urllib.parse
 from typing import Dict, Tuple
 
 # Module metadata
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 __author__ = "VULCAN-AGI Team"
 
 logger = logging.getLogger(__name__)
@@ -128,19 +132,80 @@ class PIIRedactor:
         
         return redacted, stats
     
+    def _check_patterns(self, text: str) -> bool:
+        """
+        Check text against secret patterns.
+        
+        Args:
+            text: Text to check for secrets
+            
+        Returns:
+            True if secrets found, False otherwise
+        """
+        for pattern in self.secret_patterns.values():
+            if pattern.search(text):
+                return True
+        return False
+    
     def contains_secrets(self, text: str) -> bool:
         """
         Check if text contains any secrets (for hard rejection).
+        
+        Enhanced to detect encoded secrets using multiple encoding schemes:
+        - Base64 encoding
+        - Hex encoding
+        - URL encoding
+        
+        This prevents bypass attacks where secrets are encoded before submission.
         
         Args:
             text: The text to check
             
         Returns:
-            True if text contains secrets, False otherwise
+            True if text contains secrets (plain or encoded), False otherwise
         """
-        for pattern in self.secret_patterns.values():
-            if pattern.search(text):
+        # Check original text
+        if self._check_patterns(text):
+            return True
+        
+        # Check base64 decoded content
+        # Look for potential base64 strings (20+ chars of base64 alphabet)
+        base64_pattern = re.compile(r'[A-Za-z0-9+/=]{20,}')
+        for match in base64_pattern.finditer(text):
+            try:
+                # Attempt to decode as base64
+                decoded = base64.b64decode(match.group()).decode('utf-8', errors='ignore')
+                if self._check_patterns(decoded):
+                    logger.warning("Encoded secret detected (base64)")
+                    return True
+            except Exception:
+                # Not valid base64 or decoding failed
+                pass
+        
+        # Check hex decoded content
+        # Look for potential hex strings (40+ hex chars)
+        hex_pattern = re.compile(r'[0-9a-fA-F]{40,}')
+        for match in hex_pattern.finditer(text):
+            try:
+                # Attempt to decode as hex
+                decoded = bytes.fromhex(match.group()).decode('utf-8', errors='ignore')
+                if self._check_patterns(decoded):
+                    logger.warning("Encoded secret detected (hex)")
+                    return True
+            except Exception:
+                # Not valid hex or decoding failed
+                pass
+        
+        # Check URL decoded content
+        try:
+            decoded_url = urllib.parse.unquote(text)
+            if decoded_url != text and self._check_patterns(decoded_url):
+                logger.warning("Encoded secret detected (URL encoding)")
                 return True
+        except Exception:
+            # URL decoding failed
+            pass
+        
         return False
     
     def get_stats(self) -> Dict[str, int]:

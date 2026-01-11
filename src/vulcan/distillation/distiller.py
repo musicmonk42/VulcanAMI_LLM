@@ -242,7 +242,11 @@ class OpenAIKnowledgeDistiller:
     
     def _flush_to_storage(self):
         """
-        Flush capture buffer to JSONL storage for training system consumption.
+        Flush capture buffer to JSONL storage with two-phase commit.
+        
+        Two-phase commit prevents data loss on partial failures:
+        1. Phase 1: Write examples to storage
+        2. Phase 2: Only clear buffer entries that were successfully written
         
         The stored examples are consumed by:
         - GovernedTrainer: For consensus-based weight updates
@@ -251,21 +255,35 @@ class OpenAIKnowledgeDistiller:
         with self._buffer_lock:
             if not self._capture_buffer:
                 return 0
-            
             examples_to_flush = self._capture_buffer.copy()
-            self._capture_buffer.clear()
+            # DON'T clear buffer yet - wait for successful write
         
+        # Phase 1: Write to storage
         flushed = 0
-        for example in examples_to_flush:
-            if self.storage_backend.append_example(example):
-                flushed += 1
+        try:
+            for example in examples_to_flush:
+                if self.storage_backend.append_example(example):
+                    flushed += 1
+                else:
+                    # Stop on first failure to prevent partial writes
+                    self.logger.warning(
+                        f"Partial flush: {flushed}/{len(examples_to_flush)} examples written"
+                    )
+                    break
+        except Exception as e:
+            self.logger.error(f"Flush failed, retaining buffer: {e}")
+            return 0
+        
+        # Phase 2: Commit (clear only flushed examples from buffer)
+        with self._buffer_lock:
+            self._capture_buffer = self._capture_buffer[flushed:]
         
         self.stats["buffer_flushes"] += 1
         self._save_state()
         
         self.logger.info(
             f"Flushed {flushed} examples to distillation store "
-            f"(available for GovernedTrainer)"
+            f"(available for GovernedTrainer). Buffer has {len(self._capture_buffer)} remaining."
         )
         
         return flushed

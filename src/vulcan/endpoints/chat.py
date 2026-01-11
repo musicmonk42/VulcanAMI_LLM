@@ -19,6 +19,7 @@ from vulcan.endpoints.chat_helpers import (
     AGENT_REASONING_POLL_DELAY_SEC,
     MAX_AGENT_REASONING_JOBS_TO_CHECK,
 )
+from vulcan.endpoints.utils import require_deployment
 
 logger = logging.getLogger(__name__)
 
@@ -61,10 +62,8 @@ async def chat(request: Request) -> Dict[str, Any]:
     # Get the FastAPI app from the request to access app.state
     app = request.app
     
-    if not hasattr(app.state, "deployment") or app.state.deployment is None:
-        raise HTTPException(status_code=503, detail="VULCAN deployment not initialized")
-
-    deployment = app.state.deployment
+    # Get deployment using utility that handles both standalone and mounted sub-app scenarios
+    deployment = require_deployment(request)
     collective = deployment.collective
     deps = collective.deps
 

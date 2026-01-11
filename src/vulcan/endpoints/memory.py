@@ -13,6 +13,8 @@ import logging
 
 from fastapi import APIRouter, HTTPException, Request
 
+from vulcan.endpoints.utils import require_deployment
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["memory"])
@@ -73,10 +75,7 @@ async def search_memory(request: Request) -> dict:
     """
     app = request.app
     
-    if not hasattr(app.state, "deployment"):
-        raise HTTPException(status_code=503, detail="System not initialized")
-
-    deployment = app.state.deployment
+    deployment = require_deployment(request)
 
     # Try to get error counter
     error_counter = None

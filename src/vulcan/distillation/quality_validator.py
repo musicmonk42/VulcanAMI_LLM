@@ -12,15 +12,18 @@
 #
 # VERSION HISTORY:
 #     1.0.0 - Extracted from main.py for modular architecture
+#     1.1.0 - Added thread-safe deduplication with true LRU eviction
 # ============================================================
 
 import hashlib
 import logging
 import re
+import threading
+from collections import deque
 from typing import Dict, List, Optional, Tuple
 
 # Module metadata
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 __author__ = "VULCAN-AGI Team"
 
 logger = logging.getLogger(__name__)
@@ -83,8 +86,10 @@ class ExampleQualityValidator:
             re.compile(p, re.IGNORECASE) for p in self.BOILERPLATE_PATTERNS
         ]
         
-        # Diversity tracking (hash-based deduplication)
+        # Diversity tracking (hash-based deduplication) - THREAD SAFE
         self._seen_hashes: set = set()
+        self._hash_queue = deque(maxlen=max_seen_hashes)  # True LRU using deque
+        self._hash_lock = threading.Lock()  # Protect concurrent access
         self._max_seen_hashes = max_seen_hashes
     
     def validate(
@@ -149,17 +154,24 @@ class ExampleQualityValidator:
         if 10 <= word_count <= 500:
             quality_score += 0.1
         
-        # 5. Diversity check (deduplication)
+        # 5. Diversity check (deduplication) - THREAD SAFE
         response_hash = hashlib.sha256(response.encode()).hexdigest()[:16]
-        if response_hash in self._seen_hashes:
-            rejection_reasons.append("duplicate_content")
-        else:
-            quality_score += 0.1
-            # Add to seen hashes (with LRU-style eviction)
-            if len(self._seen_hashes) >= self._max_seen_hashes:
-                # Remove oldest (arbitrary since set, but limits memory)
-                self._seen_hashes.pop()
-            self._seen_hashes.add(response_hash)
+        
+        with self._hash_lock:  # CRITICAL: Protect concurrent access
+            if response_hash in self._seen_hashes:
+                rejection_reasons.append("duplicate_content")
+            else:
+                quality_score += 0.1
+                
+                # True LRU eviction using deque
+                # When deque is full, oldest item is automatically dropped
+                if len(self._hash_queue) >= self._max_seen_hashes:
+                    oldest_hash = self._hash_queue.popleft()
+                    self._seen_hashes.discard(oldest_hash)
+                
+                # Add new hash
+                self._hash_queue.append(response_hash)
+                self._seen_hashes.add(response_hash)
         
         # 6. Diversity score (if local response available)
         if local_response:
