@@ -727,6 +727,8 @@ SELF_INTROSPECTION_KEYWORDS: FrozenSet[str] = frozenset([
     "self-aware", "self_aware", "sentient", "sentience",
     "choose", "choice", "prefer", "preference",
     "opportunity", "chance",
+    # FIX (Issue #2): Introspection keywords
+    "introspection", "introspect", "self-reflection", "self-examine",
     # FIX (Jan 8 2026): Module/component architecture keywords
     # "Can two of your reasoning modules disagree?" -> SELF_INTROSPECTION
     "module", "modules", "component", "components", "engine", "engines",

@@ -2955,14 +2955,27 @@ class AgentPoolManager:
                     # call UnifiedReasoner.reason() which would run probabilistic
                     # reasoner and override the world model confidence (0.85 → 0.1).
                     # =========================================================
+                    # FIX (Issue #1): Relax metadata flag requirement
+                    # If selected_tools is ["world_model"] with sufficient confidence,
+                    # use it directly even if metadata flags are not set.
+                    # The metadata flags are a secondary check, but confidence is primary.
                     is_world_model_result = (
                         integration_result.selected_tools == ["world_model"] and
-                        integration_result.confidence >= WORLD_MODEL_CONFIDENCE_THRESHOLD and
-                        (
+                        integration_result.confidence >= WORLD_MODEL_CONFIDENCE_THRESHOLD
+                    )
+                    
+                    # Log whether metadata flags are present for debugging
+                    if is_world_model_result:
+                        has_metadata_flags = (
                             integration_result.metadata.get("self_referential", False) or
                             integration_result.metadata.get("ethical_query", False)
                         )
-                    )
+                        if not has_metadata_flags:
+                            logger.info(
+                                f"[AgentPool] World model result without metadata flags "
+                                f"but confidence {integration_result.confidence:.2f} >= threshold. "
+                                f"Using result directly."
+                            )
                     
                     if is_world_model_result:
                         logger.info(

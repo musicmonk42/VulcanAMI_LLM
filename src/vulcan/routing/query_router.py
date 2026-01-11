@@ -2809,15 +2809,45 @@ class QueryAnalyzer:
             'write a poem', 'write a story', 'write an essay', 'write about',
             'create a poem', 'create a story', 'compose a',
             'tell me a story', 'tell me a joke',
+        )
+        
+        # FIX (Issue #3): Creative patterns that might still be about self-awareness
+        # These should be checked separately - don't exclude if they contain self-awareness topics
+        creative_exclusion_patterns = (
             'poem about', 'story about',
         )
         
-        # If any exclusion pattern is found, this is NOT self-introspection
-        if any(exc in query_lower for exc in exclusion_patterns):
-            logger.debug(
-                f"[QueryRouter] NOT self-introspection (matches exclusion pattern)"
-            )
-            return False
+        # Self-awareness keywords to check for override
+        self_awareness_override_keywords = (
+            'self-aware', 'self aware', 'self_aware',
+            'consciousness', 'conscious', 'sentient', 'sentience',
+            'introspection', 'introspect',
+        )
+        
+        # If any exclusion pattern is found, check if it's a creative pattern
+        # that might still be about self-awareness
+        for exc in exclusion_patterns:
+            if exc in query_lower:
+                # Check if this is a creative pattern that might be about self-awareness
+                if exc in creative_exclusion_patterns:
+                    # Check if query contains self-awareness keywords AFTER the pattern
+                    # e.g., "write a poem about becoming self-aware"
+                    exc_pos = query_lower.find(exc)
+                    text_after_pattern = query_lower[exc_pos + len(exc):]
+                    has_self_awareness = any(kw in text_after_pattern for kw in self_awareness_override_keywords)
+                    
+                    if has_self_awareness:
+                        logger.debug(
+                            f"[QueryRouter] Creative pattern '{exc}' found but contains "
+                            f"self-awareness keywords - NOT excluding"
+                        )
+                        continue  # Don't exclude this one
+                
+                # Non-creative exclusion pattern or creative without self-awareness
+                logger.debug(
+                    f"[QueryRouter] NOT self-introspection (matches exclusion pattern: {exc})"
+                )
+                return False
         
         # =================================================================
         # POSITIVE MATCH PHASE: Now check for actual self-introspection
@@ -2843,6 +2873,8 @@ class QueryAnalyzer:
             'feelings', 'emotions',
             'preferences', 'prefer', 'want to be', 'choose to be',
             'would rather', 'like to have', 'desire',
+            # Introspection keywords (Issue #2 fix)
+            'introspection', 'introspect', 'self-reflection', 'self-examine',
             # Only match AI/Vulcan-specific introspection (not hypothetical scenarios)
             'your thoughts', 'your opinion', 'your view', 'your perspective',
             'what you think', 'how you feel',
