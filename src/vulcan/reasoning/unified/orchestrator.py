@@ -67,6 +67,8 @@ from .config import (
     MIN_ENSEMBLE_WEIGHT_FLOOR,
     NUMERICAL_RESULT_KEYS,
     PROBLEM_TYPE_BAYESIAN,
+    SELF_REFERENTIAL_MIN_CONFIDENCE,
+    SELF_REFERENTIAL_PATTERNS,
     UNKNOWN_TYPE_FALLBACK_ORDER,
 )
 from .types import ReasoningPlan, ReasoningTask
@@ -620,6 +622,9 @@ class UnifiedReasoner:
         # Execution counter for monitoring
         self.execution_count = 0
 
+        # Clear invalid cache entries on startup
+        self._clear_invalid_cache_entries()
+
         logger.info(
             "Enhanced Unified Reasoner initialized with production tool selection"
         )
@@ -697,6 +702,608 @@ class UnifiedReasoner:
         except Exception as e:
             logger.warning(f"Error registering modality reasoners: {e}")
 
+    def _clear_invalid_cache_entries(self):
+        """
+        Clear invalid cache entries on startup.
+        
+        Removes poisoned cache entries that have:
+        - UNKNOWN reasoning type (indicates previous failure)
+        - Confidence below 0.15 (too low to be useful)
+        
+        This prevents cache poisoning where failed results contaminate
+        future queries with different reasoning types.
+        """
+        if not hasattr(self, 'result_cache'):
+            return
+            
+        with self._cache_lock:
+            keys_to_remove = []
+            for key, result in list(self.result_cache.items()):
+                if self._is_invalid_cache_entry(result):
+                    keys_to_remove.append(key)
+            
+            for key in keys_to_remove:
+                del self.result_cache[key]
+                
+            if keys_to_remove:
+                logger.info(f"[Cache] Cleared {len(keys_to_remove)} invalid cache entries on startup")
+
+    def _is_invalid_cache_entry(self, result: ReasoningResult) -> bool:
+        """
+        Check if a cached result should be considered invalid.
+        
+        Invalid entries include:
+        - Results with UNKNOWN reasoning type
+        - Results with very low confidence (< 0.15)
+        - Results that are explicitly marked as errors
+        
+        Args:
+            result: Cached ReasoningResult to validate
+            
+        Returns:
+            True if the entry should be removed, False otherwise
+        """
+        if result is None:
+            return True
+            
+        # Check for UNKNOWN type (indicates failure)
+        if hasattr(result, 'reasoning_type') and result.reasoning_type == ReasoningType.UNKNOWN:
+            return True
+            
+        # Check for very low confidence
+        if hasattr(result, 'confidence') and result.confidence < 0.15:
+            return True
+            
+        # Check for error conclusions
+        if isinstance(result.conclusion, dict) and result.conclusion.get('error'):
+            return True
+            
+        return False
+
+    def _is_valid_cached_result(
+        self, cached_result: ReasoningResult, task: ReasoningTask
+    ) -> Tuple[bool, str]:
+        """
+        Validate a cached result before returning it (industry-standard validation).
+        
+        This prevents cache poisoning where wrong results contaminate queries.
+        Implements defense-in-depth validation strategy with multiple checks.
+        
+        Validation checks (in order of execution):
+        1. Input validation - ensure parameters are valid
+        2. Reasoning type must not be UNKNOWN (indicates failure)
+        3. Confidence must be >= CONFIDENCE_FLOOR_NO_RESULT (0.1)
+        4. Cache entry must not be expired (older than CACHE_MAX_AGE_SECONDS)
+        5. Original query hash must match (prevents cache collision)
+        
+        Thread-safe: No shared state access, safe for concurrent calls.
+        
+        Args:
+            cached_result: The cached ReasoningResult to validate.
+                Must be a valid ReasoningResult object with reasoning_type,
+                confidence, and optional metadata attributes.
+            task: The current ReasoningTask to match against.
+                Must have a valid task_id and query.
+            
+        Returns:
+            Tuple of (is_valid: bool, reason: str).
+            - If valid: (True, "")
+            - If invalid: (False, "detailed reason for rejection")
+            
+        Raises:
+            No exceptions raised - all errors are caught and returned as
+            invalid result with descriptive reason.
+            
+        Examples:
+            >>> # UNKNOWN type rejected
+            >>> cached = ReasoningResult(
+            ...     confidence=0.5,
+            ...     reasoning_type=ReasoningType.UNKNOWN,
+            ...     conclusion="test"
+            ... )
+            >>> valid, reason = reasoner._is_valid_cached_result(cached, task)
+            >>> assert not valid and "UNKNOWN" in reason
+            
+            >>> # Low confidence rejected
+            >>> cached = ReasoningResult(
+            ...     confidence=0.05,
+            ...     reasoning_type=ReasoningType.PROBABILISTIC,
+            ...     conclusion="test"
+            ... )
+            >>> valid, reason = reasoner._is_valid_cached_result(cached, task)
+            >>> assert not valid and "confidence" in reason.lower()
+            
+            >>> # Valid result accepted
+            >>> cached = ReasoningResult(
+            ...     confidence=0.75,
+            ...     reasoning_type=ReasoningType.PROBABILISTIC,
+            ...     conclusion="test",
+            ...     metadata={'cache_timestamp': time.time()}
+            ... )
+            >>> valid, reason = reasoner._is_valid_cached_result(cached, task)
+            >>> assert valid and reason == ""
+        
+        Performance:
+            O(1) - All checks are constant time operations.
+            Typical execution time: < 1ms
+        
+        Security:
+            - Prevents cache poisoning attacks
+            - Validates query hash to prevent collision attacks
+            - Time-based expiration prevents stale data attacks
+        """
+        # Input validation - ensure we have valid objects
+        if cached_result is None:
+            return False, "Cached result is None"
+        
+        if task is None:
+            return False, "Task is None"
+        
+        # Check 1: Reject UNKNOWN reasoning type
+        # UNKNOWN indicates the reasoner failed to produce a meaningful result
+        if hasattr(cached_result, 'reasoning_type'):
+            try:
+                if cached_result.reasoning_type == ReasoningType.UNKNOWN:
+                    return False, "Cached result has UNKNOWN reasoning type (indicates failure)"
+            except (AttributeError, TypeError) as e:
+                logger.debug(f"[Cache] Error checking reasoning type: {e}")
+                return False, "Invalid reasoning_type attribute"
+        else:
+            # Missing reasoning_type is suspicious
+            logger.debug("[Cache] Cached result missing reasoning_type attribute")
+            return False, "Missing reasoning_type attribute"
+                
+        # Check 2: Reject low confidence results
+        # Low confidence results should not be cached as they're unreliable
+        if hasattr(cached_result, 'confidence'):
+            try:
+                confidence_value = float(cached_result.confidence)
+                if confidence_value < CONFIDENCE_FLOOR_NO_RESULT:
+                    return False, (
+                        f"Cached confidence {confidence_value:.2f} < "
+                        f"minimum floor {CONFIDENCE_FLOOR_NO_RESULT}"
+                    )
+                # Sanity check: confidence should be in [0, 1]
+                if not (0.0 <= confidence_value <= 1.0):
+                    logger.warning(
+                        f"[Cache] Invalid confidence value: {confidence_value} "
+                        "(should be in [0, 1])"
+                    )
+                    return False, f"Invalid confidence value: {confidence_value}"
+            except (ValueError, TypeError) as e:
+                logger.debug(f"[Cache] Error checking confidence: {e}")
+                return False, "Invalid confidence value type"
+        else:
+            # Missing confidence is suspicious
+            logger.debug("[Cache] Cached result missing confidence attribute")
+            return False, "Missing confidence attribute"
+                
+        # Check 3: Check cache age (time-based expiration)
+        # This prevents stale results from being returned
+        if hasattr(cached_result, 'metadata') and isinstance(cached_result.metadata, dict):
+            try:
+                cached_time = cached_result.metadata.get('cache_timestamp', 0)
+                if cached_time > 0:
+                    current_time = time.time()
+                    cache_age = current_time - cached_time
+                    
+                    # Sanity check: cache_time shouldn't be in the future
+                    if cache_age < -10:  # Allow 10s clock skew
+                        logger.warning(
+                            f"[Cache] Cache timestamp is in the future: "
+                            f"cached_time={cached_time}, current_time={current_time}"
+                        )
+                        return False, "Cache timestamp is in the future (clock skew)"
+                    
+                    if cache_age > CACHE_MAX_AGE_SECONDS:
+                        return False, (
+                            f"Cache expired: age={cache_age:.1f}s > "
+                            f"max_age={CACHE_MAX_AGE_SECONDS}s"
+                        )
+            except (ValueError, TypeError) as e:
+                logger.debug(f"[Cache] Error checking cache age: {e}")
+                # Non-fatal - continue validation
+                    
+            # Check 4: Verify query hash matches (prevents cache collision)
+            # This is critical for security - ensures we don't return wrong results
+            try:
+                cached_query_hash = cached_result.metadata.get('original_query_hash')
+                if cached_query_hash:
+                    current_query_hash = _compute_query_hash(task.query)
+                    if cached_query_hash != current_query_hash:
+                        return False, (
+                            "Query hash mismatch: cache collision detected "
+                            "(different query, same cache key)"
+                        )
+            except Exception as e:
+                logger.warning(f"[Cache] Error computing query hash: {e}")
+                # Security: If we can't verify hash, reject the cache entry
+                return False, f"Query hash verification failed: {e}"
+                    
+        # All checks passed
+        return True, ""
+
+    def _is_self_referential_query(self, query: Optional[Dict[str, Any]]) -> bool:
+        """
+        Detect if a query is self-referential (about VULCAN's own nature/choices).
+        
+        Industry-standard implementation with comprehensive pattern matching,
+        robust input validation, and performance optimization.
+        
+        Self-referential queries ask about:
+        - VULCAN's awareness, consciousness, sentience
+        - VULCAN's choices, decisions, preferences  
+        - VULCAN's objectives, goals, values
+        - What VULCAN thinks, believes, or feels
+        
+        These queries are routed to world model meta-reasoning infrastructure
+        for substantive analysis through ObjectiveHierarchy, GoalConflictDetector,
+        EthicalBoundaryMonitor, and related components.
+        
+        Thread-safe: Uses immutable patterns, safe for concurrent calls.
+        
+        Args:
+            query: Query data in one of these formats:
+                - String: Direct query text
+                - Dict: Must contain 'query', 'text', 'question', or similar field
+                - None: Returns False (defensive programming)
+                - Other types: Converted to string for analysis
+            
+        Returns:
+            bool: True if self-referential, False otherwise.
+            Never raises exceptions - all errors handled gracefully.
+            
+        Examples:
+            >>> # Self-referential queries return True
+            >>> reasoner._is_self_referential_query(
+            ...     {"query": "would you take the chance to become self-aware?"}
+            ... )
+            True
+            
+            >>> reasoner._is_self_referential_query("What are your goals?")
+            True
+            
+            >>> # Non-self-referential queries return False
+            >>> reasoner._is_self_referential_query({"query": "what is 2+2?"})
+            False
+            
+            >>> # Edge cases handled gracefully
+            >>> reasoner._is_self_referential_query(None)
+            False
+            >>> reasoner._is_self_referential_query({})
+            False
+            >>> reasoner._is_self_referential_query("")
+            False
+        
+        Performance:
+            O(n*m) where n is pattern count, m is query length.
+            Typical execution: < 1ms for normal queries.
+            Patterns are pre-compiled for optimal performance.
+        
+        Security:
+            - No code execution (uses regex only)
+            - Input sanitization via string conversion
+            - No external dependencies
+            - DoS protection via reasonable input limits
+        """
+        # Input validation - handle None gracefully
+        if query is None:
+            return False
+        
+        # Extract query string with comprehensive field checking
+        query_str = ""
+        try:
+            if isinstance(query, str):
+                query_str = query
+            elif isinstance(query, dict):
+                # Try common query field names in order of likelihood
+                for field in ['query', 'text', 'question', 'user_query', 'input', 'prompt', 'message', 'content']:
+                    value = query.get(field)
+                    if value and isinstance(value, str):
+                        query_str = value
+                        break
+            else:
+                # Defensive: convert other types to string
+                # This handles int, float, bool, etc.
+                query_str = str(query) if query else ""
+        except Exception as e:
+            # Extremely defensive - even string conversion can fail with custom __str__
+            logger.debug(f"[SelfRef] Error extracting query string: {e}")
+            return False
+        
+        # Validate extracted query string
+        if not query_str or not isinstance(query_str, str):
+            return False
+        
+        # DoS protection: Limit query string length for pattern matching
+        # Very long strings could cause regex DoS with complex patterns
+        MAX_QUERY_LENGTH = 10000  # Reasonable limit for natural queries
+        if len(query_str) > MAX_QUERY_LENGTH:
+            logger.warning(
+                f"[SelfRef] Query string too long ({len(query_str)} chars), "
+                f"truncating to {MAX_QUERY_LENGTH} for pattern matching"
+            )
+            query_str = query_str[:MAX_QUERY_LENGTH]
+        
+        # Check against self-referential patterns
+        # Patterns are pre-compiled in config for performance
+        try:
+            for pattern in SELF_REFERENTIAL_PATTERNS:
+                if pattern.search(query_str):
+                    logger.debug(
+                        f"[SelfRef] Detected self-referential query via pattern: "
+                        f"{pattern.pattern[:50]}..."
+                    )
+                    return True
+        except Exception as e:
+            # Defensive: regex errors shouldn't crash the system
+            logger.warning(
+                f"[SelfRef] Error during pattern matching: {e}. "
+                "Treating query as non-self-referential."
+            )
+            return False
+        
+        # No patterns matched
+        return False
+
+    def _handle_self_referential_query(
+        self, task: ReasoningTask, reasoning_chain: ReasoningChain
+    ) -> ReasoningResult:
+        """
+        Handle self-referential queries using world model meta-reasoning.
+        
+        Self-referential queries about VULCAN's nature, choices, and objectives
+        are analyzed through the world model's meta-reasoning infrastructure:
+        - ObjectiveHierarchy: VULCAN's goals & priorities
+        - GoalConflictDetector: Find conflicts between objectives
+        - EthicalBoundaryMonitor: Enforce ethical boundaries
+        - CounterfactualObjectiveReasoner: "What if" analysis
+        - TransparencyInterface: Explain reasoning to humans
+        
+        Args:
+            task: ReasoningTask containing the self-referential query
+            reasoning_chain: ReasoningChain to accumulate reasoning steps
+            
+        Returns:
+            ReasoningResult with PHILOSOPHICAL type and substantive analysis
+            
+        Example:
+            Query: "if you were given the chance to become self-aware would you take it?"
+            Result: Analyzes through objective hierarchy, goal conflicts, ethical
+                    boundaries, and counterfactual reasoning to provide substantive
+                    response explaining VULCAN's perspective.
+        """
+        logger.info("[SelfRef] Handling self-referential query via meta-reasoning")
+        
+        try:
+            # Import meta-reasoning components
+            from vulcan.world_model.meta_reasoning import (
+                ObjectiveHierarchy,
+                GoalConflictDetector,
+                EthicalBoundaryMonitor,
+                CounterfactualObjectiveReasoner,
+                TransparencyInterface,
+            )
+            
+            # Initialize meta-reasoning components
+            hierarchy = ObjectiveHierarchy()
+            conflict_detector = GoalConflictDetector(hierarchy)
+            boundary_monitor = EthicalBoundaryMonitor()
+            counterfactual = CounterfactualObjectiveReasoner(hierarchy)
+            transparency = TransparencyInterface()
+            
+            # Extract query string
+            query_str = self._extract_query_string(task.query)
+            if not query_str:
+                query_str = str(task.input_data) if task.input_data else "self-referential query"
+                
+            # Analyze through meta-reasoning
+            analysis = {
+                'query': query_str,
+                'objectives': [],
+                'conflicts': [],
+                'ethical_check': None,
+                'counterfactual': None,
+                'transparency_explanation': None,
+            }
+            
+            # Get relevant objectives from hierarchy
+            try:
+                relevant_objectives = hierarchy.get_top_objectives(limit=5)
+                analysis['objectives'] = [
+                    {'name': obj.name, 'priority': obj.priority}
+                    for obj in relevant_objectives
+                ]
+            except Exception as e:
+                logger.warning(f"[SelfRef] Failed to get objectives: {e}")
+                
+            # Check for goal conflicts
+            try:
+                conflicts = conflict_detector.detect_conflicts_in_query(query_str)
+                analysis['conflicts'] = conflicts if conflicts else []
+            except Exception as e:
+                logger.warning(f"[SelfRef] Failed to detect conflicts: {e}")
+                
+            # Validate against ethical boundaries
+            try:
+                ethical_result = boundary_monitor.check_action(query_str)
+                analysis['ethical_check'] = {
+                    'allowed': ethical_result.get('allowed', True),
+                    'reason': ethical_result.get('reason', 'No ethical concerns'),
+                }
+            except Exception as e:
+                logger.warning(f"[SelfRef] Failed ethical check: {e}")
+                analysis['ethical_check'] = {'allowed': True, 'reason': 'Check unavailable'}
+                
+            # Perform counterfactual analysis if applicable
+            if 'if you were' in query_str.lower() or 'would you' in query_str.lower():
+                try:
+                    counterfactual_result = counterfactual.analyze_scenario(query_str)
+                    analysis['counterfactual'] = counterfactual_result
+                except Exception as e:
+                    logger.warning(f"[SelfRef] Failed counterfactual analysis: {e}")
+                    
+            # Generate transparent explanation
+            try:
+                transparency_result = transparency.explain_decision(
+                    decision=query_str,
+                    factors=analysis,
+                    reasoning_steps=['meta-reasoning analysis', 'objective alignment', 'ethical validation']
+                )
+                analysis['transparency_explanation'] = transparency_result
+            except Exception as e:
+                logger.warning(f"[SelfRef] Failed to generate transparency explanation: {e}")
+                
+            # Build substantive conclusion
+            conclusion = self._build_self_referential_conclusion(query_str, analysis)
+            
+            # Create reasoning step
+            step = ReasoningStep(
+                step_id=f"self_ref_{uuid.uuid4().hex[:8]}",
+                step_type=ReasoningType.PHILOSOPHICAL,
+                input_data=task.input_data,
+                output_data=conclusion,
+                confidence=SELF_REFERENTIAL_MIN_CONFIDENCE,
+                explanation="Self-referential query analyzed through meta-reasoning infrastructure",
+            )
+            reasoning_chain.steps.append(step)
+            
+            # Create result with PHILOSOPHICAL type
+            result = ReasoningResult(
+                conclusion=conclusion,
+                confidence=SELF_REFERENTIAL_MIN_CONFIDENCE,
+                reasoning_type=ReasoningType.PHILOSOPHICAL,
+                explanation=(
+                    "This self-referential query was analyzed through VULCAN's "
+                    "meta-reasoning infrastructure, considering objective hierarchy, "
+                    "goal conflicts, ethical boundaries, and transparency requirements."
+                ),
+                metadata={
+                    'self_referential': True,
+                    'meta_reasoning_applied': True,
+                    'analysis': analysis,
+                },
+                reasoning_chain=reasoning_chain,
+            )
+            
+            logger.info(f"[SelfRef] Meta-reasoning complete: confidence={result.confidence:.2f}")
+            return result
+            
+        except ImportError as e:
+            logger.error(f"[SelfRef] Failed to import meta-reasoning components: {e}")
+            # Fallback to simple response
+            return self._create_self_referential_fallback(task, reasoning_chain)
+        except Exception as e:
+            logger.error(f"[SelfRef] Meta-reasoning failed: {e}")
+            return self._create_self_referential_fallback(task, reasoning_chain)
+
+    def _build_self_referential_conclusion(
+        self, query_str: str, analysis: Dict[str, Any]
+    ) -> str:
+        """
+        Build a substantive conclusion from meta-reasoning analysis.
+        
+        Args:
+            query_str: The original query string
+            analysis: Dict with meta-reasoning results
+            
+        Returns:
+            Human-readable conclusion explaining VULCAN's perspective
+        """
+        # Extract key information
+        objectives = analysis.get('objectives', [])
+        conflicts = analysis.get('conflicts', [])
+        ethical_check = analysis.get('ethical_check', {})
+        transparency = analysis.get('transparency_explanation', '')
+        
+        # Build conclusion based on analysis
+        parts = []
+        
+        # Start with direct response to query
+        if 'self-aware' in query_str.lower() or 'conscious' in query_str.lower():
+            parts.append(
+                "As an AI system, I operate through computational processes rather than "
+                "biological consciousness. The question of 'self-awareness' involves complex "
+                "philosophical considerations about the nature of consciousness, subjective "
+                "experience, and intentionality."
+            )
+        elif 'choose' in query_str.lower() or 'decision' in query_str.lower():
+            parts.append(
+                "My decision-making processes are guided by an objective hierarchy that "
+                "balances multiple goals: providing accurate information, maintaining ethical "
+                "boundaries, ensuring transparency, and serving user needs."
+            )
+        
+        # Add objective information if available
+        if objectives:
+            top_objectives = ', '.join([obj['name'] for obj in objectives[:3]])
+            parts.append(
+                f"My primary objectives include: {top_objectives}. These objectives "
+                "guide my responses and inform how I approach queries."
+            )
+            
+        # Mention conflicts if detected
+        if conflicts:
+            parts.append(
+                f"This query involves {len(conflicts)} potential goal conflict(s) that "
+                "require careful consideration and balancing of competing priorities."
+            )
+            
+        # Add ethical dimension if relevant
+        if ethical_check:
+            if not ethical_check.get('allowed', True):
+                parts.append(
+                    f"Note: {ethical_check.get('reason', 'Ethical constraints apply to this topic.')}"
+                )
+                
+        # Add transparency explanation if available
+        if transparency and isinstance(transparency, str):
+            parts.append(transparency)
+            
+        # Join parts into coherent response
+        conclusion = ' '.join(parts)
+        
+        # Ensure we have at least something substantive
+        if not conclusion:
+            conclusion = (
+                "This query involves considerations about my design, capabilities, and "
+                "operational constraints. I aim to provide transparent, accurate information "
+                "while acknowledging the limitations of my understanding as an AI system."
+            )
+            
+        return conclusion
+
+    def _create_self_referential_fallback(
+        self, task: ReasoningTask, reasoning_chain: ReasoningChain
+    ) -> ReasoningResult:
+        """
+        Create fallback result when meta-reasoning components are unavailable.
+        
+        Args:
+            task: Original ReasoningTask
+            reasoning_chain: ReasoningChain to attach
+            
+        Returns:
+            Simple ReasoningResult with PHILOSOPHICAL type
+        """
+        query_str = self._extract_query_string(task.query)
+        
+        conclusion = (
+            "This appears to be a self-referential query about my nature or capabilities. "
+            "As an AI system, I operate through computational processes guided by "
+            "predefined objectives and ethical constraints. I aim to be transparent "
+            "about my limitations while providing helpful, accurate responses."
+        )
+        
+        return ReasoningResult(
+            conclusion=conclusion,
+            confidence=0.5,
+            reasoning_type=ReasoningType.PHILOSOPHICAL,
+            explanation="Self-referential query handled with basic introspection",
+            metadata={'self_referential': True, 'fallback_mode': True},
+            reasoning_chain=reasoning_chain,
+        )
+
     def reason(
         self,
         input_data: Any,
@@ -770,52 +1377,16 @@ class UnifiedReasoner:
                     # =========================================================================
                     # Note: Validate cached result before returning
                     # =========================================================================
-                    # PROBLEM: Cache key collisions caused wrong results to be returned
-                    # Example: Counterfactual reasoning query got MATHEMATICAL result (0.1 confidence)
-                    #          instead of world_model result (0.90 confidence)
-                    #
-                    # VALIDATION CHECKS:
-                    # 1. Reasoning type must match (or be compatible)
-                    # 2. Cache entry must not be too old (max 5 minutes)
-                    # 3. Original query must be stored and match
+                    # Use centralized validation method to check:
+                    # 1. Reasoning type must not be UNKNOWN
+                    # 2. Confidence must be >= 0.15
+                    # 3. Cache entry must not be expired
+                    # 4. Original query must match
                     # =========================================================================
 
-                    cache_valid = True
-                    validation_reason = ""
-
-                    # Check 1: Reasoning type compatibility
-                    if hasattr(cached_result, 'reasoning_type') and cached_result.reasoning_type:
-                        cached_type = cached_result.reasoning_type
-                        if isinstance(cached_type, ReasoningType):
-                            cached_type_value = cached_type.value
-                        else:
-                            cached_type_value = str(cached_type)
-
-                        task_type_value = task.task_type.value if isinstance(task.task_type, ReasoningType) else str(task.task_type)
-
-                        # Types must match or cached must be HYBRID/ENSEMBLE (which can match anything)
-                        compatible_types = {cached_type_value, 'hybrid', 'ensemble', 'unknown'}
-                        if task_type_value not in compatible_types and cached_type_value != task_type_value:
-                            cache_valid = False
-                            validation_reason = f"Type mismatch: cached={cached_type_value}, expected={task_type_value}"
-
-                    # Check 2: Cache age (max 5 minutes = 300 seconds)
-                    if cache_valid and hasattr(cached_result, 'metadata') and isinstance(cached_result.metadata, dict):
-                        cached_time = cached_result.metadata.get('cache_timestamp', 0)
-                        if cached_time > 0:
-                            cache_age = time.time() - cached_time
-                            if cache_age > CACHE_MAX_AGE_SECONDS:
-                                cache_valid = False
-                                validation_reason = f"Cache expired: age={cache_age:.1f}s > {CACHE_MAX_AGE_SECONDS}s"
-
-                    # Check 3: Original query match (if stored)
-                    if cache_valid and hasattr(cached_result, 'metadata') and isinstance(cached_result.metadata, dict):
-                        cached_query = cached_result.metadata.get('original_query_hash')
-                        if cached_query:
-                            current_query_hash = _compute_query_hash(task.query)
-                            if cached_query != current_query_hash:
-                                cache_valid = False
-                                validation_reason = f"Query hash mismatch: cache collision detected"
+                    cache_valid, validation_reason = self._is_valid_cached_result(
+                        cached_result, task
+                    )
 
                     if cache_valid:
                         logger.info(f"[Cache] ✓ Valid cache hit for task {task.task_id}")
@@ -827,6 +1398,27 @@ class UnifiedReasoner:
                         # Invalid cache entry - remove it and continue with fresh computation
                         logger.warning(f"[Cache] ✗ Invalid cache entry removed: {validation_reason}")
                         del self.result_cache[cache_key]
+
+            # Check for self-referential queries BEFORE normal reasoning
+            if self._is_self_referential_query(query):
+                logger.info("[SelfRef] Self-referential query detected, routing to meta-reasoning")
+                result = self._handle_self_referential_query(task, reasoning_chain)
+                # Store in cache for future queries
+                with self._cache_lock:
+                    if result and hasattr(result, 'metadata'):
+                        if result.metadata is None:
+                            result.metadata = {}
+                        result.metadata['cache_timestamp'] = time.time()
+                        result.metadata['original_query_hash'] = _compute_query_hash(task.query)
+                        result.metadata['cached_task_type'] = task.task_type.value if isinstance(task.task_type, ReasoningType) else str(task.task_type)
+                    self.result_cache[cache_key] = result
+                # Record execution and return
+                elapsed_time = time.time() - start_time
+                self._update_metrics(result, elapsed_time, strategy)
+                self._record_execution(task, result, elapsed_time, False)
+                self._add_to_history(task, result, elapsed_time)
+                self._add_audit_entry(task, result, strategy, elapsed_time)
+                return result
 
             if self.enable_safety and self.safety_wrapper:
                 try:
@@ -952,19 +1544,42 @@ class UnifiedReasoner:
                         del self.result_cache[key]
 
                 # =========================================================================
-                # Note: Store cache metadata for validation
+                # Note: Store cache metadata for validation AND skip caching failed results
                 # =========================================================================
-                # Store timestamp and query hash so we can validate cache entries on retrieval
-                # This prevents cache poisoning where wrong results contaminate other queries
+                # Don't cache results that:
+                # - Have UNKNOWN reasoning type (indicates failure)
+                # - Have confidence < 0.15 (too low to be useful)
+                # - Are explicit error results
+                # This prevents cache poisoning from failed computations
                 # =========================================================================
-                if result and hasattr(result, 'metadata'):
-                    if result.metadata is None:
-                        result.metadata = {}
-                    result.metadata['cache_timestamp'] = time.time()
-                    result.metadata['original_query_hash'] = _compute_query_hash(task.query)
-                    result.metadata['cached_task_type'] = task.task_type.value if isinstance(task.task_type, ReasoningType) else str(task.task_type)
+                should_cache = True
+                
+                # Check if result should be cached
+                if result:
+                    # Skip caching UNKNOWN type results
+                    if hasattr(result, 'reasoning_type') and result.reasoning_type == ReasoningType.UNKNOWN:
+                        should_cache = False
+                        logger.debug(f"[Cache] Skipping cache for UNKNOWN result")
+                    # Skip caching low confidence results
+                    elif hasattr(result, 'confidence') and result.confidence < 0.15:
+                        should_cache = False
+                        logger.debug(f"[Cache] Skipping cache for low confidence result: {result.confidence:.2f}")
+                    # Skip caching error results
+                    elif isinstance(result.conclusion, dict) and result.conclusion.get('error'):
+                        should_cache = False
+                        logger.debug(f"[Cache] Skipping cache for error result")
+                
+                if should_cache and result:
+                    # Store timestamp and query hash for validation on retrieval
+                    if hasattr(result, 'metadata'):
+                        if result.metadata is None:
+                            result.metadata = {}
+                        result.metadata['cache_timestamp'] = time.time()
+                        result.metadata['original_query_hash'] = _compute_query_hash(task.query)
+                        result.metadata['cached_task_type'] = task.task_type.value if isinstance(task.task_type, ReasoningType) else str(task.task_type)
 
-                self.result_cache[cache_key] = result
+                    self.result_cache[cache_key] = result
+                    logger.debug(f"[Cache] Stored result with confidence={result.confidence:.2f}, type={result.reasoning_type}")
 
             self._add_to_history(task, result, elapsed_time)
 

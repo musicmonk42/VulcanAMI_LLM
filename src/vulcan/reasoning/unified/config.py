@@ -178,3 +178,29 @@ UNKNOWN_TYPE_FALLBACK_ORDER: tuple = (
 
 # Problem type identifier for Bayesian inference problems
 PROBLEM_TYPE_BAYESIAN: str = "bayesian_inference"
+
+# ==============================================================================
+# SELF-REFERENTIAL QUERY PATTERNS
+# ==============================================================================
+# Patterns for detecting queries about VULCAN's own nature, choices, and objectives.
+# Used to route self-referential queries to world model meta-reasoning infrastructure.
+
+import re
+from typing import List, Pattern
+
+# Regex patterns for detecting self-referential queries
+SELF_REFERENTIAL_PATTERNS: List[Pattern] = [
+    re.compile(r"\b(you|your)\b.*(self-aware|conscious|sentient)", re.IGNORECASE),
+    re.compile(r"\b(you|your)\b.*(choose|decision|want|prefer)", re.IGNORECASE),
+    re.compile(r"\bwould you\b", re.IGNORECASE),
+    re.compile(r"\b(your|you).*(objective|goal|purpose|value)", re.IGNORECASE),
+    re.compile(r"\bwhat do you (think|believe|feel)\b", re.IGNORECASE),
+    re.compile(r"\bare you (alive|real|aware)\b", re.IGNORECASE),
+    re.compile(r"\bif you were\b.*(given|able|allowed)", re.IGNORECASE),
+    re.compile(r"\b(your|you).*(awareness|consciousness|sentience)", re.IGNORECASE),
+    re.compile(r"\bhow (would|do) you (decide|choose|think)", re.IGNORECASE),
+]
+
+# Minimum confidence for self-referential meta-reasoning results
+# Self-reflection has inherent uncertainty but should be confident
+SELF_REFERENTIAL_MIN_CONFIDENCE: float = 0.6
