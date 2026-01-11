@@ -94,8 +94,8 @@ def test_agent_pool_fix():
     with open(agent_pool_path, 'r') as f:
         content = f.read()
     
-    # Check for the fix comment
-    if 'FIX (Issue #1): Relax metadata flag requirement' in content:
+    # Check for the fix - updated to match new professional comment
+    if 'Simplified World Model Result Detection' in content or 'Relax metadata flag requirement' in content:
         print("✓ Agent pool metadata flag fix found")
         
         # Check that the condition no longer requires metadata flags
