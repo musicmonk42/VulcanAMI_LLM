@@ -32,7 +32,7 @@ from vulcan.endpoints.chat_helpers import (
 )
 from vulcan.endpoints.utils import require_deployment
 from vulcan.metrics import error_counter
-from vulcan.reasoning.integration.utils import observe_query_start
+from vulcan.reasoning.integration.utils import observe_query_start, observe_outcome
 
 logger = logging.getLogger(__name__)
 
