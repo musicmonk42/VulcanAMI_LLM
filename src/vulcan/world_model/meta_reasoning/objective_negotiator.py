@@ -216,10 +216,10 @@ class ObjectiveNegotiator:
                 )
                 self.objective_hierarchy = ObjectiveHierarchy()  # Instantiates the mock
             else:
-                logger.warning(
-                    "No ObjectiveHierarchy provided. Using MagicMock fallback for now."
+                logger.info(
+                    "No ObjectiveHierarchy provided. Creating default ObjectiveHierarchy instance."
                 )
-                self.objective_hierarchy = ObjectiveHierarchy()  # Instantiates the mock
+                self.objective_hierarchy = ObjectiveHierarchy()  # Create default instance
 
         # --- START FIX: Allow Mock objects from tests ---
         elif OBJECTIVE_HIERARCHY_AVAILABLE and not isinstance(

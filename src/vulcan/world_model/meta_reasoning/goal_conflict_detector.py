@@ -262,12 +262,11 @@ class GoalConflictDetector:
                 )
                 self.objective_hierarchy = ObjectiveHierarchy()  # Instantiates the mock
             else:
-                # Import succeeded, but none provided. This is an error or needs a default.
-                # Using mock allows tests to run without needing a real hierarchy.
-                logger.warning(
-                    "No ObjectiveHierarchy provided. Using MagicMock fallback for now."
+                # Import succeeded, but none provided. Create a default instance.
+                logger.info(
+                    "No ObjectiveHierarchy provided. Creating default ObjectiveHierarchy instance."
                 )
-                self.objective_hierarchy = ObjectiveHierarchy()  # Instantiates the mock
+                self.objective_hierarchy = ObjectiveHierarchy()  # Create default instance
 
         # FIXED: Allow Mock/MagicMock types for testing
         elif OBJECTIVE_HIERARCHY_AVAILABLE and not isinstance(
