@@ -176,6 +176,13 @@ def _is_creative_task(task: ReasoningTask) -> bool:
 
 class UnifiedReasoner:
     """Enhanced unified interface with production tool selection and portfolio strategies"""
+    
+    # Default tools for ensemble reasoning when no specific tools are selected
+    DEFAULT_ENSEMBLE_TOOLS = [
+        ReasoningType.PROBABILISTIC,
+        ReasoningType.SYMBOLIC,
+        ReasoningType.CAUSAL,
+    ]
 
     def __init__(
         self,
@@ -1484,7 +1491,7 @@ class UnifiedReasoner:
                     try:
                         selection_result = self._select_tools_for_plan(plan, task)
                         # Only override if tool_selector provides tools and none were set from router
-                        if not plan.selected_tools:
+                        if not hasattr(plan, 'selected_tools') or not plan.selected_tools:
                             plan.selected_tools = (
                                 selection_result.selected_tool
                                 if hasattr(selection_result, "selected_tool")
@@ -1863,13 +1870,8 @@ class UnifiedReasoner:
                 # Fall back to default ensemble if no tools selected
                 if not tools_to_use:
                     logger.info("[Ensemble] No selected_tools from router, using default ensemble types")
-                    tools_to_use = [
-                        ReasoningType.PROBABILISTIC,
-                        ReasoningType.SYMBOLIC,
-                        ReasoningType.CAUSAL,
-                    ]
-                    # Filter to only available reasoners
-                    tools_to_use = [rt for rt in tools_to_use if rt in self.reasoners]
+                    # Use class constant for default ensemble tools
+                    tools_to_use = [rt for rt in self.DEFAULT_ENSEMBLE_TOOLS if rt in self.reasoners]
                 
                 # Create tasks for each tool
                 for reasoning_type in tools_to_use:
