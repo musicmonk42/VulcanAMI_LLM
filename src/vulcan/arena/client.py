@@ -149,13 +149,24 @@ _circuit_breaker = ArenaCircuitBreaker()
 
 # Semaphore for limiting concurrent Arena requests
 _arena_semaphore: Optional[asyncio.Semaphore] = None
+_arena_semaphore_lock = threading.Lock()
 
 
 def _get_arena_semaphore() -> asyncio.Semaphore:
-    """Get or create the Arena concurrency semaphore."""
+    """
+    Get or create the Arena concurrency semaphore with thread-safe initialization.
+    
+    Uses double-check locking pattern to prevent race conditions during
+    semaphore initialization when multiple threads access this function concurrently.
+    
+    Returns:
+        asyncio.Semaphore: The global Arena semaphore
+    """
     global _arena_semaphore
     if _arena_semaphore is None:
-        _arena_semaphore = asyncio.Semaphore(MAX_CONCURRENT_ARENA)
+        with _arena_semaphore_lock:
+            if _arena_semaphore is None:  # Double-check locking
+                _arena_semaphore = asyncio.Semaphore(MAX_CONCURRENT_ARENA)
     return _arena_semaphore
 
 
@@ -283,7 +294,13 @@ def select_arena_agent(routing_plan) -> str:
         "tune": "automl_optimizer",
     }
 
-    return agent_mapping.get(query_type, "generator")
+    agent_id = agent_mapping.get(query_type)
+    if agent_id is None:
+        logger.warning(
+            f"[ARENA] Unknown query type '{query_type}', defaulting to generator"
+        )
+        return "generator"
+    return agent_id
 
 
 def build_arena_payload(query: str, routing_plan, agent_id: str) -> dict:
@@ -495,6 +512,15 @@ async def execute_via_arena(
 
     # CRITICAL FIX: Sanitize payload to remove None keys that cause serialization failures
     payload = sanitize_payload(payload)
+    
+    # Validate that required fields are present after sanitization
+    required_fields = ['spec_id', 'parameters'] if agent_id == 'generator' else ['graph_id', 'nodes']
+    if not all(key in payload for key in required_fields):
+        logger.error(f"[ARENA] Sanitization removed required fields: {required_fields}")
+        return {
+            "status": "error",
+            "error": "Payload sanitization removed required data",
+        }
 
     # CRITICAL FIX: Pre-serialize to JSON to catch serialization errors early
     try:
