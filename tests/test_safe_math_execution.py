@@ -250,6 +250,198 @@ result = subprocess.check_output(['ls'])
 ''')
         assert result['success'] is False
 
+    def test_no_class_hierarchy_escape(self):
+        """Verify class hierarchy traversal is blocked (Issue 1 fix)."""
+        result = execute_math_code('''
+# Attempt to access __class__ to escape sandbox
+result = ().__class__
+''')
+        assert result['success'] is False
+        assert 'error' in result and result['error'] is not None
+
+    def test_no_bases_access(self):
+        """Verify __bases__ access is blocked."""
+        result = execute_math_code('''
+result = tuple.__bases__
+''')
+        assert result['success'] is False
+
+    def test_no_subclasses_access(self):
+        """Verify __subclasses__ access is blocked."""
+        result = execute_math_code('''
+result = object.__subclasses__()
+''')
+        assert result['success'] is False
+
+    def test_no_globals_access(self):
+        """Verify __globals__ access is blocked."""
+        result = execute_math_code('''
+def f():
+    pass
+result = f.__globals__
+''')
+        assert result['success'] is False
+
+    def test_function_removed(self):
+        """Verify SymPy Function is not available (Issue 2 fix)."""
+        result = execute_math_code('''
+x = Symbol('x')
+f = Function('f')
+result = f(x)
+''')
+        assert result['success'] is False
+        assert 'Function' in str(result.get('error', ''))
+
+    def test_lambda_removed(self):
+        """Verify SymPy Lambda is not available (Issue 2 fix)."""
+        result = execute_math_code('''
+x = Symbol('x')
+f = Lambda(x, x**2)
+result = f(2)
+''')
+        assert result['success'] is False
+        assert 'Lambda' in str(result.get('error', ''))
+
+    def test_sympy_module_not_exposed(self):
+        """Verify full SymPy module is not exposed."""
+        result = execute_math_code('''
+# Try to access full sympy module
+result = sympy.Function('f')
+''')
+        assert result['success'] is False
+
+    def test_print_rate_limiting(self):
+        """Verify print calls are rate-limited (Issue 3 fix)."""
+        # This should succeed - print calls just get silently ignored after limit
+        result = execute_math_code('''
+for i in range(200):
+    print(f"Line {i}")
+result = "done"
+''')
+        assert result['success'] is True
+        assert result['result'] == "done"
+
+    def test_unicode_normalization(self):
+        """Verify Unicode mathematical symbols are normalized (Issue 10 fix)."""
+        # Test mathematical italic letters
+        result = execute_math_code('''
+x = Symbol('x')
+# Using Unicode mathematical italic x (U+1D465) - should be normalized
+result = integrate(x**2, x)
+''')
+        assert result['success'] is True
+
+    def test_implicit_multiplication(self):
+        """Verify implicit multiplication is handled."""
+        result = execute_math_code('''
+k = Symbol('k')
+# 2k should become 2*k
+result = 2*k + 1
+''')
+        assert result['success'] is True
+
+
+@pytest.mark.skipif(
+    not SAFE_EXECUTION_MODULE_AVAILABLE,
+    reason="Safe execution module not available"
+)
+class TestNumericUtilsFixes:
+    """Tests for numeric_utils fixes (Issue 11)."""
+    
+    def test_normalize_weights_positive(self):
+        """Test normalize_weights with positive weights."""
+        from vulcan.utils.numeric_utils import normalize_weights
+        
+        weights = [1.0, 2.0, 3.0]
+        normalized = normalize_weights(weights)
+        
+        assert abs(sum(normalized) - 1.0) < 1e-9
+        assert abs(normalized[0] - 1/6) < 1e-9
+
+    def test_normalize_weights_negative_mixed(self):
+        """Test normalize_weights with mixed positive/negative weights."""
+        from vulcan.utils.numeric_utils import normalize_weights
+        
+        # Mixed weights should work if total is positive
+        weights = [3.0, -1.0, 2.0]  # Total = 4.0
+        normalized = normalize_weights(weights)
+        
+        assert abs(sum(normalized) - 1.0) < 1e-9
+
+    def test_normalize_weights_all_negative(self):
+        """Test normalize_weights rejects all-negative weights."""
+        from vulcan.utils.numeric_utils import normalize_weights
+        
+        weights = [-1.0, -2.0, -3.0]
+        
+        try:
+            normalize_weights(weights)
+            assert False, "Should have raised ValueError"
+        except ValueError as e:
+            assert "non-positive" in str(e)
+
+    def test_normalize_weights_zero_sum(self):
+        """Test normalize_weights rejects zero-sum weights."""
+        from vulcan.utils.numeric_utils import normalize_weights
+        
+        weights = [1.0, -1.0]  # Sum = 0
+        
+        try:
+            normalize_weights(weights)
+            assert False, "Should have raised ValueError"
+        except ValueError as e:
+            assert "too small" in str(e)
+
+
+@pytest.mark.skipif(
+    not SAFE_EXECUTION_MODULE_AVAILABLE,
+    reason="Safe execution module not available"
+)
+class TestReasoningHelpersFixes:
+    """Tests for reasoning_helpers fixes (Issue 12)."""
+    
+    def test_get_reasoning_attr_type_validation(self):
+        """Test _get_reasoning_attr with type validation."""
+        from vulcan.utils.reasoning_helpers import _get_reasoning_attr
+        
+        result = {"confidence": 0.95}
+        
+        # Should work with correct type
+        value = _get_reasoning_attr(result, "confidence", 0.0, expected_type=float)
+        assert value == 0.95
+
+    def test_get_reasoning_attr_type_mismatch(self):
+        """Test _get_reasoning_attr catches type mismatches."""
+        from vulcan.utils.reasoning_helpers import _get_reasoning_attr
+        
+        result = {"confidence": "not_a_number"}
+        
+        try:
+            _get_reasoning_attr(result, "confidence", 0.0, expected_type=float)
+            assert False, "Should have raised TypeError"
+        except TypeError as e:
+            assert "expected float" in str(e)
+            assert "got str" in str(e)
+
+    def test_get_reasoning_attr_none_value(self):
+        """Test _get_reasoning_attr allows None values."""
+        from vulcan.utils.reasoning_helpers import _get_reasoning_attr
+        
+        result = {"confidence": None}
+        
+        # None values should not trigger type validation
+        value = _get_reasoning_attr(result, "confidence", 0.0, expected_type=float)
+        assert value is None
+
+    def test_get_reasoning_attr_missing_key(self):
+        """Test _get_reasoning_attr returns default for missing keys."""
+        from vulcan.utils.reasoning_helpers import _get_reasoning_attr
+        
+        result = {"other": "value"}
+        
+        value = _get_reasoning_attr(result, "confidence", 0.5, expected_type=float)
+        assert value == 0.5
+
 
 # ============================================================================
 # MATHEMATICAL COMPUTATION TOOL TESTS
