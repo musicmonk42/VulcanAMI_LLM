@@ -131,8 +131,8 @@ def _lazy_import_reasoning():
     
     # Try multiple import paths for robustness
     import_paths = [
-        ('vulcan.reasoning', 'vulcan.reasoning.reasoning_integration'),
-        ('src.vulcan.reasoning', 'src.vulcan.reasoning.reasoning_integration'),
+        ('vulcan.reasoning', 'vulcan.reasoning.integration'),
+        ('src.vulcan.reasoning', 'src.vulcan.reasoning.integration'),
     ]
     
     for reasoning_path, integration_path in import_paths:
