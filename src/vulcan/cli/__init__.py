@@ -4,4 +4,6 @@ Vulcan CLI Module
 This module contains command-line interface and interactive mode functionality.
 """
 
-__all__ = []
+from vulcan.cli.interactive import run_interactive_mode
+
+__all__ = ["run_interactive_mode"]
