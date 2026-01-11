@@ -92,13 +92,23 @@ class DistillationStorageBackend:
                 if encryption_key:
                     self._fernet = Fernet(encryption_key.encode())
                 else:
-                    # Generate and log key (should be stored securely in production)
+                    # Generate new encryption key
                     key = Fernet.generate_key()
                     self._fernet = Fernet(key)
+                    # FIXED: Never log key material for security
                     self.logger.warning(
-                        "Generated new encryption key. Store this securely: "
-                        f"{key.decode()[:20]}..."
+                        "Generated new encryption key. "
+                        "Set DISTILLATION_ENCRYPTION_KEY env var to persist. "
+                        "Key NOT logged for security."
                     )
+                    # Store key securely if path provided
+                    key_file = self.storage_path / ".encryption_key"
+                    try:
+                        key_file.write_bytes(key)
+                        key_file.chmod(0o600)  # Owner read/write only
+                        self.logger.info(f"Encryption key stored at {key_file}")
+                    except Exception as e:
+                        self.logger.error(f"Could not store encryption key: {e}")
             except ImportError:
                 self.logger.warning(
                     "cryptography package not installed. "
@@ -320,6 +330,30 @@ class DistillationStorageBackend:
     # SYNCHRONOUS WRITE METHOD
     # ============================================================
     
+    def _sanitize_example(self, example: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Remove potential injection vectors from example.
+        
+        Prevents JSONL injection by removing control characters and newlines
+        that could break the JSONL format or inject malicious content.
+        
+        Args:
+            example: The example dictionary to sanitize
+            
+        Returns:
+            Sanitized copy of the example
+        """
+        sanitized = {}
+        for key, value in example.items():
+            if isinstance(value, str):
+                # Remove control characters and newlines
+                value = ''.join(c for c in value if c.isprintable() or c == ' ')
+                value = value.replace('\n', ' ').replace('\r', ' ')
+            elif isinstance(value, dict):
+                value = self._sanitize_example(value)
+            sanitized[key] = value
+        return sanitized
+    
     def append_example(self, example: Dict[str, Any]) -> bool:
         """
         Append a training example to storage.
@@ -340,8 +374,23 @@ class DistillationStorageBackend:
                     if self._examples_file.stat().st_size > self.max_file_size_bytes:
                         self._rotate_file(self._examples_file)
                 
-                # Serialize and optionally encrypt
-                line = json.dumps(example, separators=(',', ':'))
+                # Sanitize before serialization to prevent JSONL injection
+                sanitized = self._sanitize_example(example)
+                
+                # Serialize with strict settings
+                line = json.dumps(
+                    sanitized,
+                    separators=(',', ':'),
+                    ensure_ascii=True,  # Prevent encoding issues
+                    allow_nan=False,  # Prevent NaN/Infinity injection
+                )
+                
+                # Verify no newlines in output (defense in depth)
+                if '\n' in line or '\r' in line:
+                    self.logger.error("JSONL injection attempt detected and blocked")
+                    return False
+                
+                # Optionally encrypt
                 if self.use_encryption:
                     line = self._encrypt(line)
                 
@@ -469,6 +518,66 @@ class DistillationStorageBackend:
             
         except Exception as e:
             self.logger.error(f"Failed to rewrite examples: {e}")
+    
+    def delete_user_data(self, user_id: str) -> int:
+        """
+        Delete all examples for a user (GDPR Article 17 - Right to Erasure).
+        
+        This method implements the GDPR "right to be forgotten" by removing
+        all training examples associated with a specific user ID.
+        
+        Args:
+            user_id: User identifier to delete data for
+            
+        Returns:
+            Number of examples deleted
+        """
+        with self._lock:
+            examples = self.read_examples()
+            remaining = [ex for ex in examples if ex.get("user_id") != user_id]
+            deleted_count = len(examples) - len(remaining)
+            
+            if deleted_count > 0:
+                self._rewrite_examples(remaining)
+                # Log deletion for compliance audit
+                import hashlib
+                self.append_provenance({
+                    "event_type": "user_data_deletion",
+                    "user_id_hash": hashlib.sha256(user_id.encode()).hexdigest(),
+                    "records_deleted": deleted_count,
+                    "timestamp": time.time(),
+                })
+                self.logger.info(f"Deleted {deleted_count} examples for user {user_id[:8]}...")
+            
+            return deleted_count
+    
+    def export_user_data(self, user_id: str) -> Dict[str, Any]:
+        """
+        Export all data for a user (GDPR Article 20 - Data Portability).
+        
+        This method implements the GDPR "right to data portability" by
+        exporting all training examples for a user in a portable format.
+        
+        Args:
+            user_id: User identifier to export data for
+            
+        Returns:
+            Dictionary containing all user data in portable format
+        """
+        examples = [
+            ex for ex in self.read_examples()
+            if ex.get("user_id") == user_id
+        ]
+        
+        return {
+            "user_id": user_id,
+            "export_date": time.time(),
+            "format_version": "1.0",
+            "examples": examples,
+            "total_examples": len(examples),
+            "data_format": "JSONL",
+            "encryption_used": self.use_encryption,
+        }
     
     def _rotate_file(self, file_path: Path):
         """Rotate file when it exceeds max size."""
