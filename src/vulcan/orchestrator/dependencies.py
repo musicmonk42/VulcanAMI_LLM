@@ -1298,14 +1298,36 @@ def validate_dependencies(
                 if "(import failed)" not in dep
             ]
             
-            # FIX: Treat 'continual' as alias for 'learning_system'
-            # The learning system is implemented as 'continual' (ContinualLearner)
-            # but older code expected it to be named 'learning_system'
+            # ================================================================
+            # ARCHITECTURAL FIX: Handle 'continual' / 'learning_system' Alias
+            # ================================================================
+            # ISSUE: After refactoring (PR #704), the dependency validation
+            #        expects 'learning_system' but the actual implementation
+            #        uses 'continual' (ContinualLearner class).
+            #
+            # ROOT CAUSE:
+            # - EnhancedCollectiveDeps defines both fields:
+            #   - continual: Any = None (actual implementation)
+            #   - learning_system: Any = None (legacy/placeholder)
+            # - Field mapping at line 455 categorizes learning_system as LEARNING
+            # - However, the factory functions only initialize 'continual'
+            # - This causes false "Missing critical dependencies" errors
+            #
+            # SOLUTION:
+            # Treat 'continual' as a valid substitute for 'learning_system'.
+            # If continual learner is available, consider learning_system satisfied.
+            #
+            # FUTURE: Consider deprecating 'learning_system' field in favor of
+            #         'continual' for consistency (breaking change in v3.0.0).
+            # ================================================================
             if category == DependencyCategory.LEARNING and "learning_system" in missing_initialized:
-                # If continual learner is available, learning_system is satisfied
+                # Check if continual learner is available as substitute
                 if deps.continual is not None:
                     missing_initialized.remove("learning_system")
-                    logger.debug("Learning system validation: using 'continual' for 'learning_system'")
+                    logger.debug(
+                        "Learning system validation: 'continual' (ContinualLearner) "
+                        "satisfies 'learning_system' requirement"
+                    )
             
             if missing_initialized:
                 logger.error(

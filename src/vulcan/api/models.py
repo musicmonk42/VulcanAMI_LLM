@@ -95,35 +95,226 @@ class ExplainRequest(BaseModel):
 
 
 class FeedbackRequest(BaseModel):
-    """Request model for submitting feedback."""
-    feedback_type: str = Field(default="rating", description="Type of feedback: rating, correction, preference, thumbs")
-    query_id: str = Field(..., description="ID of the original query")
-    response_id: str = Field(..., description="ID of the response being rated")
-    reward_signal: float = Field(default=0.0, ge=-1.0, le=1.0, description="Reward signal from -1.0 to 1.0")
-    content: Optional[Any] = Field(default=None, description="Optional feedback content")
-    context: Optional[Dict[str, Any]] = Field(default=None, description="Optional context")
+    """
+    Request model for submitting RLHF (Reinforcement Learning from Human Feedback).
+    
+    This model captures structured feedback on AI responses to enable continuous
+    improvement through human preference learning.
+    
+    Attributes:
+        feedback_type: Type of feedback being submitted. Valid values:
+            - "rating": Numeric rating feedback
+            - "correction": Correction to the AI's response
+            - "preference": Preference between multiple responses
+            - "thumbs": Simple thumbs up/down feedback
+        query_id: Unique identifier of the original query that generated the response
+        response_id: Unique identifier of the response being rated
+        reward_signal: Normalized reward signal in range [-1.0, 1.0] where:
+            - 1.0 = Maximum positive feedback
+            - 0.0 = Neutral feedback
+            - -1.0 = Maximum negative feedback
+        content: Optional structured feedback content (corrections, comments, etc.)
+        context: Optional contextual information about the feedback submission
+        
+    Example:
+        >>> feedback = FeedbackRequest(
+        ...     feedback_type="rating",
+        ...     query_id="q_12345",
+        ...     response_id="r_67890",
+        ...     reward_signal=0.8
+        ... )
+    """
+    feedback_type: str = Field(
+        default="rating",
+        description="Type of feedback: rating, correction, preference, thumbs",
+        pattern="^(rating|correction|preference|thumbs)$"
+    )
+    query_id: str = Field(
+        ...,
+        description="ID of the original query",
+        min_length=1,
+        max_length=256
+    )
+    response_id: str = Field(
+        ...,
+        description="ID of the response being rated",
+        min_length=1,
+        max_length=256
+    )
+    reward_signal: float = Field(
+        default=0.0,
+        ge=-1.0,
+        le=1.0,
+        description="Normalized reward signal from -1.0 (worst) to 1.0 (best)"
+    )
+    content: Optional[Any] = Field(
+        default=None,
+        description="Optional feedback content (corrections, comments, etc.)"
+    )
+    context: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Optional contextual metadata about the feedback"
+    )
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "feedback_type": "rating",
+                "query_id": "q_12345",
+                "response_id": "r_67890",
+                "reward_signal": 0.8,
+                "content": {"comment": "Great response!"},
+                "context": {"user_id": "user_001"}
+            }
+        }
+    )
 
 
 class ThumbsFeedbackRequest(BaseModel):
-    """Request model for thumbs up/down feedback."""
-    query_id: str = Field(..., description="ID of the original query")
-    response_id: str = Field(..., description="ID of the response being rated")
-    is_positive: bool = Field(default=True, description="True for thumbs up, False for thumbs down")
+    """
+    Simplified request model for binary thumbs up/down feedback.
+    
+    This model provides a simple interface for collecting binary user satisfaction
+    feedback, typically triggered by UI thumb buttons. It's a simplified alternative
+    to the full FeedbackRequest for quick user interactions.
+    
+    Attributes:
+        query_id: Unique identifier of the original query
+        response_id: Unique identifier of the response being rated
+        is_positive: True for thumbs up (positive), False for thumbs down (negative)
+        
+    Example:
+        >>> feedback = ThumbsFeedbackRequest(
+        ...     query_id="q_12345",
+        ...     response_id="r_67890",
+        ...     is_positive=True
+        ... )
+    """
+    query_id: str = Field(
+        ...,
+        description="ID of the original query",
+        min_length=1,
+        max_length=256
+    )
+    response_id: str = Field(
+        ...,
+        description="ID of the response being rated",
+        min_length=1,
+        max_length=256
+    )
+    is_positive: bool = Field(
+        default=True,
+        description="True for thumbs up (positive), False for thumbs down (negative)"
+    )
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "query_id": "q_12345",
+                "response_id": "r_67890",
+                "is_positive": True
+            }
+        }
+    )
 
 
 class UnifiedChatRequest(BaseModel):
-    """Request model for unified chat that leverages entire platform."""
-    message: str
-    max_tokens: int = 2000  # Increased for diagnostic purposes (was 1024)
-    history: List[Dict[str, str]] = []
-    # Conversation tracking - optional with auto-generation support
-    conversation_id: Optional[str] = None
-    # These are handled automatically but can be overridden
-    enable_reasoning: bool = True
-    enable_memory: bool = True
-    enable_safety: bool = True
-    enable_planning: bool = True
-    enable_causal: bool = True
+    """
+    Request model for the unified chat endpoint with full platform integration.
+    
+    This endpoint orchestrates the entire VulcanAMI platform, providing access to:
+    - Multi-modal processing and understanding
+    - Long-term and episodic memory systems
+    - Safety validation and governance
+    - Multiple reasoning engines (symbolic, probabilistic, causal, analogical)
+    - Planning and goal management systems
+    - World model predictions and simulations
+    
+    Attributes:
+        message: The user's chat message/query (required)
+        max_tokens: Maximum tokens in the response (default: 2000)
+        history: Conversation history as list of {"role": "...", "content": "..."} dicts
+        conversation_id: Optional conversation identifier for context continuity.
+            If None, a new conversation ID will be auto-generated.
+        enable_reasoning: Enable advanced reasoning engines (default: True)
+        enable_memory: Enable long-term memory search and retrieval (default: True)
+        enable_safety: Enable safety validation and compliance checking (default: True)
+        enable_planning: Enable hierarchical planning systems (default: True)
+        enable_causal: Enable causal reasoning and inference (default: True)
+        
+    Example:
+        >>> request = UnifiedChatRequest(
+        ...     message="Explain quantum entanglement",
+        ...     max_tokens=1500,
+        ...     history=[{"role": "user", "content": "Hi"}],
+        ...     conversation_id="conv_12345"
+        ... )
+        
+    Note:
+        Feature toggles (enable_*) allow fine-grained control over platform
+        capabilities for performance tuning or specialized use cases.
+    """
+    message: str = Field(
+        ...,
+        description="User's chat message or query",
+        min_length=1,
+        max_length=10000
+    )
+    max_tokens: int = Field(
+        default=2000,
+        ge=1,
+        le=8000,
+        description="Maximum tokens in the response (increased from 1024 for diagnostic purposes)"
+    )
+    history: List[Dict[str, str]] = Field(
+        default_factory=list,
+        description="Conversation history with role/content dictionaries"
+    )
+    conversation_id: Optional[str] = Field(
+        default=None,
+        description="Optional conversation ID for context continuity (auto-generated if None)",
+        max_length=256
+    )
+    # Feature toggles for fine-grained control
+    enable_reasoning: bool = Field(
+        default=True,
+        description="Enable advanced reasoning engines"
+    )
+    enable_memory: bool = Field(
+        default=True,
+        description="Enable long-term memory search and retrieval"
+    )
+    enable_safety: bool = Field(
+        default=True,
+        description="Enable safety validation and compliance checking"
+    )
+    enable_planning: bool = Field(
+        default=True,
+        description="Enable hierarchical planning systems"
+    )
+    enable_causal: bool = Field(
+        default=True,
+        description="Enable causal reasoning and inference"
+    )
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "message": "Explain quantum entanglement",
+                "max_tokens": 1500,
+                "history": [
+                    {"role": "user", "content": "Hi"},
+                    {"role": "assistant", "content": "Hello! How can I help you?"}
+                ],
+                "conversation_id": "conv_12345",
+                "enable_reasoning": True,
+                "enable_memory": True,
+                "enable_safety": True,
+                "enable_planning": True,
+                "enable_causal": True
+            }
+        }
+    )
 
 
 # ============================================================
