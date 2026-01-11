@@ -163,79 +163,136 @@ def shutdown_reasoning(timeout: float = 5.0) -> None:
 
 
 # Observer integration functions
-def observe_query_start(query: str, query_type: str, complexity: float) -> None:
+def observe_query_start(
+    query_id: str,
+    query: str,
+    classification: Dict[str, Any]
+) -> None:
     """
     Observe the start of query processing.
 
     Args:
-        query: The user query
-        query_type: Type from router
-        complexity: Complexity score
+        query_id: Unique query identifier
+        query: Query text
+        classification: Query classification (category, complexity, tools)
     """
-    integration = get_reasoning_integration()
-    if hasattr(integration, '_system_observer') and integration._system_observer:
-        integration._system_observer.observe_query_start(query, query_type, complexity)
+    try:
+        from vulcan.world_model.system_observer import get_system_observer
+        observer = get_system_observer()
+        if observer:
+            observer.observe_query_start(query_id, query, classification)
+    except ImportError:
+        pass  # SystemObserver not available
+    except Exception as e:
+        logger.debug(f"observe_query_start error: {e}")
 
 
 def observe_engine_result(
-    engine: str,
+    query_id: str,
+    engine_name: str,
     result: Any,
-    confidence: float,
+    success: bool,
     execution_time_ms: float
 ) -> None:
     """
     Observe reasoning engine result.
 
     Args:
-        engine: Engine name
-        result: Engine result
-        confidence: Confidence score
+        query_id: Query identifier
+        engine_name: Name of reasoning engine
+        result: Reasoning result dictionary
+        success: Whether execution succeeded
         execution_time_ms: Execution time in milliseconds
     """
-    integration = get_reasoning_integration()
-    if hasattr(integration, '_system_observer') and integration._system_observer:
-        integration._system_observer.observe_engine_result(
-            engine, result, confidence, execution_time_ms
-        )
+    try:
+        from vulcan.world_model.system_observer import get_system_observer
+        observer = get_system_observer()
+        if observer:
+            # Ensure result is a dict
+            result_dict = result if isinstance(result, dict) else {'value': result}
+            observer.observe_engine_result(query_id, engine_name, result_dict, success, execution_time_ms)
+    except ImportError:
+        pass  # SystemObserver not available
+    except Exception as e:
+        logger.debug(f"observe_engine_result error: {e}")
 
 
-def observe_outcome(success: bool, selected_tools: List[str], final_confidence: float) -> None:
+def observe_outcome(
+    query_id: str,
+    response: Dict[str, Any],
+    user_feedback: Optional[Dict[str, Any]] = None
+) -> None:
     """
-    Observe final reasoning outcome.
+    Observe final query outcome.
 
     Args:
-        success: Whether reasoning succeeded
-        selected_tools: Tools that were selected
-        final_confidence: Final confidence score
+        query_id: Query identifier
+        response: Final response dictionary
+        user_feedback: Optional user feedback (rating, etc)
     """
-    integration = get_reasoning_integration()
-    if hasattr(integration, '_system_observer') and integration._system_observer:
-        integration._system_observer.observe_outcome(success, selected_tools, final_confidence)
+    try:
+        from vulcan.world_model.system_observer import get_system_observer
+        observer = get_system_observer()
+        if observer:
+            observer.observe_outcome(query_id, response, user_feedback)
+    except ImportError:
+        pass  # SystemObserver not available
+    except Exception as e:
+        logger.debug(f"observe_outcome error: {e}")
 
 
-def observe_validation_failure(reason: str) -> None:
+def observe_validation_failure(
+    query_id: str,
+    engine_name: str,
+    reason: str,
+    query: str,
+    result: Dict[str, Any]
+) -> None:
     """
     Observe validation failure.
 
     Args:
-        reason: Reason for validation failure
+        query_id: Query identifier
+        engine_name: Engine that produced invalid result
+        reason: Why validation failed
+        query: Original query
+        result: Invalid result
     """
-    integration = get_reasoning_integration()
-    if hasattr(integration, '_system_observer') and integration._system_observer:
-        integration._system_observer.observe_validation_failure(reason)
+    try:
+        from vulcan.world_model.system_observer import get_system_observer
+        observer = get_system_observer()
+        if observer:
+            observer.observe_validation_failure(query_id, engine_name, reason, query, result)
+    except ImportError:
+        pass  # SystemObserver not available
+    except Exception as e:
+        logger.debug(f"observe_validation_failure error: {e}")
 
 
-def observe_error(error: Exception, context: str) -> None:
+def observe_error(
+    query_id: str,
+    error_type: str,
+    error_message: str,
+    component: str
+) -> None:
     """
     Observe error during reasoning.
 
     Args:
-        error: The exception that occurred
-        context: Context where error occurred
+        query_id: Query identifier
+        error_type: Type of error
+        error_message: Error message
+        component: Component where error occurred
     """
-    integration = get_reasoning_integration()
-    if hasattr(integration, '_system_observer') and integration._system_observer:
-        integration._system_observer.observe_error(error, context)
+    try:
+        from vulcan.world_model.system_observer import get_system_observer
+        observer = get_system_observer()
+        if observer:
+            observer.observe_error(query_id, error_type, error_message, component)
+    except ImportError:
+        pass  # SystemObserver not available
+    except Exception as e:
+        logger.debug(f"observe_error error: {e}")
 
 
 __all__ = [
