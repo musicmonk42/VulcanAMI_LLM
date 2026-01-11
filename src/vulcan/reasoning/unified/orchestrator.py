@@ -1456,7 +1456,7 @@ class UnifiedReasoner:
         
         return PlanStep(
             step_id=task.task_id,
-            action=str(task.task_type.value) if task.task_type else "unknown",
+            action=getattr(task.task_type, 'value', str(task.task_type)) if task.task_type else "unknown",
             resources=resources,
             duration=duration,
             probability=0.8,  # Default probability (can be refined based on historical data)
@@ -4094,15 +4094,13 @@ class UnifiedReasoner:
         )
 
     # State persistence methods - imported from persistence.py for separation of concerns
-    from .persistence import save_state, load_state
-    save_state = save_state
-    load_state = load_state
+    from .persistence import save_state as save_state
+    from .persistence import load_state as load_state
 
     # Multimodal reasoning methods - imported from multimodal_handler.py for separation of concerns
-    from .multimodal_handler import reason_multimodal, reason_counterfactual, reason_by_analogy
-    reason_multimodal = reason_multimodal
-    reason_counterfactual = reason_counterfactual
-    reason_by_analogy = reason_by_analogy
+    from .multimodal_handler import reason_multimodal as reason_multimodal
+    from .multimodal_handler import reason_counterfactual as reason_counterfactual
+    from .multimodal_handler import reason_by_analogy as reason_by_analogy
 
     def get_statistics(self) -> Dict[str, Any]:
         """Get comprehensive statistics"""

@@ -1216,7 +1216,7 @@ def topological_sort_using_plan(
         for task in tasks:
             step = PlanStep(
                 step_id=task.task_id,
-                action=str(task.task_type.value) if task.task_type else "unknown",
+                action=getattr(task.task_type, 'value', str(task.task_type)) if task.task_type else "unknown",
                 resources={"compute": 1.0},
                 duration=1.0,
                 probability=1.0,
