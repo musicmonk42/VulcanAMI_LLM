@@ -58,6 +58,9 @@ async def chat(request: Request) -> Dict[str, Any]:
     AGENT_REASONING_POLL_DELAY_SEC = 0.1  # Brief wait for jobs to complete
     MAX_AGENT_REASONING_JOBS_TO_CHECK = 3  # Limit jobs to check for reasoning output
 
+    # Get the FastAPI app from the request to access app.state
+    app = request.app
+    
     if not hasattr(app.state, "deployment") or app.state.deployment is None:
         raise HTTPException(status_code=503, detail="VULCAN deployment not initialized")
 
