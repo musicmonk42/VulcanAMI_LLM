@@ -8,6 +8,9 @@ Provides an interactive command-line interface for querying VULCAN,
 checking status, running tests, and more.
 """
 
+import atexit
+import difflib
+import os
 import sys
 import logging
 from typing import Optional
@@ -24,15 +27,58 @@ except ImportError:
 
 
 class Colors:
-    """ANSI color codes for terminal output."""
-    HEADER = '\033[95m'
-    BLUE = '\033[94m'
-    CYAN = '\033[96m'
-    GREEN = '\033[92m'
-    YELLOW = '\033[93m'
-    RED = '\033[91m'
-    ENDC = '\033[0m'
-    BOLD = '\033[1m'
+    """ANSI color codes with auto-detection."""
+    
+    _colors_enabled = (
+        hasattr(sys.stdout, 'isatty') and sys.stdout.isatty()
+        and os.environ.get('TERM') != 'dumb'
+        and sys.platform != 'win32'  # Or use colorama on Windows
+    )
+    
+    HEADER = '\033[95m' if _colors_enabled else ''
+    BLUE = '\033[94m' if _colors_enabled else ''
+    GREEN = '\033[92m' if _colors_enabled else ''
+    RED = '\033[91m' if _colors_enabled else ''
+    YELLOW = '\033[93m' if _colors_enabled else ''
+    CYAN = '\033[96m' if _colors_enabled else ''
+    ENDC = '\033[0m' if _colors_enabled else ''
+    BOLD = '\033[1m' if _colors_enabled else ''
+    
+    @classmethod
+    def disable(cls):
+        """Disable colors (useful for testing or piped output)."""
+        cls._colors_enabled = False
+        for attr in ['HEADER', 'BLUE', 'GREEN', 'RED', 'YELLOW', 'CYAN', 'ENDC', 'BOLD']:
+            setattr(cls, attr, '')
+    
+    @classmethod
+    def enable(cls):
+        """Re-enable colors if supported."""
+        if sys.platform != 'win32' and hasattr(sys.stdout, 'isatty') and sys.stdout.isatty():
+            cls._colors_enabled = True
+            cls.HEADER = '\033[95m'
+            cls.BLUE = '\033[94m'
+            cls.GREEN = '\033[92m'
+            cls.RED = '\033[91m'
+            cls.YELLOW = '\033[93m'
+            cls.CYAN = '\033[96m'
+            cls.ENDC = '\033[0m'
+            cls.BOLD = '\033[1m'
+
+
+# Command aliases for convenience
+COMMAND_ALIASES = {
+    'q': 'query',
+    's': 'status',
+    'm': 'memory',
+    'i': 'improve',
+    'b': 'benchmark',
+    'h': 'help',
+    '?': 'help',
+}
+
+# Available commands for tab completion
+AVAILABLE_COMMANDS = ['query', 'status', 'memory', 'improve', 'benchmark', 'help', 'exit', 'quit']
 
 
 def print_colored(message: str, color: str = Colors.ENDC):
@@ -46,13 +92,56 @@ def print_header():
     print_colored("VULCAN Interactive Mode", Colors.BOLD + Colors.HEADER)
     print_colored("=" * 60, Colors.CYAN)
     print_colored("\nAvailable commands:", Colors.YELLOW)
-    print("  query <text>    - Query VULCAN")
-    print("  status          - Show system status")
-    print("  memory          - Show memory statistics")
-    print("  improve         - Show self-improvement status")
-    print("  benchmark       - Run performance benchmarks")
-    print("  help            - Show this help message")
+    print("  query <text>    - Query VULCAN (alias: q)")
+    print("  status          - Show system status (alias: s)")
+    print("  memory          - Show memory statistics (alias: m)")
+    print("  improve         - Show self-improvement status (alias: i)")
+    print("  benchmark       - Run performance benchmarks (alias: b)")
+    print("  help            - Show this help message (alias: h, ?)")
     print("  exit            - Exit interactive mode\n")
+
+
+def setup_readline():
+    """Configure readline for better UX with history persistence."""
+    if not READLINE_AVAILABLE:
+        return
+    
+    histfile = os.path.join(os.path.expanduser("~"), ".vulcan_history")
+    try:
+        readline.read_history_file(histfile)
+        readline.set_history_length(1000)
+    except FileNotFoundError:
+        pass
+    
+    atexit.register(readline.write_history_file, histfile)
+    readline.parse_and_bind("tab: complete")
+    readline.parse_and_bind("set editing-mode emacs")
+
+
+def setup_completion():
+    """Setup tab completion for commands."""
+    if not READLINE_AVAILABLE:
+        return
+    
+    def completer(text, state):
+        options = [cmd for cmd in AVAILABLE_COMMANDS if cmd.startswith(text)]
+        if state < len(options):
+            return options[state]
+        return None
+    
+    readline.set_completer(completer)
+    readline.parse_and_bind("tab: complete")
+
+
+def suggest_command(unknown_cmd: str) -> Optional[str]:
+    """Suggest similar commands for typos."""
+    suggestions = difflib.get_close_matches(
+        unknown_cmd,
+        AVAILABLE_COMMANDS,
+        n=1,
+        cutoff=0.6
+    )
+    return suggestions[0] if suggestions else None
 
 
 def handle_query(query_text: str) -> None:
@@ -137,7 +226,8 @@ def run_interactive_mode():
     Run interactive REPL mode.
     
     Starts an interactive command-line interface for VULCAN.
-    Supports command history (if readline available) and graceful error handling.
+    Supports command history (if readline available), command aliases,
+    tab completion, and graceful error handling.
     
     Example:
         ```python
@@ -149,8 +239,9 @@ def run_interactive_mode():
     
     if READLINE_AVAILABLE:
         # Configure readline for better UX
-        readline.parse_and_bind("tab: complete")
-        print_colored("Command history enabled (↑/↓ arrows)", Colors.YELLOW)
+        setup_readline()
+        setup_completion()
+        print_colored("Command history and tab completion enabled", Colors.YELLOW)
     
     while True:
         try:
@@ -164,6 +255,9 @@ def run_interactive_mode():
             parts = user_input.split(maxsplit=1)
             command = parts[0].lower()
             args = parts[1] if len(parts) > 1 else ""
+            
+            # Resolve command aliases
+            command = COMMAND_ALIASES.get(command, command)
             
             # Handle commands
             if command == "exit" or command == "quit":
@@ -193,7 +287,11 @@ def run_interactive_mode():
             
             else:
                 print_colored(f"Unknown command: {command}", Colors.RED)
-                print_colored("Type 'help' for available commands", Colors.YELLOW)
+                suggestion = suggest_command(command)
+                if suggestion:
+                    print_colored(f"Did you mean '{suggestion}'?", Colors.YELLOW)
+                else:
+                    print_colored("Type 'help' for available commands", Colors.YELLOW)
         
         except KeyboardInterrupt:
             print_colored("\n\nUse 'exit' to quit interactive mode", Colors.YELLOW)

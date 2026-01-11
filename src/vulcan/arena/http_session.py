@@ -10,8 +10,11 @@
 #
 # VERSION HISTORY:
 #     1.0.0 - Extracted from main.py for modular architecture
+#     1.0.1 - Added atexit cleanup registration for graceful shutdown
 # ============================================================
 
+import asyncio
+import atexit
 import logging
 import os
 from typing import Any, Optional
@@ -124,6 +127,32 @@ def get_pool_config() -> dict:
         "read_timeout": HTTP_READ_TIMEOUT,
         "session_active": is_session_active(),
     }
+
+
+def _sync_cleanup():
+    """
+    Synchronous cleanup wrapper for atexit.
+    
+    Ensures HTTP session is properly closed on application shutdown.
+    Handles cases where event loop may or may not be running.
+    """
+    global _http_session
+    if _http_session is not None and not _http_session.closed:
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # If loop is running, schedule cleanup as a task
+                loop.create_task(close_http_session())
+            else:
+                # If loop is not running, run cleanup synchronously
+                loop.run_until_complete(close_http_session())
+        except RuntimeError:
+            # No event loop available - skip cleanup gracefully
+            pass
+
+
+# Register cleanup handler to run on application exit
+atexit.register(_sync_cleanup)
 
 
 __all__ = [
