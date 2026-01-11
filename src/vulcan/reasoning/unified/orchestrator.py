@@ -1443,6 +1443,23 @@ class UnifiedReasoner:
                 reasoning_type = self._determine_reasoning_type(input_data, query)
                 task.task_type = reasoning_type
 
+            # FIX: Extract selected_tools from query (set by QueryRouter)
+            # The QueryRouter passes selected tools in query dict, we need to extract them
+            # and make them available to the plan creation process
+            selected_tools_from_router = None
+            if query and isinstance(query, dict):
+                # Try multiple possible locations where selected_tools might be stored
+                selected_tools_from_router = (
+                    query.get('selected_tools') or
+                    query.get('parameters', {}).get('selected_tools') or
+                    constraints.get('selected_tools')
+                )
+                
+                if selected_tools_from_router:
+                    logger.info(
+                        f"[UnifiedReasoner] Extracted selected_tools from query: {selected_tools_from_router}"
+                    )
+
             if self.voi_gate and task.features is not None:
                 try:
                     should_gather, voi_action = self.voi_gate.should_probe_deeper(
@@ -1457,7 +1474,7 @@ class UnifiedReasoner:
                 except Exception as e:
                     logger.warning(f"VOI gate failed: {e}")
 
-            plan = self._create_optimized_plan(task, strategy)
+            plan = self._create_optimized_plan(task, strategy, selected_tools_from_router)
 
             if strategy in [
                 ReasoningStrategy.PORTFOLIO,
@@ -1466,11 +1483,13 @@ class UnifiedReasoner:
                 if self.tool_selector:
                     try:
                         selection_result = self._select_tools_for_plan(plan, task)
-                        plan.selected_tools = (
-                            selection_result.selected_tool
-                            if hasattr(selection_result, "selected_tool")
-                            else None
-                        )
+                        # Only override if tool_selector provides tools and none were set from router
+                        if not plan.selected_tools:
+                            plan.selected_tools = (
+                                selection_result.selected_tool
+                                if hasattr(selection_result, "selected_tool")
+                                else None
+                            )
                         plan.execution_strategy = (
                             selection_result.strategy_used
                             if hasattr(selection_result, "strategy_used")
@@ -1745,7 +1764,7 @@ class UnifiedReasoner:
             return None
 
     def _create_optimized_plan(
-        self, task: ReasoningTask, strategy: ReasoningStrategy
+        self, task: ReasoningTask, strategy: ReasoningStrategy, selected_tools_from_router: Optional[List[str]] = None
     ) -> ReasoningPlan:
         """Create execution plan optimized for utility"""
 
@@ -1753,6 +1772,9 @@ class UnifiedReasoner:
         if cache_key in self.plan_cache:
             cached_plan = self.plan_cache[cache_key]
             cached_plan.tasks = [task]
+            # FIX: Also set selected_tools in cached plan if provided
+            if selected_tools_from_router:
+                cached_plan.selected_tools = selected_tools_from_router
             return cached_plan
 
         tasks = []
@@ -1820,14 +1842,14 @@ class UnifiedReasoner:
                     tasks.append(sub_task)
 
             elif strategy == ReasoningStrategy.ENSEMBLE:
-                # FIX: Use selected_tools from plan if available (from query router)
-                # Otherwise fall back to default ensemble types
+                # FIX: Use selected_tools from router if available, otherwise check plan
+                # Router tools take precedence as they come from query-specific routing decision
                 tools_to_use = []
                 
-                if hasattr(plan, 'selected_tools') and plan.selected_tools:
-                    # Convert tool name strings to ReasoningType enum values
-                    logger.info(f"[Ensemble] Using tools from plan.selected_tools: {plan.selected_tools}")
-                    for tool_name in plan.selected_tools:
+                # Priority 1: Use tools from router (passed as parameter)
+                if selected_tools_from_router:
+                    logger.info(f"[Ensemble] Using tools from router: {selected_tools_from_router}")
+                    for tool_name in selected_tools_from_router:
                         try:
                             # Map tool name string to ReasoningType enum
                             reasoning_type = self._map_tool_name_to_reasoning_type(tool_name)
@@ -1840,7 +1862,7 @@ class UnifiedReasoner:
                 
                 # Fall back to default ensemble if no tools selected
                 if not tools_to_use:
-                    logger.info("[Ensemble] No selected_tools found, using default ensemble types")
+                    logger.info("[Ensemble] No selected_tools from router, using default ensemble types")
                     tools_to_use = [
                         ReasoningType.PROBABILISTIC,
                         ReasoningType.SYMBOLIC,
@@ -1906,6 +1928,7 @@ class UnifiedReasoner:
             estimated_time=estimated_time,
             estimated_cost=estimated_cost,
             confidence_threshold=task.constraints.get("confidence_threshold", 0.5),
+            selected_tools=selected_tools_from_router,  # FIX: Store router's selected tools in plan
         )
 
         self.plan_cache[cache_key] = plan
