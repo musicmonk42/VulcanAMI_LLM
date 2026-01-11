@@ -75,6 +75,9 @@ async def unified_chat(request: Request) -> Dict[str, Any]:
             )
         return now
 
+    # Get the FastAPI app from the request to access app.state
+    app = request.app
+    
     if not hasattr(app.state, "deployment"):
         raise HTTPException(status_code=503, detail="System not initialized")
 
