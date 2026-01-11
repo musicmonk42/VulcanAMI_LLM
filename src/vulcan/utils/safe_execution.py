@@ -61,19 +61,12 @@ def _preprocess_math_code(code: str) -> str:
     
     # Comprehensive Unicode normalization for mathematical alphanumeric symbols
     # Unicode range: U+1D400–U+1D7FF (Mathematical Alphanumeric Symbols)
-    # This handles all 52 mathematical italic letters (a-z, A-Z) and more
-    normalized = []
-    for char in code:
-        code_point = ord(char)
-        # Check if it's a mathematical alphanumeric symbol
-        if 0x1D400 <= code_point <= 0x1D7FF:
-            # Use unicodedata to get compatibility decomposition
-            decomp = unicodedata.normalize('NFKD', char)
-            normalized.append(decomp)
-        else:
-            normalized.append(char)
-    
-    code = ''.join(normalized)
+    # First check if any math symbols exist to avoid unnecessary processing
+    has_math_symbols = any(0x1D400 <= ord(c) <= 0x1D7FF for c in code)
+    if has_math_symbols:
+        # Use NFKD normalization which handles all mathematical alphanumeric symbols
+        # This converts mathematical italic/bold/script letters to their ASCII equivalents
+        code = unicodedata.normalize('NFKD', code)
     
     # Replace mathematical operators
     code = code.replace('×', '*')  # Multiplication sign
@@ -170,28 +163,31 @@ class _SafePrintCollector:
         if self._call_count > _MAX_PRINT_CALLS:
             return  # Silently ignore after limit
         
-        # Calculate output size
+        # Handle file= argument - block printing to arbitrary file objects
+        if kwargs.get('file', None) is not None:
+            logger.debug("[sandboxed print] Blocked print to file=...")
+            return
+        
+        # Estimate output size before constructing the full string
+        # This avoids unnecessary string operations for oversized output
         sep = kwargs.get('sep', ' ')
         end = kwargs.get('end', '\n')
-        output = sep.join(str(obj) for obj in objects) + end
-        output_len = len(output)
+        
+        # Quick size estimate: sum of str lengths + separators
+        estimated_size = sum(len(str(obj)) for obj in objects)
+        estimated_size += len(sep) * max(0, len(objects) - 1) + len(end)
         
         # Size limit: max total output
-        if self._total_output + output_len > _MAX_PRINT_OUTPUT:
+        if self._total_output + estimated_size > _MAX_PRINT_OUTPUT:
             return  # Silently ignore if would exceed limit
         
-        self._total_output += output_len
+        # Now construct the actual output string
+        output = sep.join(str(obj) for obj in objects) + end
+        self._total_output += len(output)
         
-        # Handle file= argument
-        if kwargs.get('file', None) is None:
-            # Write to our collector
-            self.txt.append(output)
-            # Also log for debugging
-            logger.debug(f"[sandboxed print] {output.rstrip()}")
-        else:
-            # User specified file= but we block it for security
-            # Don't allow printing to arbitrary file objects
-            logger.debug(f"[sandboxed print] Blocked print to file={kwargs.get('file')}")
+        # Write to our collector and log for debugging
+        self.txt.append(output)
+        logger.debug(f"[sandboxed print] {output.rstrip()}")
 
 
 def _create_safe_print_collector(_getattr_=None) -> _SafePrintCollector:
@@ -318,13 +314,9 @@ def _guarded_getattr(obj: Any, name: str, default: Any = None) -> Any:
                 f"Access to '{name}' is not allowed in sandboxed code"
             )
     
-    # Use getattr with default
-    try:
-        return getattr(obj, name, default)
-    except AttributeError:
-        if default is not None:
-            return default
-        raise
+    # Use getattr - the third argument is the default if attribute doesn't exist
+    # If getattr raises AttributeError (which it shouldn't with 3 args), re-raise
+    return getattr(obj, name, default)
 
 # Try to import SymPy
 try:
