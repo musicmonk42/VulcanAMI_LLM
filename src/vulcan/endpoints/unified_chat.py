@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
+from vulcan.api.models import UnifiedChatRequest
 from vulcan.endpoints.chat_helpers import (
     truncate_history,
     build_context,
@@ -37,7 +38,7 @@ _gc_request_counter = 0
 
 
 @router.post("/v1/chat")
-async def unified_chat(request: Request) -> Dict[str, Any]:
+async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, Any]:
     """
     Unified chat endpoint that integrates the ENTIRE VulcanAMI platform.
 
@@ -101,12 +102,12 @@ async def unified_chat(request: Request) -> Dict[str, Any]:
     phase_start = start_time
 
     try:
-        user_message = request.message
+        user_message = body.message
         
         # CONTEXT ACCUMULATION FIX: Apply sliding window truncation to history
         # This prevents the multi-turn context from growing unbounded
-        truncated_history = _truncate_history(request.history)
-        original_history_len = len(request.history)
+        truncated_history = truncate_history(body.history)
+        original_history_len = len(body.history)
         if original_history_len != len(truncated_history):
             logger.info(
                 f"[VULCAN/v1/chat] Context truncated: {original_history_len} → {len(truncated_history)} messages"
@@ -392,7 +393,7 @@ async def unified_chat(request: Request) -> Dict[str, Any]:
                             agent_task,
                             pool,
                             capability_map,
-                            request.max_tokens,
+                            body.max_tokens,
                             v1_routing_selected_tools  # FIX: Pass selected_tools
                         )
                         for agent_task in routing_plan.agent_tasks
@@ -475,7 +476,7 @@ async def unified_chat(request: Request) -> Dict[str, Any]:
                             {
                                 "id": "output",
                                 "type": "generation",
-                                "params": {"max_tokens": request.max_tokens},
+                                "params": {"max_tokens": body.max_tokens},
                             },
                         ],
                         "edges": [
@@ -559,7 +560,7 @@ async def unified_chat(request: Request) -> Dict[str, Any]:
                 metadata["safety_status"] = "approved_lightweight"
                 systems_used.append("lightweight_safety_check")
                 logger.debug(f"[VULCAN] Short input ({len(user_message)} chars) passed lightweight safety check")
-        elif request.enable_safety and hasattr(deps, "safety") and deps.safety:
+        elif body.enable_safety and hasattr(deps, "safety") and deps.safety:
             try:
                 loop = asyncio.get_running_loop()
                 # Validate the user input for safety
@@ -630,7 +631,7 @@ async def unified_chat(request: Request) -> Dict[str, Any]:
             _task_start = time.perf_counter()
             _mem_context = []
             _systems = []
-            if not request.enable_memory:
+            if not body.enable_memory:
                 return _mem_context, _systems
 
             # Search long-term memory using pre-computed embedding
@@ -681,7 +682,7 @@ async def unified_chat(request: Request) -> Dict[str, Any]:
             _reasoning = {}
             _systems = []
             _meta = {}
-            if not request.enable_reasoning:
+            if not body.enable_reasoning:
                 return _reasoning, _systems, _meta
 
             # INTEGRATION FIX: Try UnifiedReasoner first for intelligent tool selection
@@ -853,7 +854,7 @@ async def unified_chat(request: Request) -> Dict[str, Any]:
 
             async def _causal_reasoning():
                 _op_start = time.perf_counter()
-                if request.enable_causal and hasattr(deps, "causal") and deps.causal:
+                if body.enable_causal and hasattr(deps, "causal") and deps.causal:
                     try:
                         if hasattr(deps.causal, "analyze"):
                             result = await loop.run_in_executor(
@@ -911,7 +912,7 @@ async def unified_chat(request: Request) -> Dict[str, Any]:
             _systems = []
             _meta = {}
             if not (
-                request.enable_planning
+                body.enable_planning
                 and hasattr(deps, "goal_system")
                 and deps.goal_system
             ):
@@ -1606,7 +1607,7 @@ async def unified_chat(request: Request) -> Dict[str, Any]:
                     "reasoning_type": best_reasoning_type,
                     "reasoning_confidence": best_confidence,
                     "skip_llm_synthesis": True,
-                    "conversation_id": request.conversation_id,
+                    "conversation_id": body.conversation_id,
                     "routing": routing_stats,
                     **metadata,
                 },
@@ -1690,7 +1691,7 @@ async def unified_chat(request: Request) -> Dict[str, Any]:
         llm_context = {
             "user_message": user_message,
             "conversation_history": (
-                request.history[-5:] if request.history else []
+                body.history[-5:] if body.history else []
             ),  # Last 5 messages
             "memory_context": memory_context[:3] if memory_context else [],
             "reasoning_insights": reasoning_results,
@@ -1843,7 +1844,7 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
                                 "operation": crypto_operation,
                                 "result": crypto_result,
                                 "skip_llm_synthesis": True,
-                                "conversation_id": request.conversation_id,
+                                "conversation_id": body.conversation_id,
                             },
                         )
                         
@@ -1910,7 +1911,7 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
                     # previous messages in the conversation.
                     llm_result = await hybrid_executor.execute(
                         prompt=enhanced_prompt,
-                        max_tokens=request.max_tokens,
+                        max_tokens=body.max_tokens,
                         temperature=0.7,
                         system_prompt=system_prompt,
                         conversation_history=truncated_history,
@@ -1974,7 +1975,7 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
         # STEP 8: Final Safety Check on Response
         # ================================================================
         _safety_start = time.perf_counter()
-        if request.enable_safety and hasattr(deps, "safety") and deps.safety:
+        if body.enable_safety and hasattr(deps, "safety") and deps.safety:
             try:
                 loop = asyncio.get_running_loop()
                 output_safe = await loop.run_in_executor(

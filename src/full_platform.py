@@ -3476,7 +3476,7 @@ async def vulcan_chat_proxy(request: Request):
                 )
             
             # Call the chat endpoint function directly
-            result = await unified_chat(chat_request)
+            result = await unified_chat(request, chat_request)
             return result
         else:
             return JSONResponse(
