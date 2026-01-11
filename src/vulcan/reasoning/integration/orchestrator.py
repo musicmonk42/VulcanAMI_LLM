@@ -562,9 +562,23 @@ class ReasoningIntegration:
             rationale="Fallback to default strategy",
             metadata={
                 "query_type": query_type,
-    # Methods moved to response_formatting.py
-    from .response_formatting import delegate_to_arena as _delegate_to_arena
-    from .response_formatting import sanitize_context_for_json as _sanitize_context_for_json
+                "complexity": complexity,
+                "fallback": True,
+            }
+        )
+
+    def get_statistics(self) -> Dict[str, Any]:
+        """
+        Get current integration statistics.
+
+        Returns:
+            Dictionary containing:
+                - initialized: Initialization status
+                - tool_selector_available: ToolSelector availability
+                - portfolio_executor_available: PortfolioExecutor availability
+                - invocations: Total invocation count
+                - tool_selections: Tool selection count
+                - portfolio_executions: Portfolio execution count
                 - errors: Error count
                 - success_rate: Success rate (0.0 to 1.0)
                 - fast_path_count: Fast path usage count

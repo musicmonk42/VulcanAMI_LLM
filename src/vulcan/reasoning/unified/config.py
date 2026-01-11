@@ -157,3 +157,24 @@ WEIGHT_LEARNING_RATE: float = 0.01
 
 # Decay factor for temporal weight adjustments
 WEIGHT_DECAY_FACTOR: float = 0.95
+
+# ==============================================================================
+# UNKNOWN TYPE FALLBACK ORDER
+# ==============================================================================
+# When reasoning type is UNKNOWN, try these reasoners in order.
+# Priority based on general applicability.
+
+UNKNOWN_TYPE_FALLBACK_ORDER: tuple = (
+    "PROBABILISTIC",  # Most general-purpose
+    "SYMBOLIC",       # Good for logical queries
+    "CAUSAL",         # Good for cause-effect queries
+    "ANALOGICAL",     # Good for comparison queries
+)
+
+# ==============================================================================
+# PROBLEM TYPE IDENTIFIERS
+# ==============================================================================
+# String constants for specific problem types
+
+# Problem type identifier for Bayesian inference problems
+PROBLEM_TYPE_BAYESIAN: str = "bayesian_inference"
