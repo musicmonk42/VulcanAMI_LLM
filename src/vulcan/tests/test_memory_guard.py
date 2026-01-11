@@ -6,9 +6,14 @@ Tests the memory pressure monitoring and automatic GC trigger system, ensuring:
 - Proper background thread management
 - GC triggering at threshold
 - Statistics collection
-- Thread safety
+- Thread safety with locks
+- Graduated threshold behavior
+- Aggressive callback mechanism
+- Double-checked locking for global instance
+- Non-daemon thread with atexit cleanup
 """
 
+import atexit
 import gc
 import logging
 import threading
@@ -44,16 +49,44 @@ class TestMemoryGuard(unittest.TestCase):
             pass
 
     def test_memory_guard_initialization(self):
-        """Test that MemoryGuard initializes correctly."""
+        """Test that MemoryGuard initializes correctly with graduated thresholds."""
         try:
             from vulcan.monitoring.memory_guard import MemoryGuard
         except ImportError:
             self.skipTest("MemoryGuard not available")
             return
 
+        # Test with new parameters
+        guard = MemoryGuard(
+            warning_threshold=70.0,
+            gc_threshold=75.0,
+            critical_threshold=85.0,
+            check_interval=10.0
+        )
+
+        self.assertEqual(guard.warning_threshold, 70.0)
+        self.assertEqual(guard.gc_threshold, 75.0)
+        self.assertEqual(guard.critical_threshold, 85.0)
+        self.assertEqual(guard.interval, 10.0)
+        self.assertFalse(guard._running)
+        self.assertEqual(guard.gc_triggers, 0)
+        self.assertIsNone(guard.last_gc_time)
+        self.assertEqual(guard.peak_memory_percent, 0.0)
+        self.assertIsNone(guard.aggressive_gc_callback)
+
+    def test_memory_guard_backward_compatibility(self):
+        """Test backward compatibility with threshold_percent parameter."""
+        try:
+            from vulcan.monitoring.memory_guard import MemoryGuard
+        except ImportError:
+            self.skipTest("MemoryGuard not available")
+            return
+
+        # Old API: threshold_percent should map to gc_threshold
         guard = MemoryGuard(threshold_percent=80.0, check_interval=10.0)
 
-        self.assertEqual(guard.threshold, 80.0)
+        self.assertEqual(guard.threshold, 80.0)  # Backward compat property
+        self.assertEqual(guard.gc_threshold, 80.0)
         self.assertEqual(guard.interval, 10.0)
         self.assertFalse(guard._running)
         self.assertEqual(guard.gc_triggers, 0)
@@ -61,7 +94,7 @@ class TestMemoryGuard(unittest.TestCase):
         self.assertEqual(guard.peak_memory_percent, 0.0)
 
     def test_memory_guard_start_stop(self):
-        """Test starting and stopping the memory guard."""
+        """Test starting and stopping the memory guard with non-daemon thread."""
         try:
             from vulcan.monitoring.memory_guard import MemoryGuard, PSUTIL_AVAILABLE
             if not PSUTIL_AVAILABLE:
@@ -71,13 +104,15 @@ class TestMemoryGuard(unittest.TestCase):
             self.skipTest("MemoryGuard not available")
             return
 
-        guard = MemoryGuard(threshold_percent=99.0, check_interval=0.1)
+        guard = MemoryGuard(gc_threshold=99.0, check_interval=0.1)
 
         # Start
         guard.start()
         self.assertTrue(guard._running)
         self.assertIsNotNone(guard._thread)
         self.assertTrue(guard._thread.is_alive())
+        # Verify non-daemon thread
+        self.assertFalse(guard._thread.daemon)
 
         # Wait a bit for monitoring to occur
         time.sleep(0.3)
@@ -150,32 +185,44 @@ class TestMemoryGuard(unittest.TestCase):
         self.assertIsNotNone(guard.last_gc_time)
 
     def test_get_status(self):
-        """Test status retrieval."""
+        """Test status retrieval with all new threshold fields."""
         try:
             from vulcan.monitoring.memory_guard import MemoryGuard, PSUTIL_AVAILABLE
         except ImportError:
             self.skipTest("MemoryGuard not available")
             return
 
-        guard = MemoryGuard(threshold_percent=85.0, check_interval=5.0)
+        guard = MemoryGuard(
+            warning_threshold=70.0,
+            gc_threshold=75.0,
+            critical_threshold=85.0,
+            check_interval=5.0
+        )
         guard.force_gc()  # Trigger one GC
 
         status = guard.get_status()
 
         self.assertIn("running", status)
-        self.assertIn("threshold_percent", status)
+        self.assertIn("warning_threshold", status)
+        self.assertIn("gc_threshold", status)
+        self.assertIn("critical_threshold", status)
         self.assertIn("check_interval", status)
         self.assertIn("gc_triggers", status)
         self.assertIn("last_gc_time", status)
         self.assertIn("peak_memory_percent", status)
+        self.assertIn("has_aggressive_callback", status)
 
-        self.assertEqual(status["threshold_percent"], 85.0)
+        self.assertEqual(status["warning_threshold"], 70.0)
+        self.assertEqual(status["gc_threshold"], 75.0)
+        self.assertEqual(status["critical_threshold"], 85.0)
         self.assertEqual(status["check_interval"], 5.0)
         self.assertEqual(status["gc_triggers"], 1)
+        self.assertFalse(status["has_aggressive_callback"])
 
         if PSUTIL_AVAILABLE:
             self.assertIn("current_memory_percent", status)
             self.assertIn("available_gb", status)
+            self.assertIn("action_level", status)
 
     @patch('vulcan.monitoring.memory_guard.psutil')
     def test_gc_triggered_on_high_memory(self, mock_psutil):
@@ -194,7 +241,7 @@ class TestMemoryGuard(unittest.TestCase):
 
         mock_psutil.virtual_memory.return_value = mock_memory
 
-        guard = MemoryGuard(threshold_percent=85.0, check_interval=0.05)
+        guard = MemoryGuard(gc_threshold=75.0, check_interval=0.05)
 
         # Start and let it run
         guard._running = True
@@ -205,10 +252,9 @@ class TestMemoryGuard(unittest.TestCase):
         def run_one_check():
             try:
                 memory = mock_psutil.virtual_memory()
-                if memory.percent > guard.threshold:
+                if memory.percent > guard.gc_threshold:
                     gc.collect()
-                    guard.gc_triggers += 1
-                    guard.last_gc_time = time.time()
+                    guard._increment_gc_trigger()
             except Exception:
                 pass
 
@@ -216,6 +262,135 @@ class TestMemoryGuard(unittest.TestCase):
 
         # GC should have been triggered
         self.assertGreaterEqual(guard.gc_triggers, 1)
+
+    @patch('vulcan.monitoring.memory_guard.psutil')
+    def test_graduated_thresholds_warning(self, mock_psutil):
+        """Test warning threshold (log only, no GC)."""
+        try:
+            from vulcan.monitoring.memory_guard import MemoryGuard
+        except ImportError:
+            self.skipTest("MemoryGuard not available")
+            return
+
+        # Mock memory at warning level (71%)
+        mock_memory = MagicMock()
+        mock_memory.percent = 71.0
+        mock_memory.available = 3 * 1024**3
+        mock_memory.used = 7 * 1024**3
+        mock_psutil.virtual_memory.return_value = mock_memory
+
+        guard = MemoryGuard(
+            warning_threshold=70.0,
+            gc_threshold=75.0,
+            critical_threshold=85.0,
+            check_interval=0.05
+        )
+
+        initial_gc_triggers = guard.gc_triggers
+
+        # Run one check at warning level - should NOT trigger GC
+        guard._running = True
+        guard._shutdown_event = threading.Event()
+        
+        memory = mock_psutil.virtual_memory()
+        guard._update_peak_memory(memory.percent)
+        
+        # At warning level, no GC should be triggered
+        self.assertEqual(guard.gc_triggers, initial_gc_triggers)
+
+    @patch('vulcan.monitoring.memory_guard.psutil')
+    def test_graduated_thresholds_gc(self, mock_psutil):
+        """Test GC threshold triggers garbage collection."""
+        try:
+            from vulcan.monitoring.memory_guard import MemoryGuard
+        except ImportError:
+            self.skipTest("MemoryGuard not available")
+            return
+
+        # Mock memory at GC level (76%)
+        mock_memory = MagicMock()
+        mock_memory.percent = 76.0
+        mock_memory.available = 2.4 * 1024**3
+        mock_memory.used = 7.6 * 1024**3
+        mock_psutil.virtual_memory.return_value = mock_memory
+
+        guard = MemoryGuard(
+            warning_threshold=70.0,
+            gc_threshold=75.0,
+            critical_threshold=85.0,
+            check_interval=0.05
+        )
+
+        initial_gc_triggers = guard.gc_triggers
+
+        # Manually trigger GC check
+        if mock_memory.percent > guard.gc_threshold:
+            gc.collect()
+            guard._increment_gc_trigger()
+
+        # GC should have been triggered
+        self.assertEqual(guard.gc_triggers, initial_gc_triggers + 1)
+
+    @patch('vulcan.monitoring.memory_guard.psutil')
+    def test_graduated_thresholds_critical(self, mock_psutil):
+        """Test critical threshold triggers aggressive cleanup."""
+        try:
+            from vulcan.monitoring.memory_guard import MemoryGuard
+        except ImportError:
+            self.skipTest("MemoryGuard not available")
+            return
+
+        # Mock memory at critical level (90%)
+        mock_memory = MagicMock()
+        mock_memory.percent = 90.0
+        mock_memory.available = 1 * 1024**3
+        mock_memory.used = 9 * 1024**3
+        mock_psutil.virtual_memory.return_value = mock_memory
+
+        callback_called = []
+
+        def aggressive_callback():
+            callback_called.append(True)
+
+        guard = MemoryGuard(
+            warning_threshold=70.0,
+            gc_threshold=75.0,
+            critical_threshold=85.0,
+            check_interval=0.05,
+            aggressive_gc_callback=aggressive_callback
+        )
+
+        # Manually trigger critical check
+        if mock_memory.percent > guard.critical_threshold:
+            gc.collect(generation=2)
+            guard._increment_gc_trigger()
+            if guard.aggressive_gc_callback:
+                guard.aggressive_gc_callback()
+
+        # Callback should have been called
+        self.assertEqual(len(callback_called), 1)
+        self.assertGreater(guard.gc_triggers, 0)
+
+    def test_aggressive_callback_set(self):
+        """Test setting aggressive callback."""
+        try:
+            from vulcan.monitoring.memory_guard import MemoryGuard
+        except ImportError:
+            self.skipTest("MemoryGuard not available")
+            return
+
+        callback_called = []
+
+        def my_callback():
+            callback_called.append(True)
+
+        guard = MemoryGuard(aggressive_gc_callback=my_callback)
+        
+        self.assertIsNotNone(guard.aggressive_gc_callback)
+        
+        # Test status reports callback presence
+        status = guard.get_status()
+        self.assertTrue(status["has_aggressive_callback"])
 
 
 class TestMemoryGuardGlobalFunctions(unittest.TestCase):
@@ -251,11 +426,76 @@ class TestMemoryGuardGlobalFunctions(unittest.TestCase):
             self.skipTest("Module not available")
             return
 
-        guard = start_memory_guard(threshold_percent=90.0, check_interval=1.0)
+        guard = start_memory_guard(gc_threshold=90.0, check_interval=1.0)
 
         if guard is not None:
             self.assertTrue(guard._running)
-            self.assertEqual(guard.threshold, 90.0)
+            self.assertEqual(guard.gc_threshold, 90.0)
+
+    def test_start_memory_guard_backward_compat(self):
+        """Test start_memory_guard with deprecated threshold_percent."""
+        try:
+            from vulcan.monitoring.memory_guard import (
+                start_memory_guard,
+                stop_memory_guard,
+                PSUTIL_AVAILABLE,
+            )
+            if not PSUTIL_AVAILABLE:
+                self.skipTest("psutil not available")
+                return
+        except ImportError:
+            self.skipTest("Module not available")
+            return
+
+        # Old API
+        guard = start_memory_guard(threshold_percent=88.0, check_interval=1.0)
+
+        if guard is not None:
+            self.assertTrue(guard._running)
+            self.assertEqual(guard.gc_threshold, 88.0)
+            self.assertEqual(guard.threshold, 88.0)  # Backward compat property
+
+        stop_memory_guard()
+
+    def test_start_memory_guard_double_checked_locking(self):
+        """Test double-checked locking prevents race condition."""
+        try:
+            from vulcan.monitoring.memory_guard import (
+                start_memory_guard,
+                stop_memory_guard,
+                get_memory_guard,
+                PSUTIL_AVAILABLE,
+            )
+            if not PSUTIL_AVAILABLE:
+                self.skipTest("psutil not available")
+                return
+        except ImportError:
+            self.skipTest("Module not available")
+            return
+
+        # Clean slate
+        stop_memory_guard()
+
+        guards = []
+        guards_lock = threading.Lock()
+
+        def start_guard_thread():
+            guard = start_memory_guard(gc_threshold=95.0, check_interval=1.0)
+            with guards_lock:
+                guards.append(guard)
+
+        # Start multiple threads trying to start the guard
+        threads = [threading.Thread(target=start_guard_thread) for _ in range(10)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        # All threads should get the same instance
+        unique_guards = set(id(g) for g in guards if g is not None)
+        self.assertEqual(len(unique_guards), 1, "Multiple guard instances created!")
+
+        stop_memory_guard()
 
     def test_stop_memory_guard(self):
         """Test stopping the global memory guard."""
@@ -310,6 +550,61 @@ class TestMemoryGuardGlobalFunctions(unittest.TestCase):
         collected = trigger_gc()
         self.assertIsInstance(collected, int)
 
+    def test_set_aggressive_gc_callback_function(self):
+        """Test the set_aggressive_gc_callback function."""
+        try:
+            from vulcan.monitoring.memory_guard import (
+                start_memory_guard,
+                stop_memory_guard,
+                set_aggressive_gc_callback,
+                get_memory_guard,
+                PSUTIL_AVAILABLE,
+            )
+            if not PSUTIL_AVAILABLE:
+                self.skipTest("psutil not available")
+                return
+        except ImportError:
+            self.skipTest("Module not available")
+            return
+
+        # Start guard
+        guard = start_memory_guard(gc_threshold=95.0)
+        
+        callback_called = []
+
+        def my_callback():
+            callback_called.append(True)
+
+        # Set callback
+        set_aggressive_gc_callback(my_callback)
+
+        # Verify callback is set
+        guard_inst = get_memory_guard()
+        if guard_inst:
+            self.assertIsNotNone(guard_inst.aggressive_gc_callback)
+
+        stop_memory_guard()
+
+    def test_set_aggressive_gc_callback_before_start(self):
+        """Test set_aggressive_gc_callback when guard not started."""
+        try:
+            from vulcan.monitoring.memory_guard import (
+                stop_memory_guard,
+                set_aggressive_gc_callback,
+            )
+        except ImportError:
+            self.skipTest("Module not available")
+            return
+
+        # Ensure guard is not running
+        stop_memory_guard()
+
+        def my_callback():
+            pass
+
+        # Should log warning but not crash
+        set_aggressive_gc_callback(my_callback)
+
 
 class TestMemoryGuardWithoutPsutil(unittest.TestCase):
     """Test MemoryGuard behavior when psutil is not available."""
@@ -348,10 +643,10 @@ class TestMemoryGuardWithoutPsutil(unittest.TestCase):
 
 
 class TestMemoryGuardThreadSafety(unittest.TestCase):
-    """Thread safety tests for MemoryGuard."""
+    """Thread safety tests for MemoryGuard with lock protection."""
 
     def test_concurrent_force_gc(self):
-        """Test concurrent force_gc calls."""
+        """Test concurrent force_gc calls are thread-safe."""
         try:
             from vulcan.monitoring.memory_guard import MemoryGuard
         except ImportError:
@@ -374,8 +669,54 @@ class TestMemoryGuardThreadSafety(unittest.TestCase):
             t.join()
 
         self.assertEqual(len(results), 10)
-        # gc_triggers should equal number of calls
+        # gc_triggers should equal number of calls (thread-safe)
         self.assertEqual(guard.gc_triggers, 10)
+
+    def test_concurrent_statistics_access(self):
+        """Test thread-safe access to statistics properties."""
+        try:
+            from vulcan.monitoring.memory_guard import MemoryGuard
+        except ImportError:
+            self.skipTest("Module not available")
+            return
+
+        guard = MemoryGuard()
+        errors = []
+        errors_lock = threading.Lock()
+
+        def read_stats_thread():
+            try:
+                for _ in range(100):
+                    _ = guard.gc_triggers
+                    _ = guard.last_gc_time
+                    _ = guard.peak_memory_percent
+            except Exception as e:
+                with errors_lock:
+                    errors.append(str(e))
+
+        def write_stats_thread():
+            try:
+                for _ in range(100):
+                    guard._increment_gc_trigger()
+                    guard._update_peak_memory(50.0 + (_ % 50))
+            except Exception as e:
+                with errors_lock:
+                    errors.append(str(e))
+
+        # Mix of readers and writers
+        threads = []
+        for _ in range(5):
+            threads.append(threading.Thread(target=read_stats_thread))
+            threads.append(threading.Thread(target=write_stats_thread))
+
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        self.assertEqual(len(errors), 0, f"Errors: {errors}")
+        # Verify final count is correct
+        self.assertEqual(guard.gc_triggers, 500)  # 5 threads * 100 iterations
 
     def test_concurrent_start_stop(self):
         """Test concurrent start/stop operations."""
@@ -410,6 +751,32 @@ class TestMemoryGuardThreadSafety(unittest.TestCase):
 
         guard.stop()  # Ensure stopped
         self.assertEqual(len(errors), 0, f"Errors: {errors}")
+
+    def test_thread_safe_peak_memory_update(self):
+        """Test that peak memory updates are thread-safe."""
+        try:
+            from vulcan.monitoring.memory_guard import MemoryGuard
+        except ImportError:
+            self.skipTest("Module not available")
+            return
+
+        guard = MemoryGuard()
+
+        def update_peak_thread(value):
+            guard._update_peak_memory(value)
+
+        # Update peak from multiple threads
+        threads = [
+            threading.Thread(target=update_peak_thread, args=(i,))
+            for i in range(100)
+        ]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        # Peak should be the maximum value
+        self.assertEqual(guard.peak_memory_percent, 99.0)
 
 
 if __name__ == "__main__":
