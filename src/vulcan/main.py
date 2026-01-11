@@ -6926,28 +6926,58 @@ async def unified_chat(request: UnifiedChatRequest):
                 f"direct(conf={direct_confidence:.2f}, has_conclusion={direct_conclusion is not None})"
             )
             
-            # Find best reasoning result
-            best_confidence = max(unified_confidence, agent_confidence, direct_confidence)
+            # FIX (Issue #5): Check content FIRST, then confidence
+            # Industry best practice: Validate data presence before quality thresholds
+            # This prevents accepting high-confidence results that lack actual content
+            best_confidence = 0.0
             best_conclusion = None
             best_source = None
             best_reasoning_type = None
             best_explanation = None
             
-            if unified_confidence >= MIN_REASONING_CONFIDENCE_THRESHOLD and unified_confidence == best_confidence:
-                best_conclusion = unified_conclusion
-                best_source = "unified"
-                best_reasoning_type = unified.get("reasoning_type", "unknown")
-                best_explanation = unified.get("explanation", "")
-            elif agent_confidence >= MIN_REASONING_CONFIDENCE_THRESHOLD and agent_confidence == best_confidence:
-                best_conclusion = agent_conclusion
-                best_source = "agent"
-                best_reasoning_type = agent.get("reasoning_type", "unknown")
-                best_explanation = agent.get("explanation", "")
-            elif direct_confidence >= MIN_REASONING_CONFIDENCE_THRESHOLD and direct_confidence == best_confidence:
-                best_conclusion = direct_conclusion
-                best_source = "direct"
-                best_reasoning_type = direct.get("reasoning_type", "unknown")
-                best_explanation = direct.get("explanation", "")
+            # Check each source: prioritize content existence, then confidence
+            candidates = []
+            
+            # Unified reasoning
+            if unified_conclusion is not None and unified_conclusion.strip():
+                candidates.append({
+                    'source': 'unified',
+                    'conclusion': unified_conclusion,
+                    'confidence': unified_confidence,
+                    'reasoning_type': unified.get("reasoning_type", "unknown"),
+                    'explanation': unified.get("explanation", ""),
+                })
+            
+            # Agent reasoning
+            if agent_conclusion is not None and agent_conclusion.strip():
+                candidates.append({
+                    'source': 'agent',
+                    'conclusion': agent_conclusion,
+                    'confidence': agent_confidence,
+                    'reasoning_type': agent.get("reasoning_type", "unknown"),
+                    'explanation': agent.get("explanation", ""),
+                })
+            
+            # Direct reasoning
+            if direct_conclusion is not None and direct_conclusion.strip():
+                candidates.append({
+                    'source': 'direct',
+                    'conclusion': direct_conclusion,
+                    'confidence': direct_confidence,
+                    'reasoning_type': direct.get("reasoning_type", "unknown"),
+                    'explanation': direct.get("explanation", ""),
+                })
+            
+            # Select best candidate: highest confidence among those with valid content
+            # Use defensive programming: explicit check before max() to prevent ValueError
+            if candidates:
+                best_candidate = max(candidates, key=lambda x: x['confidence'])
+                if best_candidate['confidence'] >= MIN_REASONING_CONFIDENCE_THRESHOLD:
+                    best_conclusion = best_candidate['conclusion']
+                    best_confidence = best_candidate['confidence']
+                    best_source = best_candidate['source']
+                    best_reasoning_type = best_candidate['reasoning_type']
+                    best_explanation = best_candidate['explanation']
             
             if best_conclusion is not None and best_confidence >= MIN_REASONING_CONFIDENCE_THRESHOLD:
                 use_reasoning_directly = True

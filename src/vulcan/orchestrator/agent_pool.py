@@ -2947,22 +2947,38 @@ class AgentPoolManager:
                         )
                     
                     # =========================================================
-                    # CRITICAL FIX (Issue#3): Skip UnifiedReasoner for world model results
-                    # =========================================================
+                    # =================================================================
+                    # CRITICAL FIX: Simplified World Model Result Detection
+                    # =================================================================
+                    # Industry best practice: Rely on primary indicators (tool selection
+                    # and confidence) rather than requiring secondary metadata flags.
+                    # 
                     # When apply_reasoning() returns a world model result with sufficient
-                    # confidence (>= 0.5), we MUST use it directly without invoking
-                    # other reasoning engines. Previously, the code would always
-                    # call UnifiedReasoner.reason() which would run probabilistic
-                    # reasoner and override the world model confidence (0.85 → 0.1).
-                    # =========================================================
+                    # confidence (>= 0.5), use it directly without invoking other reasoning
+                    # engines. Metadata flags provide additional context but are not
+                    # required for the decision.
+                    # 
+                    # This prevents valid world model results from being discarded due to
+                    # missing or inconsistent metadata flags while maintaining confidence
+                    # thresholds for quality assurance.
+                    # =================================================================
                     is_world_model_result = (
                         integration_result.selected_tools == ["world_model"] and
-                        integration_result.confidence >= WORLD_MODEL_CONFIDENCE_THRESHOLD and
-                        (
+                        integration_result.confidence >= WORLD_MODEL_CONFIDENCE_THRESHOLD
+                    )
+                    
+                    # Log metadata flags for debugging but don't require them
+                    if is_world_model_result:
+                        has_metadata_flags = (
                             integration_result.metadata.get("self_referential", False) or
                             integration_result.metadata.get("ethical_query", False)
                         )
-                    )
+                        if not has_metadata_flags:
+                            logger.info(
+                                f"[AgentPool] World model result without metadata flags "
+                                f"but confidence {integration_result.confidence:.2f} >= threshold. "
+                                f"Using result directly."
+                            )
                     
                     if is_world_model_result:
                         logger.info(
