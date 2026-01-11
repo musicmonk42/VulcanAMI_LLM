@@ -81,6 +81,7 @@ try:
         rate_limit_cleanup_thread,
         cleanup_rate_limits,
         start_rate_limit_cleanup,
+        stop_rate_limit_cleanup,
         check_rate_limit,
     )
 except ImportError as e:
@@ -91,7 +92,19 @@ except ImportError as e:
     rate_limit_cleanup_thread = None
     cleanup_rate_limits = None
     start_rate_limit_cleanup = None
+    stop_rate_limit_cleanup = None
     check_rate_limit = None
+
+try:
+    from vulcan.api.middleware import (
+        validate_api_key_middleware,
+        rate_limiting_middleware,
+    )
+except ImportError as e:
+    logger.warning(f"Middleware module not available: {e}")
+    _imports_successful = False
+    validate_api_key_middleware = None
+    rate_limiting_middleware = None
 
 
 # ============================================================
@@ -125,7 +138,11 @@ __all__ = [
     "rate_limit_cleanup_thread",
     "cleanup_rate_limits",
     "start_rate_limit_cleanup",
+    "stop_rate_limit_cleanup",
     "check_rate_limit",
+    # Middleware
+    "validate_api_key_middleware",
+    "rate_limiting_middleware",
     # Module utilities
     "get_module_info",
     "validate_api_module",

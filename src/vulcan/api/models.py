@@ -8,19 +8,53 @@
 #
 # VERSION HISTORY:
 #     1.0.0 - Extracted from main.py for modular architecture
+#     1.1.0 - Added request ID tracking and auto-timestamps
 # ============================================================
 
 import logging
+import secrets
+import time
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 from enum import Enum
 
 # Module metadata
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 __author__ = "VULCAN-AGI Team"
 
 logger = logging.getLogger(__name__)
+
+
+# ============================================================
+# UTILITY FUNCTIONS
+# ============================================================
+
+
+def generate_request_id(prefix: str = "req") -> str:
+    """
+    Generate a unique request ID for tracking and observability.
+    
+    Uses a combination of timestamp and cryptographically secure random
+    token to ensure uniqueness across distributed systems.
+    
+    Args:
+        prefix: Optional prefix for the request ID (default: "req")
+        
+    Returns:
+        Unique request ID in format: {prefix}_{timestamp}_{random_hex}
+        
+    Example:
+        >>> rid = generate_request_id()
+        >>> rid.startswith("req_")
+        True
+        >>> len(rid.split("_"))
+        3
+    """
+    timestamp = int(time.time() * 1000)  # Millisecond precision
+    random_hex = secrets.token_hex(8)     # 16 character hex string
+    return f"{prefix}_{timestamp}_{random_hex}"
 
 
 # ============================================================
@@ -74,6 +108,48 @@ class ApprovalRequest(BaseModel):
     approval_id: str
     approved: bool
     notes: Optional[str] = None
+
+
+class ChatHistoryMessage(BaseModel):
+    """
+    Model for a single message in chat history.
+    
+    Enforces strict validation of role and content fields to ensure
+    chat history integrity and prevent injection attacks.
+    
+    Attributes:
+        role: Message role - must be 'user', 'assistant', or 'system'
+        content: Message content - must be non-empty string
+        
+    Example:
+        >>> msg = ChatHistoryMessage(role="user", content="Hello")
+        >>> msg = ChatHistoryMessage(role="assistant", content="Hi there!")
+    
+    Raises:
+        ValidationError: If role doesn't match pattern or content is empty
+    """
+    role: str = Field(
+        ...,
+        description="Role of the message sender",
+        pattern="^(user|assistant|system)$",
+        examples=["user", "assistant", "system"]
+    )
+    content: str = Field(
+        ...,
+        description="Content of the message",
+        min_length=1,
+        max_length=50000,
+        examples=["Hello, how can you help me?"]
+    )
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "role": "user",
+                "content": "What is quantum entanglement?"
+            }
+        }
+    )
 
 
 class ChatRequest(BaseModel):
@@ -266,9 +342,10 @@ class UnifiedChatRequest(BaseModel):
         le=8000,
         description="Maximum tokens in the response"
     )
-    history: List[Dict[str, str]] = Field(
+    history: List[ChatHistoryMessage] = Field(
         default_factory=list,
-        description="Conversation history with role/content dictionaries"
+        description="Conversation history with validated role/content messages",
+        max_length=100
     )
     conversation_id: Optional[str] = Field(
         default=None,
@@ -342,6 +419,10 @@ class ChatResponse(BaseModel):
     systems_used: List[str] = []
     source: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
+    request_id: Optional[str] = Field(
+        default=None,
+        description="Unique request identifier for tracking"
+    )
 
 
 class VulcanResponse(BaseModel):
@@ -354,6 +435,10 @@ class VulcanResponse(BaseModel):
     systems_used: List[str] = []
     confidence: float = 0.0
     metadata: Optional[Dict[str, Any]] = None
+    request_id: Optional[str] = Field(
+        default=None,
+        description="Unique request identifier for tracking"
+    )
 
 
 class StatusResponse(BaseModel):
@@ -362,12 +447,20 @@ class StatusResponse(BaseModel):
     health: Optional[Dict[str, Any]] = None
     metrics: Optional[Dict[str, Any]] = None
     version: Optional[str] = None
+    request_id: Optional[str] = Field(
+        default=None,
+        description="Unique request identifier for tracking"
+    )
 
 
 class ConfigResponse(BaseModel):
     """Response model for configuration endpoints."""
     deployment_mode: str
     settings: Dict[str, Any]
+    request_id: Optional[str] = Field(
+        default=None,
+        description="Unique request identifier for tracking"
+    )
 
 
 class ImprovementApproval(BaseModel):
@@ -406,20 +499,39 @@ class HealthResponse(BaseModel):
     components: Optional[Dict[str, Any]] = Field(default=None, description="Component health details")
     version: Optional[str] = Field(default=None, description="Application version")
     uptime_seconds: Optional[float] = Field(default=None, description="Uptime in seconds")
+    request_id: Optional[str] = Field(
+        default=None,
+        description="Unique request identifier for tracking"
+    )
 
 
 class MetricsResponse(BaseModel):
     """Response model for metrics endpoints."""
     prometheus_data: Optional[str] = Field(default=None, description="Prometheus-format metrics")
     internal_metrics: Optional[Dict[str, Any]] = Field(default=None, description="Internal metrics data")
+    request_id: Optional[str] = Field(
+        default=None,
+        description="Unique request identifier for tracking"
+    )
 
 
 class ErrorResponse(BaseModel):
-    """Standard error response model."""
+    """
+    Standard error response model with auto-populated timestamp.
+    
+    Follows RFC 7807 Problem Details for HTTP APIs standard.
+    """
     error: str = Field(..., description="Error message")
     detail: Optional[str] = Field(default=None, description="Detailed error description")
     error_type: Optional[ErrorType] = Field(default=None, description="Type of error")
-    timestamp: Optional[float] = Field(default=None, description="Error timestamp")
+    timestamp: float = Field(
+        default_factory=lambda: datetime.utcnow().timestamp(),
+        description="Error timestamp (Unix epoch, auto-populated)"
+    )
+    request_id: Optional[str] = Field(
+        default=None,
+        description="Unique request identifier for tracking"
+    )
 
 
 # ============================================================
@@ -427,6 +539,8 @@ class ErrorResponse(BaseModel):
 # ============================================================
 
 __all__ = [
+    # Utility functions
+    "generate_request_id",
     # Enums
     "HealthStatus",
     "ErrorType",
@@ -445,6 +559,7 @@ __all__ = [
     # Response models
     "StepResponse",
     "ChatMessage",
+    "ChatHistoryMessage",
     "ChatResponse",
     "VulcanResponse",
     "StatusResponse",
