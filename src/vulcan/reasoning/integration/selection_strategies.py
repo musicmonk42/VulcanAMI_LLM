@@ -6,6 +6,7 @@ ReasoningIntegration orchestrator.
 """
 
 import logging
+import time
 from typing import Any, Dict, List, Optional, Tuple
 
 from .types import (
@@ -16,6 +17,9 @@ from .types import (
     DECOMPOSITION_COMPLEXITY_THRESHOLD,
     LOG_PREFIX,
     MAX_FALLBACK_ATTEMPTS,
+    CAUSAL_REASONING_THRESHOLD,
+    PROBABILISTIC_REASONING_THRESHOLD,
+    QUERY_TYPE_STRATEGY_MAP,
 )
 
 logger = logging.getLogger(__name__)
@@ -302,8 +306,8 @@ class SelectionStrategies:
         """
         Determine reasoning strategy based on query characteristics.
 
-        This method implements the fallback strategy selection logic when
-        the ToolSelector is unavailable or doesn't provide a strategy.
+        This method delegates to the standalone determine_strategy_from_query function
+        to avoid code duplication.
 
         Args:
             query_type: Type of query (reasoning, perception, planning, etc.)
@@ -312,22 +316,221 @@ class SelectionStrategies:
         Returns:
             Strategy name string
         """
-        # High complexity reasoning queries use causal reasoning
-        if query_type == "reasoning" and complexity > CAUSAL_REASONING_THRESHOLD:
-            return ReasoningStrategyType.CAUSAL_REASONING.value
+        return determine_strategy_from_query(query_type, complexity)
 
-        # Execution tasks use planning
-        if query_type == "execution":
-            return ReasoningStrategyType.PLANNING.value
 
-        # Medium-high complexity uses probabilistic reasoning
-        if complexity > PROBABILISTIC_REASONING_THRESHOLD:
-            return ReasoningStrategyType.PROBABILISTIC_REASONING.value
+def select_with_tool_selector(
+    orchestrator: Any,
+    query: str,
+    query_type: str,
+    complexity: float,
+    context: Optional[Dict[str, Any]] = None,
+) -> ReasoningResult:
+    """
+    Select tools using the ToolSelector component.
 
-        # Query type specific strategies
-        type_strategy = QUERY_TYPE_STRATEGY_MAP.get(query_type)
-        if type_strategy:
-            return type_strategy
+    This function provides the interface between the orchestrator and
+    the ToolSelector for tool selection based on query characteristics.
 
-        # Default to direct for simple queries
-        return ReasoningStrategyType.DIRECT.value
+    Args:
+        orchestrator: ReasoningIntegration instance with initialized components
+        query: The user query text to process
+        query_type: Type of query (reasoning, execution, etc.)
+        complexity: Query complexity score (0.0 to 1.0)
+        context: Optional context dictionary
+
+    Returns:
+        ReasoningResult with selected tools, strategy, and metadata
+
+    Note:
+        Falls back to default strategy if ToolSelector is unavailable.
+    """
+    # Delegate to orchestrator's internal method if available
+    if hasattr(orchestrator, '_select_with_tool_selector'):
+        return orchestrator._select_with_tool_selector(
+            query, query_type, complexity, context
+        )
+    
+    # Fallback: Use ToolSelector directly if orchestrator doesn't have the method
+    if orchestrator._tool_selector is not None:
+        try:
+            # Get selection mode based on complexity
+            from vulcan.reasoning.selection.tool_selector import SelectionMode
+            
+            if complexity > 0.7:
+                mode = SelectionMode.ACCURATE
+            elif complexity < 0.4:
+                mode = SelectionMode.FAST
+            else:
+                mode = SelectionMode.BALANCED
+            
+            # Build constraints from context
+            constraints = {}
+            if context:
+                constraints = context.get('constraints', {})
+            
+            # Call tool selector
+            selection = orchestrator._tool_selector.select_tools(
+                query=query,
+                query_type=query_type,
+                mode=mode,
+                constraints=constraints,
+            )
+            
+            # Convert to ReasoningResult
+            tools = selection.selected_tools if hasattr(selection, 'selected_tools') else ['general']
+            strategy = selection.strategy if hasattr(selection, 'strategy') else 'direct'
+            confidence = selection.confidence if hasattr(selection, 'confidence') else 0.5
+            rationale = selection.rationale if hasattr(selection, 'rationale') else 'Tool selection completed'
+            
+            return ReasoningResult(
+                selected_tools=tools,
+                reasoning_strategy=strategy,
+                confidence=confidence,
+                rationale=rationale,
+                metadata={
+                    "query_type": query_type,
+                    "complexity": complexity,
+                    "tool_selector_used": True,
+                }
+            )
+        except Exception as e:
+            logger.warning(f"{LOG_PREFIX} ToolSelector failed: {e}, using fallback")
+    
+    # Ultimate fallback: determine strategy from query characteristics
+    strategy = determine_strategy_from_query(query_type, complexity)
+    tools = get_fallback_tools(query_type, 'general', [])
+    
+    return ReasoningResult(
+        selected_tools=tools if tools else ['general'],
+        reasoning_strategy=strategy,
+        confidence=0.4,
+        rationale="Fallback selection - ToolSelector unavailable",
+        metadata={
+            "query_type": query_type,
+            "complexity": complexity,
+            "fallback": True,
+        }
+    )
+
+
+def determine_strategy_from_query(query_type: str, complexity: float) -> str:
+    """
+    Determine reasoning strategy based on query characteristics.
+
+    This function implements the fallback strategy selection logic when
+    the ToolSelector is unavailable or doesn't provide a strategy.
+
+    Args:
+        query_type: Type of query (reasoning, perception, planning, etc.)
+        complexity: Query complexity (0.0 to 1.0)
+
+    Returns:
+        Strategy name string
+    """
+    # High complexity reasoning queries use causal reasoning
+    if query_type == "reasoning" and complexity > CAUSAL_REASONING_THRESHOLD:
+        return ReasoningStrategyType.CAUSAL_REASONING.value
+
+    # Execution tasks use planning
+    if query_type == "execution":
+        return ReasoningStrategyType.PLANNING.value
+
+    # Medium-high complexity uses probabilistic reasoning
+    if complexity > PROBABILISTIC_REASONING_THRESHOLD:
+        return ReasoningStrategyType.PROBABILISTIC_REASONING.value
+
+    # Query type specific strategies
+    type_strategy = QUERY_TYPE_STRATEGY_MAP.get(query_type)
+    if type_strategy:
+        return type_strategy
+
+    # Default to direct for simple queries
+    return ReasoningStrategyType.DIRECT.value
+
+
+def get_fallback_tools(
+    query_type: str,
+    original_tool: str,
+    failed_tools: List[str],
+) -> List[str]:
+    """
+    Get appropriate fallback tools based on query type and failed tools.
+    
+    Instead of a fixed fallback list, select tools based on query characteristics.
+    This ensures queries are routed to the most appropriate alternative engine
+    before falling back to LLM (Arena delegation).
+    
+    Priority:
+    1. Query-type specific alternatives (e.g., philosophical for ethical queries)
+    2. General-purpose fallbacks (world_model for meta-queries, probabilistic)
+    3. The fallback list is filtered to exclude already-failed tools
+    
+    Args:
+        query_type: Type of query (reasoning, ethical, mathematical, etc.)
+        original_tool: The tool that originally failed
+        failed_tools: List of tools that have already been tried and failed
+        
+    Returns:
+        List of fallback tool names to try, in priority order
+    """
+    # Map query types to preferred fallback tools
+    query_type_fallbacks: Dict[str, List[str]] = {
+        # Ethical/philosophical queries → world_model is primary
+        'ethical': ['world_model', 'analogical', 'causal'],
+        'philosophical': ['world_model', 'analogical', 'causal'],
+        
+        # Mathematical queries → try mathematical engine first
+        'mathematical': ['symbolic', 'probabilistic'],
+        'symbolic': ['mathematical', 'probabilistic'],
+        
+        # Causal queries → try related engines
+        'causal': ['probabilistic', 'analogical', 'world_model'],
+        
+        # Analogical queries → try related engines  
+        'analogical': ['causal', 'world_model', 'probabilistic'],
+        
+        # Probabilistic queries → try related engines
+        'probabilistic': ['mathematical', 'causal', 'analogical'],
+        
+        # Cryptographic queries → try mathematical fallback
+        'cryptographic': ['mathematical', 'symbolic'],
+        
+        # Self-introspection queries → world_model is primary
+        'self_introspection': ['world_model', 'analogical'],
+        
+        # General/reasoning queries → broad fallback
+        'reasoning': ['world_model', 'probabilistic', 'analogical'],
+        'general': ['world_model', 'probabilistic', 'analogical'],
+    }
+    
+    # Normalize query type
+    query_type_lower = query_type.lower() if query_type else 'general'
+    
+    # Get type-specific fallbacks, or default to general
+    fallback_list = query_type_fallbacks.get(
+        query_type_lower,
+        ['world_model', 'probabilistic', 'analogical']
+    ).copy()  # Copy to avoid modifying the dict value
+    
+    # Ensure we have the general-purpose fallbacks at the end
+    default_fallbacks = ['world_model', 'probabilistic', 'analogical', 'mathematical']
+    existing_tools = set(fallback_list)
+    for tool in default_fallbacks:
+        if tool not in existing_tools:
+            fallback_list.append(tool)
+            existing_tools.add(tool)
+    
+    # Filter out the tools that have already failed
+    failed_set = set(failed_tools) | {original_tool}
+    fallback_list = [t for t in fallback_list if t not in failed_set]
+    
+    # Limit to top 3 fallbacks to prevent excessive retries
+    fallback_list = fallback_list[:3]
+    
+    logger.debug(
+        f"{LOG_PREFIX} Selected fallback tools for query_type='{query_type}', "
+        f"original_tool='{original_tool}': {fallback_list}"
+    )
+    
+    return fallback_list

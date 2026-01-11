@@ -1,4 +1,3 @@
-from typing import Any, Dict, List, Optional
 """
 Utility functions and conveniences for reasoning integration.
 
@@ -13,11 +12,14 @@ Author: Vulcan AI Team
 """
 
 import atexit
+import logging
 import threading
 from typing import Any, Dict, List, Optional
 
 from .types import ReasoningResult
 from .orchestrator import ReasoningIntegration
+
+logger = logging.getLogger(__name__)
 
 # Global singleton instance
 _reasoning_integration: Optional[ReasoningIntegration] = None
@@ -247,6 +249,11 @@ __all__ = [
     "observe_outcome",
     "observe_validation_failure",
     "observe_error",
+    "observe_reasoning_selection",
+    "observe_reasoning_execution",
+    "observe_reasoning_success",
+    "observe_reasoning_failure",
+    "observe_reasoning_degradation",
 ]
 
 
