@@ -87,6 +87,18 @@ except ImportError as e:
     verify_openai_configuration = None
     log_openai_status = None
 
+try:
+    from vulcan.llm.query_parser import (
+        StructuredQuery,
+        QueryIntent,
+        QueryDomain,
+    )
+except ImportError as e:
+    logger.warning(f"query_parser module not available: {e}")
+    StructuredQuery = None
+    QueryIntent = None
+    QueryDomain = None
+
 
 # ============================================================
 # MODULE EXPORTS
@@ -117,6 +129,10 @@ __all__ = [
     "initialize_openai_client",
     "verify_openai_configuration",
     "log_openai_status",
+    # Query Parser (Language Interface)
+    "StructuredQuery",
+    "QueryIntent",
+    "QueryDomain",
     # Module utilities
     "get_module_info",
     "validate_llm_module",
