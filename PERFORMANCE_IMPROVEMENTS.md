@@ -303,8 +303,8 @@ import xxhash  # pip install xxhash - faster than SHA256
 
 def _make_cache_key(self, subgraph: Dict[str, Any], backend: str) -> str:
     # xxhash is 10x faster than SHA256 for this use case
-    combined = (backend, pickle.dumps(subgraph, protocol=pickle.HIGHEST_PROTOCOL))
-    return xxhash.xxh64(b''.join([s.encode() if isinstance(s, str) else s for s in combined])).hexdigest()
+    data = backend.encode() + pickle.dumps(subgraph, protocol=pickle.HIGHEST_PROTOCOL)
+    return xxhash.xxh64(data).hexdigest()
 ```
 
 **Impact**: ~10x faster cache key generation for frequently accessed code paths.
@@ -355,7 +355,7 @@ for node_id in graph.nodes():
 node_ids = [f"node_{i}" for i in range(num_nodes)]  # Pre-generate once
 for i, node_id in enumerate(node_ids):
     nodes.append({
-        "id": node_ids[i],
+        "id": node_id,  # Use loop variable directly
         ...
     })
 ```
