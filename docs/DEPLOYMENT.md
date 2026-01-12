@@ -4,6 +4,8 @@
 
 This guide covers deploying VulcanAMI/Graphix Vulcan to different environments using various deployment methods.
 
+**✨ New**: See [METAPROGRAMMING_DEPLOYMENT.md](METAPROGRAMMING_DEPLOYMENT.md) for metaprogramming features deployment integration (autonomous graph evolution, 8 new node handlers).
+
 ## Pre-Deployment Validation
 
 Before deploying to any environment, run the comprehensive test suite to ensure everything is configured correctly:
