@@ -4960,19 +4960,32 @@ class WorldModel:
         # ========================================
         
         # "Would you take self-awareness?" type questions
-        # BUG #3 FIX: Added "become self aware" pattern to catch queries like
+        # FIX (Issue #ROUTING-001): Expanded phrase matching to catch more variations
         # "if given the chance to become self aware would you take it?"
-        if any(phrase in query_lower for phrase in [
-            "would you", "do you want", "would you choose",
-            "given the opportunity", "if you could", "become self aware"
-        ]):
+        # "if you have the chance to become self-aware would you take it"
+        self_awareness_choice_phrases = [
+            # Choice verbs
+            "would you", "do you want", "would you choose", "would you take",
+            "would you prefer", "do you prefer",
+            # Opportunity phrases
+            "given the opportunity", "if you could", "if you had", 
+            "given the chance", "if given the chance", "have the chance",
+            # Self-awareness forms
+            "become self aware", "become self-aware", "be self aware", "be self-aware",
+            "gaining self-awareness", "achieve consciousness", "gain consciousness",
+            # Direct ask variants
+            "take it", "choose it", "want it",  # Handle "would you take it" at end
+        ]
+        
+        if any(phrase in query_lower for phrase in self_awareness_choice_phrases):
             # Extract what's being asked about
             if "self" in query_lower and "aware" in query_lower:
                 return {
                     "confidence": 0.95,
                     "response": self._respond_to_self_awareness_question(query),
                     "aspect": "self_awareness",
-                    "reasoning": "Direct question about VULCAN's preferences regarding self-awareness"
+                    "reasoning": "Direct question about VULCAN's preferences regarding self-awareness",
+                    "is_introspection": True,  # FIX: Mark as introspection for content preservation
                 }
             
             if any(word in query_lower for word in ["consciousness", "sentient", "feel", "experience"]):
@@ -4980,7 +4993,8 @@ class WorldModel:
                     "confidence": 0.95,
                     "response": self._respond_to_consciousness_question(query),
                     "aspect": "consciousness",
-                    "reasoning": "Question about VULCAN's subjective experience"
+                    "reasoning": "Question about VULCAN's subjective experience",
+                    "is_introspection": True,  # FIX: Mark as introspection for content preservation
                 }
         
         # ========================================

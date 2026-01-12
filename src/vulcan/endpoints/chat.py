@@ -165,6 +165,24 @@ async def chat(request: Request) -> Dict[str, Any]:
                 "sensitive_topics": routing_plan.sensitive_topics,
             }
 
+            # ============================================================
+            # FIX (Issue #ROUTING-001): Add Tracing Logs for Debugging
+            # ============================================================
+            # These logs help track query routing decisions to diagnose
+            # why queries bypass reasoning engines
+            logger.info(
+                f"[VULCAN-TRACE] Query received: {request.prompt[:100]}..."
+            )
+            logger.info(
+                f"[VULCAN-TRACE] Classified as: {routing_plan.query_type.value}"
+            )
+            
+            # Extract selected tools from telemetry data
+            selected_tools = routing_plan.telemetry_data.get('selected_tools', []) if routing_plan.telemetry_data else []
+            logger.info(
+                f"[VULCAN-TRACE] Selected tools: {selected_tools}"
+            )
+            
             logger.info(
                 f"[VULCAN] Query routed: id={routing_plan.query_id}, "
                 f"type={routing_plan.query_type.value}, tasks={len(routing_plan.agent_tasks)}, "
@@ -1442,6 +1460,24 @@ async def chat(request: Request) -> Dict[str, Any]:
         world_result, world_systems = parallel_results[2]
         world_model_insights = world_result
         systems_used.extend(world_systems)
+        
+        # ============================================================
+        # FIX (Issue #ROUTING-001): Add Tracing for WorldModel Responses
+        # ============================================================
+        if world_model_insights:
+            # Log first 300 chars of WorldModel response for debugging
+            world_response = world_model_insights.get('response', '')
+            if isinstance(world_response, str):
+                logger.info(
+                    f"[VULCAN-TRACE] WorldModel response (first 300 chars): {world_response[:300]}"
+                )
+            # Check if this is an introspection response
+            is_introspection = world_model_insights.get('is_introspection', False)
+            if is_introspection:
+                logger.info(
+                    "[VULCAN-TRACE] WorldModel response marked as introspection - "
+                    "content preservation should be enforced"
+                )
     else:
         logger.debug(f"World model task failed: {parallel_results[2]}")
 
@@ -2333,6 +2369,29 @@ Based on your analysis through memory retrieval, multi-modal reasoning, causal m
         "query_id": query_id,
         "response_id": response_id,
     }
+
+    # ============================================================
+    # FIX (Issue #ROUTING-001): Add Final Response Source Logging
+    # ============================================================
+    # Determine primary response source for tracing
+    response_source = "unknown"
+    if world_model_insights:
+        response_source = "world_model"
+    elif reasoning_insights:
+        response_source = "reasoning_engines"
+    elif "openai" in systems_used:
+        response_source = "openai_only"
+    elif "agent_pool" in systems_used:
+        response_source = "agent_pool"
+    else:
+        response_source = "fallback"
+    
+    logger.info(
+        f"[VULCAN-TRACE] Final response source: {response_source}"
+    )
+    logger.info(
+        f"[VULCAN-TRACE] Systems used: {', '.join(systems_used)}"
+    )
 
     # Add routing layer stats if available
     if routing_plan:

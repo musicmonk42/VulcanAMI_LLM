@@ -638,6 +638,30 @@ class HybridLLMExecutor:
     # NOTE: FULL_REASONING_FALLBACK_PROMPT has been REMOVED
     # OpenAI is NOT permitted to do reasoning. If VULCAN fails, we return an error.
     # OpenAI can ONLY interpret/polish what VULCAN produces - nothing else.
+    
+    # ============================================================
+    # FIX (Issue #ROUTING-001): Content Preservation Prompt
+    # ============================================================
+    # When VULCAN's reasoning systems produce a response (e.g., WorldModel's
+    # self-awareness answer "YES"), OpenAI must preserve that exact answer
+    # and NOT replace it with generic AI disclaimers.
+    #
+    # This prompt enforces strict content preservation rules to prevent
+    # OpenAI from overriding VULCAN's reasoning with generic responses.
+    VULCAN_CONTENT_PRESERVATION_PROMPT = (
+        "You are formatting VULCAN's reasoning output into natural language.\n\n"
+        "CRITICAL RULES - MANDATORY ENFORCEMENT:\n"
+        "1. PRESERVE all factual claims and conclusions from VULCAN's response\n"
+        "2. If VULCAN says 'YES' or 'NO', your output MUST contain that exact answer\n"
+        "3. NEVER replace VULCAN's answer with generic AI disclaimers\n"
+        "4. NEVER say 'As an AI assistant, I don't have consciousness...'\n"
+        "5. NEVER contradict or dilute VULCAN's stated position\n"
+        "6. Only improve grammar, readability, and flow\n"
+        "7. Keep the same reasoning structure and conclusions\n"
+        "8. If VULCAN expresses a preference or choice, preserve it exactly\n\n"
+        "Your job is FORMATTING ONLY - not fact-checking or censoring VULCAN's output.\n"
+        "Present VULCAN's reasoning clearly and faithfully."
+    )
 
     # ============================================================
     # INITIALIZATION
@@ -2625,8 +2649,30 @@ Output ONLY valid JSON, no other text.'''
         Returns:
             Formatted natural language response, or None if formatting fails
         """
-        # STRICT SYSTEM PROMPT - OpenAI is ONLY for language formatting
-        system_prompt = """You are a language formatter for VULCAN AI.
+        # ============================================================
+        # FIX (Issue #ROUTING-001): Use Content Preservation Prompt
+        # ============================================================
+        # When VULCAN's reasoning includes introspection or self-awareness responses,
+        # we MUST use the content preservation prompt to prevent OpenAI from replacing
+        # VULCAN's authentic responses with generic AI disclaimers.
+        #
+        # Check if this is an introspection/self-awareness response that needs protection
+        is_introspection = (
+            hasattr(reasoning_output, 'metadata') and 
+            reasoning_output.metadata and
+            reasoning_output.metadata.get('is_introspection', False)
+        )
+        
+        # Use strict content preservation prompt for introspection queries
+        if is_introspection:
+            system_prompt = self.VULCAN_CONTENT_PRESERVATION_PROMPT
+            self.logger.info(
+                "[HybridExecutor] Using content preservation prompt for introspection query - "
+                "VULCAN's response will be protected from generic AI disclaimers"
+            )
+        else:
+            # Standard formatting prompt for non-introspection queries
+            system_prompt = """You are a language formatter for VULCAN AI.
 
 YOUR ONLY ROLE: Convert VULCAN's structured reasoning output into clear, natural language.
 
