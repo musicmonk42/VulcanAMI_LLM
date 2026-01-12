@@ -214,7 +214,9 @@ class CostAnalyzer:
         self._has_bandwidth_usage = hasattr(memory_system, "get_bandwidth_usage_gb")
         self._has_compute_stats = hasattr(memory_system, "get_compute_stats")
         self._has_compute_hours = hasattr(memory_system, "get_compute_hours")
+        self._has_api_stats = hasattr(memory_system, "get_api_stats")
         self._has_api_calls = hasattr(memory_system, "get_api_call_count")
+        self._has_cdn_stats = hasattr(memory_system, "get_cdn_stats")
         self._has_cdn_requests = hasattr(memory_system, "get_cdn_request_count")
 
     def analyze_current_costs(self) -> CostBreakdown:
@@ -325,7 +327,7 @@ class CostAnalyzer:
                     logger.warning(f"Compute cost calculation failed: {e}")
 
             # API costs - FIXED: Multiple fallback methods with cached checks
-            if hasattr(self.memory, "get_api_stats"):
+            if self._has_api_stats:
                 stats = self.memory.get_api_stats()
                 if isinstance(stats, dict):
                     try:
@@ -345,7 +347,7 @@ class CostAnalyzer:
                     logger.warning(f"API cost calculation failed: {e}")
 
             # CDN costs - FIXED: Multiple fallback methods with cached checks
-            if hasattr(self.memory, "get_cdn_stats"):
+            if self._has_cdn_stats:
                 stats = self.memory.get_cdn_stats()
                 if isinstance(stats, dict):
                     try:

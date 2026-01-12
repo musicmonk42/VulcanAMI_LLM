@@ -1,5 +1,4 @@
 # optimizer.py - Data processing optimization module
-import time
 import logging
 
 class DataOptimizer:
