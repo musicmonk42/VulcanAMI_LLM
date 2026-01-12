@@ -438,8 +438,28 @@ def vote_on_proposal(proposal_id: str):
 
 
 @app.route("/proposals/<proposal_id>/validate", methods=["POST"])
+@limiter.limit("30 per minute")
+@require_auth
 def validate_proposal(proposal_id: str):
-    """Record validation results for a proposal."""
+    """
+    Record validation results for a proposal.
+    
+    Industry standard implementation with:
+    - Authentication required
+    - Rate limiting (30/min)
+    - Input validation
+    - Comprehensive error handling
+    """
+    # Validate proposal_id format
+    if not proposal_id or not isinstance(proposal_id, str):
+        return jsonify({"error": "Invalid proposal ID"}), 400
+    
+    if not all(c.isalnum() or c in '-_' for c in proposal_id):
+        return jsonify({"error": "Invalid proposal ID format"}), 400
+    
+    if len(proposal_id) > 128:
+        return jsonify({"error": "Proposal ID too long"}), 400
+    
     try:
         registry = get_registry()
         validation_data = request.get_json()
@@ -447,20 +467,29 @@ def validate_proposal(proposal_id: str):
         if not validation_data:
             return jsonify({"error": "Request body is required"}), 400
         
+        # Validate validation_data structure
+        if not isinstance(validation_data, dict):
+            return jsonify({"error": "Invalid request body format"}), 400
+        
         # Ensure target is set
         validation_data["target"] = proposal_id
         
         validation_result = registry.record_validation(validation_data)
+        
+        # Log validation for audit trail
+        logger.info(f"Validation recorded on proposal {proposal_id} by {getattr(request, 'authenticated_agent_id', 'unknown')}")
+        
         return jsonify({
             "proposal_id": proposal_id,
             "validation_passed": validation_result,
             "message": "Validation recorded"
         })
     except ValueError as e:
-        return jsonify({"error": str(e)}), 400
+        logger.warning(f"Invalid validation data for proposal {proposal_id}: {e}")
+        return jsonify({"error": "Invalid validation data"}), 400
     except Exception as e:
-        logger.error(f"Error recording validation: {e}")
-        return jsonify({"error": str(e)}), 500
+        logger.error(f"Error recording validation on proposal {proposal_id}: {e}", exc_info=True)
+        return jsonify({"error": "Internal server error"}), 500
 
 
 @app.route("/proposals/<proposal_id>/deploy", methods=["POST"])

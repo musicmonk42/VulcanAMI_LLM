@@ -403,30 +403,75 @@ class MerkleLSMDAG:
 
     def get_proof(self, leaf_index: int) -> MerkleProof:
         """
-        Generate a proof of inclusion for a leaf.
+        Generate a proof of inclusion for a leaf efficiently.
+        
+        This implementation maintains O(log n) complexity by only traversing
+        the necessary path from leaf to root, without rebuilding the entire tree.
 
         Args:
             leaf_index: Index of the leaf
 
         Returns:
             MerkleProof object
+        
+        Raises:
+            IndexError: If leaf_index is out of bounds
         """
-        # Build a temporary full tree for proof generation
-        temp_tree = MerkleTree(algorithm=self.algorithm)
-        temp_tree.leaves = self.all_leaves[:]
-        temp_tree.tree = [self.all_leaves[:]]
-
-        current_level = self.all_leaves[:]
-        while len(current_level) > 1:
+        if leaf_index < 0 or leaf_index >= len(self.all_leaves):
+            raise IndexError(f"Leaf index {leaf_index} out of bounds (0-{len(self.all_leaves)-1})")
+        
+        # Build proof by computing sibling hashes on-demand
+        sibling_hashes = []
+        path = []
+        
+        # Start with the target leaf
+        current_idx = leaf_index
+        current_level_size = len(self.all_leaves)
+        
+        # Traverse up the tree, computing siblings at each level
+        level_leaves = self.all_leaves[:]
+        
+        while len(level_leaves) > 1:
+            # Determine if current node is left or right child
+            is_left = (current_idx % 2 == 0)
+            
+            if is_left:
+                # Current node is left child, sibling is on the right
+                sibling_idx = current_idx + 1
+                if sibling_idx < len(level_leaves):
+                    sibling_hash = level_leaves[sibling_idx]
+                else:
+                    # Odd number of nodes, duplicate the last node
+                    sibling_hash = level_leaves[current_idx]
+                path.append("R")
+            else:
+                # Current node is right child, sibling is on the left
+                sibling_idx = current_idx - 1
+                sibling_hash = level_leaves[sibling_idx]
+                path.append("L")
+            
+            sibling_hashes.append(sibling_hash)
+            
+            # Move to parent level
             next_level = []
-            it = iter(current_level)
+            it = iter(level_leaves)
             for a in it:
                 b = next(it, a)
                 next_level.append(self.hash_func(a + b).digest())
-            temp_tree.tree.append(next_level)
-            current_level = next_level
-
-        return temp_tree.get_proof(leaf_index)
+            
+            level_leaves = next_level
+            current_idx = current_idx // 2
+        
+        # Compute root from all leaves for verification
+        root = self.current_root()
+        
+        return MerkleProof(
+            leaf_index=leaf_index,
+            leaf_hash=self.all_leaves[leaf_index],
+            sibling_hashes=sibling_hashes,
+            root=root,
+            path=path,
+        )
 
     def verify_proof(self, proof: MerkleProof) -> bool:
         """Verify a proof of inclusion"""

@@ -405,10 +405,15 @@ class CountingBloomFilter:
         # Store counters as list of integers
         self.counters = [0] * self.num_counters
         self.items_added = 0
+        
+        # Overflow tracking
+        self.overflow_count = 0
+        self._overflow_logged = False
 
         logger.info(
             f"Initialized CountingBloomFilter: "
-            f"{self.num_counters} counters, {counter_bits} bits each"
+            f"{self.num_counters} counters, {counter_bits} bits each, "
+            f"max_count={self.max_count}"
         )
 
     def _hashes(self, item: bytes) -> List[int]:
@@ -419,10 +424,30 @@ class CountingBloomFilter:
         return [(h1 + i * h2) % self.m for i in range(self.k)]
 
     def add(self, item: bytes) -> None:
-        """Add an item, incrementing counters"""
+        """
+        Add an item, incrementing counters.
+        
+        Tracks overflow events when counters reach maximum value.
+        Logs warning on first overflow to alert about potential accuracy issues.
+        """
+        overflowed = False
         for idx in self._hashes(item):
             if self.counters[idx] < self.max_count:
                 self.counters[idx] += 1
+            else:
+                # Counter overflow - already at maximum
+                self.overflow_count += 1
+                overflowed = True
+        
+        # Log warning on first overflow
+        if overflowed and not self._overflow_logged:
+            logger.warning(
+                f"CountingBloomFilter counter overflow detected. "
+                f"Counter(s) have reached maximum value ({self.max_count}). "
+                f"This may affect accuracy of remove operations and membership tests."
+            )
+            self._overflow_logged = True
+        
         self.items_added += 1
 
     def remove(self, item: bytes) -> None:
@@ -445,9 +470,48 @@ class CountingBloomFilter:
         return True
 
     def clear(self) -> None:
-        """Clear all counters"""
+        """Clear all counters and reset overflow tracking"""
         self.counters = [0] * self.num_counters
         self.items_added = 0
+        self.overflow_count = 0
+        self._overflow_logged = False
+
+    def get_overflow_count(self) -> int:
+        """
+        Get the number of overflow events that have occurred.
+        
+        Returns:
+            Total number of times a counter increment was skipped due to overflow
+        """
+        return self.overflow_count
+
+    def get_stats(self) -> Dict[str, Any]:
+        """
+        Get comprehensive statistics about the filter.
+        
+        Returns:
+            Dictionary with filter statistics including overflow information
+        """
+        # Calculate fill statistics
+        non_zero_counters = sum(1 for c in self.counters if c > 0)
+        max_counter_value = max(self.counters) if self.counters else 0
+        avg_counter_value = sum(self.counters) / len(self.counters) if self.counters else 0
+        saturated_counters = sum(1 for c in self.counters if c >= self.max_count)
+        
+        return {
+            "num_counters": self.num_counters,
+            "counter_bits": self.counter_bits,
+            "max_count": self.max_count,
+            "items_added": self.items_added,
+            "k": self.k,
+            "non_zero_counters": non_zero_counters,
+            "fill_ratio": non_zero_counters / self.num_counters if self.num_counters > 0 else 0,
+            "max_counter_value": max_counter_value,
+            "avg_counter_value": avg_counter_value,
+            "saturated_counters": saturated_counters,
+            "overflow_count": self.overflow_count,
+            "has_overflowed": self.overflow_count > 0,
+        }
 
 
 class ScalableBloomFilter:
