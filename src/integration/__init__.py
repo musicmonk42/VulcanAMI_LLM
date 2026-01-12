@@ -10,6 +10,7 @@
 #     parallel_candidate_scorer - Parallel token scoring
 #     speculative_helpers    - Speculative decoding utilities
 #     token_consensus_adapter - Token consensus mechanisms
+#     gvulcan_integration    - Unified gvulcan component integration
 #
 # ============================================================
 
@@ -67,6 +68,27 @@ except ImportError as e:
     CONSENSUS_ADAPTER_AVAILABLE = False
     TokenConsensusAdapter = None
 
+# GVulcan Integration
+try:
+    from src.integration.gvulcan_integration import (
+        GVulcanIntegration,
+        GVULCAN_AVAILABLE,
+        GVULCAN_COMPONENTS,
+        get_integration,
+        get_component_status,
+        is_component_available,
+        reset_integration,
+    )
+except ImportError as e:
+    logger.warning(f"gvulcan_integration not available: {e}")
+    GVULCAN_AVAILABLE = False
+    GVulcanIntegration = None
+    GVULCAN_COMPONENTS = {}
+    get_integration = None
+    get_component_status = None
+    is_component_available = None
+    reset_integration = None
+
 __all__ = [
     "__version__",
     "__author__",
@@ -87,6 +109,14 @@ __all__ = [
     # Consensus
     "TokenConsensusAdapter",
     "CONSENSUS_ADAPTER_AVAILABLE",
+    # GVulcan Integration
+    "GVulcanIntegration",
+    "GVULCAN_AVAILABLE",
+    "GVULCAN_COMPONENTS",
+    "get_integration",
+    "get_component_status",
+    "is_component_available",
+    "reset_integration",
 ]
 
 logger.debug(f"VULCAN Integration package v{__version__} loaded")
