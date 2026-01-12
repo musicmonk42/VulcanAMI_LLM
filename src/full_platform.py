@@ -435,7 +435,6 @@ class UnifiedPlatformSettings(BaseSettings):
     enable_api_server: bool = True
     enable_registry_grpc: bool = True
     enable_listener: bool = True
-    enable_chat_endpoint: bool = True
     
     # Cloud platform detection (for logging purposes)
     _is_cloud_platform: bool = bool(
@@ -444,11 +443,6 @@ class UnifiedPlatformSettings(BaseSettings):
         or os.environ.get("RENDER")  # Render.com detection
         or os.environ.get("HEROKU_APP_NAME")  # Heroku detection
     )
-
-    # Chat endpoint configuration
-    chat_mount: str = "/chat"
-    chat_module: str = "src.chat_endpoint"
-    chat_attr: str = "app"
 
     # Auto-detect src structure
     auto_detect_src: bool = True
@@ -2195,29 +2189,6 @@ async def _background_services_initialization(app: FastAPI, worker_id: int, logg
                 logger.error(f"❌ Failed to mount PII Service: {e}", exc_info=True)
         else:
             logger.info("⊘ PII Service disabled via configuration")
-
-        await asyncio.sleep(0.05)  # Brief yield for health checks
-
-        # Import and mount Chat Endpoint (for vulcan_chat.html frontend)
-        if settings.enable_chat_endpoint:
-            try:
-                chat_result = await import_service_async(
-                    "Chat Endpoint", settings.chat_module, settings.chat_attr, "FastAPI"
-                )
-                await service_manager.register_service(
-                    "chat",
-                    chat_result,
-                    settings.chat_mount,
-                    f"{settings.chat_mount}/health",
-                )
-                await service_manager.mount_service(app, "chat")
-                logger.info(f"✓ Mounted Chat Endpoint at {settings.chat_mount}")
-                logger.info("  → Chat API available at /chat/v1/chat")
-                logger.info("  → Note: VULCAN also provides /vulcan/v1/chat")
-            except Exception as e:
-                logger.error(f"❌ Failed to mount Chat Endpoint: {e}", exc_info=True)
-        else:
-            logger.info("⊘ Chat Endpoint disabled via configuration")
 
         await asyncio.sleep(0.05)  # Brief yield for health checks
 

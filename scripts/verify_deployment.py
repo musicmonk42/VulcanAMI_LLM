@@ -81,7 +81,6 @@ def verify_deployment(base_url: str) -> bool:
         ("API Gateway Health", "/api-gateway/health", False),
         ("DQS Health", "/dqs/health", False),
         ("PII Health", "/pii/health", False),
-        ("Chat Health", "/chat/health", False),
         
         # Static files
         ("Static Files", "/static/vulcan_chat.html", False),
