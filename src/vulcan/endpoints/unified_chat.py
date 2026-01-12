@@ -42,6 +42,57 @@ router = APIRouter(tags=["chat"])
 _gc_request_counter = 0
 
 
+def _normalize_conclusion_to_string(conclusion: Any) -> Optional[str]:
+    """
+    Normalize a conclusion value to a string, handling dict and other types.
+    
+    Provides type-safe extraction using explicit type checking and graceful
+    fallbacks to prevent AttributeError on string operations.
+    
+    Args:
+        conclusion: The conclusion value from reasoning results
+                   (may be str, dict, or other type)
+    
+    Returns:
+        str: The normalized string conclusion, or None if unavailable
+        
+    Examples:
+        >>> _normalize_conclusion_to_string("answer")
+        "answer"
+        >>> _normalize_conclusion_to_string({"conclusion": "answer"})
+        "answer"
+        >>> _normalize_conclusion_to_string({"result": "answer"})
+        "answer"
+        >>> _normalize_conclusion_to_string(None)
+        None
+    """
+    if conclusion is None:
+        return None
+    
+    # If already a string, return as-is
+    if isinstance(conclusion, str):
+        return conclusion
+    
+    # If dict, try to extract string content from common keys
+    if isinstance(conclusion, dict):
+        # Try common keys in priority order
+        for key in ('conclusion', 'result', 'response', 'answer', 'content'):
+            if key in conclusion:
+                value = conclusion[key]
+                # Recursively normalize in case nested
+                if isinstance(value, str):
+                    return value
+                elif isinstance(value, dict):
+                    return _normalize_conclusion_to_string(value)
+        
+        # If no standard key found, convert entire dict to string as fallback
+        # This ensures we don't lose information
+        return str(conclusion)
+    
+    # For other types (int, float, bool, etc.), convert to string
+    return str(conclusion)
+
+
 @router.post("/v1/chat")
 async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, Any]:
     """
@@ -1546,8 +1597,13 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
             # Check each source: prioritize content existence, then confidence
             candidates = []
             
+            # Normalize conclusions to strings (handle dict/other types defensively)
+            unified_conclusion = _normalize_conclusion_to_string(unified_conclusion)
+            agent_conclusion = _normalize_conclusion_to_string(agent_conclusion)
+            direct_conclusion = _normalize_conclusion_to_string(direct_conclusion)
+            
             # Unified reasoning
-            if unified_conclusion is not None and unified_conclusion.strip():
+            if unified_conclusion is not None and isinstance(unified_conclusion, str) and unified_conclusion.strip():
                 candidates.append({
                     'source': 'unified',
                     'conclusion': unified_conclusion,
@@ -1557,7 +1613,7 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
                 })
             
             # Agent reasoning
-            if agent_conclusion is not None and agent_conclusion.strip():
+            if agent_conclusion is not None and isinstance(agent_conclusion, str) and agent_conclusion.strip():
                 candidates.append({
                     'source': 'agent',
                     'conclusion': agent_conclusion,
@@ -1567,7 +1623,7 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
                 })
             
             # Direct reasoning
-            if direct_conclusion is not None and direct_conclusion.strip():
+            if direct_conclusion is not None and isinstance(direct_conclusion, str) and direct_conclusion.strip():
                 candidates.append({
                     'source': 'direct',
                     'conclusion': direct_conclusion,
