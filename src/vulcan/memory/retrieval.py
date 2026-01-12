@@ -384,6 +384,21 @@ class MemoryIndex:
 
             return False
 
+    def clear(self):
+        """Clear all memories from index."""
+        with self.lock:
+            if not self.is_faiss:
+                if hasattr(self.index, 'clear'):
+                    self.index.clear()
+                return
+            
+            # For FAISS, recreate the index
+            self.index = self._create_faiss_index()
+            self.id_map.clear()
+            self.reverse_map.clear()
+            self.deleted_indices.clear()
+            logger.info("Cleared memory index")
+
     def _rebuild_index(self):
         """Rebuild index without deleted items."""
         if not self.is_faiss:
@@ -534,6 +549,24 @@ class ShardedMemoryIndex:
             f"shard_size={shard_size}, shards=1"
         )
     
+    def _get_shard_size(self, shard: MemoryIndex) -> int:
+        """Get the current size of a shard.
+        
+        Args:
+            shard: MemoryIndex shard
+            
+        Returns:
+            Number of memories in the shard
+        """
+        # For FAISS backend
+        if hasattr(shard, 'id_map') and len(shard.id_map) > 0:
+            return len(shard.id_map)
+        # For NumPy backend
+        elif hasattr(shard, 'index') and hasattr(shard.index, 'memory_ids'):
+            return len(shard.index.memory_ids)
+        # Fallback
+        return 0
+    
     def _create_new_shard(self) -> int:
         """Create a new shard.
         
@@ -561,7 +594,9 @@ class ShardedMemoryIndex:
         with self._lock:
             # Check if current shard is full
             current_shard = self.shards[self.current_shard_idx]
-            if len(current_shard.id_map) >= self.shard_size:
+            current_size = self._get_shard_size(current_shard)
+            
+            if current_size >= self.shard_size:
                 # Create new shard
                 self.current_shard_idx = self._create_new_shard()
                 current_shard = self.shards[self.current_shard_idx]
@@ -656,15 +691,14 @@ class ShardedMemoryIndex:
             Dict with shard statistics
         """
         with self._lock:
+            shard_utilization = [self._get_shard_size(shard) for shard in self.shards]
             return {
                 'total_shards': len(self.shards),
                 'shard_size': self.shard_size,
                 'total_memories': len(self.memory_to_shard),
-                'shard_utilization': [
-                    len(shard.id_map) for shard in self.shards
-                ],
+                'shard_utilization': shard_utilization,
                 'avg_utilization': (
-                    sum(len(shard.id_map) for shard in self.shards) / len(self.shards)
+                    sum(shard_utilization) / len(self.shards)
                     if self.shards else 0
                 ),
             }
