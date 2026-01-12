@@ -15,22 +15,31 @@ Run with: pytest src/vulcan/tests/test_curiosity_crystallizer_e2e.py -v
 """
 
 import time
+import uuid
 from unittest.mock import Mock, patch
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import pytest
 
-from vulcan.curiosity_engine.curiosity_engine_core import (
+# Import ExecutionTrace type for type hints (avoiding circular imports)
+try:
+    from src.vulcan.knowledge_crystallizer.principle_extractor import (
+        ExecutionTrace as PrincipleExtractorTrace,
+    )
+except ImportError:
+    PrincipleExtractorTrace = None  # Type hint only
+
+from src.vulcan.curiosity_engine.curiosity_engine_core import (
     ExperimentResult,
     KnowledgeIntegrator,
 )
-from vulcan.curiosity_engine.experiment_generator import Experiment, ExperimentType
-from vulcan.curiosity_engine.gap_analyzer import KnowledgeGap
-from vulcan.knowledge_crystallizer.knowledge_crystallizer_core import (
+from src.vulcan.curiosity_engine.experiment_generator import Experiment, ExperimentType
+from src.vulcan.curiosity_engine.gap_analyzer import KnowledgeGap
+from src.vulcan.knowledge_crystallizer.knowledge_crystallizer_core import (
     ExecutionTrace,
     KnowledgeCrystallizer,
 )
-from vulcan.knowledge_crystallizer.principle_extractor import Principle
+from src.vulcan.knowledge_crystallizer.principle_extractor import Principle
 
 
 # ============================================================================

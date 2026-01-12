@@ -103,9 +103,10 @@ def sample_execution_trace():
 def sample_principle():
     """
     Create a sample principle for testing
-
-    FIX: Uses module-level simple_execution function instead of local function
-    to ensure the principle can be pickled for storage tests.
+    
+    Note: Uses module-level simple_execution function to ensure the principle 
+    can be pickled for storage tests. Python's pickle module requires functions
+    to be defined at module level, not inside other functions.
     """
     test_pattern = Pattern(
         pattern_type=PatternType.SEQUENTIAL,
@@ -120,7 +121,7 @@ def sample_principle():
         confidence=0.75,
         applicable_domains=["optimization", "general"],
         measurement_requirements=["accuracy", "latency"],
-        execution_logic=simple_execution,  # FIX: Reference module-level function
+        execution_logic=simple_execution,  # Reference module-level function for pickling
         execution_type="function",
     )
 

@@ -9,6 +9,7 @@ import copy
 import logging
 import threading
 import time
+import uuid
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from queue import Empty, PriorityQueue
@@ -26,6 +27,17 @@ from .exploration_budget import DynamicBudget, ResourceMonitor
 
 # Import other curiosity_engine components
 from .gap_analyzer import GapAnalyzer, KnowledgeGap
+
+# Import ExecutionTrace type for optional crystallization feature
+try:
+    from ..knowledge_crystallizer.principle_extractor import (
+        ExecutionTrace as PrincipleExtractorTrace,
+    )
+
+    CRYSTALLIZATION_AVAILABLE = True
+except ImportError:
+    PrincipleExtractorTrace = None
+    CRYSTALLIZATION_AVAILABLE = False
 
 # Note: Import resolution_bridge for cross-process state persistence
 # This fixes Bug #1 (Phantom Resolution Loop) and Bug #2 (Cold Start Always Triggered)
@@ -1154,7 +1166,7 @@ class KnowledgeIntegrator:
 
     def _convert_to_execution_trace(
         self, knowledge: Dict[str, Any]
-    ) -> Optional[Any]:
+    ) -> Optional["PrincipleExtractorTrace"]:
         """
         Convert experiment learned knowledge to ExecutionTrace for crystallization
         
@@ -1168,11 +1180,12 @@ class KnowledgeIntegrator:
         Returns:
             ExecutionTrace object if conversion successful, None otherwise
         """
-        try:
-            # Import ExecutionTrace from principle_extractor (not knowledge_crystallizer_core)
-            # The principle_extractor.ExecutionTrace is what the extractor expects
-            from ..knowledge_crystallizer.principle_extractor import ExecutionTrace
+        # Check if crystallization is available at module level
+        if not CRYSTALLIZATION_AVAILABLE or PrincipleExtractorTrace is None:
+            logger.debug("Crystallization not available, skipping trace conversion")
+            return None
             
+        try:
             # Extract experiment metadata
             experiment_type = knowledge.get("experiment_type", "unknown")
             domain = knowledge.get("domain", "general")
@@ -1238,9 +1251,12 @@ class KnowledgeIntegrator:
             if "observations" in knowledge:
                 context["observations"] = knowledge["observations"]
             
+            # Generate unique trace_id using UUID for guaranteed uniqueness
+            trace_id = f"experiment_{experiment_type}_{uuid.uuid4().hex[:16]}"
+            
             # Create ExecutionTrace with proper structure for principle_extractor
-            trace = ExecutionTrace(
-                trace_id=f"experiment_{experiment_type}_{int(time.time() * 1000)}",
+            trace = PrincipleExtractorTrace(
+                trace_id=trace_id,
                 actions=actions,
                 outcomes=outcomes,
                 context=context,
@@ -1260,11 +1276,6 @@ class KnowledgeIntegrator:
             
             return trace
             
-        except ImportError as e:
-            logger.warning(
-                "Could not import ExecutionTrace for crystallization: %s", e
-            )
-            return None
         except Exception as e:
             logger.warning("Failed to convert knowledge to ExecutionTrace: %s", e)
             return None
