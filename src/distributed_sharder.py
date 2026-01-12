@@ -47,6 +47,7 @@ logging.basicConfig(
 MAX_SHARD_SIZE_MB = 100
 DEFAULT_CHECKPOINT_DIR = Path("./sharder_checkpoints")
 PRUNING_STRATEGIES = ["magnitude", "random", "structured"]
+MAX_COMPRESSION_WORKERS = 4  # Maximum parallel workers for shard compression
 
 
 class CompressionType(Enum):
@@ -370,7 +371,7 @@ class DistributedSharder:
                 return shard_bytes
         
         # Parallelize compression across shards
-        with ThreadPoolExecutor(max_workers=min(len(shards), 4)) as executor:
+        with ThreadPoolExecutor(max_workers=min(len(shards), MAX_COMPRESSION_WORKERS)) as executor:
             compressed = list(executor.map(compress_single_shard, shards))
         
         return compressed

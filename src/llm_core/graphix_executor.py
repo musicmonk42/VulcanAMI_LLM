@@ -80,6 +80,11 @@ logger = logging.getLogger(__name__)
 # while keeping warm-up time fast (~70-100ms instead of full model execution)
 WARMUP_MIN_LAYERS = 2
 
+# LFU cache eviction tolerance for stale entries
+# Allows entries with slightly higher access counts to still be evicted
+# to avoid excessive heap rebuilding
+MAX_ACCESS_COUNT_VARIANCE = 10
+
 
 # ============================================================
 # PERFORMANCE INSTRUMENTATION (Added for bottleneck diagnosis)
@@ -429,7 +434,7 @@ class KVCacheManager:
                 entry = self.cache[key]
                 # Verify access count matches (entry hasn't been updated significantly)
                 # Allow small variance to avoid excessive rebuilding
-                if entry.access_count <= access_count + 10:
+                if entry.access_count <= access_count + MAX_ACCESS_COUNT_VARIANCE:
                     del self.cache[key]
                     return
         

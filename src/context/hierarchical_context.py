@@ -797,9 +797,6 @@ class HierarchicalContext:
         Uses incremental size tracking for O(1) performance.
         """
         with self._lock:
-            # Use tracked sizes instead of sampling
-            total_size = self._ep_size_bytes + self._sem_size_bytes + self._proc_size_bytes
-
             # Retrieval time
             avg_retrieval_time = (
                 sum(self._retrieval_times) / len(self._retrieval_times)
