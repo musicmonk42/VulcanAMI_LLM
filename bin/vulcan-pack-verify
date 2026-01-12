@@ -37,7 +37,7 @@ class PackVerifier:
         self.errors = []
         self.warnings = []
     
-    def verify(self, full: bool = False) -> Dict[str, Any]:
+    def verify(self, full: bool = False, verify_bloom: bool = False) -> Dict[str, Any]:
         """Verify packfile"""
         logger.info(f"Verifying packfile: {self.pack_path}")
         
@@ -72,6 +72,21 @@ class PackVerifier:
             index_size = struct.unpack('>I', f.read(4))[0]
             compressed_index = f.read(index_size)
             
+            # Verify bloom filter if requested
+            if verify_bloom:
+                logger.info("Verifying bloom filter accuracy...")
+                bloom_result = self._verify_bloom_filter(bloom_filter, bloom_size)
+                
+                if bloom_result['false_positive_rate'] > 0.1:
+                    self.warnings.append(
+                        f"High false positive rate: {bloom_result['false_positive_rate']:.2%}"
+                    )
+                
+                logger.info(f"✅ Bloom filter verification complete:")
+                logger.info(f"   Coverage: {bloom_result['coverage']:.2%}")
+                logger.info(f"   False positive rate: {bloom_result['false_positive_rate']:.4%}")
+                logger.info(f"   Bits set: {bloom_result['bits_set']}/{bloom_result['total_bits']}")
+            
             # Verify chunk count
             if full:
                 logger.info("Performing full verification...")
@@ -80,6 +95,58 @@ class PackVerifier:
                 pass
             
             return self._build_result(len(self.errors) == 0)
+    
+    def _verify_bloom_filter(self, bloom_filter: bytes, bloom_size: int) -> Dict[str, Any]:
+        """
+        Verify bloom filter accuracy and calculate metrics.
+        
+        Returns:
+            Dictionary with:
+                - coverage: Percentage of bits set
+                - false_positive_rate: Estimated FP rate
+                - bits_set: Number of bits set
+                - total_bits: Total bits in bloom filter
+        """
+        total_bits = bloom_size * 8
+        bits_set = 0
+        
+        # Count set bits
+        for byte in bloom_filter:
+            bits_set += bin(byte).count('1')
+        
+        # Calculate coverage
+        coverage = bits_set / total_bits if total_bits > 0 else 0
+        
+        # Estimate false positive rate using standard bloom filter formula
+        # FP rate ≈ (1 - e^(-kn/m))^k
+        # where k = number of hash functions (7 in our case)
+        # n = number of elements (estimated from bits set)
+        # m = total bits
+        
+        k = 7  # Number of hash functions used
+        
+        # Estimate number of elements from coverage
+        # coverage = 1 - (1 - 1/m)^(kn)
+        # Solving for n: n ≈ -m * ln(1 - coverage) / k
+        import math
+        if coverage > 0 and coverage < 1:
+            estimated_elements = -total_bits * math.log(1 - coverage) / k
+        else:
+            estimated_elements = 0
+        
+        # Calculate false positive rate
+        if total_bits > 0 and estimated_elements > 0:
+            fp_rate = (1 - math.exp(-k * estimated_elements / total_bits)) ** k
+        else:
+            fp_rate = 0.0
+        
+        return {
+            'coverage': coverage,
+            'false_positive_rate': fp_rate,
+            'bits_set': bits_set,
+            'total_bits': total_bits,
+            'estimated_elements': int(estimated_elements)
+        }
     
     def _build_result(self, success: bool) -> Dict[str, Any]:
         return {
@@ -120,7 +187,7 @@ def main():
     
     # Verify pack
     verifier = PackVerifier(args.packfile)
-    result = verifier.verify(full=args.full)
+    result = verifier.verify(full=args.full, verify_bloom=args.bloom)
     
     # Output results
     if args.json:
