@@ -46,11 +46,8 @@ def _normalize_conclusion_to_string(conclusion: Any) -> Optional[str]:
     """
     Normalize a conclusion value to a string, handling dict and other types.
     
-    This function provides type-safe extraction of conclusion strings from
-    reasoning results that may be returned as dicts, strings, or other types.
-    
-    Industry best practice: Defensive programming with explicit type handling
-    to prevent AttributeError when calling string methods on non-string types.
+    Provides type-safe extraction using explicit type checking and graceful
+    fallbacks to prevent AttributeError on string operations.
     
     Args:
         conclusion: The conclusion value from reasoning results
@@ -1600,8 +1597,7 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
             # Check each source: prioritize content existence, then confidence
             candidates = []
             
-            # Normalize conclusions to strings (handle dict/other types)
-            # Industry best practice: Type normalization before string operations
+            # Normalize conclusions to strings (handle dict/other types defensively)
             unified_conclusion = _normalize_conclusion_to_string(unified_conclusion)
             agent_conclusion = _normalize_conclusion_to_string(agent_conclusion)
             direct_conclusion = _normalize_conclusion_to_string(direct_conclusion)

@@ -221,12 +221,7 @@ class ReasoningIntegration:
         """
         Check if query is self-referential (asks about the system itself).
         
-        This is a wrapper method that delegates to the imported function
-        from query_analysis module. Instance method is needed for use in
-        apply_reasoning method.
-        
-        Industry best practice: Delegation pattern for clean separation of
-        concerns while maintaining object-oriented interface.
+        Wrapper method that delegates to the imported is_self_referential function.
         
         Args:
             query: The user query to analyze
@@ -240,12 +235,7 @@ class ReasoningIntegration:
         """
         Check if query requires ethical analysis or moral reasoning.
         
-        This is a wrapper method that delegates to the imported function
-        from query_analysis module. Instance method is needed for use in
-        apply_reasoning method.
-        
-        Industry best practice: Delegation pattern for clean separation of
-        concerns while maintaining object-oriented interface.
+        Wrapper method that delegates to the imported is_ethical_query function.
         
         Args:
             query: The user query to analyze
@@ -259,12 +249,7 @@ class ReasoningIntegration:
         """
         Consult world model for introspective queries about system capabilities.
         
-        This is a wrapper method that delegates to the imported function
-        from query_analysis module. Instance method is needed for use in
-        apply_reasoning method.
-        
-        Industry best practice: Delegation pattern for clean separation of
-        concerns while maintaining object-oriented interface.
+        Wrapper method that delegates to the imported consult_world_model_introspection function.
         
         Args:
             query: The user query
