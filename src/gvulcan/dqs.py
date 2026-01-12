@@ -17,6 +17,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
+from src.utils.performance_metrics import PerformanceTimer
+
 logger = logging.getLogger(__name__)
 
 # Schema Registry for validation
@@ -274,7 +276,7 @@ class DQSScorer:
 
     def score(self, comp: DQSComponents) -> DQSResult:
         """
-        Score a data item with optional schema validation.
+        Score a data item with optional schema validation and performance tracking.
 
         Args:
             comp: DQS components
@@ -282,63 +284,64 @@ class DQSScorer:
         Returns:
             DQSResult with score, gate decision, and validation metadata
         """
-        # Schema validation
-        schema_validation_score = 1.0  # Default: perfect validation
-        validation_metadata = {}
-        
-        if self.enable_schema_validation and self.schema_registry:
-            try:
-                # Convert components to dict for validation
-                comp_dict = comp.to_dict()
-                
-                # Validate against dqs_components schema
-                validation_result = self.schema_registry.validate(comp_dict, "dqs_components")
-                
-                if validation_result.valid:
-                    schema_validation_score = 1.0
-                    validation_metadata["schema_valid"] = True
-                else:
-                    # Penalize score based on validation errors
-                    error_count = len(validation_result.errors)
-                    schema_validation_score = max(0.0, 1.0 - (error_count * 0.1))
-                    validation_metadata["schema_valid"] = False
-                    validation_metadata["schema_errors"] = error_count
-                    logger.warning(
-                        f"DQS component schema validation failed: {error_count} error(s)"
-                    )
-            except Exception as e:
-                logger.error(f"Schema validation error in DQS scoring: {e}")
-                validation_metadata["schema_validation_error"] = str(e)
-        
-        # Compute base score using selected model
-        if self.model == "v2":
-            base_score = compute_dqs_v2(comp, self.weights)
-        elif self.model == "strict":
-            base_score = compute_dqs_v2(comp, self.weights, pii_penalty_factor=2.0)
-        else:
-            base_score = compute_dqs(comp, self.weights)
-        
-        # Incorporate schema validation into final score (10% weight)
-        if self.enable_schema_validation and schema_validation_score < 1.0:
-            final_score = base_score * 0.9 + schema_validation_score * 0.1
-            validation_metadata["base_score"] = base_score
-            validation_metadata["schema_score"] = schema_validation_score
-            validation_metadata["final_score"] = final_score
-        else:
-            final_score = base_score
+        with PerformanceTimer("dqs_scoring", self.model):
+            # Schema validation
+            schema_validation_score = 1.0  # Default: perfect validation
+            validation_metadata = {}
+            
+            if self.enable_schema_validation and self.schema_registry:
+                try:
+                    # Convert components to dict for validation
+                    comp_dict = comp.to_dict()
+                    
+                    # Validate against dqs_components schema
+                    validation_result = self.schema_registry.validate(comp_dict, "dqs_components")
+                    
+                    if validation_result.valid:
+                        schema_validation_score = 1.0
+                        validation_metadata["schema_valid"] = True
+                    else:
+                        # Penalize score based on validation errors
+                        error_count = len(validation_result.errors)
+                        schema_validation_score = max(0.0, 1.0 - (error_count * 0.1))
+                        validation_metadata["schema_valid"] = False
+                        validation_metadata["schema_errors"] = error_count
+                        logger.warning(
+                            f"DQS component schema validation failed: {error_count} error(s)"
+                        )
+                except Exception as e:
+                    logger.error(f"Schema validation error in DQS scoring: {e}")
+                    validation_metadata["schema_validation_error"] = str(e)
+            
+            # Compute base score using selected model
+            if self.model == "v2":
+                base_score = compute_dqs_v2(comp, self.weights)
+            elif self.model == "strict":
+                base_score = compute_dqs_v2(comp, self.weights, pii_penalty_factor=2.0)
+            else:
+                base_score = compute_dqs(comp, self.weights)
+            
+            # Incorporate schema validation into final score (10% weight)
+            if self.enable_schema_validation and schema_validation_score < 1.0:
+                final_score = base_score * 0.9 + schema_validation_score * 0.1
+                validation_metadata["base_score"] = base_score
+                validation_metadata["schema_score"] = schema_validation_score
+                validation_metadata["final_score"] = final_score
+            else:
+                final_score = base_score
 
-        decision = gate(final_score, self.reject_below, self.quarantine_below)
+            decision = gate(final_score, self.reject_below, self.quarantine_below)
 
-        result = DQSResult(
-            score=final_score, 
-            components=comp, 
-            gate_decision=decision,
-            metadata=validation_metadata
-        )
+            result = DQSResult(
+                score=final_score, 
+                components=comp, 
+                gate_decision=decision,
+                metadata=validation_metadata
+            )
 
-        logger.debug(f"Scored item: {final_score:.3f} -> {decision}")
+            logger.debug(f"Scored item: {final_score:.3f} -> {decision}")
 
-        return result
+            return result
 
     def score_batch(self, items: List[DQSComponents]) -> List[DQSResult]:
         """

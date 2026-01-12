@@ -3043,125 +3043,128 @@ class WorldModel:
         Update world model from new observation
         FIXED: Refactored locking to prevent deadlock with router.
         INTEGRATED: Schema validation for observations
+        ENHANCED: Performance tracking for observation processing
         """
+        from src.utils.performance_metrics import PerformanceTimer
 
-        start_time = time.time()
+        with PerformanceTimer("world_model_update", "observation_processing"):
+            start_time = time.time()
 
-        # --- Part 1: Validation and Planning (Locked) ---
-        with self.lock:
-            # Schema validation (if enabled)
-            validation_errors = []
-            if self.validate_observations and self.schema_registry:
+            # --- Part 1: Validation and Planning (Locked) ---
+            with self.lock:
+                # Schema validation (if enabled)
+                validation_errors = []
+                if self.validate_observations and self.schema_registry:
+                    try:
+                        # Convert observation to dict for validation
+                        obs_dict = {
+                            "timestamp": observation.timestamp,
+                            "domain": observation.domain,
+                            "variables": observation.variables,
+                            "confidence": observation.confidence,
+                        }
+                        if observation.metadata:
+                            obs_dict["metadata"] = observation.metadata
+                        
+                        # Validate against observation schema
+                        validation_result = self.schema_registry.validate(obs_dict, "observation")
+                        if not validation_result.valid:
+                            validation_errors = [err.to_dict() for err in validation_result.errors]
+                            logger.warning(
+                                f"Observation schema validation failed: {len(validation_errors)} error(s). "
+                                "Processing will continue but data quality may be compromised."
+                            )
+                            for err in validation_result.errors[:3]:  # Log first 3 errors
+                                logger.debug(f"  - {err.message} at {err.path}")
+                    except Exception as e:
+                        logger.error(f"Schema validation error: {e}", exc_info=True)
+                
+                # EXAMINE: Validate and analyze observation
+                is_valid, error_msg = self.observation_processor.validate_observation(
+                    observation
+                )
+                if not is_valid:
+                    logger.warning("Invalid observation: %s", error_msg)
+                    return {"status": "rejected", "reason": error_msg}
+
+                # Extract components
+                variables = self.observation_processor.extract_variables(observation)
+                intervention_data = self.observation_processor.detect_intervention_data(
+                    observation
+                )
+                temporal_patterns = self.observation_processor.extract_temporal_patterns(
+                    observation
+                )
+
+                # --- START NEW LINGUISTIC PROCESSING ---
+                linguistic_data = self.observation_processor.extract_linguistic_data(
+                    observation
+                )
+                if linguistic_data:
+                    self.update_from_text(linguistic_data, {})  # Use the new method
+                # --- END NEW LINGUISTIC PROCESSING ---
+
+                # SELECT: Use router to determine which updates to run
+                if self.router:
+                    constraints = {"time_budget_ms": 1000, "priority_threshold": "normal"}
+                    update_plan = self.router.route(observation, constraints)
+                else:
+                    # Fallback: run all updates sequentially
+                    update_plan = None
+                    execution_results = self._sequential_update(observation)
+
+            # --- Part 2: Execution (Unlocked) ---
+            # The router executes its own updates, which manage their own locks.
+            # This MUST be called outside the main lock to prevent deadlock.
+            if self.router and update_plan:
                 try:
-                    # Convert observation to dict for validation
-                    obs_dict = {
-                        "timestamp": observation.timestamp,
-                        "domain": observation.domain,
-                        "variables": observation.variables,
-                        "confidence": observation.confidence,
-                    }
-                    if observation.metadata:
-                        obs_dict["metadata"] = observation.metadata
-                    
-                    # Validate against observation schema
-                    validation_result = self.schema_registry.validate(obs_dict, "observation")
-                    if not validation_result.valid:
-                        validation_errors = [err.to_dict() for err in validation_result.errors]
-                        logger.warning(
-                            f"Observation schema validation failed: {len(validation_errors)} error(s). "
-                            "Processing will continue but data quality may be compromised."
-                        )
-                        for err in validation_result.errors[:3]:  # Log first 3 errors
-                            logger.debug(f"  - {err.message} at {err.path}")
+                    execution_results = self.router.execute(update_plan)
                 except Exception as e:
-                    logger.error(f"Schema validation error: {e}", exc_info=True)
-            
-            # EXAMINE: Validate and analyze observation
-            is_valid, error_msg = self.observation_processor.validate_observation(
-                observation
-            )
-            if not is_valid:
-                logger.warning("Invalid observation: %s", error_msg)
-                return {"status": "rejected", "reason": error_msg}
+                    logger.error(f"Router execution failed: {e}", exc_info=True)
+                    return {"status": "error", "reason": f"Router execution failed: {e}"}
 
-            # Extract components
-            variables = self.observation_processor.extract_variables(observation)
-            intervention_data = self.observation_processor.detect_intervention_data(
-                observation
-            )
-            temporal_patterns = self.observation_processor.extract_temporal_patterns(
-                observation
-            )
+            # --- Part 3: Finalization (Locked) ---
+            with self.lock:
+                # NOTE: The router's execution plan (e.g., _execute_intervention_update)
+                # is now responsible for calling process_intervention_observation.
+                # The redundant call here has been removed to prevent duplicate processing
+                # and fix the deadlock.
 
-            # --- START NEW LINGUISTIC PROCESSING ---
-            linguistic_data = self.observation_processor.extract_linguistic_data(
-                observation
-            )
-            if linguistic_data:
-                self.update_from_text(linguistic_data, {})  # Use the new method
-            # --- END NEW LINGUISTIC PROCESSING ---
+                # Bootstrap mode: check for testable correlations
+                if self.bootstrap_mode and INTERVENTION_MANAGER_AVAILABLE:
+                    self._check_bootstrap_opportunities()
 
-            # SELECT: Use router to determine which updates to run
-            if self.router:
-                constraints = {"time_budget_ms": 1000, "priority_threshold": "normal"}
-                update_plan = self.router.route(observation, constraints)
-            else:
-                # Fallback: run all updates sequentially
-                update_plan = None
-                execution_results = self._sequential_update(observation)
+                # REMEMBER: Update state and validate periodically
+                self.observation_count += 1
+                self.last_observation_time = observation.timestamp
 
-        # --- Part 2: Execution (Unlocked) ---
-        # The router executes its own updates, which manage their own locks.
-        # This MUST be called outside the main lock to prevent deadlock.
-        if self.router and update_plan:
-            try:
-                execution_results = self.router.execute(update_plan)
-            except Exception as e:
-                logger.error(f"Router execution failed: {e}", exc_info=True)
-                return {"status": "error", "reason": f"Router execution failed: {e}"}
+                # Periodic validation
+                validation_result = self.consistency_validator.validate_if_needed()
 
-        # --- Part 3: Finalization (Locked) ---
-        with self.lock:
-            # NOTE: The router's execution plan (e.g., _execute_intervention_update)
-            # is now responsible for calling process_intervention_observation.
-            # The redundant call here has been removed to prevent duplicate processing
-            # and fix the deadlock.
+            # Prepare response
+            execution_time = (time.time() - start_time) * 1000
 
-            # Bootstrap mode: check for testable correlations
-            if self.bootstrap_mode and INTERVENTION_MANAGER_AVAILABLE:
-                self._check_bootstrap_opportunities()
-
-            # REMEMBER: Update state and validate periodically
-            self.observation_count += 1
-            self.last_observation_time = observation.timestamp
-
-            # Periodic validation
-            validation_result = self.consistency_validator.validate_if_needed()
-
-        # Prepare response
-        execution_time = (time.time() - start_time) * 1000
-
-        response = {
-            "status": "success",
-            "variables_extracted": len(variables),
-            "patterns_detected": len(temporal_patterns.get("trends", {})),
-            "intervention_processed": intervention_data is not None,
-            "updates_executed": execution_results.get("updates_executed", []),
-            "execution_time_ms": execution_time,
-            "validation": validation_result,
-            "safety_checks": self.safety_mode,
-            "meta_reasoning_enabled": self.meta_reasoning_enabled,
-            "self_improvement_enabled": self.self_improvement_enabled,
-        }
-        
-        # Add schema validation results if applicable
-        if self.validate_observations and validation_errors:
-            response["schema_validation"] = {
-                "valid": len(validation_errors) == 0,
-                "errors": validation_errors,
+            response = {
+                "status": "success",
+                "variables_extracted": len(variables),
+                "patterns_detected": len(temporal_patterns.get("trends", {})),
+                "intervention_processed": intervention_data is not None,
+                "updates_executed": execution_results.get("updates_executed", []),
+                "execution_time_ms": execution_time,
+                "validation": validation_result,
+                "safety_checks": self.safety_mode,
+                "meta_reasoning_enabled": self.meta_reasoning_enabled,
+                "self_improvement_enabled": self.self_improvement_enabled,
             }
-        
-        return response
+            
+            # Add schema validation results if applicable
+            if self.validate_observations and validation_errors:
+                response["schema_validation"] = {
+                    "valid": len(validation_errors) == 0,
+                    "errors": validation_errors,
+                }
+            
+            return response
 
     def update_from_text(self, text: str, predictions: Dict[str, Any]):
         """
