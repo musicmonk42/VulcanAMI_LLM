@@ -16,7 +16,10 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
-from vulcan.api.models import UnifiedChatRequest
+from enum import Enum as EnumBase
+
+from vulcan.api.models import UnifiedChatRequest, VulcanResponse
+from vulcan.arena import AIOHTTP_AVAILABLE
 from vulcan.endpoints.chat_helpers import (
     truncate_history,
     build_context,
@@ -25,6 +28,7 @@ from vulcan.endpoints.chat_helpers import (
     MAX_HISTORY_MESSAGES,
     MAX_HISTORY_TOKENS,
     MAX_MESSAGE_LENGTH,
+    MAX_REASONING_STEPS,
     SLOW_PHASE_THRESHOLD_MS,
     SLOW_REQUEST_THRESHOLD_MS,
     GC_SIGNIFICANT_CLEANUP_THRESHOLD,
@@ -32,6 +36,7 @@ from vulcan.endpoints.chat_helpers import (
     MAX_REASONING_RESULT_LENGTH,
     HANDLED_DICT_RESULT_KEYS,
 )
+from vulcan.reasoning.formatters import format_direct_reasoning_response as _format_direct_reasoning_response
 from vulcan.endpoints.utils import require_deployment
 from vulcan.metrics import error_counter
 from vulcan.reasoning.integration.utils import observe_query_start, observe_outcome, observe_engine_result
