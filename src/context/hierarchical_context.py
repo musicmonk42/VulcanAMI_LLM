@@ -826,32 +826,6 @@ class HierarchicalContext:
                 last_pruning=self._last_pruning,
             )
 
-            # Retrieval time
-            avg_retrieval_time = (
-                sum(self._retrieval_times) / len(self._retrieval_times)
-                if self._retrieval_times
-                else 0.0
-            )
-
-            # Cache hit rate
-            total_requests = self._cache_hits + self._cache_misses
-            cache_hit_rate = (
-                self._cache_hits / total_requests if total_requests > 0 else 0.0
-            )
-
-            return MemoryStatistics(
-                episodic_count=len(self.episodic),
-                semantic_count=len(self.semantic_index),
-                procedural_count=len(self.procedural),
-                total_size_bytes=total_size,
-                avg_retrieval_time_ms=avg_retrieval_time,
-                consolidation_count=self._consolidation_count,
-                pruning_count=self._pruning_count,
-                cache_hit_rate=cache_hit_rate,
-                last_consolidation=self._last_consolidation,
-                last_pruning=self._last_pruning,
-            )
-
     def clear_cache(self) -> None:
         """Clear retrieval cache"""
         with self._lock:

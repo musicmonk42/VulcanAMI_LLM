@@ -743,13 +743,15 @@ Include comments explaining optimizations made.
     def _make_cache_key(self, subgraph: Dict[str, Any], backend: str) -> str:
         """
         Generate a unique cache key for a subgraph and backend combination.
+        Uses MD5 for faster hashing (sufficient for non-cryptographic cache keys).
         """
         # Create a deterministic string representation
         subgraph_str = json.dumps(subgraph, sort_keys=True)
         combined = f"{backend}:{subgraph_str}"
 
-        # Generate hash
-        return hashlib.sha256(combined.encode()).hexdigest()
+        # Generate hash - MD5 is faster and sufficient for cache keys
+        # usedforsecurity=False indicates this is not for security purposes
+        return hashlib.md5(combined.encode(), usedforsecurity=False).hexdigest()
 
     def _get_from_cache(self, cache_key: str) -> Optional[Dict[str, Any]]:
         """Retrieve kernel from cache."""
