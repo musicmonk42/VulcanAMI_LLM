@@ -337,15 +337,15 @@ class StrategyOrchestrator:
                             tool_predictions[tool] = cost_pred.get(
                                 CostComponent.TIME_MS.value, {}
                             ).get('mean', float('inf'))
-            except Exception as e:
-                logger.warning(f"[Strategy] Cost prediction failed: {e}")
-                # Fallback to default predictions
-                for tool in self.available_tools:
-                    tool_predictions[tool] = 1000.0  # 1 second default
-        else:
-            # Fallback predictions
-            for tool in self.available_tools:
-                tool_predictions[tool] = 1000.0
+                    except Exception as e:
+                        logger.warning(f"[Strategy] Cost prediction failed: {e}")
+                        # Fallback to default predictions
+                        for tool in self.available_tools:
+                            tool_predictions[tool] = 1000.0  # 1 second default
+                else:
+                    # Fallback predictions
+                    for tool in self.available_tools:
+                        tool_predictions[tool] = 1000.0
         
         # Step 5: Get tool health status
         health_status = "healthy"
