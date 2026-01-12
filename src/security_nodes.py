@@ -9,21 +9,24 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding
 
-# Handle KeyManager import - it doesn't exist, so handle gracefully
+# Handle KeyManager import - use unified version
 try:
+    from key_manager import KeyManager
+except ImportError:
     try:
         from .key_manager import KeyManager
     except ImportError:
-        from key_manager import KeyManager
-except ImportError:
-    # KeyManager doesn't exist - create a minimal stub
-    class KeyManager:
-        def __init__(self, agent_id: str):
-            self.agent_id = agent_id
-            self.keys = {}
+        # Fallback stub if unified KeyManager isn't available
+        class KeyManager:
+            def __init__(self, agent_id: str):
+                self.agent_id = agent_id
+                self.keys = {}
 
-        def get_key(self, key_id: str):
-            return self.keys.get(key_id)
+            def get_key(self, key_id: str):
+                return self.keys.get(key_id)
+
+            def store_key(self, key_id: str, key_data):
+                self.keys[key_id] = key_data
 
 
 # NSOAligner exists

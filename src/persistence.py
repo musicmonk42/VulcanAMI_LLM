@@ -147,103 +147,42 @@ class WorkingMemory:
             }
 
 
+# Import unified KeyManager
+from key_manager import KeyManager as UnifiedKeyManager
+
+
+# Backward compatibility wrapper for persistence.py
+# This ensures existing code continues to work without changes
 class KeyManager:
-    """Manages cryptographic keys with secure persistence."""
+    """
+    Backward compatibility wrapper for persistence.py KeyManager.
+    
+    This wrapper delegates to the unified KeyManager implementation while
+    maintaining the exact API expected by existing persistence code.
+    """
 
     def __init__(self, keys_dir: Path):
+        # Use the unified KeyManager with ECC configuration
+        self._manager = UnifiedKeyManager(
+            key_store_dir=keys_dir,
+            algorithm=None,  # Uses default ECDSA_P256
+            auto_generate=True
+        )
+        # Expose attributes for backward compatibility
         self.keys_dir = keys_dir
-        self.keys_dir.mkdir(exist_ok=True, parents=True)
-        self.private_key_path = self.keys_dir / "private_key.pem"
-        self.public_key_path = self.keys_dir / "public_key.pem"
-        self.lock = threading.Lock()
-
-        # Load or generate keys
-        self.private_key, self.public_key = self._load_or_generate_keys()
-
-    def _load_or_generate_keys(
-        self,
-    ) -> Tuple[ec.EllipticCurvePrivateKey, ec.EllipticCurvePublicKey]:
-        """Load existing keys or generate new ones."""
-        with self.lock:
-            if self.private_key_path.exists() and self.public_key_path.exists():
-                try:
-                    # Load existing keys
-                    with open(self.private_key_path, "rb") as f:
-                        private_key = serialization.load_pem_private_key(
-                            f.read(), password=None, backend=default_backend()
-                        )
-
-                    with open(self.public_key_path, "rb") as f:
-                        public_key = serialization.load_pem_public_key(
-                            f.read(), backend=default_backend()
-                        )
-
-                    logger.info("Loaded existing cryptographic keys")
-                    return private_key, public_key
-
-                except Exception as e:
-                    logger.error(f"Failed to load keys: {e}")
-                    raise KeyManagementError(f"Failed to load keys: {e}")
-            else:
-                # Generate new keys
-                logger.info("Generating new cryptographic keys")
-                private_key = ec.generate_private_key(ec.SECP256R1(), default_backend())
-                public_key = private_key.public_key()
-
-                # Persist keys
-                self._save_keys(private_key, public_key)
-
-                return private_key, public_key
-
-    def _save_keys(
-        self,
-        private_key: ec.EllipticCurvePrivateKey,
-        public_key: ec.EllipticCurvePublicKey,
-    ):
-        """Save keys to disk securely."""
-        try:
-            # Save private key
-            private_pem = private_key.private_bytes(
-                encoding=serialization.Encoding.PEM,
-                format=serialization.PrivateFormat.PKCS8,
-                encryption_algorithm=serialization.NoEncryption(),  # In production, use password encryption
-            )
-
-            with open(self.private_key_path, "wb") as f:
-                f.write(private_pem)
-
-            # Set restrictive permissions on private key
-            os.chmod(self.private_key_path, 0o600)
-
-            # Save public key
-            public_pem = public_key.public_bytes(
-                encoding=serialization.Encoding.PEM,
-                format=serialization.PublicFormat.SubjectPublicKeyInfo,
-            )
-
-            with open(self.public_key_path, "wb") as f:
-                f.write(public_pem)
-
-            logger.info("Saved cryptographic keys to disk")
-
-        except Exception as e:
-            logger.error(f"Failed to save keys: {e}")
-            raise KeyManagementError(f"Failed to save keys: {e}")
+        self.private_key_path = self._manager.private_key_path
+        self.public_key_path = self._manager.public_key_path
+        self.lock = self._manager.lock
+        self.private_key = self._manager._cached_private_key
+        self.public_key = self._manager._cached_public_key
 
     def sign_data(self, data: bytes) -> str:
         """Signs data using ECDSA and returns the hex signature."""
-        return self.private_key.sign(data, ec.ECDSA(hashes.SHA256())).hex()
+        return self._manager.sign_data(data)
 
     def verify_signature(self, data: bytes, signature: str) -> bool:
         """Verifies data signature using the public key."""
-        try:
-            self.public_key.verify(
-                bytes.fromhex(signature), data, ec.ECDSA(hashes.SHA256())
-            )
-            return True
-        except (InvalidSignature, ValueError) as e:
-            logger.debug(f"Signature verification failed: {e}")
-            return False
+        return self._manager.verify_signature(data, signature)
 
 
 class ConnectionPool:
