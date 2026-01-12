@@ -260,6 +260,11 @@ class HierarchicalContext:
         self._last_consolidation = time.time()
         self._last_pruning = time.time()
         self._retrieval_times: deque = deque(maxlen=100)
+        
+        # Incremental size tracking for O(1) statistics
+        self._ep_size_bytes: int = 0
+        self._sem_size_bytes: int = 0
+        self._proc_size_bytes: int = 0
 
     # ================================ Public Retrieval ================================ #
 
@@ -669,6 +674,10 @@ class HierarchicalContext:
 
         # Remove in reverse order to preserve indices
         for idx in sorted(to_remove, reverse=True):
+            # Update size tracking before removal
+            item = self.episodic[idx]
+            item_size = len(str(asdict(item)))
+            self._ep_size_bytes -= item_size
             del self.episodic[idx]
 
         return len(to_remove)
@@ -708,9 +717,12 @@ class HierarchicalContext:
         scored.sort(key=lambda x: x[0])
         to_remove = [idx for _, idx in scored[:count]]
 
-        # Update indices
+        # Update indices and size tracking
         for idx in sorted(to_remove, reverse=True):
             entry = self.semantic_index[idx]
+            # Update size tracking before removal
+            entry_size = len(str(asdict(entry)))
+            self._sem_size_bytes -= entry_size
             # Remove from term index
             for term in entry.terms:
                 self._semantic_term_index[term].discard(idx)
@@ -750,9 +762,12 @@ class HierarchicalContext:
         scored.sort(key=lambda x: x[0])
         to_remove = [idx for _, idx in scored[:count]]
 
-        # Update indices
+        # Update indices and size tracking
         for idx in sorted(to_remove, reverse=True):
             pattern = self.procedural[idx]
+            # Update size tracking before removal
+            pattern_size = len(str(asdict(pattern)))
+            self._proc_size_bytes -= pattern_size
             # Remove from term index
             for term in pattern.signature_terms:
                 self._procedural_term_index[term].discard(idx)
@@ -779,25 +794,37 @@ class HierarchicalContext:
     def get_statistics(self) -> MemoryStatistics:
         """
         Get comprehensive memory statistics.
+        Uses incremental size tracking for O(1) performance.
         """
         with self._lock:
-            # Compute sizes (approximate)
-            ep_size = sum(len(str(asdict(e))) for e in self.episodic[:100])
-            ep_size = (ep_size // 100) * len(self.episodic) if self.episodic else 0
+            # Use tracked sizes instead of sampling
+            total_size = self._ep_size_bytes + self._sem_size_bytes + self._proc_size_bytes
 
-            sem_size = sum(len(str(asdict(s))) for s in self.semantic_index[:100])
-            sem_size = (
-                (sem_size // 100) * len(self.semantic_index)
-                if self.semantic_index
-                else 0
+            # Retrieval time
+            avg_retrieval_time = (
+                sum(self._retrieval_times) / len(self._retrieval_times)
+                if self._retrieval_times
+                else 0.0
             )
 
-            proc_size = sum(len(str(asdict(p))) for p in self.procedural[:100])
-            proc_size = (
-                (proc_size // 100) * len(self.procedural) if self.procedural else 0
+            # Cache hit rate
+            total_requests = self._cache_hits + self._cache_misses
+            cache_hit_rate = (
+                self._cache_hits / total_requests if total_requests > 0 else 0.0
             )
 
-            total_size = ep_size + sem_size + proc_size
+            return MemoryStatistics(
+                episodic_count=len(self.episodic),
+                semantic_count=len(self.semantic_index),
+                procedural_count=len(self.procedural),
+                total_size_bytes=self._ep_size_bytes + self._sem_size_bytes + self._proc_size_bytes,
+                avg_retrieval_time_ms=avg_retrieval_time,
+                consolidation_count=self._consolidation_count,
+                pruning_count=self._pruning_count,
+                cache_hit_rate=cache_hit_rate,
+                last_consolidation=self._last_consolidation,
+                last_pruning=self._last_pruning,
+            )
 
             # Retrieval time
             avg_retrieval_time = (
@@ -881,14 +908,17 @@ class HierarchicalContext:
         self, prompt: Any, token: Any, trace: Any, importance: float = 1.0
     ) -> None:
         """Append to episodic memory"""
-        self.episodic.append(
-            EpisodicItem(
-                prompt=prompt,
-                token=token,
-                trace=trace,
-                importance=importance,
-            )
+        item = EpisodicItem(
+            prompt=prompt,
+            token=token,
+            trace=trace,
+            importance=importance,
         )
+        self.episodic.append(item)
+        
+        # Update size tracking
+        item_size = len(str(asdict(item)))
+        self._ep_size_bytes += item_size
 
     def _recent_episodic(self, k: int) -> List[EpisodicItem]:
         """Get k most recent episodic items"""
@@ -1023,11 +1053,15 @@ class HierarchicalContext:
         # Find existing
         for i, s in enumerate(self.semantic_index):
             if s.concept == concept:
+                old_size = len(str(asdict(s)))
                 s.freq += 1
                 s.last_seen = time.time()
                 s.importance = max(s.importance, importance)
                 if meta:
                     s.meta.update(meta)
+                # Update size tracking
+                new_size = len(str(asdict(s)))
+                self._sem_size_bytes += (new_size - old_size)
                 return
 
         # Add new
@@ -1036,6 +1070,10 @@ class HierarchicalContext:
         )
         idx = len(self.semantic_index)
         self.semantic_index.append(entry)
+        
+        # Update size tracking
+        entry_size = len(str(asdict(entry)))
+        self._sem_size_bytes += entry_size
 
         # Update index
         for term in terms:
@@ -1104,6 +1142,7 @@ class HierarchicalContext:
         # Find existing
         for i, p in enumerate(self.procedural):
             if p.name == name:
+                old_size = len(str(asdict(p)))
                 p.freq += 1
                 p.last_seen = time.time()
                 p.importance = max(p.importance, importance)
@@ -1114,6 +1153,9 @@ class HierarchicalContext:
                     dict.fromkeys([str(t) for t in (p.signature_terms or [])] + sig)
                 )[:50]
                 p.signature_terms = merged
+                # Update size tracking
+                new_size = len(str(asdict(p)))
+                self._proc_size_bytes += (new_size - old_size)
                 return
 
         # Add new
@@ -1122,6 +1164,10 @@ class HierarchicalContext:
         )
         idx = len(self.procedural)
         self.procedural.append(proc)
+        
+        # Update size tracking
+        proc_size = len(str(asdict(proc)))
+        self._proc_size_bytes += proc_size
 
         # Update index (ensure term is string for consistency)
         for term in sig:
