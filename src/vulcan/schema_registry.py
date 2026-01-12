@@ -39,18 +39,23 @@ logger = logging.getLogger(__name__)
 # Import schema auto-generator for converting EBNF to JSON Schema
 _SCHEMA_AUTO_GENERATOR_AVAILABLE = False
 try:
-    # Add tools directory to path for schema_auto_generator import
-    tools_path = Path(__file__).parent.parent.parent / "tools"
-    if str(tools_path) not in sys.path:
-        sys.path.insert(0, str(tools_path))
-    import schema_auto_generator as sag
+    # Try relative import first (when installed as package)
+    from ...tools import schema_auto_generator as sag
     _SCHEMA_AUTO_GENERATOR_AVAILABLE = True
-except ImportError as e:
-    logger.warning(
-        f"schema_auto_generator not available: {e}. "
-        "Schema generation from EBNF will be disabled."
-    )
-    sag = None
+except (ImportError, ValueError):
+    # Fall back to path manipulation for development/testing
+    try:
+        tools_path = Path(__file__).resolve().parent.parent.parent / "tools"
+        if tools_path.exists() and str(tools_path) not in sys.path:
+            sys.path.insert(0, str(tools_path))
+        import schema_auto_generator as sag
+        _SCHEMA_AUTO_GENERATOR_AVAILABLE = True
+    except ImportError as e:
+        logger.warning(
+            f"schema_auto_generator not available: {e}. "
+            "Schema generation from EBNF will be disabled."
+        )
+        sag = None
 
 
 # Default EBNF grammar definitions for Vulcan schemas

@@ -23,13 +23,17 @@ logger = logging.getLogger(__name__)
 SchemaRegistry = None
 _SCHEMA_REGISTRY_AVAILABLE = False
 try:
-    import sys
-    sys.path.insert(0, str(Path(__file__).parent.parent / "vulcan"))
-    from schema_registry import SchemaRegistry
+    # Try relative import first (when installed as package)
+    from ..vulcan.schema_registry import SchemaRegistry
     _SCHEMA_REGISTRY_AVAILABLE = True
-except ImportError as e:
-    logger.debug(f"SchemaRegistry not available: {e}")
-    SchemaRegistry = None
+except (ImportError, ValueError):
+    # Fall back to absolute import for development/testing
+    try:
+        from vulcan.schema_registry import SchemaRegistry
+        _SCHEMA_REGISTRY_AVAILABLE = True
+    except ImportError as e:
+        logger.debug(f"SchemaRegistry not available: {e}")
+        SchemaRegistry = None
 
 
 @dataclass
