@@ -28,8 +28,10 @@ class SafetyUnavailable:
 # Track availability
 SAFETY_VALIDATOR_AVAILABLE = False
 GOVERNANCE_ORCHESTRATOR_AVAILABLE = False
+DQS_AVAILABLE = False
 SafetyValidator = None
 GovernanceOrchestrator = None
+DQSValidator = None
 
 # Import SafetyValidator using relative import to avoid circular imports
 try:
@@ -55,6 +57,17 @@ except ImportError as e:
     GOVERNANCE_ORCHESTRATOR_AVAILABLE = False
     GovernanceOrchestrator = None
 
+# Import DQS integration using relative import
+try:
+    from .dqs_integration import DQSValidator as _DQSValidator, DQS_AVAILABLE as _DQS_AVAILABLE
+    
+    DQSValidator = _DQSValidator
+    DQS_AVAILABLE = _DQS_AVAILABLE
+except ImportError as e:
+    logger.warning(f"DQS integration not available: {e}")
+    DQS_AVAILABLE = False
+    DQSValidator = None
+
 
 def get_safety_validator():
     """Return EnhancedSafetyValidator if importable, else stub."""
@@ -72,6 +85,8 @@ __all__ = [
     "SafetyUnavailable",
     "SafetyValidator",
     "GovernanceOrchestrator",
+    "DQSValidator",
     "SAFETY_VALIDATOR_AVAILABLE",
     "GOVERNANCE_ORCHESTRATOR_AVAILABLE",
+    "DQS_AVAILABLE",
 ]

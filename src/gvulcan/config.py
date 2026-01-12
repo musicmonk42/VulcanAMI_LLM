@@ -1891,7 +1891,14 @@ class GVulcanConfig:
         return None
 
     def auto_tune(self) -> None:
-        """Auto-tune configuration based on system resources"""
+        """
+        Auto-tune configuration based on system resources.
+        
+        Industry standard implementation detecting:
+        - CPU cores for thread pool sizing
+        - Memory for cache sizing
+        - GPU resources for ML workloads
+        """
 
         import psutil
 
@@ -1919,8 +1926,49 @@ class GVulcanConfig:
         self.database.pool_size = min(cpu_count * 4, 100)
         self.database.max_overflow = self.database.pool_size // 2
 
+        # GPU detection for ML workloads
+        try:
+            import torch
+            if torch.cuda.is_available():
+                gpu_count = torch.cuda.device_count()
+                # Get memory of first GPU (assumes homogeneous GPU setup)
+                gpu_memory_gb = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+                
+                # Configure ML settings for GPU
+                self.ml.device = "cuda"
+                self.ml.distributed_training = gpu_count > 1
+                
+                # Adjust batch sizes based on GPU memory
+                if gpu_memory_gb >= 16:
+                    # High-end GPU (e.g., A100, V100)
+                    self.ml.batch_size = min(self.ml.batch_size * 2, 128)
+                elif gpu_memory_gb >= 8:
+                    # Mid-range GPU (e.g., RTX 3080, T4)
+                    self.ml.batch_size = min(self.ml.batch_size, 64)
+                else:
+                    # Lower-end GPU
+                    self.ml.batch_size = min(self.ml.batch_size, 32)
+                
+                logger.info(
+                    f"Detected {gpu_count} GPU(s) with {gpu_memory_gb:.1f}GB memory. "
+                    f"Configured for {'distributed' if gpu_count > 1 else 'single-GPU'} training."
+                )
+            else:
+                # No GPU available, use CPU
+                self.ml.device = "cpu"
+                self.ml.distributed_training = False
+                logger.info("No GPU detected, using CPU for ML workloads")
+        except ImportError:
+            # PyTorch not installed
+            logger.debug("PyTorch not available, skipping GPU detection")
+            pass
+        except Exception as e:
+            # Other errors during GPU detection
+            logger.warning(f"Error during GPU detection: {e}")
+            pass
+
         logger.info(
-            f"Auto-tuned configuration for {cpu_count} CPUs and {memory_gb:.1f} GB RAM"
+            f"Auto-tuned configuration for {cpu_count} CPUs, {memory_gb:.1f}GB RAM"
         )
 
     @contextmanager
