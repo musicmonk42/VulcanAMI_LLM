@@ -1867,6 +1867,94 @@ async def _background_services_initialization(app: FastAPI, worker_id: int, logg
                                 f"Failed to initialize CuriosityDriver: {cd_err}"
                             )
                         # ================================================================
+                        
+                        # ================================================================
+                        # FIX Issue 6: PERIODIC DATABASE CLEANUP SCHEDULING
+                        # Schedule periodic cleanup of SQLite databases to prevent
+                        # unbounded growth of query_outcomes.db and gap_resolutions.db
+                        # ================================================================
+                        try:
+                            async def periodic_database_cleanup():
+                                """
+                                Periodic task to clean up old data from SQLite databases.
+                                
+                                Runs every 24 hours and removes:
+                                - Query outcomes older than 7 days (outcome_bridge)
+                                - Gap resolutions older than 30 days (resolution_bridge)
+                                
+                                This prevents databases from growing unbounded.
+                                """
+                                from vulcan.curiosity_engine.outcome_bridge import cleanup_old_outcomes
+                                from vulcan.curiosity_engine.resolution_bridge import cleanup_old_data
+                                
+                                cleanup_interval = 86400  # 24 hours in seconds
+                                outcome_retention_days = 7  # Keep outcomes for 7 days
+                                resolution_retention_days = 30  # Keep resolutions for 30 days
+                                
+                                while True:
+                                    try:
+                                        await asyncio.sleep(cleanup_interval)
+                                        
+                                        logger.info(
+                                            "[DatabaseCleanup] Starting periodic cleanup "
+                                            f"(outcomes: {outcome_retention_days}d, "
+                                            f"resolutions: {resolution_retention_days}d)"
+                                        )
+                                        
+                                        # Clean up old query outcomes
+                                        try:
+                                            outcomes_deleted = cleanup_old_outcomes(days=outcome_retention_days)
+                                            logger.info(
+                                                f"[DatabaseCleanup] Deleted {outcomes_deleted} "
+                                                f"old query outcomes (>{outcome_retention_days} days)"
+                                            )
+                                        except Exception as e:
+                                            logger.warning(
+                                                f"[DatabaseCleanup] Outcome cleanup failed: {e}"
+                                            )
+                                        
+                                        # Clean up old gap resolutions
+                                        try:
+                                            resolutions_deleted = cleanup_old_data(days=resolution_retention_days)
+                                            logger.info(
+                                                f"[DatabaseCleanup] Deleted {resolutions_deleted} "
+                                                f"old gap resolutions (>{resolution_retention_days} days)"
+                                            )
+                                        except Exception as e:
+                                            logger.warning(
+                                                f"[DatabaseCleanup] Resolution cleanup failed: {e}"
+                                            )
+                                        
+                                        logger.info("[DatabaseCleanup] Periodic cleanup complete")
+                                        
+                                    except asyncio.CancelledError:
+                                        logger.info("[DatabaseCleanup] Cleanup task cancelled")
+                                        break
+                                    except Exception as e:
+                                        logger.error(
+                                            f"[DatabaseCleanup] Unexpected error in cleanup loop: {e}"
+                                        )
+                                        # Don't break - continue trying on next interval
+                            
+                            # Schedule the periodic cleanup task
+                            asyncio.create_task(
+                                periodic_database_cleanup(),
+                                name="periodic_database_cleanup"
+                            )
+                            logger.info(
+                                "✓ Database cleanup scheduled (interval=24h, "
+                                "outcomes_retention=7d, resolutions_retention=30d)"
+                            )
+                            
+                        except ImportError as e:
+                            logger.warning(
+                                f"Database cleanup modules not available: {e}"
+                            )
+                        except Exception as cleanup_err:
+                            logger.error(
+                                f"Failed to schedule database cleanup: {cleanup_err}"
+                            )
+                        # ================================================================
 
                     else:
                         logger.info(
