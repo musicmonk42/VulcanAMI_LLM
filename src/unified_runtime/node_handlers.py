@@ -62,9 +62,12 @@ except ImportError:
 
 # Import dispatchers with fallback
 try:
-    from .auto_ml_nodes import dispatch_auto_ml_node
+    from src.auto_ml_nodes import dispatch_auto_ml_node
 except ImportError:
-    dispatch_auto_ml_node = None
+    try:
+        from auto_ml_nodes import dispatch_auto_ml_node
+    except ImportError:
+        dispatch_auto_ml_node = None
 
 try:
     from .security_nodes import dispatch_security_node

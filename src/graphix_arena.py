@@ -166,6 +166,19 @@ except ImportError:
     SecurityAuditEngine = None
     SECURITY_AUDIT_AVAILABLE = False
 
+# Centralized audit logger integration
+try:
+    from audit_log import TamperEvidentLogger
+    
+    CENTRALIZED_AUDIT_AVAILABLE = True
+except ImportError:
+    try:
+        from src.audit_log import TamperEvidentLogger
+        CENTRALIZED_AUDIT_AVAILABLE = True
+    except ImportError:
+        TamperEvidentLogger = None
+        CENTRALIZED_AUDIT_AVAILABLE = False
+
 try:
     from llm_client import GraphixLLMClient
 
@@ -891,12 +904,31 @@ class GraphixArena:
             logger.warning("UnifiedRuntime not available, using mock runtime")
             self.runtime = self._create_mock_runtime()
 
-        # Initialize audit with fallback
-        if SECURITY_AUDIT_AVAILABLE and SecurityAuditEngine is not None:
+        # Initialize audit with centralized logger (fallback to SecurityAuditEngine, then mock)
+        # Priority: TamperEvidentLogger (centralized) > SecurityAuditEngine > Mock
+        if CENTRALIZED_AUDIT_AVAILABLE and TamperEvidentLogger is not None:
+            try:
+                self.audit_logger = TamperEvidentLogger()
+                self.audit = self._create_audit_wrapper(self.audit_logger)
+                logger.info("✅ Centralized TamperEvidentLogger initialized for Arena")
+            except Exception as e:
+                logger.warning(f"Failed to initialize TamperEvidentLogger: {e}")
+                if SECURITY_AUDIT_AVAILABLE and SecurityAuditEngine is not None:
+                    self.audit_logger = None
+                    self.audit = SecurityAuditEngine()
+                    logger.info("✅ SecurityAuditEngine initialized as fallback")
+                else:
+                    self.audit_logger = None
+                    self.audit = self._create_mock_audit()
+                    logger.warning("Using mock audit (no audit engines available)")
+        elif SECURITY_AUDIT_AVAILABLE and SecurityAuditEngine is not None:
+            self.audit_logger = None
             self.audit = SecurityAuditEngine()
+            logger.info("✅ SecurityAuditEngine initialized")
         else:
-            logger.warning("SecurityAuditEngine not available, using mock audit")
+            self.audit_logger = None
             self.audit = self._create_mock_audit()
+            logger.warning("SecurityAuditEngine not available, using mock audit")
 
         # Initialize LLM client with fallback and error handling
         if LLM_CLIENT_AVAILABLE and GraphixLLMClient is not None:
@@ -1177,6 +1209,62 @@ class GraphixArena:
 
         return MockRuntime()
 
+    def _create_audit_wrapper(self, audit_logger):
+        """
+        Create synchronous audit wrapper for TamperEvidentLogger.
+        
+        This adapter allows synchronous code to use the async TamperEvidentLogger
+        by running async calls in a thread pool executor.
+        
+        Args:
+            audit_logger: TamperEvidentLogger instance
+            
+        Returns:
+            Wrapper object with synchronous log_event method
+        """
+        import asyncio
+        from concurrent.futures import ThreadPoolExecutor
+        
+        class AuditLoggerWrapper:
+            def __init__(self, async_logger):
+                self.async_logger = async_logger
+                self.executor = ThreadPoolExecutor(max_workers=2)
+                
+            def log_event(self, event_type: str, details: Dict):
+                """
+                Synchronous wrapper for async emit_audit_event.
+                
+                Runs the async call in a thread pool to avoid blocking.
+                """
+                try:
+                    # Check if we're in an event loop
+                    try:
+                        loop = asyncio.get_running_loop()
+                        # We're in an async context, schedule the task
+                        asyncio.create_task(
+                            self.async_logger.emit_audit_event(
+                                event_type=event_type,
+                                details=details,
+                                critical=False
+                            )
+                        )
+                    except RuntimeError:
+                        # No event loop, run in executor
+                        def run_async():
+                            asyncio.run(
+                                self.async_logger.emit_audit_event(
+                                    event_type=event_type,
+                                    details=details,
+                                    critical=False
+                                )
+                            )
+                        self.executor.submit(run_async)
+                        
+                except Exception as e:
+                    logger.error(f"Audit logging failed: {e}")
+                    
+        return AuditLoggerWrapper(audit_logger)
+
     def _create_mock_audit(self):
         """Create mock audit engine."""
 
@@ -1379,6 +1467,19 @@ class GraphixArena:
         Returns:
             Dictionary with execution results and metadata
         """
+        # Emit audit event for graph execution start
+        graph_id = graph.get('id', graph.get('graph_id', 'unknown'))
+        start_time = time.time()
+        
+        self.audit.log_event(
+            "graph_execution_start",
+            {
+                "graph_id": graph_id,
+                "node_count": len(graph.get('nodes', [])),
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+        )
+        
         # Note: Validate graph structure before processing
         # This prevents "Missing 'nodes' field" errors from data integrity issues
         if not isinstance(graph, dict):
@@ -1405,31 +1506,34 @@ class GraphixArena:
             logger.info(f"[Arena] Executing graph with {len(nodes)} nodes (CPU fallback)")
 
         results = {}
+        execution_success = True
+        error_details = None
 
-        for node in nodes:
-            node_id = node.get('id')
-            op_type = node.get('op', 'mvm')
+        try:
+            for node in nodes:
+                node_id = node.get('id')
+                op_type = node.get('op', 'mvm')
 
-            # Get inputs from previous results or node data
-            inputs = self._gather_inputs(node, results)
+                # Get inputs from previous results or node data
+                inputs = self._gather_inputs(node, results)
 
-            # Route through dispatcher
-            if op_type in ('mvm', 'matmul', 'photonic_mvm', 'photonic_fused'):
-                # Build params for photonic ops
-                params = node.get('params', {})
-                if not params and op_type.startswith('photonic'):
-                    # Provide default photonic params
-                    params = {
-                        'noise_std': 0.01,
-                        'multiplexing': 'wavelength',
-                        'compression': 'ITU-F.748-quantized',
-                        'bandwidth_ghz': 100,
-                        'latency_ps': 50,
-                    }
-                
-                # Use original op_type if it's already a photonic operation,
-                # otherwise prefix with 'photonic_' for dispatcher routing
-                dispatch_op = op_type if op_type.startswith('photonic') else f'photonic_{op_type}'
+                # Route through dispatcher
+                if op_type in ('mvm', 'matmul', 'photonic_mvm', 'photonic_fused'):
+                    # Build params for photonic ops
+                    params = node.get('params', {})
+                    if not params and op_type.startswith('photonic'):
+                        # Provide default photonic params
+                        params = {
+                            'noise_std': 0.01,
+                            'multiplexing': 'wavelength',
+                            'compression': 'ITU-F.748-quantized',
+                            'bandwidth_ghz': 100,
+                            'latency_ps': 50,
+                        }
+                    
+                    # Use original op_type if it's already a photonic operation,
+                    # otherwise prefix with 'photonic_' for dispatcher routing
+                    dispatch_op = op_type if op_type.startswith('photonic') else f'photonic_{op_type}'
                 # FIX #6: Use async dispatch to offload CPU-intensive matrix ops
                 result = await self._dispatch_compute_async(
                     dispatch_op,
@@ -1443,6 +1547,32 @@ class GraphixArena:
                 )
 
             results[node_id] = result
+
+        except Exception as e:
+            execution_success = False
+            error_details = str(e)
+            logger.error(f"[Arena] Graph execution failed: {e}")
+            
+        # Emit audit event for graph execution completion
+        execution_time = time.time() - start_time
+        self.audit.log_event(
+            "graph_execution_complete",
+            {
+                "graph_id": graph_id,
+                "node_count": len(nodes),
+                "success": execution_success,
+                "execution_time_ms": execution_time * 1000,
+                "error": error_details,
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+        )
+        
+        if not execution_success:
+            return self._add_gdpr_metadata({
+                'results': results,
+                'success': False,
+                'error': error_details
+            })
 
         return self._add_gdpr_metadata({'results': results, 'success': True})
 
