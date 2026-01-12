@@ -79,6 +79,24 @@ except ImportError:
     )
 
 # ============================================================
+# GRAPHIX PLATFORM DEEP INTEGRATION - ConsensusManager
+# ============================================================
+# Import ConsensusManager for distributed voting on conflicting agent results
+try:
+    from src.consensus_manager import ConsensusManager
+    CONSENSUS_MANAGER_AVAILABLE = True
+except ImportError:
+    try:
+        from consensus_manager import ConsensusManager
+        CONSENSUS_MANAGER_AVAILABLE = True
+    except ImportError:
+        ConsensusManager = None
+        CONSENSUS_MANAGER_AVAILABLE = False
+        logging.getLogger(__name__).warning(
+            "ConsensusManager not available, distributed voting will be disabled"
+        )
+
+# ============================================================
 # REASONING INTEGRATION - Wire reasoning engines into task execution
 # ============================================================
 # CIRCULAR IMPORT FIX: Do NOT import UnifiedReasoner at module level.
@@ -1070,6 +1088,36 @@ class AgentPoolManager:
         self.auto_scaler = AutoScaler(self)
         self.recovery_manager = RecoveryManager(self)
         
+        # ============================================================
+        # GRAPHIX PLATFORM DEEP INTEGRATION - ConsensusManager
+        # ============================================================
+        # Initialize ConsensusManager for distributed voting on conflicting agent results
+        # and leader election for task assignment
+        self.consensus_manager = None
+        if CONSENSUS_MANAGER_AVAILABLE and ConsensusManager is not None:
+            try:
+                # Use conservative chaos parameters for production reliability
+                self.consensus_manager = ConsensusManager(
+                    chaos_params={
+                        "failure_rate": 0.05,  # 5% simulated failure rate
+                        "max_delay": 0.01,      # 10ms max delay
+                        "drop_rate": 0.0        # No dropped votes in production
+                    },
+                    timeout=0.1,  # 100ms voting timeout
+                    deadlock_threshold=3,
+                    max_retries=5,
+                    backend="thread"  # Use thread backend for Windows compatibility
+                )
+                logger.info(
+                    f"✅ ConsensusManager initialized for distributed voting "
+                    f"(quorum=0.51, timeout=100ms, backend=thread)"
+                )
+            except Exception as e:
+                logger.warning(f"Failed to initialize ConsensusManager: {e}")
+                self.consensus_manager = None
+        else:
+            logger.warning("⚠️ ConsensusManager not available - distributed voting disabled")
+        
         # Initialize TournamentManager for multi-agent selection
         self.tournament_manager = None
         if TOURNAMENT_MANAGER_AVAILABLE and TournamentManager is not None:
@@ -1095,7 +1143,8 @@ class AgentPoolManager:
             f"AgentPoolManager initialized: "
             f"min_agents={self.min_agents}, max_agents={self.max_agents}, "
             f"queue_type={task_queue_type}, "
-            f"cachetools_available={CACHETOOLS_AVAILABLE}"
+            f"cachetools_available={CACHETOOLS_AVAILABLE}, "
+            f"consensus_manager_available={self.consensus_manager is not None}"
         )
 
     # ========== THREAD POOL FIX: Background Job Executor ==========
