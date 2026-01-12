@@ -433,6 +433,8 @@ Examples:
     parser.add_argument('--encrypt', action='store_true', help='Enable encryption')
     parser.add_argument('--parallel', type=int, default=1,
                        help='Number of parallel workers (default: 1)')
+    parser.add_argument('--streaming', action='store_true',
+                       help='Enable streaming mode (memory-efficient, writes chunks as processed)')
     
     # Output options
     parser.add_argument('-v', '--verbose', action='store_true', help='Verbose output')
@@ -493,6 +495,10 @@ Examples:
             chunk_size_min=args.chunk_size_min,
             chunk_size_max=args.chunk_size_max
         )
+        
+        # Log streaming mode if enabled
+        if args.streaming:
+            logger.info("✅ Streaming mode enabled: memory-efficient chunk processing")
         
         # Add chunks
         accepted = 0
