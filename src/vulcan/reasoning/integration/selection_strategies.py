@@ -329,8 +329,13 @@ def select_with_tool_selector(
     """
     Select tools using the ToolSelector component.
 
-    This function provides the interface between the orchestrator and
-    the ToolSelector for tool selection based on query characteristics.
+    This function contains the IMPLEMENTATION for tool selection. It is called by:
+    1. orchestrator._select_with_tool_selector() as a thin wrapper (Adapter Pattern)
+    2. decomposition.py as a fallback when decomposition fails
+    
+    IMPORTANT: This function must NOT delegate back to orchestrator._select_with_tool_selector
+    to avoid infinite recursion. The orchestrator method delegates TO this function,
+    not the other way around.
 
     Args:
         orchestrator: ReasoningIntegration instance with initialized components
@@ -345,13 +350,7 @@ def select_with_tool_selector(
     Note:
         Falls back to default strategy if ToolSelector is unavailable.
     """
-    # Delegate to orchestrator's internal method if available
-    if hasattr(orchestrator, '_select_with_tool_selector'):
-        return orchestrator._select_with_tool_selector(
-            query, query_type, complexity, context
-        )
-    
-    # Fallback: Use ToolSelector directly if orchestrator doesn't have the method
+    # Use ToolSelector directly if available
     if orchestrator._tool_selector is not None:
         try:
             # Get selection mode based on complexity
