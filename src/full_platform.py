@@ -1797,6 +1797,45 @@ async def _background_services_initialization(app: FastAPI, worker_id: int, logg
                                 # Store reference in app state
                                 vulcan_module.app.state.curiosity_driver = curiosity_driver
 
+                                # ================================================================
+                                # FIX Issue 3: Wire CuriosityEngine gap callback to SelfImprovementDrive
+                                # This enables detected knowledge gaps to boost relevant improvement objectives
+                                # ================================================================
+                                try:
+                                    world_model = vulcan_deployment.collective.deps.world_model
+                                    if world_model and hasattr(world_model, 'self_improvement'):
+                                        self_improvement_drive = world_model.self_improvement
+                                        if self_improvement_drive and hasattr(
+                                            self_improvement_drive, 'process_gaps_from_curiosity_engine'
+                                        ):
+                                            # Wire the callback
+                                            curiosity_engine.set_on_gaps_detected_callback(
+                                                self_improvement_drive.process_gaps_from_curiosity_engine
+                                            )
+                                            logger.info(
+                                                "✓ CuriosityEngine → SelfImprovementDrive gap callback wired "
+                                                "(gap detection will boost improvement objectives)"
+                                            )
+                                        else:
+                                            logger.debug(
+                                                "SelfImprovementDrive found but lacks gap callback method - "
+                                                "skipping callback wiring"
+                                            )
+                                    else:
+                                        logger.debug(
+                                            "WorldModel or SelfImprovementDrive not available - "
+                                            "skipping gap callback wiring"
+                                        )
+                                except AttributeError as attr_err:
+                                    logger.debug(
+                                        f"Gap callback wiring skipped (expected during early init): {attr_err}"
+                                    )
+                                except Exception as callback_err:
+                                    logger.warning(
+                                        f"Failed to wire gap detection callback: {callback_err}"
+                                    )
+                                # ================================================================
+
                                 # Start the driver (async operation)
                                 async def start_curiosity_driver():
                                     try:
