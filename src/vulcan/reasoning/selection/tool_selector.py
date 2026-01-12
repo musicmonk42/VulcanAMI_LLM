@@ -58,7 +58,7 @@ try:
 except ImportError:
     SKLEARN_AVAILABLE = False
     logger.warning(
-        "scikit-learn not available. CalibratedDecisionMaker will be disabled."
+        "scikit-learn not available. ToolConfidenceCalibrator will be disabled."
     )
 
 try:
@@ -850,18 +850,37 @@ class MultiTierFeatureExtractor:
 
 
 # ==============================================================================
-# 3. Full Implementation for CalibratedDecisionMaker
+# 3. Full Implementation for ToolConfidenceCalibrator
 # ==============================================================================
-class CalibratedDecisionMaker:
+class ToolConfidenceCalibrator:
     """
-    Calibrates tool confidence scores using Isotonic Regression.
-    This replaces the simple formula-based stub.
-
+    Tool-specific confidence calibrator using Isotonic Regression.
+    
+    This class is designed specifically for calibrating confidence scores in the
+    tool selection system. It uses isotonic regression to learn the relationship
+    between predicted confidence and actual success rates for individual tools.
+    
+    Note: This is distinct from the full-featured CalibratedDecisionMaker in
+    src/conformal/confidence_calibration.py, which provides multiple calibration
+    methods (temperature scaling, Platt scaling, beta calibration, conformal
+    prediction) for general-purpose confidence calibration across the system.
+    
+    Use this class when you need:
+    - Simple, tool-specific calibration
+    - Isotonic regression only
+    - Minimal overhead for tool selection
+    
+    Use conformal.CalibratedDecisionMaker when you need:
+    - Multi-method calibration (temperature, Platt, beta, conformal)
+    - System-wide calibration metrics
+    - Advanced calibration diagnostics
+    
+    Thread-safe: Uses RLock for concurrent access to calibration data.
     """
 
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         if not SKLEARN_AVAILABLE:
-            raise ImportError("scikit-learn is required for CalibratedDecisionMaker.")
+            raise ImportError("scikit-learn is required for ToolConfidenceCalibrator.")
 
         # CRITICAL FIX: Handle None config
         config = config or {}
@@ -3748,7 +3767,7 @@ class ToolSelector:
         self.feature_extractor = MultiTierFeatureExtractor(
             config.get("feature_config", {})
         )
-        self.calibrator = CalibratedDecisionMaker(config.get("calibration_config", {}))
+        self.calibrator = ToolConfidenceCalibrator(config.get("calibration_config", {}))
         self.voi_gate = ValueOfInformationGate(config.get("voi_config", {}))
         self.distribution_monitor = DistributionMonitor(
             config.get("monitor_config", {})

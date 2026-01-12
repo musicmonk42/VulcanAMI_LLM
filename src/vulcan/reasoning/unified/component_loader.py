@@ -127,13 +127,15 @@ def _load_selection_components() -> Dict[str, Any]:
                 SelectionCache._original_init_patched = True  # type: ignore
                 logger.info("Applied nuclear monkey-patch to SelectionCache.__init__")
             
-            # Optional: CalibratedDecisionMaker (may not exist in all versions)
+            # Optional: ToolConfidenceCalibrator (renamed from CalibratedDecisionMaker)
+            # Note: This is distinct from conformal.CalibratedDecisionMaker which provides
+            # full-featured calibration. This is the tool-specific calibrator.
             try:
-                from vulcan.reasoning.selection.confidence_calibration import (
-                    CalibratedDecisionMaker,
+                from vulcan.reasoning.selection.tool_selector import (
+                    ToolConfidenceCalibrator,
                 )
             except ImportError:
-                CalibratedDecisionMaker = None
+                ToolConfidenceCalibrator = None
             
             _SELECTION_COMPONENTS = {
                 "ToolSelector": ToolSelector,
@@ -151,7 +153,7 @@ def _load_selection_components() -> Dict[str, Any]:
                 "WarmStartPool": WarmStartPool,
                 "StochasticCostModel": StochasticCostModel,
                 "CostComponent": CostComponent,
-                "CalibratedDecisionMaker": CalibratedDecisionMaker,
+                "ToolConfidenceCalibrator": ToolConfidenceCalibrator,
             }
             return _SELECTION_COMPONENTS
             
