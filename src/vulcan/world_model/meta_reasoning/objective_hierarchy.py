@@ -721,6 +721,20 @@ class ObjectiveHierarchy:
 
             return self.priority_order.copy()
 
+    def get_top_objectives(self, limit: int = 5) -> List[str]:
+        """
+        Get top N objectives by priority
+        
+        Args:
+            limit: Maximum number of objectives to return (default: 5)
+            
+        Returns:
+            List of top objective names ordered by priority
+        """
+        with self.lock:
+            priority_order = self.get_priority_order()
+            return priority_order[:limit]
+
     def get_hierarchy_structure(self) -> Dict[str, Any]:
         """
         Get complete hierarchy structure as a nested dictionary.

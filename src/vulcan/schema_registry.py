@@ -45,17 +45,23 @@ try:
 except (ImportError, ValueError):
     # Fall back to path manipulation for development/testing
     try:
+        # Calculate the correct path to tools directory
         tools_path = Path(__file__).resolve().parent.parent.parent / "tools"
         if tools_path.exists() and str(tools_path) not in sys.path:
             sys.path.insert(0, str(tools_path))
         import schema_auto_generator as sag
         _SCHEMA_AUTO_GENERATOR_AVAILABLE = True
     except ImportError as e:
-        logger.warning(
-            f"schema_auto_generator not available: {e}. "
-            "Schema generation from EBNF will be disabled."
-        )
-        sag = None
+        # Final fallback: try absolute import
+        try:
+            from tools import schema_auto_generator as sag
+            _SCHEMA_AUTO_GENERATOR_AVAILABLE = True
+        except ImportError:
+            logger.warning(
+                f"schema_auto_generator not available: {e}. "
+                "Schema generation from EBNF will be disabled."
+            )
+            sag = None
 
 
 # Default EBNF grammar definitions for Vulcan schemas
@@ -84,6 +90,76 @@ VULCAN_SCHEMAS = {
         <ReasoningQuery> ::= query:STRING, query_type:STRING, complexity:FLOAT,
                              [context:json_object], [constraints:json_object];
     """,
+}
+
+# Fallback JSON schemas for when EBNF compilation is not available
+FALLBACK_SCHEMAS = {
+    "observation": {
+        "type": "object",
+        "properties": {
+            "timestamp": {"type": "number"},
+            "domain": {"type": "string"},
+            "variables": {"type": "object"},
+            "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+            "source": {"type": "string"},
+            "metadata": {"type": "object"}
+        },
+        "required": ["timestamp", "domain", "variables"]
+    },
+    "prediction": {
+        "type": "object",
+        "properties": {
+            "target": {"type": "string"},
+            "value": {},
+            "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+            "method": {"type": "string"},
+            "timestamp": {"type": "number"}
+        },
+        "required": ["target", "value", "confidence", "method"]
+    },
+    "agent_task": {
+        "type": "object",
+        "properties": {
+            "task_id": {"type": "string"},
+            "task_type": {"type": "string"},
+            "query": {"type": "string"},
+            "context": {"type": "object"},
+            "tools": {"type": "array", "items": {"type": "string"}},
+            "priority": {"type": "integer"}
+        },
+        "required": ["task_id", "task_type", "query"]
+    },
+    "dqs_components": {
+        "type": "object",
+        "properties": {
+            "pii_confidence": {"type": "number", "minimum": 0, "maximum": 1},
+            "graph_completeness": {"type": "number", "minimum": 0, "maximum": 1},
+            "syntactic_completeness": {"type": "number", "minimum": 0, "maximum": 1}
+        },
+        "required": ["pii_confidence", "graph_completeness", "syntactic_completeness"]
+    },
+    "cost_config": {
+        "type": "object",
+        "properties": {
+            "tool_name": {"type": "string"},
+            "time_ms": {"type": "number"},
+            "energy_mj": {"type": "number"},
+            "cold_start_penalty": {"type": "number"},
+            "health_threshold": {"type": "number", "minimum": 0, "maximum": 1}
+        },
+        "required": ["tool_name", "time_ms", "energy_mj"]
+    },
+    "reasoning_query": {
+        "type": "object",
+        "properties": {
+            "query": {"type": "string"},
+            "query_type": {"type": "string"},
+            "complexity": {"type": "number", "minimum": 0, "maximum": 1},
+            "context": {"type": "object"},
+            "constraints": {"type": "object"}
+        },
+        "required": ["query", "query_type", "complexity"]
+    },
 }
 
 
@@ -262,8 +338,13 @@ class SchemaRegistry:
         schema = self._compile_ebnf_to_schema(ebnf_grammar)
         
         if schema is None:
-            logger.error(f"Failed to compile default schema: {schema_name}")
-            return False
+            # Try fallback schema if EBNF compilation failed
+            if schema_name in FALLBACK_SCHEMAS:
+                logger.info(f"Using fallback schema for: {schema_name}")
+                schema = FALLBACK_SCHEMAS[schema_name]
+            else:
+                logger.error(f"Failed to compile default schema: {schema_name}, no fallback available")
+                return False
         
         with self._schemas_lock:
             self._schemas[schema_name] = schema

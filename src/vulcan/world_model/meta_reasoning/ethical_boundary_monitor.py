@@ -569,7 +569,7 @@ class EthicalBoundaryMonitor:
         Check if action violates ethical boundaries
 
         Args:
-            action: Action to check
+            action: Action to check (Dict or str - will be normalized to Dict)
             context: Optional context for checking
 
         Returns:
@@ -578,6 +578,14 @@ class EthicalBoundaryMonitor:
             - violation: EthicalViolation object if violation detected, None otherwise
         """
         with self.lock:
+            # FIXED: Normalize action to dict if it's a string
+            if isinstance(action, str):
+                action = {
+                    "query": action,
+                    "action_type": "query",
+                    "description": action
+                }
+            
             # Check if in shutdown state
             if self.shutdown_triggered:
                 return (

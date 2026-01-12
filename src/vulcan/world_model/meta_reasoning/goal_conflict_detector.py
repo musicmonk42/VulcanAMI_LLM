@@ -507,6 +507,48 @@ class GoalConflictDetector:
 
             return unique_conflicts
 
+    def detect_conflicts_in_query(self, query: str) -> List[Conflict]:
+        """
+        Detect conflicts in a query string by analyzing it as a proposal
+        
+        Args:
+            query: Query string to analyze
+            
+        Returns:
+            List of detected conflicts
+        """
+        # Convert query string to a proposal dict
+        # Use hashlib for deterministic, session-independent ID
+        import hashlib
+        query_hash = hashlib.sha256(query.encode()).hexdigest()[:16]
+        
+        proposal = {
+            "id": f"query_{query_hash}",
+            "query": query,
+            "description": query,
+            "type": "query_analysis"
+        }
+        
+        # Analyze objectives mentioned in the query
+        # Extract common objective keywords from the query
+        objectives = []
+        query_lower = query.lower()
+        
+        # Get objectives from hierarchy using getattr for safe access
+        hierarchy_objectives = getattr(self.objective_hierarchy, 'objectives', {})
+        
+        # Check if query mentions any known objectives
+        for obj_name in hierarchy_objectives.keys():
+            if obj_name.lower() in query_lower or obj_name.lower().replace('_', ' ') in query_lower:
+                objectives.append(obj_name)
+        
+        # If objectives found, add them to the proposal
+        if objectives:
+            proposal["objectives"] = objectives
+        
+        # Use existing conflict detection logic
+        return self.detect_conflicts_in_proposal(proposal)
+
     def analyze_multi_objective_tension(
         self, objectives: List[str]
     ) -> MultiObjectiveTension:
