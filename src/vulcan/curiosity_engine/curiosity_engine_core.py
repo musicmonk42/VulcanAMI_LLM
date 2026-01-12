@@ -1529,9 +1529,6 @@ class CuriosityEngine:
         except Exception as wake_err:
             # Non-critical error - don't fail gap injection
             logger.debug(f"[CuriosityEngine] Could not wake CuriosityDriver: {wake_err}")
-                logger.info(
-                    f"[CuriosityEngine] Added {len(gaps)} external gaps"
-                )
     
     def get_external_gaps_count(self) -> int:
         """Get the number of pending external gaps."""
