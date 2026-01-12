@@ -1293,8 +1293,55 @@ class AnalogPhotonicEmulator:
         logger.info("Emulator shutdown complete")
 
 
-# Export singleton for compatibility
-analog_photonic_emulator = AnalogPhotonicEmulator()
+# Lazy initialization singleton - prevents import-time resource allocation
+_emulator_instance: Optional[AnalogPhotonicEmulator] = None
+_emulator_lock = threading.RLock()
+
+
+def get_emulator(
+    backend: PhotonicBackend = PhotonicBackend.CPU,
+    params: Optional[PhotonicParameters] = None,
+    noise_models: Optional[List[NoiseModel]] = None,
+    device: str = "cpu",
+    noise_seed: Optional[int] = None,
+) -> AnalogPhotonicEmulator:
+    """
+    Get or create the AnalogPhotonicEmulator singleton instance.
+    
+    This factory function implements lazy initialization to prevent resource
+    allocation at import time. Configuration can be changed on first access.
+    
+    Args:
+        backend: Hardware backend to use
+        params: Photonic parameters
+        noise_models: Noise models to apply
+        device: Torch device ('cpu' or 'cuda')
+        noise_seed: Random seed for reproducibility
+        
+    Returns:
+        AnalogPhotonicEmulator singleton instance
+    """
+    global _emulator_instance
+    
+    if _emulator_instance is None:
+        with _emulator_lock:
+            # Double-check after acquiring lock
+            if _emulator_instance is None:
+                _emulator_instance = AnalogPhotonicEmulator(
+                    backend=backend,
+                    params=params,
+                    noise_models=noise_models,
+                    device=device,
+                    noise_seed=noise_seed,
+                )
+                logger.info(f"AnalogPhotonicEmulator initialized with backend {backend.value}")
+    
+    return _emulator_instance
+
+
+# Export singleton factory for compatibility
+# NOTE: This defers initialization until first access
+analog_photonic_emulator = None  # Will be initialized via get_emulator()
 
 
 # Example usage
