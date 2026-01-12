@@ -621,6 +621,131 @@ class ReasoningIntegration:
             }
         )
 
+    def _select_with_tool_selector(
+        self,
+        query: str,
+        query_type: str,
+        complexity: float,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> ReasoningResult:
+        """
+        Select tools using the ToolSelector component for simpler queries.
+        
+        Industry Standard: Delegates to the standalone select_with_tool_selector
+        function from selection_strategies.py, which provides the core tool
+        selection logic. This method serves as the instance method interface
+        that applies_reasoning_impl.py expects to call on ReasoningIntegration.
+        
+        This method is called for queries that don't require problem decomposition
+        (complexity < DECOMPOSITION_COMPLEXITY_THRESHOLD). It uses the ToolSelector
+        to determine which reasoning engines should process the query based on:
+        - Query text and semantic matching
+        - Query type categorization
+        - Complexity score
+        - Historical performance data
+        - Resource constraints from context
+        
+        Args:
+            query: The user query text to process
+            query_type: Type of query (reasoning, execution, perception, etc.)
+            complexity: Query complexity score (0.0 to 1.0)
+            context: Optional context dictionary containing:
+                - constraints: Resource/time constraints for selection
+                - conversation_id: ID for conversation tracking
+                - history: Previous messages for context
+                - classifier_suggested_tools: Tools suggested by query classifier
+        
+        Returns:
+            ReasoningResult containing:
+                - selected_tools: List of tool names to use (e.g., ['causal', 'mathematical'])
+                - reasoning_strategy: Strategy to apply (e.g., 'causal_reasoning')
+                - confidence: Confidence score (0.0 to 1.0)
+                - rationale: Human-readable explanation of selection
+                - metadata: Additional context about the selection process
+        
+        Raises:
+            No exceptions are raised. Errors result in fallback to default tools.
+        
+        Example:
+            >>> result = self._select_with_tool_selector(
+            ...     query="What causes earthquakes?",
+            ...     query_type="reasoning",
+            ...     complexity=0.6,
+            ...     context={"conversation_id": "conv_123"}
+            ... )
+            >>> print(result.selected_tools)
+            ['causal', 'general']
+        
+        Note:
+            This method is automatically called by apply_reasoning() for queries
+            with complexity below the decomposition threshold. It's not typically
+            called directly by external code.
+        """
+        # Import the standalone function from selection_strategies
+        from .selection_strategies import select_with_tool_selector
+        
+        # Delegate to the standalone function, passing self as orchestrator
+        # This allows the function to access self._tool_selector and other components
+        return select_with_tool_selector(
+            orchestrator=self,
+            query=query,
+            query_type=query_type,
+            complexity=complexity,
+            context=context
+        )
+
+    def _record_selection_time(self, selection_time_ms: float) -> None:
+        """
+        Record a tool selection time for performance monitoring.
+        
+        Industry Standard: Maintains a rolling window of recent selection times
+        and updates aggregate statistics. This enables performance tracking and
+        identification of degradation in query processing speed.
+        
+        The method updates both:
+        1. The raw selection_times list (for detailed analysis)
+        2. The aggregate avg_selection_time_ms in statistics (for monitoring)
+        
+        Implementation uses a thread-safe approach with proper locking to handle
+        concurrent calls from multiple threads processing queries in parallel.
+        
+        Args:
+            selection_time_ms: Time taken for tool selection in milliseconds
+        
+        Note:
+            To prevent unbounded memory growth, only the most recent times
+            are retained (configurable limit, typically last 1000 selections).
+            The average is calculated incrementally using all recorded times.
+        
+        Example:
+            >>> self._record_selection_time(15.3)  # Record 15.3ms selection
+            >>> stats = self.get_statistics()
+            >>> print(f"Avg: {stats['avg_selection_time_ms']:.1f}ms")
+            Avg: 12.8ms
+        """
+        # Limit the number of stored times to prevent unbounded growth
+        # Keep last 1000 selections for rolling average calculation
+        MAX_STORED_TIMES = 1000
+        
+        with self._stats_lock:
+            # Append the new time
+            self._selection_times.append(selection_time_ms)
+            
+            # Trim to max size if needed (FIFO - remove oldest)
+            if len(self._selection_times) > MAX_STORED_TIMES:
+                self._selection_times = self._selection_times[-MAX_STORED_TIMES:]
+            
+            # Calculate and update average
+            if self._selection_times:
+                self._stats.avg_selection_time_ms = sum(self._selection_times) / len(self._selection_times)
+            
+            # Log slow selections for performance analysis (threshold: 100ms)
+            if selection_time_ms > 100.0:
+                logger.warning(
+                    f"{LOG_PREFIX} Slow selection detected: {selection_time_ms:.1f}ms "
+                    f"(avg: {self._stats.avg_selection_time_ms:.1f}ms)"
+                )
+
     def get_statistics(self) -> Dict[str, Any]:
         """
         Get current integration statistics.
