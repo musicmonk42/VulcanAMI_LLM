@@ -82,19 +82,24 @@ done
 
 if [ "$SECRET_OK" -ne 1 ]; then
   cat >&2 <<'EOF'
-ERROR: No valid JWT secret provided.
+WARNING: No valid JWT secret provided.
+Application will start in LIMITED MODE:
+  - Health endpoints (/health/live, /health/ready, /health) will work
+  - JWT authentication will be DISABLED
+  - Protected endpoints will return 401 Unauthorized
 Provide one STRONG secret (>=32 chars, not common/weak) via environment variable:
   - GRAPHIX_JWT_SECRET   (Graphix API Server)
   - JWT_SECRET_KEY       (Flask registry)
   - JWT_SECRET           (Unified Platform)
 Example secure secret:
   openssl rand -base64 48 | tr -d '+/'
-Refusing to start without a secure secret.
 EOF
-  exit 1
+  echo "⚠️  Starting in LIMITED MODE without JWT authentication" >&2
+  export JWT_VALIDATION_MODE="disabled"
+else
+  echo "Verified JWT secret in variable: $SELECTED $EXPIRY_NOTE"
+  export JWT_VALIDATION_MODE="enabled"
 fi
-
-echo "Verified JWT secret in variable: $SELECTED $EXPIRY_NOTE"
 
 # Execute main process
 exec "$@"

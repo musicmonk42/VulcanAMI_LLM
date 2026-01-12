@@ -72,6 +72,57 @@ make ps
 make logs-compose
 ```
 
+#### JWT Secret Configuration
+
+**IMPORTANT**: The application requires a JWT secret for authentication. The entrypoint script validates the secret on startup:
+
+**Limited Mode (Health Checks Only)**:
+- If NO valid JWT secret is provided, the application starts in LIMITED MODE
+- Health endpoints (`/health/live`, `/health/ready`, `/health`) work normally
+- Authentication features are DISABLED
+- Protected endpoints return 401 Unauthorized
+- **Use case**: Initial deployment, health check validation, troubleshooting
+
+**Full Mode (Production)**:
+- Requires ONE of these environment variables:
+  - `JWT_SECRET`
+  - `JWT_SECRET_KEY`  
+  - `GRAPHIX_JWT_SECRET`
+- Secret requirements:
+  - Minimum 32 characters
+  - No weak patterns (password, 123456, etc.)
+  - URL-safe characters recommended
+- All features enabled including authentication
+
+**Generate a secure JWT secret**:
+```bash
+# Generate URL-safe secret (recommended)
+openssl rand -base64 48 | tr -d '+/'
+
+# Or use Python
+python3 -c "import secrets; print(secrets.token_urlsafe(48))"
+```
+
+**Example .env configuration**:
+```bash
+# For production - REQUIRED
+JWT_SECRET=$(openssl rand -base64 48 | tr -d '+/')
+
+# Alternative variable names (any one of these works)
+# JWT_SECRET_KEY=$(openssl rand -base64 48 | tr -d '+/')
+# GRAPHIX_JWT_SECRET=$(openssl rand -base64 48 | tr -d '+/')
+```
+
+**Startup validation messages**:
+```
+# With valid JWT (FULL MODE):
+✅ Verified JWT secret in variable: JWT_SECRET (rotate secrets periodically)
+
+# Without valid JWT (LIMITED MODE):
+⚠️  WARNING: No valid JWT secret provided.
+⚠️  Application will start in LIMITED MODE without JWT authentication
+```
+
 #### Production Docker Compose
 
 ```bash
