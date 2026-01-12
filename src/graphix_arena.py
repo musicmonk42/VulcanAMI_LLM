@@ -231,6 +231,24 @@ except ImportError:
     DistributedSharder = None
     SHARDER_AVAILABLE = False
 
+# ConsensusEngine for governance
+try:
+    from consensus_engine import ConsensusEngine
+
+    CONSENSUS_AVAILABLE = True
+except ImportError:
+    ConsensusEngine = None
+    CONSENSUS_AVAILABLE = False
+
+# DQSValidator for data quality validation
+try:
+    from vulcan.safety.dqs_integration import DQSValidator
+
+    DQS_VALIDATOR_AVAILABLE = True
+except ImportError:
+    DQSValidator = None
+    DQS_VALIDATOR_AVAILABLE = False
+
 # Registry
 try:
     from language_evolution_registry import LanguageEvolutionRegistry
@@ -1119,6 +1137,67 @@ class GraphixArena:
         # Bounded feedback log
         self.feedback_log: deque = deque(maxlen=MAX_FEEDBACK_LOG_SIZE)
 
+        # ============================================================
+        # GRAPHIX PLATFORM DEEP INTEGRATION - ConsensusEngine
+        # ============================================================
+        # Initialize ConsensusEngine for governance approval gates
+        # This adds distributed governance to agent execution with trust-weighted voting
+        self.consensus_engine = None
+        if CONSENSUS_AVAILABLE and ConsensusEngine:
+            try:
+                self.consensus_engine = ConsensusEngine(
+                    quorum=0.51,  # 51% participation required
+                    approval_threshold=0.66,  # 66% approval required
+                    proposal_duration_days=7
+                )
+                # Register arena orchestrator as a trusted agent
+                self.consensus_engine.register_agent("arena_orchestrator", trust_level=0.9)
+                logger.info("✅ ConsensusEngine initialized for governance gates (quorum=0.51, approval=0.66)")
+            except Exception as e:
+                logger.warning(f"Failed to initialize ConsensusEngine: {e}")
+                self.consensus_engine = None
+        else:
+            logger.warning("⚠️ ConsensusEngine not available - governance gates disabled")
+
+        # ============================================================
+        # GRAPHIX PLATFORM DEEP INTEGRATION - DQSValidator
+        # ============================================================
+        # Initialize DQSValidator for data quality validation before graph execution
+        # This prevents low-quality data from entering the reasoning pipeline
+        self.dqs_validator = None
+        if DQS_VALIDATOR_AVAILABLE and DQSValidator:
+            try:
+                self.dqs_validator = DQSValidator(
+                    reject_threshold=0.3,  # Reject data with DQS < 0.3
+                    quarantine_threshold=0.4,  # Quarantine data with DQS < 0.4
+                    model="v2"  # Use latest DQS model
+                )
+                logger.info("✅ DQSValidator initialized for data quality gates (reject=0.3, quarantine=0.4)")
+            except Exception as e:
+                logger.warning(f"DQSValidator initialization failed: {e}")
+                self.dqs_validator = None
+        else:
+            logger.warning("⚠️ DQSValidator not available - data quality validation disabled")
+
+        # ============================================================
+        # GRAPHIX PLATFORM DEEP INTEGRATION - DistributedSharder
+        # ============================================================
+        # Initialize DistributedSharder for automatic tensor sharding
+        # This enables handling of large tensors (>10MB) with distributed computation
+        self.sharder = None
+        if SHARDER_AVAILABLE and DistributedSharder:
+            try:
+                self.sharder = DistributedSharder(
+                    dry_run=False,
+                    backend="local",  # Use local backend by default
+                )
+                logger.info("✅ DistributedSharder initialized for automatic tensor sharding (threshold=10MB)")
+            except Exception as e:
+                logger.warning(f"DistributedSharder initialization failed: {e}")
+                self.sharder = None
+        else:
+            logger.warning("⚠️ DistributedSharder not available - large tensor handling limited")
+
         # Initialize interpretability components
         self.interpret_engine = (
             InterpretabilityEngine()
@@ -1331,7 +1410,13 @@ class GraphixArena:
 
     def _dispatch_compute(self, op: str, *args, **kwargs) -> Any:
         """
-        Route computation through hardware dispatcher.
+        Route computation through hardware dispatcher with automatic tensor sharding.
+        
+        ============================================================
+        GRAPHIX PLATFORM DEEP INTEGRATION - DistributedSharder
+        ============================================================
+        Automatically shards large tensors (>10MB) for distributed computation
+        to prevent memory exhaustion and enable parallel processing.
         
         Falls back to numpy if dispatcher unavailable.
         
@@ -1343,6 +1428,113 @@ class GraphixArena:
         Returns:
             Computation result (numpy array or error dict)
         """
+        # ============================================================
+        # GRAPHIX PLATFORM DEEP INTEGRATION - Automatic Tensor Sharding
+        # ============================================================
+        # Shard large tensors automatically to prevent memory exhaustion
+        SHARD_THRESHOLD_MB = 10.0  # 10MB threshold for sharding
+        
+        if self.sharder and NUMPY_AVAILABLE and args:
+            # Calculate total tensor size
+            total_size_bytes = 0
+            sharded_args = []
+            shard_metadata_list = []
+            
+            for arg in args:
+                if isinstance(arg, np.ndarray):
+                    arg_size_mb = arg.nbytes / (1024 * 1024)
+                    total_size_bytes += arg.nbytes
+                    
+                    # Shard if above threshold
+                    if arg_size_mb > SHARD_THRESHOLD_MB:
+                        try:
+                            logger.info(
+                                f"[Sharder] Sharding large tensor "
+                                f"({arg_size_mb:.2f}MB > {SHARD_THRESHOLD_MB}MB)"
+                            )
+                            shards, metadata = self.sharder.shard_tensor(
+                                arg,
+                                num_nodes=4,  # Split into 4 shards
+                                axis=0,
+                                compress=False
+                            )
+                            sharded_args.append(shards)
+                            shard_metadata_list.append(metadata)
+                            logger.info(
+                                f"[Sharder] Created {len(shards)} shards, "
+                                f"shard shapes: {metadata.shard_shapes}"
+                            )
+                        except Exception as e:
+                            logger.warning(f"[Sharder] Failed to shard tensor: {e}, using full tensor")
+                            sharded_args.append([arg])
+                            shard_metadata_list.append(None)
+                    else:
+                        # Don't shard small tensors
+                        sharded_args.append([arg])
+                        shard_metadata_list.append(None)
+                else:
+                    # Non-tensor argument, pass through
+                    sharded_args.append([arg])
+                    shard_metadata_list.append(None)
+            
+            # If any tensors were sharded, execute in parallel and unshard
+            if any(meta is not None for meta in shard_metadata_list):
+                logger.info(f"[Sharder] Executing distributed computation on shards")
+                results = []
+                
+                # Get maximum shard count
+                max_shards = max(
+                    len(shards) for shards in sharded_args
+                )
+                
+                # Execute each shard combination
+                for shard_idx in range(max_shards):
+                    # Get args for this shard (repeat if not sharded)
+                    shard_args = []
+                    for i, shards in enumerate(sharded_args):
+                        shard_arg = shards[min(shard_idx, len(shards) - 1)]
+                        shard_args.append(shard_arg)
+                    
+                    # Execute on this shard
+                    try:
+                        shard_result = self._execute_shard(op, shard_args, kwargs)
+                        results.append(shard_result)
+                    except Exception as e:
+                        logger.error(f"[Sharder] Shard {shard_idx} execution failed: {e}")
+                        # Use zero result for failed shard
+                        if results:
+                            results.append(np.zeros_like(results[0]))
+                        else:
+                            results.append(np.array([]))
+                
+                # Unshard results
+                if results and any(isinstance(r, np.ndarray) for r in results):
+                    try:
+                        # Find first valid metadata for unsharding
+                        unshard_metadata = next(
+                            (meta for meta in shard_metadata_list if meta is not None),
+                            None
+                        )
+                        
+                        if unshard_metadata:
+                            final_result = self.sharder.unshard(results, unshard_metadata)
+                            logger.info(
+                                f"[Sharder] Unsharded {len(results)} results into "
+                                f"shape {final_result.shape}"
+                            )
+                            return final_result
+                        else:
+                            # Fallback: concatenate results
+                            final_result = np.concatenate(results, axis=0)
+                            logger.info(
+                                f"[Sharder] Concatenated {len(results)} results "
+                                f"(no metadata available)"
+                            )
+                            return final_result
+                    except Exception as e:
+                        logger.error(f"[Sharder] Unshard failed: {e}, using first result")
+                        return results[0] if results else np.array([])
+        
         # Use dispatcher if available
         if self.hardware_dispatcher:
             try:
@@ -1370,6 +1562,38 @@ class GraphixArena:
             return np.dot(args[0], args[1])
         else:
             raise ValueError(f"Unknown operation: {op}")
+
+    def _execute_shard(self, op: str, args: list, kwargs: dict) -> np.ndarray:
+        """
+        Execute operation on a single shard.
+        
+        Helper method for distributed shard execution.
+        
+        Args:
+            op: Operation name
+            args: Shard arguments
+            kwargs: Operation parameters
+            
+        Returns:
+            Shard result
+        """
+        # Use dispatcher if available
+        if self.hardware_dispatcher:
+            try:
+                return self.hardware_dispatcher.dispatch(op, *args, **kwargs)
+            except Exception as e:
+                logger.debug(f"[Sharder] Dispatcher failed for shard: {e}")
+        
+        # Fallback to numpy
+        if not NUMPY_AVAILABLE:
+            raise RuntimeError("NumPy not available for shard execution")
+        
+        if op in ('photonic_mvm', 'mvm') and len(args) >= 2:
+            return np.dot(args[0], args[1])
+        elif op == 'matmul' and len(args) >= 2:
+            return np.matmul(args[0], args[1])
+        else:
+            raise ValueError(f"Unknown shard operation: {op}")
 
     async def _dispatch_compute_async(self, op: str, *args, **kwargs) -> Any:
         """
@@ -1454,18 +1678,210 @@ class GraphixArena:
             # Default: return first input or empty
             return inputs[0] if inputs else np.array([])
 
+    # ============================================================
+    # GRAPHIX PLATFORM DEEP INTEGRATION - Helper Methods
+    # ============================================================
+    
+    def _requires_consensus(self, agent_id: str, task: str, data: Dict) -> bool:
+        """
+        Determine if a task requires consensus approval before execution.
+        
+        This implements the governance gate for high-risk operations that could:
+        - Modify critical system state
+        - Execute privileged operations
+        - Access sensitive data
+        - Affect other agents
+        
+        Industry-standard risk criteria:
+        - Administrative/system agents require consensus
+        - Operations with "admin", "modify", "delete" in task description
+        - Tasks marked as high-risk in metadata
+        
+        Args:
+            agent_id: Agent identifier
+            task: Task description
+            data: Task data with metadata
+            
+        Returns:
+            True if consensus is required, False otherwise
+        """
+        # Risk criteria 1: Administrative/privileged agents
+        admin_agents = {"admin", "system", "root", "orchestrator"}
+        if any(admin_keyword in agent_id.lower() for admin_keyword in admin_agents):
+            logger.info(f"[Consensus] Agent {agent_id} requires consensus (privileged agent)")
+            return True
+        
+        # Risk criteria 2: High-risk operations in task description
+        high_risk_keywords = {
+            "delete", "remove", "modify", "admin", "system", 
+            "privilege", "grant", "revoke", "escalate"
+        }
+        if any(keyword in task.lower() for keyword in high_risk_keywords):
+            logger.info(f"[Consensus] Task requires consensus (high-risk operation detected)")
+            return True
+        
+        # Risk criteria 3: Explicit risk flag in metadata
+        metadata = data.get("metadata", {})
+        if metadata.get("requires_consensus") or metadata.get("high_risk"):
+            logger.info(f"[Consensus] Task requires consensus (marked in metadata)")
+            return True
+        
+        # Risk criteria 4: Data sensitivity level
+        data_sensitivity = metadata.get("sensitivity_level", "").lower()
+        if data_sensitivity in {"high", "critical", "confidential"}:
+            logger.info(f"[Consensus] Task requires consensus (high data sensitivity)")
+            return True
+        
+        return False
+
+    def _estimate_pii(self, graph: Dict) -> float:
+        """
+        Estimate PII (Personally Identifiable Information) confidence in graph data.
+        
+        This is a heuristic estimation used by DQSValidator to assess data privacy risk.
+        
+        Industry-standard PII indicators:
+        - Email addresses, phone numbers, SSN patterns
+        - Names, addresses
+        - Financial information
+        
+        Args:
+            graph: Graph data to analyze
+            
+        Returns:
+            PII confidence score (0.0-1.0)
+        """
+        import re
+        
+        # Convert graph to string for pattern matching
+        graph_str = json.dumps(graph).lower()
+        
+        pii_patterns = {
+            "email": r'\b[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}\b',
+            "phone": r'\b\d{3}[-.]?\d{3}[-.]?\d{4}\b',
+            "ssn": r'\b\d{3}-\d{2}-\d{4}\b',
+            "credit_card": r'\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b',
+        }
+        
+        pii_indicators = ["name", "address", "dob", "birthdate", "password"]
+        
+        # Check for pattern matches
+        pii_score = 0.0
+        for pattern_name, pattern in pii_patterns.items():
+            if re.search(pattern, graph_str):
+                pii_score += 0.3
+        
+        # Check for PII indicator keywords
+        for indicator in pii_indicators:
+            if indicator in graph_str:
+                pii_score += 0.1
+        
+        # Clamp to [0.0, 1.0]
+        return min(1.0, pii_score)
+
+    def _calculate_completeness(self, graph: Dict) -> float:
+        """
+        Calculate graph completeness score.
+        
+        A complete graph has:
+        - All required fields (id, nodes, edges)
+        - Valid node structure with ids and types
+        - Valid edge structure with source/target references
+        
+        Args:
+            graph: Graph data to analyze
+            
+        Returns:
+            Completeness score (0.0-1.0)
+        """
+        score = 0.0
+        
+        # Check for required fields (0.3 weight)
+        if "id" in graph or "graph_id" in graph:
+            score += 0.1
+        if "nodes" in graph:
+            score += 0.1
+        if "edges" in graph:
+            score += 0.1
+        
+        # Check node quality (0.4 weight)
+        nodes = graph.get("nodes", [])
+        if nodes:
+            valid_nodes = sum(
+                1 for node in nodes 
+                if isinstance(node, dict) and "id" in node
+            )
+            node_completeness = valid_nodes / len(nodes) if nodes else 0
+            score += 0.4 * node_completeness
+        
+        # Check edge quality (0.3 weight)
+        edges = graph.get("edges", [])
+        if edges:
+            node_ids = {node.get("id") for node in nodes if isinstance(node, dict) and "id" in node}
+            valid_edges = sum(
+                1 for edge in edges
+                if isinstance(edge, dict) 
+                and edge.get("from") in node_ids 
+                and edge.get("to") in node_ids
+            )
+            edge_completeness = valid_edges / len(edges) if edges else 0
+            score += 0.3 * edge_completeness
+        else:
+            # No edges is valid for simple graphs
+            score += 0.3
+        
+        return min(1.0, score)
+
+    def _validate_syntax(self, graph: Dict) -> bool:
+        """
+        Validate graph syntax.
+        
+        Checks for:
+        - Valid JSON structure (already checked by parser)
+        - Required fields present
+        - Valid data types
+        
+        Args:
+            graph: Graph to validate
+            
+        Returns:
+            True if syntax is valid, False otherwise
+        """
+        # Basic structure check
+        if not isinstance(graph, dict):
+            return False
+        
+        # Nodes must be a list
+        if "nodes" in graph and not isinstance(graph["nodes"], list):
+            return False
+        
+        # Edges must be a list
+        if "edges" in graph and not isinstance(graph["edges"], list):
+            return False
+        
+        return True
+
     async def execute_graph(self, graph: dict) -> dict:
         """
-        Execute graph using optimal hardware backend.
+        Execute graph using optimal hardware backend with DQS validation.
         
         Routes matrix operations through the hardware dispatcher for optimal
         performance on available accelerators (photonic, GPU, emulator, CPU).
+        
+        ============================================================
+        GRAPHIX PLATFORM DEEP INTEGRATION - DQS Validation
+        ============================================================
+        Before graph execution, validates data quality using DQSValidator
+        to prevent low-quality data from entering the reasoning pipeline.
         
         Args:
             graph: Graph definition with nodes and edges
             
         Returns:
             Dictionary with execution results and metadata
+            
+        Raises:
+            ValueError: If DQS validation fails (score below reject threshold)
         """
         # Emit audit event for graph execution start
         graph_id = graph.get('id', graph.get('graph_id', 'unknown'))
@@ -1479,6 +1895,54 @@ class GraphixArena:
                 "timestamp": datetime.utcnow().isoformat(),
             }
         )
+        
+        # ============================================================
+        # GRAPHIX PLATFORM DEEP INTEGRATION - DQS Validation Gate
+        # ============================================================
+        # Validate data quality before execution to prevent low-quality
+        # data from entering the reasoning pipeline
+        if self.dqs_validator:
+            try:
+                # Calculate data quality metrics
+                pii_confidence = self._estimate_pii(graph)
+                graph_completeness = self._calculate_completeness(graph)
+                syntactic_completeness = 1.0 if self._validate_syntax(graph) else 0.5
+                
+                # Perform DQS validation
+                dqs_result = self.dqs_validator.validate(
+                    pii_confidence=pii_confidence,
+                    graph_completeness=graph_completeness,
+                    syntactic_completeness=syntactic_completeness,
+                )
+                
+                logger.info(
+                    f"[DQS] Graph {graph_id} validation: "
+                    f"score={dqs_result.score:.3f}, decision={dqs_result.decision}"
+                )
+                
+                # Reject graphs with low DQS scores
+                if dqs_result.decision == "reject":
+                    error_msg = (
+                        f"DQS validation rejected graph {graph_id}: "
+                        f"score={dqs_result.score:.3f} (threshold={self.dqs_validator.reject_threshold})"
+                    )
+                    logger.warning(f"[DQS] {error_msg}")
+                    raise ValueError(error_msg)
+                
+                # Quarantine warning for borderline quality
+                if dqs_result.decision == "quarantine":
+                    logger.warning(
+                        f"[DQS] Graph {graph_id} quality warning: "
+                        f"score={dqs_result.score:.3f} (quarantine threshold)"
+                    )
+                
+            except Exception as e:
+                # Log DQS validation errors but don't block execution
+                # (fail-open for availability)
+                logger.error(f"[DQS] Validation error for graph {graph_id}: {e}")
+                # Re-raise ValueError for explicit reject decisions
+                if isinstance(e, ValueError) and "rejected" in str(e).lower():
+                    raise
         
         # Note: Validate graph structure before processing
         # This prevents "Missing 'nodes' field" errors from data integrity issues
@@ -1665,6 +2129,80 @@ class GraphixArena:
             has_reasoning_tools or
             is_reasoning_query_type
         )
+        
+        # ============================================================
+        # GRAPHIX PLATFORM DEEP INTEGRATION - Consensus Governance Gate
+        # ============================================================
+        # Check if this operation requires consensus approval before execution
+        # This adds distributed governance for high-risk operations
+        if self.consensus_engine and self._requires_consensus(agent_id, task, data):
+            logger.info(f"[Consensus] Agent {agent_id} task requires governance approval")
+            
+            try:
+                # Create proposal for consensus voting
+                proposal_graph = {
+                    "id": f"agent_task_{agent_id}_{int(time.time())}",
+                    "type": "Graph",
+                    "nodes": [{
+                        "id": "task_execution",
+                        "type": "ProposalNode",
+                        "proposed_by": "arena_orchestrator",
+                        "rationale": f"Agent {agent_id} executing task: {task[:100]}",
+                        "proposal_content": {
+                            "type": "agent_task_execution",
+                            "agent_id": agent_id,
+                            "task": task,
+                            "data_hash": hashlib.sha256(
+                                json.dumps(data, sort_keys=True).encode()
+                            ).hexdigest()[:16]
+                        }
+                    }],
+                    "edges": []
+                }
+                
+                # Submit proposal and get consensus
+                proposal_id = self.consensus_engine.propose(
+                    proposal_graph=proposal_graph,
+                    agent_id="arena_orchestrator",
+                    duration_days=1  # Short duration for real-time operations
+                )
+                
+                # Evaluate consensus immediately
+                consensus_result = self.consensus_engine.evaluate_consensus(proposal_id)
+                
+                logger.info(
+                    f"[Consensus] Proposal {proposal_id}: "
+                    f"status={consensus_result['status']}, "
+                    f"approval_ratio={consensus_result.get('approval_ratio', 0):.2%}"
+                )
+                
+                # Check if approved
+                if consensus_result["status"] != "approved":
+                    rejection_reason = (
+                        f"Consensus rejected agent {agent_id} task execution: "
+                        f"status={consensus_result['status']}, "
+                        f"approval_ratio={consensus_result.get('approval_ratio', 0):.2%} "
+                        f"(required: {self.consensus_engine.approval_threshold:.2%})"
+                    )
+                    logger.warning(f"[Consensus] {rejection_reason}")
+                    
+                    # Raise BiasDetectedException for governance rejection
+                    # Note: Import at runtime to avoid circular dependency
+                    try:
+                        from vulcan.safety.safety_types import BiasDetectedException
+                        raise BiasDetectedException(rejection_reason)
+                    except ImportError:
+                        # Fallback to standard exception if BiasDetectedException unavailable
+                        raise RuntimeError(rejection_reason)
+                
+                logger.info(f"[Consensus] Agent {agent_id} task approved by consensus")
+                
+            except Exception as e:
+                # Log consensus errors but don't block execution
+                # (fail-open for availability, but re-raise explicit rejections)
+                if "rejected" in str(e).lower() or isinstance(e, RuntimeError):
+                    raise
+                logger.error(f"[Consensus] Error checking consensus for agent {agent_id}: {e}")
         
         if should_invoke_reasoning and REASONING_AVAILABLE:
             # Build trigger reason for logging
