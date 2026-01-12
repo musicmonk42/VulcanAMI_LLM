@@ -2637,19 +2637,29 @@ async def lifespan(app: FastAPI):
                 logger.error(f"Error during adversarial tester shutdown: {adv_err}")
 
             # Shutdown CuriosityDriver (only if we initialized it)
+            # FIX Issue 1: Robust shutdown with multiple fallback locations
             try:
-                # Get driver from vulcan module app state
-                vulcan_module = importlib.import_module("src.vulcan.main")
-                curiosity_driver = getattr(
-                    vulcan_module.app.state, "curiosity_driver", None
-                )
-
+                curiosity_driver = None
+                
+                # Try to get driver from vulcan module app state first
+                try:
+                    vulcan_module = importlib.import_module("src.vulcan.main")
+                    curiosity_driver = getattr(
+                        vulcan_module.app.state, "curiosity_driver", None
+                    )
+                except (ImportError, AttributeError):
+                    pass
+                
+                # Fallback: Check main app.state directly
+                if curiosity_driver is None:
+                    curiosity_driver = getattr(app.state, "curiosity_driver", None)
+                
                 if curiosity_driver is not None:
                     logger.info("Stopping CuriosityDriver...")
                     await curiosity_driver.stop()
                     logger.info("✓ CuriosityDriver shutdown complete")
-            except ImportError:
-                pass
+                else:
+                    logger.debug("CuriosityDriver not found in app state (not initialized or already stopped)")
             except Exception as cd_err:
                 logger.error(f"Error during CuriosityDriver shutdown: {cd_err}")
             
