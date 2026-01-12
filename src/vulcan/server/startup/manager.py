@@ -443,11 +443,14 @@ class StartupManager:
     def _initialize_hybrid_executor(self, llm_instance: Any) -> None:
         """Initialize HybridLLMExecutor singleton."""
         try:
-            from vulcan.distillation.hybrid_executor import (
+            from vulcan.llm.hybrid_executor import (
                 get_or_create_hybrid_executor,
                 verify_hybrid_executor_setup
             )
-            from vulcan.utils_main.openai_client import get_openai_client
+            from vulcan.llm.openai_client import get_openai_client, log_openai_status
+            
+            # Log OpenAI configuration status
+            log_openai_status()
             
             self.app.state.hybrid_executor = get_or_create_hybrid_executor(
                 local_llm=llm_instance,
@@ -457,12 +460,16 @@ class StartupManager:
                 ensemble_min_confidence=self.settings.llm_ensemble_min_confidence,
                 openai_max_tokens=self.settings.llm_openai_max_tokens,
             )
-            logger.debug(f"✓ HybridLLMExecutor ({self.settings.llm_execution_mode})")
+            
+            if self.app.state.hybrid_executor:
+                logger.info(f"✓ HybridLLMExecutor initialized successfully at startup (mode={self.settings.llm_execution_mode})")
+            else:
+                logger.warning("⚠ HybridLLMExecutor initialization failed - LLM generation may be unavailable")
             
             # Verify setup
             verification = verify_hybrid_executor_setup()
             if verification["status"] == "PASS":
-                logger.debug(f"✓ HybridExecutor verified")
+                logger.info(f"✓ HybridExecutor verified: {verification['message']}")
             else:
                 logger.warning(f"⚠ HybridExecutor: {verification['message']}")
                 
