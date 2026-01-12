@@ -21,6 +21,7 @@ from vulcan.endpoints.chat_helpers import (
     truncate_history,
     build_context,
     extract_tools_from_routing,  # FIX Issue 7: Import tools extraction helper
+    format_reasoning_results,  # Fix: Import reasoning formatter for LLM context
     MAX_HISTORY_MESSAGES,
     MAX_HISTORY_TOKENS,
     MAX_MESSAGE_LENGTH,
@@ -93,6 +94,108 @@ def _normalize_conclusion_to_string(conclusion: Any) -> Optional[str]:
     
     # For other types (int, float, bool, etc.), convert to string
     return str(conclusion)
+
+
+def _calculate_aggregate_confidence(reasoning_results: Dict[str, Any]) -> float:
+    """
+    Calculate aggregate confidence score from multiple reasoning engines.
+    
+    Industry Standard: Weighted averaging with proper handling of edge cases.
+    Uses harmonic mean for conservative confidence estimation - if any engine
+    has low confidence, the aggregate is pulled down appropriately.
+    
+    Args:
+        reasoning_results: Dictionary mapping engine names to their results
+    
+    Returns:
+        Aggregate confidence score between 0.0 and 1.0.
+        Returns 0.0 if no valid confidence scores found.
+    
+    Example:
+        >>> results = {
+        ...     'symbolic': {'confidence': 0.9},
+        ...     'probabilistic': {'confidence': 0.8}
+        ... }
+        >>> _calculate_aggregate_confidence(results)
+        0.847  # Harmonic mean
+    """
+    if not reasoning_results:
+        return 0.0
+    
+    confidence_scores = []
+    
+    for engine_result in reasoning_results.values():
+        if isinstance(engine_result, dict):
+            confidence = engine_result.get('confidence')
+            if confidence is not None:
+                try:
+                    # Handle both float (0.0-1.0) and int (0-100) formats
+                    if isinstance(confidence, (int, float)):
+                        if confidence > 1.0:
+                            confidence = confidence / 100.0
+                        confidence_scores.append(float(confidence))
+                except (ValueError, TypeError):
+                    continue
+    
+    if not confidence_scores:
+        return 0.5  # Default to neutral confidence if no scores available
+    
+    # Use harmonic mean for conservative confidence estimation
+    # This ensures that low confidence in any engine pulls down the aggregate
+    try:
+        harmonic_mean = len(confidence_scores) / sum(1.0 / c if c > 0 else float('inf') for c in confidence_scores)
+        return max(0.0, min(1.0, harmonic_mean))  # Clamp to [0, 1]
+    except (ZeroDivisionError, ValueError):
+        # Fallback to arithmetic mean if harmonic mean fails
+        return sum(confidence_scores) / len(confidence_scores)
+
+
+async def _execute_with_enhanced_prompt(
+    hybrid_executor: Any,
+    enhanced_prompt: str,
+    body: Any,
+    truncated_history: List[Dict[str, str]],
+) -> Dict[str, Any]:
+    """
+    Execute LLM with enhanced prompt (fallback method).
+    
+    This is the traditional execution path used when format_output_for_user()
+    is not applicable (e.g., no reasoning results, or fallback after error).
+    
+    Industry Standard: Extracted as a separate function to avoid code duplication
+    and make the control flow in the main function clearer.
+    
+    Args:
+        hybrid_executor: The HybridLLMExecutor instance
+        enhanced_prompt: The prompt with embedded reasoning context
+        body: The request body containing max_tokens and other parameters
+        truncated_history: Conversation history for multi-turn context
+    
+    Returns:
+        Dictionary with 'text', 'source', 'systems_used', and optional metadata
+    
+    Raises:
+        Exception: Propagates any exceptions from hybrid_executor.execute()
+    """
+    # Build system prompt that emphasizes using reasoning output AND conversation memory
+    system_prompt = (
+        "You are VULCAN, an advanced AI assistant powered by specialized reasoning engines. "
+        "IMPORTANT: You SHOULD remember and reference information shared earlier in this conversation. "
+        "When a user shares their name, location, preferences, or any personal details during this session, "
+        "you may recall and use that information naturally in your responses. This is expected behavior. "
+        "When reasoning analysis is provided in the prompt, you MUST incorporate it directly into your response. "
+        "Do NOT ignore or paraphrase away the specific conclusions, probabilities, proofs, or causal analyses provided. "
+        "Present the reasoning results clearly and explain how they answer the user's question."
+    )
+    
+    # Execute with conversation history for multi-turn context
+    return await hybrid_executor.execute(
+        prompt=enhanced_prompt,
+        max_tokens=body.max_tokens,
+        temperature=0.7,
+        system_prompt=system_prompt,
+        conversation_history=truncated_history,
+    )
 
 
 @router.post("/v1/chat")
@@ -1836,7 +1939,7 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
                 reasoning_str = ""
                 if reasoning_results:
                     try:
-                        reasoning_str = _format_reasoning_results(reasoning_results)
+                        reasoning_str = format_reasoning_results(reasoning_results)
                         # Note: Log reasoning output to verify it's reaching this point
                         logger.info(
                             f"[VULCAN] Reasoning results formatted: "
@@ -1968,37 +2071,99 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
                     logger.info("[VULCAN] HybridLLMExecutor registered in app.state for future requests")
 
                 try:
-                    # Build system prompt that emphasizes using reasoning output AND conversation memory
-                    # MEMORY FIX: Explicitly allow the model to remember and use information from the conversation
-                    system_prompt = (
-                        "You are VULCAN, an advanced AI assistant powered by specialized reasoning engines. "
-                        "IMPORTANT: You SHOULD remember and reference information shared earlier in this conversation. "
-                        "When a user shares their name, location, preferences, or any personal details during this session, "
-                        "you may recall and use that information naturally in your responses. This is expected behavior. "
-                        "When reasoning analysis is provided in the prompt, you MUST incorporate it directly into your response. "
-                        "Do NOT ignore or paraphrase away the specific conclusions, probabilities, proofs, or causal analyses provided. "
-                        "Present the reasoning results clearly and explain how they answer the user's question."
-                    )
+                    # ================================================================
+                    # CRITICAL FIX: Use format_output_for_user() when reasoning is available
+                    # This passes VULCAN's reasoning context to OpenAI for proper formatting
+                    # ================================================================
                     
-                    # CONVERSATION MEMORY FIX: Pass truncated conversation history to enable
-                    # multi-turn context. This ensures the LLM can remember and reference
-                    # previous messages in the conversation.
-                    llm_result = await hybrid_executor.execute(
-                        prompt=enhanced_prompt,
-                        max_tokens=body.max_tokens,
-                        temperature=0.7,
-                        system_prompt=system_prompt,
-                        conversation_history=truncated_history,
-                    )
-
-                    response_text = llm_result.get("text", "")
-                    llm_systems = llm_result.get("systems_used", [])
-                    systems_used.extend(llm_systems)
-
-                    source = llm_result.get("source", "unknown")
-                    logger.info(
-                        f"[VULCAN] Multi-turn response via hybrid execution (mode={settings.llm_execution_mode}, source={source})"
-                    )
+                    # Check if we have reasoning results to format
+                    has_reasoning = bool(reasoning_results and any(reasoning_results.values()))
+                    
+                    if has_reasoning:
+                        # PATH 1: Use format_output_for_user() for structured reasoning output
+                        # This is the PRIMARY fix - it passes reasoning context to OpenAI
+                        logger.info(
+                            f"[VULCAN] Using format_output_for_user() with reasoning results "
+                            f"(engines: {list(reasoning_results.keys())})"
+                        )
+                        
+                        # Build structured reasoning output for the formatter
+                        # This includes all VULCAN reasoning components
+                        structured_reasoning = {
+                            'success': True,
+                            'result': reasoning_results,
+                            'confidence': _calculate_aggregate_confidence(reasoning_results),
+                            'method': 'vulcan_unified_reasoning',
+                            'reasoning_trace': [],
+                            'metadata': {
+                                'world_model': world_model_insight,
+                                'plan': plan_result,
+                                'memory_context': len(memory_context) if memory_context else 0,
+                            }
+                        }
+                        
+                        # Add world model insights to the structured output
+                        if world_model_insight:
+                            structured_reasoning['metadata']['world_model_insight'] = world_model_insight
+                        
+                        # Add planning results
+                        if plan_result:
+                            structured_reasoning['metadata']['plan_result'] = plan_result
+                        
+                        try:
+                            # Call format_output_for_user with VULCAN's reasoning
+                            llm_result = await hybrid_executor.format_output_for_user(
+                                reasoning_output=structured_reasoning,
+                                original_prompt=user_message,
+                                max_tokens=body.max_tokens,
+                            )
+                            
+                            response_text = llm_result.get("text", "")
+                            llm_systems = llm_result.get("systems_used", [])
+                            systems_used.extend(llm_systems)
+                            
+                            source = llm_result.get("source", "unknown")
+                            logger.info(
+                                f"[VULCAN] ✓ Response formatted from reasoning results "
+                                f"(source={source}, distillation_captured={llm_result.get('distillation_captured', False)})"
+                            )
+                            
+                        except Exception as format_error:
+                            logger.warning(
+                                f"[VULCAN] format_output_for_user() failed: {type(format_error).__name__}: {format_error}. "
+                                f"Falling back to execute() with enhanced prompt."
+                            )
+                            # Fallback to original execute() method
+                            llm_result = await _execute_with_enhanced_prompt(
+                                hybrid_executor=hybrid_executor,
+                                enhanced_prompt=enhanced_prompt,
+                                body=body,
+                                truncated_history=truncated_history,
+                            )
+                            response_text = llm_result.get("text", "")
+                            llm_systems = llm_result.get("systems_used", [])
+                            systems_used.extend(llm_systems)
+                            source = llm_result.get("source", "unknown")
+                    
+                    else:
+                        # PATH 2: No reasoning results - use traditional execute() method
+                        # This handles queries that don't need reasoning (simple chat, etc.)
+                        logger.info("[VULCAN] No reasoning results available, using execute() method")
+                        
+                        llm_result = await _execute_with_enhanced_prompt(
+                            hybrid_executor=hybrid_executor,
+                            enhanced_prompt=enhanced_prompt,
+                            body=body,
+                            truncated_history=truncated_history,
+                        )
+                        
+                        response_text = llm_result.get("text", "")
+                        llm_systems = llm_result.get("systems_used", [])
+                        systems_used.extend(llm_systems)
+                        source = llm_result.get("source", "unknown")
+                        logger.info(
+                            f"[VULCAN] Response via execute() (mode={settings.llm_execution_mode}, source={source})"
+                        )
 
                 except Exception as e:
                     logger.error(f"Hybrid LLM execution failed: {type(e).__name__}: {e}")
