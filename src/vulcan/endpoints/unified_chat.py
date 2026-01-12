@@ -96,6 +96,53 @@ def _normalize_conclusion_to_string(conclusion: Any) -> Optional[str]:
     return str(conclusion)
 
 
+def _get_reasoning_attr(obj: Any, attr: str, default: Any = None) -> Any:
+    """
+    Safely extract attribute from reasoning output (dict or object).
+    
+    Industry Standard: Defensive attribute access with proper type checking
+    and graceful fallbacks. Handles both dictionary-based and object-based
+    reasoning results without raising AttributeError or KeyError.
+    
+    This helper addresses a common pattern in reasoning systems where output
+    can be either structured (dict) or object-oriented, depending on the
+    reasoning engine used.
+    
+    Args:
+        obj: The reasoning output object (dict, ReasoningResult, or other)
+        attr: Name of the attribute to extract (e.g., 'conclusion', 'confidence')
+        default: Default value to return if attribute is not found (default: None)
+    
+    Returns:
+        The extracted attribute value, or default if not found
+    
+    Examples:
+        >>> result = {"conclusion": "answer", "confidence": 0.9}
+        >>> _get_reasoning_attr(result, "conclusion")
+        "answer"
+        
+        >>> class ReasoningResult:
+        ...     def __init__(self):
+        ...         self.conclusion = "answer"
+        ...         self.confidence = 0.9
+        >>> result = ReasoningResult()
+        >>> _get_reasoning_attr(result, "conclusion")
+        "answer"
+        
+        >>> _get_reasoning_attr({}, "missing", default="N/A")
+        "N/A"
+    """
+    if obj is None:
+        return default
+    
+    # Handle dictionary-based results (most common case)
+    if isinstance(obj, dict):
+        return obj.get(attr, default)
+    
+    # Handle object-based results (ReasoningResult, custom classes, etc.)
+    return getattr(obj, attr, default)
+
+
 def _calculate_aggregate_confidence(reasoning_results: Dict[str, Any]) -> float:
     """
     Calculate aggregate confidence score from multiple reasoning engines.
