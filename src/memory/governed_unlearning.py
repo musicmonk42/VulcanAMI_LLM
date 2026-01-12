@@ -361,7 +361,8 @@ class GovernedUnlearning:
         # Task management
         self.pending_proposals: Dict[str, IRProposal] = {}
         self.governance_results: Dict[str, GovernanceResult] = {}
-        self.pending_tasks: deque = deque()
+        # FIXED: Added maxlen to prevent unbounded memory growth
+        self.pending_tasks: deque = deque(maxlen=1000)
         self.active_tasks: Dict[str, UnlearningTask] = {}
         self.completed_tasks: deque = deque(maxlen=1000)
         self.executor = ThreadPoolExecutor(max_workers=max_workers)

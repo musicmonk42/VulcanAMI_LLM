@@ -501,79 +501,45 @@ class RateLimiter:
                 del self.requests[identifier]
 
 
+# Import unified KeyManager and re-export KeyAlgorithm
+from key_manager import (
+    KeyManager as UnifiedKeyManager,
+    KeyAlgorithm as UnifiedKeyAlgorithm,
+)
+
+# Re-export KeyAlgorithm for backward compatibility
+KeyAlgorithm = UnifiedKeyAlgorithm
+
+
+# Backward compatibility wrapper for agent_registry.py
 class KeyManager:
-    """Manages cryptographic key operations."""
+    """
+    Backward compatibility wrapper for agent_registry.py KeyManager.
+    
+    This wrapper delegates to the unified KeyManager implementation while
+    maintaining the exact API expected by existing agent registry code.
+    """
 
     def __init__(self, key_store_dir: str = "keys"):
-        self.key_store = Path(key_store_dir)
-        self.key_store.mkdir(parents=True, exist_ok=True)
-        self.backend = default_backend()
+        # Use the unified KeyManager without auto-generation
+        self._manager = UnifiedKeyManager(
+            key_store_dir=key_store_dir,
+            algorithm=UnifiedKeyAlgorithm.ECDSA_P256,
+            auto_generate=False
+        )
+        # Expose attributes for backward compatibility
+        self.key_store = self._manager.key_store_dir
+        self.backend = self._manager.backend
 
     def generate_key_pair(self, algorithm: KeyAlgorithm) -> Tuple[bytes, bytes]:
         """Generate a new key pair."""
-        if algorithm == KeyAlgorithm.RSA_2048:
-            private_key = rsa.generate_private_key(
-                public_exponent=65537, key_size=2048, backend=self.backend
-            )
-        elif algorithm == KeyAlgorithm.RSA_4096:
-            private_key = rsa.generate_private_key(
-                public_exponent=65537, key_size=4096, backend=self.backend
-            )
-        elif algorithm == KeyAlgorithm.ED25519:
-            private_key = ed25519.Ed25519PrivateKey.generate()
-        elif algorithm == KeyAlgorithm.ECDSA_P256:
-            private_key = ec.generate_private_key(ec.SECP256R1(), self.backend)
-        elif algorithm == KeyAlgorithm.ECDSA_P384:
-            private_key = ec.generate_private_key(ec.SECP384R1(), self.backend)
-        elif algorithm == KeyAlgorithm.ECDSA_P521:
-            private_key = ec.generate_private_key(ec.SECP521R1(), self.backend)
-        else:
-            raise ValueError(f"Unsupported algorithm: {algorithm}")
-
-        # Serialize keys
-        private_pem = private_key.private_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PrivateFormat.PKCS8,
-            encryption_algorithm=serialization.NoEncryption(),
-        )
-
-        public_key = private_key.public_key()
-        public_pem = public_key.public_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PublicFormat.SubjectPublicKeyInfo,
-        )
-
-        return public_pem, private_pem
+        return self._manager.generate_key_pair(algorithm)
 
     def sign_message(
         self, message: bytes, private_key_pem: bytes, algorithm: KeyAlgorithm
     ) -> bytes:
         """Sign a message with a private key."""
-        private_key = serialization.load_pem_private_key(
-            private_key_pem, password=None, backend=self.backend
-        )
-
-        if algorithm in [KeyAlgorithm.RSA_2048, KeyAlgorithm.RSA_4096]:
-            signature = private_key.sign(
-                message,
-                padding.PSS(
-                    mgf=padding.MGF1(hashes.SHA256()),
-                    salt_length=padding.PSS.MAX_LENGTH,
-                ),
-                hashes.SHA256(),
-            )
-        elif algorithm == KeyAlgorithm.ED25519:
-            signature = private_key.sign(message)
-        elif algorithm in [
-            KeyAlgorithm.ECDSA_P256,
-            KeyAlgorithm.ECDSA_P384,
-            KeyAlgorithm.ECDSA_P521,
-        ]:
-            signature = private_key.sign(message, ec.ECDSA(hashes.SHA256()))
-        else:
-            raise ValueError(f"Unsupported algorithm: {algorithm}")
-
-        return signature
+        return self._manager.sign_message(message, private_key_pem, algorithm)
 
     def verify_signature(
         self,
@@ -583,39 +549,9 @@ class KeyManager:
         algorithm: KeyAlgorithm,
     ) -> bool:
         """Verify a signature with a public key (constant-time comparison)."""
-        try:
-            public_key = serialization.load_pem_public_key(
-                public_key_pem, backend=self.backend
-            )
-
-            if algorithm in [KeyAlgorithm.RSA_2048, KeyAlgorithm.RSA_4096]:
-                public_key.verify(
-                    signature,
-                    message,
-                    padding.PSS(
-                        mgf=padding.MGF1(hashes.SHA256()),
-                        salt_length=padding.PSS.MAX_LENGTH,
-                    ),
-                    hashes.SHA256(),
-                )
-            elif algorithm == KeyAlgorithm.ED25519:
-                public_key.verify(signature, message)
-            elif algorithm in [
-                KeyAlgorithm.ECDSA_P256,
-                KeyAlgorithm.ECDSA_P384,
-                KeyAlgorithm.ECDSA_P521,
-            ]:
-                public_key.verify(signature, message, ec.ECDSA(hashes.SHA256()))
-            else:
-                return False
-
-            return True
-
-        except InvalidSignature:
-            return False
-        except Exception as e:
-            logger.error(f"Signature verification error: {e}")
-            return False
+        return self._manager.verify_message_signature(
+            message, signature, public_key_pem, algorithm
+        )
 
     def encrypt_key(self, key_data: bytes, password: str) -> Tuple[bytes, bytes]:
         """Encrypt a key with a password using PKCS#7 padding."""
@@ -657,22 +593,21 @@ class KeyManager:
 
         cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=self.backend)
         decryptor = cipher.decryptor()
-        decrypted = decryptor.update(encrypted_data) + decryptor.finalize()
 
+        decrypted = decryptor.update(encrypted_data) + decryptor.finalize()
         return self._pkcs7_unpad(decrypted)
 
-    def _pkcs7_pad(self, data: bytes) -> bytes:
-        """PKCS#7 padding."""
+    @staticmethod
+    def _pkcs7_pad(data: bytes) -> bytes:
+        """Apply PKCS#7 padding."""
         block_size = 16
         padding_length = block_size - (len(data) % block_size)
-        padding = bytes([padding_length]) * padding_length
+        padding = bytes([padding_length] * padding_length)
         return data + padding
 
-    def _pkcs7_unpad(self, data: bytes) -> bytes:
-        """Remove PKCS#7 padding with validation."""
-        if not data:
-            raise ValueError("Cannot unpad empty data")
-
+    @staticmethod
+    def _pkcs7_unpad(data: bytes) -> bytes:
+        """Remove PKCS#7 padding."""
         padding_length = data[-1]
 
         if padding_length < 1 or padding_length > 16:
@@ -684,7 +619,6 @@ class KeyManager:
                 raise ValueError("Invalid padding")
 
         return data[:-padding_length]
-
 
 class CertificateAuthority:
     """Manages X.509 certificates for agents."""

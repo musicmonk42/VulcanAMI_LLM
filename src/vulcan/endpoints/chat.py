@@ -2041,13 +2041,10 @@ Based on your analysis through memory retrieval, multi-modal reasoning, causal m
             logger.debug("[VULCAN] NSOAligner not available for fallback guard")
         except Exception as fallback_safety_err:
             logger.warning(f"[VULCAN] Fallback guard NSOAligner validation failed: {fallback_safety_err}")
-        finally:
-            # Clean up resources if safety was successfully initialized
-            if safety is not None:
-                try:
-                    safety.shutdown()
-                except Exception:
-                    pass  # Ignore shutdown errors
+        # NOTE: DO NOT call safety.shutdown() here!
+        # get_nso_aligner() returns a SINGLETON instance that must persist across requests.
+        # Shutting it down here would destroy the shared instance for all subsequent requests.
+        # Only call reset_nso_aligner() during application shutdown or in test teardown.
 
     if not response_text:
         response_text = "I apologize, but I'm currently unable to process your request. Please try again."

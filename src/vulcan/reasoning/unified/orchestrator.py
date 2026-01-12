@@ -571,7 +571,8 @@ class UnifiedReasoner:
         }
 
         # Task management
-        self.task_queue = deque()
+        # FIXED: Added maxlen to prevent unbounded memory growth
+        self.task_queue = deque(maxlen=10000)
         self.active_tasks = {}
         self.completed_tasks = deque(maxlen=1000)
 

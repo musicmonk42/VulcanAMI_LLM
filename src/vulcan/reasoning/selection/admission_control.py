@@ -134,7 +134,9 @@ class SlidingWindowRateLimiter:
     def __init__(self, window_size_seconds: int, max_requests: int):
         self.window_size = window_size_seconds
         self.max_requests = max_requests
-        self.requests = deque()
+        # FIXED: Added maxlen to prevent unbounded memory growth
+        # Keep up to 2x max_requests to handle burst patterns accurately
+        self.requests = deque(maxlen=max(max_requests * 2, 10000))
 
         # CRITICAL FIX: Use RLock
         self.lock = threading.RLock()

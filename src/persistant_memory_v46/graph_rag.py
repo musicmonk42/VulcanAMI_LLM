@@ -121,7 +121,8 @@ class LRUCache:
     def __init__(self, capacity: int = 1000):
         self.capacity = capacity
         self.cache = {}
-        self.order = deque()
+        # FIXED: Added maxlen as safety backstop matching capacity
+        self.order = deque(maxlen=capacity)
 
     def get(self, key: str):
         if key not in self.cache:

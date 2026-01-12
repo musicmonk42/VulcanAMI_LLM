@@ -3412,6 +3412,34 @@ def get_nso_aligner(
     This function ensures that the NSOAligner is only initialized once,
     preventing the expensive model reloading on every request.
     
+    **CRITICAL: DO NOT CALL .shutdown() ON THE RETURNED INSTANCE!**
+    
+    The returned NSOAligner is a SINGLETON that is shared across all callers.
+    Calling .shutdown() will destroy the shared instance and break all subsequent
+    requests. The singleton will persist for the lifetime of the application.
+    
+    Lifecycle Management:
+        - First call: Creates the singleton instance
+        - Subsequent calls: Returns the existing instance (params ignored)
+        - Application shutdown: Call reset_nso_aligner() to clean up
+        - Testing: Call reset_nso_aligner() in tearDown/cleanup fixtures
+    
+    Example CORRECT usage:
+        ```python
+        safety = get_nso_aligner()
+        result = safety.multi_model_audit(data)
+        # NO shutdown() call - instance persists for next request
+        ```
+    
+    Example INCORRECT usage (BUG):
+        ```python
+        safety = get_nso_aligner()
+        try:
+            result = safety.multi_model_audit(data)
+        finally:
+            safety.shutdown()  # BUG: Destroys singleton for everyone!
+        ```
+    
     Args:
         claude_client: Optional external LLM client (only used on first init)
         gemini_client: Optional secondary LLM client (only used on first init)
@@ -3420,7 +3448,10 @@ def get_nso_aligner(
         **kwargs: Additional arguments passed to NSOAligner (only used on first init)
     
     Returns:
-        NSOAligner: The singleton instance
+        NSOAligner: The singleton instance (shared across all callers)
+    
+    See Also:
+        reset_nso_aligner(): Use to reset the singleton during shutdown or testing
     """
     global _nso_aligner_instance
     
@@ -3442,9 +3473,33 @@ def get_nso_aligner(
 
 def reset_nso_aligner():
     """
-    Reset the singleton instance. Use for testing or reconfiguration.
+    Reset the singleton instance. Use ONLY for testing or application shutdown.
     
-    WARNING: This will shutdown the existing instance if one exists.
+    **WARNING**: This function destroys the global NSOAligner singleton instance.
+    It should ONLY be called:
+    
+    1. During application shutdown/cleanup
+    2. In test tearDown/cleanup fixtures
+    3. When explicitly reconfiguring the aligner with different parameters
+    
+    **DO NOT** call this during normal request processing, as it will break
+    concurrent requests that are using the singleton instance.
+    
+    Thread Safety:
+        This function is thread-safe and will properly shutdown the instance
+        while preventing race conditions with get_nso_aligner().
+    
+    Example test usage:
+        ```python
+        def tearDown(self):
+            reset_nso_aligner()  # Clean up between tests
+        ```
+    
+    Example application shutdown:
+        ```python
+        import atexit
+        atexit.register(reset_nso_aligner)  # Clean up on exit
+        ```
     """
     global _nso_aligner_instance
     

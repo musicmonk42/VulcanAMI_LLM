@@ -2661,7 +2661,8 @@ class WorkingMemory(BaseMemorySystem):
         self.visuospatial_sketchpad: deque = deque(maxlen=4)  # Visual/spatial info
 
         # Central executive
-        self.task_queue: deque = deque()
+        # FIXED: Added maxlen to prevent unbounded memory growth
+        self.task_queue: deque = deque(maxlen=1000)
         self.current_task = None
 
         # Set running flag BEFORE starting thread
