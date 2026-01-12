@@ -122,6 +122,18 @@ class StrategyOrchestrator:
                 self.schema_registry = None
                 self.validate_configs = False
         
+        # Add CPU awareness for monitoring
+        self._cpu_caps = None
+        try:
+            from src.utils.cpu_capabilities import get_cpu_capabilities
+            self._cpu_caps = get_cpu_capabilities()
+            logger.info(
+                f"[StrategyOrchestrator] CPU: {self._cpu_caps.get_best_vector_instruction_set()} "
+                f"({self._cpu_caps.get_performance_tier()})"
+            )
+        except Exception as e:
+            logger.debug(f"[StrategyOrchestrator] CPU detection unavailable: {e}")
+        
         # Initialize all strategy components with fallbacks
         self.cost_model = None
         self.distribution_monitor = None
@@ -202,122 +214,129 @@ class StrategyOrchestrator:
         """
         Analyze a query and recommend the best tool.
         
-        This is the main entry point for tool selection.
+        This is the main entry point for tool selection with comprehensive 
+        performance tracking throughout the pipeline.
         Includes schema validation for queries and cost configurations.
         Note: This is a synchronous method for simpler integration.
         """
-        start_time = time.time()
-        context = context or {}
-        features = None
-        tier_used = 1
-        drift_detected = False
-        drift_summary = {}
-        voi_decision = 'proceed'
-        extraction_time_ms = 0.0
-        validation_status = {"query_valid": True, "configs_valid": True}
+        from src.utils.performance_metrics import PerformanceTimer
         
-        # Schema validation for query (if it's a dict with expected structure)
-        if self.validate_configs and self.schema_registry:
-            try:
-                if isinstance(query, dict) and 'query' in query:
-                    # Validate as reasoning_query
-                    query_validation = self.schema_registry.validate(query, "reasoning_query")
-                    validation_status["query_valid"] = query_validation.valid
-                    if not query_validation.valid:
-                        logger.warning(
-                            f"Query schema validation failed: {len(query_validation.errors)} error(s)"
-                        )
-            except Exception as e:
-                logger.debug(f"Query validation error: {e}")
-        
-        # Step 1: Extract features (start with Tier 1)
-        if self.feature_extractor:
-            try:
-                extract_start = time.time()
-                features = self.feature_extractor.extract_tier1(query)
-                extraction_time_ms = (time.time() - extract_start) * 1000
-                tier_used = 1
-                logger.info(
-                    f"[Strategy] Extracted {len(features) if features is not None else 0} "
-                    f"Tier-1 features in {extraction_time_ms:.1f}ms"
-                )
-            except Exception as e:
-                logger.warning(f"[Strategy] Feature extraction failed: {e}")
-                features = np.zeros(15)  # Fallback
-        else:
-            # Create dummy features if extractor not available
-            features = np.zeros(15)
-        
-        # Step 2: Check for distribution drift
-        if self.distribution_monitor and features is not None:
-            try:
-                drift_detected = self.distribution_monitor.detect_shift(features.reshape(1, -1))
-                drift_summary = self.distribution_monitor.get_drift_summary()
-                
-                if drift_detected:
-                    self.total_drift_detections += 1
-                    logger.warning(f"[Strategy] Distribution drift detected! Summary: {drift_summary}")
-            except Exception as e:
-                logger.warning(f"[Strategy] Drift detection failed: {e}")
-        
-        # Step 3: VOI decision - should we gather more features?
-        if self.voi_gate and DecisionState and VOIAction and features is not None:
-            try:
-                decision_state = DecisionState(
-                    features=features,
-                    uncertainty=self.DEFAULT_INITIAL_UNCERTAINTY,
-                    current_confidence=self.DEFAULT_INITIAL_CONFIDENCE,
-                    gathered_information=[],
-                    remaining_budget={'time_ms': context.get('budget_ms', 1000)}
-                )
-                
-                # FIX: Pass extracted uncertainty and confidence values instead of DecisionState
-                # The should_gather_more method expects numeric values, not a DecisionState object
-                # It returns a boolean: True if more info should be gathered
-                # Use getattr with defaults to handle missing attributes gracefully
-                uncertainty_val = getattr(decision_state, 'uncertainty', self.DEFAULT_INITIAL_UNCERTAINTY)
-                confidence_val = getattr(decision_state, 'current_confidence', self.DEFAULT_INITIAL_CONFIDENCE)
-                
-                should_gather = self.voi_gate.should_gather_more(
-                    uncertainty=uncertainty_val if uncertainty_val is not None else self.DEFAULT_INITIAL_UNCERTAINTY,
-                    confidence=confidence_val if confidence_val is not None else self.DEFAULT_INITIAL_CONFIDENCE,
-                    query_id=context.get('query_id')
-                )
-                
-                if should_gather:
-                    voi_decision = 'gather_more'
-                    self.total_voi_gathers += 1
-                    
-                    # Extract higher-tier features since VOI recommends gathering more
-                    if self.feature_extractor:
-                        try:
-                            extract_start = time.time()
-                            # Default to tier 2 for "gather_more" decision
-                            features = self.feature_extractor.extract_tier2(query)
-                            tier_used = 2
-                            
-                            extraction_time_ms = (time.time() - extract_start) * 1000
-                            logger.info(
-                                f"[Strategy] VOI: Upgraded to Tier-{tier_used} features "
-                                f"({extraction_time_ms:.1f}ms)"
+        with PerformanceTimer("strategy_analysis", "full_pipeline"):
+            start_time = time.time()
+            context = context or {}
+            features = None
+            tier_used = 1
+            drift_detected = False
+            drift_summary = {}
+            voi_decision = 'proceed'
+            extraction_time_ms = 0.0
+            validation_status = {"query_valid": True, "configs_valid": True}
+            
+            # Schema validation for query (if it's a dict with expected structure)
+            if self.validate_configs and self.schema_registry:
+                try:
+                    if isinstance(query, dict) and 'query' in query:
+                        # Validate as reasoning_query
+                        query_validation = self.schema_registry.validate(query, "reasoning_query")
+                        validation_status["query_valid"] = query_validation.valid
+                        if not query_validation.valid:
+                            logger.warning(
+                                f"Query schema validation failed: {len(query_validation.errors)} error(s)"
                             )
-                        except Exception as e:
-                            logger.warning(f"[Strategy] Higher-tier extraction failed: {e}")
-            except Exception as e:
-                logger.warning(f"[Strategy] VOI analysis failed: {e}")
-        
-        # Step 4: Predict costs for each tool
-        tool_costs = {}
-        tool_predictions = {}
-        
-        if self.cost_model and CostComponent and features is not None:
-            try:
-                for tool in self.available_tools:
-                    cost_pred = self.cost_model.predict_cost(tool, features)
-                    tool_costs[tool] = cost_pred
-                    tool_predictions[tool] = cost_pred.get(
-                        CostComponent.TIME_MS.value, {}
-                    ).get('mean', float('inf'))
+                except Exception as e:
+                    logger.debug(f"Query validation error: {e}")
+            
+            # Step 1: Extract features (start with Tier 1)
+            with PerformanceTimer("strategy_analysis", "feature_extraction"):
+                if self.feature_extractor:
+                    try:
+                        extract_start = time.time()
+                        features = self.feature_extractor.extract_tier1(query)
+                        extraction_time_ms = (time.time() - extract_start) * 1000
+                        tier_used = 1
+                        logger.info(
+                            f"[Strategy] Extracted {len(features) if features is not None else 0} "
+                            f"Tier-1 features in {extraction_time_ms:.1f}ms"
+                        )
+                    except Exception as e:
+                        logger.warning(f"[Strategy] Feature extraction failed: {e}")
+                        features = np.zeros(15)  # Fallback
+                else:
+                    # Create dummy features if extractor not available
+                    features = np.zeros(15)
+            
+            # Step 2: Check for distribution drift
+            with PerformanceTimer("strategy_analysis", "drift_detection"):
+                if self.distribution_monitor and features is not None:
+                    try:
+                        drift_detected = self.distribution_monitor.detect_shift(features.reshape(1, -1))
+                        drift_summary = self.distribution_monitor.get_drift_summary()
+                        
+                        if drift_detected:
+                            self.total_drift_detections += 1
+                            logger.warning(f"[Strategy] Distribution drift detected! Summary: {drift_summary}")
+                    except Exception as e:
+                        logger.warning(f"[Strategy] Drift detection failed: {e}")
+            
+            # Step 3: VOI decision - should we gather more features?
+            if self.voi_gate and DecisionState and VOIAction and features is not None:
+                try:
+                    decision_state = DecisionState(
+                        features=features,
+                        uncertainty=self.DEFAULT_INITIAL_UNCERTAINTY,
+                        current_confidence=self.DEFAULT_INITIAL_CONFIDENCE,
+                        gathered_information=[],
+                        remaining_budget={'time_ms': context.get('budget_ms', 1000)}
+                    )
+                    
+                    # FIX: Pass extracted uncertainty and confidence values instead of DecisionState
+                    # The should_gather_more method expects numeric values, not a DecisionState object
+                    # It returns a boolean: True if more info should be gathered
+                    # Use getattr with defaults to handle missing attributes gracefully
+                    uncertainty_val = getattr(decision_state, 'uncertainty', self.DEFAULT_INITIAL_UNCERTAINTY)
+                    confidence_val = getattr(decision_state, 'current_confidence', self.DEFAULT_INITIAL_CONFIDENCE)
+                    
+                    should_gather = self.voi_gate.should_gather_more(
+                        uncertainty=uncertainty_val if uncertainty_val is not None else self.DEFAULT_INITIAL_UNCERTAINTY,
+                        confidence=confidence_val if confidence_val is not None else self.DEFAULT_INITIAL_CONFIDENCE,
+                        query_id=context.get('query_id')
+                    )
+                    
+                    if should_gather:
+                        voi_decision = 'gather_more'
+                        self.total_voi_gathers += 1
+                        
+                        # Extract higher-tier features since VOI recommends gathering more
+                        if self.feature_extractor:
+                            try:
+                                extract_start = time.time()
+                                # Default to tier 2 for "gather_more" decision
+                                features = self.feature_extractor.extract_tier2(query)
+                                tier_used = 2
+                                
+                                extraction_time_ms = (time.time() - extract_start) * 1000
+                                logger.info(
+                                    f"[Strategy] VOI: Upgraded to Tier-{tier_used} features "
+                                    f"({extraction_time_ms:.1f}ms)"
+                                )
+                            except Exception as e:
+                                logger.warning(f"[Strategy] Higher-tier extraction failed: {e}")
+                except Exception as e:
+                    logger.warning(f"[Strategy] VOI analysis failed: {e}")
+            
+            # Step 4: Predict costs for each tool
+            with PerformanceTimer("strategy_analysis", "cost_prediction"):
+                tool_costs = {}
+                tool_predictions = {}
+                
+                if self.cost_model and CostComponent and features is not None:
+                    try:
+                        for tool in self.available_tools:
+                            cost_pred = self.cost_model.predict_cost(tool, features)
+                            tool_costs[tool] = cost_pred
+                            tool_predictions[tool] = cost_pred.get(
+                                CostComponent.TIME_MS.value, {}
+                            ).get('mean', float('inf'))
             except Exception as e:
                 logger.warning(f"[Strategy] Cost prediction failed: {e}")
                 # Fallback to default predictions
