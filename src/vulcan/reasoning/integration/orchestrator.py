@@ -34,6 +34,11 @@ from .safety_checker import (
     get_safety_filtered_fallback_tools,
 )
 from .query_router import get_reasoning_type_from_route
+from .query_analysis import (
+    is_self_referential,
+    is_ethical_query,
+    consult_world_model_introspection,
+)
 
 from .decomposition import process_with_decomposition
 from .cross_domain import apply_cross_domain_transfer
@@ -211,6 +216,64 @@ class ReasoningIntegration:
             )
         
         return should_decompose
+
+    def _is_self_referential(self, query: str) -> bool:
+        """
+        Check if query is self-referential (asks about the system itself).
+        
+        This is a wrapper method that delegates to the imported function
+        from query_analysis module. Instance method is needed for use in
+        apply_reasoning method.
+        
+        Industry best practice: Delegation pattern for clean separation of
+        concerns while maintaining object-oriented interface.
+        
+        Args:
+            query: The user query to analyze
+            
+        Returns:
+            bool: True if query is self-referential, False otherwise
+        """
+        return is_self_referential(query)
+    
+    def _is_ethical_query(self, query: str) -> bool:
+        """
+        Check if query requires ethical analysis or moral reasoning.
+        
+        This is a wrapper method that delegates to the imported function
+        from query_analysis module. Instance method is needed for use in
+        apply_reasoning method.
+        
+        Industry best practice: Delegation pattern for clean separation of
+        concerns while maintaining object-oriented interface.
+        
+        Args:
+            query: The user query to analyze
+            
+        Returns:
+            bool: True if query is ethical, False otherwise
+        """
+        return is_ethical_query(query)
+    
+    def _consult_world_model_introspection(self, query: str) -> Optional[Dict[str, Any]]:
+        """
+        Consult world model for introspective queries about system capabilities.
+        
+        This is a wrapper method that delegates to the imported function
+        from query_analysis module. Instance method is needed for use in
+        apply_reasoning method.
+        
+        Industry best practice: Delegation pattern for clean separation of
+        concerns while maintaining object-oriented interface.
+        
+        Args:
+            query: The user query
+            
+        Returns:
+            Optional[Dict[str, Any]]: Dictionary with introspection result if applicable,
+                                     None otherwise
+        """
+        return consult_world_model_introspection(query)
 
     def _init_components(self) -> None:
         """
