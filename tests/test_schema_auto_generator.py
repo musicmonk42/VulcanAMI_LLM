@@ -5,12 +5,14 @@ Comprehensive pytest suite for schema_auto_generator.py
 import hashlib
 import json
 import os
+import sys
 import tempfile
 from pathlib import Path
 
 import pytest
 
-# Import the module to test
+# Import the module to test - fix import path
+sys.path.insert(0, str(Path(__file__).parent.parent / "src" / "tools"))
 import schema_auto_generator as sag
 
 

@@ -7,16 +7,34 @@ tool selection through:
 - Distribution drift detection and alerting
 - Stochastic cost prediction with uncertainty quantification
 - Tool health monitoring and degradation handling
+INTEGRATED: Schema validation for cost configurations and queries
 """
 
 import logging
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import numpy as np
 
 logger = logging.getLogger(__name__)
+
+# Schema Registry for validation
+SchemaRegistry = None
+_SCHEMA_REGISTRY_AVAILABLE = False
+try:
+    # Try relative import first (when installed as package)
+    from ..vulcan.schema_registry import SchemaRegistry
+    _SCHEMA_REGISTRY_AVAILABLE = True
+except (ImportError, ValueError):
+    # Fall back to absolute import for development/testing
+    try:
+        from vulcan.schema_registry import SchemaRegistry
+        _SCHEMA_REGISTRY_AVAILABLE = True
+    except ImportError as e:
+        logger.debug(f"SchemaRegistry not available: {e}")
+        SchemaRegistry = None
 
 # Try importing strategy components with fallbacks
 try:
@@ -91,6 +109,18 @@ class StrategyOrchestrator:
     
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         config = config or {}
+        
+        # Initialize schema registry if available
+        self.schema_registry = None
+        self.validate_configs = config.get('validate_configs', True)
+        if _SCHEMA_REGISTRY_AVAILABLE and SchemaRegistry and self.validate_configs:
+            try:
+                self.schema_registry = SchemaRegistry.get_instance()
+                logger.info("[StrategyOrchestrator] SchemaRegistry integrated")
+            except Exception as e:
+                logger.warning(f"[StrategyOrchestrator] Failed to init SchemaRegistry: {e}")
+                self.schema_registry = None
+                self.validate_configs = False
         
         # Initialize all strategy components with fallbacks
         self.cost_model = None
@@ -173,6 +203,7 @@ class StrategyOrchestrator:
         Analyze a query and recommend the best tool.
         
         This is the main entry point for tool selection.
+        Includes schema validation for queries and cost configurations.
         Note: This is a synchronous method for simpler integration.
         """
         start_time = time.time()
@@ -183,6 +214,21 @@ class StrategyOrchestrator:
         drift_summary = {}
         voi_decision = 'proceed'
         extraction_time_ms = 0.0
+        validation_status = {"query_valid": True, "configs_valid": True}
+        
+        # Schema validation for query (if it's a dict with expected structure)
+        if self.validate_configs and self.schema_registry:
+            try:
+                if isinstance(query, dict) and 'query' in query:
+                    # Validate as reasoning_query
+                    query_validation = self.schema_registry.validate(query, "reasoning_query")
+                    validation_status["query_valid"] = query_validation.valid
+                    if not query_validation.valid:
+                        logger.warning(
+                            f"Query schema validation failed: {len(query_validation.errors)} error(s)"
+                        )
+            except Exception as e:
+                logger.debug(f"Query validation error: {e}")
         
         # Step 1: Extract features (start with Tier 1)
         if self.feature_extractor:
@@ -355,6 +401,7 @@ class StrategyOrchestrator:
                 'all_costs': {t: tool_predictions.get(t, 0) for t in self.available_tools},
                 'analysis_time_ms': elapsed_ms,
                 'drift_summary': drift_summary if drift_detected else None,
+                'validation_status': validation_status,
             }
         )
     

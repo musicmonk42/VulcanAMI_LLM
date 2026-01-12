@@ -40,6 +40,10 @@ try:
     ECDSA_AVAILABLE = True
 except ImportError:
     ECDSA_AVAILABLE = False
+    logger.warning(
+        "ECDSA library not available. Schema signing will be disabled. "
+        "Install with: pip install ecdsa"
+    )
 
     class SigningKey:
         def __init__(self):
@@ -89,6 +93,9 @@ TYPE_MAP = {
 }
 
 PRIMITIVE_TYPES = set(TYPE_MAP.keys())
+
+# Maximum recursion depth to prevent stack overflow from malicious grammars
+MAX_RECURSION_DEPTH = 100
 
 
 class ParsingError(Exception):
@@ -195,9 +202,27 @@ def tokenize(ebnf_text: str) -> List[Tuple[str, str]]:
 
 
 def parse_expression(
-    tokens: List[Tuple[str, str]], index: int
+    tokens: List[Tuple[str, str]], index: int, depth: int = 0
 ) -> Tuple[Optional[Dict[str, Any]], int]:
-    """Recursive descent parser for a single EBNF expression."""
+    """Recursive descent parser for a single EBNF expression.
+    
+    Args:
+        tokens: List of tokenized EBNF elements
+        index: Current position in token list
+        depth: Current recursion depth (used to prevent stack overflow)
+        
+    Returns:
+        Tuple of (parsed expression dict, final index position)
+        
+    Raises:
+        ParsingError: If recursion depth exceeds MAX_RECURSION_DEPTH
+    """
+    if depth > MAX_RECURSION_DEPTH:
+        raise ParsingError(
+            f"Maximum recursion depth ({MAX_RECURSION_DEPTH}) exceeded. "
+            "Possible circular or malicious grammar."
+        )
+    
     expr = {"type": "sequence", "items": []}
     current_seq = []
     alternation_items = []
@@ -253,17 +278,17 @@ def parse_expression(
             index += 1
         elif kind == "KEYWORD":
             if value == "[":
-                expr_in_bracket, end_idx = parse_expression(tokens, index + 1)
+                expr_in_bracket, end_idx = parse_expression(tokens, index + 1, depth + 1)
                 if expr_in_bracket is not None:
                     add_to_seq({"type": "optional", "value": expr_in_bracket})
                 index = end_idx + 1
             elif value == "{":
-                expr_in_brace, end_idx = parse_expression(tokens, index + 1)
+                expr_in_brace, end_idx = parse_expression(tokens, index + 1, depth + 1)
                 if expr_in_brace is not None:
                     add_to_seq({"type": "repetition", "value": expr_in_brace})
                 index = end_idx + 1
             elif value == "(":
-                expr_in_paren, end_idx = parse_expression(tokens, index + 1)
+                expr_in_paren, end_idx = parse_expression(tokens, index + 1, depth + 1)
                 if expr_in_paren is not None:
                     add_to_seq(expr_in_paren)
                 index = end_idx + 1

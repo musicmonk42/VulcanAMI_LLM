@@ -13,8 +13,12 @@
 # that no insecure JWT secrets are embedded in the Docker image.
 #
 # REQUIRED ENVIRONMENT VARIABLES (set in Railway dashboard):
-# - JWT_SECRET_KEY: Strong secret for JWT signing (min 32 chars)
-# - OPENAI_API_KEY: For LLM chat features
+# - JWT_SECRET: Strong secret for JWT signing (min 32 chars)
+#   Generate with: openssl rand -base64 48 | tr -d '+/'
+#   OR use JWT_SECRET_KEY or GRAPHIX_JWT_SECRET
+#   NOTE: Application will start in LIMITED MODE without JWT secret,
+#         but authentication features will be disabled
+# - OPENAI_API_KEY: For LLM chat features (required for full functionality)
 #
 # OPTIONAL ENVIRONMENT VARIABLES:
 # - PORT: Server port (Railway sets this automatically)
