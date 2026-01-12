@@ -60,40 +60,46 @@ Typical use cases
 - **Hardware Agnostic**: Supports CPU, GPU, and future hardware (photonic computing, memristor arrays)
 - **Persistent Memory v46**: S3-backed storage with CloudFront CDN acceleration and LSM tree optimization
 - **Distributed Execution**: Horizontal scaling with Kubernetes orchestration and auto-scaling
+- **Autonomous Evolution**: Metaprogramming node handlers enable self-improving graphs (8 handlers, 59 tests, 100% passing)
 
 ### 🎯 **Enterprise Ready**
 - **Docker & Kubernetes**: Production deployment patterns with Helm charts and multi-environment configs
 - **Reproducible Builds**: 4,007 SHA256-hashed dependencies, 100% pinned versions for supply chain security
 - **Comprehensive Testing**: 43% test coverage with 89 test files, 42+ CI/CD checks, and 29 reproducibility scenarios
 - **Complete Documentation**: 96 markdown files covering architecture, APIs, deployment, security, and operations
+- **Metaprogramming Features**: Autonomous graph evolution with PATTERN_COMPILE, FIND_SUBGRAPH, GRAPH_SPLICE, GRAPH_COMMIT handlers ([docs/METAPROGRAMMING_DEPLOYMENT.md](docs/METAPROGRAMMING_DEPLOYMENT.md))
 
 ---
 
 ## Key Capabilities
 
-- Graph IR and validation
+- **Graph IR and validation**
   - Typed nodes/edges with size limits, unique IDs, and cycle detection.
   - Policy hooks to extend validation for domain and safety rules.
+  - **NEW**: 8 metaprogramming node handlers (PATTERN_COMPILE, FIND_SUBGRAPH, GRAPH_SPLICE, GRAPH_COMMIT, NSO_MODIFY, ETHICAL_LABEL, EVAL, HALT)
 
-- Executor
+- **Executor**
   - Concurrent, layerized execution for DAGs with per-node error handling and timeouts.
   - Extensible node types (input, transform, filter, generative, combine, output).
   - Observability and audit integrated at node and graph levels.
+  - **NEW**: GraphAwareEvolutionEngine with dual-mode operation (metaprogramming + dict fallback)
 
-- Governance and consensus
+- **Governance and consensus**
   - Trust-weighted voting (approve/reject/abstain) with quorum thresholds.
   - Proposal lifecycle (draft/open/approved/rejected/expired/applied/failed).
   - Optional VULCAN world-model assessment hooks for additional risk/context checks.
   - Thread-safe operations with periodic cleanup of expired proposals.
+  - **NEW**: NSO authorization and ethical labeling for autonomous graph modifications
 
-- Observability and dashboards
+- **Observability and dashboards**
   - Prometheus metrics: latency histograms (p50/p95), errors, explainability gauges, cleanup stats, disk usage, and more.
   - Auto-generated Grafana dashboard JSON export with example alert thresholds.
 
-- Security and audit
+- **Security and audit**
   - SQLite-backed audit trail with WAL, integrity checks, and recovery routines.
   - Selective alerting to channels (e.g., Slack) with severity filtering and stats.
   - Rate limiting and JWT/API key layers for service endpoints.
+  - **NEW**: Multi-layer defense for graph self-modification (fail-safe defaults, complete audit trail, version control)
 
 ---
 
