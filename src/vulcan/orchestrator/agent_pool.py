@@ -2826,11 +2826,32 @@ class AgentPoolManager:
                         f"forcing reasoning with tools={selected_tools}"
                     )
             elif is_creative_task:
-                # Log that we're NOT overriding for creative tasks
-                logger.info(
-                    f"[AgentPool] Task {task_id}: Creative task detected, "
-                    f"NOT forcing world_model (keeping tools={selected_tools})"
-                )
+                # ISSUE 8 FIX: Still invoke basic reasoning for complex creative tasks
+                # Creative tasks should get reasoning context when complexity is high
+                # Calculate complexity from graph structure
+                complexity = graph.get("complexity", 0.0)
+                if not complexity and graph:
+                    # Try to calculate complexity if not provided
+                    try:
+                        complexity = self._calculate_task_complexity(graph, parameters)
+                    except Exception:
+                        complexity = 0.5  # Default to medium
+                
+                if complexity > 0.5:
+                    # Complex creative task - allow reasoning for better context
+                    is_reasoning_task = True
+                    logger.info(
+                        f"[AgentPool] Task {task_id}: Complex creative task detected "
+                        f"(complexity={complexity:.2f}), invoking reasoning for context "
+                        f"(keeping tools={selected_tools})"
+                    )
+                else:
+                    # Simple creative task - no reasoning needed
+                    logger.info(
+                        f"[AgentPool] Task {task_id}: Simple creative task detected "
+                        f"(complexity={complexity:.2f}), NOT forcing world_model "
+                        f"(keeping tools={selected_tools})"
+                    )
 
             # ==================================================================
             # FIX TASK 2: Invoke reasoning for complex queries even when tools=["general"]
