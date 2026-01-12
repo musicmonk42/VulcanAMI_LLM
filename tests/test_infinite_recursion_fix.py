@@ -10,12 +10,18 @@ Bug: Lines 348-352 in selection_strategies.py created a circular delegation
 Fix: Removed the delegation check so the standalone function contains the implementation
 """
 
+import os
 import sys
 import unittest
-from unittest.mock import MagicMock, Mock, patch
+from types import SimpleNamespace
+from unittest.mock import Mock
 
-# Add src to path for imports
-sys.path.insert(0, '/home/runner/work/VulcanAMI_LLM/VulcanAMI_LLM/src')
+# Add src to path for imports using relative path
+test_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(test_dir)
+src_path = os.path.join(project_root, 'src')
+if src_path not in sys.path:
+    sys.path.insert(0, src_path)
 
 from vulcan.reasoning.integration.selection_strategies import select_with_tool_selector
 from vulcan.reasoning.integration.types import ReasoningResult
@@ -24,6 +30,22 @@ from vulcan.reasoning.integration.types import ReasoningResult
 class TestInfiniteRecursionFix(unittest.TestCase):
     """Test suite for the infinite recursion fix."""
 
+    def setUp(self):
+        """Set up test fixtures - mock the SelectionMode module."""
+        # Create a mock module for the SelectionMode import
+        mock_tool_selector_module = SimpleNamespace()
+        mock_tool_selector_module.SelectionMode = SimpleNamespace(
+            BALANCED='BALANCED',
+            ACCURATE='ACCURATE',
+            FAST='FAST'
+        )
+        sys.modules['vulcan.reasoning.selection.tool_selector'] = mock_tool_selector_module
+
+    def tearDown(self):
+        """Clean up test fixtures - remove mock module."""
+        if 'vulcan.reasoning.selection.tool_selector' in sys.modules:
+            del sys.modules['vulcan.reasoning.selection.tool_selector']
+
     def test_no_infinite_recursion_when_called_from_orchestrator(self):
         """
         Verify that calling select_with_tool_selector with an orchestrator
@@ -31,115 +53,79 @@ class TestInfiniteRecursionFix(unittest.TestCase):
         
         This is the core test for the bug fix.
         """
-        # Mock the SelectionMode import that happens inside the function
-        import sys
-        from types import SimpleNamespace
+        # Create a mock orchestrator with the _select_with_tool_selector method
+        mock_orchestrator = Mock()
+        mock_orchestrator._select_with_tool_selector = Mock()
         
-        # Create a mock module for the import
-        mock_tool_selector_module = SimpleNamespace()
-        mock_tool_selector_module.SelectionMode = SimpleNamespace(
-            BALANCED='BALANCED',
-            ACCURATE='ACCURATE',
-            FAST='FAST'
+        # Create a mock tool selector that returns a proper result
+        mock_tool_selector = Mock()
+        mock_selection = Mock()
+        mock_selection.selected_tools = ['test_tool']
+        mock_selection.strategy = 'test_strategy'
+        mock_selection.confidence = 0.8
+        mock_selection.rationale = 'Test selection'
+        mock_tool_selector.select_tools = Mock(return_value=mock_selection)
+        
+        mock_orchestrator._tool_selector = mock_tool_selector
+        
+        # Call the function - this should NOT recurse into orchestrator._select_with_tool_selector
+        result = select_with_tool_selector(
+            orchestrator=mock_orchestrator,
+            query="test query",
+            query_type="general",
+            complexity=0.5,
+            context=None
         )
-        sys.modules['vulcan.reasoning.selection.tool_selector'] = mock_tool_selector_module
         
-        try:
-            # Create a mock orchestrator with the _select_with_tool_selector method
-            mock_orchestrator = Mock()
-            mock_orchestrator._select_with_tool_selector = Mock()
-            
-            # Create a mock tool selector that returns a proper result
-            mock_tool_selector = Mock()
-            mock_selection = Mock()
-            mock_selection.selected_tools = ['test_tool']
-            mock_selection.strategy = 'test_strategy'
-            mock_selection.confidence = 0.8
-            mock_selection.rationale = 'Test selection'
-            mock_tool_selector.select_tools = Mock(return_value=mock_selection)
-            
-            mock_orchestrator._tool_selector = mock_tool_selector
-            
-            # Call the function - this should NOT recurse into orchestrator._select_with_tool_selector
-            result = select_with_tool_selector(
-                orchestrator=mock_orchestrator,
-                query="test query",
-                query_type="general",
-                complexity=0.5,
-                context=None
-            )
-            
-            # Verify the result is correct
-            self.assertIsInstance(result, ReasoningResult)
-            self.assertEqual(result.selected_tools, ['test_tool'])
-            
-            # CRITICAL: Verify that orchestrator._select_with_tool_selector was NOT called
-            # This proves we didn't delegate back to the orchestrator (which would cause recursion)
-            mock_orchestrator._select_with_tool_selector.assert_not_called()
-            
-            # Verify we DID call the tool selector directly
-            mock_tool_selector.select_tools.assert_called_once()
-        finally:
-            # Clean up the mock module
-            if 'vulcan.reasoning.selection.tool_selector' in sys.modules:
-                del sys.modules['vulcan.reasoning.selection.tool_selector']
+        # Verify the result is correct
+        self.assertIsInstance(result, ReasoningResult)
+        self.assertEqual(result.selected_tools, ['test_tool'])
+        
+        # CRITICAL: Verify that orchestrator._select_with_tool_selector was NOT called
+        # This proves we didn't delegate back to the orchestrator (which would cause recursion)
+        mock_orchestrator._select_with_tool_selector.assert_not_called()
+        
+        # Verify we DID call the tool selector directly
+        mock_tool_selector.select_tools.assert_called_once()
 
     def test_directly_uses_tool_selector_implementation(self):
         """
         Verify that select_with_tool_selector directly uses orchestrator._tool_selector
         instead of delegating to orchestrator._select_with_tool_selector.
         """
-        # Mock the SelectionMode import that happens inside the function
-        import sys
-        from types import SimpleNamespace
-        
-        # Create a mock module for the import
-        mock_tool_selector_module = SimpleNamespace()
-        mock_tool_selector_module.SelectionMode = SimpleNamespace(
-            BALANCED='BALANCED',
-            ACCURATE='ACCURATE',
-            FAST='FAST'
+        # Create mock orchestrator with both methods
+        mock_orchestrator = Mock()
+        mock_orchestrator._select_with_tool_selector = Mock(
+            side_effect=Exception("Should not be called - would cause recursion!")
         )
-        sys.modules['vulcan.reasoning.selection.tool_selector'] = mock_tool_selector_module
         
-        try:
-            # Create mock orchestrator with both methods
-            mock_orchestrator = Mock()
-            mock_orchestrator._select_with_tool_selector = Mock(
-                side_effect=Exception("Should not be called - would cause recursion!")
-            )
-            
-            # Set up tool selector to work properly
-            mock_tool_selector = Mock()
-            mock_selection = Mock()
-            mock_selection.selected_tools = ['direct_tool']
-            mock_selection.strategy = 'direct_strategy'
-            mock_selection.confidence = 0.9
-            mock_selection.rationale = 'Direct selection'
-            mock_tool_selector.select_tools = Mock(return_value=mock_selection)
-            
-            mock_orchestrator._tool_selector = mock_tool_selector
-            
-            # This should succeed without calling _select_with_tool_selector
-            result = select_with_tool_selector(
-                orchestrator=mock_orchestrator,
-                query="direct test",
-                query_type="reasoning",
-                complexity=0.7,
-                context=None
-            )
-            
-            # Verify success
-            self.assertIsInstance(result, ReasoningResult)
-            self.assertEqual(result.selected_tools, ['direct_tool'])
-            
-            # Verify we used the tool selector directly, not the orchestrator method
-            mock_tool_selector.select_tools.assert_called_once()
-            mock_orchestrator._select_with_tool_selector.assert_not_called()
-        finally:
-            # Clean up the mock module
-            if 'vulcan.reasoning.selection.tool_selector' in sys.modules:
-                del sys.modules['vulcan.reasoning.selection.tool_selector']
+        # Set up tool selector to work properly
+        mock_tool_selector = Mock()
+        mock_selection = Mock()
+        mock_selection.selected_tools = ['direct_tool']
+        mock_selection.strategy = 'direct_strategy'
+        mock_selection.confidence = 0.9
+        mock_selection.rationale = 'Direct selection'
+        mock_tool_selector.select_tools = Mock(return_value=mock_selection)
+        
+        mock_orchestrator._tool_selector = mock_tool_selector
+        
+        # This should succeed without calling _select_with_tool_selector
+        result = select_with_tool_selector(
+            orchestrator=mock_orchestrator,
+            query="direct test",
+            query_type="reasoning",
+            complexity=0.7,
+            context=None
+        )
+        
+        # Verify success
+        self.assertIsInstance(result, ReasoningResult)
+        self.assertEqual(result.selected_tools, ['direct_tool'])
+        
+        # Verify we used the tool selector directly, not the orchestrator method
+        mock_tool_selector.select_tools.assert_called_once()
+        mock_orchestrator._select_with_tool_selector.assert_not_called()
 
     def test_fallback_when_tool_selector_unavailable(self):
         """
