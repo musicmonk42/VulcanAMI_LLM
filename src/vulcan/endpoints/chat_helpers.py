@@ -244,3 +244,71 @@ def build_context(
     )
     
     return context
+
+
+# ============================================================
+# FIX Issue 7: Consistent Tools Extraction Helper
+# ============================================================
+
+def extract_tools_from_routing(routing_plan: Any) -> List[str]:
+    """
+    Extract tools/capabilities from routing plan in a consistent way.
+    
+    FIX Issue 7: This function provides a single source of truth for extracting
+    tools from routing results, ensuring consistency across all chat endpoints.
+    
+    The function tries multiple extraction strategies in order:
+    1. telemetry_data.selected_tools (most reliable)
+    2. agent_tasks.capability (fallback for v1 routing)
+    3. ['general'] (default when no tools found)
+    
+    Args:
+        routing_plan: The ProcessingPlan or QueryPlan from query routing
+        
+    Returns:
+        List of tool/capability names that were selected for the query
+        
+    Example:
+        >>> plan = route_query("What is 2+2?")
+        >>> tools = extract_tools_from_routing(plan)
+        >>> # ['reasoning', 'calculator']
+    """
+    if routing_plan is None:
+        return ['general']
+    
+    selected_tools = []
+    
+    # Strategy 1: Check telemetry_data.selected_tools (QueryRouter v2)
+    if hasattr(routing_plan, 'telemetry_data'):
+        telemetry_tools = routing_plan.telemetry_data.get('selected_tools', [])
+        if telemetry_tools:
+            selected_tools = telemetry_tools
+    
+    # Strategy 2: Extract from agent_tasks.capability (QueryRouter v1)
+    if not selected_tools and hasattr(routing_plan, 'agent_tasks'):
+        try:
+            selected_tools = [
+                task.capability for task in routing_plan.agent_tasks
+                if hasattr(task, 'capability')
+            ]
+        except (AttributeError, TypeError):
+            pass
+    
+    # Strategy 3: Try to extract from plan attributes directly
+    if not selected_tools:
+        # Check for selected_tools attribute directly
+        if hasattr(routing_plan, 'selected_tools'):
+            selected_tools = routing_plan.selected_tools
+        # Check for capabilities attribute
+        elif hasattr(routing_plan, 'capabilities'):
+            selected_tools = routing_plan.capabilities
+    
+    # Default fallback
+    if not selected_tools:
+        selected_tools = ['general']
+    
+    # Ensure we return a list (handle single string case)
+    if isinstance(selected_tools, str):
+        selected_tools = [selected_tools]
+    
+    return selected_tools
