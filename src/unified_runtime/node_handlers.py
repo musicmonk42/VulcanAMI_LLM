@@ -84,6 +84,11 @@ try:
 except ImportError:
     dispatch_explainability_node = None
 
+try:
+    from .metaprogramming_handlers import get_metaprogramming_handlers
+except ImportError:
+    get_metaprogramming_handlers = None
+
 # <<< --- FIX for normalize_node --- >>>
 # Ensure NUMPY_AVAILABLE is defined at the module level
 try:
@@ -2650,7 +2655,7 @@ def get_node_handlers() -> Dict[str, Callable]:
     """
     Returns the complete registry of node handlers
     """
-    return {
+    handlers = {
         # Core nodes
         "CONST": const_node,
         "ADD": add_node,
@@ -2706,6 +2711,16 @@ def get_node_handlers() -> Dict[str, Callable]:
         "QUERY_MEMORIES": query_memories_node,
         "QueryMemoriesNode": query_memories_node,  # Alias
     }
+    
+    # Add metaprogramming handlers if available
+    if get_metaprogramming_handlers:
+        try:
+            metaprogramming_handlers = get_metaprogramming_handlers()
+            handlers.update(metaprogramming_handlers)
+        except Exception as e:
+            logger.warning(f"Failed to load metaprogramming handlers: {e}")
+    
+    return handlers
 
 
 def validate_node_handler(handler: Callable) -> bool:
