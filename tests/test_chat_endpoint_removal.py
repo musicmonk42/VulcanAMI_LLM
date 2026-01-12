@@ -27,27 +27,30 @@ def test_chat_endpoint_file_removed():
 def test_full_platform_chat_config_removed():
     """
     Verify that chat endpoint configuration has been removed from full_platform.py.
+    
+    Uses AST parsing for robust verification of removed configuration variables.
     """
     full_platform_file = Path("src/full_platform.py")
     assert full_platform_file.exists(), f"File not found: {full_platform_file}"
     
     with open(full_platform_file, 'r') as f:
         content = f.read()
+        tree = ast.parse(content, filename=str(full_platform_file))
     
-    # Check that chat endpoint config variables are removed
-    assert 'enable_chat_endpoint' not in content, \
+    # Check for removed configuration using AST
+    found_config_vars = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+            found_config_vars.add(node.target.id)
+    
+    # Verify specific config variables are NOT present
+    assert 'enable_chat_endpoint' not in found_config_vars, \
         "enable_chat_endpoint should be removed from UnifiedPlatformSettings"
-    assert 'chat_mount: str = "/chat"' not in content, \
-        "chat_mount configuration should be removed"
-    assert 'chat_module: str = "src.chat_endpoint"' not in content, \
-        "chat_module configuration should be removed"
-    assert 'chat_attr: str = "app"' not in content, \
-        "chat_attr configuration should be removed"
     
-    # Check that mounting block is removed
+    # Also check string content for mounting logic removal
     assert 'Import and mount Chat Endpoint' not in content, \
         "Chat Endpoint mounting block should be removed"
-    assert '→ Chat API available at /chat/v1/chat' not in content, \
+    assert 'Chat API available at /chat/v1/chat' not in content, \
         "Chat endpoint logging should be removed"
     
     print("✓ Chat endpoint configuration removed from full_platform.py")

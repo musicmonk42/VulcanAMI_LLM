@@ -16,6 +16,10 @@ def test_observe_engine_result_imported():
     """
     Verify that observe_engine_result is imported in unified_chat.py.
     
+    This test verifies the fix for a critical production bug where the function
+    observe_engine_result() was called on line 1451 but not imported, causing
+    NameError: name 'observe_engine_result' is not defined and 500 errors.
+    
     This test uses AST parsing to check for the presence of observe_engine_result
     in the imports from vulcan.reasoning.integration.utils.
     """
