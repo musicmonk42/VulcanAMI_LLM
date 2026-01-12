@@ -490,6 +490,187 @@ class MemoryIndex:
 
 
 # ============================================================
+# SHARDED MEMORY INDEX
+# ============================================================
+
+
+class ShardedMemoryIndex:
+    """Sharded memory index for scalable vector search."""
+    
+    def __init__(
+        self,
+        dimension: int = 512,
+        shard_size: int = 100000,
+        index_type: str = "flat",
+        use_gpu: bool = False,
+    ):
+        """Initialize sharded index.
+        
+        Args:
+            dimension: Embedding dimension
+            shard_size: Maximum items per shard
+            index_type: Type of index to use per shard
+            use_gpu: Whether to use GPU
+        """
+        self.dimension = dimension
+        self.shard_size = shard_size
+        self.index_type = index_type
+        self.use_gpu = use_gpu
+        
+        # Shards: List of MemoryIndex instances
+        self.shards: List[MemoryIndex] = []
+        # Track which shard each memory is in
+        self.memory_to_shard: Dict[str, int] = {}
+        # Current shard for new additions
+        self.current_shard_idx = 0
+        
+        self._lock = threading.RLock()
+        
+        # Create initial shard
+        self._create_new_shard()
+        
+        logger.info(
+            f"Initialized sharded index: dimension={dimension}, "
+            f"shard_size={shard_size}, shards=1"
+        )
+    
+    def _create_new_shard(self) -> int:
+        """Create a new shard.
+        
+        Returns:
+            Index of the new shard
+        """
+        shard = MemoryIndex(
+            dimension=self.dimension,
+            index_type=self.index_type,
+            use_gpu=self.use_gpu,
+        )
+        self.shards.append(shard)
+        return len(self.shards) - 1
+    
+    def add(self, memory_id: str, embedding: np.ndarray) -> bool:
+        """Add embedding to sharded index.
+        
+        Args:
+            memory_id: Memory identifier
+            embedding: Embedding vector
+            
+        Returns:
+            True if added successfully
+        """
+        with self._lock:
+            # Check if current shard is full
+            current_shard = self.shards[self.current_shard_idx]
+            if len(current_shard.id_map) >= self.shard_size:
+                # Create new shard
+                self.current_shard_idx = self._create_new_shard()
+                current_shard = self.shards[self.current_shard_idx]
+                logger.info(
+                    f"Created new shard {self.current_shard_idx}, "
+                    f"total shards: {len(self.shards)}"
+                )
+            
+            # Add to current shard
+            success = current_shard.add(memory_id, embedding)
+            if success:
+                self.memory_to_shard[memory_id] = self.current_shard_idx
+            
+            return success
+    
+    def search(
+        self, query_embedding: np.ndarray, k: int = 10
+    ) -> List[Tuple[str, float]]:
+        """Search across all shards in parallel.
+        
+        Args:
+            query_embedding: Query embedding vector
+            k: Number of results to return
+            
+        Returns:
+            List of (memory_id, score) tuples
+        """
+        with self._lock:
+            if not self.shards:
+                return []
+            
+            # Search all shards in parallel
+            from concurrent.futures import ThreadPoolExecutor, as_completed
+            
+            all_results = []
+            
+            with ThreadPoolExecutor(max_workers=min(len(self.shards), 10)) as executor:
+                # Submit search tasks for each shard
+                future_to_shard = {
+                    executor.submit(shard.search, query_embedding, k): idx
+                    for idx, shard in enumerate(self.shards)
+                }
+                
+                # Collect results as they complete
+                for future in as_completed(future_to_shard):
+                    try:
+                        shard_results = future.result()
+                        all_results.extend(shard_results)
+                    except Exception as e:
+                        shard_idx = future_to_shard[future]
+                        logger.error(f"Shard {shard_idx} search failed: {e}")
+            
+            # Sort by score and return top k
+            all_results.sort(key=lambda x: x[1], reverse=True)
+            return all_results[:k]
+    
+    def remove(self, memory_id: str) -> bool:
+        """Remove memory from sharded index.
+        
+        Args:
+            memory_id: Memory identifier
+            
+        Returns:
+            True if removed successfully
+        """
+        with self._lock:
+            if memory_id not in self.memory_to_shard:
+                return False
+            
+            shard_idx = self.memory_to_shard[memory_id]
+            if shard_idx >= len(self.shards):
+                return False
+            
+            success = self.shards[shard_idx].remove(memory_id)
+            if success:
+                del self.memory_to_shard[memory_id]
+            
+            return success
+    
+    def clear(self):
+        """Clear all shards."""
+        with self._lock:
+            for shard in self.shards:
+                shard.clear()
+            self.memory_to_shard.clear()
+            logger.info("Cleared all shards")
+    
+    def get_stats(self) -> Dict[str, Any]:
+        """Get shard statistics.
+        
+        Returns:
+            Dict with shard statistics
+        """
+        with self._lock:
+            return {
+                'total_shards': len(self.shards),
+                'shard_size': self.shard_size,
+                'total_memories': len(self.memory_to_shard),
+                'shard_utilization': [
+                    len(shard.id_map) for shard in self.shards
+                ],
+                'avg_utilization': (
+                    sum(len(shard.id_map) for shard in self.shards) / len(self.shards)
+                    if self.shards else 0
+                ),
+            }
+
+
+# ============================================================
 # TEXT SEARCH INDEX
 # ============================================================
 

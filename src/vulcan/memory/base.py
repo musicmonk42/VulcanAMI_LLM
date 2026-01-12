@@ -3,6 +3,7 @@
 import logging
 import threading
 import time
+import tracemalloc
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
@@ -213,6 +214,13 @@ class MemoryConfig:
     enable_indexing: bool = True
     index_update_batch: int = 100
     similarity_threshold: float = 0.7
+    
+    # New configuration options for improvements
+    enable_connection_pooling: bool = True
+    max_connections_per_node: int = 5
+    shard_size: int = 100000
+    enable_memory_monitoring: bool = True
+    memory_warning_threshold_mb: float = 1000
 
     def __post_init__(self):
         """Validate configuration parameters."""
@@ -267,6 +275,25 @@ class MemoryConfig:
                 f"replication_factor {self.replication_factor} too low, setting to 1"
             )
             self.replication_factor = 1
+        
+        # Validate new configuration options
+        if self.max_connections_per_node < 1:
+            logger.warning(
+                f"max_connections_per_node {self.max_connections_per_node} too low, setting to 1"
+            )
+            self.max_connections_per_node = 1
+        
+        if self.shard_size < 1000:
+            logger.warning(
+                f"shard_size {self.shard_size} too low, setting to 1000"
+            )
+            self.shard_size = 1000
+        
+        if self.memory_warning_threshold_mb < 0:
+            logger.warning(
+                f"memory_warning_threshold_mb {self.memory_warning_threshold_mb} negative, setting to 0"
+            )
+            self.memory_warning_threshold_mb = 0
 
 
 # ============================================================
@@ -499,3 +526,126 @@ class BaseMemorySystem(ABC):
         """Context manager exit with cleanup."""
         self.shutdown()
         return False
+
+
+# ============================================================
+# MEMORY USAGE MONITORING
+# ============================================================
+
+
+class MemoryUsageMonitor:
+    """Monitor actual memory consumption using tracemalloc."""
+    
+    def __init__(
+        self,
+        warning_threshold_mb: float = 1000,
+        critical_threshold_mb: float = 2000,
+    ):
+        """Initialize memory usage monitor.
+        
+        Args:
+            warning_threshold_mb: Warning threshold in megabytes
+            critical_threshold_mb: Critical threshold in megabytes
+        """
+        self.warning_threshold_mb = warning_threshold_mb
+        self.critical_threshold_mb = critical_threshold_mb
+        self._lock = threading.RLock()
+        self._monitoring = False
+        self._usage_by_type: Dict[MemoryType, int] = {}
+        
+        # Start tracemalloc if not already started
+        if not tracemalloc.is_tracing():
+            tracemalloc.start()
+            logger.info("Started memory tracing with tracemalloc")
+    
+    def track_memory(self, memory: Memory):
+        """Track memory consumption for a memory object."""
+        with self._lock:
+            # Estimate memory size
+            size = self._estimate_memory_size(memory)
+            
+            # Update usage by type
+            if memory.type not in self._usage_by_type:
+                self._usage_by_type[memory.type] = 0
+            self._usage_by_type[memory.type] += size
+            
+            # Check thresholds
+            total_mb = sum(self._usage_by_type.values()) / (1024 * 1024)
+            
+            if total_mb >= self.critical_threshold_mb:
+                logger.critical(
+                    f"Memory usage critical: {total_mb:.2f} MB "
+                    f"(threshold: {self.critical_threshold_mb} MB)"
+                )
+            elif total_mb >= self.warning_threshold_mb:
+                logger.warning(
+                    f"Memory usage warning: {total_mb:.2f} MB "
+                    f"(threshold: {self.warning_threshold_mb} MB)"
+                )
+    
+    def untrack_memory(self, memory: Memory):
+        """Remove memory from tracking."""
+        with self._lock:
+            size = self._estimate_memory_size(memory)
+            
+            if memory.type in self._usage_by_type:
+                self._usage_by_type[memory.type] = max(
+                    0, self._usage_by_type[memory.type] - size
+                )
+    
+    def _estimate_memory_size(self, memory: Memory) -> int:
+        """Estimate memory size in bytes."""
+        size = 0
+        
+        # Content size
+        if hasattr(memory.content, '__sizeof__'):
+            size += memory.content.__sizeof__()
+        
+        # Embedding size
+        if memory.embedding is not None:
+            size += memory.embedding.nbytes
+        
+        # Metadata size (rough estimate)
+        size += len(str(memory.metadata))
+        
+        return size
+    
+    def get_usage_stats(self) -> Dict[str, Any]:
+        """Get current usage statistics."""
+        with self._lock:
+            current, peak = tracemalloc.get_traced_memory()
+            
+            return {
+                'current_mb': current / (1024 * 1024),
+                'peak_mb': peak / (1024 * 1024),
+                'by_type': {
+                    k.value: v / (1024 * 1024) 
+                    for k, v in self._usage_by_type.items()
+                },
+                'warning_threshold_mb': self.warning_threshold_mb,
+                'critical_threshold_mb': self.critical_threshold_mb,
+            }
+    
+    def get_adaptive_capacity(self, memory_type: MemoryType) -> int:
+        """Calculate adaptive capacity based on current usage."""
+        with self._lock:
+            stats = self.get_usage_stats()
+            current_mb = stats['current_mb']
+            
+            # If we're above warning threshold, reduce capacity
+            if current_mb >= self.warning_threshold_mb:
+                reduction_factor = min(
+                    0.5,
+                    (current_mb - self.warning_threshold_mb) / self.warning_threshold_mb
+                )
+                return int(10000 * (1 - reduction_factor))
+            
+            # Normal capacity
+            return 100000
+    
+    def shutdown(self):
+        """Clean up monitoring resources."""
+        with self._lock:
+            if tracemalloc.is_tracing():
+                tracemalloc.stop()
+                logger.info("Stopped memory tracing")

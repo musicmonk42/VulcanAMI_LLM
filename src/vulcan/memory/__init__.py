@@ -10,18 +10,32 @@ from .base import (
     MemoryQuery,
     MemoryStats,
     MemoryType,
+    MemoryUsageMonitor,
 )
 from .consolidation import ConsolidationStrategy, MemoryConsolidator, MemoryOptimizer
 from .distributed import (
+    ConnectionPool,
     ConsistencyLevel,
+    DistributedCheckpoint,
     DistributedMemory,
     MemoryFederation,
     MemoryNode,
 )
 from .hierarchical import HierarchicalMemory, MemoryLevel
 from .learning_persistence import LearningStatePersistence
-from .persistence import CompressionType, MemoryPersistence, MemoryVersionControl
-from .retrieval import AttentionMechanism, MemoryIndex, MemorySearch, RetrievalResult
+from .persistence import (
+    CompressionStats,
+    CompressionType,
+    MemoryPersistence,
+    MemoryVersionControl,
+)
+from .retrieval import (
+    AttentionMechanism,
+    MemoryIndex,
+    MemorySearch,
+    RetrievalResult,
+    ShardedMemoryIndex,
+)
 from .specialized import (
     Concept,
     Episode,
@@ -44,6 +58,7 @@ __all__ = [
     "MemoryConfig",
     "MemoryStats",
     "MemoryException",
+    "MemoryUsageMonitor",
     # Hierarchical
     "HierarchicalMemory",
     "MemoryLevel",
@@ -52,10 +67,13 @@ __all__ = [
     "MemoryFederation",
     "MemoryNode",
     "ConsistencyLevel",
+    "ConnectionPool",
+    "DistributedCheckpoint",
     # Persistence
     "MemoryPersistence",
     "MemoryVersionControl",
     "CompressionType",
+    "CompressionStats",
     "LearningStatePersistence",
     # Retrieval
     "MemoryIndex",
@@ -63,6 +81,7 @@ __all__ = [
     "AttentionMechanism",
     "RetrievalResult",
     "VectorMemoryStore",  # Added - Alias for MemoryIndex
+    "ShardedMemoryIndex",
     # Consolidation
     "MemoryConsolidator",
     "ConsolidationStrategy",
