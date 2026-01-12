@@ -67,7 +67,7 @@ Settings are saved in browser localStorage.
   - ⚠️ **Warnings Tab** - Safety status, audit logs, adversarial monitoring
   - 🔧 **Internals Tab** - World model, memory, hardware, routing, and API endpoints list
 
-### Backend (src/chat_endpoint.py)
+### Backend (VULCAN Platform)
 - ✅ Full VULCAN platform integration
 - ✅ World Model (causal reasoning)
 - ✅ Unified Reasoner (5 modes)
@@ -78,19 +78,15 @@ Settings are saved in browser localStorage.
 
 ## API Endpoints
 
-The chat functionality is available at two endpoints:
+The chat functionality is available through the VULCAN platform:
 
-### Primary: VULCAN Chat (`/vulcan/v1/chat`)
+### VULCAN Chat (`/vulcan/v1/chat`)
 
-The main VULCAN service includes a comprehensive chat endpoint.
-
-### Standalone: Chat Endpoint (`/chat/v1/chat`)
-
-A standalone chat service that can be used independently.
+The main VULCAN service includes a comprehensive chat endpoint with full platform integration.
 
 ### Request Format
 
-**POST** `/vulcan/v1/chat` or `/chat/v1/chat`
+**POST** `/vulcan/v1/chat`
 
 ```json
 {
@@ -119,7 +115,7 @@ A standalone chat service that can be used independently.
 
 ### Health Check
 
-**GET** `/vulcan/health` or `/chat/health`
+**GET** `/vulcan/health`
 
 ```json
 {
@@ -175,7 +171,7 @@ python src/full_platform.py --auth-method api_key
 Then include the key in your requests:
 
 ```javascript
-fetch('http://localhost:8080/chat/v1/chat', {
+fetch('http://localhost:8080/vulcan/v1/chat', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
@@ -186,15 +182,6 @@ fetch('http://localhost:8080/chat/v1/chat', {
     enable_reasoning: true
   })
 })
-```
-
-### Disable Chat Endpoint
-
-If you only want to use the VULCAN `/vulcan/v1/chat` endpoint:
-
-```bash
-export UNIFIED_ENABLE_CHAT_ENDPOINT=false
-python src/full_platform.py
 ```
 
 ## Troubleshooting
@@ -246,16 +233,16 @@ The backend has CORS enabled for all origins by default. If you still see issues
 
 ### Components not loading
 
-Some components may not be available depending on dependencies. Check the `/chat/health` endpoint to see which systems are active.
+Some components may not be available depending on dependencies. Check the `/vulcan/health` endpoint to see which systems are active.
 
 ## Architecture
 
 ```
-User → vulcan_chat.html → HTTP POST → /chat/v1/chat (or /vulcan/v1/chat)
+User → vulcan_chat.html → HTTP POST → /vulcan/v1/chat
                                            ↓
                                ┌─────────────────────────┐
-                               │     Chat Endpoint       │
-                               │  (chat_endpoint.py)     │
+                               │     VULCAN Chat Endpoint       │
+                               │  (unified_chat.py)     │
                                └─────────────────────────┘
                                            ↓
                            ┌────────────────┴────────────────┐
@@ -289,7 +276,7 @@ Systems activated per message: 5-7 depending on query type and enabled features.
 
 | File | Description |
 |------|-------------|
-| `src/chat_endpoint.py` | Standalone chat API endpoint |
+| `src/vulcan/endpoints/unified_chat.py` | VULCAN chat endpoint with full platform integration |
 | `src/vulcan/main.py` | VULCAN main app with integrated `/v1/chat` |
 | `src/full_platform.py` | Unified platform that mounts all services |
 | `start_chat_interface.sh` | One-click startup script |
