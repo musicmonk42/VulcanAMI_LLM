@@ -22,6 +22,15 @@ from .types import (
     QUERY_TYPE_STRATEGY_MAP,
 )
 
+# Import SelectionRequest for ToolSelector calls
+try:
+    from vulcan.reasoning.selection.tool_selector import SelectionRequest, SelectionMode
+    SELECTION_REQUEST_AVAILABLE = True
+except ImportError:
+    SELECTION_REQUEST_AVAILABLE = False
+    SelectionRequest = None
+    SelectionMode = None
+
 logger = logging.getLogger(__name__)
 
 
@@ -370,7 +379,18 @@ def select_with_tool_selector(
             
             # Call tool selector - FIXED: Use correct method name select_and_execute
             # Build SelectionRequest
-            from vulcan.reasoning.selection.tool_selector import SelectionRequest
+            if not SELECTION_REQUEST_AVAILABLE:
+                logger.error("SelectionRequest not available, cannot call select_and_execute")
+                # Fall back to direct tool selection
+                tools = get_fallback_tools(query_type, 'general', [])
+                return ReasoningResult(
+                    selected_tools=tools if tools else ['general'],
+                    reasoning_strategy='direct',
+                    confidence=0.4,
+                    rationale="SelectionRequest unavailable",
+                    metadata={"query_type": query_type, "complexity": complexity}
+                )
+                
             selection_request = SelectionRequest(
                 query=query,
                 query_type=query_type,

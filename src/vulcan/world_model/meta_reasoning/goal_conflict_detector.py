@@ -518,8 +518,12 @@ class GoalConflictDetector:
             List of detected conflicts
         """
         # Convert query string to a proposal dict
+        # Use hashlib for deterministic, session-independent ID
+        import hashlib
+        query_hash = hashlib.sha256(query.encode()).hexdigest()[:16]
+        
         proposal = {
-            "id": f"query_{hash(query)}",
+            "id": f"query_{query_hash}",
             "query": query,
             "description": query,
             "type": "query_analysis"
@@ -530,12 +534,8 @@ class GoalConflictDetector:
         objectives = []
         query_lower = query.lower()
         
-        # Use mock-safe attribute access
-        hierarchy_objectives = {}
-        if hasattr(self.objective_hierarchy, "objectives") and isinstance(
-            self.objective_hierarchy.objectives, dict
-        ):
-            hierarchy_objectives = self.objective_hierarchy.objectives
+        # Get objectives from hierarchy using getattr for safe access
+        hierarchy_objectives = getattr(self.objective_hierarchy, 'objectives', {})
         
         # Check if query mentions any known objectives
         for obj_name in hierarchy_objectives.keys():

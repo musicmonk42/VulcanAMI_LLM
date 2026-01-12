@@ -2834,7 +2834,11 @@ class AgentPoolManager:
                     # Try to calculate complexity if not provided
                     try:
                         complexity = self._calculate_task_complexity(graph, parameters)
-                    except Exception:
+                    except (AttributeError, KeyError, TypeError) as e:
+                        logger.warning(
+                            f"[AgentPool] Task {task_id}: Failed to calculate complexity "
+                            f"for creative task: {e}. Using default complexity=0.5"
+                        )
                         complexity = 0.5  # Default to medium
                 
                 if complexity > 0.5:
