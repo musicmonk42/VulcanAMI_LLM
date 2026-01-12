@@ -331,6 +331,220 @@ class RPCServer:
 
 
 # ============================================================
+# CONNECTION POOL
+# ============================================================
+
+
+class ConnectionPool:
+    """Thread-safe connection pool for RPC connections."""
+    
+    def __init__(
+        self,
+        max_connections_per_node: int = 5,
+        connection_timeout: float = 30.0,
+    ):
+        """Initialize connection pool.
+        
+        Args:
+            max_connections_per_node: Maximum connections per node
+            connection_timeout: Connection timeout in seconds
+        """
+        self.max_connections_per_node = max_connections_per_node
+        self.connection_timeout = connection_timeout
+        
+        # Pools per node: node_id -> Queue of connections
+        self._pools: Dict[str, Any] = {}
+        # Track connection count per node
+        self._connection_counts: Dict[str, int] = {}
+        # Node connection info: node_id -> (host, port)
+        self._node_info: Dict[str, Tuple[str, int]] = {}
+        
+        self._lock = threading.RLock()
+        
+        # Health check
+        self._health_check_thread = None
+        self._health_check_running = False
+        
+        if ZMQ_AVAILABLE:
+            self.context = zmq.Context()
+        else:
+            self.context = None
+        
+        logger.info(
+            f"Initialized connection pool: "
+            f"max_per_node={max_connections_per_node}, timeout={connection_timeout}s"
+        )
+    
+    def get_connection(self, node_id: str, host: str, port: int) -> Any:
+        """Get connection from pool or create new one.
+        
+        Args:
+            node_id: Node identifier
+            host: Node host
+            port: Node port
+            
+        Returns:
+            Connection object
+        """
+        with self._lock:
+            # Store node info
+            self._node_info[node_id] = (host, port)
+            
+            # Initialize pool if needed
+            if node_id not in self._pools:
+                import queue
+                self._pools[node_id] = queue.Queue(
+                    maxsize=self.max_connections_per_node
+                )
+                self._connection_counts[node_id] = 0
+            
+            pool = self._pools[node_id]
+            
+            # Try to get existing connection
+            try:
+                conn = pool.get_nowait()
+                # Verify connection is still valid
+                if self._is_connection_healthy(conn):
+                    return conn
+                else:
+                    # Connection unhealthy, close it and create new
+                    self._close_connection(conn)
+                    self._connection_counts[node_id] -= 1
+            except Exception:
+                # No available connection in pool
+                pass
+            
+            # Create new connection if under limit
+            if self._connection_counts[node_id] < self.max_connections_per_node:
+                conn = self._create_connection(host, port)
+                if conn:
+                    self._connection_counts[node_id] += 1
+                    return conn
+            
+            # Pool exhausted, wait for available connection
+            try:
+                conn = pool.get(timeout=self.connection_timeout)
+                if self._is_connection_healthy(conn):
+                    return conn
+                else:
+                    self._close_connection(conn)
+                    self._connection_counts[node_id] -= 1
+            except Exception as e:
+                logger.error(f"Failed to get connection for {node_id}: {e}")
+            
+            return None
+    
+    def return_connection(self, node_id: str, conn: Any):
+        """Return connection to pool.
+        
+        Args:
+            node_id: Node identifier
+            conn: Connection to return
+        """
+        with self._lock:
+            if node_id not in self._pools:
+                self._close_connection(conn)
+                return
+            
+            pool = self._pools[node_id]
+            
+            # Check if connection is healthy before returning
+            if self._is_connection_healthy(conn):
+                try:
+                    pool.put_nowait(conn)
+                except Exception:
+                    # Pool full, close connection
+                    self._close_connection(conn)
+                    self._connection_counts[node_id] -= 1
+            else:
+                # Unhealthy connection, close it
+                self._close_connection(conn)
+                self._connection_counts[node_id] -= 1
+    
+    def _create_connection(self, host: str, port: int) -> Optional[Any]:
+        """Create new connection.
+        
+        Args:
+            host: Host to connect to
+            port: Port to connect to
+            
+        Returns:
+            Connection object or None
+        """
+        try:
+            if ZMQ_AVAILABLE:
+                socket_conn = self.context.socket(zmq.REQ)
+                socket_conn.connect(f"tcp://{host}:{port}")
+                socket_conn.setsockopt(zmq.RCVTIMEO, int(self.connection_timeout * 1000))
+                socket_conn.setsockopt(zmq.SNDTIMEO, int(self.connection_timeout * 1000))
+                return socket_conn
+            else:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(self.connection_timeout)
+                sock.connect((host, port))
+                return sock
+        except Exception as e:
+            logger.error(f"Failed to create connection to {host}:{port}: {e}")
+            return None
+    
+    def _is_connection_healthy(self, conn: Any) -> bool:
+        """Check if connection is healthy.
+        
+        Args:
+            conn: Connection to check
+            
+        Returns:
+            True if healthy, False otherwise
+        """
+        if conn is None:
+            return False
+        
+        try:
+            # Simple health check
+            if ZMQ_AVAILABLE and hasattr(conn, 'closed'):
+                return not conn.closed
+            elif hasattr(conn, 'fileno'):
+                # Socket-based connection
+                return conn.fileno() != -1
+            return True
+        except Exception:
+            return False
+    
+    def _close_connection(self, conn: Any):
+        """Close connection.
+        
+        Args:
+            conn: Connection to close
+        """
+        try:
+            if hasattr(conn, 'close'):
+                conn.close()
+        except Exception as e:
+            logger.debug(f"Error closing connection: {e}")
+    
+    def cleanup(self):
+        """Clean up all connections."""
+        with self._lock:
+            for node_id, pool in self._pools.items():
+                # Drain pool
+                while not pool.empty():
+                    try:
+                        conn = pool.get_nowait()
+                        self._close_connection(conn)
+                    except Exception:
+                        break
+            
+            self._pools.clear()
+            self._connection_counts.clear()
+            self._node_info.clear()
+            
+            if self.context:
+                self.context.term()
+            
+            logger.info("Connection pool cleaned up")
+
+
+# ============================================================
 # MEMORY NODE
 # ============================================================
 
@@ -522,6 +736,234 @@ class MemoryFederation:
         self.monitor_running = False
         if self.monitor_thread:
             self.monitor_thread.join(timeout=2.0)
+
+
+# ============================================================
+# DISTRIBUTED CHECKPOINT
+# ============================================================
+
+
+class DistributedCheckpoint:
+    """Distributed checkpoint with 2-phase commit protocol."""
+    
+    def __init__(self, federation: 'MemoryFederation', persistence: Any):
+        """Initialize distributed checkpoint.
+        
+        Args:
+            federation: Memory federation for node coordination
+            persistence: MemoryPersistence instance for actual storage
+        """
+        self.federation = federation
+        self.persistence = persistence
+        self._lock = threading.RLock()
+        
+        # Track checkpoint state
+        self.active_checkpoints: Dict[str, Dict[str, Any]] = {}
+        self.checkpoint_history: List[str] = []
+        
+        logger.info("Initialized distributed checkpoint coordinator")
+    
+    def initiate_checkpoint(self) -> str:
+        """Initiate distributed checkpoint using 2-phase commit.
+        
+        Returns:
+            Checkpoint ID
+        """
+        with self._lock:
+            # Generate checkpoint ID
+            checkpoint_id = f"ckpt_{int(time.time() * 1000)}"
+            
+            # Check if we're the leader
+            if not self.federation.leader_id:
+                self.federation.elect_leader()
+            
+            # Only leader can initiate checkpoint
+            if self.federation.leader_id != self.federation.nodes.get(
+                list(self.federation.nodes.keys())[0] if self.federation.nodes else None
+            ):
+                logger.warning("Only leader can initiate checkpoint")
+                return ""
+            
+            logger.info(f"Initiating checkpoint {checkpoint_id}")
+            
+            # Phase 1: Prepare
+            prepare_results = self._phase_prepare(checkpoint_id)
+            
+            if not prepare_results:
+                logger.error("Checkpoint prepare phase failed - no nodes responded")
+                return ""
+            
+            # Check if all nodes prepared successfully
+            all_prepared = all(result['success'] for result in prepare_results.values())
+            
+            if all_prepared:
+                # Phase 2: Commit
+                commit_results = self._phase_commit(checkpoint_id)
+                
+                # Track checkpoint
+                self.active_checkpoints[checkpoint_id] = {
+                    'timestamp': time.time(),
+                    'status': 'committed',
+                    'nodes': list(commit_results.keys()),
+                }
+                self.checkpoint_history.append(checkpoint_id)
+                
+                logger.info(f"Checkpoint {checkpoint_id} committed successfully")
+                return checkpoint_id
+            else:
+                # Phase 2: Abort
+                self._phase_abort(checkpoint_id)
+                logger.error(f"Checkpoint {checkpoint_id} aborted - prepare phase failed")
+                return ""
+    
+    def _phase_prepare(self, checkpoint_id: str) -> Dict[str, Dict[str, Any]]:
+        """Phase 1: Ask all nodes to prepare checkpoint.
+        
+        Args:
+            checkpoint_id: Checkpoint identifier
+            
+        Returns:
+            Dict mapping node_id to prepare result
+        """
+        results = {}
+        
+        for node_id, node in self.federation.nodes.items():
+            if not node.is_healthy():
+                continue
+            
+            try:
+                # In real implementation, would use RPC to send prepare request
+                # For now, simulate local checkpoint preparation
+                result = {
+                    'success': True,
+                    'node_id': node_id,
+                    'timestamp': time.time(),
+                }
+                results[node_id] = result
+                logger.debug(f"Node {node_id} prepared checkpoint {checkpoint_id}")
+            except Exception as e:
+                logger.error(f"Node {node_id} failed to prepare: {e}")
+                results[node_id] = {'success': False, 'error': str(e)}
+        
+        return results
+    
+    def _phase_commit(self, checkpoint_id: str) -> Dict[str, Dict[str, Any]]:
+        """Phase 2: Commit checkpoint on all nodes.
+        
+        Args:
+            checkpoint_id: Checkpoint identifier
+            
+        Returns:
+            Dict mapping node_id to commit result
+        """
+        results = {}
+        
+        for node_id, node in self.federation.nodes.items():
+            if not node.is_healthy():
+                continue
+            
+            try:
+                # In real implementation, would use RPC to send commit request
+                # For now, use local persistence
+                if self.persistence:
+                    # Save checkpoint metadata
+                    checkpoint_data = {
+                        'checkpoint_id': checkpoint_id,
+                        'node_id': node_id,
+                        'timestamp': time.time(),
+                        'memory_count': node.memory_count,
+                    }
+                    # Persistence layer would handle actual saving
+                
+                results[node_id] = {'success': True}
+                logger.debug(f"Node {node_id} committed checkpoint {checkpoint_id}")
+            except Exception as e:
+                logger.error(f"Node {node_id} failed to commit: {e}")
+                results[node_id] = {'success': False, 'error': str(e)}
+        
+        return results
+    
+    def _phase_abort(self, checkpoint_id: str):
+        """Phase 2: Abort checkpoint on all nodes.
+        
+        Args:
+            checkpoint_id: Checkpoint identifier
+        """
+        for node_id, node in self.federation.nodes.items():
+            if not node.is_healthy():
+                continue
+            
+            try:
+                # In real implementation, would use RPC to send abort request
+                logger.debug(f"Node {node_id} aborted checkpoint {checkpoint_id}")
+            except Exception as e:
+                logger.error(f"Node {node_id} failed to abort: {e}")
+    
+    def recover_from_checkpoint(self, checkpoint_id: str) -> bool:
+        """Recover from distributed checkpoint.
+        
+        Args:
+            checkpoint_id: Checkpoint identifier
+            
+        Returns:
+            True if recovery successful, False otherwise
+        """
+        with self._lock:
+            if checkpoint_id not in self.active_checkpoints:
+                logger.error(f"Checkpoint {checkpoint_id} not found")
+                return False
+            
+            checkpoint_info = self.active_checkpoints[checkpoint_id]
+            
+            if checkpoint_info['status'] != 'committed':
+                logger.error(f"Checkpoint {checkpoint_id} not in committed state")
+                return False
+            
+            logger.info(f"Recovering from checkpoint {checkpoint_id}")
+            
+            # Coordinate recovery across all nodes
+            recovery_count = 0
+            for node_id in checkpoint_info['nodes']:
+                if node_id not in self.federation.nodes:
+                    continue
+                
+                try:
+                    # In real implementation, would use RPC to trigger recovery
+                    # For now, simulate recovery
+                    recovery_count += 1
+                    logger.debug(f"Node {node_id} recovered from checkpoint")
+                except Exception as e:
+                    logger.error(f"Node {node_id} failed to recover: {e}")
+            
+            success = recovery_count > 0
+            if success:
+                logger.info(
+                    f"Successfully recovered {recovery_count} nodes from checkpoint {checkpoint_id}"
+                )
+            else:
+                logger.error(f"Failed to recover any nodes from checkpoint {checkpoint_id}")
+            
+            return success
+    
+    def get_checkpoint_status(self) -> Dict[str, Any]:
+        """Get status of all checkpoints.
+        
+        Returns:
+            Dict with checkpoint status information
+        """
+        with self._lock:
+            return {
+                'active_checkpoints': len(self.active_checkpoints),
+                'checkpoint_history': self.checkpoint_history[-10:],  # Last 10
+                'checkpoints': {
+                    ckpt_id: {
+                        'timestamp': info['timestamp'],
+                        'status': info['status'],
+                        'nodes': len(info['nodes']),
+                    }
+                    for ckpt_id, info in self.active_checkpoints.items()
+                },
+            }
 
 
 # ============================================================

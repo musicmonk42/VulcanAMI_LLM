@@ -2,13 +2,14 @@
 
 from .base import Memory, MemoryQuery
 from ..security_fixes import safe_pickle_load
+import copy
 import logging
 import math
 import pickle
 import re
 import threading
 import time
-from collections import defaultdict
+from collections import defaultdict, deque
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
@@ -384,6 +385,21 @@ class MemoryIndex:
 
             return False
 
+    def clear(self):
+        """Clear all memories from index."""
+        with self.lock:
+            if not self.is_faiss:
+                if hasattr(self.index, 'clear'):
+                    self.index.clear()
+                return
+            
+            # For FAISS, recreate the index
+            self.index = self._create_faiss_index()
+            self.id_map.clear()
+            self.reverse_map.clear()
+            self.deleted_indices.clear()
+            logger.info("Cleared memory index")
+
     def _rebuild_index(self):
         """Rebuild index without deleted items."""
         if not self.is_faiss:
@@ -487,6 +503,206 @@ class MemoryIndex:
                         logger.info(f"NumPy index loaded from {path}.numpy")
                 except Exception as e:
                     logger.error(f"Failed to load NumPy index: {e}")
+
+
+# ============================================================
+# SHARDED MEMORY INDEX
+# ============================================================
+
+
+class ShardedMemoryIndex:
+    """Sharded memory index for scalable vector search."""
+    
+    def __init__(
+        self,
+        dimension: int = 512,
+        shard_size: int = 100000,
+        index_type: str = "flat",
+        use_gpu: bool = False,
+    ):
+        """Initialize sharded index.
+        
+        Args:
+            dimension: Embedding dimension
+            shard_size: Maximum items per shard
+            index_type: Type of index to use per shard
+            use_gpu: Whether to use GPU
+        """
+        self.dimension = dimension
+        self.shard_size = shard_size
+        self.index_type = index_type
+        self.use_gpu = use_gpu
+        
+        # Shards: List of MemoryIndex instances
+        self.shards: List[MemoryIndex] = []
+        # Track which shard each memory is in
+        self.memory_to_shard: Dict[str, int] = {}
+        # Current shard for new additions
+        self.current_shard_idx = 0
+        
+        self._lock = threading.RLock()
+        
+        # Create initial shard
+        self._create_new_shard()
+        
+        logger.info(
+            f"Initialized sharded index: dimension={dimension}, "
+            f"shard_size={shard_size}, shards=1"
+        )
+    
+    def _get_shard_size(self, shard: MemoryIndex) -> int:
+        """Get the current size of a shard.
+        
+        Args:
+            shard: MemoryIndex shard
+            
+        Returns:
+            Number of memories in the shard
+        """
+        # For FAISS backend
+        if hasattr(shard, 'id_map') and len(shard.id_map) > 0:
+            return len(shard.id_map)
+        # For NumPy backend
+        elif hasattr(shard, 'index') and hasattr(shard.index, 'memory_ids'):
+            return len(shard.index.memory_ids)
+        # Fallback
+        return 0
+    
+    def _create_new_shard(self) -> int:
+        """Create a new shard.
+        
+        Returns:
+            Index of the new shard
+        """
+        shard = MemoryIndex(
+            dimension=self.dimension,
+            index_type=self.index_type,
+            use_gpu=self.use_gpu,
+        )
+        self.shards.append(shard)
+        return len(self.shards) - 1
+    
+    def add(self, memory_id: str, embedding: np.ndarray) -> bool:
+        """Add embedding to sharded index.
+        
+        Args:
+            memory_id: Memory identifier
+            embedding: Embedding vector
+            
+        Returns:
+            True if added successfully
+        """
+        with self._lock:
+            # Check if current shard is full
+            current_shard = self.shards[self.current_shard_idx]
+            current_size = self._get_shard_size(current_shard)
+            
+            if current_size >= self.shard_size:
+                # Create new shard
+                self.current_shard_idx = self._create_new_shard()
+                current_shard = self.shards[self.current_shard_idx]
+                logger.info(
+                    f"Created new shard {self.current_shard_idx}, "
+                    f"total shards: {len(self.shards)}"
+                )
+            
+            # Add to current shard
+            success = current_shard.add(memory_id, embedding)
+            if success:
+                self.memory_to_shard[memory_id] = self.current_shard_idx
+            
+            return success
+    
+    def search(
+        self, query_embedding: np.ndarray, k: int = 10
+    ) -> List[Tuple[str, float]]:
+        """Search across all shards in parallel.
+        
+        Args:
+            query_embedding: Query embedding vector
+            k: Number of results to return
+            
+        Returns:
+            List of (memory_id, score) tuples
+        """
+        with self._lock:
+            if not self.shards:
+                return []
+            
+            # Search all shards in parallel
+            from concurrent.futures import ThreadPoolExecutor, as_completed
+            
+            all_results = []
+            
+            with ThreadPoolExecutor(max_workers=min(len(self.shards), 10)) as executor:
+                # Submit search tasks for each shard
+                future_to_shard = {
+                    executor.submit(shard.search, query_embedding, k): idx
+                    for idx, shard in enumerate(self.shards)
+                }
+                
+                # Collect results as they complete
+                for future in as_completed(future_to_shard):
+                    try:
+                        shard_results = future.result()
+                        all_results.extend(shard_results)
+                    except Exception as e:
+                        shard_idx = future_to_shard[future]
+                        logger.error(f"Shard {shard_idx} search failed: {e}")
+            
+            # Sort by score and return top k
+            all_results.sort(key=lambda x: x[1], reverse=True)
+            return all_results[:k]
+    
+    def remove(self, memory_id: str) -> bool:
+        """Remove memory from sharded index.
+        
+        Args:
+            memory_id: Memory identifier
+            
+        Returns:
+            True if removed successfully
+        """
+        with self._lock:
+            if memory_id not in self.memory_to_shard:
+                return False
+            
+            shard_idx = self.memory_to_shard[memory_id]
+            if shard_idx >= len(self.shards):
+                return False
+            
+            success = self.shards[shard_idx].remove(memory_id)
+            if success:
+                del self.memory_to_shard[memory_id]
+            
+            return success
+    
+    def clear(self):
+        """Clear all shards."""
+        with self._lock:
+            for shard in self.shards:
+                shard.clear()
+            self.memory_to_shard.clear()
+            logger.info("Cleared all shards")
+    
+    def get_stats(self) -> Dict[str, Any]:
+        """Get shard statistics.
+        
+        Returns:
+            Dict with shard statistics
+        """
+        with self._lock:
+            shard_utilization = [self._get_shard_size(shard) for shard in self.shards]
+            return {
+                'total_shards': len(self.shards),
+                'shard_size': self.shard_size,
+                'total_memories': len(self.memory_to_shard),
+                'shard_utilization': shard_utilization,
+                'avg_utilization': (
+                    sum(shard_utilization) / len(self.shards)
+                    if self.shards else 0
+                ),
+            }
 
 
 # ============================================================
@@ -1412,3 +1628,332 @@ class MemorySearch:
                 self.metadata_index = defaultdict(
                     lambda: defaultdict(set), safe_pickle_load(f)
                 )
+
+
+# ============================================================
+# MEMORY PREFETCHER
+# ============================================================
+
+
+class MemoryPrefetcher:
+    """Prefetch memories based on access patterns."""
+    
+    def __init__(
+        self,
+        cache_size: int = 100,
+        prediction_window: int = 10,
+    ):
+        """Initialize memory prefetcher.
+        
+        Args:
+            cache_size: Maximum size of prefetch cache
+            prediction_window: Number of past accesses to consider
+        """
+        self.cache_size = cache_size
+        self.prediction_window = prediction_window
+        
+        # Track access patterns
+        self.access_history: deque = deque(maxlen=prediction_window * 10)
+        self.access_counts: Dict[str, int] = defaultdict(int)
+        self.co_occurrence: Dict[str, Dict[str, int]] = defaultdict(
+            lambda: defaultdict(int)
+        )
+        
+        # Prefetch cache
+        self.prefetch_cache: Dict[str, Memory] = {}
+        
+        # Thread safety
+        self._lock = threading.RLock()
+        
+        # Background prefetch thread
+        self._prefetch_thread = None
+        self._stop_prefetch = False
+        
+        logger.info(
+            f"Initialized memory prefetcher: cache_size={cache_size}, "
+            f"window={prediction_window}"
+        )
+    
+    def record_access(self, memory_id: str, memory: Optional[Memory] = None):
+        """Record a memory access.
+        
+        Args:
+            memory_id: ID of accessed memory
+            memory: Optional memory object to cache
+        """
+        with self._lock:
+            self.access_history.append((time.time(), memory_id))
+            self.access_counts[memory_id] += 1
+            
+            # Update co-occurrence patterns
+            recent_ids = [mid for _, mid in list(self.access_history)[-self.prediction_window:]]
+            for prev_id in recent_ids[:-1]:
+                if prev_id != memory_id:
+                    self.co_occurrence[prev_id][memory_id] += 1
+            
+            # Cache the memory if provided
+            if memory and memory_id not in self.prefetch_cache:
+                if len(self.prefetch_cache) >= self.cache_size:
+                    # Evict least recently used
+                    oldest_id = min(
+                        self.prefetch_cache.keys(),
+                        key=lambda mid: self.access_counts.get(mid, 0)
+                    )
+                    del self.prefetch_cache[oldest_id]
+                
+                self.prefetch_cache[memory_id] = memory
+    
+    def predict_next_accesses(self, current_id: str, k: int = 5) -> List[str]:
+        """Predict next memory accesses based on patterns.
+        
+        Args:
+            current_id: Currently accessed memory ID
+            k: Number of predictions to return
+            
+        Returns:
+            List of predicted memory IDs
+        """
+        with self._lock:
+            if current_id not in self.co_occurrence:
+                # No pattern data, return most frequently accessed
+                sorted_ids = sorted(
+                    self.access_counts.items(),
+                    key=lambda x: x[1],
+                    reverse=True
+                )
+                return [mid for mid, _ in sorted_ids[:k]]
+            
+            # Get co-occurring memories
+            co_occur = self.co_occurrence[current_id]
+            sorted_predictions = sorted(
+                co_occur.items(),
+                key=lambda x: x[1],
+                reverse=True
+            )
+            
+            return [mid for mid, _ in sorted_predictions[:k]]
+    
+    def get_from_cache(self, memory_id: str) -> Optional[Memory]:
+        """Get memory from prefetch cache.
+        
+        Args:
+            memory_id: Memory ID to retrieve
+            
+        Returns:
+            Cached memory or None
+        """
+        with self._lock:
+            return self.prefetch_cache.get(memory_id)
+    
+    def preload_memories(
+        self,
+        current_id: str,
+        memory_loader: callable,
+        k: int = 5,
+    ):
+        """Preload predicted memories in background.
+        
+        Args:
+            current_id: Currently accessed memory ID
+            memory_loader: Function to load memories by ID
+            k: Number of memories to preload
+        """
+        predictions = self.predict_next_accesses(current_id, k)
+        
+        def _preload():
+            for memory_id in predictions:
+                if memory_id not in self.prefetch_cache:
+                    try:
+                        memory = memory_loader(memory_id)
+                        if memory:
+                            with self._lock:
+                                if len(self.prefetch_cache) < self.cache_size:
+                                    self.prefetch_cache[memory_id] = memory
+                    except Exception as e:
+                        logger.debug(f"Failed to preload {memory_id}: {e}")
+        
+        # Run in background thread
+        threading.Thread(target=_preload, daemon=True).start()
+    
+    def get_stats(self) -> Dict[str, Any]:
+        """Get prefetcher statistics.
+        
+        Returns:
+            Dict with statistics
+        """
+        with self._lock:
+            return {
+                'cache_size': len(self.prefetch_cache),
+                'max_cache_size': self.cache_size,
+                'total_accesses': len(self.access_history),
+                'unique_memories': len(self.access_counts),
+                'patterns_learned': len(self.co_occurrence),
+            }
+
+
+# ============================================================
+# QUERY PLANNER
+# ============================================================
+
+
+class QueryPlanner:
+    """Optimize query execution by analyzing query components."""
+    
+    def __init__(self):
+        """Initialize query planner."""
+        # Track index statistics
+        self.index_stats: Dict[str, Dict[str, Any]] = {
+            'vector': {'queries': 0, 'avg_time_ms': 0, 'selectivity': 1.0},
+            'temporal': {'queries': 0, 'avg_time_ms': 0, 'selectivity': 0.5},
+            'text': {'queries': 0, 'avg_time_ms': 0, 'selectivity': 0.3},
+            'metadata': {'queries': 0, 'avg_time_ms': 0, 'selectivity': 0.8},
+        }
+        
+        self._lock = threading.RLock()
+        
+        logger.info("Initialized query planner")
+    
+    def plan_query(
+        self,
+        query: MemoryQuery,
+        available_indices: List[str],
+    ) -> List[Tuple[str, Dict[str, Any]]]:
+        """Generate optimal query plan.
+        
+        Args:
+            query: Memory query to plan
+            available_indices: List of available index types
+            
+        Returns:
+            List of (index_type, query_params) tuples in execution order
+        """
+        with self._lock:
+            plan = []
+            
+            # Analyze query components
+            has_embedding = query.embedding is not None
+            has_time_range = query.time_range is not None
+            has_filters = len(query.filters) > 0
+            
+            # Order indices by estimated selectivity (most selective first)
+            index_selectivity = []
+            
+            if has_time_range and 'temporal' in available_indices:
+                selectivity = self.index_stats['temporal']['selectivity']
+                index_selectivity.append(('temporal', selectivity))
+            
+            if has_embedding and 'vector' in available_indices:
+                selectivity = self.index_stats['vector']['selectivity']
+                index_selectivity.append(('vector', selectivity))
+            
+            if has_filters and 'metadata' in available_indices:
+                selectivity = self.index_stats['metadata']['selectivity']
+                index_selectivity.append(('metadata', selectivity))
+            
+            # Sort by selectivity (lower is better - fewer results)
+            index_selectivity.sort(key=lambda x: x[1])
+            
+            # Build plan
+            for index_type, _ in index_selectivity:
+                query_params = self._get_index_params(query, index_type)
+                plan.append((index_type, query_params))
+            
+            logger.debug(f"Generated query plan: {[idx for idx, _ in plan]}")
+            return plan
+    
+    def _get_index_params(
+        self,
+        query: MemoryQuery,
+        index_type: str,
+    ) -> Dict[str, Any]:
+        """Extract relevant parameters for index type.
+        
+        Args:
+            query: Memory query
+            index_type: Type of index
+            
+        Returns:
+            Dict of parameters for the index
+        """
+        if index_type == 'vector':
+            return {
+                'embedding': query.embedding,
+                'k': query.limit,
+                'threshold': query.threshold,
+            }
+        elif index_type == 'temporal':
+            return {
+                'time_range': query.time_range,
+                'limit': query.limit,
+            }
+        elif index_type == 'metadata':
+            return {
+                'filters': query.filters,
+                'limit': query.limit,
+            }
+        elif index_type == 'text':
+            return {
+                'content': query.content,
+                'limit': query.limit,
+            }
+        
+        return {}
+    
+    def update_stats(
+        self,
+        index_type: str,
+        query_time_ms: float,
+        results_count: int,
+        total_count: int,
+    ):
+        """Update index statistics after query execution.
+        
+        Args:
+            index_type: Type of index used
+            query_time_ms: Query execution time in milliseconds
+            results_count: Number of results returned
+            total_count: Total number of possible results
+        """
+        with self._lock:
+            if index_type not in self.index_stats:
+                return
+            
+            stats = self.index_stats[index_type]
+            
+            # Update query count
+            stats['queries'] += 1
+            
+            # Update average time (exponential moving average)
+            alpha = 0.1  # Smoothing factor
+            if stats['queries'] == 1:
+                stats['avg_time_ms'] = query_time_ms
+            else:
+                stats['avg_time_ms'] = (
+                    alpha * query_time_ms + 
+                    (1 - alpha) * stats['avg_time_ms']
+                )
+            
+            # Update selectivity
+            if total_count > 0:
+                selectivity = results_count / total_count
+                stats['selectivity'] = (
+                    alpha * selectivity +
+                    (1 - alpha) * stats['selectivity']
+                )
+    
+    def get_stats(self) -> Dict[str, Dict[str, Any]]:
+        """Get query planner statistics.
+        
+        Returns:
+            Dict with index statistics
+        """
+        with self._lock:
+            return copy.deepcopy(self.index_stats)
+    
+    def reset_stats(self):
+        """Reset all statistics."""
+        with self._lock:
+            for stats in self.index_stats.values():
+                stats['queries'] = 0
+                stats['avg_time_ms'] = 0
+            logger.info("Reset query planner statistics")

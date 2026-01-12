@@ -231,6 +231,121 @@ class SemanticCompressor:
 
 
 # ============================================================
+# COMPRESSION STATISTICS
+# ============================================================
+
+
+@dataclass
+class CompressionStats:
+    """Statistics for memory compression performance."""
+    
+    compression_type: CompressionType
+    total_compressions: int = 0
+    total_decompressions: int = 0
+    
+    # Size metrics
+    total_original_bytes: int = 0
+    total_compressed_bytes: int = 0
+    
+    # Timing metrics (in milliseconds)
+    total_compression_time_ms: float = 0.0
+    total_decompression_time_ms: float = 0.0
+    
+    # Error tracking
+    compression_errors: int = 0
+    decompression_errors: int = 0
+    
+    def record_compression(
+        self,
+        original_bytes: int,
+        compressed_bytes: int,
+        time_ms: float,
+        error: bool = False,
+    ):
+        """Record a compression operation.
+        
+        Args:
+            original_bytes: Size before compression
+            compressed_bytes: Size after compression
+            time_ms: Time taken in milliseconds
+            error: Whether an error occurred
+        """
+        self.total_compressions += 1
+        if error:
+            self.compression_errors += 1
+        else:
+            self.total_original_bytes += original_bytes
+            self.total_compressed_bytes += compressed_bytes
+            self.total_compression_time_ms += time_ms
+    
+    def record_decompression(
+        self,
+        time_ms: float,
+        error: bool = False,
+    ):
+        """Record a decompression operation.
+        
+        Args:
+            time_ms: Time taken in milliseconds
+            error: Whether an error occurred
+        """
+        self.total_decompressions += 1
+        if error:
+            self.decompression_errors += 1
+        else:
+            self.total_decompression_time_ms += time_ms
+    
+    def get_compression_ratio(self) -> float:
+        """Calculate average compression ratio.
+        
+        Returns:
+            Compression ratio (original / compressed)
+        """
+        if self.total_compressed_bytes == 0:
+            return 0.0
+        return self.total_original_bytes / self.total_compressed_bytes
+    
+    def get_avg_compression_time_ms(self) -> float:
+        """Calculate average compression time.
+        
+        Returns:
+            Average time in milliseconds
+        """
+        if self.total_compressions == 0:
+            return 0.0
+        return self.total_compression_time_ms / self.total_compressions
+    
+    def get_avg_decompression_time_ms(self) -> float:
+        """Calculate average decompression time.
+        
+        Returns:
+            Average time in milliseconds
+        """
+        if self.total_decompressions == 0:
+            return 0.0
+        return self.total_decompression_time_ms / self.total_decompressions
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert stats to dictionary.
+        
+        Returns:
+            Dict with all statistics
+        """
+        return {
+            'compression_type': self.compression_type.value,
+            'total_compressions': self.total_compressions,
+            'total_decompressions': self.total_decompressions,
+            'total_original_bytes': self.total_original_bytes,
+            'total_compressed_bytes': self.total_compressed_bytes,
+            'compression_ratio': self.get_compression_ratio(),
+            'avg_compression_time_ms': self.get_avg_compression_time_ms(),
+            'avg_decompression_time_ms': self.get_avg_decompression_time_ms(),
+            'compression_errors': self.compression_errors,
+            'decompression_errors': self.decompression_errors,
+        }
+
+
+# ============================================================
 # ENHANCED MEMORY COMPRESSION
 # ============================================================
 
