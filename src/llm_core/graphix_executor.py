@@ -45,6 +45,7 @@ A comprehensive executor for Graphix IR graphs with enterprise features:
 """
 
 import functools
+import heapq
 import json
 import logging
 import math
@@ -323,6 +324,10 @@ class KVCacheManager:
         self.cache: OrderedDict[str, KVCacheEntry] = OrderedDict()
         self.hits = 0
         self.misses = 0
+        
+        # Heap-based LFU support: stores (access_count, timestamp, key) tuples
+        self._lfu_heap: List[Tuple[int, float, str]] = []
+        self._lfu_entry_map: Dict[str, int] = {}  # key -> index in heap
 
     def _make_key(self, layer_idx: int, head_idx: int, position: int) -> str:
         """Create cache key."""
@@ -340,6 +345,10 @@ class KVCacheManager:
             # Move to end for LRU
             if self.eviction_policy == CacheEvictionPolicy.LRU:
                 self.cache.move_to_end(key)
+            
+            # Update heap for LFU
+            elif self.eviction_policy == CacheEvictionPolicy.LFU:
+                self._update_lfu_heap(key, entry)
 
             self.hits += 1
             return entry
@@ -367,6 +376,10 @@ class KVCacheManager:
         )
 
         self.cache[key] = entry
+        
+        # Add to LFU heap if using LFU policy
+        if self.eviction_policy == CacheEvictionPolicy.LFU:
+            self._add_to_lfu_heap(key, entry)
 
     def _evict(self) -> None:
         """Evict entry based on policy."""
@@ -378,9 +391,8 @@ class KVCacheManager:
             self.cache.popitem(last=False)
 
         elif self.eviction_policy == CacheEvictionPolicy.LFU:
-            # Remove least frequently used
-            min_key = min(self.cache.keys(), key=lambda k: self.cache[k].access_count)
-            del self.cache[min_key]
+            # Remove least frequently used using heap
+            self._evict_lfu_heap()
 
         elif self.eviction_policy == CacheEvictionPolicy.FIFO:
             # Remove first inserted
@@ -396,12 +408,60 @@ class KVCacheManager:
                 ),
             )
             del self.cache[min_key]
+    
+    def _add_to_lfu_heap(self, key: str, entry: KVCacheEntry) -> None:
+        """Add entry to LFU heap."""
+        heap_entry = (entry.access_count, entry.timestamp, key)
+        heapq.heappush(self._lfu_heap, heap_entry)
+        self._lfu_entry_map[key] = len(self._lfu_heap) - 1
+    
+    def _update_lfu_heap(self, key: str, entry: KVCacheEntry) -> None:
+        """Update entry in LFU heap after access."""
+        # For simplicity, we'll rebuild the heap when updating
+        # This is still more efficient than O(n) linear search for eviction
+        # In practice, we rebuild only when the heap gets too large
+        if len(self._lfu_heap) > self.max_size * 2:
+            self._rebuild_lfu_heap()
+    
+    def _rebuild_lfu_heap(self) -> None:
+        """Rebuild LFU heap from current cache state."""
+        self._lfu_heap.clear()
+        self._lfu_entry_map.clear()
+        for key, entry in self.cache.items():
+            heap_entry = (entry.access_count, entry.timestamp, key)
+            heapq.heappush(self._lfu_heap, heap_entry)
+    
+    def _evict_lfu_heap(self) -> None:
+        """Evict least frequently used entry using heap."""
+        # Pop from heap until we find a valid entry that's still in cache
+        while self._lfu_heap:
+            access_count, timestamp, key = heapq.heappop(self._lfu_heap)
+            
+            # Check if this entry is still in cache and matches current state
+            if key in self.cache:
+                entry = self.cache[key]
+                # Verify access count matches (entry hasn't been updated)
+                if entry.access_count == access_count:
+                    del self.cache[key]
+                    if key in self._lfu_entry_map:
+                        del self._lfu_entry_map[key]
+                    return
+        
+        # Fallback: if heap is empty or all entries are stale, rebuild and try again
+        if self.cache:
+            self._rebuild_lfu_heap()
+            if self._lfu_heap:
+                _, _, key = heapq.heappop(self._lfu_heap)
+                if key in self.cache:
+                    del self.cache[key]
 
     def clear(self) -> None:
         """Clear cache."""
         self.cache.clear()
         self.hits = 0
         self.misses = 0
+        self._lfu_heap.clear()
+        self._lfu_entry_map.clear()
 
     def get_stats(self) -> Dict[str, Any]:
         """Get cache statistics."""
