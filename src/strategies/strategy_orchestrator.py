@@ -18,6 +18,8 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 
+from src.utils.performance_metrics import PerformanceTimer
+
 logger = logging.getLogger(__name__)
 
 # Schema Registry for validation
@@ -219,8 +221,6 @@ class StrategyOrchestrator:
         Includes schema validation for queries and cost configurations.
         Note: This is a synchronous method for simpler integration.
         """
-        from src.utils.performance_metrics import PerformanceTimer
-        
         with PerformanceTimer("strategy_analysis", "full_pipeline"):
             start_time = time.time()
             context = context or {}

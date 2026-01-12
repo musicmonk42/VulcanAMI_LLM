@@ -17,6 +17,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
+from src.utils.performance_metrics import PerformanceTimer
+
 logger = logging.getLogger(__name__)
 
 # Schema Registry for validation
@@ -282,8 +284,6 @@ class DQSScorer:
         Returns:
             DQSResult with score, gate decision, and validation metadata
         """
-        from src.utils.performance_metrics import PerformanceTimer
-        
         with PerformanceTimer("dqs_scoring", self.model):
             # Schema validation
             schema_validation_score = 1.0  # Default: perfect validation

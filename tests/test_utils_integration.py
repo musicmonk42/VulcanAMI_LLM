@@ -1,8 +1,8 @@
 """
 Integration tests for src/utils/ module.
 
-Tests verify that all utilities are properly integrated with platform components.
-Following highest industry standards with comprehensive coverage and clear assertions.
+Tests verify that all utilities integrate properly with platform components,
+following industry standards with comprehensive coverage and clear assertions.
 """
 
 import json
