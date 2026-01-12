@@ -2986,6 +2986,22 @@ class AgentPoolManager:
                             f"{integration_result.confidence:.2f}. Using this result directly "
                             f"without invoking other reasoning engines."
                         )
+                        
+                        # ============================================================
+                        # FIX (Issue #ROUTING-001): Mark WorldModel responses for content preservation
+                        # ============================================================
+                        # When WorldModel returns an introspection response, we must prevent
+                        # OpenAI from replacing it with generic AI disclaimers. Set metadata
+                        # flags to enforce content preservation.
+                        is_introspection = integration_result.metadata.get("is_introspection", False)
+                        if is_introspection or 'world_model' in selected_tools:
+                            integration_result.metadata['preserve_content'] = True
+                            integration_result.metadata['no_openai_replacement'] = True
+                            logger.info(
+                                "[AgentPool] Marked WorldModel response for content preservation - "
+                                "OpenAI will not replace with generic disclaimers"
+                            )
+                        
                         # Create a reasoning_result from the integration result
                         # to maintain consistency with downstream code
                         try:
@@ -3004,6 +3020,10 @@ class AgentPoolManager:
                                     "source": "world_model",
                                     "self_referential": integration_result.metadata.get("self_referential", False),
                                     "ethical_query": integration_result.metadata.get("ethical_query", False),
+                                    # FIX: Pass content preservation flags through to final response
+                                    "preserve_content": integration_result.metadata.get("preserve_content", False),
+                                    "no_openai_replacement": integration_result.metadata.get("no_openai_replacement", False),
+                                    "is_introspection": integration_result.metadata.get("is_introspection", False),
                                 }
                             )
                         except ImportError:
