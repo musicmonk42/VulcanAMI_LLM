@@ -245,6 +245,11 @@ ANALOGICAL_KEYWORDS: FrozenSet[str] = frozenset([
     "deep structure", "surface similarity",
     "transfer", "transfer learning",
     "metaphor", "metaphorical",
+    # FIX (Issue #ROUTING-001): Additional analogical reasoning patterns
+    # Required to catch structure mapping queries that bypass the engine
+    "analogical reasoning",  # Explicit label in queries
+    "map.*deep structure",  # Combined pattern as keyword
+    "map.*domain",  # Domain mapping variations
 ])
 
 # =============================================================================
@@ -706,13 +711,20 @@ SELF_INTROSPECTION_PATTERNS: Tuple[re.Pattern, ...] = (
     # - "if you had the chance to become self-aware would you take it?"
     # - "would you choose to be conscious?"
     # - "given the opportunity to be self-aware, would you?"
+    # 
+    # FIX (Issue #ROUTING-001): Enhanced patterns to catch variations with typos
+    # and different phrasings that were bypassing WorldModel routing
     re.compile(r"\bwould\s+you\s+(take|choose|want|prefer)\b", re.IGNORECASE),
-    re.compile(r"\b(given|had)\s+(the\s+)?(chance|opportunity)\s+to\s+", re.IGNORECASE),
-    re.compile(r"\bbecome\s+(self-?aware|conscious|sentient)\b", re.IGNORECASE),
+    re.compile(r"\b(given|had|have)\s+(the\s+)?(chance|opportunity)\s+to\s+", re.IGNORECASE),
+    re.compile(r"\b(become|becoming)\s+(self-?aware|conscious|sentient)\b", re.IGNORECASE),
     re.compile(r"\b(self-?aware|conscious|sentient)\s+would\s+you\b", re.IGNORECASE),
-    re.compile(r"\bif\s+you\s+(could|had|were)\s+", re.IGNORECASE),
+    re.compile(r"\bif\s+you\s+(could|had|were|have)\s+", re.IGNORECASE),
     re.compile(r"\byes\s+or\s+no\b.*\b(you|your)\b", re.IGNORECASE),
     re.compile(r"\b(you|your)\b.*\byes\s+or\s+no\b", re.IGNORECASE),
+    # Additional patterns for self-awareness choice questions
+    re.compile(r"\b(would|do)\s+you\s+(take|want|choose)\s+it\b", re.IGNORECASE),
+    re.compile(r"\bself[- ]?aware(ness)?\b.*\b(would|take|want|choose)\b", re.IGNORECASE),
+    re.compile(r"\b(if|when)\s+you\s+have\s+(the\s+)?(chance|opportunity)\b", re.IGNORECASE),
 )
 
 SELF_INTROSPECTION_KEYWORDS: FrozenSet[str] = frozenset([

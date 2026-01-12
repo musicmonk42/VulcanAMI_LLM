@@ -5023,6 +5023,9 @@ class QueryAnalyzer:
         Uses weighted keyword matching with priority ordering to determine
         the most appropriate query type. Enhanced with new query types for
         proper routing that prevents misclassification.
+        
+        FIX (Issue #ROUTING-001): Added fallback detection layer to catch
+        queries that slip through pattern matching.
 
         Args:
             query_lower: Lowercased query string
@@ -5084,6 +5087,26 @@ class QueryAnalyzer:
         # Find highest scoring type
         max_score = max(scores.values())
         if max_score == 0:
+            # ============================================================
+            # FIX (Issue #ROUTING-001): Fallback Detection Layer
+            # ============================================================
+            # When primary classification returns GENERAL (max_score==0),
+            # apply fallback detection to catch specialized queries that
+            # may have slipped through pattern matching.
+            fallback_type = self._detect_query_type_fallback(query_lower)
+            if fallback_type:
+                # Map fallback type string to QueryType enum
+                fallback_map = {
+                    'self_introspection': QueryType.REASONING,
+                    'analogical': QueryType.REASONING,
+                    'philosophical': QueryType.PHILOSOPHICAL,
+                }
+                detected_type = fallback_map.get(fallback_type, QueryType.GENERAL)
+                logger.info(
+                    f"[QueryRouter] Fallback detection upgraded GENERAL → {detected_type.value} "
+                    f"(fallback_type={fallback_type})"
+                )
+                return detected_type
             return QueryType.GENERAL
 
         # Return first type with max score (maintains priority order)
@@ -5705,6 +5728,68 @@ class QueryAnalyzer:
             if pattern.search(query):
                 return True
         return False
+
+    def _detect_query_type_fallback(self, query: str) -> Optional[str]:
+        """
+        Fallback detection when pattern matching fails.
+        
+        FIX (Issue #ROUTING-001): This method provides keyword-based fallback detection
+        for queries that slip through pattern matching. It catches common query types
+        that may bypass the primary classification system.
+        
+        Industry Standard: Multi-layer detection with graceful degradation ensures
+        no query is misrouted due to pattern matching edge cases.
+        
+        Args:
+            query: The query string to analyze
+            
+        Returns:
+            Query type string if detected, None otherwise
+            
+        Example:
+            >>> _detect_query_type_fallback("if you have the chance to become self aware would you take it")
+            'self_introspection'
+            >>> _detect_query_type_fallback("map the deep structure from domain s to domain t")
+            'analogical'
+        """
+        if not query or not isinstance(query, str):
+            return None
+            
+        query_lower = query.lower()
+        
+        # Self-awareness keywords (highest priority for introspection)
+        self_awareness_keywords = ['self-aware', 'self aware', 'consciousness', 'sentient', 'sentience']
+        choice_keywords = ['would you', 'do you', 'could you', 'take it', 'choose it', 'want it']
+        
+        has_self_awareness = any(kw in query_lower for kw in self_awareness_keywords)
+        has_choice = any(kw in query_lower for kw in choice_keywords)
+        
+        if has_self_awareness and has_choice:
+            logger.info(
+                "[QueryRouter] Fallback detection: self_introspection "
+                f"(self_awareness={has_self_awareness}, choice={has_choice})"
+            )
+            return 'self_introspection'
+        
+        # Analogical keywords
+        analogical_keywords = [
+            'analogical', 'analogy', 'structure mapping', 
+            'domain s', 'domain t', 'map the', 'deep structure'
+        ]
+        if any(kw in query_lower for kw in analogical_keywords):
+            logger.info("[QueryRouter] Fallback detection: analogical")
+            return 'analogical'
+        
+        # Causal/ethical keywords (for trolley problems)
+        causal_ethical_keywords = [
+            'trolley', 'ethical dilemma', 'moral dilemma', 
+            'causal', 'confounding', 'intervention'
+        ]
+        if any(kw in query_lower for kw in causal_ethical_keywords):
+            logger.info("[QueryRouter] Fallback detection: philosophical/causal")
+            return 'philosophical'
+        
+        return None
 
     def _decompose_to_tasks(
         self,
