@@ -107,7 +107,13 @@ except ImportError:
             # Handle file path input
             if isinstance(file_or_path, (str, bytes)):
                 if isinstance(file_or_path, bytes):
-                    file_or_path = file_or_path.decode('utf-8')
+                    try:
+                        file_or_path = file_or_path.decode('utf-8')
+                    except UnicodeDecodeError as e:
+                        raise ValueError(
+                            f"Invalid UTF-8 encoded path: {e}. "
+                            "Path must be valid UTF-8 or ASCII string."
+                        ) from e
                 
                 if not os.path.isfile(file_or_path):
                     raise FileNotFoundError(f"Pickle file not found: {file_or_path}")
