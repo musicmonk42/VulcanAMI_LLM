@@ -18,7 +18,7 @@ import sys
 from collections import deque
 
 
-class TestDequeB oudedness:
+class TestDequeBoundedness:
     """Test that all deques have maxlen limits."""
 
     def test_governed_unlearning_pending_tasks(self):
