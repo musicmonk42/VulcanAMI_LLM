@@ -277,11 +277,17 @@ class KeyManager:
                     raise KeyGenerationError(f"Unsupported algorithm: {algo}")
 
                 # Serialize private key
+                # SECURITY NOTE: This uses NoEncryption() for compatibility with existing code.
+                # For production environments with sensitive keys, consider:
+                # 1. Using serialization.BestAvailableEncryption(password) with a strong password
+                # 2. Storing keys in HSM (Hardware Security Module) or cloud KMS
+                # 3. Using password-protected keystores
+                # 4. Implementing key rotation policies
+                # The current implementation prioritizes backward compatibility and ease of use.
                 private_pem = private_key.private_bytes(
                     encoding=serialization.Encoding.PEM,
                     format=serialization.PrivateFormat.PKCS8,
                     encryption_algorithm=serialization.NoEncryption(),
-                    # NOTE: In production, consider using BestAvailableEncryption(password)
                 )
 
                 # Extract and serialize public key

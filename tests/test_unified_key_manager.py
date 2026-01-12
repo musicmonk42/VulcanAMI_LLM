@@ -246,7 +246,16 @@ class TestBackwardCompatibility:
 
     def test_persistence_wrapper(self, temp_keystore):
         """Test persistence.py style wrapper."""
-        from src.persistence import KeyManager as PersistenceKeyManager
+        # Import with proper path handling
+        import sys
+        from pathlib import Path
+        
+        # Ensure src is in path
+        repo_root = Path(__file__).parent.parent
+        if str(repo_root / "src") not in sys.path:
+            sys.path.insert(0, str(repo_root / "src"))
+        
+        from persistence import KeyManager as PersistenceKeyManager
 
         km = PersistenceKeyManager(keys_dir=temp_keystore)
 
@@ -257,7 +266,16 @@ class TestBackwardCompatibility:
 
     def test_agent_registry_wrapper(self, temp_keystore):
         """Test agent_registry.py style wrapper."""
-        from src.agent_registry import KeyManager as RegistryKeyManager, KeyAlgorithm
+        # Import with proper path handling
+        import sys
+        from pathlib import Path
+        
+        # Ensure src is in path
+        repo_root = Path(__file__).parent.parent
+        if str(repo_root / "src") not in sys.path:
+            sys.path.insert(0, str(repo_root / "src"))
+        
+        from agent_registry import KeyManager as RegistryKeyManager, KeyAlgorithm
 
         km = RegistryKeyManager(key_store_dir=str(temp_keystore))
 

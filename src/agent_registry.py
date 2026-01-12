@@ -620,46 +620,6 @@ class KeyManager:
 
         return data[:-padding_length]
 
-
-
-            length=32,
-            salt=salt,
-            iterations=KEY_DERIVATION_ITERATIONS,
-            backend=self.backend,
-        )
-        key = kdf.derive(password.encode())
-
-        cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=self.backend)
-        decryptor = cipher.decryptor()
-        decrypted = decryptor.update(encrypted_data) + decryptor.finalize()
-
-        return self._pkcs7_unpad(decrypted)
-
-    def _pkcs7_pad(self, data: bytes) -> bytes:
-        """PKCS#7 padding."""
-        block_size = 16
-        padding_length = block_size - (len(data) % block_size)
-        padding = bytes([padding_length]) * padding_length
-        return data + padding
-
-    def _pkcs7_unpad(self, data: bytes) -> bytes:
-        """Remove PKCS#7 padding with validation."""
-        if not data:
-            raise ValueError("Cannot unpad empty data")
-
-        padding_length = data[-1]
-
-        if padding_length < 1 or padding_length > 16:
-            raise ValueError("Invalid padding")
-
-        # Verify padding
-        for i in range(padding_length):
-            if data[-(i + 1)] != padding_length:
-                raise ValueError("Invalid padding")
-
-        return data[:-padding_length]
-
-
 class CertificateAuthority:
     """Manages X.509 certificates for agents."""
 
