@@ -18,6 +18,7 @@ Key Features:
 import hashlib
 import json
 import logging
+import os
 import threading
 from abc import ABC, abstractmethod
 from copy import deepcopy
@@ -88,6 +89,29 @@ except ImportError:
     padding = MockPadding()
     hashes = MockHashes()
     InvalidSignature = type("InvalidSignature", (Exception,), {})
+
+
+def _verify_crypto_available():
+    """Verify cryptography library is available for production use."""
+    import os
+    if not HAS_CRYPTOGRAPHY:
+        import warnings
+        warnings.warn(
+            "cryptography library not installed. "
+            "Real signature verification is DISABLED. "
+            "Install with: pip install cryptography",
+            SecurityWarning
+        )
+        # In production mode, fail closed
+        if os.environ.get("REGISTRY_PRODUCTION_MODE", "").lower() == "true":
+            raise RuntimeError(
+                "SECURITY ERROR: cryptography library required in production mode. "
+                "Install with: pip install cryptography"
+            )
+
+
+# Verify crypto availability at module load time
+_verify_crypto_available()
 
 
 # --- Merkle Tree Implementation ---
@@ -191,6 +215,125 @@ class InMemoryBackend(AbstractBackend):
                 ]
             else:
                 return list(self._data_store.keys())
+
+
+class DatabaseBackendAdapter(AbstractBackend):
+    """Adapter that wraps DatabaseManager to implement AbstractBackend interface."""
+
+    def __init__(self, db_manager):
+        """
+        Initialize adapter with DatabaseManager instance.
+        
+        Args:
+            db_manager: DatabaseManager instance from registry_api_server
+        """
+        self.db_manager = db_manager
+        self.logger = logging.getLogger("DatabaseBackendAdapter")
+        # Map keys to table names
+        self._key_to_table_map = {
+            "global_registry_state": "registry_state",
+            "audit_log": "audit_log",
+            "grammar_versions": "grammar_versions",
+        }
+
+    def _get_table_for_key(self, key: str) -> str:
+        """Map a key to its corresponding database table."""
+        # Check if it's a known singleton key
+        if key in self._key_to_table_map:
+            return self._key_to_table_map[key]
+        # Check if it's a proposal key
+        if key.startswith("proposal_"):
+            return "proposals"
+        # Default to a generic key-value table
+        return "key_value_store"
+
+    def load_data(self, key: str) -> Optional[Dict]:
+        """Load data for a given key from the database."""
+        table = self._get_table_for_key(key)
+        try:
+            if table in ["proposals", "key_value_store"]:
+                return self.db_manager.get_record(table, key)
+            elif table == "registry_state":
+                # Special handling for registry state
+                return self.db_manager.get_record("key_value_store", key)
+            elif table == "grammar_versions":
+                return self.db_manager.get_record("key_value_store", key)
+            elif table == "audit_log":
+                # Audit log uses different structure
+                records = self.db_manager.get_full_audit_log()
+                return {"records": records} if records else None
+        except Exception as e:
+            self.logger.error(f"Error loading data for key {key}: {e}")
+            return None
+
+    def save_data(self, key: str, data: Dict) -> str:
+        """Save data for a given key to the database."""
+        table = self._get_table_for_key(key)
+        try:
+            if table in ["proposals", "key_value_store"]:
+                self.db_manager.save_record(table, key, data)
+            elif table in ["registry_state", "grammar_versions"]:
+                self.db_manager.save_record("key_value_store", key, data)
+            return hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()
+        except Exception as e:
+            self.logger.error(f"Error saving data for key {key}: {e}")
+            raise
+
+    def append_record(self, key: str, record: Dict) -> str:
+        """Append a record to a key's history (used for audit log)."""
+        try:
+            if key == "audit_log":
+                self.db_manager.log_audit(record)
+            else:
+                # For other keys, load existing data, append, and save
+                current_data = self.load_data(key) or {"records": []}
+                if "records" not in current_data:
+                    current_data["records"] = []
+                current_data["records"].append(record)
+                self.save_data(key, current_data)
+            return hashlib.sha256(json.dumps(record, sort_keys=True).encode()).hexdigest()
+        except Exception as e:
+            self.logger.error(f"Error appending record to key {key}: {e}")
+            raise
+
+    def get_history(self, key: str) -> List[Dict]:
+        """Get the history of records for a key."""
+        try:
+            if key == "audit_log":
+                return self.db_manager.get_full_audit_log()
+            else:
+                data = self.load_data(key)
+                return data.get("records", []) if data else []
+        except Exception as e:
+            self.logger.error(f"Error getting history for key {key}: {e}")
+            return []
+
+    def list_keys(self, prefix: str = "") -> List[str]:
+        """List all keys, optionally filtered by prefix."""
+        try:
+            # This is a simplified implementation
+            # In a real database, you'd query across multiple tables
+            keys = []
+            
+            # Check proposals table
+            if not prefix or prefix.startswith("proposal_"):
+                proposals = self.db_manager.query_records("proposals")
+                for prop in proposals:
+                    if "id" in prop.get("node", {}):
+                        prop_key = f"proposal_{prop['node']['id']}"
+                        if not prefix or prop_key.startswith(prefix):
+                            keys.append(prop_key)
+            
+            # Check key_value_store for singleton keys
+            for singleton_key in self._key_to_table_map.keys():
+                if not prefix or singleton_key.startswith(prefix):
+                    if self.load_data(singleton_key):
+                        keys.append(singleton_key)
+            
+            return keys
+        except Exception as e:
+            self.logger.error(f"Error listing keys with prefix {prefix}: {e}")
+            return []
 
 
 # --- Key Management System Abstraction ---
