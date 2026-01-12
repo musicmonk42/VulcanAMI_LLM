@@ -3,6 +3,7 @@ Data Quality Score (DQS) System
 
 This module provides comprehensive data quality scoring with support for
 multiple scoring models, historical tracking, anomaly detection, and reporting.
+INTEGRATED: Schema validation for DQS components
 """
 
 from __future__ import annotations
@@ -17,6 +18,18 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
+
+# Schema Registry for validation
+SchemaRegistry = None
+_SCHEMA_REGISTRY_AVAILABLE = False
+try:
+    import sys
+    sys.path.insert(0, str(Path(__file__).parent.parent / "vulcan"))
+    from schema_registry import SchemaRegistry
+    _SCHEMA_REGISTRY_AVAILABLE = True
+except ImportError as e:
+    logger.debug(f"SchemaRegistry not available: {e}")
+    SchemaRegistry = None
 
 
 @dataclass
@@ -208,6 +221,7 @@ class DQSScorer:
         reject_below: float = 0.3,
         quarantine_below: float = 0.4,
         model: str = "default",
+        enable_schema_validation: bool = True,
     ):
         """
         Initialize DQS scorer.
@@ -217,6 +231,7 @@ class DQSScorer:
             reject_below: Rejection threshold
             quarantine_below: Quarantine threshold
             model: Scoring model ("default", "v2", "strict")
+            enable_schema_validation: Enable schema validation for DQS components
         """
         self.weights = weights or {
             "pii_confidence": 0.3,
@@ -226,6 +241,18 @@ class DQSScorer:
         self.reject_below = reject_below
         self.quarantine_below = quarantine_below
         self.model = model
+        self.enable_schema_validation = enable_schema_validation
+        
+        # Initialize schema registry if available
+        self.schema_registry = None
+        if enable_schema_validation and _SCHEMA_REGISTRY_AVAILABLE and SchemaRegistry:
+            try:
+                self.schema_registry = SchemaRegistry.get_instance()
+                logger.info("Schema validation enabled for DQS scoring")
+            except Exception as e:
+                logger.warning(f"Failed to initialize SchemaRegistry: {e}")
+                self.schema_registry = None
+                self.enable_schema_validation = False
 
         # Validate thresholds
         if not 0 <= reject_below <= 1:
@@ -237,31 +264,75 @@ class DQSScorer:
 
         logger.info(
             f"Initialized DQS Scorer with model={model}, "
-            f"reject={reject_below}, quarantine={quarantine_below}"
+            f"reject={reject_below}, quarantine={quarantine_below}, "
+            f"schema_validation={enable_schema_validation}"
         )
 
     def score(self, comp: DQSComponents) -> DQSResult:
         """
-        Score a data item.
+        Score a data item with optional schema validation.
 
         Args:
             comp: DQS components
 
         Returns:
-            DQSResult with score and gate decision
+            DQSResult with score, gate decision, and validation metadata
         """
+        # Schema validation
+        schema_validation_score = 1.0  # Default: perfect validation
+        validation_metadata = {}
+        
+        if self.enable_schema_validation and self.schema_registry:
+            try:
+                # Convert components to dict for validation
+                comp_dict = comp.to_dict()
+                
+                # Validate against dqs_components schema
+                validation_result = self.schema_registry.validate(comp_dict, "dqs_components")
+                
+                if validation_result.valid:
+                    schema_validation_score = 1.0
+                    validation_metadata["schema_valid"] = True
+                else:
+                    # Penalize score based on validation errors
+                    error_count = len(validation_result.errors)
+                    schema_validation_score = max(0.0, 1.0 - (error_count * 0.1))
+                    validation_metadata["schema_valid"] = False
+                    validation_metadata["schema_errors"] = error_count
+                    logger.warning(
+                        f"DQS component schema validation failed: {error_count} error(s)"
+                    )
+            except Exception as e:
+                logger.error(f"Schema validation error in DQS scoring: {e}")
+                validation_metadata["schema_validation_error"] = str(e)
+        
+        # Compute base score using selected model
         if self.model == "v2":
-            score = compute_dqs_v2(comp, self.weights)
+            base_score = compute_dqs_v2(comp, self.weights)
         elif self.model == "strict":
-            score = compute_dqs_v2(comp, self.weights, pii_penalty_factor=2.0)
+            base_score = compute_dqs_v2(comp, self.weights, pii_penalty_factor=2.0)
         else:
-            score = compute_dqs(comp, self.weights)
+            base_score = compute_dqs(comp, self.weights)
+        
+        # Incorporate schema validation into final score (10% weight)
+        if self.enable_schema_validation and schema_validation_score < 1.0:
+            final_score = base_score * 0.9 + schema_validation_score * 0.1
+            validation_metadata["base_score"] = base_score
+            validation_metadata["schema_score"] = schema_validation_score
+            validation_metadata["final_score"] = final_score
+        else:
+            final_score = base_score
 
-        decision = gate(score, self.reject_below, self.quarantine_below)
+        decision = gate(final_score, self.reject_below, self.quarantine_below)
 
-        result = DQSResult(score=score, components=comp, gate_decision=decision)
+        result = DQSResult(
+            score=final_score, 
+            components=comp, 
+            gate_decision=decision,
+            metadata=validation_metadata
+        )
 
-        logger.debug(f"Scored item: {score:.3f} -> {decision}")
+        logger.debug(f"Scored item: {final_score:.3f} -> {decision}")
 
         return result
 

@@ -47,6 +47,16 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+# Schema Registry for validation
+SchemaRegistry = None
+_SCHEMA_REGISTRY_AVAILABLE = False
+try:
+    from ..schema_registry import SchemaRegistry
+    _SCHEMA_REGISTRY_AVAILABLE = True
+except ImportError as e:
+    logger.debug(f"SchemaRegistry not available: {e}")
+    SchemaRegistry = None
+
 # Shared constants for query pattern detection (from system_observer)
 # These are used by both WorldModel and SystemObserver for consistent classification
 try:
@@ -2173,6 +2183,22 @@ class WorldModel:
 
         # Thread safety
         self.lock = threading.RLock()
+        
+        # Schema validation integration
+        self.schema_registry = None
+        self.validate_observations = config.get("validate_observations", True)
+        if _SCHEMA_REGISTRY_AVAILABLE and SchemaRegistry and self.validate_observations:
+            try:
+                self.schema_registry = SchemaRegistry.get_instance()
+                logger.info("✓ SchemaRegistry integrated - observation validation enabled")
+            except Exception as e:
+                logger.warning(f"Failed to initialize SchemaRegistry: {e}")
+                self.schema_registry = None
+                self.validate_observations = False
+        elif not self.validate_observations:
+            logger.info("Schema validation disabled by configuration")
+        else:
+            logger.warning("SchemaRegistry not available - observation validation disabled")
 
         # Verify component interfaces
         self._verify_component_interfaces()
@@ -3016,12 +3042,40 @@ class WorldModel:
         """
         Update world model from new observation
         FIXED: Refactored locking to prevent deadlock with router.
+        INTEGRATED: Schema validation for observations
         """
 
         start_time = time.time()
 
         # --- Part 1: Validation and Planning (Locked) ---
         with self.lock:
+            # Schema validation (if enabled)
+            validation_errors = []
+            if self.validate_observations and self.schema_registry:
+                try:
+                    # Convert observation to dict for validation
+                    obs_dict = {
+                        "timestamp": observation.timestamp,
+                        "domain": observation.domain,
+                        "variables": observation.variables,
+                        "confidence": observation.confidence,
+                    }
+                    if observation.metadata:
+                        obs_dict["metadata"] = observation.metadata
+                    
+                    # Validate against observation schema
+                    validation_result = self.schema_registry.validate(obs_dict, "observation")
+                    if not validation_result.valid:
+                        validation_errors = [err.to_dict() for err in validation_result.errors]
+                        logger.warning(
+                            f"Observation schema validation failed: {len(validation_errors)} error(s). "
+                            "Processing will continue but data quality may be compromised."
+                        )
+                        for err in validation_result.errors[:3]:  # Log first 3 errors
+                            logger.debug(f"  - {err.message} at {err.path}")
+                except Exception as e:
+                    logger.error(f"Schema validation error: {e}", exc_info=True)
+            
             # EXAMINE: Validate and analyze observation
             is_valid, error_msg = self.observation_processor.validate_observation(
                 observation
@@ -3087,7 +3141,7 @@ class WorldModel:
         # Prepare response
         execution_time = (time.time() - start_time) * 1000
 
-        return {
+        response = {
             "status": "success",
             "variables_extracted": len(variables),
             "patterns_detected": len(temporal_patterns.get("trends", {})),
@@ -3099,6 +3153,15 @@ class WorldModel:
             "meta_reasoning_enabled": self.meta_reasoning_enabled,
             "self_improvement_enabled": self.self_improvement_enabled,
         }
+        
+        # Add schema validation results if applicable
+        if self.validate_observations and validation_errors:
+            response["schema_validation"] = {
+                "valid": len(validation_errors) == 0,
+                "errors": validation_errors,
+            }
+        
+        return response
 
     def update_from_text(self, text: str, predictions: Dict[str, Any]):
         """
