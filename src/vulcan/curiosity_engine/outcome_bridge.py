@@ -549,6 +549,10 @@ class OutcomeBridge:
         """
         Record a query outcome and send to learning system.
         
+        FIX Issue 5: Now triggers CuriosityDriver wake when outcomes arrive
+        to exit dormant mode and process new data without waiting for the
+        5-minute dormant check interval.
+        
         Args:
             query_id: Unique query identifier
             status: Query status ("success", "error", "timeout")
@@ -582,6 +586,51 @@ class OutcomeBridge:
             'tools': tools,
             'timestamp': time.time(),
         }
+        
+        # FIX Issue 5: Wake CuriosityDriver from dormant mode
+        # This ensures the driver processes new outcomes immediately instead
+        # of waiting up to 5 minutes for the next dormant check
+        try:
+            # Try to get driver from app state (multiple fallback locations)
+            curiosity_driver = None
+            
+            # Attempt 1: Import vulcan.main and check its app.state
+            try:
+                from src.vulcan.main import app as vulcan_app
+                curiosity_driver = getattr(vulcan_app.state, 'curiosity_driver', None)
+            except (ImportError, AttributeError):
+                pass
+            
+            # Attempt 2: Try alternative import path
+            if curiosity_driver is None:
+                try:
+                    import vulcan.main as vulcan_main
+                    if hasattr(vulcan_main, 'app'):
+                        curiosity_driver = getattr(vulcan_main.app.state, 'curiosity_driver', None)
+                except (ImportError, AttributeError):
+                    pass
+            
+            # Attempt 3: Check global app state (if available)
+            if curiosity_driver is None:
+                try:
+                    from fastapi import applications
+                    # This is a fallback - may not always work
+                    if hasattr(applications, '_app_state'):
+                        curiosity_driver = getattr(applications._app_state, 'curiosity_driver', None)
+                except (ImportError, AttributeError):
+                    pass
+            
+            # Wake driver if found and dormant
+            if curiosity_driver and hasattr(curiosity_driver, 'wake_from_dormant'):
+                if getattr(curiosity_driver, 'is_dormant', False):
+                    curiosity_driver.wake_from_dormant()
+                    logger.debug(
+                        f"[QueryOutcome] Woke CuriosityDriver from dormant mode "
+                        f"(new outcome arrived: {query_id})"
+                    )
+        except Exception as wake_err:
+            # Non-critical error - don't fail outcome recording
+            logger.debug(f"[QueryOutcome] Could not wake CuriosityDriver: {wake_err}")
         
         # Send to learning system
         if self.learning_system:

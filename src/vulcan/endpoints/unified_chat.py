@@ -20,6 +20,7 @@ from vulcan.api.models import UnifiedChatRequest
 from vulcan.endpoints.chat_helpers import (
     truncate_history,
     build_context,
+    extract_tools_from_routing,  # FIX Issue 7: Import tools extraction helper
     MAX_HISTORY_MESSAGES,
     MAX_HISTORY_TOKENS,
     MAX_MESSAGE_LENGTH,
@@ -2330,6 +2331,108 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
             },
             user_feedback=None  # Feedback comes later via /feedback endpoint
         )
+        
+        # ================================================================
+        # FIX Issue 4: Record query outcome to OutcomeBridge for CuriosityEngine
+        # This enables the curiosity-driven learning system to detect gaps
+        # from actual query processing data
+        # ================================================================
+        try:
+            from vulcan.curiosity_engine.outcome_bridge import get_outcome_bridge
+            from vulcan.curiosity_engine.outcome_queue import record_outcome, QueryOutcome, OutcomeStatus
+            
+            # Calculate routing time from timing breakdown
+            routing_time_ms = 0.0
+            if timing_breakdown and "query_routing" in timing_breakdown.get("phases", {}):
+                routing_time_ms = timing_breakdown["phases"]["query_routing"].get("duration_ms", 0.0)
+            
+            # FIX Issue 7: Use consistent tools extraction helper
+            selected_tools = extract_tools_from_routing(routing_plan)
+            
+            # Determine outcome status based on response quality
+            # Success if response generated and safety checks passed
+            outcome_status = "success" if metadata.get("safety_status") == "safe" else "error"
+            
+            # Record to OutcomeBridge (SQLite for subprocess visibility)
+            bridge = get_outcome_bridge()
+            bridge.record(
+                query_id=query_id,
+                status=outcome_status,
+                routing_ms=routing_time_ms,
+                total_ms=latency_ms,
+                complexity=routing_stats.get("complexity_score", 0.5) if routing_stats else 0.5,
+                query_type=routing_stats.get("query_type", "general") if routing_stats else "general",
+                tools=selected_tools,
+            )
+            
+            # Also record to in-memory OutcomeQueue (for main process CuriosityEngine)
+            # This provides dual recording path for robustness
+            outcome = QueryOutcome(
+                query_id=query_id,
+                query_type=routing_stats.get("query_type", "general") if routing_stats else "general",
+                status=OutcomeStatus.SUCCESS if outcome_status == "success" else OutcomeStatus.ERROR,
+                execution_time_ms=latency_ms,
+                routing_time_ms=routing_time_ms,
+                complexity=routing_stats.get("complexity_score", 0.5) if routing_stats else 0.5,
+                capabilities_used=selected_tools,
+                metadata={
+                    "response_source": response_source,
+                    "reasoning_confidence": best_confidence,
+                    "safety_status": metadata.get("safety_status"),
+                    "systems_used": systems_used[:10],  # Limit to prevent bloat
+                }
+            )
+            outcome.compute_features()
+            record_outcome(outcome)
+            
+            # ================================================================
+            # FIX Issue 2: Report outcome to QueryRouter for CuriosityEngine integration
+            # This enables the router's curiosity engine connection to detect gaps
+            # ================================================================
+            try:
+                # Get the query analyzer (which contains the router)
+                from vulcan.routing import get_query_analyzer
+                
+                query_analyzer = get_query_analyzer()
+                if query_analyzer and hasattr(query_analyzer, 'report_query_outcome'):
+                    # Build result dict for curiosity engine
+                    result_dict = {
+                        'response': response_text[:500],  # Truncate for memory efficiency
+                        'latency_ms': latency_ms,
+                        'complexity': routing_stats.get("complexity_score", 0.5) if routing_stats else 0.5,
+                        'tools_used': selected_tools,
+                        'response_source': response_source,
+                        'confidence': best_confidence,
+                    }
+                    
+                    # Report to QueryRouter (which forwards to CuriosityEngine)
+                    query_analyzer.report_query_outcome(
+                        query=user_message,
+                        result=result_dict,
+                        success=(outcome_status == "success"),
+                        domain="query_processing",
+                        query_type=routing_stats.get("query_type", "general") if routing_stats else "general"
+                    )
+                    
+                    logger.debug(
+                        f"[VULCAN/v1/chat] Reported outcome to QueryRouter for "
+                        f"CuriosityEngine gap detection"
+                    )
+            except Exception as router_report_err:
+                # Non-critical error
+                logger.debug(
+                    f"[VULCAN/v1/chat] Failed to report to QueryRouter: {router_report_err}"
+                )
+            # ================================================================
+            
+            logger.debug(
+                f"[VULCAN/v1/chat] Outcome recorded: query_id={query_id}, "
+                f"status={outcome_status}, tools={selected_tools}"
+            )
+        except Exception as record_err:
+            # Non-critical error - don't fail the request if outcome recording fails
+            logger.debug(f"[VULCAN/v1/chat] Failed to record outcome: {record_err}")
+        # ================================================================
 
         return {
             "response": response_text,
@@ -2367,12 +2470,8 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
             if timing_breakdown and "query_routing" in timing_breakdown.get("phases", {}):
                 routing_time_ms = timing_breakdown["phases"]["query_routing"].get("duration_ms", 0.0)
             
-            # Extract selected tools from routing_plan telemetry_data if available
-            selected_tools = []
-            if routing_plan and hasattr(routing_plan, 'telemetry_data'):
-                selected_tools = routing_plan.telemetry_data.get('selected_tools', [])
-            if not selected_tools:
-                selected_tools = ['general']
+            # FIX Issue 7: Use consistent tools extraction helper
+            selected_tools = extract_tools_from_routing(routing_plan)
             
             bridge = get_outcome_bridge()
             bridge.record(

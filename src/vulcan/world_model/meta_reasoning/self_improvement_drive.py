@@ -4546,3 +4546,120 @@ Output the complete modified file content.
             "objective_type": objective_type,
             "structure": structure,
         }
+    
+    def process_gaps_from_curiosity_engine(self, gaps: List[Dict[str, Any]]) -> List[str]:
+        """
+        Process gaps detected by CuriosityEngine and boost relevant objectives.
+        
+        This method is called by CuriosityEngine when knowledge gaps are detected,
+        enabling the self-improvement system to dynamically prioritize objectives
+        based on actual system weaknesses.
+        
+        FIX Issue 3: This callback enables CuriosityEngine → SelfImprovementDrive
+        integration, connecting gap detection to objective prioritization.
+        
+        Gap Types → Objective Mapping:
+        - slow_routing, routing_variance → optimize_performance
+        - complex_query_handling → improve_test_coverage (more tests for edge cases)
+        - high_error_rate → fix_known_bugs
+        - decomposition failures → fix_circular_imports (code structure issues)
+        - prediction/causal gaps → enhance_safety_systems (improve validation)
+        
+        Args:
+            gaps: List of gap dictionaries from CuriosityEngine
+                Each gap has: {type, priority, domain, estimated_cost, metadata}
+                
+        Returns:
+            List of objective types that were boosted
+            
+        Example:
+            >>> gaps = [
+            ...     {"type": "slow_routing", "priority": 0.8, "domain": "query_processing"},
+            ...     {"type": "high_error_rate", "priority": 0.9, "domain": "reasoning"}
+            ... ]
+            >>> boosted = self.process_gaps_from_curiosity_engine(gaps)
+            >>> # ['optimize_performance', 'fix_known_bugs']
+        """
+        if not gaps:
+            return []
+        
+        # Map gap types to improvement objectives
+        gap_to_objective = {
+            'slow_routing': 'optimize_performance',
+            'routing_variance': 'optimize_performance',
+            'complex_query_handling': 'improve_test_coverage',
+            'high_error_rate': 'fix_known_bugs',
+            'decomposition': 'fix_circular_imports',
+            'causal': 'enhance_safety_systems',
+            'prediction': 'enhance_safety_systems',
+            'transfer': 'optimize_performance',
+            'latent': 'improve_test_coverage',
+        }
+        
+        # Track which objectives should be boosted
+        objectives_to_boost = set()
+        boost_amounts = {}  # objective -> total boost amount
+        
+        for gap in gaps:
+            gap_type = gap.get('type', '')
+            gap_priority = gap.get('priority', 0.5)
+            
+            # Find matching objective
+            objective_type = gap_to_objective.get(gap_type)
+            if objective_type:
+                objectives_to_boost.add(objective_type)
+                # Accumulate boost amount based on gap priority
+                # Higher priority gaps = bigger boost
+                boost = gap_priority * 0.2  # Boost by up to 0.2 per gap
+                boost_amounts[objective_type] = boost_amounts.get(objective_type, 0) + boost
+        
+        # Apply boosts to objectives
+        boosted_objectives = []
+        for objective in self.objectives:
+            if objective.type in objectives_to_boost:
+                boost_amount = min(boost_amounts[objective.type], 0.5)  # Cap at +0.5
+                old_weight = objective.weight
+                objective.weight = min(1.0, objective.weight + boost_amount)
+                
+                boosted_objectives.append(objective.type)
+                
+                logger.info(
+                    f"[SelfImprovementDrive] Boosted objective '{objective.type}' "
+                    f"weight: {old_weight:.2f} → {objective.weight:.2f} "
+                    f"(gap-driven priority boost)"
+                )
+                
+                # Notify if weight changed significantly
+                if boost_amount >= 0.2:
+                    self._send_alert(
+                        "INFO",
+                        {
+                            "message": f"Objective '{objective.type}' priority boosted significantly",
+                            "old_weight": old_weight,
+                            "new_weight": objective.weight,
+                            "reason": "CuriosityEngine detected relevant knowledge gaps"
+                        }
+                    )
+        
+        # Save state to persist weight changes
+        if boosted_objectives:
+            self._save_state()
+            logger.info(
+                f"[SelfImprovementDrive] Processed {len(gaps)} gaps, "
+                f"boosted {len(boosted_objectives)} objectives: {boosted_objectives}"
+            )
+        else:
+            logger.debug(
+                f"[SelfImprovementDrive] Processed {len(gaps)} gaps, "
+                f"no matching objectives found for boost"
+            )
+        
+        return boosted_objectives
+    
+    def _send_alert(self, severity: str, details: Dict[str, Any]) -> None:
+        """Send alert using callback if configured."""
+        if self.alert_callback:
+            try:
+                self.alert_callback(severity, details)
+            except Exception as e:
+                logger.warning(f"Alert callback failed: {e}")

@@ -1797,6 +1797,45 @@ async def _background_services_initialization(app: FastAPI, worker_id: int, logg
                                 # Store reference in app state
                                 vulcan_module.app.state.curiosity_driver = curiosity_driver
 
+                                # ================================================================
+                                # FIX Issue 3: Wire CuriosityEngine gap callback to SelfImprovementDrive
+                                # This enables detected knowledge gaps to boost relevant improvement objectives
+                                # ================================================================
+                                try:
+                                    world_model = vulcan_deployment.collective.deps.world_model
+                                    if world_model and hasattr(world_model, 'self_improvement'):
+                                        self_improvement_drive = world_model.self_improvement
+                                        if self_improvement_drive and hasattr(
+                                            self_improvement_drive, 'process_gaps_from_curiosity_engine'
+                                        ):
+                                            # Wire the callback
+                                            curiosity_engine.set_on_gaps_detected_callback(
+                                                self_improvement_drive.process_gaps_from_curiosity_engine
+                                            )
+                                            logger.info(
+                                                "✓ CuriosityEngine → SelfImprovementDrive gap callback wired "
+                                                "(gap detection will boost improvement objectives)"
+                                            )
+                                        else:
+                                            logger.debug(
+                                                "SelfImprovementDrive found but lacks gap callback method - "
+                                                "skipping callback wiring"
+                                            )
+                                    else:
+                                        logger.debug(
+                                            "WorldModel or SelfImprovementDrive not available - "
+                                            "skipping gap callback wiring"
+                                        )
+                                except AttributeError as attr_err:
+                                    logger.debug(
+                                        f"Gap callback wiring skipped (expected during early init): {attr_err}"
+                                    )
+                                except Exception as callback_err:
+                                    logger.warning(
+                                        f"Failed to wire gap detection callback: {callback_err}"
+                                    )
+                                # ================================================================
+
                                 # Start the driver (async operation)
                                 async def start_curiosity_driver():
                                     try:
@@ -1826,6 +1865,94 @@ async def _background_services_initialization(app: FastAPI, worker_id: int, logg
                         except Exception as cd_err:
                             logger.error(
                                 f"Failed to initialize CuriosityDriver: {cd_err}"
+                            )
+                        # ================================================================
+                        
+                        # ================================================================
+                        # FIX Issue 6: PERIODIC DATABASE CLEANUP SCHEDULING
+                        # Schedule periodic cleanup of SQLite databases to prevent
+                        # unbounded growth of query_outcomes.db and gap_resolutions.db
+                        # ================================================================
+                        try:
+                            async def periodic_database_cleanup():
+                                """
+                                Periodic task to clean up old data from SQLite databases.
+                                
+                                Runs every 24 hours and removes:
+                                - Query outcomes older than 7 days (outcome_bridge)
+                                - Gap resolutions older than 30 days (resolution_bridge)
+                                
+                                This prevents databases from growing unbounded.
+                                """
+                                from vulcan.curiosity_engine.outcome_bridge import cleanup_old_outcomes
+                                from vulcan.curiosity_engine.resolution_bridge import cleanup_old_data
+                                
+                                cleanup_interval = 86400  # 24 hours in seconds
+                                outcome_retention_days = 7  # Keep outcomes for 7 days
+                                resolution_retention_days = 30  # Keep resolutions for 30 days
+                                
+                                while True:
+                                    try:
+                                        await asyncio.sleep(cleanup_interval)
+                                        
+                                        logger.info(
+                                            "[DatabaseCleanup] Starting periodic cleanup "
+                                            f"(outcomes: {outcome_retention_days}d, "
+                                            f"resolutions: {resolution_retention_days}d)"
+                                        )
+                                        
+                                        # Clean up old query outcomes
+                                        try:
+                                            outcomes_deleted = cleanup_old_outcomes(days=outcome_retention_days)
+                                            logger.info(
+                                                f"[DatabaseCleanup] Deleted {outcomes_deleted} "
+                                                f"old query outcomes (>{outcome_retention_days} days)"
+                                            )
+                                        except Exception as e:
+                                            logger.warning(
+                                                f"[DatabaseCleanup] Outcome cleanup failed: {e}"
+                                            )
+                                        
+                                        # Clean up old gap resolutions
+                                        try:
+                                            resolutions_deleted = cleanup_old_data(days=resolution_retention_days)
+                                            logger.info(
+                                                f"[DatabaseCleanup] Deleted {resolutions_deleted} "
+                                                f"old gap resolutions (>{resolution_retention_days} days)"
+                                            )
+                                        except Exception as e:
+                                            logger.warning(
+                                                f"[DatabaseCleanup] Resolution cleanup failed: {e}"
+                                            )
+                                        
+                                        logger.info("[DatabaseCleanup] Periodic cleanup complete")
+                                        
+                                    except asyncio.CancelledError:
+                                        logger.info("[DatabaseCleanup] Cleanup task cancelled")
+                                        break
+                                    except Exception as e:
+                                        logger.error(
+                                            f"[DatabaseCleanup] Unexpected error in cleanup loop: {e}"
+                                        )
+                                        # Don't break - continue trying on next interval
+                            
+                            # Schedule the periodic cleanup task
+                            asyncio.create_task(
+                                periodic_database_cleanup(),
+                                name="periodic_database_cleanup"
+                            )
+                            logger.info(
+                                "✓ Database cleanup scheduled (interval=24h, "
+                                "outcomes_retention=7d, resolutions_retention=30d)"
+                            )
+                            
+                        except ImportError as e:
+                            logger.warning(
+                                f"Database cleanup modules not available: {e}"
+                            )
+                        except Exception as cleanup_err:
+                            logger.error(
+                                f"Failed to schedule database cleanup: {cleanup_err}"
                             )
                         # ================================================================
 
@@ -2637,19 +2764,29 @@ async def lifespan(app: FastAPI):
                 logger.error(f"Error during adversarial tester shutdown: {adv_err}")
 
             # Shutdown CuriosityDriver (only if we initialized it)
+            # FIX Issue 1: Robust shutdown with multiple fallback locations
             try:
-                # Get driver from vulcan module app state
-                vulcan_module = importlib.import_module("src.vulcan.main")
-                curiosity_driver = getattr(
-                    vulcan_module.app.state, "curiosity_driver", None
-                )
-
+                curiosity_driver = None
+                
+                # Try to get driver from vulcan module app state first
+                try:
+                    vulcan_module = importlib.import_module("src.vulcan.main")
+                    curiosity_driver = getattr(
+                        vulcan_module.app.state, "curiosity_driver", None
+                    )
+                except (ImportError, AttributeError):
+                    pass
+                
+                # Fallback: Check main app.state directly
+                if curiosity_driver is None:
+                    curiosity_driver = getattr(app.state, "curiosity_driver", None)
+                
                 if curiosity_driver is not None:
                     logger.info("Stopping CuriosityDriver...")
                     await curiosity_driver.stop()
                     logger.info("✓ CuriosityDriver shutdown complete")
-            except ImportError:
-                pass
+                else:
+                    logger.debug("CuriosityDriver not found in app state (not initialized or already stopped)")
             except Exception as cd_err:
                 logger.error(f"Error during CuriosityDriver shutdown: {cd_err}")
             

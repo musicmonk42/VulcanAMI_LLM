@@ -1455,6 +1455,9 @@ class CuriosityEngine:
         learning cycle. Gaps added this way will be included in the next call
         to identify_knowledge_gaps().
         
+        FIX Issue 5: Now triggers CuriosityDriver wake to process gaps immediately
+        instead of waiting for the dormant mode check interval.
+        
         Args:
             gap: KnowledgeGap to add to the external gaps queue
         """
@@ -1464,10 +1467,17 @@ class CuriosityEngine:
                 f"[CuriosityEngine] Added external gap: type={gap.type}, "
                 f"domain={gap.domain}, priority={gap.priority:.2f}"
             )
+        
+        # FIX Issue 5: Wake CuriosityDriver if dormant
+        # This ensures externally injected gaps trigger immediate processing
+        self._wake_curiosity_driver()
     
     def add_external_gaps(self, gaps: List[KnowledgeGap]) -> None:
         """
         Add multiple gaps from an external source.
+        
+        FIX Issue 5: Now triggers CuriosityDriver wake to process gaps immediately
+        instead of waiting for the dormant mode check interval.
         
         Args:
             gaps: List of KnowledgeGaps to add
@@ -1476,6 +1486,49 @@ class CuriosityEngine:
             for gap in gaps:
                 self._external_gaps.append(gap)
             if gaps:
+                logger.info(
+                    f"[CuriosityEngine] Added {len(gaps)} external gaps"
+                )
+                # FIX Issue 5: Wake CuriosityDriver if dormant
+                self._wake_curiosity_driver()
+    
+    def _wake_curiosity_driver(self) -> None:
+        """
+        Wake the CuriosityDriver from dormant mode.
+        
+        FIX Issue 5: Helper method to trigger driver wake when new work arrives.
+        Uses multiple fallback locations to find the driver instance.
+        """
+        try:
+            curiosity_driver = None
+            
+            # Attempt 1: Import vulcan.main and check its app.state
+            try:
+                from src.vulcan.main import app as vulcan_app
+                curiosity_driver = getattr(vulcan_app.state, 'curiosity_driver', None)
+            except (ImportError, AttributeError):
+                pass
+            
+            # Attempt 2: Try alternative import path
+            if curiosity_driver is None:
+                try:
+                    import vulcan.main as vulcan_main
+                    if hasattr(vulcan_main, 'app'):
+                        curiosity_driver = getattr(vulcan_main.app.state, 'curiosity_driver', None)
+                except (ImportError, AttributeError):
+                    pass
+            
+            # Wake driver if found and dormant
+            if curiosity_driver and hasattr(curiosity_driver, 'wake_from_dormant'):
+                if getattr(curiosity_driver, 'is_dormant', False):
+                    curiosity_driver.wake_from_dormant()
+                    logger.debug(
+                        "[CuriosityEngine] Woke CuriosityDriver from dormant mode "
+                        "(external gap injected)"
+                    )
+        except Exception as wake_err:
+            # Non-critical error - don't fail gap injection
+            logger.debug(f"[CuriosityEngine] Could not wake CuriosityDriver: {wake_err}")
                 logger.info(
                     f"[CuriosityEngine] Added {len(gaps)} external gaps"
                 )
