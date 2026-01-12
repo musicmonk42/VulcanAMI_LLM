@@ -343,6 +343,14 @@ class DatabaseConnectionPool:
         conn.execute("PRAGMA journal_mode=WAL;")  # Improve concurrency
         return conn
 
+    def _is_connection_healthy(self, conn: sqlite3.Connection) -> bool:
+        """Check if a connection is still valid."""
+        try:
+            conn.execute("SELECT 1")
+            return True
+        except sqlite3.Error:
+            return False
+
     @contextmanager
     def get_connection(self):
         """Get a connection from the pool, waiting up to the timeout."""
@@ -353,7 +361,18 @@ class DatabaseConnectionPool:
             while not acquired:  # Loop until connection acquired or timeout
                 if self._connections:
                     conn = self._connections.pop()
-                    acquired = True
+                    
+                    # Verify connection is healthy
+                    if self._is_connection_healthy(conn):
+                        acquired = True
+                    else:
+                        # Connection is stale, close it and create new one
+                        try:
+                            conn.close()
+                        except Exception:
+                            pass
+                        conn = self._create_connection()
+                        acquired = True
                 else:
                     # Calculate remaining time accurately
                     elapsed_time = time.monotonic() - start_time
@@ -433,6 +452,24 @@ class DatabaseManager:
                     )
                 """
                 )
+                # Add a generic key-value store for singleton objects
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS key_value_store (
+                        id TEXT PRIMARY KEY,
+                        data TEXT NOT NULL
+                    )
+                """
+                )
+                # Add proposals table for compatibility with DatabaseBackendAdapter
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS proposals (
+                        id TEXT PRIMARY KEY,
+                        data TEXT NOT NULL
+                    )
+                """
+                )
                 # Add index on audit log timestamp for faster ordering
                 cursor.execute(
                     "CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_log(timestamp)"
@@ -454,6 +491,8 @@ class DatabaseManager:
         "lang_proposals": {"id_column": "id", "data_column": "data"},
         "agents": {"id_column": "agent_id", "data_column": "profile_data"},
         "audit_log": {"id_column": "id", "data_column": "data"},
+        "key_value_store": {"id_column": "id", "data_column": "data"},
+        "proposals": {"id_column": "id", "data_column": "data"},
     }
 
     def _validate_table_name(self, table_name: str) -> str:
@@ -633,12 +672,12 @@ class DatabaseManager:
 
 
 # --- Service Components (now using DatabaseManager) ---
-class RegistryAPI:
-    """Persistent RegistryAPI for graph storage."""
+class PersistentRegistryAPI:
+    """Persistent RegistryAPI for graph storage using SQLite."""
 
     def __init__(self, db_manager: DatabaseManager):
         self.db = db_manager
-        self.logger = logging.getLogger("RegistryAPI")
+        self.logger = logging.getLogger("PersistentRegistryAPI")
 
     def submit_proposal(self, proposal_node: Dict) -> str:
         prop_id = proposal_node.get(
@@ -889,33 +928,90 @@ class AgentRegistry:
     def authenticate_agent(
         self, agent_id: str, message: str, signature_hex: str
     ) -> bool:
-        """Authenticate agent based on simplified signature check."""
+        """Authenticate agent using real RSA-PSS signature verification."""
         self.logger.debug(f"Authenticating agent: {agent_id}")
         agent_info = self.get_agent_info(agent_id)
         if not agent_info:
             self.logger.warning(f"Authentication failed: Agent {agent_id} not found.")
             return False
-        # Simplified check (replace with actual crypto verification)
-        # Check if signature matches hash of message
-        expected_sig = hashlib.sha256(message.encode()).hexdigest()
-        is_valid = signature_hex == expected_sig
-        if is_valid:
-            self.logger.debug(f"Agent {agent_id} authenticated successfully.")
-        else:
-            self.logger.warning(
-                f"Authentication failed for {agent_id}: Invalid signature."
+        
+        public_key_pem = agent_info.get('public_key_pem')
+        if not public_key_pem:
+            self.logger.warning(f"Authentication failed: no public key for agent {agent_id}")
+            return False
+        
+        try:
+            from cryptography.hazmat.primitives import serialization, hashes
+            from cryptography.hazmat.primitives.asymmetric import padding
+            from cryptography.exceptions import InvalidSignature
+            
+            # Convert message to bytes if string
+            message_bytes = message if isinstance(message, bytes) else message.encode()
+            
+            # Load public key
+            public_key = serialization.load_pem_public_key(public_key_pem.encode())
+            
+            # Verify signature
+            public_key.verify(
+                bytes.fromhex(signature_hex),
+                message_bytes,
+                padding.PSS(
+                    mgf=padding.MGF1(hashes.SHA256()),
+                    salt_length=padding.PSS.MAX_LENGTH
+                ),
+                hashes.SHA256()
             )
-        return is_valid
+            self.logger.debug(f"Agent {agent_id} authenticated successfully.")
+            return True
+        except InvalidSignature:
+            self.logger.warning(f"Authentication failed: invalid signature for agent {agent_id}")
+            return False
+        except ImportError:
+            self.logger.error("Cryptography library not available for signature verification")
+            return False
+        except Exception as e:
+            self.logger.error(f"Authentication error for agent {agent_id}: {e}")
+            return False
 
     def verify_agent_signature(
         self, agent_id: str, message: bytes, signature_hex: str
     ) -> bool:
-        """Verify agent signature (replace with actual crypto)."""
+        """Verify agent signature using real RSA-PSS verification."""
         agent_info = self.get_agent_info(agent_id)
         if not agent_info:
             return False
-        expected_sig = hashlib.sha256(message).hexdigest()
-        return signature_hex == expected_sig
+        
+        public_key_pem = agent_info.get('public_key_pem')
+        if not public_key_pem:
+            return False
+        
+        try:
+            from cryptography.hazmat.primitives import serialization, hashes
+            from cryptography.hazmat.primitives.asymmetric import padding
+            from cryptography.exceptions import InvalidSignature
+            
+            # Load public key
+            public_key = serialization.load_pem_public_key(public_key_pem.encode())
+            
+            # Verify signature
+            public_key.verify(
+                bytes.fromhex(signature_hex),
+                message if isinstance(message, bytes) else message.encode(),
+                padding.PSS(
+                    mgf=padding.MGF1(hashes.SHA256()),
+                    salt_length=padding.PSS.MAX_LENGTH
+                ),
+                hashes.SHA256()
+            )
+            return True
+        except InvalidSignature:
+            return False
+        except ImportError:
+            self.logger.error("Cryptography library not available for signature verification")
+            return False
+        except Exception as e:
+            self.logger.error(f"Signature verification error for agent {agent_id}: {e}")
+            return False
 
     def query_agents(
         self,
@@ -1127,7 +1223,7 @@ class RegistryServicer(RegistryServiceServicer):
 
     def __init__(
         self,
-        registry_api: RegistryAPI,
+        registry_api: PersistentRegistryAPI,
         lang_evolution_registry: LanguageEvolutionRegistry,
         agent_registry: AgentRegistry,
         security_audit_engine: SecurityAuditEngine,
@@ -1718,7 +1814,7 @@ def serve(port: int = 50051, db_path: str = DB_PATH):
 
     # Initialize components with persistent storage
     db_manager = DatabaseManager(db_path=db_path)
-    registry_api = RegistryAPI(db_manager)
+    registry_api = PersistentRegistryAPI(db_manager)
     lang_evolution_registry = LanguageEvolutionRegistry(db_manager)
     agent_registry = AgentRegistry(db_manager)
     security_audit_engine = SecurityAuditEngine(db_manager)

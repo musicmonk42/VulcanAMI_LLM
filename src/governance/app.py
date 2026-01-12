@@ -12,14 +12,19 @@ The Registry service provides:
 - Audit logging with cryptographic integrity
 """
 
+import hmac
 import json
 import logging
+import os
 from datetime import datetime
+from functools import wraps
 from typing import Any, Dict, Optional
 
 from flask import Flask, jsonify, request
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
-from .registry_api import RegistryAPI, InMemoryBackend, SimpleKMS
+from .registry_api import RegistryAPI, InMemoryBackend, SimpleKMS, DatabaseBackendAdapter
 
 # Configure logging - use module-level logger
 logger = logging.getLogger(__name__)
@@ -27,17 +32,88 @@ logger = logging.getLogger(__name__)
 # Create Flask app
 app = Flask(__name__)
 
+# Initialize rate limiter
+limiter = Limiter(
+    app=app,
+    key_func=get_remote_address,
+    default_limits=["100 per minute"],
+    storage_uri="memory://",
+)
+
 # Initialize the Registry API
 _registry: Optional[RegistryAPI] = None
+_db_manager = None
+
+
+def get_db_manager():
+    """Get or create the DatabaseManager singleton."""
+    global _db_manager
+    if _db_manager is None:
+        db_path = os.environ.get("REGISTRY_DB_PATH", "registry.db")
+        # Import DatabaseManager from registry_api_server
+        try:
+            from .registry_api_server import DatabaseManager
+            _db_manager = DatabaseManager(db_path)
+            logger.info(f"DatabaseManager initialized with path: {db_path}")
+        except ImportError as e:
+            logger.warning(f"Could not import DatabaseManager: {e}. Using InMemoryBackend.")
+            _db_manager = None
+    return _db_manager
 
 
 def get_registry() -> RegistryAPI:
-    """Get or create the Registry API singleton."""
+    """Get or create the Registry API singleton with persistent storage."""
     global _registry
     if _registry is None:
-        _registry = RegistryAPI(backend=InMemoryBackend(), kms=SimpleKMS())
-        logger.info("Registry API initialized")
+        db_manager = get_db_manager()
+        if db_manager:
+            # Use DatabaseManager for persistent storage
+            _registry = RegistryAPI(backend=DatabaseBackendAdapter(db_manager), kms=SimpleKMS())
+            logger.info("Registry API initialized with persistent storage")
+        else:
+            # Fallback to InMemoryBackend for development/testing
+            _registry = RegistryAPI(backend=InMemoryBackend(), kms=SimpleKMS())
+            logger.warning("Registry API initialized with InMemoryBackend (data will not persist)")
     return _registry
+
+
+def require_auth(f):
+    """
+    Authentication decorator for Flask endpoints.
+    
+    Validates requests using either:
+    1. API key in X-API-Key header
+    2. Agent signature in Authorization header
+    """
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        # Check for API key authentication
+        api_key = request.headers.get('X-API-Key')
+        if api_key:
+            expected_key = os.environ.get('REGISTRY_API_KEY')
+            if expected_key and hmac.compare_digest(api_key, expected_key):
+                return f(*args, **kwargs)
+        
+        # Check for agent signature authentication
+        auth_header = request.headers.get('Authorization')
+        if auth_header and auth_header.startswith('Signature '):
+            try:
+                # Parse: "Signature agent_id:signature_hex"
+                parts = auth_header[10:].split(':')
+                if len(parts) == 2:
+                    agent_id, signature_hex = parts
+                    registry = get_registry()
+                    # Create message from request data
+                    message = f"{request.method}:{request.path}:{request.get_data(as_text=True)}"
+                    if registry.agent_registry.verify_agent_signature(agent_id, message.encode(), signature_hex):
+                        request.authenticated_agent_id = agent_id
+                        return f(*args, **kwargs)
+            except Exception as e:
+                logger.warning(f"Signature authentication failed: {e}")
+        
+        return jsonify({"error": "Unauthorized", "message": "Valid API key or agent signature required"}), 401
+    
+    return decorated
 
 
 @app.route("/health", methods=["GET"])
@@ -103,6 +179,8 @@ def list_proposals():
 
 
 @app.route("/proposals", methods=["POST"])
+@limiter.limit("30 per minute")
+@require_auth
 def submit_proposal():
     """Submit a new proposal."""
     try:
@@ -142,6 +220,8 @@ def get_proposal(proposal_id: str):
 
 
 @app.route("/proposals/<proposal_id>/vote", methods=["POST"])
+@limiter.limit("30 per minute")
+@require_auth
 def vote_on_proposal(proposal_id: str):
     """Record votes for a proposal."""
     try:
@@ -194,6 +274,8 @@ def validate_proposal(proposal_id: str):
 
 
 @app.route("/proposals/<proposal_id>/deploy", methods=["POST"])
+@limiter.limit("5 per minute")
+@require_auth
 def deploy_proposal(proposal_id: str):
     """Deploy a grammar version from a proposal."""
     try:
@@ -271,6 +353,7 @@ def verify_audit_log():
 
 
 @app.route("/agents", methods=["POST"])
+@require_auth
 def register_agent():
     """Register a new agent."""
     try:
