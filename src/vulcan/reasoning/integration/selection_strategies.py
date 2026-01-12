@@ -368,13 +368,16 @@ def select_with_tool_selector(
             if context:
                 constraints = context.get('constraints', {})
             
-            # Call tool selector
-            selection = orchestrator._tool_selector.select_tools(
+            # Call tool selector - FIXED: Use correct method name select_and_execute
+            # Build SelectionRequest
+            from vulcan.reasoning.selection.tool_selector import SelectionRequest
+            selection_request = SelectionRequest(
                 query=query,
                 query_type=query_type,
                 mode=mode,
                 constraints=constraints,
             )
+            selection = orchestrator._tool_selector.select_and_execute(selection_request)
             
             # Convert to ReasoningResult
             tools = selection.selected_tools if hasattr(selection, 'selected_tools') else ['general']
