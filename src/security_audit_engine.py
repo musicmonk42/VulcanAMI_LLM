@@ -219,7 +219,13 @@ class SecurityAuditEngine:
         )
 
     def _check_and_migrate_schema(self):
-        """Check schema version and migrate if needed."""
+        """
+        Check schema version and migrate if needed.
+        
+        FIXED: Use ALTER TABLE to preserve existing data instead of deleting database.
+        This migration adds the 'severity' column if it's missing, preserving all
+        existing audit log entries.
+        """
         if not self.db_path.exists():
             self.logger.debug("Database does not exist yet, will be created")
             return
@@ -241,43 +247,40 @@ class SecurityAuditEngine:
                 columns = {row[1] for row in cursor.fetchall()}
 
                 if "severity" not in columns:
-                    self.logger.warning(
-                        "Old schema detected (missing 'severity' column)"
-                    )
-                    conn.close()
-
-                    # Backup old database
-                    backup_path = self.db_path.with_suffix(".db.backup")
-                    if backup_path.exists():
-                        backup_path.unlink()
-
-                    import shutil
-
-                    shutil.copy2(self.db_path, backup_path)
-                    self.logger.info(f"Backed up old database to {backup_path}")
-
-                    # Delete old database
-                    self.db_path.unlink()
-
-                    # Remove WAL files if they exist
-                    wal_file = self.db_path.with_suffix(".db-wal")
-                    shm_file = self.db_path.with_suffix(".db-shm")
-                    if wal_file.exists():
-                        wal_file.unlink()
-                    if shm_file.exists():
-                        shm_file.unlink()
-
                     self.logger.info(
-                        "Old database removed, will create new one with current schema"
+                        "Old schema detected (missing 'severity' column). "
+                        "Migrating schema using ALTER TABLE to preserve data..."
                     )
+                    
+                    try:
+                        # CRITICAL FIX: Use ALTER TABLE instead of deleting database
+                        # This preserves all existing audit log data
+                        cursor.execute(
+                            "ALTER TABLE audit_log ADD COLUMN severity TEXT DEFAULT 'info'"
+                        )
+                        conn.commit()
+                        
+                        self.logger.info(
+                            "Schema migration completed successfully. "
+                            "Added 'severity' column with default value 'info'. "
+                            "All existing data preserved."
+                        )
+                    except sqlite3.OperationalError as e:
+                        # If ALTER TABLE fails (e.g., column already exists but not detected),
+                        # log and continue
+                        self.logger.warning(
+                            f"ALTER TABLE failed (column may already exist): {e}"
+                        )
                 else:
                     self.logger.debug("Schema is up to date")
 
             conn.close()
 
         except sqlite3.DatabaseError as e:
-            self.logger.warning(f"Database appears corrupted: {e}")
-            # Will be handled by initialization
+            self.logger.warning(
+                f"Database appears corrupted: {e}. "
+                "Database initialization will handle recreation if needed."
+            )
         except Exception as e:
             self.logger.debug(f"Schema check encountered issue: {e}")
 

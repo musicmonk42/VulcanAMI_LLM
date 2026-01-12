@@ -67,7 +67,9 @@ class MemoryBoundedDeque:
         Args:
             max_size_mb: Maximum size in megabytes
         """
-        self.deque = deque()
+        # IMPROVEMENT: Add maxlen as a safety backstop in addition to size-based limiting
+        # This prevents edge cases where size estimation fails
+        self.deque = deque(maxlen=100000)  # Hard limit: 100k items
         self.max_size_bytes = max_size_mb * 1024 * 1024
         self.current_size_bytes = 0
         self.lock = threading.RLock()
