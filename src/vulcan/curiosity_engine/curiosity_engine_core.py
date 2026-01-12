@@ -1169,10 +1169,9 @@ class KnowledgeIntegrator:
             ExecutionTrace object if conversion successful, None otherwise
         """
         try:
-            # Import ExecutionTrace here to avoid circular dependency
-            from ..knowledge_crystallizer.knowledge_crystallizer_core import (
-                ExecutionTrace,
-            )
+            # Import ExecutionTrace from principle_extractor (not knowledge_crystallizer_core)
+            # The principle_extractor.ExecutionTrace is what the extractor expects
+            from ..knowledge_crystallizer.principle_extractor import ExecutionTrace
             
             # Extract experiment metadata
             experiment_type = knowledge.get("experiment_type", "unknown")
@@ -1239,7 +1238,7 @@ class KnowledgeIntegrator:
             if "observations" in knowledge:
                 context["observations"] = knowledge["observations"]
             
-            # Create ExecutionTrace with proper structure
+            # Create ExecutionTrace with proper structure for principle_extractor
             trace = ExecutionTrace(
                 trace_id=f"experiment_{experiment_type}_{int(time.time() * 1000)}",
                 actions=actions,

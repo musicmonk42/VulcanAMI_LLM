@@ -70,7 +70,7 @@ def sample_experiment(sample_knowledge_gap):
         complexity=0.6,
         timeout=30.0,
         success_criteria={"min_accuracy": 0.8},
-        experiment_type=ExperimentType.PATTERN_DISCOVERY,
+        experiment_type=ExperimentType.EXPLORATORY,
         parameters={"method": "evolutionary", "generations": 10},
     )
 
@@ -171,7 +171,7 @@ class TestKnowledgeIntegrationPipeline:
             complexity=0.7,
             timeout=60.0,
             success_criteria={"min_accuracy": 0.85},
-            experiment_type=ExperimentType.OPTIMIZATION,
+            experiment_type=ExperimentType.ITERATIVE,
             parameters={"optimizer": "adam", "epochs": 50},
         )
 
@@ -218,7 +218,7 @@ class TestKnowledgeIntegrationPipeline:
             complexity=0.3,
             timeout=10.0,
             success_criteria={},
-            experiment_type=ExperimentType.EXPLORATION,
+            experiment_type=ExperimentType.EXPLORATORY,
             parameters={},
         )
 
@@ -282,7 +282,7 @@ class TestPrincipleApplicationAfterCrystallization:
             complexity=0.65,
             timeout=40.0,
             success_criteria={"min_success_rate": 0.9},
-            experiment_type=ExperimentType.PIPELINE_DESIGN,
+            experiment_type=ExperimentType.ITERATIVE,
             parameters={"approach": "incremental"},
         )
 
@@ -304,11 +304,11 @@ class TestPrincipleApplicationAfterCrystallization:
         )
 
         assert search_results is not None
-        assert hasattr(search_results, "results")
+        assert hasattr(search_results, "principles")
 
         # Step 4: If principles were created, verify they have the right structure
         if search_results.total_count > 0:
-            for principle in search_results.results:
+            for principle in search_results.principles:
                 assert hasattr(principle, "id")
                 assert hasattr(principle, "confidence")
                 # Principles from crystallization should have better confidence than default 0.5
@@ -350,7 +350,7 @@ class TestPrincipleApplicationAfterCrystallization:
                 complexity=0.4,
                 timeout=20.0,
                 success_criteria={},
-                experiment_type=ExperimentType.EXPLORATION,
+                experiment_type=ExperimentType.EXPLORATORY,
                 parameters={"iteration": i},
             )
 
@@ -462,7 +462,7 @@ class TestErrorHandlingAndEdgeCases:
             complexity=0.3,
             timeout=10.0,
             success_criteria={},
-            experiment_type=ExperimentType.EXPLORATION,
+            experiment_type=ExperimentType.EXPLORATORY,
             parameters={},
         )
 
