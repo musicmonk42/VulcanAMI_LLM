@@ -90,7 +90,7 @@ import numpy as np
 
 # Initialize GraphRAG
 rag = GraphRAG(
-    embedding_model="llm_embeddings",
+    embedding_model="all-MiniLM-L6-v2",
     index_type="disk_based_tier_c",
     prefetch=True
 )
@@ -332,7 +332,7 @@ proof_hex = prover.export_proof(proof['proof_id'], format="hex")
 
 ```python
 rag = GraphRAG(
-    embedding_model="llm_embeddings",      # Embedding model
+    embedding_model="all-MiniLM-L6-v2",      # Embedding model
     index_type="disk_based_tier_c",        # Index type
     cache_size=10000,                      # Cache size
     rerank_model="cross_encoder",          # Reranking model

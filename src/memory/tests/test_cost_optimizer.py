@@ -1,6 +1,25 @@
-"""Comprehensive test suite for cost_optimizer.py"""
+"""
+Comprehensive test suite for cost_optimizer.py
 
-from cost_optimizer import (
+This module tests the cost optimization functionality for memory systems,
+including cost analysis, optimization strategies, and budget management.
+"""
+
+import os
+import sys
+import threading
+import time
+from unittest.mock import Mock
+
+import pytest
+
+# Add src to path properly to enable imports
+_here = os.path.dirname(os.path.abspath(__file__))
+_src = os.path.dirname(os.path.dirname(os.path.dirname(_here)))
+if _src not in sys.path:
+    sys.path.insert(0, _src)
+
+from src.memory.cost_optimizer import (
     CostAnalyzer,
     CostBreakdown,
     CostOptimizer,
@@ -9,14 +28,6 @@ from cost_optimizer import (
     OptimizationReport,
     OptimizationStrategy,
 )
-import sys
-import threading
-import time
-from unittest.mock import Mock
-
-import pytest
-
-sys.path.insert(0, "/mnt/user-data/uploads")
 
 
 # ============================================================

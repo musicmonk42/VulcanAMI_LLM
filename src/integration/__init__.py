@@ -89,6 +89,46 @@ except ImportError as e:
     is_component_available = None
     reset_integration = None
 
+# Memory Bridge - Unified memory system integration
+try:
+    from src.integration.memory_bridge import (
+        MemoryBridge,
+        MemoryBridgeConfig,
+        create_memory_bridge,
+        PERSISTENT_MEMORY_AVAILABLE,
+        HIERARCHICAL_MEMORY_AVAILABLE,
+        GOVERNED_UNLEARNING_AVAILABLE,
+        COST_OPTIMIZER_AVAILABLE,
+    )
+    MEMORY_BRIDGE_AVAILABLE = True
+except ImportError as e:
+    logger.debug(f"MemoryBridge not available: {e}")
+    MEMORY_BRIDGE_AVAILABLE = False
+    MemoryBridge = None
+    MemoryBridgeConfig = None
+    create_memory_bridge = None
+    PERSISTENT_MEMORY_AVAILABLE = False
+    HIERARCHICAL_MEMORY_AVAILABLE = False
+    GOVERNED_UNLEARNING_AVAILABLE = False
+    COST_OPTIMIZER_AVAILABLE = False
+
+# GVulcan Bridge - Data quality and policy utilities
+try:
+    from src.integration.gvulcan_bridge import (
+        GVulcanBridge,
+        create_gvulcan_bridge,
+        DQS_AVAILABLE,
+        OPA_AVAILABLE,
+    )
+    GVULCAN_BRIDGE_AVAILABLE = True
+except ImportError as e:
+    logger.debug(f"GVulcanBridge not available: {e}")
+    GVULCAN_BRIDGE_AVAILABLE = False
+    GVulcanBridge = None
+    create_gvulcan_bridge = None
+    DQS_AVAILABLE = False
+    OPA_AVAILABLE = False
+
 __all__ = [
     "__version__",
     "__author__",
@@ -117,6 +157,21 @@ __all__ = [
     "get_component_status",
     "is_component_available",
     "reset_integration",
+    # Memory Bridge
+    "MemoryBridge",
+    "MemoryBridgeConfig",
+    "create_memory_bridge",
+    "MEMORY_BRIDGE_AVAILABLE",
+    "PERSISTENT_MEMORY_AVAILABLE",
+    "HIERARCHICAL_MEMORY_AVAILABLE",
+    "GOVERNED_UNLEARNING_AVAILABLE",
+    "COST_OPTIMIZER_AVAILABLE",
+    # GVulcan Bridge
+    "GVulcanBridge",
+    "create_gvulcan_bridge",
+    "GVULCAN_BRIDGE_AVAILABLE",
+    "DQS_AVAILABLE",
+    "OPA_AVAILABLE",
 ]
 
 logger.debug(f"VULCAN Integration package v{__version__} loaded")

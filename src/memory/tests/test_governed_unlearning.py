@@ -1,6 +1,25 @@
-"""Comprehensive test suite for governed_unlearning.py"""
+"""
+Comprehensive test suite for governed_unlearning.py
 
-from governed_unlearning import (
+This module tests the governed unlearning functionality, including proposal
+submission, governance evaluation, audit logging, and metrics tracking.
+"""
+
+import os
+import sys
+import threading
+import time
+from unittest.mock import Mock
+
+import pytest
+
+# Add src to path properly to enable imports
+_here = os.path.dirname(os.path.abspath(__file__))
+_src = os.path.dirname(os.path.dirname(os.path.dirname(_here)))
+if _src not in sys.path:
+    sys.path.insert(0, _src)
+
+from src.memory.governed_unlearning import (
     GovernanceResult,
     GovernedUnlearning,
     IRProposal,
@@ -11,14 +30,6 @@ from governed_unlearning import (
     UnlearningTask,
     UrgencyLevel,
 )
-import sys
-import threading
-import time
-from unittest.mock import Mock
-
-import pytest
-
-sys.path.insert(0, "/mnt/user-data/uploads")
 
 
 # ============================================================
