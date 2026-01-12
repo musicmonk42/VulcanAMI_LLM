@@ -9,6 +9,7 @@ import gzip
 import logging
 import pickle
 import threading
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -46,6 +47,7 @@ logging.basicConfig(
 MAX_SHARD_SIZE_MB = 100
 DEFAULT_CHECKPOINT_DIR = Path("./sharder_checkpoints")
 PRUNING_STRATEGIES = ["magnitude", "random", "structured"]
+MAX_COMPRESSION_WORKERS = 4  # Maximum parallel workers for shard compression
 
 
 class CompressionType(Enum):
@@ -342,6 +344,43 @@ class DistributedSharder:
     ) -> List[bytes]:
         """
         Compress shards using specified algorithm.
+        Uses parallel compression for multiple shards.
+
+        Args:
+            shards: List of numpy arrays
+            compression_type: Compression algorithm
+
+        Returns:
+            List of compressed bytes
+        """
+        # Use sequential compression for single shard or small number of shards
+        if len(shards) <= 1:
+            return self._compress_shards_sequential(shards, compression_type)
+        
+        # Use parallel compression for multiple shards
+        def compress_single_shard(shard: np.ndarray) -> bytes:
+            """Compress a single shard."""
+            shard_bytes = np.ascontiguousarray(shard).tobytes()
+            
+            if compression_type == CompressionType.SNAPPY and SNAPPY_AVAILABLE:
+                return snappy.compress(shard_bytes)
+            elif compression_type == CompressionType.GZIP:
+                return gzip.compress(shard_bytes)
+            else:
+                # No compression or unavailable
+                return shard_bytes
+        
+        # Parallelize compression across shards
+        with ThreadPoolExecutor(max_workers=min(len(shards), MAX_COMPRESSION_WORKERS)) as executor:
+            compressed = list(executor.map(compress_single_shard, shards))
+        
+        return compressed
+    
+    def _compress_shards_sequential(
+        self, shards: List[np.ndarray], compression_type: CompressionType
+    ) -> List[bytes]:
+        """
+        Compress shards sequentially (fallback method).
 
         Args:
             shards: List of numpy arrays

@@ -45,6 +45,7 @@ A comprehensive executor for Graphix IR graphs with enterprise features:
 """
 
 import functools
+import heapq
 import json
 import logging
 import math
@@ -78,6 +79,11 @@ logger = logging.getLogger(__name__)
 # Using 2 layers provides sufficient coverage to pin tensors in RAM
 # while keeping warm-up time fast (~70-100ms instead of full model execution)
 WARMUP_MIN_LAYERS = 2
+
+# LFU cache eviction tolerance for stale entries
+# Allows entries with slightly higher access counts to still be evicted
+# to avoid excessive heap rebuilding
+MAX_ACCESS_COUNT_VARIANCE = 10
 
 
 # ============================================================
@@ -323,6 +329,10 @@ class KVCacheManager:
         self.cache: OrderedDict[str, KVCacheEntry] = OrderedDict()
         self.hits = 0
         self.misses = 0
+        
+        # Heap-based LFU support: stores (access_count, timestamp, key) tuples
+        # Uses lazy deletion - entries may be stale and are validated during eviction
+        self._lfu_heap: List[Tuple[int, float, str]] = []
 
     def _make_key(self, layer_idx: int, head_idx: int, position: int) -> str:
         """Create cache key."""
@@ -367,6 +377,10 @@ class KVCacheManager:
         )
 
         self.cache[key] = entry
+        
+        # Add to LFU heap if using LFU policy
+        if self.eviction_policy == CacheEvictionPolicy.LFU:
+            self._add_to_lfu_heap(key, entry)
 
     def _evict(self) -> None:
         """Evict entry based on policy."""
@@ -378,9 +392,8 @@ class KVCacheManager:
             self.cache.popitem(last=False)
 
         elif self.eviction_policy == CacheEvictionPolicy.LFU:
-            # Remove least frequently used
-            min_key = min(self.cache.keys(), key=lambda k: self.cache[k].access_count)
-            del self.cache[min_key]
+            # Remove least frequently used using heap
+            self._evict_lfu_heap()
 
         elif self.eviction_policy == CacheEvictionPolicy.FIFO:
             # Remove first inserted
@@ -396,12 +409,49 @@ class KVCacheManager:
                 ),
             )
             del self.cache[min_key]
+    
+    def _add_to_lfu_heap(self, key: str, entry: KVCacheEntry) -> None:
+        """Add entry to LFU heap."""
+        heap_entry = (entry.access_count, entry.timestamp, key)
+        heapq.heappush(self._lfu_heap, heap_entry)
+    
+    def _rebuild_lfu_heap(self) -> None:
+        """Rebuild LFU heap from current cache state."""
+        self._lfu_heap.clear()
+        for key, entry in self.cache.items():
+            heap_entry = (entry.access_count, entry.timestamp, key)
+            heapq.heappush(self._lfu_heap, heap_entry)
+    
+    def _evict_lfu_heap(self) -> None:
+        """Evict least frequently used entry using heap with lazy deletion."""
+        # Pop from heap until we find a valid entry that's still in cache
+        # This implements lazy deletion - stale entries are cleaned up during eviction
+        while self._lfu_heap:
+            access_count, timestamp, key = heapq.heappop(self._lfu_heap)
+            
+            # Check if this entry is still in cache and matches current state
+            if key in self.cache:
+                entry = self.cache[key]
+                # Verify access count matches (entry hasn't been updated significantly)
+                # Allow small variance to avoid excessive rebuilding
+                if entry.access_count <= access_count + MAX_ACCESS_COUNT_VARIANCE:
+                    del self.cache[key]
+                    return
+        
+        # Fallback: if heap is empty or all entries are stale, rebuild and try again
+        if self.cache:
+            self._rebuild_lfu_heap()
+            if self._lfu_heap:
+                _, _, key = heapq.heappop(self._lfu_heap)
+                if key in self.cache:
+                    del self.cache[key]
 
     def clear(self) -> None:
         """Clear cache."""
         self.cache.clear()
         self.hits = 0
         self.misses = 0
+        self._lfu_heap.clear()
 
     def get_stats(self) -> Dict[str, Any]:
         """Get cache statistics."""

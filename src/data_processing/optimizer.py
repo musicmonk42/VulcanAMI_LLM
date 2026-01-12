@@ -1,5 +1,4 @@
 # optimizer.py - Data processing optimization module
-import time
 import logging
 
 class DataOptimizer:
@@ -10,8 +9,6 @@ class DataOptimizer:
         if query in self.cache:
             return self.cache[query]
         
-        # Simulate a database fetch with a delay
-        time.sleep(0.1)  # Simulating response time
         data = self._execute_query(query)
         self.cache[query] = data
         return data

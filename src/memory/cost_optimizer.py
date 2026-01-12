@@ -205,6 +205,19 @@ class CostAnalyzer:
             "api_call": 0.0001,
             "cdn_request": 0.000001,
         }
+        
+        # Cache capability detection results for performance
+        self._has_storage_stats = hasattr(memory_system, "get_storage_stats")
+        self._has_tier_storage = hasattr(memory_system, "get_tier_storage_gb")
+        self._has_total_storage = hasattr(memory_system, "get_total_storage_gb")
+        self._has_bandwidth_stats = hasattr(memory_system, "get_bandwidth_stats")
+        self._has_bandwidth_usage = hasattr(memory_system, "get_bandwidth_usage_gb")
+        self._has_compute_stats = hasattr(memory_system, "get_compute_stats")
+        self._has_compute_hours = hasattr(memory_system, "get_compute_hours")
+        self._has_api_stats = hasattr(memory_system, "get_api_stats")
+        self._has_api_calls = hasattr(memory_system, "get_api_call_count")
+        self._has_cdn_stats = hasattr(memory_system, "get_cdn_stats")
+        self._has_cdn_requests = hasattr(memory_system, "get_cdn_request_count")
 
     def analyze_current_costs(self) -> CostBreakdown:
         """
@@ -212,12 +225,13 @@ class CostAnalyzer:
 
         FIXED: Now provides fallback logic when memory system methods don't exist.
         Calculates costs from alternative methods if primary methods are unavailable.
+        Uses cached capability detection for improved performance.
         """
         breakdown = CostBreakdown()
 
         try:
-            # Storage costs - FIXED: Multiple fallback methods
-            if hasattr(self.memory, "get_storage_stats"):
+            # Storage costs - FIXED: Multiple fallback methods with cached checks
+            if self._has_storage_stats:
                 stats = self.memory.get_storage_stats()
                 if isinstance(stats, dict):
                     try:
@@ -233,21 +247,21 @@ class CostAnalyzer:
                         logger.warning(f"Invalid storage stats data: {e}")
                         breakdown.storage_cost = 0.0
             # FIXED: Fallback method using tier-based storage
-            elif hasattr(self.memory, "get_tier_storage_gb"):
+            elif self._has_tier_storage:
                 try:
                     hot_gb = (
                         self.memory.get_tier_storage_gb(ResourceTier.HOT)
-                        if hasattr(self.memory, "get_tier_storage_gb")
+                        if self._has_tier_storage
                         else 0
                     )
                     warm_gb = (
                         self.memory.get_tier_storage_gb(ResourceTier.WARM)
-                        if hasattr(self.memory, "get_tier_storage_gb")
+                        if self._has_tier_storage
                         else 0
                     )
                     cold_gb = (
                         self.memory.get_tier_storage_gb(ResourceTier.COLD)
-                        if hasattr(self.memory, "get_tier_storage_gb")
+                        if self._has_tier_storage
                         else 0
                     )
 
@@ -259,7 +273,7 @@ class CostAnalyzer:
                 except Exception as e:
                     logger.warning(f"Fallback storage calculation failed: {e}")
             # FIXED: Second fallback using total storage
-            elif hasattr(self.memory, "get_total_storage_gb"):
+            elif self._has_total_storage:
                 try:
                     total_gb = float(self.memory.get_total_storage_gb())
                     # Assume mixed tier pricing (average)
@@ -272,8 +286,8 @@ class CostAnalyzer:
                 except Exception as e:
                     logger.warning(f"Total storage calculation failed: {e}")
 
-            # Bandwidth costs - FIXED: Multiple fallback methods
-            if hasattr(self.memory, "get_bandwidth_stats"):
+            # Bandwidth costs - FIXED: Multiple fallback methods with cached checks
+            if self._has_bandwidth_stats:
                 stats = self.memory.get_bandwidth_stats()
                 if isinstance(stats, dict):
                     try:
@@ -285,7 +299,7 @@ class CostAnalyzer:
                         logger.warning(f"Invalid bandwidth stats data: {e}")
                         breakdown.bandwidth_cost = 0.0
             # FIXED: Fallback method
-            elif hasattr(self.memory, "get_bandwidth_usage_gb"):
+            elif self._has_bandwidth_usage:
                 try:
                     bandwidth_gb = float(self.memory.get_bandwidth_usage_gb())
                     breakdown.bandwidth_cost = (
@@ -294,8 +308,8 @@ class CostAnalyzer:
                 except Exception as e:
                     logger.warning(f"Bandwidth calculation failed: {e}")
 
-            # Compute costs - FIXED: Add type checking
-            if hasattr(self.memory, "get_compute_stats"):
+            # Compute costs - FIXED: Add type checking with cached checks
+            if self._has_compute_stats:
                 stats = self.memory.get_compute_stats()
                 if isinstance(stats, dict):
                     try:
@@ -305,9 +319,15 @@ class CostAnalyzer:
                     except (ValueError, TypeError) as e:
                         logger.warning(f"Invalid compute stats data: {e}")
                         breakdown.compute_cost = 0.0
+            elif self._has_compute_hours:
+                try:
+                    compute_hours = float(self.memory.get_compute_hours())
+                    breakdown.compute_cost = compute_hours * self.pricing["compute_hour"]
+                except Exception as e:
+                    logger.warning(f"Compute cost calculation failed: {e}")
 
-            # API costs - FIXED: Multiple fallback methods
-            if hasattr(self.memory, "get_api_stats"):
+            # API costs - FIXED: Multiple fallback methods with cached checks
+            if self._has_api_stats:
                 stats = self.memory.get_api_stats()
                 if isinstance(stats, dict):
                     try:
@@ -319,15 +339,15 @@ class CostAnalyzer:
                         logger.warning(f"Invalid API stats data: {e}")
                         breakdown.api_cost = 0.0
             # FIXED: Fallback method
-            elif hasattr(self.memory, "get_api_call_count"):
+            elif self._has_api_calls:
                 try:
                     api_calls = float(self.memory.get_api_call_count())
                     breakdown.api_cost = api_calls * self.pricing["api_call"]
                 except Exception as e:
                     logger.warning(f"API cost calculation failed: {e}")
 
-            # CDN costs - FIXED: Multiple fallback methods
-            if hasattr(self.memory, "get_cdn_stats"):
+            # CDN costs - FIXED: Multiple fallback methods with cached checks
+            if self._has_cdn_stats:
                 stats = self.memory.get_cdn_stats()
                 if isinstance(stats, dict):
                     try:
@@ -339,7 +359,7 @@ class CostAnalyzer:
                         logger.warning(f"Invalid CDN stats data: {e}")
                         breakdown.cdn_cost = 0.0
             # FIXED: Fallback method
-            elif hasattr(self.memory, "get_cdn_request_count"):
+            elif self._has_cdn_requests:
                 try:
                     cdn_requests = float(self.memory.get_cdn_request_count())
                     breakdown.cdn_cost = cdn_requests * self.pricing["cdn_request"]
