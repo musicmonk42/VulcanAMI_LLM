@@ -312,3 +312,176 @@ def extract_tools_from_routing(routing_plan: Any) -> List[str]:
         selected_tools = [selected_tools]
     
     return selected_tools
+
+
+# ============================================================
+# REASONING RESULTS FORMATTING FOR LLM CONTEXT
+# ============================================================
+
+def format_reasoning_results(reasoning_results: Dict[str, Any]) -> str:
+    """
+    Format reasoning results into a structured string for LLM context.
+    
+    This function converts VULCAN's structured reasoning outputs into a clear,
+    readable format that can be passed to the LLM for natural language generation.
+    
+    The function handles multiple reasoning engine outputs (symbolic, probabilistic,
+    causal, analogical, agent-based) and extracts key information like conclusions,
+    confidence scores, explanations, and reasoning steps.
+    
+    Industry Standard Practices:
+    - Defensive programming: handles None values, missing keys, and type errors
+    - Comprehensive logging: logs warnings for malformed data
+    - Graceful degradation: returns partial results even if some engines fail
+    - Type safety: explicit type checks before attribute access
+    - Performance: efficient string building with pre-allocated buffer
+    
+    Args:
+        reasoning_results: Dictionary mapping engine names to their results.
+                          Each result may contain: conclusion, confidence,
+                          reasoning_type, explanation, reasoning_steps, etc.
+    
+    Returns:
+        Formatted string representation of reasoning results suitable for
+        LLM context. Returns empty string if no valid results.
+    
+    Example:
+        >>> results = {
+        ...     'symbolic': {
+        ...         'conclusion': 'The statement is logically valid',
+        ...         'confidence': 0.95,
+        ...         'reasoning_type': 'deductive',
+        ...     }
+        ... }
+        >>> formatted = format_reasoning_results(results)
+        >>> print(formatted)
+        Reasoning Analysis:
+        
+        Symbolic Reasoning:
+        - Conclusion: The statement is logically valid
+        - Confidence: 95%
+        - Type: deductive
+    """
+    if not reasoning_results or not isinstance(reasoning_results, dict):
+        logger.debug("[format_reasoning_results] No valid reasoning results to format")
+        return ""
+    
+    # Use list for efficient string building
+    parts = ["Reasoning Analysis:\n"]
+    formatted_count = 0
+    
+    for engine_name, result in reasoning_results.items():
+        try:
+            # Skip None or empty results
+            if result is None:
+                continue
+            
+            # Handle different result types
+            if isinstance(result, dict):
+                formatted_section = _format_engine_result_dict(engine_name, result)
+            elif isinstance(result, str):
+                # Direct string result
+                formatted_section = f"\n{engine_name.replace('_', ' ').title()}:\n{result}\n"
+            else:
+                # Other types - convert to string
+                formatted_section = f"\n{engine_name.replace('_', ' ').title()}:\n{str(result)[:MAX_REASONING_RESULT_LENGTH]}\n"
+            
+            if formatted_section:
+                parts.append(formatted_section)
+                formatted_count += 1
+                
+        except Exception as e:
+            logger.warning(
+                f"[format_reasoning_results] Failed to format {engine_name}: "
+                f"{type(e).__name__}: {e}"
+            )
+            continue
+    
+    # Return empty string if no results were formatted
+    if formatted_count == 0:
+        logger.debug("[format_reasoning_results] No reasoning engines produced formattable results")
+        return ""
+    
+    return "".join(parts)
+
+
+def _format_engine_result_dict(engine_name: str, result: Dict[str, Any]) -> str:
+    """
+    Format a single reasoning engine's result dictionary.
+    
+    Helper function for format_reasoning_results that handles dict-type results.
+    Extracts and formats common fields like conclusion, confidence, reasoning_type,
+    explanation, and reasoning_steps.
+    
+    Industry Standard: This is a private helper function (leading underscore)
+    that encapsulates complexity and makes the main function more maintainable.
+    
+    Args:
+        engine_name: Name of the reasoning engine (e.g., 'symbolic', 'probabilistic')
+        result: Dictionary containing the engine's output
+    
+    Returns:
+        Formatted string section for this engine, or empty string if no
+        relevant data found
+    """
+    # Extract common fields with safe access patterns
+    conclusion = result.get('conclusion')
+    confidence = result.get('confidence')
+    reasoning_type = result.get('reasoning_type')
+    explanation = result.get('explanation')
+    reasoning_steps = result.get('reasoning_steps', [])
+    
+    # Build formatted section
+    section_parts = [f"\n{engine_name.replace('_', ' ').title()}:"]
+    has_content = False
+    
+    # Format conclusion
+    if conclusion is not None:
+        # Handle nested dict in conclusion
+        if isinstance(conclusion, dict):
+            conclusion_str = conclusion.get('result') or conclusion.get('answer') or str(conclusion)[:MAX_REASONING_RESULT_LENGTH]
+        else:
+            conclusion_str = str(conclusion)[:MAX_REASONING_RESULT_LENGTH]
+        
+        section_parts.append(f"\n- Conclusion: {conclusion_str}")
+        has_content = True
+    
+    # Format confidence
+    if confidence is not None:
+        try:
+            # Handle both float (0.0-1.0) and int (0-100) confidence values
+            if isinstance(confidence, (int, float)):
+                if confidence <= 1.0:
+                    confidence_pct = int(confidence * 100)
+                else:
+                    confidence_pct = int(confidence)
+                section_parts.append(f"\n- Confidence: {confidence_pct}%")
+                has_content = True
+        except (ValueError, TypeError) as e:
+            logger.debug(f"[_format_engine_result_dict] Invalid confidence value: {e}")
+    
+    # Format reasoning type
+    if reasoning_type is not None:
+        section_parts.append(f"\n- Type: {reasoning_type}")
+        has_content = True
+    
+    # Format explanation
+    if explanation is not None:
+        explanation_str = str(explanation)[:MAX_REASONING_RESULT_LENGTH]
+        section_parts.append(f"\n- Explanation: {explanation_str}")
+        has_content = True
+    
+    # Format reasoning steps (if available)
+    if reasoning_steps and isinstance(reasoning_steps, (list, tuple)):
+        section_parts.append("\n- Reasoning Steps:")
+        for i, step in enumerate(reasoning_steps[:MAX_REASONING_STEPS], 1):
+            step_str = str(step)[:MAX_REASONING_RESULT_LENGTH]
+            section_parts.append(f"\n  {i}. {step_str}")
+        has_content = True
+    
+    # Return formatted section or empty string
+    if has_content:
+        section_parts.append("\n")
+        return "".join(section_parts)
+    else:
+        return ""
