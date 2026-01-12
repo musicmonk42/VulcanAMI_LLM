@@ -40085,7 +40085,7 @@ Some tests want strict mode (WARN => BLO...
   - Test focus area suggestions
 - ... and 47 more functions
 
-### `src/vulcan/tests/test_knowledge_crystallizer_intergration.py`
+### `src/vulcan/tests/test_knowledge_crystallizer_integration.py`
 
 **Classes (6):**
 
