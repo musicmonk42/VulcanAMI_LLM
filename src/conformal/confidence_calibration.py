@@ -8,6 +8,7 @@ including temperature scaling, isotonic regression, and conformal prediction.
 import json
 import logging
 import pickle
+import threading
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -334,13 +335,23 @@ class ConformalPredictor:
 
 class CalibratedDecisionMaker:
     """
-    Main calibration system integrating multiple methods
+    Main calibration system integrating multiple methods.
+    
+    This class provides full-featured confidence calibration using multiple
+    methods (temperature scaling, isotonic regression, Platt scaling, beta
+    calibration) and conformal prediction. It maintains calibration data
+    and metrics for multiple tools.
+    
+    Thread-safe: Uses RLock for concurrent access to shared calibration data.
+    
+    Note: This is distinct from vulcan.reasoning.selection.tool_selector.ToolConfidenceCalibrator,
+    which is a simplified, tool-specific calibrator for the tool selection system.
     """
 
     def __init__(self, n_bins: int = 10):
         """
         Initialize calibrated decision maker
-
+        
         Args:
             n_bins: Number of bins for ECE calculation
         """
@@ -357,6 +368,9 @@ class CalibratedDecisionMaker:
 
         # Default calibration method priorities
         self.calibration_methods = ["isotonic", "temperature", "platt", "beta"]
+        
+        # Thread safety lock for concurrent access
+        self._lock = threading.RLock()
 
     def add_observation(
         self,
@@ -365,70 +379,83 @@ class CalibratedDecisionMaker:
         actual: bool,
         features: Optional[np.ndarray] = None,
     ):
-        """Add calibration observation"""
-
+        """Add calibration observation (thread-safe)"""
+        
         data_point = CalibrationData(
             prediction=prediction, actual=actual, features=features, tool_name=tool_name
         )
 
-        self.calibration_data[tool_name].append(data_point)
+        with self._lock:
+            self.calibration_data[tool_name].append(data_point)
 
     def fit_calibration(self, tool_name: str, method: Optional[str] = None):
         """
-        Fit calibration for a tool
+        Fit calibration for a tool (thread-safe)
 
         Args:
             tool_name: Name of the tool
             method: Specific calibration method or None for auto-select
         """
+        
+        with self._lock:
+            if tool_name not in self.calibration_data:
+                logger.warning(f"No calibration data for {tool_name}")
+                return
 
-        if tool_name not in self.calibration_data:
-            logger.warning(f"No calibration data for {tool_name}")
-            return
+            data = self.calibration_data[tool_name]
 
-        data = self.calibration_data[tool_name]
+            if len(data) < 50:
+                logger.warning(f"Insufficient data for calibration: {len(data)} samples")
+                return
 
-        if len(data) < 50:
-            logger.warning(f"Insufficient data for calibration: {len(data)} samples")
-            return
+            # Extract predictions and labels
+            predictions = np.array([d.prediction for d in data])
+            labels = np.array([d.actual for d in data])
 
-        # Extract predictions and labels
-        predictions = np.array([d.prediction for d in data])
-        labels = np.array([d.actual for d in data])
-
+        # Fit calibrators (outside lock to avoid holding during expensive operations)
+        # We'll use local variables then acquire lock to store results
+        calibrators_to_add = {}
+        
         # Fit different calibrators
         if method == "temperature" or method is None:
             temp_cal = TemperatureScaling()
             # Need logits for temperature scaling
             logits = self._predictions_to_logits(predictions)
             temp_cal.fit(logits, labels)
-            self.calibrators[tool_name]["temperature"] = temp_cal
+            calibrators_to_add["temperature"] = temp_cal
 
         if method == "isotonic" or method is None:
             iso_cal = IsotonicCalibration()
             iso_cal.fit(predictions, labels)
-            self.calibrators[tool_name]["isotonic"] = iso_cal
+            calibrators_to_add["isotonic"] = iso_cal
 
         if method == "platt" or method is None:
             platt_cal = PlattScaling()
             platt_cal.fit(predictions, labels)
-            self.calibrators[tool_name]["platt"] = platt_cal
+            calibrators_to_add["platt"] = platt_cal
 
         if method == "beta" or method is None:
             beta_cal = BetaCalibration()
             beta_cal.fit(predictions, labels)
-            self.calibrators[tool_name]["beta"] = beta_cal
+            calibrators_to_add["beta"] = beta_cal
 
         # Fit conformal predictor
         conf_cal = ConformalPredictor()
         conf_cal.fit(predictions, labels)
-        self.calibrators[tool_name]["conformal"] = conf_cal
+        calibrators_to_add["conformal"] = conf_cal
 
         # Compute metrics
-        self.metrics[tool_name] = self.compute_metrics(predictions, labels)
+        metrics = self.compute_metrics(predictions, labels)
+        
+        # Store results atomically
+        with self._lock:
+            if tool_name not in self.calibrators:
+                self.calibrators[tool_name] = {}
+            self.calibrators[tool_name].update(calibrators_to_add)
+            self.metrics[tool_name] = metrics
 
         logger.info(
-            f"Calibration fitted for {tool_name}: ECE={self.metrics[tool_name].ece:.4f}"
+            f"Calibration fitted for {tool_name}: ECE={metrics.ece:.4f}"
         )
 
     def calibrate_confidence(
@@ -439,7 +466,7 @@ class CalibratedDecisionMaker:
         method: Optional[str] = None,
     ) -> float:
         """
-        Calibrate raw confidence score
+        Calibrate raw confidence score (thread-safe)
 
         Args:
             tool_name: Name of the tool
@@ -450,24 +477,25 @@ class CalibratedDecisionMaker:
         Returns:
             Calibrated confidence
         """
+        
+        with self._lock:
+            if tool_name not in self.calibrators:
+                return raw_confidence
 
-        if tool_name not in self.calibrators:
-            return raw_confidence
+            # Select calibration method
+            if method is None:
+                # Use first available method in priority order
+                for method_name in self.calibration_methods:
+                    if method_name in self.calibrators[tool_name]:
+                        method = method_name
+                        break
 
-        # Select calibration method
-        if method is None:
-            # Use first available method in priority order
-            for method_name in self.calibration_methods:
-                if method_name in self.calibrators[tool_name]:
-                    method = method_name
-                    break
+            if method not in self.calibrators[tool_name]:
+                return raw_confidence
 
-        if method not in self.calibrators[tool_name]:
-            return raw_confidence
+            calibrator = self.calibrators[tool_name][method]
 
-        calibrator = self.calibrators[tool_name][method]
-
-        # Apply calibration
+        # Apply calibration (outside lock)
         if method == "temperature":
             logit = self._prediction_to_logit(raw_confidence)
             calibrated = calibrator.calibrate(np.array([logit]))[0]
@@ -483,20 +511,21 @@ class CalibratedDecisionMaker:
         self, tool_name: str, confidence: float, alpha: float = 0.1
     ) -> Tuple[bool, bool, float]:
         """
-        Get conformal prediction set
+        Get conformal prediction set (thread-safe)
 
         Returns:
             (include_negative, include_positive, p_value)
         """
+        
+        with self._lock:
+            if tool_name not in self.calibrators:
+                return True, True, 0.5
 
-        if tool_name not in self.calibrators:
-            return True, True, 0.5
+            if "conformal" not in self.calibrators[tool_name]:
+                return True, True, 0.5
 
-        if "conformal" not in self.calibrators[tool_name]:
-            return True, True, 0.5
-
-        conf_predictor = self.calibrators[tool_name]["conformal"]
-        conf_predictor.alpha = alpha
+            conf_predictor = self.calibrators[tool_name]["conformal"]
+            conf_predictor.alpha = alpha
 
         return conf_predictor.predict_set(confidence)
 

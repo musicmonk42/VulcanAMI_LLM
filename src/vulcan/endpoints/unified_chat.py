@@ -1893,11 +1893,29 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
         # Generate response
         response_text = ""
 
-        if hasattr(app.state, "llm") and app.state.llm:
+        # CRITICAL FIX: Check for hybrid_executor, not just local LLM
+        # OpenAI can work even when local LLM is unavailable
+        # This prevents "Full LLM response generation is currently unavailable" errors
+        # when OpenAI is configured but local GraphixVulcanLLM fails to initialize
+        hybrid_executor = getattr(app.state, 'hybrid_executor', None)
+        if hybrid_executor is None:
+            # Try to create hybrid executor on-demand (works with OpenAI even if local_llm is None)
             try:
-                loop = asyncio.get_running_loop()
-                llm = app.state.llm
+                from vulcan.llm import get_or_create_hybrid_executor, get_openai_client
+                local_llm = getattr(app.state, 'llm', None)
+                hybrid_executor = get_or_create_hybrid_executor(
+                    local_llm=local_llm,
+                    openai_client_getter=get_openai_client,
+                    mode=settings.llm_execution_mode,
+                )
+                if hybrid_executor:
+                    app.state.hybrid_executor = hybrid_executor
+                    logger.info("[VULCAN] Created hybrid_executor on-demand for LLM generation")
+            except Exception as e:
+                logger.warning(f"[VULCAN] Failed to create hybrid_executor on-demand: {e}")
 
+        if hybrid_executor:
+            try:
                 # Build enhanced prompt with context - handle None values explicitly
                 memory_str = ""
                 if memory_context:
@@ -2044,31 +2062,9 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
                         
                         return final_response
 
-                # PERFORMANCE FIX (Issue #1): Use singleton HybridLLMExecutor
-                # First try app.state, then fall back to module-level singleton
-                hybrid_executor = getattr(app.state, 'hybrid_executor', None)
-                if hybrid_executor is None:
-                    # Try module-level singleton (may have been initialized elsewhere)
-                    hybrid_executor = get_hybrid_executor()
-                    if hybrid_executor is not None:
-                        # Register the singleton with app.state for faster access on next request
-                        app.state.hybrid_executor = hybrid_executor
-                        logger.debug("[VULCAN] Using module-level HybridLLMExecutor singleton")
-                if hybrid_executor is None:
-                    # Final fallback: create via singleton (will be cached for future requests)
-                    logger.warning("[VULCAN] Creating HybridLLMExecutor via singleton (startup init may have failed)")
-                    hybrid_executor = get_or_create_hybrid_executor(
-                        local_llm=llm,
-                        openai_client_getter=get_openai_client,
-                        mode=settings.llm_execution_mode,
-                        timeout=settings.llm_parallel_timeout,
-                        ensemble_min_confidence=settings.llm_ensemble_min_confidence,
-                        openai_max_tokens=settings.llm_openai_max_tokens,
-                    )
-                    # CRITICAL FIX: Register the newly created executor in app.state
-                    # This prevents re-creation on every request within the same worker
-                    app.state.hybrid_executor = hybrid_executor
-                    logger.info("[VULCAN] HybridLLMExecutor registered in app.state for future requests")
+                # PERFORMANCE FIX: hybrid_executor already checked/created above
+                # No need to re-check - we already have it from the outer if block
+                # This section was redundant with the check at line ~1900
 
                 try:
                     # ================================================================
