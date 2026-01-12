@@ -18,6 +18,7 @@
 # - Both services can coexist or be deployed independently
 # ============================================================
 
+import asyncio
 import logging
 import os
 import sys
@@ -467,13 +468,148 @@ try:
     logger.info("📝 This FastAPI wrapper runs on uvicorn (port 8000 by default)")
     logger.info("ℹ️  Deploy separately or use reverse proxy for hybrid mode")
 
-    # TODO: For hybrid mode, integrate VULCAN Gateway routes
-    # This would require mounting the aiohttp app or proxying requests
-    # Example: app.mount("/v1", ...)
+    # ====================================================================
+    # HYBRID MODE IMPLEMENTATION - VULCAN Route Proxying
+    # ====================================================================
+    if DEPLOYMENT_MODE == "hybrid":
+        import aiohttp
+        
+        # VULCAN Gateway base URL (configurable via environment)
+        VULCAN_BASE_URL = os.environ.get("VULCAN_BASE_URL", "http://localhost:8080")
+        
+        logger.info(f"🔗 Hybrid mode enabled - proxying VULCAN endpoints from {VULCAN_BASE_URL}")
+        
+        # Timeout configuration for VULCAN requests
+        VULCAN_TIMEOUT = int(os.environ.get("VULCAN_TIMEOUT", 30))
+        
+        async def proxy_to_vulcan(request: Request, path: str):
+            """
+            Proxy requests to VULCAN AGI Gateway.
+            
+            This function forwards requests to the VULCAN AGI Gateway (aiohttp)
+            running on a different port or host, enabling hybrid deployment.
+            
+            Args:
+                request: Incoming FastAPI request
+                path: Target path on VULCAN Gateway
+                
+            Returns:
+                Response from VULCAN Gateway
+            """
+            # Build target URL
+            target_url = f"{VULCAN_BASE_URL}{path}"
+            
+            # Get query parameters
+            query_params = dict(request.query_params)
+            
+            # Get headers (exclude host header)
+            headers = dict(request.headers)
+            headers.pop('host', None)
+            
+            # Get request body if present
+            body = None
+            if request.method in ["POST", "PUT", "PATCH"]:
+                try:
+                    body = await request.body()
+                except Exception as e:
+                    logger.error(f"Failed to read request body: {e}")
+            
+            try:
+                # Create aiohttp session with timeout
+                timeout = aiohttp.ClientTimeout(total=VULCAN_TIMEOUT)
+                async with aiohttp.ClientSession(timeout=timeout) as session:
+                    # Forward request to VULCAN Gateway
+                    async with session.request(
+                        method=request.method,
+                        url=target_url,
+                        params=query_params,
+                        headers=headers,
+                        data=body,
+                    ) as resp:
+                        # Get response content
+                        content = await resp.read()
+                        
+                        # Forward response
+                        return Response(
+                            content=content,
+                            status_code=resp.status,
+                            headers=dict(resp.headers),
+                            media_type=resp.content_type,
+                        )
+                        
+            except aiohttp.ClientConnectorError as e:
+                logger.error(f"Failed to connect to VULCAN Gateway at {VULCAN_BASE_URL}: {e}")
+                return JSONResponse(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    content={
+                        "error": "VULCAN Gateway unavailable",
+                        "message": f"Could not connect to VULCAN Gateway at {VULCAN_BASE_URL}",
+                        "details": str(e),
+                    }
+                )
+            except asyncio.TimeoutError:
+                logger.error(f"Timeout proxying request to VULCAN Gateway: {target_url}")
+                return JSONResponse(
+                    status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+                    content={
+                        "error": "Gateway timeout",
+                        "message": f"VULCAN Gateway did not respond within {VULCAN_TIMEOUT}s",
+                    }
+                )
+            except Exception as e:
+                logger.error(f"Error proxying request to VULCAN Gateway: {e}")
+                return JSONResponse(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    content={
+                        "error": "Proxy error",
+                        "message": "Error proxying request to VULCAN Gateway",
+                        "details": str(e),
+                    }
+                )
+        
+        # Register VULCAN proxy routes
+        # These routes forward requests to the VULCAN AGI Gateway
+        
+        @app.api_route("/v1/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"], tags=["VULCAN Proxy"])
+        async def vulcan_v1_proxy(request: Request, path: str):
+            """Proxy requests to VULCAN AGI Gateway /v1/* endpoints"""
+            return await proxy_to_vulcan(request, f"/v1/{path}")
+        
+        @app.get("/ws", tags=["VULCAN Proxy"])
+        async def vulcan_ws_proxy(request: Request):
+            """
+            WebSocket proxy endpoint (informational).
+            
+            Note: WebSocket proxying requires special handling.
+            For production, use a reverse proxy like nginx or traefik.
+            """
+            return JSONResponse(
+                status_code=status.HTTP_501_NOT_IMPLEMENTED,
+                content={
+                    "message": "WebSocket proxying not implemented",
+                    "recommendation": "Use reverse proxy (nginx/traefik) for WebSocket support",
+                    "vulcan_ws_url": f"{VULCAN_BASE_URL}/ws",
+                }
+            )
+        
+        @app.api_route("/graphql", methods=["GET", "POST"], tags=["VULCAN Proxy"])
+        async def vulcan_graphql_proxy(request: Request):
+            """Proxy GraphQL requests to VULCAN AGI Gateway"""
+            return await proxy_to_vulcan(request, "/graphql")
+        
+        logger.info("✅ Hybrid mode routes registered - VULCAN endpoints proxied")
+        logger.info("📝 Proxied endpoints: /v1/*, /graphql")
+        logger.info("⚠️  WebSocket /ws requires reverse proxy for production")
+    else:
+        logger.info("ℹ️  Hybrid mode not enabled - set GATEWAY_MODE=hybrid to enable")
 
 except ImportError as e:
     logger.warning(f"⚠️  VULCAN AGI Gateway not available: {e}")
     logger.info("Running in FastAPI-only mode (health/metrics endpoints)")
+    
+    if DEPLOYMENT_MODE == "hybrid":
+        logger.error("❌ Hybrid mode requires VULCAN AGI Gateway but it's not available")
+        logger.error("   Set GATEWAY_MODE=fastapi or install VULCAN dependencies")
 
 
 # ====================================================================

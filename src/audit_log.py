@@ -7,6 +7,7 @@ import logging
 import os
 import secrets
 import socket
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
@@ -251,11 +252,16 @@ class TamperEvidentLogger:
     """
 
     _instance: Optional["TamperEvidentLogger"] = None
+    _lock: threading.Lock = threading.Lock()
 
     def __new__(cls, config: Optional[AuditLoggerConfig] = None):
+        # Double-check locking pattern for thread-safe singleton initialization
         if cls._instance is None:
-            cls._instance = super(TamperEvidentLogger, cls).__new__(cls)
-            cls._instance._initialized = False
+            with cls._lock:
+                # Check again after acquiring lock
+                if cls._instance is None:
+                    cls._instance = super(TamperEvidentLogger, cls).__new__(cls)
+                    cls._instance._initialized = False
         return cls._instance
 
     def __init__(self, config: Optional[AuditLoggerConfig] = None):

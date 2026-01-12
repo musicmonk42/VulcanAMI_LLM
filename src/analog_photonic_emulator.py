@@ -1293,8 +1293,77 @@ class AnalogPhotonicEmulator:
         logger.info("Emulator shutdown complete")
 
 
-# Export singleton for compatibility
-analog_photonic_emulator = AnalogPhotonicEmulator()
+# Lazy initialization singleton - prevents import-time resource allocation
+_emulator_instance: Optional[AnalogPhotonicEmulator] = None
+_emulator_lock = threading.RLock()
+
+
+def get_emulator(
+    backend: PhotonicBackend = PhotonicBackend.CPU,
+    params: Optional[PhotonicParameters] = None,
+    noise_models: Optional[List[NoiseModel]] = None,
+    device: str = "cpu",
+    noise_seed: Optional[int] = None,
+) -> AnalogPhotonicEmulator:
+    """
+    Get or create the AnalogPhotonicEmulator singleton instance.
+    
+    This factory function implements lazy initialization to prevent resource
+    allocation at import time. Configuration can be changed on first access.
+    
+    Args:
+        backend: Hardware backend to use
+        params: Photonic parameters
+        noise_models: Noise models to apply
+        device: Torch device ('cpu' or 'cuda')
+        noise_seed: Random seed for reproducibility
+        
+    Returns:
+        AnalogPhotonicEmulator singleton instance
+    """
+    global _emulator_instance
+    
+    if _emulator_instance is None:
+        with _emulator_lock:
+            # Double-check after acquiring lock
+            if _emulator_instance is None:
+                _emulator_instance = AnalogPhotonicEmulator(
+                    backend=backend,
+                    params=params,
+                    noise_models=noise_models,
+                    device=device,
+                    noise_seed=noise_seed,
+                )
+                logger.info(f"AnalogPhotonicEmulator initialized with backend {backend.value}")
+    
+    return _emulator_instance
+
+
+# Export singleton factory for compatibility
+# This provides backward compatibility while implementing lazy initialization
+class _EmulatorSingleton:
+    """
+    Lazy singleton wrapper for AnalogPhotonicEmulator.
+    
+    Provides backward compatibility for code expecting analog_photonic_emulator
+    to be a module-level instance while implementing lazy initialization.
+    """
+    _instance: Optional[AnalogPhotonicEmulator] = None
+    
+    def __getattr__(self, name: str):
+        """Lazy initialization on first attribute access."""
+        if self._instance is None:
+            self._instance = get_emulator()
+        return getattr(self._instance, name)
+    
+    def __call__(self, *args, **kwargs):
+        """Allow calling methods on the singleton."""
+        if self._instance is None:
+            self._instance = get_emulator()
+        return self._instance(*args, **kwargs)
+
+# Backward-compatible singleton - initializes lazily on first use
+analog_photonic_emulator = _EmulatorSingleton()
 
 
 # Example usage

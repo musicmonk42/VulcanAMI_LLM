@@ -7,7 +7,7 @@ AutoML nodes with hardware acceleration, compression, and audit support.
 
 import logging
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import numpy as np
 
@@ -67,7 +67,7 @@ class RandomNode:
         self.compressor = LLMCompressor() if LLM_COMPRESSOR_AVAILABLE else None
         self.hardware = HardwareDispatcher() if HARDWARE_DISPATCHER_AVAILABLE else None
 
-    def execute(
+    async def execute(
         self, params: Dict[str, Any], context: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Execute random value generation with optional compression and hardware acceleration."""
@@ -247,7 +247,7 @@ class HyperParamNode:
     def __init__(self):
         self.compressor = LLMCompressor() if LLM_COMPRESSOR_AVAILABLE else None
 
-    def execute(
+    async def execute(
         self, params: Dict[str, Any], context: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Define hyperparameter search space with optional compression."""
@@ -409,7 +409,7 @@ class SearchNode:
         self.hardware = HardwareDispatcher() if HARDWARE_DISPATCHER_AVAILABLE else None
         self.kernel_audit = GrokKernelAudit() if GROK_KERNEL_AUDIT_AVAILABLE else None
 
-    def execute(
+    async def execute(
         self, params: Dict[str, Any], context: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Execute hyperparameter search with optional hardware acceleration and auditing."""
@@ -640,8 +640,10 @@ class SearchNode:
             raise
 
 
-def dispatch_auto_ml_node(
-    node: Dict[str, Any], context: Dict[str, Any]
+async def dispatch_auto_ml_node(
+    node: Dict[str, Any], 
+    context: Dict[str, Any], 
+    inputs: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """
     Dispatch function for AutoML nodes, integrating with unified_runtime.py.
@@ -650,6 +652,7 @@ def dispatch_auto_ml_node(
     Args:
         node: Node specification with type and params
         context: Execution context with audit log
+        inputs: Input data from previous nodes (optional)
 
     Returns:
         Node execution result
@@ -665,116 +668,125 @@ def dispatch_auto_ml_node(
         if key in node:
             params[key] = node[key]
 
+    # Merge inputs if provided
+    if inputs:
+        params.update(inputs)
+
     # Initialize context audit log if needed
     if "audit_log" not in context:
         context["audit_log"] = []
 
     # Dispatch to appropriate node
     if node_type == "RandomNode":
-        return RandomNode().execute(params, context)
+        return await RandomNode().execute(params, context)
     elif node_type == "HyperParamNode":
-        return HyperParamNode().execute(params, context)
+        return await HyperParamNode().execute(params, context)
     elif node_type == "SearchNode":
-        return SearchNode().execute(params, context)
+        return await SearchNode().execute(params, context)
     else:
         raise ValueError(f"Unknown AutoML node type: {node_type}")
 
 
 # Demo and testing
 if __name__ == "__main__":
-    print("=" * 60)
-    print("AutoML Nodes - Production Demo")
-    print("=" * 60)
+    import asyncio
+    
+    async def main():
+        print("=" * 60)
+        print("AutoML Nodes - Production Demo")
+        print("=" * 60)
 
-    # Show available modules
-    print("\nAvailable modules:")
-    print(f"  Optuna: {OPTUNA_AVAILABLE}")
-    print(f"  LLMCompressor: {LLM_COMPRESSOR_AVAILABLE}")
-    print(f"  HardwareDispatcher: {HARDWARE_DISPATCHER_AVAILABLE}")
-    print(f"  GrokKernelAudit: {GROK_KERNEL_AUDIT_AVAILABLE}")
+        # Show available modules
+        print("\nAvailable modules:")
+        print(f"  Optuna: {OPTUNA_AVAILABLE}")
+        print(f"  LLMCompressor: {LLM_COMPRESSOR_AVAILABLE}")
+        print(f"  HardwareDispatcher: {HARDWARE_DISPATCHER_AVAILABLE}")
+        print(f"  GrokKernelAudit: {GROK_KERNEL_AUDIT_AVAILABLE}")
 
-    # Initialize context
-    context = {"audit_log": []}
+        # Initialize context
+        context = {"audit_log": []}
 
-    # Example 1: RandomNode
-    print("\n1. Testing RandomNode...")
-    random_node = {
-        "type": "RandomNode",
-        "params": {
-            "distribution": "uniform",
-            "range": [0.0, 1.0],
-            "tensor": [[0.1, 0.2], [0.3, 0.4]],
-            "ethical_label": "EU2025:Safe",
-        },
-    }
-
-    try:
-        result = dispatch_auto_ml_node(random_node, context)
-        print(f"   Result: value={result['value']:.4f}")
-        print(f"   Compression: {result.get('compression_ok', False)}")
-        print(f"   Energy: {result.get('energy_nj', 'N/A')} nJ")
-    except Exception as e:
-        print(f"   Error: {e}")
-
-    # Example 2: HyperParamNode
-    print("\n2. Testing HyperParamNode...")
-    hyperparam_node = {
-        "type": "HyperParamNode",
-        "params": {
-            "space": {
-                "learning_rate": [0.001, 0.1],
-                "dropout": [0.1, 0.5],
-                "batch_size": [16, 128],
+        # Example 1: RandomNode
+        print("\n1. Testing RandomNode...")
+        random_node = {
+            "type": "RandomNode",
+            "params": {
+                "distribution": "uniform",
+                "range": [0.0, 1.0],
+                "tensor": [[0.1, 0.2], [0.3, 0.4]],
+                "ethical_label": "EU2025:Safe",
             },
-            "strategy": "bayesian",
-            "tensor": [[0.5, 0.6]],
-            "ethical_label": "EU2025:Safe",
-        },
-    }
+        }
 
-    try:
-        result = dispatch_auto_ml_node(hyperparam_node, context)
-        print(f"   Space dimensions: {result['dimensions']}")
-        print(f"   Strategy: {result['strategy']}")
-        print(f"   Compression: {result.get('compression_ok', False)}")
-    except Exception as e:
-        print(f"   Error: {e}")
+        try:
+            result = await dispatch_auto_ml_node(random_node, context)
+            print(f"   Result: value={result['value']:.4f}")
+            print(f"   Compression: {result.get('compression_ok', False)}")
+            print(f"   Energy: {result.get('energy_nj', 'N/A')} nJ")
+        except Exception as e:
+            print(f"   Error: {e}")
 
-    # Example 3: SearchNode
-    print("\n3. Testing SearchNode...")
-    search_node = {
-        "type": "SearchNode",
-        "params": {
-            "algorithm": "bayesian",
-            "objective": "accuracy",
-            "space": {"learning_rate": [0.001, 0.1], "dropout": [0.1, 0.5]},
-            "n_trials": 5,
-            "tensor": [[0.7, 0.8]],
-            "kernel": "def optimize(): pass",
-            "ethical_label": "EU2025:Safe",
-        },
-    }
+        # Example 2: HyperParamNode
+        print("\n2. Testing HyperParamNode...")
+        hyperparam_node = {
+            "type": "HyperParamNode",
+            "params": {
+                "space": {
+                    "learning_rate": [0.001, 0.1],
+                    "dropout": [0.1, 0.5],
+                    "batch_size": [16, 128],
+                },
+                "strategy": "bayesian",
+                "tensor": [[0.5, 0.6]],
+                "ethical_label": "EU2025:Safe",
+            },
+        }
 
-    try:
-        result = dispatch_auto_ml_node(search_node, context)
-        print(f"   Optimal params: {result['optimal_params']}")
-        print(f"   Objective value: {result['objective_value']:.4f}")
-        print(f"   Compression: {result.get('compression_ok', False)}")
-        print(f"   Energy: {result.get('energy_nj', 'N/A')} nJ")
-        print(
-            f"   Kernel audit: {result.get('kernel_audit', {}).get('available', 'N/A')}"
-        )
-    except Exception as e:
-        print(f"   Error: {e}")
+        try:
+            result = await dispatch_auto_ml_node(hyperparam_node, context)
+            print(f"   Space dimensions: {result['dimensions']}")
+            print(f"   Strategy: {result['strategy']}")
+            print(f"   Compression: {result.get('compression_ok', False)}")
+        except Exception as e:
+            print(f"   Error: {e}")
 
-    # Show audit log
-    print("\n4. Audit Log:")
-    print(f"   Total entries: {len(context['audit_log'])}")
-    for i, entry in enumerate(context["audit_log"], 1):
-        print(
-            f"   {i}. {entry['node_type']}: {entry['status']} at {entry['timestamp']}"
-        )
+        # Example 3: SearchNode
+        print("\n3. Testing SearchNode...")
+        search_node = {
+            "type": "SearchNode",
+            "params": {
+                "algorithm": "bayesian",
+                "objective": "accuracy",
+                "space": {"learning_rate": [0.001, 0.1], "dropout": [0.1, 0.5]},
+                "n_trials": 5,
+                "tensor": [[0.7, 0.8]],
+                "kernel": "def optimize(): pass",
+                "ethical_label": "EU2025:Safe",
+            },
+        }
 
-    print("\n" + "=" * 60)
-    print("Demo completed successfully!")
-    print("=" * 60)
+        try:
+            result = await dispatch_auto_ml_node(search_node, context)
+            print(f"   Optimal params: {result['optimal_params']}")
+            print(f"   Objective value: {result['objective_value']:.4f}")
+            print(f"   Compression: {result.get('compression_ok', False)}")
+            print(f"   Energy: {result.get('energy_nj', 'N/A')} nJ")
+            print(
+                f"   Kernel audit: {result.get('kernel_audit', {}).get('available', 'N/A')}"
+            )
+        except Exception as e:
+            print(f"   Error: {e}")
+
+        # Show audit log
+        print("\n4. Audit Log:")
+        print(f"   Total entries: {len(context['audit_log'])}")
+        for i, entry in enumerate(context['audit_log'], 1):
+            print(
+                f"   {i}. {entry['node_type']}: {entry['status']} at {entry['timestamp']}"
+            )
+
+        print("\n" + "=" * 60)
+        print("Demo completed successfully!")
+        print("=" * 60)
+    
+    asyncio.run(main())
