@@ -1340,8 +1340,30 @@ def get_emulator(
 
 
 # Export singleton factory for compatibility
-# NOTE: This defers initialization until first access
-analog_photonic_emulator = None  # Will be initialized via get_emulator()
+# This provides backward compatibility while implementing lazy initialization
+class _EmulatorSingleton:
+    """
+    Lazy singleton wrapper for AnalogPhotonicEmulator.
+    
+    Provides backward compatibility for code expecting analog_photonic_emulator
+    to be a module-level instance while implementing lazy initialization.
+    """
+    _instance: Optional[AnalogPhotonicEmulator] = None
+    
+    def __getattr__(self, name: str):
+        """Lazy initialization on first attribute access."""
+        if self._instance is None:
+            self._instance = get_emulator()
+        return getattr(self._instance, name)
+    
+    def __call__(self, *args, **kwargs):
+        """Allow calling methods on the singleton."""
+        if self._instance is None:
+            self._instance = get_emulator()
+        return self._instance(*args, **kwargs)
+
+# Backward-compatible singleton - initializes lazily on first use
+analog_photonic_emulator = _EmulatorSingleton()
 
 
 # Example usage

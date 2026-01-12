@@ -7,7 +7,7 @@ AutoML nodes with hardware acceleration, compression, and audit support.
 
 import logging
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import numpy as np
 
@@ -641,7 +641,9 @@ class SearchNode:
 
 
 async def dispatch_auto_ml_node(
-    node: Dict[str, Any], context: Dict[str, Any], inputs: Dict[str, Any] = None
+    node: Dict[str, Any], 
+    context: Dict[str, Any], 
+    inputs: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """
     Dispatch function for AutoML nodes, integrating with unified_runtime.py.
