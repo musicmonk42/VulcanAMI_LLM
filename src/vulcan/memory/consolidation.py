@@ -238,6 +238,59 @@ class HierarchicalClustering(ClusteringAlgorithm):
         return labels.tolist()
 
 
+class GPUAcceleratedClustering(ClusteringAlgorithm):
+    """GPU-accelerated clustering using cuML (RAPIDS)."""
+    
+    @staticmethod
+    def cluster(embeddings: np.ndarray, n_clusters: int, use_gpu: bool = True) -> List[int]:
+        """Cluster using GPU acceleration if available.
+        
+        Args:
+            embeddings: Embeddings to cluster
+            n_clusters: Number of clusters
+            use_gpu: Whether to use GPU (if available)
+            
+        Returns:
+            List of cluster labels
+        """
+        # Only use GPU for large datasets
+        if len(embeddings) < 10000:
+            logger.info("Dataset too small for GPU acceleration, using CPU")
+            return KMeansClustering.cluster(embeddings, n_clusters)
+        
+        # Try to use cuML if available
+        if use_gpu:
+            try:
+                import cuml
+                from cuml.cluster import KMeans as cuKMeans
+                
+                logger.info(f"Using GPU-accelerated clustering for {len(embeddings)} embeddings")
+                
+                # Convert to cuDF for GPU processing
+                kmeans = cuKMeans(n_clusters=n_clusters, random_state=42)
+                labels = kmeans.fit_predict(embeddings)
+                
+                # Convert back to numpy
+                if hasattr(labels, 'to_numpy'):
+                    labels = labels.to_numpy()
+                elif hasattr(labels, 'get'):
+                    labels = labels.get()  # CuPy array
+                
+                logger.info("GPU clustering completed successfully")
+                return labels.tolist()
+            
+            except ImportError:
+                logger.warning(
+                    "cuML not available, falling back to CPU. "
+                    "Install RAPIDS cuML for GPU support: pip install cuml-cu11"
+                )
+            except Exception as e:
+                logger.warning(f"GPU clustering failed: {e}, falling back to CPU")
+        
+        # Fallback to CPU
+        return KMeansClustering.cluster(embeddings, n_clusters)
+
+
 # ============================================================
 # ENHANCED MEMORY CONSOLIDATOR
 # ============================================================

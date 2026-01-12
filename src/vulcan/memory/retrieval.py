@@ -2,13 +2,14 @@
 
 from .base import Memory, MemoryQuery
 from ..security_fixes import safe_pickle_load
+import copy
 import logging
 import math
 import pickle
 import re
 import threading
 import time
-from collections import defaultdict
+from collections import defaultdict, deque
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
@@ -1627,3 +1628,332 @@ class MemorySearch:
                 self.metadata_index = defaultdict(
                     lambda: defaultdict(set), safe_pickle_load(f)
                 )
+
+
+# ============================================================
+# MEMORY PREFETCHER
+# ============================================================
+
+
+class MemoryPrefetcher:
+    """Prefetch memories based on access patterns."""
+    
+    def __init__(
+        self,
+        cache_size: int = 100,
+        prediction_window: int = 10,
+    ):
+        """Initialize memory prefetcher.
+        
+        Args:
+            cache_size: Maximum size of prefetch cache
+            prediction_window: Number of past accesses to consider
+        """
+        self.cache_size = cache_size
+        self.prediction_window = prediction_window
+        
+        # Track access patterns
+        self.access_history: deque = deque(maxlen=prediction_window * 10)
+        self.access_counts: Dict[str, int] = defaultdict(int)
+        self.co_occurrence: Dict[str, Dict[str, int]] = defaultdict(
+            lambda: defaultdict(int)
+        )
+        
+        # Prefetch cache
+        self.prefetch_cache: Dict[str, Memory] = {}
+        
+        # Thread safety
+        self._lock = threading.RLock()
+        
+        # Background prefetch thread
+        self._prefetch_thread = None
+        self._stop_prefetch = False
+        
+        logger.info(
+            f"Initialized memory prefetcher: cache_size={cache_size}, "
+            f"window={prediction_window}"
+        )
+    
+    def record_access(self, memory_id: str, memory: Optional[Memory] = None):
+        """Record a memory access.
+        
+        Args:
+            memory_id: ID of accessed memory
+            memory: Optional memory object to cache
+        """
+        with self._lock:
+            self.access_history.append((time.time(), memory_id))
+            self.access_counts[memory_id] += 1
+            
+            # Update co-occurrence patterns
+            recent_ids = [mid for _, mid in list(self.access_history)[-self.prediction_window:]]
+            for prev_id in recent_ids[:-1]:
+                if prev_id != memory_id:
+                    self.co_occurrence[prev_id][memory_id] += 1
+            
+            # Cache the memory if provided
+            if memory and memory_id not in self.prefetch_cache:
+                if len(self.prefetch_cache) >= self.cache_size:
+                    # Evict least recently used
+                    oldest_id = min(
+                        self.prefetch_cache.keys(),
+                        key=lambda mid: self.access_counts.get(mid, 0)
+                    )
+                    del self.prefetch_cache[oldest_id]
+                
+                self.prefetch_cache[memory_id] = memory
+    
+    def predict_next_accesses(self, current_id: str, k: int = 5) -> List[str]:
+        """Predict next memory accesses based on patterns.
+        
+        Args:
+            current_id: Currently accessed memory ID
+            k: Number of predictions to return
+            
+        Returns:
+            List of predicted memory IDs
+        """
+        with self._lock:
+            if current_id not in self.co_occurrence:
+                # No pattern data, return most frequently accessed
+                sorted_ids = sorted(
+                    self.access_counts.items(),
+                    key=lambda x: x[1],
+                    reverse=True
+                )
+                return [mid for mid, _ in sorted_ids[:k]]
+            
+            # Get co-occurring memories
+            co_occur = self.co_occurrence[current_id]
+            sorted_predictions = sorted(
+                co_occur.items(),
+                key=lambda x: x[1],
+                reverse=True
+            )
+            
+            return [mid for mid, _ in sorted_predictions[:k]]
+    
+    def get_from_cache(self, memory_id: str) -> Optional[Memory]:
+        """Get memory from prefetch cache.
+        
+        Args:
+            memory_id: Memory ID to retrieve
+            
+        Returns:
+            Cached memory or None
+        """
+        with self._lock:
+            return self.prefetch_cache.get(memory_id)
+    
+    def preload_memories(
+        self,
+        current_id: str,
+        memory_loader: callable,
+        k: int = 5,
+    ):
+        """Preload predicted memories in background.
+        
+        Args:
+            current_id: Currently accessed memory ID
+            memory_loader: Function to load memories by ID
+            k: Number of memories to preload
+        """
+        predictions = self.predict_next_accesses(current_id, k)
+        
+        def _preload():
+            for memory_id in predictions:
+                if memory_id not in self.prefetch_cache:
+                    try:
+                        memory = memory_loader(memory_id)
+                        if memory:
+                            with self._lock:
+                                if len(self.prefetch_cache) < self.cache_size:
+                                    self.prefetch_cache[memory_id] = memory
+                    except Exception as e:
+                        logger.debug(f"Failed to preload {memory_id}: {e}")
+        
+        # Run in background thread
+        threading.Thread(target=_preload, daemon=True).start()
+    
+    def get_stats(self) -> Dict[str, Any]:
+        """Get prefetcher statistics.
+        
+        Returns:
+            Dict with statistics
+        """
+        with self._lock:
+            return {
+                'cache_size': len(self.prefetch_cache),
+                'max_cache_size': self.cache_size,
+                'total_accesses': len(self.access_history),
+                'unique_memories': len(self.access_counts),
+                'patterns_learned': len(self.co_occurrence),
+            }
+
+
+# ============================================================
+# QUERY PLANNER
+# ============================================================
+
+
+class QueryPlanner:
+    """Optimize query execution by analyzing query components."""
+    
+    def __init__(self):
+        """Initialize query planner."""
+        # Track index statistics
+        self.index_stats: Dict[str, Dict[str, Any]] = {
+            'vector': {'queries': 0, 'avg_time_ms': 0, 'selectivity': 1.0},
+            'temporal': {'queries': 0, 'avg_time_ms': 0, 'selectivity': 0.5},
+            'text': {'queries': 0, 'avg_time_ms': 0, 'selectivity': 0.3},
+            'metadata': {'queries': 0, 'avg_time_ms': 0, 'selectivity': 0.8},
+        }
+        
+        self._lock = threading.RLock()
+        
+        logger.info("Initialized query planner")
+    
+    def plan_query(
+        self,
+        query: MemoryQuery,
+        available_indices: List[str],
+    ) -> List[Tuple[str, Dict[str, Any]]]:
+        """Generate optimal query plan.
+        
+        Args:
+            query: Memory query to plan
+            available_indices: List of available index types
+            
+        Returns:
+            List of (index_type, query_params) tuples in execution order
+        """
+        with self._lock:
+            plan = []
+            
+            # Analyze query components
+            has_embedding = query.embedding is not None
+            has_time_range = query.time_range is not None
+            has_filters = len(query.filters) > 0
+            
+            # Order indices by estimated selectivity (most selective first)
+            index_selectivity = []
+            
+            if has_time_range and 'temporal' in available_indices:
+                selectivity = self.index_stats['temporal']['selectivity']
+                index_selectivity.append(('temporal', selectivity))
+            
+            if has_embedding and 'vector' in available_indices:
+                selectivity = self.index_stats['vector']['selectivity']
+                index_selectivity.append(('vector', selectivity))
+            
+            if has_filters and 'metadata' in available_indices:
+                selectivity = self.index_stats['metadata']['selectivity']
+                index_selectivity.append(('metadata', selectivity))
+            
+            # Sort by selectivity (lower is better - fewer results)
+            index_selectivity.sort(key=lambda x: x[1])
+            
+            # Build plan
+            for index_type, _ in index_selectivity:
+                query_params = self._get_index_params(query, index_type)
+                plan.append((index_type, query_params))
+            
+            logger.debug(f"Generated query plan: {[idx for idx, _ in plan]}")
+            return plan
+    
+    def _get_index_params(
+        self,
+        query: MemoryQuery,
+        index_type: str,
+    ) -> Dict[str, Any]:
+        """Extract relevant parameters for index type.
+        
+        Args:
+            query: Memory query
+            index_type: Type of index
+            
+        Returns:
+            Dict of parameters for the index
+        """
+        if index_type == 'vector':
+            return {
+                'embedding': query.embedding,
+                'k': query.limit,
+                'threshold': query.threshold,
+            }
+        elif index_type == 'temporal':
+            return {
+                'time_range': query.time_range,
+                'limit': query.limit,
+            }
+        elif index_type == 'metadata':
+            return {
+                'filters': query.filters,
+                'limit': query.limit,
+            }
+        elif index_type == 'text':
+            return {
+                'content': query.content,
+                'limit': query.limit,
+            }
+        
+        return {}
+    
+    def update_stats(
+        self,
+        index_type: str,
+        query_time_ms: float,
+        results_count: int,
+        total_count: int,
+    ):
+        """Update index statistics after query execution.
+        
+        Args:
+            index_type: Type of index used
+            query_time_ms: Query execution time in milliseconds
+            results_count: Number of results returned
+            total_count: Total number of possible results
+        """
+        with self._lock:
+            if index_type not in self.index_stats:
+                return
+            
+            stats = self.index_stats[index_type]
+            
+            # Update query count
+            stats['queries'] += 1
+            
+            # Update average time (exponential moving average)
+            alpha = 0.1  # Smoothing factor
+            if stats['queries'] == 1:
+                stats['avg_time_ms'] = query_time_ms
+            else:
+                stats['avg_time_ms'] = (
+                    alpha * query_time_ms + 
+                    (1 - alpha) * stats['avg_time_ms']
+                )
+            
+            # Update selectivity
+            if total_count > 0:
+                selectivity = results_count / total_count
+                stats['selectivity'] = (
+                    alpha * selectivity +
+                    (1 - alpha) * stats['selectivity']
+                )
+    
+    def get_stats(self) -> Dict[str, Dict[str, Any]]:
+        """Get query planner statistics.
+        
+        Returns:
+            Dict with index statistics
+        """
+        with self._lock:
+            return copy.deepcopy(self.index_stats)
+    
+    def reset_stats(self):
+        """Reset all statistics."""
+        with self._lock:
+            for stats in self.index_stats.values():
+                stats['queries'] = 0
+                stats['avg_time_ms'] = 0
+            logger.info("Reset query planner statistics")

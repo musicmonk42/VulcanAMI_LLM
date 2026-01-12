@@ -12,7 +12,12 @@ from .base import (
     MemoryType,
     MemoryUsageMonitor,
 )
-from .consolidation import ConsolidationStrategy, MemoryConsolidator, MemoryOptimizer
+from .consolidation import (
+    ConsolidationStrategy,
+    GPUAcceleratedClustering,
+    MemoryConsolidator,
+    MemoryOptimizer,
+)
 from .distributed import (
     ConnectionPool,
     ConsistencyLevel,
@@ -21,7 +26,7 @@ from .distributed import (
     MemoryFederation,
     MemoryNode,
 )
-from .hierarchical import HierarchicalMemory, MemoryLevel
+from .hierarchical import EmbeddingMigration, HierarchicalMemory, MemoryLevel
 from .learning_persistence import LearningStatePersistence
 from .persistence import (
     CompressionStats,
@@ -32,7 +37,9 @@ from .persistence import (
 from .retrieval import (
     AttentionMechanism,
     MemoryIndex,
+    MemoryPrefetcher,
     MemorySearch,
+    QueryPlanner,
     RetrievalResult,
     ShardedMemoryIndex,
 )
@@ -62,6 +69,7 @@ __all__ = [
     # Hierarchical
     "HierarchicalMemory",
     "MemoryLevel",
+    "EmbeddingMigration",
     # Distributed
     "DistributedMemory",
     "MemoryFederation",
@@ -82,10 +90,13 @@ __all__ = [
     "RetrievalResult",
     "VectorMemoryStore",  # Added - Alias for MemoryIndex
     "ShardedMemoryIndex",
+    "MemoryPrefetcher",
+    "QueryPlanner",
     # Consolidation
     "MemoryConsolidator",
     "ConsolidationStrategy",
     "MemoryOptimizer",
+    "GPUAcceleratedClustering",
     # Specialized
     "EpisodicMemory",
     "SemanticMemory",

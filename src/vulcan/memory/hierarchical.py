@@ -150,6 +150,241 @@ class MemoryLevel:
 
 
 # ============================================================
+# EMBEDDING MIGRATION
+# ============================================================
+
+
+class EmbeddingMigration:
+    """Manages incremental migration of embeddings to new models."""
+    
+    def __init__(
+        self,
+        old_model_name: str,
+        new_model_name: str,
+        batch_size: int = 100,
+    ):
+        """Initialize embedding migration.
+        
+        Args:
+            old_model_name: Name of the old embedding model
+            new_model_name: Name of the new embedding model
+            batch_size: Number of memories to migrate per batch
+        """
+        self.old_model_name = old_model_name
+        self.new_model_name = new_model_name
+        self.batch_size = batch_size
+        
+        # Track migration progress
+        self.total_memories = 0
+        self.migrated_count = 0
+        self.failed_count = 0
+        self.migration_status = "not_started"  # not_started, in_progress, completed, failed
+        
+        # Thread safety
+        self._lock = threading.RLock()
+        self._migration_thread = None
+        self._stop_migration = False
+        
+        # Load new model if available
+        self.new_model = None
+        if SENTENCE_TRANSFORMERS_AVAILABLE:
+            try:
+                self.new_model = SentenceTransformer(new_model_name)
+                logger.info(f"Loaded new embedding model: {new_model_name}")
+            except Exception as e:
+                logger.error(f"Failed to load new embedding model: {e}")
+        
+        logger.info(
+            f"Initialized embedding migration: {old_model_name} -> {new_model_name}"
+        )
+    
+    def start_migration(
+        self,
+        memories: List[Memory],
+        callback: Optional[callable] = None,
+    ) -> bool:
+        """Start background migration in batches.
+        
+        Args:
+            memories: List of memories to migrate
+            callback: Optional callback function called after each batch
+            
+        Returns:
+            True if migration started successfully
+        """
+        with self._lock:
+            if self.migration_status == "in_progress":
+                logger.warning("Migration already in progress")
+                return False
+            
+            if not self.new_model:
+                logger.error("New embedding model not available")
+                return False
+            
+            self.total_memories = len(memories)
+            self.migrated_count = 0
+            self.failed_count = 0
+            self.migration_status = "in_progress"
+            self._stop_migration = False
+            
+            # Start migration thread
+            self._migration_thread = threading.Thread(
+                target=self._migrate_background,
+                args=(memories, callback),
+                daemon=True,
+            )
+            self._migration_thread.start()
+            
+            logger.info(f"Started migration of {self.total_memories} memories")
+            return True
+    
+    def _migrate_background(
+        self,
+        memories: List[Memory],
+        callback: Optional[callable],
+    ):
+        """Background migration worker.
+        
+        Args:
+            memories: List of memories to migrate
+            callback: Optional callback function
+        """
+        try:
+            # Process in batches
+            for i in range(0, len(memories), self.batch_size):
+                if self._stop_migration:
+                    logger.info("Migration stopped by user")
+                    with self._lock:
+                        self.migration_status = "stopped"
+                    return
+                
+                batch = memories[i:i + self.batch_size]
+                batch_success, batch_failed = self._migrate_batch(batch)
+                
+                with self._lock:
+                    self.migrated_count += batch_success
+                    self.failed_count += batch_failed
+                
+                # Call callback if provided
+                if callback:
+                    try:
+                        callback(self.get_progress())
+                    except Exception as e:
+                        logger.error(f"Migration callback error: {e}")
+                
+                # Log progress
+                progress_pct = (self.migrated_count / self.total_memories) * 100
+                logger.info(
+                    f"Migration progress: {self.migrated_count}/{self.total_memories} "
+                    f"({progress_pct:.1f}%), failed: {self.failed_count}"
+                )
+            
+            # Migration complete
+            with self._lock:
+                if self.failed_count == 0:
+                    self.migration_status = "completed"
+                    logger.info("Migration completed successfully")
+                else:
+                    self.migration_status = "completed_with_errors"
+                    logger.warning(
+                        f"Migration completed with {self.failed_count} failures"
+                    )
+        
+        except Exception as e:
+            logger.error(f"Migration failed: {e}", exc_info=True)
+            with self._lock:
+                self.migration_status = "failed"
+    
+    def _migrate_batch(self, batch: List[Memory]) -> Tuple[int, int]:
+        """Migrate a batch of memories.
+        
+        Args:
+            batch: Batch of memories to migrate
+            
+        Returns:
+            Tuple of (success_count, failure_count)
+        """
+        success_count = 0
+        failure_count = 0
+        
+        for memory in batch:
+            try:
+                # Check if already migrated
+                if memory.metadata.get("embedding_model") == self.new_model_name:
+                    success_count += 1
+                    continue
+                
+                # Generate new embedding
+                if isinstance(memory.content, str):
+                    new_embedding = self.new_model.encode(
+                        memory.content,
+                        show_progress_bar=False
+                    )
+                    
+                    # Update memory
+                    memory.embedding = new_embedding
+                    memory.metadata["embedding_model"] = self.new_model_name
+                    memory.metadata["embedding_version"] = "migrated"
+                    memory.metadata["migration_timestamp"] = time.time()
+                    
+                    success_count += 1
+                else:
+                    logger.warning(f"Cannot migrate non-string content: {memory.id}")
+                    failure_count += 1
+            
+            except Exception as e:
+                logger.error(f"Failed to migrate memory {memory.id}: {e}")
+                failure_count += 1
+        
+        return success_count, failure_count
+    
+    def stop_migration(self):
+        """Stop the migration process."""
+        with self._lock:
+            if self.migration_status != "in_progress":
+                return
+            
+            self._stop_migration = True
+            logger.info("Stopping migration...")
+    
+    def get_progress(self) -> Dict[str, Any]:
+        """Get migration progress.
+        
+        Returns:
+            Dict with progress information
+        """
+        with self._lock:
+            progress_pct = (
+                (self.migrated_count / self.total_memories * 100)
+                if self.total_memories > 0 else 0
+            )
+            
+            return {
+                "status": self.migration_status,
+                "total_memories": self.total_memories,
+                "migrated_count": self.migrated_count,
+                "failed_count": self.failed_count,
+                "progress_percentage": progress_pct,
+                "old_model": self.old_model_name,
+                "new_model": self.new_model_name,
+            }
+    
+    def wait_for_completion(self, timeout: Optional[float] = None) -> bool:
+        """Wait for migration to complete.
+        
+        Args:
+            timeout: Maximum time to wait in seconds
+            
+        Returns:
+            True if migration completed, False if timeout
+        """
+        if self._migration_thread and self._migration_thread.is_alive():
+            self._migration_thread.join(timeout=timeout)
+            return not self._migration_thread.is_alive()
+        return True
+
+
+# ============================================================
 # HIERARCHICAL MEMORY WITH TOOL SELECTION
 # ============================================================
 
