@@ -1109,8 +1109,37 @@ class KnowledgeIntegrator:
             logger.error("Error integrating results: %s", e)
 
     def _update_knowledge_base(self, knowledge: Dict[str, Any], knowledge_base: Any):
-        """Update knowledge crystallizer"""
+        """
+        Update knowledge crystallizer with enhanced integration
+        
+        Attempts to crystallize experiment knowledge using full principle extraction.
+        Falls back to simple storage if crystallization is not available or fails.
+        
+        Args:
+            knowledge: Learned knowledge dictionary from experiment
+            knowledge_base: Knowledge crystallizer instance
+        """
         try:
+            # Attempt crystallization for richer principle extraction
+            if hasattr(knowledge_base, "crystallize") and callable(
+                getattr(knowledge_base, "crystallize", None)
+            ):
+                try:
+                    execution_trace = self._convert_to_execution_trace(knowledge)
+                    if execution_trace:
+                        result = knowledge_base.crystallize(execution_trace)
+                        logger.info(
+                            "Crystallized experiment knowledge: %d principles extracted with confidence %.2f",
+                            len(result.principles),
+                            result.confidence,
+                        )
+                        return  # Success - crystallization completed
+                except Exception as e:
+                    logger.warning(
+                        "Crystallization failed, falling back to store_knowledge: %s", e
+                    )
+            
+            # Fallback: Use simple storage for individual knowledge items
             for key, value in knowledge.items():
                 if key not in ["raw_output", "experiment_type"]:
                     if hasattr(knowledge_base, "store_knowledge") and callable(
@@ -1122,6 +1151,124 @@ class KnowledgeIntegrator:
                             logger.warning("Error storing knowledge: %s", e)
         except Exception as e:
             logger.error("Error updating knowledge base: %s", e)
+
+    def _convert_to_execution_trace(
+        self, knowledge: Dict[str, Any]
+    ) -> Optional[Any]:
+        """
+        Convert experiment learned knowledge to ExecutionTrace for crystallization
+        
+        This method creates a properly structured ExecutionTrace that can be
+        processed by the KnowledgeCrystallizer for full principle extraction,
+        including pattern detection, confidence calculation, and domain assignment.
+        
+        Args:
+            knowledge: Learned knowledge dictionary from experiment
+            
+        Returns:
+            ExecutionTrace object if conversion successful, None otherwise
+        """
+        try:
+            # Import ExecutionTrace here to avoid circular dependency
+            from ..knowledge_crystallizer.knowledge_crystallizer_core import (
+                ExecutionTrace,
+            )
+            
+            # Extract experiment metadata
+            experiment_type = knowledge.get("experiment_type", "unknown")
+            domain = knowledge.get("domain", "general")
+            
+            # Build actions list from knowledge patterns
+            actions = []
+            if "patterns" in knowledge:
+                patterns = knowledge["patterns"]
+                if isinstance(patterns, list):
+                    for i, pattern in enumerate(patterns):
+                        actions.append(
+                            {
+                                "type": "pattern_application",
+                                "params": {"pattern": pattern, "step": i},
+                            }
+                        )
+                elif isinstance(patterns, dict):
+                    for key, value in patterns.items():
+                        actions.append(
+                            {"type": "pattern_application", "params": {key: value}}
+                        )
+            
+            # If no patterns, create actions from other knowledge keys
+            if not actions:
+                for key, value in knowledge.items():
+                    if key not in [
+                        "raw_output",
+                        "experiment_type",
+                        "domain",
+                        "observations",
+                    ]:
+                        actions.append(
+                            {"type": "knowledge_acquisition", "params": {key: value}}
+                        )
+            
+            # Ensure we have at least one action
+            if not actions:
+                actions.append(
+                    {
+                        "type": "experiment",
+                        "params": {"type": experiment_type, "data": knowledge},
+                    }
+                )
+            
+            # Extract outcomes from knowledge
+            outcomes = {
+                "success": True,  # Assume success if we got learned knowledge
+                "experiment_type": experiment_type,
+            }
+            
+            # Add any metrics or results
+            for key in ["accuracy", "precision", "recall", "value", "score"]:
+                if key in knowledge:
+                    outcomes[key] = knowledge[key]
+            
+            # Build context from remaining knowledge
+            context = {
+                "domain": domain,
+                "source": "curiosity_engine_experiment",
+            }
+            
+            # Add observations to context if present
+            if "observations" in knowledge:
+                context["observations"] = knowledge["observations"]
+            
+            # Create ExecutionTrace with proper structure
+            trace = ExecutionTrace(
+                trace_id=f"experiment_{experiment_type}_{int(time.time() * 1000)}",
+                actions=actions,
+                outcomes=outcomes,
+                context=context,
+                success=True,
+                domain=domain,
+                metadata={
+                    "source": "curiosity_engine",
+                    "experiment_type": experiment_type,
+                },
+            )
+            
+            logger.debug(
+                "Converted experiment knowledge to ExecutionTrace: %d actions, domain=%s",
+                len(actions),
+                domain,
+            )
+            
+            return trace
+            
+        except ImportError as e:
+            logger.warning(
+                "Could not import ExecutionTrace for crystallization: %s", e
+            )
+            return None
+        except Exception as e:
+            logger.warning("Failed to convert knowledge to ExecutionTrace: %s", e)
+            return None
 
     def _update_world_model(self, observations: List[Any], world_model: Any):
         """Update world model with observations"""
