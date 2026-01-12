@@ -261,9 +261,20 @@ def _detect_macos_capabilities(caps: CPUCapabilities) -> None:
             ):
                 # Apple Silicon always has NEON
                 caps.has_neon = True
+
+    except FileNotFoundError:
+        # sysctl not available (e.g., in containers or non-standard environments)
+        logger.debug("sysctl not available, using architecture-based defaults")
+        if "arm" in caps.architecture.lower() or "aarch" in caps.architecture.lower():
+            caps.has_neon = True  # Apple Silicon always has NEON
+
+    except subprocess.TimeoutExpired:
+        logger.debug("sysctl timed out, using architecture-based defaults")
+        if "arm" in caps.architecture.lower() or "aarch" in caps.architecture.lower():
+            caps.has_neon = True
+
     except Exception as e:
         logger.debug(f"Could not detect macOS capabilities: {e}")
-
         # Apple Silicon fallback
         if "arm" in caps.architecture.lower() or "aarch" in caps.architecture.lower():
             caps.has_neon = True

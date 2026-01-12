@@ -224,6 +224,27 @@ class StochasticCostModel:
         # Cost predictor
         self.predictor = CostPredictor()
 
+        # CPU capabilities for cost adjustment
+        try:
+            from src.utils.cpu_capabilities import get_cpu_capabilities
+            
+            self._cpu_caps = get_cpu_capabilities()
+            self._cpu_cost_multiplier = self._calculate_cpu_multiplier()
+            logger.info(
+                f"[CostModel] CPU tier: {self._cpu_caps.get_performance_tier()}, "
+                f"multiplier: {self._cpu_cost_multiplier:.2f}"
+            )
+        except Exception as e:
+            logger.warning(f"[CostModel] CPU detection failed: {e}, using default multiplier")
+            self._cpu_caps = None
+            self._cpu_cost_multiplier = 1.0
+
+        # Define compute-intensive tools that benefit from better CPU capabilities
+        self._compute_intensive_tools = {
+            "symbolic", "causal", "multimodal", "visualizer", 
+            "generator", "evolver", "analogical"
+        }
+
         # Default distributions
         self._initialize_defaults()
 
@@ -234,6 +255,34 @@ class StochasticCostModel:
         self.prediction_errors = deque(maxlen=100)
         self.total_predictions = 0
         self.total_updates = 0
+
+    def _calculate_cpu_multiplier(self) -> float:
+        """Calculate cost multiplier based on CPU capabilities.
+        
+        Higher performance CPUs (AVX-512, SVE2) execute compute-intensive operations
+        faster, reducing time costs. This multiplier adjusts predictions to reflect
+        hardware capabilities.
+        
+        Returns:
+            float: Cost multiplier where <1.0 means faster (better CPU), 
+                   >1.0 means slower (basic CPU)
+        """
+        if self._cpu_caps is None:
+            return 1.0
+            
+        tier = self._cpu_caps.get_performance_tier()
+        
+        # Higher performance = lower cost multiplier (faster execution)
+        # These multipliers are empirically derived from benchmarks showing
+        # that AVX-512 can be 2-4x faster than scalar for vectorizable workloads
+        multipliers = {
+            "High Performance": 0.7,      # AVX-512/SVE2 - significant speedup
+            "Medium Performance": 0.85,   # AVX2/SVE/NEON - moderate speedup
+            "Standard Performance": 1.0,  # AVX/SSE4 - baseline
+            "Basic Performance": 1.5,     # Scalar only - slower
+        }
+        
+        return multipliers.get(tier, 1.0)
 
     def _initialize_defaults(self):
         """Initialize default cost distributions
@@ -311,6 +360,9 @@ class StochasticCostModel:
     ) -> Dict[str, Any]:
         """
         Predict cost distribution with confidence intervals
+        
+        Applies CPU-aware adjustments for compute-intensive operations based on
+        detected instruction set capabilities (AVX-512, AVX2, etc.)
 
         Returns:
             Dictionary with cost predictions for each component
@@ -352,6 +404,13 @@ class StochasticCostModel:
                             self.cold_start_penalties[component] * 0.2
                         ) ** 2
 
+                # Apply CPU multiplier for compute-intensive operations
+                # Only affects time and energy, not memory
+                if (tool_name in self._compute_intensive_tools and 
+                    component in [CostComponent.TIME_MS, CostComponent.ENERGY_MJ]):
+                    adjusted_mean *= self._cpu_cost_multiplier
+                    adjusted_var *= (self._cpu_cost_multiplier ** 2)
+
                 # Try predictive model
                 predicted = self.predictor.predict(
                     features, complexity, tool_name, component
@@ -375,6 +434,13 @@ class StochasticCostModel:
 
             # Add aggregate prediction
             predictions["failure_risk"] = health.error_rate * (1 + complexity)
+            
+            # Add CPU adjustment metadata for monitoring
+            if tool_name in self._compute_intensive_tools:
+                predictions["cpu_adjusted"] = True
+                predictions["cpu_multiplier"] = self._cpu_cost_multiplier
+                if self._cpu_caps:
+                    predictions["cpu_tier"] = self._cpu_caps.get_performance_tier()
 
             return predictions
 
