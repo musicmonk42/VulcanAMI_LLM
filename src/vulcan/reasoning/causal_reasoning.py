@@ -692,6 +692,18 @@ class EnhancedCausalReasoning(CausalReasoningEngine):
         if not self.causal_dag or (
             NETWORKX_AVAILABLE and self.causal_dag.number_of_nodes() == 0
         ):
+            # FIX (Jan 13 2026): Provide more informative feedback when no DAG exists
+            # Instead of just returning confidence=0.1, explain what's needed
+            explanation = (
+                f"Cannot perform causal intervention on '{variable}' because no causal DAG is available. "
+                f"To perform causal interventions, you need to either:\n"
+                f"1. Build a causal DAG from data using build_from_data()\n"
+                f"2. Manually construct a DAG by adding causal edges\n"
+                f"3. Provide a pre-built causal graph structure\n"
+                f"Current state: DAG is {'None' if not self.causal_dag else 'empty (no nodes)'}"
+            )
+            logger.warning(f"[CausalReasoner] {explanation}")
+            
             result = InterventionResult(
                 intervention={variable: value},
                 direct_effects={},
@@ -699,7 +711,7 @@ class EnhancedCausalReasoning(CausalReasoningEngine):
                 causal_paths=[],
                 # Note: Use minimum confidence floor instead of 0.0
                 confidence=0.1,
-                explanation="No causal DAG available",
+                explanation=explanation,
             )
             # CRITICAL FIX: Record intervention
             self.record_intervention(variable, value, {"result": "no_dag"})
