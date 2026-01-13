@@ -1418,9 +1418,10 @@ class SymbolicToolWrapper:
     3. Returns result in expected format
     """
     
-    def __init__(self, engine):
+    def __init__(self, engine, config: Optional[Dict[str, Any]] = None):
         self.engine = engine
         self.name = "symbolic"
+        self.config = config or {}
     
     def reason(self, problem: Any) -> Dict[str, Any]:
         """
@@ -1858,9 +1859,10 @@ class ProbabilisticToolWrapper:
         '%', 'percent', 'chance', 'risk', 'uncertainty',
     )
     
-    def __init__(self, engine):
+    def __init__(self, engine, config: Optional[Dict[str, Any]] = None):
         self.engine = engine
         self.name = "probabilistic"
+        self.config = config or {}
     
     def reason(self, problem: Any) -> Dict[str, Any]:
         """
@@ -2252,9 +2254,10 @@ class CausalToolWrapper:
     The CausalReasoner performs causal DAG analysis and counterfactual reasoning.
     """
     
-    def __init__(self, engine):
+    def __init__(self, engine, config: Optional[Dict[str, Any]] = None):
         self.engine = engine
         self.name = "causal"
+        self.config = config or {}
     
     def reason(self, problem: Any) -> Dict[str, Any]:
         """
@@ -2321,9 +2324,10 @@ class AnalogicalToolWrapper:
     Wrapper for AnalogicalReasoner that exposes reason() method.
     """
     
-    def __init__(self, engine):
+    def __init__(self, engine, config: Optional[Dict[str, Any]] = None):
         self.engine = engine
         self.name = "analogical"
+        self.config = config or {}
     
     def reason(self, problem: Any) -> Dict[str, Any]:
         """Execute analogical reasoning on the problem."""
@@ -2380,9 +2384,10 @@ class MultimodalToolWrapper:
     Wrapper for MultimodalReasoner that exposes reason() method.
     """
     
-    def __init__(self, engine):
+    def __init__(self, engine, config: Optional[Dict[str, Any]] = None):
         self.engine = engine
         self.name = "multimodal"
+        self.config = config or {}
     
     def reason(self, problem: Any) -> Dict[str, Any]:
         """Execute multimodal reasoning on the problem."""
@@ -2466,16 +2471,18 @@ class WorldModelToolWrapper:
     instead of querying the actual self-model where Vulcan's identity lives.
     """
     
-    def __init__(self, world_model=None):
+    def __init__(self, world_model=None, config: Optional[Dict[str, Any]] = None):
         """
         Initialize the World Model tool wrapper.
         
         Args:
             world_model: The WorldModel instance to query. If None, uses
                          static self-model data representing Vulcan's core identity.
+            config: Optional configuration dict (for warm pool compatibility).
         """
         self.world_model = world_model
         self.name = "world_model"
+        self.config = config or {}
         self.logger = logging.getLogger(__name__)
         
         # =================================================================
@@ -3373,15 +3380,17 @@ class CryptographicToolWrapper:
         'what is', 'determine', 'produce', 'create'
     })
     
-    def __init__(self, engine):
+    def __init__(self, engine, config: Optional[Dict[str, Any]] = None):
         """
         Initialize with a CryptographicEngine instance.
         
         Args:
             engine: CryptographicEngine instance
+            config: Optional configuration dict (for warm pool compatibility).
         """
         self.engine = engine
         self.name = "cryptographic"
+        self.config = config or {}
     
     def reason(self, problem: Any) -> Dict[str, Any]:
         """
@@ -3516,12 +3525,17 @@ class PhilosophicalToolWrapper:
     philosophical/ethical queries to World Model's _philosophical_reasoning method.
     """
     
-    def __init__(self, engine=None):
+    def __init__(self, engine=None, config: Optional[Dict[str, Any]] = None):
         """
         Initialize wrapper. Engine parameter is ignored - uses World Model.
+        
+        Args:
+            engine: Ignored (for API compatibility)
+            config: Optional configuration dict (for warm pool compatibility).
         """
         self._world_model = None
         self.name = "philosophical"
+        self.config = config or {}
     
     def _get_world_model(self):
         """Lazy-load World Model using singleton."""
@@ -3616,15 +3630,17 @@ class MathematicalToolWrapper:
     - Safe sandboxed execution via RestrictedPython
     """
     
-    def __init__(self, engine):
+    def __init__(self, engine, config: Optional[Dict[str, Any]] = None):
         """
         Initialize with a MathematicalComputationTool instance.
         
         Args:
             engine: MathematicalComputationTool instance
+            config: Optional configuration dict (for warm pool compatibility).
         """
         self.engine = engine
         self.name = "mathematical"
+        self.config = config or {}
     
     def reason(self, problem: Any) -> Dict[str, Any]:
         """
