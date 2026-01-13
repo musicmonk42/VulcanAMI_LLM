@@ -2985,8 +2985,50 @@ class AgentPoolManager:
                     )
                 
                 try:
-                    # Map task type to reasoning type
-                    reasoning_type = self._map_task_to_reasoning_type(task_type)
+                    # =========================================================
+                    # CRITICAL FIX: Check selected_tools FIRST (Priority 1)
+                    # =========================================================
+                    # ISSUE: Task type mapping was taking precedence over selected_tools
+                    # from QueryRouter/QueryClassifier, causing queries to route to wrong
+                    # reasoning engines (e.g., SAT queries → MathTool instead of SymbolicReasoner)
+                    #
+                    # FIX: Check selected_tools BEFORE _map_task_to_reasoning_type()
+                    # This ensures QueryRouter/QueryClassifier selections always override
+                    # task_type string matching.
+                    # =========================================================
+                    reasoning_type = None  # Initialize to None
+                    
+                    # PRIORITY 1: Check selected_tools from QueryRouter/QueryClassifier
+                    if selected_tools and ReasoningType is not None:
+                        primary_tool = selected_tools[0].lower()
+                        tool_to_reasoning_type = {
+                            'symbolic': ReasoningType.SYMBOLIC,
+                            'probabilistic': ReasoningType.PROBABILISTIC,
+                            'causal': ReasoningType.CAUSAL,
+                            'analogical': ReasoningType.ANALOGICAL,
+                            'mathematical': ReasoningType.MATHEMATICAL,
+                            'philosophical': ReasoningType.PHILOSOPHICAL,
+                            'world_model': ReasoningType.PHILOSOPHICAL,  # world_model uses philosophical
+                            'general': ReasoningType.SYMBOLIC,  # general uses symbolic
+                            'multimodal': ReasoningType.MULTIMODAL,
+                            'cryptographic': ReasoningType.SYMBOLIC,  # crypto uses symbolic
+                        }
+                        mapped_reasoning_type = tool_to_reasoning_type.get(primary_tool)
+                        if mapped_reasoning_type:
+                            reasoning_type = mapped_reasoning_type
+                            logger.info(
+                                f"[AgentPool] Task {task_id}: Using reasoning type {reasoning_type} "
+                                f"from selected_tools={selected_tools} (overriding task_type={task_type})"
+                            )
+                    elif selected_tools and ReasoningType is None:
+                        logger.warning(
+                            f"[AgentPool] Task {task_id}: selected_tools={selected_tools} but "
+                            "ReasoningType not available - falling back to task_type mapping"
+                        )
+                    
+                    # PRIORITY 2: Fall back to task_type mapping only if no selected_tools
+                    if reasoning_type is None:
+                        reasoning_type = self._map_task_to_reasoning_type(task_type)
                     
                     # Calculate complexity from graph structure
                     complexity = self._calculate_task_complexity(graph, parameters)
