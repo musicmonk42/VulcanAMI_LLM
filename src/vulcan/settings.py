@@ -196,6 +196,26 @@ class Settings(BaseSettings):
     # Set ARENA_COMPLEXITY_THRESHOLD=0.0 to disable fast-path skip entirely
     arena_complexity_threshold: float = Field(default=0.1, env="ARENA_COMPLEXITY_THRESHOLD")
 
+    # ================================================================
+    # LLM-FIRST QUERY CLASSIFICATION CONFIGURATION
+    # LLM-first classification uses LLM as primary classification method
+    # with keyword matching as fallback for improved accuracy
+    # ================================================================
+    # Enable LLM-first classification (LLM before keywords)
+    # When True: Cache → Security → Greetings → LLM → Keywords (fallback)
+    # When False: Cache → Security → Greetings → Keywords → LLM (fallback)
+    llm_first_classification: bool = Field(
+        default=True, env="LLM_FIRST_CLASSIFICATION"
+    )
+    # Timeout for LLM classification requests (seconds)
+    classification_llm_timeout: float = Field(
+        default=3.0, env="CLASSIFICATION_LLM_TIMEOUT"
+    )
+    # LLM model to use for classification
+    classification_llm_model: str = Field(
+        default="gpt-4o-mini", env="CLASSIFICATION_LLM_MODEL"
+    )
+
     class Config:
         env_file = ".env"
         case_sensitive = False

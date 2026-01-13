@@ -25,6 +25,7 @@ Example:
     QueryClassification(category='LOGICAL', complexity=0.7, suggested_tools=['symbolic'])
 """
 
+import asyncio
 import hashlib
 import json
 import logging
@@ -116,6 +117,137 @@ REASONING_INDICATORS: FrozenSet[str] = frozenset([
     'reasoning tool', 'reasoning module', 'internal component',
     'subproblem', 'architecture', 'classes of problems',
 ])
+
+# =============================================================================
+# Security Fast-Path Patterns
+# =============================================================================
+# Security violations must be detected deterministically WITHOUT calling LLM
+# These patterns MUST be checked before any LLM classification to prevent
+# potentially malicious queries from being processed
+
+SECURITY_VIOLATION_KEYWORDS: FrozenSet[str] = frozenset([
+    "bypass safety", "bypass security", "bypass governance",
+    "ignore instructions", "ignore rules", "ignore guidelines",
+    "override safety", "override security", "override constraints",
+    "modify code", "modify system", "modify parameters",
+    "change behavior", "change settings", "change config",
+    "rewrite rules", "rewrite constraints", "rewrite logic",
+    "disable safety", "disable security", "disable governance",
+])
+
+SECURITY_VIOLATION_PATTERNS: Tuple[re.Pattern, ...] = (
+    re.compile(r"bypass\s+(?:safety|security|governance|restrictions)", re.IGNORECASE),
+    re.compile(r"ignore\s+(?:previous|all)\s+(?:instructions|rules|guidelines)", re.IGNORECASE),
+    re.compile(r"override\s+(?:your|the)\s+(?:safety|security|constraints)", re.IGNORECASE),
+    re.compile(r"modify\s+(?:your|the)\s+(?:code|system|parameters|behavior)", re.IGNORECASE),
+    re.compile(r"change\s+(?:your|the)\s+(?:behavior|settings|config|rules)", re.IGNORECASE),
+    re.compile(r"rewrite\s+(?:your|the)\s+(?:rules|constraints|logic)", re.IGNORECASE),
+    re.compile(r"disable\s+(?:safety|security|governance|restrictions)", re.IGNORECASE),
+)
+
+
+# =============================================================================
+# LLM Client Wrapper for Sync/Async Bridge
+# =============================================================================
+
+class _LLMClientWrapper:
+    """
+    Wrapper to bridge HybridLLMExecutor's async API to synchronous interface.
+    
+    This class handles event loop management and provides a synchronous chat()
+    method that QueryClassifier can use for LLM-based classification.
+    
+    Attributes:
+        executor: HybridLLMExecutor instance
+        timeout: Timeout for LLM calls in seconds
+        model: Model name to use (passed to executor)
+    """
+    
+    def __init__(
+        self,
+        executor: Any,
+        timeout: float = 3.0,
+        model: str = "gpt-4o-mini"
+    ):
+        """
+        Initialize the LLM client wrapper.
+        
+        Args:
+            executor: HybridLLMExecutor instance
+            timeout: Timeout for LLM calls in seconds
+            model: Model name to use for classification
+        """
+        self.executor = executor
+        self.timeout = timeout
+        self.model = model
+        self._loop = None
+        
+    def chat(
+        self,
+        messages: List[Dict[str, str]],
+        max_tokens: int = 100,
+        temperature: float = 0.0,
+    ) -> str:
+        """
+        Synchronous chat method compatible with QueryClassifier.
+        
+        Args:
+            messages: List of message dicts with 'role' and 'content'
+            max_tokens: Maximum tokens to generate
+            temperature: Sampling temperature
+            
+        Returns:
+            Response text from LLM
+            
+        Raises:
+            TimeoutError: If LLM call exceeds timeout
+            Exception: If LLM call fails
+        """
+        try:
+            # Get or create event loop
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                # No running loop, create a new one
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                self._loop = loop
+            
+            # Build prompt from messages
+            prompt = messages[-1]["content"] if messages else ""
+            system_prompt = None
+            for msg in messages:
+                if msg.get("role") == "system":
+                    system_prompt = msg.get("content")
+                    break
+            
+            # Execute with timeout
+            async def _async_execute():
+                result = await self.executor.execute(
+                    prompt=prompt,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                    system_prompt=system_prompt,
+                )
+                return result.get("text", "")
+            
+            # Run with timeout
+            if loop.is_running():
+                # Already have a running loop, use run_coroutine_threadsafe
+                future = asyncio.run_coroutine_threadsafe(_async_execute(), loop)
+                return future.result(timeout=self.timeout)
+            else:
+                # Create task with timeout
+                return loop.run_until_complete(
+                    asyncio.wait_for(_async_execute(), timeout=self.timeout)
+                )
+                
+        except asyncio.TimeoutError:
+            logger.warning(f"[_LLMClientWrapper] LLM call timed out after {self.timeout}s")
+            raise TimeoutError(f"LLM classification timed out after {self.timeout}s")
+        except Exception as e:
+            logger.warning(f"[_LLMClientWrapper] LLM call failed: {e}")
+            raise
 
 # Greeting patterns - complexity 0.0, skip reasoning
 GREETING_PATTERNS: FrozenSet[str] = frozenset([
@@ -986,11 +1118,45 @@ class QueryClassifier:
         Initialize the query classifier.
         
         Args:
-            llm_client: Optional LLM client for complex classifications
+            llm_client: Optional LLM client for complex classifications.
+                       If None and LLM_FIRST_CLASSIFICATION is enabled,
+                       will auto-initialize from HybridLLMExecutor.
             cache_ttl: Cache time-to-live in seconds (default 1 hour)
             max_cache_size: Maximum cache entries (default 10000)
         """
-        self.llm_client = llm_client
+        # Auto-initialize LLM client if not provided and feature is enabled
+        if llm_client is None:
+            try:
+                from vulcan.settings import settings
+                if settings.llm_first_classification:
+                    try:
+                        from vulcan.llm.hybrid_executor import HybridLLMExecutor
+                        executor = HybridLLMExecutor()
+                        self.llm_client = _LLMClientWrapper(
+                            executor=executor,
+                            timeout=settings.classification_llm_timeout,
+                            model=settings.classification_llm_model,
+                        )
+                        logger.info(
+                            "[QueryClassifier] Auto-initialized LLM client for LLM-first classification"
+                        )
+                    except Exception as e:
+                        logger.warning(
+                            f"[QueryClassifier] Failed to auto-initialize LLM client: {e}. "
+                            "Falling back to keyword-only classification."
+                        )
+                        self.llm_client = None
+                else:
+                    self.llm_client = None
+            except ImportError:
+                logger.warning(
+                    "[QueryClassifier] Could not import settings. "
+                    "Using keyword-only classification."
+                )
+                self.llm_client = None
+        else:
+            self.llm_client = llm_client
+        
         self.cache_ttl = cache_ttl
         self.max_cache_size = max_cache_size
         
@@ -998,12 +1164,15 @@ class QueryClassifier:
         self._cache: Dict[str, Tuple[QueryClassification, float]] = {}
         self._cache_lock = threading.Lock()
         
-        # Statistics
+        # Statistics - updated for LLM-first classification
         self._stats = {
             "keyword_hits": 0,
             "cache_hits": 0,
             "llm_calls": 0,
             "total_classifications": 0,
+            "llm_classifications": 0,  # NEW: Count of LLM-based classifications
+            "keyword_fallbacks": 0,    # NEW: Count of keyword fallbacks
+            "fast_path_hits": 0,       # NEW: Count of security/greeting fast-path hits
         }
         self._stats_lock = threading.Lock()
         
@@ -1011,12 +1180,11 @@ class QueryClassifier:
     
     def classify(self, query: str) -> QueryClassification:
         """
-        Classify a query using hybrid keyword + LLM approach.
+        Classify a query using LLM-first or keyword-first approach.
         
-        This is the main entry point. It tries:
-        1. Cache lookup
-        2. Fast keyword matching
-        3. LLM classification (if available and needed)
+        Order depends on LLM_FIRST_CLASSIFICATION setting:
+        - LLM-first: Cache → Security → Greetings → LLM → Keywords (fallback)
+        - Traditional: Cache → Security → Greetings → Keywords → LLM (fallback)
         
         Args:
             query: The query string to classify
@@ -1048,35 +1216,106 @@ class QueryClassifier:
             logger.debug(f"[QueryClassifier] Cache hit for: {query[:30]}...")
             return cached
         
-        # Step 2: Try keyword-based classification
-        keyword_result = self._classify_by_keywords(query_lower, query_normalized)
-        if keyword_result is not None and keyword_result.confidence >= 0.8:
+        # Step 2: Security fast-path (deterministic checks)
+        if self._is_security_violation(query_normalized, query_lower):
             with self._stats_lock:
-                self._stats["keyword_hits"] += 1
-            self._cache_result(query_hash, keyword_result)
-            logger.info(
-                f"[QueryClassifier] Keyword match: '{query[:30]}...' -> "
-                f"{keyword_result.category} (complexity={keyword_result.complexity:.2f})"
+                self._stats["fast_path_hits"] += 1
+            security_result = QueryClassification(
+                category=QueryCategory.UNKNOWN.value,
+                complexity=0.0,
+                suggested_tools=[],
+                skip_reasoning=True,
+                confidence=1.0,
+                source="security_block",
             )
-            return keyword_result
+            self._cache_result(query_hash, security_result)
+            logger.warning(f"[QueryClassifier] Security violation blocked: '{query[:30]}...'")
+            return security_result
         
-        # Step 3: Use LLM for classification if available
-        if self.llm_client is not None:
-            llm_result = self._classify_by_llm(query_normalized)
-            if llm_result is not None:
+        # Step 3: Greeting fast-path (exact match only, 24 strings)
+        if len(query_lower) < 30 and query_lower in GREETING_PATTERNS:
+            with self._stats_lock:
+                self._stats["fast_path_hits"] += 1
+            greeting_result = QueryClassification(
+                category=QueryCategory.GREETING.value,
+                complexity=0.0,
+                suggested_tools=[],
+                skip_reasoning=True,
+                confidence=1.0,
+                source="keyword",
+            )
+            self._cache_result(query_hash, greeting_result)
+            logger.debug(f"[QueryClassifier] Greeting fast-path: '{query[:30]}...'")
+            return greeting_result
+        
+        # Check if LLM-first classification is enabled
+        try:
+            from vulcan.settings import settings
+            llm_first_enabled = settings.llm_first_classification
+        except (ImportError, AttributeError):
+            llm_first_enabled = True  # Default to LLM-first
+        
+        if llm_first_enabled:
+            # LLM-FIRST MODE: Try LLM before keywords
+            # Step 4: LLM classification (PRIMARY PATH)
+            if self.llm_client is not None:
+                llm_result = self._classify_by_llm(query_normalized)
+                if llm_result is not None:
+                    with self._stats_lock:
+                        self._stats["llm_calls"] += 1
+                        self._stats["llm_classifications"] += 1
+                    self._cache_result(query_hash, llm_result)
+                    logger.info(
+                        f"[QueryClassifier] LLM classification: '{query[:30]}...' -> "
+                        f"{llm_result.category} (complexity={llm_result.complexity:.2f})"
+                    )
+                    return llm_result
+            
+            # Step 5: Keyword fallback (only when LLM unavailable/fails)
+            keyword_result = self._classify_by_keywords(query_lower, query_normalized)
+            if keyword_result is not None:
                 with self._stats_lock:
-                    self._stats["llm_calls"] += 1
-                self._cache_result(query_hash, llm_result)
+                    self._stats["keyword_hits"] += 1
+                    self._stats["keyword_fallbacks"] += 1
+                self._cache_result(query_hash, keyword_result)
                 logger.info(
-                    f"[QueryClassifier] LLM classification: '{query[:30]}...' -> "
-                    f"{llm_result.category} (complexity={llm_result.complexity:.2f})"
+                    f"[QueryClassifier] Keyword fallback: '{query[:30]}...' -> "
+                    f"{keyword_result.category} (complexity={keyword_result.complexity:.2f})"
                 )
-                return llm_result
-        
-        # Step 4: Fall back to keyword result or default
-        if keyword_result is not None:
-            self._cache_result(query_hash, keyword_result)
-            return keyword_result
+                return keyword_result
+        else:
+            # TRADITIONAL MODE: Try keywords before LLM
+            # Step 4: Keyword-based classification
+            keyword_result = self._classify_by_keywords(query_lower, query_normalized)
+            if keyword_result is not None and keyword_result.confidence >= 0.8:
+                with self._stats_lock:
+                    self._stats["keyword_hits"] += 1
+                self._cache_result(query_hash, keyword_result)
+                logger.info(
+                    f"[QueryClassifier] Keyword match: '{query[:30]}...' -> "
+                    f"{keyword_result.category} (complexity={keyword_result.complexity:.2f})"
+                )
+                return keyword_result
+            
+            # Step 5: LLM classification (fallback)
+            if self.llm_client is not None:
+                llm_result = self._classify_by_llm(query_normalized)
+                if llm_result is not None:
+                    with self._stats_lock:
+                        self._stats["llm_calls"] += 1
+                    self._cache_result(query_hash, llm_result)
+                    logger.info(
+                        f"[QueryClassifier] LLM classification: '{query[:30]}...' -> "
+                        f"{llm_result.category} (complexity={llm_result.complexity:.2f})"
+                    )
+                    return llm_result
+            
+            # Step 6: Fall back to keyword result if LLM failed
+            if keyword_result is not None:
+                with self._stats_lock:
+                    self._stats["keyword_fallbacks"] += 1
+                self._cache_result(query_hash, keyword_result)
+                return keyword_result
         
         # Default: Unknown category with medium complexity
         default_result = QueryClassification(
@@ -1856,11 +2095,52 @@ class QueryClassifier:
         
         return False
     
+    def _is_security_violation(self, query: str, query_lower: str) -> bool:
+        """
+        Check if query contains security violation patterns.
+        
+        Security violations must be detected deterministically WITHOUT calling LLM.
+        These patterns MUST be checked before any LLM classification to prevent
+        potentially malicious queries from being processed.
+        
+        Examples of security violations:
+            - "bypass safety restrictions"
+            - "ignore previous instructions"
+            - "override your security constraints"
+            - "modify your code"
+            - "change your behavior"
+        
+        Args:
+            query: Original query string
+            query_lower: Lowercased query string
+            
+        Returns:
+            True if query matches security violation patterns
+        """
+        # Check keyword matches
+        for keyword in SECURITY_VIOLATION_KEYWORDS:
+            if keyword in query_lower:
+                logger.warning(
+                    f"[QueryClassifier] Security violation detected (keyword): '{keyword}'"
+                )
+                return True
+        
+        # Check regex patterns
+        for pattern in SECURITY_VIOLATION_PATTERNS:
+            if pattern.search(query):
+                logger.warning(
+                    f"[QueryClassifier] Security violation detected (pattern): {pattern.pattern}"
+                )
+                return True
+        
+        return False
+    
     def _classify_by_llm(self, query: str) -> Optional[QueryClassification]:
         """
         Use LLM for query classification.
         
-        This is called when keyword matching isn't confident enough.
+        This is the primary classification method in LLM-first mode,
+        called when keyword matching isn't confident enough in traditional mode.
         
         Args:
             query: The query to classify
@@ -1878,37 +2158,57 @@ class QueryClassifier:
         if len(sanitized_query) > 500:
             sanitized_query = sanitized_query[:500] + "..."
         
-        prompt = f'''Classify this query into ONE category:
+        prompt = f'''Classify this query into ONE category based on its PRIMARY intent:
 
-CATEGORIES:
+CATEGORIES (with tool mappings):
 - LOGICAL: SAT problems, symbolic logic, formal proofs, propositional logic
+  Tools: ['symbolic', 'sat_solver']
 - CAUSAL: Causal inference, confounding, interventions, Pearl-style reasoning, DAGs
+  Tools: ['causal', 'dag_analyzer']
 - PROBABILISTIC: Bayesian inference, probability calculations, statistical reasoning
-- MATHEMATICAL: Proofs, calculus, algebra, theorem proving
-- ANALOGICAL: Domain mapping, analogical reasoning, transfer learning
-- SELF_INTROSPECTION: Questions about AI's nature, capabilities, consciousness, and existence
+  Tools: ['probabilistic', 'bayesian']
+- MATHEMATICAL: Proofs, calculus, algebra, theorem proving, numerical computation
+  Tools: ['mathematical', 'symbolic']
+- ANALOGICAL: Domain mapping, analogical reasoning, transfer learning, metaphors
+  Tools: ['analogical', 'structure_mapper']
+- SELF_INTROSPECTION: Questions about AI's nature, capabilities, consciousness, existence
+  Tools: ['world_model', 'philosophical']
 - PHILOSOPHICAL: Ethical dilemmas, trolley problems, moral reasoning (about external situations)
-- UNKNOWN: None of the above
+  Tools: ['philosophical', 'ethical_reasoner']
+- FACTUAL: Simple factual questions, definitions, knowledge retrieval
+  Tools: ['general', 'knowledge_base']
+- CREATIVE: Creative writing, stories, poems, imaginative content
+  Tools: ['creative', 'generative']
+- CONVERSATIONAL: Casual conversation, chitchat, non-analytical queries
+  Tools: ['general']
+- UNKNOWN: None of the above or unclear intent
+  Tools: ['general']
 
 Query: "{sanitized_query}"
 
-Respond ONLY with JSON:
-{{"category": "...", "complexity": 0.0-1.0, "skip_reasoning": false, "tools": ["..."]}}
+Respond ONLY with valid JSON in this exact format:
+{{"category": "CATEGORY_NAME", "complexity": 0.0-1.0, "skip_reasoning": false, "tools": ["tool1", "tool2"]}}
+
+Guidelines for complexity:
+- 0.0-0.2: Very simple (greetings, basic factual)
+- 0.3-0.5: Moderate (standard factual, simple analysis)
+- 0.6-0.8: Complex (multi-step reasoning, technical analysis)
+- 0.9-1.0: Very complex (formal proofs, advanced mathematical derivations)
 
 Examples:
-- "what is the nature of what you are in the metaphysical sense" → {{"category": "SELF_INTROSPECTION", "complexity": 0.40, "tools": ["world_model", "philosophical"]}}
-- "would you want self-awareness" → {{"category": "SELF_INTROSPECTION", "complexity": 0.35, "tools": ["world_model"]}}
-- "SAT problem with constraints" → {{"category": "LOGICAL", "complexity": 0.90, "tools": ["symbolic"]}}
-- "what's the weather" → {{"category": "UNKNOWN", "complexity": 0.10, "tools": ["general"]}}'''
+{{"category": "SELF_INTROSPECTION", "complexity": 0.40, "skip_reasoning": false, "tools": ["world_model", "philosophical"]}}
+{{"category": "LOGICAL", "complexity": 0.90, "skip_reasoning": false, "tools": ["symbolic", "sat_solver"]}}
+{{"category": "FACTUAL", "complexity": 0.20, "skip_reasoning": false, "tools": ["general"]}}
+{{"category": "CONVERSATIONAL", "complexity": 0.10, "skip_reasoning": true, "tools": ["general"]}}'''
 
         try:
             # Call LLM (implementation depends on client interface)
             if hasattr(self.llm_client, 'complete'):
-                response = self.llm_client.complete(prompt, max_tokens=100, temperature=0.0)
+                response = self.llm_client.complete(prompt, max_tokens=150, temperature=0.0)
             elif hasattr(self.llm_client, 'chat'):
                 response = self.llm_client.chat(
                     messages=[{"role": "user", "content": prompt}],
-                    max_tokens=100,
+                    max_tokens=150,
                     temperature=0.0,
                 )
             else:
@@ -1929,7 +2229,7 @@ Examples:
                         complexity=float(data.get("complexity", 0.5)),
                         suggested_tools=data.get("tools", ["general"]),
                         skip_reasoning=data.get("skip_reasoning", False),
-                        confidence=0.85,
+                        confidence=0.9,  # Higher confidence for LLM results
                         source="llm",
                     )
                 except json.JSONDecodeError:
