@@ -1015,63 +1015,101 @@ result = simplify(integral)
             # Skip logic pattern rejection - this is explicit math
         else:
             # =================================================================
-            # Note (CRITICAL): PRIORITY 0 - Reject non-mathematical queries
+            # FIX Issue #3: Check for MATH PROOF indicators BEFORE rejecting
             # =================================================================
-            # These patterns indicate queries that should NOT be processed by the
-            # math engine, even if they contain math-related words like "proof"
-            # or "function". Return None early to prevent nonsensical output.
-            #
-            # Examples:
-            # - "Is {A→B, B→C, ¬C, A∨B} satisfiable?" -> Logic query, not math
-            # - "Verify proof about differentiable functions" -> Proof verification, not computation
-            # - "Formalize in FOL" -> First-order logic, not math
+            # Problem: Queries like "Verify this calculus proof" were being rejected
+            # as "logic patterns" because they contain "verify proof".
+            # 
+            # Solution: Check for mathematical proof indicators (calculus, analysis,
+            # continuity, limits, derivatives, etc.) BEFORE rejecting as logic.
+            # Only reject queries that are PURE logic without math content.
             # =================================================================
-            # ROOT CAUSE FIX: Expanded logic patterns to catch more cases
-            logic_patterns = [
-                # Propositional logic symbols
-                '→', '∧', '∨', '¬', '⊢', '⊨', '⇒', '⇔',
-                # Propositional logic keywords
-                'satisfiable', 'unsatisfiable', 'tautology', 'contradiction',
-                'propositional', 'boolean', 'truth table', 'truth value',
-                # First-order logic symbols
-                '∀', '∃',
-                # First-order logic keywords
-                'forall', 'exists', 'formalize', 'fol', 
-                'first-order logic', 'first order logic',
-                'predicate', 'quantifier', 'universal quantifier', 'existential',
-                # Proof theory - ROOT CAUSE FIX: Added missing patterns
-                'prove that', 'prove the', 'proof that', 'proof of',
-                'verify proof', 'check proof', 'is the proof valid',
-                'proof is valid', 'proof is invalid',
-                'theorem', 'axiom', 'lemma', 'corollary',
-                # Logic validation - ROOT CAUSE FIX: Added
-                'is valid', 'is invalid', 'validity',
-                'sound', 'soundness', 'complete', 'completeness',
-                'entails', 'implies that', 'logically follows',
-                # Model theory - ROOT CAUSE FIX: Added
-                'interpretation', 'model of', 'satisfies',
-                'consistent', 'inconsistent', 'consistency',
-                # SAT/SMT
-                'sat problem', 'sat solver', 'smt',
-                # Self-introspection queries (not math!)
-                'what makes you', 'who are you', 'are you', 'your capabilities',
-                'how do you', 'your reasoning', 'your architecture',
+            
+            math_proof_indicators = [
+                # Calculus and analysis
+                'differentiable', 'continuous', 'continuity', 'limit', 'lim',
+                'derivative', 'integral', 'convergence', 'divergence',
+                # Mathematical notation
+                'f(x)', 'g(x)', 'x→', 'd/dx', 'dy/dx',
+                # Mathematical verification (NOT logic verification)
+                'mathematical verification', 'calculus proof', 'analysis proof',
+                'limit proof', 'derivative proof', 'integral proof',
+                # Mathematical concepts
+                'epsilon', 'delta', 'epsilon-delta',
+                'cauchy', 'weierstrass', 'riemann',
+                # General mathematical context
+                'calculus', 'analysis', 'topology', 'measure theory',
             ]
             
-            if any(pattern in query_lower for pattern in logic_patterns):
-                logger.info(
-                    f"[MathTool] Note: Query contains logic patterns, not mathematical. "
-                    f"Declining to compute. Query: {query[:80]}..."
-                )
-                return None
+            # Check if this is a mathematical proof verification
+            has_math_proof_indicators = any(
+                indicator in query_lower for indicator in math_proof_indicators
+            )
             
-            # Also check for logic symbols in original query (case-sensitive)
-            if any(sym in query for sym in ['→', '∧', '∨', '¬', '∀', '∃', '⊢', '⊨', '⇒', '⇔']):
+            if has_math_proof_indicators:
                 logger.info(
-                    f"[MathTool] Note: Query contains logic symbols. "
-                    f"Declining to compute. Query: {query[:80]}..."
+                    f"[MathTool] FIX Issue #3: Detected mathematical proof indicators - "
+                    f"proceeding with verification despite 'proof' keyword. Query: {query[:80]}..."
                 )
-                return None
+                # Continue to mathematical processing - don't reject
+            else:
+                # =================================================================
+                # Note (CRITICAL): PRIORITY 0 - Reject non-mathematical queries
+                # =================================================================
+                # These patterns indicate queries that should NOT be processed by the
+                # math engine, even if they contain math-related words like "proof"
+                # or "function". Return None early to prevent nonsensical output.
+                #
+                # Examples:
+                # - "Is {A→B, B→C, ¬C, A∨B} satisfiable?" -> Logic query, not math
+                # - "Verify proof about predicate logic" -> Logic verification, not math
+                # - "Formalize in FOL" -> First-order logic, not math
+                # =================================================================
+                # ROOT CAUSE FIX: Expanded logic patterns to catch more cases
+                logic_patterns = [
+                    # Propositional logic symbols
+                    '→', '∧', '∨', '¬', '⊢', '⊨', '⇒', '⇔',
+                    # Propositional logic keywords
+                    'satisfiable', 'unsatisfiable', 'tautology', 'contradiction',
+                    'propositional', 'boolean', 'truth table', 'truth value',
+                    # First-order logic symbols
+                    '∀', '∃',
+                    # First-order logic keywords
+                    'forall', 'exists', 'formalize', 'fol', 
+                    'first-order logic', 'first order logic',
+                    'predicate logic', 'quantifier', 'universal quantifier', 'existential',
+                    # FIX Issue #3: Only reject PURE logic proofs (not math proofs)
+                    # Removed generic "prove that", "verify proof" - only reject if no math indicators
+                    'logic proof', 'logical proof', 'proof of logic',
+                    'theorem in logic', 'axiom of logic', 'logical axiom',
+                    # Logic validation - ROOT CAUSE FIX: Added
+                    'logically valid', 'logically invalid', 'logical validity',
+                    'logical soundness', 'logical completeness',
+                    'entails', 'logically follows',
+                    # Model theory - ROOT CAUSE FIX: Added
+                    'interpretation', 'model of', 'satisfies',
+                    'consistent', 'inconsistent', 'consistency',
+                    # SAT/SMT
+                    'sat problem', 'sat solver', 'smt',
+                    # Self-introspection queries (not math!)
+                    'what makes you', 'who are you', 'are you', 'your capabilities',
+                    'how do you', 'your reasoning', 'your architecture',
+                ]
+                
+                if any(pattern in query_lower for pattern in logic_patterns):
+                    logger.info(
+                        f"[MathTool] Note: Query contains logic patterns, not mathematical. "
+                        f"Declining to compute. Query: {query[:80]}..."
+                    )
+                    return None
+                
+                # Also check for logic symbols in original query (case-sensitive)
+                if any(sym in query for sym in ['→', '∧', '∨', '¬', '∀', '∃', '⊢', '⊨', '⇒', '⇔']):
+                    logger.info(
+                        f"[MathTool] Note: Query contains logic symbols. "
+                        f"Declining to compute. Query: {query[:80]}..."
+                    )
+                    return None
         
         # =================================================================
         # BUG #2 FIX: PRIORITY 0.5 - Simple arithmetic expressions
