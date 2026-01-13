@@ -269,6 +269,28 @@ except ImportError as e:
     clear_embedding_cache = None
     clear_and_rebuild_embedding_cache = None
 
+# Query Classifier
+try:
+    from .query_classifier import (
+        QueryClassifier,
+        QueryCategory,
+        QueryClassification,
+        get_query_classifier,
+        classify_query,
+        _LLMClientWrapper,
+    )
+    
+    QUERY_CLASSIFIER_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"Query classifier module not available: {e}")
+    QUERY_CLASSIFIER_AVAILABLE = False
+    QueryClassifier = None
+    QueryCategory = None
+    QueryClassification = None
+    get_query_classifier = None
+    classify_query = None
+    _LLMClientWrapper = None
+
 
 # ============================================================
 # MODULE INITIALIZATION
@@ -478,6 +500,14 @@ __all__ = [
     "clear_embedding_cache",
     "clear_and_rebuild_embedding_cache",  # FIX: Cache corruption recovery
     "EMBEDDING_CACHE_AVAILABLE",
+    # Query Classifier
+    "QueryClassifier",
+    "QueryCategory",
+    "QueryClassification",
+    "get_query_classifier",
+    "classify_query",
+    "_LLMClientWrapper",
+    "QUERY_CLASSIFIER_AVAILABLE",
     # Module functions
     "initialize_routing_components",
     "get_routing_status",

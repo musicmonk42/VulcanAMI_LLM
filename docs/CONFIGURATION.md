@@ -97,6 +97,9 @@ query routing delays, cascade timeouts, and learning system issues.
 | OPENAI_LANGUAGE_ONLY | No | Restrict OpenAI to language-only operations | "true" |
 | OPENAI_LANGUAGE_FORMATTING | No | Route output formatting to OpenAI (fast ~2-5s) | "true" |
 | OPENAI_LANGUAGE_POLISH | No | Enable OpenAI for output polishing (legacy) | "false" |
+| LLM_FIRST_CLASSIFICATION | No | Use LLM before keywords for query classification | "true" |
+| CLASSIFICATION_LLM_TIMEOUT | No | Timeout for LLM classification requests (seconds) | "3.0" |
+| CLASSIFICATION_LLM_MODEL | No | Model to use for query classification | "gpt-4o-mini" |
 
 **Performance Tuning Notes:**
 
@@ -157,6 +160,37 @@ generation - converting VULCAN's reasoning results into natural language prose.
   the internal LLM's language output. Both serve the same conceptual role -
   language generation from VULCAN's reasoning results. OPENAI_LANGUAGE_FORMATTING
   is the preferred option (replaces this).
+
+**LLM-First Query Classification:**
+
+VULCAN now supports LLM-first query classification for improved semantic understanding
+of user queries. This feature addresses the "brittleness" of keyword-based classification.
+
+- **LLM_FIRST_CLASSIFICATION**: When "true" (default), uses LLM for query classification
+  BEFORE falling back to keyword matching. Classification order:
+  * Cache lookup (instant)
+  * Security fast-path (deterministic, blocks malicious queries)
+  * Greeting fast-path (exact match, 24 patterns, 0ms latency)
+  * **LLM classification (PRIMARY - semantic understanding)**
+  * Keyword fallback (when LLM unavailable/times out)
+  * Default UNKNOWN
+  
+  When "false", uses traditional keyword-first approach with LLM as fallback.
+
+- **CLASSIFICATION_LLM_TIMEOUT**: Maximum time (3.0 seconds) for LLM classification
+  requests. Short timeout prevents classification from blocking query processing.
+  LLM calls that exceed this timeout gracefully fall back to keyword matching.
+
+- **CLASSIFICATION_LLM_MODEL**: Model to use for classification. Default is "gpt-4o-mini"
+  which provides fast, cost-effective classification with good accuracy. Alternative
+  models: "gpt-4o", "claude-3-haiku-20240307".
+
+**Key Benefits:**
+- Better semantic understanding of complex queries
+- Reduces misclassification from keyword pattern matching
+- Security violations are blocked deterministically (never sent to LLM)
+- Greetings use fast-path (no LLM call overhead)
+- All results cached to prevent repeated LLM calls
 
 ## 3. Profiles
 development:

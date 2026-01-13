@@ -157,6 +157,15 @@ llm:
   anthropic:
     enabled: false
     # API key must be set via secrets (see secrets.anthropicApiKey)
+  # Query Classification Configuration (NEW FEATURE)
+  # LLM-first classification for improved semantic understanding
+  classification:
+    # Enable LLM-first classification (LLM before keywords)
+    llmFirst: true
+    # Timeout for LLM classification requests (seconds)
+    timeout: 3.0
+    # Model to use for classification (fast and cost-effective)
+    model: "gpt-4o-mini"
   # Self-improvement configuration
   selfImprovement:
     enabled: false
