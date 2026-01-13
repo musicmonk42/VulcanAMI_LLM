@@ -23,6 +23,7 @@ import asyncio
 import os
 import sys
 import time
+import shutil
 from pathlib import Path
 
 # Get the directory of the current script (src/)
@@ -471,6 +472,9 @@ MAX_NODES = 10000  # Note: Added max node count for validation
 MAX_REBERT_THRESHOLD = 0.5
 MIN_REBERT_THRESHOLD = 0.0
 
+# Byte conversion constants
+BYTES_PER_MB = 1024 * 1024  # 1 MB in bytes
+
 # Reasoning integration constants
 MAX_REASONING_QUERY_LENGTH = 2000  # Maximum characters for reasoning query input
 REASONING_COMPLEXITY_BASE = 0.3  # Base complexity score
@@ -503,6 +507,9 @@ def _is_limited_shm_environment() -> bool:
     Returns:
         True if running in an environment with limited /dev/shm, False otherwise.
     """
+    # Minimum /dev/shm size required for Ray (500MB)
+    MIN_SHM_SIZE_MB = 500
+    
     # Check for cloud platform environment variables
     cloud_platforms = [
         "RAILWAY_ENVIRONMENT",      # Railway
@@ -521,14 +528,13 @@ def _is_limited_shm_environment() -> bool:
     
     # Check actual /dev/shm size on Linux
     try:
-        import shutil
         shm_path = "/dev/shm"
         if os.path.exists(shm_path):
             total, used, free = shutil.disk_usage(shm_path)
-            # If /dev/shm is less than 500MB, consider it limited
+            # If /dev/shm is less than MIN_SHM_SIZE_MB, consider it limited
             # Ray recommends at least 30% of available RAM (typically several GB)
-            if total < 500 * 1024 * 1024:  # 500MB
-                logger.debug(f"/dev/shm has only {total / (1024*1024):.0f}MB - considered limited")
+            if total < MIN_SHM_SIZE_MB * BYTES_PER_MB:
+                logger.debug(f"/dev/shm has only {total / BYTES_PER_MB:.0f}MB - considered limited")
                 return True
     except Exception:
         pass  # Can't check, assume not limited
