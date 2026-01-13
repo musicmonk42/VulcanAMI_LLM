@@ -3491,6 +3491,37 @@ class UnifiedReasoner:
         """Execute a single reasoning task"""
 
         try:
+            # =========================================================
+            # CRITICAL FIX: Check if task has explicit tool selection
+            # =========================================================
+            # If the task has selected_tools from QueryRouter/QueryClassifier,
+            # those should override the task_type mapping. This ensures queries
+            # route to the correct reasoning engine (e.g., SAT → SymbolicReasoner
+            # instead of MathematicalComputationTool).
+            # =========================================================
+            if task.query and isinstance(task.query, dict):
+                selected_tools = task.query.get('selected_tools', []) or task.query.get('tools', [])
+                if selected_tools:
+                    primary_tool = selected_tools[0].lower()
+                    tool_type_map = {
+                        'symbolic': ReasoningType.SYMBOLIC,
+                        'probabilistic': ReasoningType.PROBABILISTIC,
+                        'causal': ReasoningType.CAUSAL,
+                        'analogical': ReasoningType.ANALOGICAL,
+                        'mathematical': ReasoningType.MATHEMATICAL,
+                        'philosophical': ReasoningType.PHILOSOPHICAL,
+                        'world_model': ReasoningType.PHILOSOPHICAL,
+                        'general': ReasoningType.SYMBOLIC,
+                        'multimodal': ReasoningType.MULTIMODAL,
+                    }
+                    if primary_tool in tool_type_map:
+                        original_type = task.task_type
+                        task.task_type = tool_type_map[primary_tool]
+                        logger.info(
+                            f"[UnifiedReasoner] Task {task.task_id}: Overriding task_type "
+                            f"{original_type} → {task.task_type} based on selected_tools={selected_tools}"
+                        )
+            
             if task.task_type in self.reasoners:
                 reasoner = self.reasoners[task.task_type]
                 return self._execute_reasoner(reasoner, task)

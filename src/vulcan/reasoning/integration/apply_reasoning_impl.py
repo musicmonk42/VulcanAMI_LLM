@@ -488,6 +488,24 @@ def apply_reasoning(
                         context['is_self_introspection'] = True
                         context['original_query_type'] = original_query_type  # FIX: Track original for debugging
                 
+                # =================================================================
+                # CRITICAL FIX: Mark classifier suggestions as authoritative for 
+                # specialized reasoning categories
+                # =================================================================
+                # When the classifier identifies a query as PROBABILISTIC, CAUSAL,
+                # SYMBOLIC, etc., these selections should ALWAYS be respected and
+                # NEVER be overridden by task_type mapping in agent_pool.py
+                # =================================================================
+                elif classification.category in REASONING_CATEGORIES:
+                    if context is None:
+                        context = {}
+                    context['classifier_is_authoritative'] = True
+                    context['prevent_task_type_override'] = True
+                    logger.info(
+                        f"{LOG_PREFIX} Reasoning category {classification.category} detected - "
+                        f"marking classifier as authoritative with tools={classification.suggested_tools}"
+                    )
+                
                 elif classification.category in SIMPLE_QUERY_CATEGORIES:
                     # =================================================================
                     # FIX: Check if we should override or respect classifier's tools
