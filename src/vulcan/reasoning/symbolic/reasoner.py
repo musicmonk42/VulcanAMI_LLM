@@ -296,6 +296,26 @@ class SymbolicReasoner:
         if prop_pattern:
             return True
         
+        # FIX (Jan 13 2026): Detect structured constraint listings that mix natural language with formal symbols
+        # Patterns like:
+        #   "Propositions: A,B,C\nConstraints: A→B, B→C, ¬C"
+        #   "Given: A, B, C\nRules: A implies B, not C"
+        # These are SAT problems expressed with structured natural language formatting
+        structured_listing_pattern = re.search(
+            r'(proposition|constraint|given|rule|axiom|premise)s?\s*[:]\s*[A-Z]',
+            query,
+            re.IGNORECASE
+        )
+        if structured_listing_pattern:
+            # Double-check that it contains formal symbols or logic operators
+            has_formal_elements = (
+                any(sym in query for sym in logic_symbols) or
+                any(op in query for op in ascii_logic) or
+                re.search(r'\b[A-Z]\s*,\s*[A-Z]', query)  # Multiple propositional variables
+            )
+            if has_formal_elements:
+                return True
+        
         return False
 
     def check_applicability(self, query: str) -> Dict[str, Any]:

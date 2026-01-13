@@ -3709,19 +3709,24 @@ class ToolSelector:
     # Class-level compiled regex patterns for keyword matching (cached for performance)
     # These are compiled once when the class is loaded, not on every method call
     _MATH_PATTERN = re.compile(
-        r'p\(a\|b\)|p\(a and b\)|bayesian|bayes theorem|'
+        r'p\(a\|b\)|p\(a\∣b\)|p\(a and b\)|bayesian|bayes theorem|bayes rule|'
         r'calculate probability|compute probability|prior probability|'
-        r'posterior probability|likelihood ratio|conditional probability',
+        r'posterior probability|likelihood ratio|conditional probability|'
+        r'sensitivity|specificity|prevalence|'
+        r'p\([^)]*\|[^)]*\)|p\([^)]*\∣[^)]*\)',  # Match P(X|Y) or P(X∣Y) with Unicode
         re.IGNORECASE
     )
     _SAT_PATTERN = re.compile(
         r'satisfiable|sat solver|cnf formula|first-order logic|'
-        r'predicate logic|forall|exists|∀|∃',
+        r'predicate logic|forall|exists|∀|∃|'
+        r'proposition|constraint.*satisf|'
+        r'logical.*satisf|cnf|dnf',
         re.IGNORECASE
     )
     _CAUSAL_PATTERN = re.compile(
         r'causal graph|causal model|do-calculus|confounding variable|'
-        r'intervention do\(|backdoor criterion|frontdoor criterion',
+        r'intervention do\(|backdoor criterion|frontdoor criterion|'
+        r'causal.*infer|causal.*effect|confounder|confounding',
         re.IGNORECASE
     )
 
@@ -5368,6 +5373,63 @@ class ToolSelector:
         
         # Default: just run the best tool
         return ExecutionStrategy.SINGLE
+
+    def _execute_with_selected_tools(
+        self,
+        request: SelectionRequest,
+        candidates: List[Dict[str, Any]],
+        features: np.ndarray,
+        start_time: float,
+    ) -> SelectionResult:
+        """Execute reasoning with pre-selected tools (e.g., from keyword override).
+        
+        This method is called when tools are selected via keyword patterns
+        or other override mechanisms, bypassing the normal candidate generation.
+        It uses the existing execution pipeline to run the selected tools.
+        
+        Args:
+            request: The selection request
+            candidates: List of pre-selected tool candidates with utilities
+            features: Extracted features for the request
+            start_time: Start time for tracking execution duration
+            
+        Returns:
+            SelectionResult with execution results
+        """
+        try:
+            # Ensure features are set on request
+            request.features = features
+            
+            # Select execution strategy based on candidates
+            strategy = self._select_strategy(request, candidates)
+            
+            # Execute the portfolio with selected tools
+            execution_result = self._execute_portfolio(request, candidates, strategy)
+            
+            # Post-process the results
+            final_result = self._postprocess_result(request, execution_result, start_time)
+            
+            # Update learning system if enabled
+            if self.config.get("learning_enabled"):
+                self._update_learning(request, final_result)
+            
+            # Cache result if enabled
+            if self.config.get("cache_enabled"):
+                self._cache_result(request, final_result)
+            
+            # Update statistics
+            self._update_statistics(final_result)
+            
+            logger.info(
+                f"[ToolSelector] Executed with pre-selected tools: "
+                f"{[c['tool'] for c in candidates]} (confidence={final_result.calibrated_confidence:.3f})"
+            )
+            
+            return final_result
+            
+        except Exception as e:
+            logger.error(f"[ToolSelector] Execution with selected tools failed: {e}", exc_info=True)
+            return self._create_failure_result()
 
     def _execute_portfolio(
         self,
