@@ -1760,7 +1760,13 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
             direct_conclusion = _normalize_conclusion_to_string(direct_conclusion)
             
             # Unified reasoning
-            if unified_conclusion is not None and isinstance(unified_conclusion, str) and unified_conclusion.strip():
+            # Issue #6 FIX: Skip not_applicable results - they shouldn't count against confidence
+            unified_is_not_applicable = (
+                unified.get("not_applicable") is True or 
+                unified.get("applicable") is False
+            )
+            if (unified_conclusion is not None and isinstance(unified_conclusion, str) and 
+                unified_conclusion.strip() and not unified_is_not_applicable):
                 candidates.append({
                     'source': 'unified',
                     'conclusion': unified_conclusion,
@@ -1768,9 +1774,20 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
                     'reasoning_type': unified.get("reasoning_type", "unknown"),
                     'explanation': unified.get("explanation", ""),
                 })
+            elif unified_is_not_applicable:
+                logger.debug(
+                    f"[VULCAN] Issue #6 FIX: Skipping unified reasoning result "
+                    f"(not_applicable=True) - will try next engine"
+                )
             
             # Agent reasoning
-            if agent_conclusion is not None and isinstance(agent_conclusion, str) and agent_conclusion.strip():
+            # Issue #6 FIX: Skip not_applicable results
+            agent_is_not_applicable = (
+                agent.get("not_applicable") is True or 
+                agent.get("applicable") is False
+            )
+            if (agent_conclusion is not None and isinstance(agent_conclusion, str) and 
+                agent_conclusion.strip() and not agent_is_not_applicable):
                 candidates.append({
                     'source': 'agent',
                     'conclusion': agent_conclusion,
@@ -1778,9 +1795,20 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
                     'reasoning_type': agent.get("reasoning_type", "unknown"),
                     'explanation': agent.get("explanation", ""),
                 })
+            elif agent_is_not_applicable:
+                logger.debug(
+                    f"[VULCAN] Issue #6 FIX: Skipping agent reasoning result "
+                    f"(not_applicable=True) - will try next engine"
+                )
             
             # Direct reasoning
-            if direct_conclusion is not None and isinstance(direct_conclusion, str) and direct_conclusion.strip():
+            # Issue #6 FIX: Skip not_applicable results
+            direct_is_not_applicable = (
+                direct.get("not_applicable") is True or 
+                direct.get("applicable") is False
+            )
+            if (direct_conclusion is not None and isinstance(direct_conclusion, str) and 
+                direct_conclusion.strip() and not direct_is_not_applicable):
                 candidates.append({
                     'source': 'direct',
                     'conclusion': direct_conclusion,
@@ -1788,6 +1816,11 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
                     'reasoning_type': direct.get("reasoning_type", "unknown"),
                     'explanation': direct.get("explanation", ""),
                 })
+            elif direct_is_not_applicable:
+                logger.debug(
+                    f"[VULCAN] Issue #6 FIX: Skipping direct reasoning result "
+                    f"(not_applicable=True) - will try next engine"
+                )
             
             # Select best candidate: highest confidence among those with valid content
             # Use defensive programming: explicit check before max() to prevent ValueError

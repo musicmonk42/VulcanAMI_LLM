@@ -2344,6 +2344,15 @@ class CuriosityEngine:
 
             # Note: Filter gaps to prevent accumulation
             gaps = self._filter_gaps_with_resolution(raw_gaps)
+            
+            # FIX OPERATIONAL: Inject synthetic gaps if no real gaps found
+            # This prevents the curiosity engine from going dormant
+            if len(gaps) == 0:
+                logger.info(
+                    "[CuriosityEngine] FIX OPERATIONAL: No real gaps found, "
+                    "injecting synthetic gaps to maintain learning"
+                )
+                gaps = self.inject_synthetic_gaps()
 
             # APPLY: Add to dependency graph
             for gap in gaps:
@@ -2368,6 +2377,49 @@ class CuriosityEngine:
             return gaps
         except Exception as e:
             logger.error("Error identifying gaps: %s", e)
+            return []
+
+    def inject_synthetic_gaps(self) -> List[KnowledgeGap]:
+        """
+        FIX OPERATIONAL: Inject synthetic knowledge gaps to prevent prolonged dormancy.
+        
+        When the system can't find real gaps and enters dormant mode, this generates
+        synthetic gaps to maintain continuous learning and exploration.
+        
+        Returns:
+            List of synthetic knowledge gaps for exploration
+        """
+        synthetic_gaps = []
+        
+        try:
+            # Generate synthetic gaps for different domains
+            synthetic_domains = [
+                ("reasoning_efficiency", "Optimize reasoning pathway selection"),
+                ("error_pattern_analysis", "Analyze error patterns in recent queries"),
+                ("knowledge_consolidation", "Consolidate fragmented knowledge"),
+                ("unexplored_domains", "Explore underutilized reasoning capabilities"),
+            ]
+            
+            for domain, description in synthetic_domains:
+                gap = KnowledgeGap(
+                    type="exploration",
+                    description=f"Synthetic gap: {description}",
+                    estimated_difficulty=0.3,
+                    estimated_cost=10.0,
+                    expected_reward=5.0,
+                    domain=domain,
+                    priority=0.4,
+                )
+                synthetic_gaps.append(gap)
+            
+            logger.info(
+                f"[CuriosityEngine] FIX OPERATIONAL: Injected {len(synthetic_gaps)} "
+                f"synthetic gaps to prevent dormancy"
+            )
+            
+            return synthetic_gaps
+        except Exception as e:
+            logger.error(f"Error injecting synthetic gaps: {e}")
             return []
 
     def identify_gaps_with_cycle_detection(self) -> List[KnowledgeGap]:

@@ -831,9 +831,19 @@ class SymbolicReasoner:
             
         except Exception as e:
             logger.error(f"Query failed: {e}")
-            # Note: Return moderate confidence for parse errors on applicable queries
-            # The query looked like it was in our domain but failed to parse
-            return {"proven": False, "confidence": SYMBOLIC_PARSE_ERROR_CONFIDENCE, "proof": None, "error": str(e), "applicable": True}
+            # Issue #3 FIX: Parse failures should return clear signal
+            # Return confidence=0.0 with explicit "not_applicable" flag so the
+            # system can try alternative engines instead of treating this as a
+            # low-confidence result in the symbolic domain
+            return {
+                "proven": False, 
+                "confidence": 0.0,  # Changed from SYMBOLIC_PARSE_ERROR_CONFIDENCE to 0.0
+                "proof": None, 
+                "error": str(e), 
+                "applicable": False,  # Changed from True to False
+                "not_applicable": True,  # Explicit flag for routing
+                "reason": f"FOL parsing failed: {str(e)}"
+            }
 
     def _handle_fol_formalization(self, query: str) -> Dict[str, Any]:
         """
