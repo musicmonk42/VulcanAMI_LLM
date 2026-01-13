@@ -230,10 +230,10 @@ spec:
         - name: RAY_OBJECT_STORE_MEMORY
           value: {{ .Values.ray.objectStoreMemory | quote }}
         {{- end }}
-        {{- /* Ray Docker warnings suppression (prevents spurious warnings in container logs) */}}
+        {{- end }}
+        {{- /* Ray Docker warnings suppression (always set to suppress warnings even when Ray is disabled) */}}
         - name: RAY_DISABLE_DOCKER_CPU_WARNING
           value: "1"
-        {{- end }}
         {{- /* CuriosityDriver Configuration (Active Learning Heartbeat) */}}
         {{- if .Values.curiosityDriver }}
         {{- if .Values.curiosityDriver.enabled }}
