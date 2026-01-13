@@ -3217,25 +3217,68 @@ class AgentPoolManager:
                     # ==================================================================
                     # BUG FIX (Issue #6): Update selected_tools from integration result
                     # ==================================================================
-                    # The reasoning integration may have corrected the tools based on
-                    # semantic analysis (e.g., detecting SELF_INTROSPECTION and routing
-                    # to world_model instead of the router's wrong mathematical tools).
-                    # We MUST update selected_tools here so downstream processing uses
-                    # the corrected tools, not the router's original wrong selection.
-                    #
-                    # Example that was broken:
-                    #   Router says: tools=['probabilistic', 'symbolic', 'mathematical']
-                    #   Integration says: tools=['world_model'] (for self-introspection)
-                    #   Without this fix: downstream uses router's wrong tools
+                    # FIXED: Only override when integration explicitly says to
+                    # The router's tool selection should be respected unless there's a 
+                    # good reason to override (e.g., self-introspection detection)
                     # ==================================================================
                     if hasattr(integration_result, 'selected_tools') and integration_result.selected_tools:
-                        old_tools = selected_tools
-                        selected_tools = integration_result.selected_tools
-                        if old_tools != selected_tools:
+                        # Check if integration explicitly requests override
+                        should_override = (
+                            # Explicit override flag from integration
+                            (hasattr(integration_result, 'override_router_tools') and 
+                             integration_result.override_router_tools) or
+                            # Metadata indicates authoritative classification
+                            (hasattr(integration_result, 'metadata') and 
+                             integration_result.metadata and
+                             integration_result.metadata.get('classifier_is_authoritative', False)) or
+                            # Self-introspection detected (world_model is special case)
+                            (hasattr(integration_result, 'metadata') and
+                             integration_result.metadata and
+                             integration_result.metadata.get('is_self_introspection', False))
+                        )
+                        
+                        # DON'T override if integration just returns ['general'] as a fallback
+                        is_general_fallback = (
+                            integration_result.selected_tools == ['general'] and
+                            selected_tools and 
+                            selected_tools != ['general'] and
+                            not should_override
+                        )
+                        
+                        if is_general_fallback:
                             logger.info(
-                                f"[AgentPool] BUG FIX (Issue #6): Updated selected_tools from "
-                                f"'{old_tools}' to '{selected_tools}' based on reasoning_integration"
+                                f"[AgentPool] PRESERVING router tools '{selected_tools}' - "
+                                f"integration returned ['general'] as fallback, not authoritative override"
                             )
+                            # Keep the router's original selection
+                        elif should_override:
+                            old_tools = selected_tools
+                            selected_tools = integration_result.selected_tools
+                            logger.info(
+                                f"[AgentPool] AUTHORITATIVE override: Updated selected_tools from "
+                                f"'{old_tools}' to '{selected_tools}' (override_requested=True)"
+                            )
+                        else:
+                            # No explicit override - prefer more specific tools
+                            # If router gave specific tools and integration gave general, keep router's
+                            if selected_tools and integration_result.selected_tools:
+                                router_is_more_specific = (
+                                    selected_tools != ['general'] and
+                                    integration_result.selected_tools == ['general']
+                                )
+                                if router_is_more_specific:
+                                    logger.info(
+                                        f"[AgentPool] Keeping router's specific tools '{selected_tools}' "
+                                        f"over integration's general fallback"
+                                    )
+                                else:
+                                    old_tools = selected_tools
+                                    selected_tools = integration_result.selected_tools
+                                    if old_tools != selected_tools:
+                                        logger.info(
+                                            f"[AgentPool] Updated selected_tools from '{old_tools}' "
+                                            f"to '{selected_tools}' based on reasoning_integration"
+                                        )
                     
                     # ==================================================================
                     # BUG FIX: Update task_type based on what reasoning_integration detected
