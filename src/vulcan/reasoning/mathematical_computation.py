@@ -1669,13 +1669,42 @@ Brief explanation:"""
         - "Can you solve this riddle?"
         - "Integrate this feedback into your response"
         
+        Issue #4 FIX: Don't reject mathematical verification queries.
+        Queries like "Mathematical Verification - Proof check" ARE mathematical.
+        Check for mathematical verification patterns BEFORE rejecting based on "proof".
+        
         Returns:
             True if query contains genuine mathematical content,
             False if it's a non-mathematical query that happens to contain math words.
         """
         query_lower = query.lower()
         
+        # Issue #4 FIX: Check for mathematical verification patterns FIRST
+        # These indicate mathematical proof checking, which IS a mathematical task
+        math_verification_patterns = [
+            'mathematical verification',
+            'proof check',
+            'verify.*proof',
+            'check.*proof',
+            'step 1.*step 2',  # Multi-step verification
+            'claim:',          # Mathematical claim format
+            'therefore',       # Proof conclusion marker
+            'hidden flaw',     # Flaw detection in proofs
+        ]
+        
+        is_math_verification = any(
+            re.search(pattern, query_lower) for pattern in math_verification_patterns
+        )
+        
+        if is_math_verification:
+            logger.info(
+                f"[MathTool] Issue #4 FIX: Detected mathematical verification pattern - "
+                f"treating as mathematical despite 'proof' keyword"
+            )
+            return True
+        
         # Check for logic/proof queries (NOT mathematical computation)
+        # Issue #4 FIX: Removed "proof" from blacklist when mathematical verification detected
         logic_indicators = [
             # Logic symbols
             '→', '∧', '∨', '¬', '⊢', '⊨', '∀', '∃', '⇒', '⇔',
