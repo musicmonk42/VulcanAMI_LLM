@@ -703,18 +703,18 @@ class WarmStartPool:
                                     return cls(config={})
                                     
                                 logger.debug(f"Factory for {tool_name} created with empty config")
-                            except Exception:
+                            except Exception as e:
                                 # Can't instantiate - use as singleton (not ideal but safe)
                                 logger.warning(
-                                    f"Using {tool_name} as singleton - factory creation failed"
+                                    f"Using {tool_name} as singleton - factory creation failed: {type(e).__name__}: {e}"
                                 )
 
                                 def factory(inst=tool_instance):
                                     return inst
-                        except Exception:
+                        except Exception as e:
                             # Can't instantiate - use as singleton (not ideal but safe)
                             logger.warning(
-                                f"Using {tool_name} as singleton - factory creation failed"
+                                f"Using {tool_name} as singleton - factory creation failed: {type(e).__name__}: {e}"
                             )
 
                             def factory(inst=tool_instance):

@@ -132,6 +132,8 @@ except ImportError as e:
         MerkleLSMDAG = None
         MerkleTree = None
         BloomFilter = None
+        CountingBloomFilter = None
+        ScalableBloomFilter = None
 
 
 # ============================================================================

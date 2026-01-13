@@ -3524,11 +3524,16 @@ class PhilosophicalToolWrapper:
         self.name = "philosophical"
     
     def _get_world_model(self):
-        """Lazy-load World Model."""
+        """Lazy-load World Model using singleton."""
         if self._world_model is None:
             try:
-                from vulcan.world_model.world_model_core import WorldModel
-                self._world_model = WorldModel()
+                # FIX: Use singleton to avoid repeated 10-15s initialization overhead
+                from vulcan.reasoning.singletons import get_world_model
+                self._world_model = get_world_model()
+                if self._world_model is None:
+                    # Fallback to direct instantiation if singleton not available
+                    from vulcan.world_model.world_model_core import WorldModel
+                    self._world_model = WorldModel()
             except ImportError:
                 logger.warning("[PhilosophicalToolWrapper] World Model not available")
         return self._world_model
@@ -3700,6 +3705,25 @@ class ToolSelector:
     """
     Main tool selector orchestrating all components
     """
+    
+    # Class-level compiled regex patterns for keyword matching (cached for performance)
+    # These are compiled once when the class is loaded, not on every method call
+    _MATH_PATTERN = re.compile(
+        r'p\(a\|b\)|p\(a and b\)|bayesian|bayes theorem|'
+        r'calculate probability|compute probability|prior probability|'
+        r'posterior probability|likelihood ratio|conditional probability',
+        re.IGNORECASE
+    )
+    _SAT_PATTERN = re.compile(
+        r'satisfiable|sat solver|cnf formula|first-order logic|'
+        r'predicate logic|forall|exists|∀|∃',
+        re.IGNORECASE
+    )
+    _CAUSAL_PATTERN = re.compile(
+        r'causal graph|causal model|do-calculus|confounding variable|'
+        r'intervention do\(|backdoor criterion|frontdoor criterion',
+        re.IGNORECASE
+    )
 
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         """
@@ -4472,6 +4496,50 @@ class ToolSelector:
                         f"[ToolSelector] Delegation check: Delegation active to '{delegated_tool}' - "
                         f"NOT overriding with formal logic detection"
                     )
+
+            # ================================================================
+            # FIX: Add keyword-based routing for OBVIOUS query types
+            # ================================================================
+            # While the LLM classifier is the primary tool selection method,
+            # it's currently broken and always returns 'analogical'.
+            # Add conservative keyword detection for very obvious cases using
+            # optimized regex patterns for better performance.
+            # ================================================================
+            keyword_override_tool = None
+            if not delegation_active:
+                problem_text = str(request.problem).lower()
+                
+                # Use class-level compiled regex patterns (cached for performance)
+                # No need to import re or recompile - patterns are class attributes
+                
+                if self._MATH_PATTERN.search(problem_text):
+                    keyword_override_tool = 'probabilistic'
+                    logger.info(
+                        f"[ToolSelector] KEYWORD OVERRIDE: Detected Bayesian probability query -> 'probabilistic'"
+                    )
+                elif self._SAT_PATTERN.search(problem_text):
+                    keyword_override_tool = 'symbolic'
+                    logger.info(
+                        f"[ToolSelector] KEYWORD OVERRIDE: Detected SAT/FOL query -> 'symbolic'"
+                    )
+                elif self._CAUSAL_PATTERN.search(problem_text):
+                    keyword_override_tool = 'causal'
+                    logger.info(
+                        f"[ToolSelector] KEYWORD OVERRIDE: Detected causal inference query -> 'causal'"
+                    )
+                
+                # If keyword override found, use it and skip classifier
+                if keyword_override_tool:
+                    candidates = [{'tool': keyword_override_tool, 'utility': 1.0, 'source': 'keyword_override'}]
+                    features = self._extract_features(request)
+                    
+                    result = self._execute_with_selected_tools(
+                        request=request,
+                        candidates=candidates,
+                        features=features,
+                        start_time=start_time
+                    )
+                    return result
 
             # ================================================================
             # Note: REMOVED formal logic pattern override (Jan 9 2026)

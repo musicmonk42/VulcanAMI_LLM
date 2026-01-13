@@ -14,14 +14,26 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
-# Persistent memory imports
-from persistant_memory_v46 import (
-    GraphRAG,
-    MerkleLSM,
-    PackfileStore,
-    UnlearningEngine,
-    ZKProver,
-)
+# Persistent memory imports with fallback
+# FIX Issue #8: Add import guard for persistant_memory_v46
+try:
+    from persistant_memory_v46 import (
+        GraphRAG,
+        MerkleLSM,
+        PackfileStore,
+        UnlearningEngine,
+        ZKProver,
+    )
+    PERSISTENT_MEMORY_AVAILABLE = True
+except ImportError:
+    # Fallback: Create placeholder classes if module not available
+    logging.warning("persistant_memory_v46 not available, using fallback implementations")
+    PERSISTENT_MEMORY_AVAILABLE = False
+    GraphRAG = None
+    MerkleLSM = None
+    PackfileStore = None
+    UnlearningEngine = None
+    ZKProver = None
 
 from .base import (
     BaseMemorySystem,
@@ -1867,24 +1879,40 @@ class PersistentHierarchicalMemory:
         self.episodic = EpisodicMemory()
         self.semantic = SemanticMemory()
         self.procedural = ProceduralMemory()
+        
+        # FIX Issue #8: Add guards for persistent memory components
+        if PERSISTENT_MEMORY_AVAILABLE:
+            # Persistent storage backend (S3Store aliased as PackfileStore)
+            self.persistent_store = PackfileStore(
+                bucket=config.memory_bucket,
+            )
 
-        # Persistent storage backend (S3Store aliased as PackfileStore)
-        self.persistent_store = PackfileStore(
-            bucket=config.memory_bucket,
-        )
+            # LSM tree for efficient compaction
+            self.lsm_compactor = MerkleLSM(32, "adaptive", True)
 
-        # LSM tree for efficient compaction
-        self.lsm_compactor = MerkleLSM(32, "adaptive", True)
+            # Graph-based retrieval augmented generation
+            # FIX: Changed from invalid "llm_embeddings" to valid model "all-MiniLM-L6-v2"
+            self.graph_rag = GraphRAG("all-MiniLM-L6-v2", "disk_based_tier_c", True)
 
-        # Graph-based retrieval augmented generation
-        # FIX: Changed from invalid "llm_embeddings" to valid model "all-MiniLM-L6-v2"
-        self.graph_rag = GraphRAG("all-MiniLM-L6-v2", "disk_based_tier_c", True)
+            # Unlearning engine for privacy and data deletion
+            self.unlearning_engine = UnlearningEngine(merkle_graph=self.lsm_compactor)
 
-        # Unlearning engine for privacy and data deletion
-        self.unlearning_engine = UnlearningEngine(merkle_graph=self.lsm_compactor)
-
-        # Zero-knowledge proofs for verification
-        self.zk_prover = ZKProver()
+            # Zero-knowledge proofs for verification
+            self.zk_prover = ZKProver()
+            
+            logging.info("PersistentHierarchicalMemory initialized with full persistent backend")
+        else:
+            # Fallback: Use local memory only
+            self.persistent_store = None
+            self.lsm_compactor = None
+            self.graph_rag = None
+            self.unlearning_engine = None
+            self.zk_prover = None
+            
+            logging.warning(
+                "PersistentHierarchicalMemory initialized without persistent backend "
+                "(persistant_memory_v46 not available). Using local memory only."
+            )
         
         # Initialize learning persistence singleton
         self._init_learning_persistence()
@@ -1985,10 +2013,14 @@ class PersistentHierarchicalMemory:
         elif self._is_frequently_accessed(memory_item):
             self._serialize_to_local(memory_item)
         else:
-            # Compact and upload to persistent storage
-            packfile = self.lsm_compactor.compact([memory_item])
-            pack_id = str(uuid.uuid4())
-            self.persistent_store.put_object(key=f"packs/{pack_id}.pack", data=packfile)
+            # Compact and upload to persistent storage (if available)
+            if PERSISTENT_MEMORY_AVAILABLE and self.lsm_compactor and self.persistent_store:
+                packfile = self.lsm_compactor.compact([memory_item])
+                pack_id = str(uuid.uuid4())
+                self.persistent_store.put_object(key=f"packs/{pack_id}.pack", data=packfile)
+            else:
+                # Fallback: Store locally
+                self._serialize_to_local(memory_item)
 
     def retrieve(self, query, k=10):
         """
@@ -2007,12 +2039,15 @@ class PersistentHierarchicalMemory:
             results.extend(self._search_local_disk(query, k=k - len(results)))
 
         # Search persistent store via GraphRAG if still more needed
-        if len(results) < k:
-            results.extend(
-                self.graph_rag.retrieve(
-                    query, k=k - len(results), parent_child_context=True
+        if len(results) < k and PERSISTENT_MEMORY_AVAILABLE and self.graph_rag:
+            try:
+                results.extend(
+                    self.graph_rag.retrieve(
+                        query, k=k - len(results), parent_child_context=True
+                    )
                 )
-            )
+            except Exception as e:
+                logging.debug(f"GraphRAG retrieve failed: {e}")
 
         return results
 
@@ -2055,25 +2090,26 @@ class PersistentHierarchicalMemory:
             "metadata": metadata or {},
         }
         
-        # Store in GraphRAG for semantic retrieval
-        try:
-            doc_id = f"interaction_{query_id}"
-            combined_text = f"Query: {query}\n\nAnswer: {answer}"
-            self.graph_rag.add_document(
-                doc_id=doc_id,
-                content=combined_text,
-                metadata={
-                    "type": "interaction",
-                    "query_id": query_id,
-                    "tools_used": tools_used or [],
-                    "success": success,
-                    "timestamp": interaction_content["timestamp"],
-                },
-                auto_chunk=True,
-            )
-            logger.debug(f"Stored interaction {query_id} in GraphRAG")
-        except Exception as e:
-            logger.warning(f"Failed to store interaction in GraphRAG: {e}")
+        # Store in GraphRAG for semantic retrieval (if available)
+        if PERSISTENT_MEMORY_AVAILABLE and self.graph_rag:
+            try:
+                doc_id = f"interaction_{query_id}"
+                combined_text = f"Query: {query}\n\nAnswer: {answer}"
+                self.graph_rag.add_document(
+                    doc_id=doc_id,
+                    content=combined_text,
+                    metadata={
+                        "type": "interaction",
+                        "query_id": query_id,
+                        "tools_used": tools_used or [],
+                        "success": success,
+                        "timestamp": interaction_content["timestamp"],
+                    },
+                    auto_chunk=True,
+                )
+                logger.debug(f"Stored interaction {query_id} in GraphRAG")
+            except Exception as e:
+                logger.warning(f"Failed to store interaction in GraphRAG: {e}")
         
         # Store in episodic memory for quick access
         try:
@@ -2128,6 +2164,11 @@ class PersistentHierarchicalMemory:
             - success: Whether the interaction was successful
         """
         results: List[Dict[str, Any]] = []
+        
+        # Check if GraphRAG is available
+        if not PERSISTENT_MEMORY_AVAILABLE or not self.graph_rag:
+            logging.warning("GraphRAG not available, cannot search past interactions")
+            return results
         
         try:
             # Search GraphRAG for semantic matches
