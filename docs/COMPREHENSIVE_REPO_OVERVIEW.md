@@ -1394,7 +1394,7 @@ For exhaustive documentation of every service, function, and class:
 
 - **AGI:** Artificial General Intelligence
 - **VULCAN:** Versatile Universal Learning Architecture for Cognitive Neural Agents
-- **CSIU:** Curiosity, Safety, Impact, Uncertainty (meta-reasoning framework)
+- **CSIU:** Collective Self-Improvement via Human Understanding (meta-reasoning framework)
 - **IR:** Intermediate Representation (graph format)
 - **DAG:** Directed Acyclic Graph
 - **JWT:** JSON Web Token
