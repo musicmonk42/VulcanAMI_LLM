@@ -334,7 +334,7 @@ class UnifiedReasoner:
         # Note: Pass the actual LLM client to MathematicalComputationTool instead of None
         # This fixes the LLM Interface Bug where tools received strings instead of LLM objects
         try:
-            from .mathematical_computation import MathematicalComputationTool
+            from ..mathematical_computation import MathematicalComputationTool
 
             # Try to get the LLM client from multiple sources
             # FIX TASK 4: Try multiple sources for LLM client
@@ -348,11 +348,15 @@ class UnifiedReasoner:
                     # HybridLLMExecutor has a local_llm attribute that is the GraphixVulcanLLM instance
                     llm_client = getattr(hybrid_executor, 'local_llm', None)
                     if llm_client is not None:
-                        logger.info("Mathematical computation tool will use GraphixVulcanLLM from hybrid executor")
-            except ImportError:
-                logger.debug("Hybrid executor not available for mathematical computation tool")
+                        logger.info("[MathTool] Using GraphixVulcanLLM from hybrid executor")
+                    else:
+                        logger.debug("[MathTool] Hybrid executor found but local_llm is None")
+                else:
+                    logger.debug("[MathTool] Hybrid executor get returned None")
+            except ImportError as ie:
+                logger.debug(f"[MathTool] Hybrid executor import failed: {ie}")
             except Exception as e:
-                logger.debug(f"Failed to get LLM from hybrid executor: {e}")
+                logger.warning(f"[MathTool] Failed to get LLM from hybrid executor: {e}")
 
             # Source 2: Try to get from singletons if hybrid executor didn't have it
             if llm_client is None:
@@ -360,9 +364,11 @@ class UnifiedReasoner:
                     from vulcan.reasoning.singletons import get_llm_client
                     llm_client = get_llm_client()
                     if llm_client is not None:
-                        logger.info("Mathematical computation tool will use LLM from singletons")
-                except (ImportError, AttributeError):
-                    pass
+                        logger.info("[MathTool] Using LLM from singletons")
+                    else:
+                        logger.debug("[MathTool] Singleton get_llm_client returned None")
+                except (ImportError, AttributeError) as e:
+                    logger.debug(f"[MathTool] Singletons get_llm_client not available: {e}")
 
             # Source 3: Try to get from main's global
             if llm_client is None:
@@ -371,20 +377,34 @@ class UnifiedReasoner:
                     if hasattr(main, 'global_llm_client'):
                         llm_client = main.global_llm_client
                         if llm_client is not None:
-                            logger.info("Mathematical computation tool will use LLM from main.global_llm_client")
-                except (ImportError, AttributeError):
-                    pass
+                            logger.info("[MathTool] Using LLM from main.global_llm_client")
+                        else:
+                            logger.debug("[MathTool] main.global_llm_client is None")
+                    else:
+                        logger.debug("[MathTool] main module has no global_llm_client attribute")
+                except (ImportError, AttributeError) as e:
+                    logger.debug(f"[MathTool] main.global_llm_client not available: {e}")
+            
+            # Log final status
+            if llm_client is None:
+                logger.warning(
+                    "[MathTool] No LLM client found from any source. "
+                    "Mathematical reasoning may have reduced capabilities. "
+                    "Consider calling set_llm_client() in singletons during startup."
+                )
 
             math_tool = MathematicalComputationTool(
                 llm=llm_client,  # Pass the actual LLM client instead of None
                 enable_learning=enable_learning
             )
             self.reasoners[ReasoningType.MATHEMATICAL] = math_tool
-            logger.info(f"Mathematical computation tool registered (llm={'available' if llm_client else 'none'})")
+            logger.info(f"[MathTool] ✓ Mathematical computation tool registered (llm={'available' if llm_client else 'NONE'})")
         except ImportError as e:
-            logger.warning(f"Mathematical computation tool not available: {e}")
+            logger.error(f"[MathTool] ✗ Mathematical computation tool import failed: {e}")
+            logger.error("[MathTool] Mathematical reasoning will not be available")
         except Exception as e:
-            logger.warning(f"Error initializing mathematical computation tool: {e}")
+            logger.error(f"[MathTool] ✗ Error initializing mathematical computation tool: {e}", exc_info=True)
+            logger.error("[MathTool] Mathematical reasoning will not be available")
 
         # PHILOSOPHICAL REASONER REMOVED: Ethical reasoning now handled by World Model
         # The World Model has full meta-reasoning machinery:
