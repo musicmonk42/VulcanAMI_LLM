@@ -691,14 +691,32 @@ class PrincipleExtractor:
         )
 
     def _adjust_thresholds(self):
-        """Adjust thresholds based on strategy"""
+        """
+        Adjust thresholds based on strategy.
+        
+        FIX Issue #1: Lowered thresholds for exploratory and balanced modes to enable
+        principle extraction from single experiment traces. Previous min_evidence_count=3
+        was too high for experimental learning scenarios.
+        
+        Thresholds by strategy:
+        - CONSERVATIVE: High confidence (5+ evidence, 0.8+ confidence)
+        - BALANCED: Moderate requirements (2 evidence, 0.6 confidence)  
+        - AGGRESSIVE: Low barriers (1 evidence, 0.4 confidence)
+        - EXPLORATORY: Experimental (1 evidence, 0.3 confidence)
+        """
         if self.strategy == ExtractionStrategy.CONSERVATIVE:
             self.min_evidence_count = max(5, self.min_evidence_count)
             self.min_confidence = max(0.8, self.min_confidence)
+        elif self.strategy == ExtractionStrategy.BALANCED:
+            # FIX Issue #1: Lower to 2 for balanced mode (was implicitly 3)
+            self.min_evidence_count = 2
+            self.min_confidence = max(0.6, self.min_confidence)
         elif self.strategy == ExtractionStrategy.AGGRESSIVE:
-            self.min_evidence_count = max(1, self.min_evidence_count - 1)
+            # FIX Issue #1: Ensure minimum is 1 (was max(1, count-1) which could be 2)
+            self.min_evidence_count = 1
             self.min_confidence = max(0.4, self.min_confidence - 0.2)
         elif self.strategy == ExtractionStrategy.EXPLORATORY:
+            # Already correctly set to 1
             self.min_evidence_count = 1
             self.min_confidence = 0.3
 
@@ -1474,9 +1492,96 @@ class PatternDetector:
                 composite = self._detect_composite_patterns(patterns)
                 patterns.extend(composite)
 
+            # FIX Issue #1: Experiment-specific patterns
+            # Add detection for experiment action types that were being missed
+            exp_patterns = self._detect_experiment_patterns(trace)
+            patterns.extend(exp_patterns)
+
             return patterns
         except Exception as e:
             logger.error("Error detecting patterns: %s", e)
+            return []
+
+    def _detect_experiment_patterns(self, trace: ExecutionTrace) -> List[Pattern]:
+        """
+        Detect experiment-specific patterns.
+        
+        FIX Issue #1: Added to recognize experiment-specific action types like
+        "experiment", "explore", "hypothesis", "test", "observe" which were not
+        detected by standard sequential pattern detection (which requires multiple
+        distinct action types).
+        
+        Args:
+            trace: Execution trace to analyze
+            
+        Returns:
+            List of experiment patterns detected
+        """
+        try:
+            patterns = []
+            
+            if not trace.actions or len(trace.actions) == 0:
+                return patterns
+            
+            # Extract action types
+            action_types = []
+            for action in trace.actions:
+                if isinstance(action, dict):
+                    action_type = action.get("type", "").lower()
+                    action_types.append(action_type)
+                elif hasattr(action, "type"):
+                    action_types.append(str(action.type).lower())
+                else:
+                    action_types.append(str(action).lower())
+            
+            # Experiment-specific action indicators
+            experiment_actions = {
+                "experiment", "explore", "exploration", "hypothesis", "hypothesize",
+                "test", "testing", "validate", "validation", "observe", "observation",
+                "measure", "measurement", "trial", "probe", "investigate", "investigation",
+                "discover", "discovery", "analyze", "analysis", "pattern_application",
+                "knowledge_acquisition", "baseline", "capability_probe", "self_diagnostic"
+            }
+            
+            # Count experiment actions
+            exp_action_count = sum(
+                1 for atype in action_types 
+                if any(exp_word in atype for exp_word in experiment_actions)
+            )
+            
+            # Create experiment pattern if we have experiment actions
+            if exp_action_count > 0:
+                # Get all experiment-related actions in order
+                exp_sequence = [
+                    atype for atype in action_types
+                    if any(exp_word in atype for exp_word in experiment_actions)
+                ]
+                
+                if exp_sequence:
+                    # Create experiment workflow pattern
+                    pattern = Pattern(
+                        pattern_type=PatternType.SEQUENTIAL,
+                        components=exp_sequence,
+                        structure={
+                            "experiment_workflow": True,
+                            "action_count": len(exp_sequence),
+                            "experiment_type": trace.domain if hasattr(trace, "domain") else "general"
+                        },
+                        frequency=1.0,
+                        # Higher confidence for experiment patterns
+                        confidence=min(1.0, 0.6 + 0.1 * min(exp_action_count, 4)),
+                        complexity=len(exp_sequence),
+                        metadata={
+                            "pattern_source": "experiment_detection",
+                            "fix_issue": "1_experiment_pattern_detection"
+                        }
+                    )
+                    patterns.append(pattern)
+            
+            return patterns
+            
+        except Exception as e:
+            logger.error("Error detecting experiment patterns: %s", e)
             return []
 
     def _detect_sequential_patterns(self, trace: ExecutionTrace) -> List[Pattern]:
@@ -1704,9 +1809,18 @@ class PatternDetector:
             return []
 
     def _is_conditional_action(self, action: Any) -> bool:
-        """Check if action is conditional"""
+        """
+        Check if action is conditional.
+        
+        FIX Issue #1: Added experiment-specific action types like "experiment",
+        "explore", "hypothesis", "test", "observe" to conditional detection.
+        """
         try:
-            indicators = ["condition", "if", "when", "check", "test", "evaluate"]
+            indicators = [
+                "condition", "if", "when", "check", "test", "evaluate",
+                # FIX Issue #1: Add experiment-specific indicators
+                "experiment", "explore", "hypothesis", "observe", "measure", "validate"
+            ]
             action_str = str(action).lower()
             return any(ind in action_str for ind in indicators)
         except Exception:
