@@ -1630,7 +1630,7 @@ class SemanticBridge:
         return final_resolution
 
     def get_applicable_concepts(
-        self, domain: str, min_confidence: float = 0.7
+        self, domain: str, min_confidence: float = 0.5
     ) -> List[Concept]:
         """
         Get concepts applicable to domain using inverted index (FIXED: optimized with inverted index)
