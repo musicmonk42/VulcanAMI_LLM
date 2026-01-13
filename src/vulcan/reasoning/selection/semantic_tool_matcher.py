@@ -1215,10 +1215,16 @@ class SemanticToolMatcher:
             logger.info("[SemanticToolMatcher] Query embedding cache cleared")
 
     def match_query(
-        self, query: str, available_tools: Optional[List[str]] = None
+        self, 
+        query: str, 
+        available_tools: Optional[List[str]] = None,
+        use_llm_classification: bool = True
     ) -> Dict[str, SemanticMatch]:
         """
         Match query to tools using semantic similarity and keyword patterns.
+        
+        If use_llm_classification=True and QueryClassifier returns high-confidence
+        results, those are used instead of embedding-based matching.
 
         Note: Query embedding is now computed ONCE using the cache,
         instead of being recomputed for every tool in the loop.
@@ -1230,6 +1236,7 @@ class SemanticToolMatcher:
         Args:
             query: The input query/problem text
             available_tools: Optional list of available tools (defaults to all)
+            use_llm_classification: Whether to try LLM classification first (default: True)
 
         Returns:
             Dictionary mapping tool names to SemanticMatch objects
@@ -1237,6 +1244,38 @@ class SemanticToolMatcher:
         if available_tools is None:
             available_tools = list(TOOL_DESCRIPTIONS.keys())
 
+        # ==============================================================================
+        # NEW: Try LLM classification first
+        # ==============================================================================
+        if use_llm_classification:
+            try:
+                from ...routing.query_classifier import classify_query
+                classification = classify_query(query)
+                
+                if classification.confidence >= 0.8 and classification.suggested_tools:
+                    # Convert to SemanticMatch format
+                    matches = {}
+                    for i, tool in enumerate(classification.suggested_tools):
+                        if tool in available_tools:
+                            matches[tool] = SemanticMatch(
+                                tool_name=tool,
+                                similarity_score=classification.confidence - (i * 0.05),
+                                keyword_matches=[],
+                                keyword_boost=0.0,
+                                combined_score=classification.confidence - (i * 0.05),
+                            )
+                    if matches:
+                        logger.debug(
+                            f"[SemanticToolMatcher] Using LLM classification: "
+                            f"{list(matches.keys())} (confidence={classification.confidence:.2f})"
+                        )
+                        return matches
+            except Exception as e:
+                logger.debug(f"[SemanticToolMatcher] LLM classification failed, using embeddings: {e}")
+        
+        # ==============================================================================
+        # Fallback: Use embedding-based matching (original implementation)
+        # ==============================================================================
         results = {}
         query_lower = query.lower().strip()
         
