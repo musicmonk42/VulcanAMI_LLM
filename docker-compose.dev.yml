@@ -306,6 +306,9 @@ services:
         REJECT_INSECURE_JWT: ack
     container_name: vulcanami-full-platform
     hostname: full-platform
+    # Shared memory size for Ray object store (prevents /dev/shm warning)
+    # Ray recommends at least 30% of available RAM for object store
+    shm_size: '10gb'
     environment:
       - ENVIRONMENT=development
       - VERSION=4.6.0
@@ -345,6 +348,8 @@ services:
       # Ray Configuration (Architectural Fix #3)
       - RAY_ENABLED=${RAY_ENABLED:-false}
       - RAY_ADDRESS=${RAY_ADDRESS:-auto}
+      # Ray Docker warnings suppression (prevents spurious warnings in container logs)
+      - RAY_DISABLE_DOCKER_CPU_WARNING=1
       # Reasoning System Configuration (Singleton Pattern - Progressive Degradation Fix)
       # Enables prewarming of all singletons at startup to prevent
       # query routing degradation from 469ms to 152,048ms

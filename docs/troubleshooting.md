@@ -76,6 +76,45 @@ curl http://localhost:5000/health
 
 ## 1. Docker Issues
 
+### Issue: Ray Docker CPU detection and shared memory warnings
+
+**Symptoms:**
+- Container logs show: `WARNING utils.py:458 -- Detecting docker specified CPUs`
+- Container logs show: `WARNING services.py:2155 -- The object store is using /tmp instead of /dev/shm`
+
+**Cause:**
+Ray detects it's running in a Docker container and generates warnings about CPU detection and shared memory configuration.
+
+**Solution:**
+
+1. **Suppress CPU detection warning** by setting the environment variable:
+   ```bash
+   RAY_DISABLE_DOCKER_CPU_WARNING=1
+   ```
+
+2. **Fix shared memory warning** by adding `shm_size` to your Docker Compose configuration:
+   ```yaml
+   services:
+     your-service:
+       shm_size: '10gb'  # Recommended: at least 30% of available RAM
+   ```
+
+For Kubernetes deployments, mount an emptyDir with Memory medium as `/dev/shm`:
+```yaml
+volumes:
+  - name: dshm
+    emptyDir:
+      medium: Memory
+      sizeLimit: "4Gi"
+volumeMounts:
+  - name: dshm
+    mountPath: /dev/shm
+```
+
+These configurations are already applied in the repository's Docker Compose and Kubernetes manifests.
+
+---
+
 ### Issue: REJECT_INSECURE_JWT build error
 
 **Symptoms:**

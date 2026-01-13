@@ -235,6 +235,17 @@ API_PORT              # Default: 8000
 DATABASE_URL          # Override default connection
 ```
 
+### Ray Configuration (Optional)
+When Ray is enabled for distributed computing, the following environment variables help optimize container behavior:
+
+```bash
+RAY_DISABLE_DOCKER_CPU_WARNING=1  # Suppress CPU detection warning in containers
+RAY_ENABLED=true                   # Enable Ray workers (default: false)
+RAY_ADDRESS=auto                   # Ray cluster address or "auto" for local
+```
+
+**Important**: For optimal Ray performance, containers need adequate shared memory. This is configured in Docker Compose files with `shm_size: '10gb'` (recommended: at least 30% of available RAM). Without sufficient shared memory, Ray's object store will fall back to `/tmp`, which harms performance.
+
 ## Validation Scripts
 
 ### quick_docker_validation.sh

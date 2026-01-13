@@ -146,6 +146,10 @@ data:
   DISTILLATION_ASYNC_WRITES: "true"
   DISTILLATION_ASYNC_BUFFER_SIZE: "100"
   DISTILLATION_ASYNC_FLUSH_INTERVAL: "5.0"
+  # Ray Docker Configuration (Container Optimization)
+  # Suppresses spurious Ray warnings when running inside containers
+  # The CPU detection warning is safe to suppress when CPU limits are correctly configured
+  RAY_DISABLE_DOCKER_CPU_WARNING: "1"
   # Vulcan Memory System v46 Configuration
   MILVUS_HOST: "milvus-service"
   MILVUS_PORT: "19530"
