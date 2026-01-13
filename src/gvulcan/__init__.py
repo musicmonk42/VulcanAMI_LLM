@@ -118,6 +118,22 @@ try:
             """Delegate all attribute access to wrapped MerkleLSM."""
             return getattr(self._lsm, name)
     
+    # Import additional bloom filter types from local implementation
+    # These are not available in persistant_memory_v46.lsm
+    try:
+        from .bloom import CountingBloomFilter, ScalableBloomFilter
+        logger.debug("CountingBloomFilter and ScalableBloomFilter imported from local bloom module")
+    except ImportError as e:
+        logger.debug(f"CountingBloomFilter/ScalableBloomFilter not available: {e}")
+        CountingBloomFilter = None
+        ScalableBloomFilter = None
+    
+    # MerkleTree from local implementation if available
+    try:
+        from .merkle import MerkleTree
+    except ImportError:
+        MerkleTree = None
+    
     logger.info("Deprecated storage components available (BloomFilter, MerkleLSMDAG)")
             
 except ImportError as e:
@@ -216,7 +232,10 @@ __all__ = [
     "CONFIG_AVAILABLE",
     # Deprecated (use persistant_memory_v46 instead)
     "BloomFilter",
+    "CountingBloomFilter",
+    "ScalableBloomFilter",
     "MerkleLSMDAG",
+    "MerkleTree",
 ]
 
 logger.debug(f"GVulcan package v{__version__} loaded")

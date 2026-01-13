@@ -960,6 +960,16 @@ class GraphixArena:
                     logger.info(
                         "✅ GraphixLLMClient initialized (mock mode - OPENAI_API_KEY not configured)"
                     )
+                # Register LLM client with singletons so MathTool and other components can access it
+                try:
+                    from vulcan.reasoning.singletons import set_llm_client
+                    if self.llm_client is not None:
+                        set_llm_client(self.llm_client)
+                        logger.info("✅ LLM client registered with singletons (MathTool will have full capabilities)")
+                except ImportError:
+                    logger.debug("Singletons module not available for LLM registration")
+                except Exception as e:
+                    logger.warning(f"Failed to register LLM client with singletons: {e}")
             except Exception as e:
                 # Log with exc_info=True to capture full traceback even if exception message is empty
                 logger.error(
@@ -1126,13 +1136,37 @@ class GraphixArena:
             logger.debug("Ray not available, using standard subprocess execution")
 
         # Initialize hardware dispatcher for optimal backend routing
-        # PRIORITY 0 FIX: Force-kill HardwareDispatcher to prevent resource starvation
-        # The AnalogPhotonicEmulator was causing 4000% CPU usage even when disabled in config.
-        # Ignoring config and hardcoding disabled state to prevent CPU starvation.
-        logger.warning("🛑 HARDWARE DISPATCHER FORCEFULLY DISABLED IN CODE")
-        self.hardware_dispatcher = None
-        self.use_hardware = False
-        logger.warning("[GraphixArena] 🛑 HARDWARE DISPATCHER FORCEFULLY DISABLED IN CODE - Ignoring configuration")
+        # The dispatcher is disabled by default to prevent resource starvation that was
+        # observed with AnalogPhotonicEmulator (4000% CPU usage). Enable via environment
+        # variable VULCAN_ENABLE_HARDWARE_DISPATCHER=1 when hardware acceleration is needed.
+        enable_hardware = os.getenv("VULCAN_ENABLE_HARDWARE_DISPATCHER", "0").lower() in ("1", "true", "yes")
+        
+        if enable_hardware and HARDWARE_DISPATCH_AVAILABLE and HardwareDispatcher is not None:
+            try:
+                # Initialize with mock mode by default, real hardware requires API keys
+                use_mock = os.getenv("VULCAN_HARDWARE_USE_MOCK", "1").lower() in ("1", "true", "yes")
+                self.hardware_dispatcher = HardwareDispatcher(
+                    use_mock=use_mock,
+                    enable_metrics=True,
+                    enable_health_checks=False,  # Disable health checks to reduce CPU overhead
+                )
+                self.use_hardware = True
+                logger.info(
+                    f"✅ HardwareDispatcher initialized (mock={use_mock}). "
+                    f"Set VULCAN_ENABLE_HARDWARE_DISPATCHER=0 to disable."
+                )
+            except Exception as e:
+                logger.warning(f"⚠️ HardwareDispatcher initialization failed: {e}")
+                self.hardware_dispatcher = None
+                self.use_hardware = False
+        else:
+            self.hardware_dispatcher = None
+            self.use_hardware = False
+            if not enable_hardware:
+                logger.info(
+                    "[GraphixArena] HardwareDispatcher disabled (default). "
+                    "Set VULCAN_ENABLE_HARDWARE_DISPATCHER=1 to enable."
+                )
 
         # Bounded feedback log
         self.feedback_log: deque = deque(maxlen=MAX_FEEDBACK_LOG_SIZE)
