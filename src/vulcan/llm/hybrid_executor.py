@@ -2692,12 +2692,28 @@ You receive JSON containing:
 
 Make this human-readable. Nothing more."""
 
-        # Note: Check reasoning confidence BEFORE sending to OpenAI
-        # If confidence is too low, don't let OpenAI try to solve the problem
+        # Issue #7 FIX: Check reasoning confidence BEFORE sending to OpenAI
+        # BUT: Don't block OpenAI if reasoning engine says "not_applicable"
+        # When engine declines (not_applicable=True), we should let OpenAI try
         MIN_REASONING_CONFIDENCE = 0.5
         reasoning_confidence = getattr(reasoning_output, 'confidence', None) or 0.0
         
-        if reasoning_confidence < MIN_REASONING_CONFIDENCE:
+        # Issue #7 FIX: Check if reasoning engine declined the query (not_applicable)
+        # If so, don't treat this as a failure - let OpenAI attempt it
+        is_not_applicable = False
+        if hasattr(reasoning_output, 'to_dict'):
+            try:
+                output_dict = reasoning_output.to_dict()
+                is_not_applicable = (
+                    output_dict.get('not_applicable') is True or
+                    output_dict.get('applicable') is False
+                )
+            except Exception:
+                pass
+        
+        # Issue #7 FIX: Only block OpenAI if reasoning truly attempted but failed
+        # Don't block if engine declined (not_applicable) - that means try another approach
+        if reasoning_confidence < MIN_REASONING_CONFIDENCE and not is_not_applicable:
             self.logger.warning(
                 f"[HybridExecutor] Note: Reasoning confidence ({reasoning_confidence:.2f}) < "
                 f"threshold ({MIN_REASONING_CONFIDENCE}). Returning failure message instead of "
@@ -2707,6 +2723,11 @@ Make this human-readable. Nothing more."""
                 f"I was unable to complete the specialized reasoning for this problem. "
                 f"The reasoning engine returned confidence {reasoning_confidence:.2f}. "
                 f"Please try rephrasing your question or providing more context."
+            )
+        elif is_not_applicable:
+            self.logger.info(
+                f"[HybridExecutor] Issue #7 FIX: Reasoning engine declined query "
+                f"(not_applicable=True). Allowing OpenAI to attempt the query."
             )
 
         # Build the user prompt with VULCAN's structured output
