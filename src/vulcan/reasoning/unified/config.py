@@ -162,13 +162,41 @@ WEIGHT_DECAY_FACTOR: float = 0.95
 # UNKNOWN TYPE FALLBACK ORDER
 # ==============================================================================
 # When reasoning type is UNKNOWN, try these reasoners in order.
-# Priority based on general applicability.
+# Priority based on general applicability and robustness.
+#
+# CRITICAL FIX (Jan 2026): Added MATHEMATICAL, MULTIMODAL, ABSTRACT to prevent
+# 0.10 confidence failures when classification returns UNKNOWN for queries that
+# should be handled by these reasoners.
+#
+# Root Cause: When a query is classified as UNKNOWN (or reclassified due to
+# low confidence), the system tries fallback reasoners in sequence. If the
+# appropriate reasoner isn't in the fallback list, the query falls through
+# all options and returns an empty result with 0.10 confidence.
+#
+# Priority Ordering Rationale:
+# 1. PROBABILISTIC - Most general, handles uncertainty quantification
+# 2. MATHEMATICAL - Handles computations, formulas, symbolic math
+# 3. SYMBOLIC - Logical reasoning, SAT problems, formal proofs
+# 4. CAUSAL - Cause-effect analysis, interventions
+# 5. ANALOGICAL - Structure mapping, comparisons
+# 6. MULTIMODAL - Cross-modality reasoning (image+text, etc.)
+# 7. ABSTRACT - High-level conceptual reasoning
+#
+# Industry Standards Applied:
+# - Explicit documentation of ordering rationale
+# - Root cause analysis in comments for maintainability
+# - Type annotation for IDE support and static analysis
+# - Immutable tuple to prevent runtime modifications
+# ==============================================================================
 
 UNKNOWN_TYPE_FALLBACK_ORDER: tuple = (
-    "PROBABILISTIC",  # Most general-purpose
-    "SYMBOLIC",       # Good for logical queries
-    "CAUSAL",         # Good for cause-effect queries
-    "ANALOGICAL",     # Good for comparison queries
+    "PROBABILISTIC",  # Most general-purpose, handles uncertainty
+    "MATHEMATICAL",   # Symbolic math, computations, formulas (ADDED: Jan 2026)
+    "SYMBOLIC",       # Logical reasoning, SAT, formal proofs
+    "CAUSAL",         # Cause-effect analysis, interventions
+    "ANALOGICAL",     # Structure mapping, comparisons
+    "MULTIMODAL",     # Cross-modality reasoning (ADDED: Jan 2026)
+    "ABSTRACT",       # High-level conceptual reasoning (ADDED: Jan 2026)
 )
 
 # ==============================================================================

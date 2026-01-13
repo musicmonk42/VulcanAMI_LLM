@@ -110,9 +110,63 @@ logger = logging.getLogger(__name__)
 # ==============================================================================
 # Pre-compiled regex patterns for mathematical expression detection
 # Used in _classify_reasoning_task() to identify mathematical queries
+#
+# ENHANCED (Jan 2026): Added support for advanced mathematical notation:
+# - Summation: ∑, \sum
+# - Integration: ∫, \int  
+# - Derivatives: ∂, \partial, d/dx
+# - Probability notation: P(X|Y), P(X)
+# - Logical quantifiers: ∀, ∃, forall, exists
+# - Set notation: ∈, ∪, ∩, ⊂, ⊆
+#
+# Root Cause Fix: Original patterns only matched simple arithmetic (2+2)
+# but failed to detect advanced mathematical queries like:
+# - "Compute ∑_{k=1}^n (2k-1)"
+# - "Calculate ∫ x^2 dx"
+# - "Find P(X|+) given sensitivity/specificity"
+#
+# Industry Standards Applied:
+# - Unicode support for mathematical symbols
+# - Case-insensitive matching
+# - Comprehensive pattern coverage
+# - Performance-optimized pre-compilation
+# ==============================================================================
 
+# Basic arithmetic expressions (2+2, 3*4, etc.)
 MATH_EXPRESSION_PATTERN = re.compile(r'\d+\s*[+\-*/^]\s*\d+')
+
+# Mathematical query phrases with arithmetic
 MATH_QUERY_PATTERN = re.compile(r'(?:what\s+is|calculate|compute|evaluate)\s+\d+\s*[+\-*/^]\s*\d+', re.IGNORECASE)
+
+# Advanced mathematical notation (ADDED: Jan 2026)
+MATH_SYMBOLS_PATTERN = re.compile(
+    r'[∑∫∂∀∃∈∪∩⊂⊆⊇⊃∅∞π∏√±≤≥≠≈×÷∇Δ]|'  # Unicode math symbols
+    r'\\(?:sum|int|partial|forall|exists|infty|pi|prod|sqrt|nabla|delta)|'  # LaTeX commands
+    r'\b(?:sum|integral|derivative|limit|forall|exists)\b',  # English keywords
+    re.IGNORECASE | re.UNICODE
+)
+
+# Probability notation: P(X), P(X|Y), Pr(A), etc.
+# Note: Pattern supports both ASCII pipe '|' (U+007C) and mathematical vertical bar '∣' (U+2223)
+# for conditional probability notation. The latter is the proper Unicode mathematical symbol,
+# but many users type the ASCII version, so we support both for robustness.
+PROBABILITY_NOTATION_PATTERN = re.compile(
+    r'P\s*\([^)]+\)|'  # P(X), P(Disease)
+    r'P\s*\([^)]+\s*[|∣]\s*[^)]+\)|'  # P(X|Y), P(Disease|Test+) - supports both | and ∣
+    r'Pr\s*\([^)]+\)|'  # Pr(X) - alternative notation
+    r'E\s*\[[^\]]+\]|'  # E[X] - expected value
+    r'Var\s*\([^)]+\)',  # Var(X) - variance
+    re.IGNORECASE
+)
+
+# Induction proof patterns
+INDUCTION_PATTERN = re.compile(
+    r'\b(?:prove|verify|show)\s+by\s+induction\b|'
+    r'\bbase\s+case\b|'
+    r'\binductive\s+(?:step|hypothesis)\b|'
+    r'\b(?:assume|given)\s+.*\s+(?:prove|show)\b',
+    re.IGNORECASE
+)
 
 
 def _is_test_environment() -> bool:
@@ -2530,13 +2584,37 @@ class UnifiedReasoner:
             scores[ReasoningType.SYMBOLIC] += 0.2  # Reduced from 0.3
             if any(op in input_data for op in [" AND ", " OR ", " NOT ", "=>"]):
                 scores[ReasoningType.SYMBOLIC] += 0.4
+            
             # Note: Detect mathematical expressions in string input (e.g., "2+2", "3*4")
             # Uses pre-compiled module-level patterns for performance
             if MATH_EXPRESSION_PATTERN.search(input_data):
                 scores[ReasoningType.MATHEMATICAL] += 0.8  # Strong preference for math expressions
+            
             # Also detect "what is X+Y" or "calculate X+Y" patterns
             if MATH_QUERY_PATTERN.search(input_data):
                 scores[ReasoningType.MATHEMATICAL] += 0.9
+            
+            # ENHANCED (Jan 2026): Detect advanced mathematical notation
+            # Summation (∑), integration (∫), derivatives (∂), etc.
+            if MATH_SYMBOLS_PATTERN.search(input_data):
+                scores[ReasoningType.MATHEMATICAL] += 1.0  # Very strong preference
+                logger.debug(f"[Classifier] Advanced math notation detected, boosting MATHEMATICAL")
+            
+            # Detect induction proof patterns
+            if INDUCTION_PATTERN.search(input_data):
+                scores[ReasoningType.MATHEMATICAL] += 0.7
+                logger.debug(f"[Classifier] Induction pattern detected, boosting MATHEMATICAL")
+            
+            # Detect probability notation P(X|Y) - but distinguish from Bayesian statistical problems
+            # Pure probability notation (without sensitivity/specificity) -> MATHEMATICAL
+            # Bayesian inference (with medical test parameters) -> PROBABILISTIC  
+            if PROBABILITY_NOTATION_PATTERN.search(input_data):
+                # Check if it's a Bayesian inference problem (handled separately below)
+                bayes_indicators = ["sensitivity", "specificity", "prevalence", "test", "diagnostic"]
+                is_bayesian = any(indicator in input_data.lower() for indicator in bayes_indicators)
+                if not is_bayesian:
+                    scores[ReasoningType.MATHEMATICAL] += 0.6
+                    logger.debug(f"[Classifier] Probability notation detected (non-Bayesian), boosting MATHEMATICAL")
         elif isinstance(input_data, dict):
             if any(
                 key in input_data for key in ["graph", "nodes", "edges", "evidence"]
