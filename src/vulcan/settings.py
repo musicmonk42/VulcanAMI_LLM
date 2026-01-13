@@ -215,6 +215,22 @@ class Settings(BaseSettings):
     classification_llm_model: str = Field(
         default="gpt-4o-mini", env="CLASSIFICATION_LLM_MODEL"
     )
+    
+    # ================================================================
+    # TOOL SELECTOR LLM CLASSIFICATION INTEGRATION
+    # Configuration for integrating QueryClassifier into ToolSelector
+    # ================================================================
+    # Enable LLM classification in ToolSelector candidate generation
+    # When True: ToolSelector will use QueryClassifier as primary tool selection
+    # When False: ToolSelector will use SemanticToolMatcher + BayesianMemoryPrior only
+    tool_selector_use_llm_classification: bool = Field(
+        default=True, env="TOOL_SELECTOR_USE_LLM_CLASSIFICATION"
+    )
+    # Minimum confidence threshold for using LLM classification results
+    # If LLM confidence < threshold, fall back to semantic matching
+    tool_selector_llm_confidence_threshold: float = Field(
+        default=0.8, env="TOOL_SELECTOR_LLM_CONFIDENCE_THRESHOLD"
+    )
 
     class Config:
         env_file = ".env"

@@ -70,6 +70,17 @@ try:
 except ImportError:
     MATH_VERIFICATION_AVAILABLE = False
 
+# QueryClassifier availability for LLM-based tool selection
+try:
+    from ...routing.query_classifier import (
+        classify_query,
+        QueryClassification,
+        QueryClassifier,
+    )
+    QUERY_CLASSIFIER_AVAILABLE = True
+except ImportError:
+    QUERY_CLASSIFIER_AVAILABLE = False
+
 
 __all__ = [
     # Main Orchestrator
@@ -104,6 +115,7 @@ __all__ = [
     "SEMANTIC_MATCHER_AVAILABLE",
     "CIRCUIT_BREAKER_AVAILABLE",
     "MATH_VERIFICATION_AVAILABLE",
+    "QUERY_CLASSIFIER_AVAILABLE",
 ]
 
 # Add optional components to __all__ if they were imported successfully
@@ -120,3 +132,6 @@ if CIRCUIT_BREAKER_AVAILABLE:
         "get_circuit_breaker_stats",
         "reset_embedding_circuit_breaker",
     ])
+
+if QUERY_CLASSIFIER_AVAILABLE:
+    __all__.extend(["classify_query", "QueryClassification", "QueryClassifier"])
