@@ -204,15 +204,6 @@ class _LLMClientWrapper:
             Exception: If LLM call fails
         """
         try:
-            # Get or create event loop
-            try:
-                loop = asyncio.get_running_loop()
-            except RuntimeError:
-                # No running loop, create a new one
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                self._loop = loop
-            
             # Build prompt from messages
             prompt = messages[-1]["content"] if messages else ""
             system_prompt = None
@@ -231,14 +222,17 @@ class _LLMClientWrapper:
                 )
                 return result.get("text", "")
             
-            # Run with timeout
-            if loop.is_running():
-                # Already have a running loop, use run_coroutine_threadsafe
+            # Try to get running loop, but don't set as default to avoid conflicts
+            try:
+                loop = asyncio.get_running_loop()
+                # Running loop exists - use run_coroutine_threadsafe
+                # This handles the case where we're called from async context
                 future = asyncio.run_coroutine_threadsafe(_async_execute(), loop)
                 return future.result(timeout=self.timeout)
-            else:
-                # Create task with timeout
-                return loop.run_until_complete(
+            except RuntimeError:
+                # No running loop - use asyncio.run (Python 3.7+)
+                # This creates a new event loop for the coroutine and closes it after
+                return asyncio.run(
                     asyncio.wait_for(_async_execute(), timeout=self.timeout)
                 )
                 
@@ -1249,11 +1243,17 @@ class QueryClassifier:
             return greeting_result
         
         # Check if LLM-first classification is enabled
+        # Default to keyword-first for safety when settings unavailable
         try:
             from vulcan.settings import settings
             llm_first_enabled = settings.llm_first_classification
         except (ImportError, AttributeError):
-            llm_first_enabled = True  # Default to LLM-first
+            # SAFETY: Default to False (keyword-first) when settings unavailable
+            # This ensures graceful degradation if configuration system fails
+            llm_first_enabled = False
+            logger.warning(
+                "[QueryClassifier] Settings unavailable, defaulting to keyword-first mode"
+            )
         
         if llm_first_enabled:
             # LLM-FIRST MODE: Try LLM before keywords
