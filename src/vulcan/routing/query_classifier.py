@@ -1227,7 +1227,12 @@ class QueryClassifier:
         # This caused skip_reasoning=True and bypassed the cryptographic engine entirely.
         #
         # Solution: Check cryptographic keywords BEFORE factual patterns.
-        # Priority order: MATHEMATICAL_PROOF > LANGUAGE > CRYPTOGRAPHIC > FACTUAL
+        # 
+        # Checking order (independent checks with early returns):
+        #   1. MATHEMATICAL_PROOF patterns (checked first)
+        #   2. LANGUAGE_REASONING patterns (checked second)
+        #   3. CRYPTOGRAPHIC patterns (checked third)
+        #   4. FACTUAL patterns (checked later in the method)
         #
         # FIX: Use word-boundary matching for short keywords to prevent false positives
         # like "mac" matching "machine" (experience machine → CRYPTOGRAPHIC instead of PHILOSOPHICAL)

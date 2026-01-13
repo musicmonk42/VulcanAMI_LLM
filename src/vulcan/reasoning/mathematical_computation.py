@@ -1078,8 +1078,9 @@ result = simplify(integral)
                     'forall', 'exists', 'formalize', 'fol', 
                     'first-order logic', 'first order logic',
                     'predicate logic', 'quantifier', 'universal quantifier', 'existential',
-                    # FIX Issue #3: Only reject PURE logic proofs (not math proofs)
-                    # Removed generic "prove that", "verify proof" - only reject if no math indicators
+                    # FIX Issue #3: Removed overly broad patterns to avoid rejecting math proofs
+                    # Removed: 'prove that', 'verify proof', 'check proof', 'theorem', 'axiom'
+                    # These are kept ONLY in logic-specific context below
                     'logic proof', 'logical proof', 'proof of logic',
                     'theorem in logic', 'axiom of logic', 'logical axiom',
                     # Logic validation - ROOT CAUSE FIX: Added

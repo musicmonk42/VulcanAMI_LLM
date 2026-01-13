@@ -293,9 +293,10 @@ class TestIssue4LaTeXNotationPreservation:
         text = "lim x→a [f(x)/g(x)]"
         lexer = Lexer(text, preprocess=True)
         
-        # After preprocessing, should still contain '/' for fraction
-        assert '/' in lexer.text or 'or' not in lexer.text, (
-            "Fraction notation should be preserved, not converted to 'or'"
+        # After preprocessing, should preserve '/' for fraction
+        # The "/" should not be converted to " or " in mathematical context
+        assert '/' in lexer.text, (
+            f"Fraction notation should be preserved, not converted. Got: {lexer.text}"
         )
     
     def test_derivative_notation_preserved(self):
@@ -323,9 +324,9 @@ class TestIssue4LaTeXNotationPreservation:
         text = "The ratio is 3/4"
         lexer = Lexer(text, preprocess=True)
         
-        # Should preserve numeric fraction
-        assert '/' in lexer.text or '3' in lexer.text, (
-            "Numeric fraction should be preserved"
+        # Should preserve numeric fraction - both '3/4' or at minimum '/' and '3' together
+        assert '/' in lexer.text and '3' in lexer.text and '4' in lexer.text, (
+            f"Numeric fraction 3/4 should be preserved. Got: {lexer.text}"
         )
     
     def test_non_math_slash_still_converted(self):

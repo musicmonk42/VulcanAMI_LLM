@@ -160,7 +160,8 @@ class Lexer:
             r'lim\s*_{[^}]+}',  # LaTeX limits: lim_{x→a}
             r'lim\s+[a-z]→',    # Unicode limits: lim x→a
             r'd\s*/\s*d[a-z]',  # Derivatives: d/dx, dy/dt
-            r'\b[a-z]\s*\([^)]*\)\s*/\s*[a-z]\s*\([^)]*\)',  # Fractions: f(x)/g(x)
+            # FIX: Simplified regex to avoid nested quantifiers - more efficient
+            r'[a-z]\([^)]+\)\s*/\s*[a-z]\([^)]+\)',  # Fractions: f(x)/g(x)
             r'\d+\s*/\s*\d+',   # Numeric fractions: 3/4, 10/2
             r'[a-z]\s*/\s*[a-z]',  # Variable fractions: x/y
         ]
