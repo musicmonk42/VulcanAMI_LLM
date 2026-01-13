@@ -1271,13 +1271,16 @@ class GraphixArena:
                     "This may cause performance issues or startup delays."
                 )
         else:
-            # Use config file setting (which is auto-disabled in limited /dev/shm environments)
-            enable_ray = ray_enabled_in_config
-            if not enable_ray and limited_shm:
+            # Use config file setting, BUT auto-disable in limited /dev/shm environments
+            # The config file may have enabled: true, but we override to false in cloud environments
+            if limited_shm and ray_enabled_in_config:
                 logger.info(
                     "☁️ Ray auto-disabled: limited /dev/shm detected (cloud/container environment). "
                     "Using subprocess execution. Set VULCAN_ENABLE_RAY=1 to override."
                 )
+                enable_ray = False
+            else:
+                enable_ray = ray_enabled_in_config
         
         if enable_ray and RAY_AVAILABLE and ray is not None and ArenaWorker is not None:
             try:
