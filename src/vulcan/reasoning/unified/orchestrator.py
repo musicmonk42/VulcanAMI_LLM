@@ -147,9 +147,12 @@ MATH_SYMBOLS_PATTERN = re.compile(
 )
 
 # Probability notation: P(X), P(X|Y), Pr(A), etc.
+# Note: Pattern supports both ASCII pipe '|' (U+007C) and mathematical vertical bar '∣' (U+2223)
+# for conditional probability notation. The latter is the proper Unicode mathematical symbol,
+# but many users type the ASCII version, so we support both for robustness.
 PROBABILITY_NOTATION_PATTERN = re.compile(
     r'P\s*\([^)]+\)|'  # P(X), P(Disease)
-    r'P\s*\([^)]+\s*[|∣]\s*[^)]+\)|'  # P(X|Y), P(Disease|Test+)
+    r'P\s*\([^)]+\s*[|∣]\s*[^)]+\)|'  # P(X|Y), P(Disease|Test+) - supports both | and ∣
     r'Pr\s*\([^)]+\)|'  # Pr(X) - alternative notation
     r'E\s*\[[^\]]+\]|'  # E[X] - expected value
     r'Var\s*\([^)]+\)',  # Var(X) - variance

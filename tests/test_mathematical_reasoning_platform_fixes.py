@@ -22,6 +22,7 @@ Industry Standards Applied:
 
 import pytest
 import re
+import time
 from typing import Dict, Any
 
 # Try to import the modules - handle missing dependencies gracefully
@@ -256,22 +257,20 @@ class TestPatternPerformance:
     def test_pattern_compilation(self):
         """Patterns should be pre-compiled for performance"""
         # All patterns should be compiled regex objects
-        assert isinstance(MATH_SYMBOLS_PATTERN, re.Pattern), \
-            "MATH_SYMBOLS_PATTERN should be compiled"
-        assert isinstance(PROBABILITY_NOTATION_PATTERN, re.Pattern), \
-            "PROBABILITY_NOTATION_PATTERN should be compiled"
-        assert isinstance(INDUCTION_PATTERN, re.Pattern), \
-            "INDUCTION_PATTERN should be compiled"
-        assert isinstance(MATH_EXPRESSION_PATTERN, re.Pattern), \
-            "MATH_EXPRESSION_PATTERN should be compiled"
-        assert isinstance(MATH_QUERY_PATTERN, re.Pattern), \
-            "MATH_QUERY_PATTERN should be compiled"
+        patterns_to_check = [
+            (MATH_SYMBOLS_PATTERN, "MATH_SYMBOLS_PATTERN"),
+            (PROBABILITY_NOTATION_PATTERN, "PROBABILITY_NOTATION_PATTERN"),
+            (INDUCTION_PATTERN, "INDUCTION_PATTERN"),
+            (MATH_EXPRESSION_PATTERN, "MATH_EXPRESSION_PATTERN"),
+            (MATH_QUERY_PATTERN, "MATH_QUERY_PATTERN"),
+        ]
+        
+        for pattern, name in patterns_to_check:
+            assert isinstance(pattern, re.Pattern), f"{name} should be compiled"
     
     @pytest.mark.benchmark
     def test_pattern_matching_speed(self):
         """Pattern matching should be fast (< 1ms per query)"""
-        import time
-        
         queries = [
             "Compute exactly: ∑_{k=1}^n (2k-1). Then verify by induction.",
             "Calculate ∫ x^2 dx from 0 to 1",
@@ -310,7 +309,13 @@ class TestRegressionPrevention:
             "Basic arithmetic must still be detected"
     
     def test_simple_probability_queries_still_work(self):
-        """Simple probability queries should still work"""
+        """Simple probability queries should still work
+        
+        Note: This test accesses the private method _is_probability_query() directly
+        to ensure regression prevention for the gate check logic, which is critical
+        for routing queries correctly. The public interface (reason()) would require
+        full system setup and wouldn't isolate this specific functionality.
+        """
         from vulcan.reasoning.probabilistic_reasoning import ProbabilisticReasoner
         reasoner = ProbabilisticReasoner()
         assert reasoner._is_probability_query("What is the probability of heads?"), \
