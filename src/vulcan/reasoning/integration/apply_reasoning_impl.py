@@ -256,6 +256,7 @@ def apply_reasoning(
                         reasoning_strategy=strategy_type,
                         confidence=wm_result["confidence"],
                         rationale=wm_result.get("reasoning", "World model introspection"),
+                        override_router_tools=True,  # Self-introspection MUST use world_model
                         metadata={
                             "query_type": query_type,
                             "complexity": complexity,
@@ -268,6 +269,8 @@ def apply_reasoning(
                             "reasoning_type": reasoning_type,
                             "aspect": wm_result.get("aspect", "general"),
                             "selection_time_ms": selection_time,
+                            "classifier_is_authoritative": True,
+                            "is_self_introspection": is_self_ref,
                         },
                     )
 
@@ -362,14 +365,32 @@ def apply_reasoning(
                 # The LLM classifier correctly identifies simple factual queries
                 # (e.g., "What is the capital of France?") but QueryRouter may
                 # incorrectly override with specialized tools like ['probabilistic'].
-                # Respect the LLM classifier's judgment for these categories.
-                # Note: Added CREATIVE and CHITCHAT to skip reasoning
-                # Note: Added SELF_INTROSPECTION - these must use world_model tool
+                # =================================================================
+                # FIX: Only truly simple categories that NEVER need reasoning
+                # =================================================================
+                # Previously, FACTUAL and CONVERSATIONAL were in SIMPLE_QUERY_CATEGORIES,
+                # but these can contain reasoning queries that got misclassified.
+                # Now we only treat GREETING and CHITCHAT as truly simple.
+                # =================================================================
+                TRULY_SIMPLE_CATEGORIES = frozenset([
+                    'GREETING', 'CHITCHAT', 'greeting', 'chitchat'
+                ])
+                
+                # Categories that might be simple but could also need reasoning
+                # We'll check these more carefully and not override if they have reasoning tools
                 SIMPLE_QUERY_CATEGORIES = frozenset([
                     'FACTUAL', 'CONVERSATIONAL', 'UNKNOWN', 'GREETING',
                     'CREATIVE', 'CHITCHAT',  # Note: Creative/chitchat skip reasoning
                     'factual', 'conversational', 'unknown', 'greeting',
                     'creative', 'chitchat',  # lowercase variants
+                ])
+                
+                # Reasoning categories that should NEVER be overridden to ['general']
+                REASONING_CATEGORIES = frozenset([
+                    'PROBABILISTIC', 'LOGICAL', 'CAUSAL', 'MATHEMATICAL', 'ANALOGICAL', 
+                    'PHILOSOPHICAL', 'SYMBOLIC', 'LANGUAGE',
+                    'probabilistic', 'logical', 'causal', 'mathematical', 'analogical',
+                    'philosophical', 'symbolic', 'language',
                 ])
                 
                 # Note: Self-introspection queries MUST use world_model tool
@@ -468,28 +489,46 @@ def apply_reasoning(
                         context['original_query_type'] = original_query_type  # FIX: Track original for debugging
                 
                 elif classification.category in SIMPLE_QUERY_CATEGORIES:
-                    # For simple queries, ensure we use general tools
-                    if classification.suggested_tools != ['general']:
-                        logger.warning(
-                            f"{LOG_PREFIX} FIX#4: LLM classifier suggested "
-                            f"{classification.suggested_tools} for category "
-                            f"{classification.category}, overriding to ['general'] "
-                            f"for simple factual query"
-                        )
-                        classification.suggested_tools = ['general']
-                        if context is None:
-                            context = {}
-                        context['classifier_suggested_tools'] = ['general']
-                    
-                    # Set flag to prevent router override downstream
-                    if context is None:
-                        context = {}
-                    context['prevent_router_tool_override'] = True
-                    context['classifier_is_authoritative'] = True
-                    logger.info(
-                        f"{LOG_PREFIX} FIX#4: Preventing router tool override - "
-                        f"LLM classifier identified this as {classification.category}"
+                    # =================================================================
+                    # FIX: Check if we should override or respect classifier's tools
+                    # =================================================================
+                    # Don't override if:
+                    # 1. Context says prevent override
+                    # 2. Classifier explicitly suggested reasoning tools
+                    # 3. Category is a reasoning category
+                    should_not_override = (
+                        context and context.get('prevent_router_tool_override') or
+                        context and context.get('classifier_is_authoritative') or
+                        classification.category in REASONING_CATEGORIES or
+                        (classification.suggested_tools and 
+                         any(t.lower() in REASONING_CATEGORIES for t in classification.suggested_tools))
                     )
+                    
+                    if not should_not_override:
+                        # Only truly simple queries get general tools
+                        if classification.category in TRULY_SIMPLE_CATEGORIES:
+                            if classification.suggested_tools != ['general']:
+                                logger.info(
+                                    f"{LOG_PREFIX} Simple greeting/chitchat detected - using ['general']"
+                                )
+                                classification.suggested_tools = ['general']
+                                if context is None:
+                                    context = {}
+                                context['classifier_suggested_tools'] = ['general']
+                                context['prevent_router_tool_override'] = True
+                                context['classifier_is_authoritative'] = True
+                        else:
+                            # FACTUAL, CONVERSATIONAL etc. - check if they have reasoning keywords
+                            # Don't override - let the classifier's suggested_tools stand
+                            logger.debug(
+                                f"{LOG_PREFIX} Category {classification.category} - keeping classifier tools: "
+                                f"{classification.suggested_tools}"
+                            )
+                    else:
+                        logger.debug(
+                            f"{LOG_PREFIX} Not overriding - category {classification.category} has "
+                            f"reasoning tools or override prevention flag set"
+                        )
                     
             except ImportError:
                 logger.debug(f"{LOG_PREFIX} QueryClassifier not available, using heuristic fallback")

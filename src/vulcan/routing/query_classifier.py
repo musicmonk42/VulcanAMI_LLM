@@ -2158,48 +2158,78 @@ class QueryClassifier:
         if len(sanitized_query) > 500:
             sanitized_query = sanitized_query[:500] + "..."
         
-        prompt = f'''Classify this query into ONE category based on its PRIMARY intent:
+        prompt = f'''Classify this query into exactly ONE category.
 
-CATEGORIES (with tool mappings):
-- LOGICAL: SAT problems, symbolic logic, formal proofs, propositional logic
-  Tools: ['symbolic', 'sat_solver']
-- CAUSAL: Causal inference, confounding, interventions, Pearl-style reasoning, DAGs
-  Tools: ['causal', 'dag_analyzer']
-- PROBABILISTIC: Bayesian inference, probability calculations, statistical reasoning
-  Tools: ['probabilistic', 'bayesian']
-- MATHEMATICAL: Proofs, calculus, algebra, theorem proving, numerical computation
-  Tools: ['mathematical', 'symbolic']
-- ANALOGICAL: Domain mapping, analogical reasoning, transfer learning, metaphors
-  Tools: ['analogical', 'structure_mapper']
-- SELF_INTROSPECTION: Questions about AI's nature, capabilities, consciousness, existence
-  Tools: ['world_model', 'philosophical']
-- PHILOSOPHICAL: Ethical dilemmas, trolley problems, moral reasoning (about external situations)
-  Tools: ['philosophical', 'ethical_reasoner']
-- FACTUAL: Simple factual questions, definitions, knowledge retrieval
-  Tools: ['general', 'knowledge_base']
-- CREATIVE: Creative writing, stories, poems, imaginative content
-  Tools: ['creative', 'generative']
-- CONVERSATIONAL: Casual conversation, chitchat, non-analytical queries
-  Tools: ['general']
-- UNKNOWN: None of the above or unclear intent
-  Tools: ['general']
+CATEGORIES (choose the MOST SPECIFIC match):
+
+- PROBABILISTIC: Bayesian inference, conditional probability, P(X|Y), Bayes' theorem,
+  sensitivity/specificity, base rates, posterior probability, likelihood ratios,
+  probability distributions, expected value, random variables.
+  Examples: "What is P(disease|positive test)?", "Bayes with sensitivity 0.99",
+  "Calculate the posterior probability"
+  Tools: ["probabilistic"]
+
+- LOGICAL: Propositional logic, satisfiability (SAT), CNF/DNF, logical connectives
+  (→, ∧, ∨, ¬), validity, tautology, first-order logic (FOL), quantifiers (∀, ∃),
+  syllogisms, formal proofs, theorem proving.
+  Examples: "Is A→B, B→C, ¬C satisfiable?", "Prove using modus ponens",
+  "Formalize in first-order logic"
+  Tools: ["symbolic"]
+
+- CAUSAL: Causal inference, confounding variables, interventions, do-calculus,
+  causal graphs (DAGs), counterfactuals, Pearl's framework, cause and effect,
+  causal discovery, treatment effects.
+  Examples: "Does X cause Y or is it confounded?", "What is the causal effect?",
+  "Draw the causal DAG"
+  Tools: ["causal"]
+
+- MATHEMATICAL: Numerical computation, calculus (derivatives, integrals), algebra,
+  arithmetic, equations, matrices, optimization, statistics (non-Bayesian).
+  Examples: "Calculate 2+2", "Find the derivative of x^2", "Solve for x"
+  Tools: ["mathematical"]
+
+- ANALOGICAL: Structure mapping, analogies, metaphors, domain transfer.
+  Examples: "How is X like Y?", "Map the analogy between domains"
+  Tools: ["analogical"]
+
+- PHILOSOPHICAL: Ethics, trolley problem, thought experiments, consciousness.
+  Examples: "Is it ethical to...", "The trolley problem"
+  Tools: ["philosophical", "world_model"]
+
+- SELF_INTROSPECTION: Questions about the AI's nature, capabilities, feelings.
+  Examples: "What are you?", "Can you feel emotions?"
+  Tools: ["world_model"]
+
+- GREETING: Simple greetings (hello, hi, thanks, bye)
+  Tools: ["general"]
+- CHITCHAT: Casual conversation (how are you)
+  Tools: ["general"]
+- FACTUAL: Simple fact lookups (what is X, who is Y)
+  Tools: ["general"]
+- CREATIVE: Writing requests (write a poem, story)
+  Tools: ["general"]
+
+CRITICAL DISTINCTIONS:
+- "Bayes" or "P(X|Y)" or "sensitivity/specificity" → PROBABILISTIC (NOT MATHEMATICAL)
+- "→" or "∧" or "satisfiable" or "SAT" → LOGICAL (NOT MATHEMATICAL)
+- "cause" or "confound" or "intervention" → CAUSAL (NOT PROBABILISTIC)
+- Numbers with +/-/*/ operations only → MATHEMATICAL
 
 Query: "{sanitized_query}"
 
-Respond ONLY with valid JSON in this exact format:
-{{"category": "CATEGORY_NAME", "complexity": 0.0-1.0, "skip_reasoning": false, "tools": ["tool1", "tool2"]}}
+Respond with JSON only:
+{{"category": "CATEGORY_NAME", "complexity": 0.0-1.0, "skip_reasoning": true/false, "tools": ["tool_name"]}}
 
-Guidelines for complexity:
-- 0.0-0.2: Very simple (greetings, basic factual)
-- 0.3-0.5: Moderate (standard factual, simple analysis)
-- 0.6-0.8: Complex (multi-step reasoning, technical analysis)
-- 0.9-1.0: Very complex (formal proofs, advanced mathematical derivations)
-
-Examples:
-{{"category": "SELF_INTROSPECTION", "complexity": 0.40, "skip_reasoning": false, "tools": ["world_model", "philosophical"]}}
-{{"category": "LOGICAL", "complexity": 0.90, "skip_reasoning": false, "tools": ["symbolic", "sat_solver"]}}
-{{"category": "FACTUAL", "complexity": 0.20, "skip_reasoning": false, "tools": ["general"]}}
-{{"category": "CONVERSATIONAL", "complexity": 0.10, "skip_reasoning": true, "tools": ["general"]}}'''
+TOOL MAPPINGS:
+- PROBABILISTIC → ["probabilistic"]
+- LOGICAL → ["symbolic"]
+- CAUSAL → ["causal"]
+- MATHEMATICAL → ["mathematical"]
+- ANALOGICAL → ["analogical"]
+- PHILOSOPHICAL → ["philosophical", "world_model"]
+- SELF_INTROSPECTION → ["world_model"]
+- GREETING/CHITCHAT/FACTUAL/CREATIVE → ["general"]
+'''
 
         try:
             # Call LLM (implementation depends on client interface)

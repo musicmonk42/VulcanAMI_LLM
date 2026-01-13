@@ -336,6 +336,10 @@ class ReasoningResult:
         rationale: Human-readable explanation of the selection decision
         metadata: Additional context information about the selection
         routing_decision: Optional audit trail for tool selection
+        override_router_tools: Explicit flag to indicate this result should override
+            router's selection. Only set to True when the integration has HIGH 
+            confidence that its classification is correct (e.g., self-introspection,
+            explicit delegation). Default is False, meaning router's tools are preferred.
     """
 
     selected_tools: List[str]
@@ -344,6 +348,11 @@ class ReasoningResult:
     rationale: str
     metadata: Dict[str, Any] = field(default_factory=dict)
     routing_decision: Optional[RoutingDecision] = None
+    
+    # NEW: Explicit flag to indicate this result should override router's selection
+    # Only set to True when the integration has HIGH confidence that its
+    # classification is correct (e.g., self-introspection, explicit delegation)
+    override_router_tools: bool = False
 
     def __post_init__(self) -> None:
         """Validate result data after initialization."""
