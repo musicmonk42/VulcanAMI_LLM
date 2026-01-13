@@ -144,6 +144,18 @@ except ImportError:
         logger.debug("Outcome bridge not available - implicit feedback disabled")
 
 
+# Import QueryClassifier for LLM-based tool classification
+try:
+    from ...routing.query_classifier import classify_query, QueryClassification
+    QUERY_CLASSIFIER_AVAILABLE = True
+    logger.info("QueryClassifier imported for LLM-based tool selection")
+except ImportError as e:
+    logger.warning(f"QueryClassifier not available: {e}")
+    QUERY_CLASSIFIER_AVAILABLE = False
+    classify_query = None
+    QueryClassification = None
+
+
 # Import mathematical verification for accuracy feedback
 # This enables learning from mathematical reasoning accuracy
 try:
@@ -429,6 +441,15 @@ MULTIMODAL_TIME_BUDGET_MULTIPLIER = 3.0  # Allow multimodal more time headroom
 CANDIDATE_PRIOR_THRESHOLD = 0.15  # Minimum prior probability to be a candidate
 CANDIDATE_MAX_COUNT = 2  # Maximum number of candidates (1-2 tools, not 5)
 CANDIDATE_DOMINANCE_RATIO = 2.0  # If top tool has 2x the prior, use only that tool
+
+# ==============================================================================
+# LLM Classification Integration Configuration
+# ==============================================================================
+# Configuration for integrating QueryClassifier's LLM-based classification
+# into ToolSelector's candidate generation pipeline.
+LLM_CLASSIFICATION_ENABLED = True  # Feature flag to enable/disable LLM classification
+LLM_CLASSIFICATION_CONFIDENCE_THRESHOLD = 0.8  # Minimum confidence to use LLM result
+LLM_CLASSIFICATION_TIMEOUT = 3.0  # Seconds - timeout for LLM classification call
 
 
 class MultiTierFeatureExtractor:
@@ -5232,6 +5253,92 @@ class ToolSelector:
             logger.error(f"Feature refinement failed: {e}")
             return features
 
+    def _extract_query_text(self, problem: Any) -> str:
+        """
+        Extract query text from problem for classification.
+        
+        Args:
+            problem: The problem object (can be string, dict, or object with attributes)
+            
+        Returns:
+            Query text string extracted from problem
+        """
+        if isinstance(problem, str):
+            return problem
+        elif isinstance(problem, dict):
+            # Try common keys
+            for key in ['query', 'text', 'question', 'problem', 'input']:
+                if key in problem:
+                    return str(problem[key])
+            return str(problem)
+        elif hasattr(problem, 'query'):
+            return str(problem.query)
+        elif hasattr(problem, 'text'):
+            return str(problem.text)
+        else:
+            return str(problem)[:1000]  # Truncate for safety
+    
+    def _get_llm_classification(
+        self, 
+        query_text: str, 
+        safe_tools: List[str]
+    ) -> Optional[List[str]]:
+        """
+        Get tool candidates from LLM-based QueryClassifier.
+        
+        Args:
+            query_text: The query to classify
+            safe_tools: List of tools that passed safety checks
+            
+        Returns:
+            List of candidate tool names, or None if classification failed/low confidence
+        """
+        if not LLM_CLASSIFICATION_ENABLED or not QUERY_CLASSIFIER_AVAILABLE:
+            return None
+        
+        try:
+            classification = classify_query(query_text)
+            
+            logger.debug(
+                f"[ToolSelector] LLM classification: category={classification.category}, "
+                f"confidence={classification.confidence:.2f}, "
+                f"suggested_tools={classification.suggested_tools}"
+            )
+            
+            # Check confidence threshold
+            if classification.confidence < LLM_CLASSIFICATION_CONFIDENCE_THRESHOLD:
+                logger.debug(
+                    f"[ToolSelector] LLM confidence {classification.confidence:.2f} "
+                    f"below threshold {LLM_CLASSIFICATION_CONFIDENCE_THRESHOLD}, using fallback"
+                )
+                return None
+            
+            # Filter to safe tools only
+            candidates = [
+                tool for tool in classification.suggested_tools 
+                if tool in safe_tools
+            ]
+            
+            if not candidates:
+                logger.debug(
+                    f"[ToolSelector] No LLM-suggested tools in safe_tools list, using fallback"
+                )
+                return None
+            
+            # Limit candidates
+            candidates = candidates[:CANDIDATE_MAX_COUNT]
+            
+            logger.info(
+                f"[ToolSelector] Using LLM classification: {candidates} "
+                f"(category={classification.category}, confidence={classification.confidence:.2f})"
+            )
+            
+            return candidates
+            
+        except Exception as e:
+            logger.warning(f"[ToolSelector] LLM classification failed: {e}, using fallback")
+            return None
+    
     def _generate_candidates(
         self,
         request: SelectionRequest,
@@ -5248,9 +5355,74 @@ class ToolSelector:
         
         When semantic matching returns {causal: 0.70, symbolic: 0.08, ...}, 
         we only run the clearly winning tool, not all 5 tools.
+        
+        Integration with LLM Classification:
+        1. Extract query text from problem
+        2. Call LLM classifier for high-confidence tool suggestions
+        3. If confidence >= 0.8, use LLM-suggested tools as primary candidates
+        4. Fall back to SemanticToolMatcher + BayesianMemoryPrior if LLM fails/low confidence
         """
         candidates = []
 
+        # ==============================================================================
+        # PHASE 1: Try LLM classification first (PRIMARY PATH)
+        # ==============================================================================
+        try:
+            # Extract query text from the problem
+            query_text = self._extract_query_text(request.problem)
+            
+            # Get LLM classification candidates
+            llm_candidates = self._get_llm_classification(query_text, safe_tools)
+            
+            if llm_candidates:
+                # LLM classification succeeded with high confidence
+                # Build candidate list using LLM-suggested tools
+                for tool_name in llm_candidates:
+                    cost_dist = self.cost_model.predict_cost(tool_name, features)
+                    
+                    time_budget = request.constraints.get("time_budget_ms", float("inf"))
+                    if tool_name == "multimodal":
+                        time_budget *= MULTIMODAL_TIME_BUDGET_MULTIPLIER
+                    
+                    if cost_dist["time"]["mean"] > time_budget:
+                        logger.debug(f"Tool {tool_name} filtered: cost > budget")
+                        continue
+                    if cost_dist["energy"]["mean"] > request.constraints.get("energy_budget_mj", float("inf")):
+                        continue
+                    
+                    # High quality estimate for LLM-selected tools
+                    quality_estimate = 0.9  # LLM has high confidence
+                    
+                    candidates.append({
+                        "tool": tool_name,
+                        "utility": self.utility_model.compute_utility(
+                            quality=quality_estimate,
+                            time=cost_dist["time"]["mean"],
+                            energy=cost_dist["energy"]["mean"],
+                            risk=0.1,  # Low risk for LLM-selected tools
+                            context={"mode": request.mode.value},
+                        ),
+                        "quality": quality_estimate,
+                        "cost": cost_dist,
+                        "prior": 0.9,  # High prior for LLM selection
+                        "source": "llm_classification",
+                    })
+                
+                if candidates:
+                    logger.info(
+                        f"[ToolSelector] Using {len(candidates)} LLM-classified candidates: "
+                        f"{[c['tool'] for c in candidates]}"
+                    )
+                    candidates.sort(key=lambda x: x["utility"], reverse=True)
+                    return candidates
+                else:
+                    logger.debug("[ToolSelector] LLM candidates filtered by budget, falling back")
+        except Exception as e:
+            logger.warning(f"[ToolSelector] LLM classification error: {e}, using fallback")
+
+        # ==============================================================================
+        # PHASE 2: Fallback to SemanticToolMatcher + BayesianMemoryPrior
+        # ==============================================================================
         try:
             tool_priors = prior_dist.tool_probs if hasattr(prior_dist, 'tool_probs') and prior_dist.tool_probs else {}
             
