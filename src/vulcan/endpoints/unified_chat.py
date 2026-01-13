@@ -1672,7 +1672,7 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
         # FIX (Jan 7 2026): Lowered from 0.3 to 0.15 to prevent unnecessary OpenAI fallbacks
         # for queries that reasoning engines handle correctly but with moderate confidence.
         # Configurable via VULCAN_MIN_REASONING_CONFIDENCE environment variable.
-        MIN_REASONING_CONFIDENCE_THRESHOLD = float(os.environ.get("VULCAN_MIN_REASONING_CONFIDENCE", "0.15"))
+        MIN_REASONING_CONFIDENCE_THRESHOLD = float(os.environ.get("VULCAN_MIN_REASONING_CONFIDENCE", "0.10"))
         
         # Check if we should use reasoning results directly
         use_reasoning_directly = False

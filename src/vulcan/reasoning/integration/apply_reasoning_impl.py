@@ -585,6 +585,44 @@ def apply_reasoning(
             result.metadata["selection_time_ms"] = selection_time
 
             # ================================================================
+            # SEMANTIC BRIDGE FIX: Apply cross-domain knowledge transfer
+            # ================================================================
+            # The semantic bridge enables knowledge learned in one domain to be
+            # applied in related domains, improving reasoning quality for queries
+            # that span multiple conceptual areas.
+            # ================================================================
+            if self._should_use_cross_domain_transfer(
+                result.selected_tools, 
+                {"type": query_type, "complexity": complexity}
+            ):
+                try:
+                    logger.info(
+                        f"{LOG_PREFIX} Applying cross-domain knowledge transfer for "
+                        f"tools: {result.selected_tools}"
+                    )
+                    transfer_result = apply_cross_domain_transfer(
+                        orchestrator=self,
+                        query=query,
+                        query_analysis={"type": query_type, "complexity": complexity},
+                        selected_tools=result.selected_tools,
+                    )
+                    
+                    if transfer_result.get("success") and transfer_result.get("transfer_count", 0) > 0:
+                        logger.info(
+                            f"{LOG_PREFIX} Cross-domain transfer applied: "
+                            f"{transfer_result['transfer_count']} concepts transferred"
+                        )
+                        # Add transfer info to metadata
+                        result.metadata["cross_domain_transfer"] = transfer_result
+                    else:
+                        logger.debug(
+                            f"{LOG_PREFIX} Cross-domain transfer: {transfer_result.get('error', 'no concepts transferred')}"
+                        )
+                except Exception as e:
+                    # Cross-domain transfer is non-critical - log but don't fail
+                    logger.debug(f"{LOG_PREFIX} Cross-domain transfer failed (non-critical): {e}")
+
+            # ================================================================
             # META-REASONING VALIDATION FIX: Validate answer coherence
             # ================================================================
             # This critical validation layer catches cases where:

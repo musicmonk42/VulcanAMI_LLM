@@ -111,9 +111,10 @@ def apply_cross_domain_transfer(
         # Step 3: Get applicable concepts from primary domain
         applicable_concepts = []
         try:
+            # SEMANTIC BRIDGE FIX: Lower confidence threshold from 0.6 to 0.4
             applicable_concepts = orchestrator._semantic_bridge.get_applicable_concepts(
                 domain=primary_domain,
-                min_confidence=0.6,
+                min_confidence=0.4,
             )
         except Exception as e:
             logger.debug(f"{LOG_PREFIX} Failed to get applicable concepts: {e}")
@@ -130,9 +131,10 @@ def apply_cross_domain_transfer(
             
             # Get source domain concepts
             try:
+                # SEMANTIC BRIDGE FIX: Lower confidence threshold from 0.5 to 0.3
                 source_concepts = orchestrator._semantic_bridge.get_applicable_concepts(
                     domain=source_domain,
-                    min_confidence=0.5,
+                    min_confidence=0.3,
                 )
             except Exception as e:
                 logger.debug(f"{LOG_PREFIX} Failed to get concepts from {source_domain}: {e}")

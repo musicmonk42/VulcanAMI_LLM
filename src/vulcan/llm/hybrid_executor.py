@@ -679,7 +679,7 @@ class HybridLLMExecutor:
         openai_cache_max_size: int = 1000,
         openai_cache_ttl_seconds: int = 3600,  # 1 hour default
         prefer_reasoning: bool = True,  # TASK 2 FIX: Prefer reasoning engine results
-        reasoning_confidence_threshold: float = 0.5,  # TASK 2 FIX: Min confidence for reasoning
+        reasoning_confidence_threshold: float = 0.25,  # BUG #5 FIX: Lowered from 0.5 to 0.25 for partial reasoning success
     ):
         """
         Initialize the hybrid executor.

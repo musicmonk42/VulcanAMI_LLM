@@ -862,14 +862,16 @@ class SymbolicReasoner:
         
         try:
             # Use NL converter to generate FOL formalization
+            # BUG #2 FIX: convert() returns a string (the formula), not a dict
             fol_result = self.nl_converter.convert(query)
             
-            if fol_result and fol_result.get("success"):
+            # Handle string return type (successful conversion)
+            if isinstance(fol_result, str) and fol_result:
                 return {
                     "proven": True,
                     "confidence": 0.85,
-                    "fol_formalization": fol_result.get("formula", ""),
-                    "explanation": f"FOL formalization: {fol_result.get('formula', '')}",
+                    "fol_formalization": fol_result,
+                    "explanation": f"FOL formalization: {fol_result}",
                     "applicable": True,
                     "method": "fol_formalization",
                 }
@@ -920,9 +922,10 @@ class SymbolicReasoner:
         for statement in statements:
             try:
                 # Try to convert using NL converter
+                # BUG #2 FIX: convert() returns a string (the formula), not a dict
                 result = self.nl_converter.convert(statement)
-                if result and result.get("success"):
-                    formalizations.append(result.get("formula", statement))
+                if isinstance(result, str) and result:
+                    formalizations.append(result)
                 else:
                     # Add as-is with note
                     formalizations.append(f"# Unable to formalize: {statement}")

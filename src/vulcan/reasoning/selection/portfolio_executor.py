@@ -1051,7 +1051,13 @@ class PortfolioExecutor:
             return list(results.values())[0] if results else None
 
     def _score_result(self, result: Any) -> float:
-        """Score a result for comparison"""
+        """Score a result for comparison
+        
+        BUG #4 FIX: Prioritize successful results over failures.
+        When a specialized tool (like ProbabilisticEngine) returns a successful
+        result with reasonable confidence, it should not be overridden by a
+        generic tool's failure with low confidence.
+        """
 
         if result is None:
             return 0.0
@@ -1059,7 +1065,23 @@ class PortfolioExecutor:
         try:
             score = 0.5  # Base score
 
-            if hasattr(result, "confidence"):
+            # BUG #4 FIX: Handle dict results (most common from reasoning engines)
+            if isinstance(result, dict):
+                # Check if this is an error/failure result
+                has_error = result.get("error") is not None
+                has_result = "result" in result or "answer" in result or "conclusion" in result
+                
+                # If result has an error and no actual answer, penalize heavily
+                if has_error and not has_result:
+                    score = result.get("confidence", 0.1) * 0.5  # Reduce failed result score
+                else:
+                    # Get confidence from dict
+                    score = result.get("confidence", result.get("score", result.get("probability", 0.5)))
+                    
+                    # Bonus for successful results with actual content
+                    if has_result and score > 0.0:
+                        score = min(score * 1.1, 1.0)  # Small boost for results with content
+            elif hasattr(result, "confidence"):
                 score = result.confidence
             elif hasattr(result, "score"):
                 score = result.score

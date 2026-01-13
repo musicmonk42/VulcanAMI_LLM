@@ -2403,12 +2403,10 @@ class CuriosityEngine:
             for domain, description in synthetic_domains:
                 gap = KnowledgeGap(
                     type="exploration",
-                    description=f"Synthetic gap: {description}",
-                    estimated_difficulty=0.3,
-                    estimated_cost=10.0,
-                    expected_reward=5.0,
                     domain=domain,
                     priority=0.4,
+                    estimated_cost=10.0,
+                    metadata={"description": f"Synthetic gap: {description}", "expected_reward": 5.0},
                 )
                 synthetic_gaps.append(gap)
             
