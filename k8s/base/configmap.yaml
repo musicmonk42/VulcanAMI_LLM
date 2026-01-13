@@ -96,6 +96,15 @@ data:
   # Evidence: ISSUE-003 shows 66-80% of queries timeout at 10s threshold.
   # 30s allows embedding completion while still providing reasonable response times.
   QUERY_ROUTING_TIMEOUT: "30.0"
+  # LLM-First Query Classification Configuration (NEW FEATURE)
+  # Enable LLM-first classification for improved query understanding
+  # When true: Cache → Security → Greetings → LLM → Keywords (fallback)
+  # When false: Cache → Security → Greetings → Keywords → LLM (fallback)
+  LLM_FIRST_CLASSIFICATION: "true"
+  # LLM classification timeout in seconds (short to prevent blocking)
+  CLASSIFICATION_LLM_TIMEOUT: "3.0"
+  # LLM model for classification (gpt-4o-mini for speed and cost)
+  CLASSIFICATION_LLM_MODEL: "gpt-4o-mini"
   # VULCAN Internal LLM Timeout Configuration
   # TIMEOUT FIX: Increased from 15s to 30s per Claude diagnosis
   # 15s was causing timeouts before internal LLM could complete complex reasoning

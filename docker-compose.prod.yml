@@ -328,6 +328,11 @@ services:
       # PERFORMANCE FIX: Increased from 10s to 30s to reduce timeout rate.
       # Evidence: ISSUE-003 shows 66-80% of queries timeout at 10s threshold.
       - QUERY_ROUTING_TIMEOUT=${QUERY_ROUTING_TIMEOUT:-30.0}
+      # LLM-First Query Classification Configuration (NEW FEATURE)
+      # Enable LLM-first classification for improved semantic understanding
+      - LLM_FIRST_CLASSIFICATION=${LLM_FIRST_CLASSIFICATION:-true}
+      - CLASSIFICATION_LLM_TIMEOUT=${CLASSIFICATION_LLM_TIMEOUT:-3.0}
+      - CLASSIFICATION_LLM_MODEL=${CLASSIFICATION_LLM_MODEL:-gpt-4o-mini}
       # OpenAI Response Caching Configuration (Performance Optimization)
       # Enables LRU+TTL caching for OpenAI API responses to reduce costs and latency
       - OPENAI_CACHE_ENABLED=${OPENAI_CACHE_ENABLED:-true}

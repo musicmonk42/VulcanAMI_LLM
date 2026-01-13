@@ -393,6 +393,15 @@ spec:
         - name: SKIP_OPENAI
           value: {{ .Values.llm.openai.skipOpenai | default false | quote }}
         {{- end }}
+        {{- /* LLM-First Query Classification Configuration (NEW FEATURE) */}}
+        {{- if .Values.llm.classification }}
+        - name: LLM_FIRST_CLASSIFICATION
+          value: {{ .Values.llm.classification.llmFirst | default true | quote }}
+        - name: CLASSIFICATION_LLM_TIMEOUT
+          value: {{ .Values.llm.classification.timeout | default 3.0 | quote }}
+        - name: CLASSIFICATION_LLM_MODEL
+          value: {{ .Values.llm.classification.model | default "gpt-4o-mini" | quote }}
+        {{- end }}
         {{- end }}
         {{- if .Values.memorySystem.enabled }}
         # Vulcan Memory System v46 AWS credentials
