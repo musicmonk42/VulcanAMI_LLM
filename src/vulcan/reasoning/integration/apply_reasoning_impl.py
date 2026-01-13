@@ -591,10 +591,7 @@ def apply_reasoning(
             # applied in related domains, improving reasoning quality for queries
             # that span multiple conceptual areas.
             # ================================================================
-            if self._should_use_cross_domain_transfer(
-                result.selected_tools, 
-                {"type": query_type, "complexity": complexity}
-            ):
+            if self._should_use_cross_domain_transfer(result.selected_tools):
                 try:
                     logger.info(
                         f"{LOG_PREFIX} Applying cross-domain knowledge transfer for "
