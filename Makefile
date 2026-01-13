@@ -473,10 +473,18 @@ enable-openai-cache: ## Enable OpenAI response caching (Performance Optimization
 .PHONY: enable-ray
 enable-ray: ## Enable Ray workers for distributed execution (Fix #3)
 	@echo "$(GREEN)Enabling Ray workers...$(NC)"
-	@echo "Set RAY_ENABLED=true in your .env file"
 	@echo ""
-	@echo "RAY_ENABLED=true"
-	@echo "RAY_ADDRESS=auto"
+	@echo "$(YELLOW)⚠ CLOUD PLATFORM WARNING:$(NC)"
+	@echo "Ray is automatically DISABLED on cloud platforms (Railway, Render, Heroku)"
+	@echo "because they have limited /dev/shm (shared memory). Ray requires at least"
+	@echo "500MB of shared memory; Railway only provides 64MB."
+	@echo ""
+	@echo "For LOCAL Docker or Kubernetes, set in your .env file:"
+	@echo ""
+	@echo "VULCAN_ENABLE_RAY=1"
+	@echo ""
+	@echo "Also ensure --shm-size=10g (Docker) or 4Gi emptyDir (K8s) is configured."
+	@echo "See: make docker-run (includes --shm-size=10g by default)"
 
 .PHONY: prewarm-singletons
 prewarm-singletons: ## Prewarm reasoning singletons (Progressive Degradation Fix)

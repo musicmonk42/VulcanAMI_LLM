@@ -190,8 +190,14 @@ distillation:
 # Ray Configuration (Architectural Fix #3)
 # Ray Actors manage memory/CPU better than subprocess
 # The shared memory volume (/dev/shm) is automatically mounted by the deployment template
+#
+# CLOUD PLATFORM NOTE:
+# Ray is disabled by default because cloud platforms (Railway, Render, Heroku)
+# have limited /dev/shm (e.g., Railway only has 64MB). The application automatically
+# detects limited /dev/shm environments and disables Ray even if enabled here.
+# For Kubernetes with proper /dev/shm configuration (see shmSizeLimit), Ray works fine.
 ray:
-  enabled: false  # Set to true to enable Ray workers
+  enabled: false  # Set to true to enable Ray workers (only for K8s/Docker with adequate /dev/shm)
   address: "auto"  # Ray cluster address or "auto" for local
   numCpus: 4
   numGpus: 0
@@ -199,6 +205,7 @@ ray:
   # Shared memory size limit for Ray object store
   # Ray recommends at least 30% of available RAM for object store
   # This is automatically mounted at /dev/shm to prevent Ray warnings
+  # Minimum: 500MB (Ray object store requirement)
   shmSizeLimit: "4Gi"
   # Docker CPU warning suppression (always enabled to clean up logs)
   # Set RAY_DISABLE_DOCKER_CPU_WARNING=1 to suppress CPU detection warnings

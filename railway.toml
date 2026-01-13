@@ -28,6 +28,12 @@
 # - VULCAN_LLM_API_KEY: For self-improvement features (defaults to OPENAI_API_KEY)
 # - DATABASE_URL: PostgreSQL connection string
 # - REDIS_URL: Redis connection string
+# - VULCAN_ENABLE_RAY: Set to '1' to force-enable Ray (not recommended on Railway)
+#
+# RAY DISTRIBUTED COMPUTING:
+# Ray is automatically disabled on Railway due to limited /dev/shm (64MB).
+# This is normal and the application will use subprocess execution instead.
+# To force-enable Ray (may cause issues): VULCAN_ENABLE_RAY=1
 #
 # GIT PERSISTENCE (IMPORTANT FOR SELF-IMPROVEMENT):
 # To prevent the "Groundhog Day" loop where self-improvement fixes are lost on
