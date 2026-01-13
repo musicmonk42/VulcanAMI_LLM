@@ -1,0 +1,69 @@
+# VULCAN Runtime Configuration
+# ============================
+# Configuration for distributed computing and runtime execution
+# This file controls Ray initialization and subprocess execution settings
+
+distributed:
+  # Backend type: 'ray' or 'subprocess'
+  # When 'ray' is selected and Ray is available, distributed execution is enabled
+  # When 'subprocess' is selected, standard subprocess execution is used
+  backend: ray
+  
+  # Ray-specific configuration
+  ray:
+    # Enable Ray when available (overrides VULCAN_ENABLE_RAY env var if set)
+    enabled: true
+    
+    # Number of CPUs to use ('auto' = all available)
+    num_cpus: auto
+    
+    # Object store memory in bytes (e.g., 2GB = 2147483648)
+    # Set to 'auto' to let Ray decide
+    object_store_memory: auto
+    
+    # Dashboard configuration
+    include_dashboard: false
+    dashboard_host: '0.0.0.0'
+    dashboard_port: 8265
+    
+    # Logging level for Ray ('DEBUG', 'INFO', 'WARNING', 'ERROR')
+    logging_level: WARNING
+    
+    # Temporary directory for Ray (set to null for default)
+    temp_dir: null
+    
+    # Whether to automatically initialize Ray at startup
+    auto_init: true
+    
+    # Ignore reinitialization errors (safe default)
+    ignore_reinit_error: true
+
+  # Subprocess fallback configuration (used when Ray is disabled/unavailable)
+  subprocess:
+    # Timeout for subprocess execution in seconds
+    timeout: 300
+    
+    # Maximum number of concurrent subprocesses
+    max_workers: 4
+
+# Performance tuning
+performance:
+  # Enable worker reuse (reduces process startup overhead)
+  worker_reuse: true
+  
+  # Warm pool size for pre-initialized workers
+  warm_pool_size: 3
+  
+  # Task timeout in seconds
+  task_timeout: 60
+
+# Logging configuration for runtime events
+logging:
+  # Log Ray initialization events
+  log_ray_init: true
+  
+  # Log execution backend selection
+  log_backend_selection: true
+  
+  # Log performance metrics
+  log_metrics: true

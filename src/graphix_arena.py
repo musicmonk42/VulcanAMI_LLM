@@ -486,6 +486,93 @@ OUTPUT_END_MARKER = "###ARENA_OUTPUT_END###"
 
 
 # ============================================================
+# RUNTIME CONFIGURATION LOADER
+# ============================================================
+# Load distributed execution configuration from runtime.yaml
+# This enables Ray initialization based on configuration file settings
+# ============================================================
+
+def _load_runtime_config() -> Dict[str, Any]:
+    """
+    Load runtime configuration from configs/runtime.yaml.
+    
+    Returns:
+        Dictionary with runtime configuration, or empty dict if not found.
+    """
+    default_config = {
+        "distributed": {
+            "backend": "ray",
+            "ray": {
+                "enabled": True,  # Note: Changed default to True for performance
+                "num_cpus": "auto",
+                "object_store_memory": "auto",
+                "include_dashboard": False,
+                "logging_level": "WARNING",
+                "auto_init": True,
+                "ignore_reinit_error": True,
+            },
+            "subprocess": {
+                "timeout": 300,
+                "max_workers": 4,
+            },
+        },
+        "performance": {
+            "worker_reuse": True,
+            "warm_pool_size": 3,
+            "task_timeout": 60,
+        },
+        "logging": {
+            "log_ray_init": True,
+            "log_backend_selection": True,
+            "log_metrics": True,
+        },
+    }
+    
+    if not YAML_AVAILABLE:
+        logger.debug("YAML not available, using default runtime configuration")
+        return default_config
+    
+    try:
+        config_path = Path(__file__).parent.parent / "configs" / "runtime.yaml"
+        if config_path.exists():
+            with open(config_path, "r", encoding="utf-8") as f:
+                config = yaml.safe_load(f) or {}
+            logger.debug(f"Loaded runtime configuration from {config_path}")
+            # Merge with defaults to ensure all keys exist
+            return _merge_configs(default_config, config)
+        else:
+            logger.debug(f"runtime.yaml not found at {config_path}, using defaults")
+            return default_config
+    except Exception as e:
+        logger.warning(f"Failed to load runtime.yaml: {e}, using defaults")
+        return default_config
+
+
+def _merge_configs(default: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Deep merge override config into default config.
+    
+    Args:
+        default: Default configuration dictionary
+        override: Override configuration dictionary
+        
+    Returns:
+        Merged configuration dictionary
+    """
+    result = default.copy()
+    for key, value in override.items():
+        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+            result[key] = _merge_configs(result[key], value)
+        else:
+            result[key] = value
+    return result
+
+
+# Load runtime configuration at module level
+_RUNTIME_CONFIG = _load_runtime_config()
+
+
+# ============================================================
 # RAY ARENA WORKER (Architectural Fix #3)
 # ============================================================
 # Ray Actors manage memory and CPU resources better than Python's
@@ -1104,26 +1191,87 @@ class GraphixArena:
         # ============================================================
         # Initialize Ray workers for distributed agent task execution.
         # Ray manages memory/CPU better than subprocess, preventing zombie processes.
-        # Enable Ray via VULCAN_ENABLE_RAY=1 (disabled by default for compatibility).
+        # Configuration is loaded from configs/runtime.yaml (enabled by default).
+        # Override with VULCAN_ENABLE_RAY=0 to disable.
         self.ray_workers: Dict[str, Any] = {}
         self.use_ray = False
         
-        enable_ray = os.getenv("VULCAN_ENABLE_RAY", "0").lower() in ("1", "true", "yes")
+        # Load Ray configuration from runtime.yaml
+        ray_config = _RUNTIME_CONFIG.get("distributed", {}).get("ray", {})
+        ray_enabled_in_config = ray_config.get("enabled", True)  # Default to True
+        
+        # Environment variable takes precedence over config file
+        env_ray_setting = os.getenv("VULCAN_ENABLE_RAY")
+        if env_ray_setting is not None:
+            enable_ray = env_ray_setting.lower() in ("1", "true", "yes")
+        else:
+            # Use config file setting (default: enabled)
+            enable_ray = ray_enabled_in_config
         
         if enable_ray and RAY_AVAILABLE and ray is not None and ArenaWorker is not None:
             try:
                 # Initialize Ray if not already initialized
                 if not ray.is_initialized():
                     logger.info("Initializing Ray for distributed execution...")
+                    
+                    # Build Ray init kwargs from config
+                    init_kwargs = {
+                        "ignore_reinit_error": ray_config.get("ignore_reinit_error", True),
+                    }
+                    
+                    # Set logging level from config
+                    log_level_str = ray_config.get("logging_level", "WARNING").upper()
+                    log_level_map = {
+                        "DEBUG": logging.DEBUG,
+                        "INFO": logging.INFO,
+                        "WARNING": logging.WARNING,
+                        "ERROR": logging.ERROR,
+                    }
+                    init_kwargs["logging_level"] = log_level_map.get(log_level_str, logging.WARNING)
+                    
+                    # Set num_cpus if not 'auto'
+                    num_cpus = ray_config.get("num_cpus", "auto")
+                    if num_cpus != "auto" and isinstance(num_cpus, int):
+                        init_kwargs["num_cpus"] = num_cpus
+                    
+                    # Set object store memory if not 'auto'
+                    obj_store = ray_config.get("object_store_memory", "auto")
+                    if obj_store != "auto":
+                        if isinstance(obj_store, str):
+                            # Parse strings like "2GB"
+                            obj_store = obj_store.upper()
+                            if obj_store.endswith("GB"):
+                                init_kwargs["object_store_memory"] = int(float(obj_store[:-2]) * 1024 * 1024 * 1024)
+                            elif obj_store.endswith("MB"):
+                                init_kwargs["object_store_memory"] = int(float(obj_store[:-2]) * 1024 * 1024)
+                        elif isinstance(obj_store, int):
+                            init_kwargs["object_store_memory"] = obj_store
+                    
+                    # Set dashboard options
+                    if not ray_config.get("include_dashboard", False):
+                        init_kwargs["include_dashboard"] = False
+                    
+                    # Set temp directory if configured
+                    temp_dir = ray_config.get("temp_dir")
+                    if temp_dir:
+                        init_kwargs["_temp_dir"] = temp_dir
+                    
                     try:
-                        ray.init(
-                            ignore_reinit_error=True,
-                            logging_level=logging.WARNING,  # Reduce Ray log verbosity
+                        ray.init(**init_kwargs)
+                        # Log Ray cluster info
+                        resources = ray.cluster_resources() if ray.is_initialized() else {}
+                        cpus = resources.get("CPU", "unknown")
+                        logger.info(
+                            f"✅ Ray initialized successfully ({cpus} CPUs available)"
                         )
-                        logger.info("✅ Ray initialized successfully")
                     except Exception as init_error:
                         logger.warning(f"⚠ Ray initialization failed: {init_error}")
                         raise
+                else:
+                    # Ray already initialized
+                    resources = ray.cluster_resources()
+                    cpus = resources.get("CPU", "unknown")
+                    logger.info(f"✅ Ray already initialized ({cpus} CPUs available)")
                 
                 if ray.is_initialized():
                     self.use_ray = True
@@ -1148,8 +1296,8 @@ class GraphixArena:
                 self.use_ray = False
         elif RAY_AVAILABLE and not enable_ray:
             logger.info(
-                "[GraphixArena] Ray available but disabled (default). "
-                "Set VULCAN_ENABLE_RAY=1 to enable distributed execution."
+                "[GraphixArena] Ray available but disabled via configuration. "
+                "Set VULCAN_ENABLE_RAY=1 or update configs/runtime.yaml to enable."
             )
         else:
             logger.debug("Ray not available, using standard subprocess execution")
