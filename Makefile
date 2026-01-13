@@ -169,6 +169,8 @@ docker-run: ## Run Docker container (full platform)
 	@echo "$(GREEN)Running Docker container (full platform)...$(NC)"
 	docker run --rm -it \
 		--name $(CONTAINER_MAIN) \
+		--shm-size=1g \
+		-e RAY_DISABLE_DOCKER_CPU_WARNING=1 \
 		-e JWT_SECRET_KEY=$$(openssl rand -base64 48) \
 		-e JWT_SECRET=$$(openssl rand -base64 48) \
 		-e GRAPHIX_JWT_SECRET=$$(openssl rand -base64 48) \
@@ -181,6 +183,8 @@ docker-run: ## Run Docker container (full platform)
 docker-shell: ## Get shell in Docker container
 	@echo "$(GREEN)Starting shell in container...$(NC)"
 	docker run --rm -it \
+		--shm-size=1g \
+		-e RAY_DISABLE_DOCKER_CPU_WARNING=1 \
 		--entrypoint /bin/bash \
 		-v "$$(pwd)":/app \
 		$(IMAGE_MAIN):$(TAG)
