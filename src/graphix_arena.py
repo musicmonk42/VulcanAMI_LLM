@@ -1104,11 +1104,27 @@ class GraphixArena:
         # ============================================================
         # Initialize Ray workers for distributed agent task execution.
         # Ray manages memory/CPU better than subprocess, preventing zombie processes.
+        # Enable Ray via VULCAN_ENABLE_RAY=1 (disabled by default for compatibility).
         self.ray_workers: Dict[str, Any] = {}
         self.use_ray = False
         
-        if RAY_AVAILABLE and ray is not None and ArenaWorker is not None:
+        enable_ray = os.getenv("VULCAN_ENABLE_RAY", "0").lower() in ("1", "true", "yes")
+        
+        if enable_ray and RAY_AVAILABLE and ray is not None and ArenaWorker is not None:
             try:
+                # Initialize Ray if not already initialized
+                if not ray.is_initialized():
+                    logger.info("Initializing Ray for distributed execution...")
+                    try:
+                        ray.init(
+                            ignore_reinit_error=True,
+                            logging_level=logging.WARNING,  # Reduce Ray log verbosity
+                        )
+                        logger.info("✅ Ray initialized successfully")
+                    except Exception as init_error:
+                        logger.warning(f"⚠ Ray initialization failed: {init_error}")
+                        raise
+                
                 if ray.is_initialized():
                     self.use_ray = True
                     # Pre-create workers for each agent
@@ -1127,11 +1143,14 @@ class GraphixArena:
                     else:
                         logger.warning("⚠ No Ray workers created, falling back to subprocess")
                         self.use_ray = False
-                else:
-                    logger.info("Ray available but not initialized, using subprocess execution")
             except Exception as e:
                 logger.warning(f"⚠ Ray worker initialization failed: {e}, using subprocess")
                 self.use_ray = False
+        elif RAY_AVAILABLE and not enable_ray:
+            logger.info(
+                "[GraphixArena] Ray available but disabled (default). "
+                "Set VULCAN_ENABLE_RAY=1 to enable distributed execution."
+            )
         else:
             logger.debug("Ray not available, using standard subprocess execution")
 
