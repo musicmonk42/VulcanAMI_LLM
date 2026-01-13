@@ -218,6 +218,9 @@ class TransparencyInterface:
         # Serialization cache
         self.cache = {}
         self.cache_ttl = 60  # 1 minute
+        
+        # Configuration for explain_decision confidence
+        self.default_explanation_confidence = 0.75  # Configurable default
 
         # Audit log
         self.audit_log: List[Dict[str, Any]] = []
@@ -1740,7 +1743,7 @@ class TransparencyInterface:
                     'decision_summary': decision_summary,
                     'contributing_factors': contributing_factors,
                     'reasoning_trace': reasoning_steps,
-                    'confidence': 0.75,  # Default confidence for transparency explanations
+                    'confidence': self.default_explanation_confidence,  # Use configurable value
                     'factors_detail': self._make_serializable(factors),
                     'timestamp': time.time(),
                 }

@@ -3524,11 +3524,16 @@ class PhilosophicalToolWrapper:
         self.name = "philosophical"
     
     def _get_world_model(self):
-        """Lazy-load World Model."""
+        """Lazy-load World Model using singleton."""
         if self._world_model is None:
             try:
-                from vulcan.world_model.world_model_core import WorldModel
-                self._world_model = WorldModel()
+                # FIX: Use singleton to avoid repeated 10-15s initialization overhead
+                from vulcan.reasoning.singletons import get_world_model
+                self._world_model = get_world_model()
+                if self._world_model is None:
+                    # Fallback to direct instantiation if singleton not available
+                    from vulcan.world_model.world_model_core import WorldModel
+                    self._world_model = WorldModel()
             except ImportError:
                 logger.warning("[PhilosophicalToolWrapper] World Model not available")
         return self._world_model
@@ -4478,47 +4483,36 @@ class ToolSelector:
             # ================================================================
             # While the LLM classifier is the primary tool selection method,
             # it's currently broken and always returns 'analogical'.
-            # Add conservative keyword detection for very obvious cases:
-            # - Mathematical: "Bayes", "P(", "probability", "calculate", "∑", "∫"
-            # - Symbolic: "SAT", "satisfiable", "prove", "∀", "∃", "CNF", "FOL"
-            # - Causal: "causation", "intervention", "Pearl", "causal graph"
-            #
-            # This only triggers when delegation is NOT active and only for
-            # unambiguous keywords that clearly indicate reasoning type.
+            # Add conservative keyword detection for very obvious cases using
+            # optimized regex patterns for better performance.
             # ================================================================
             keyword_override_tool = None
             if not delegation_active:
                 problem_text = str(request.problem).lower()
                 
+                # Compile regex patterns for efficient matching (done once, cached by Python)
+                import re
+                
                 # Mathematical patterns (very specific)
-                if any(keyword in problem_text for keyword in [
-                    'p(a|b)', 'p(a and b)', 'bayesian', 'bayes theorem',
-                    'calculate probability', 'compute probability',
-                    'prior probability', 'posterior probability',
-                    'likelihood ratio', 'conditional probability'
-                ]):
+                math_pattern = re.compile(r'p\(a\|b\)|p\(a and b\)|bayesian|bayes theorem|calculate probability|compute probability|prior probability|posterior probability|likelihood ratio|conditional probability', re.IGNORECASE)
+                
+                # SAT/FOL patterns (very specific)
+                sat_pattern = re.compile(r'satisfiable|sat solver|cnf formula|first-order logic|predicate logic|forall|exists|∀|∃', re.IGNORECASE)
+                
+                # Causal inference patterns (very specific)
+                causal_pattern = re.compile(r'causal graph|causal model|do-calculus|confounding variable|intervention do\(|backdoor criterion|frontdoor criterion', re.IGNORECASE)
+                
+                if math_pattern.search(problem_text):
                     keyword_override_tool = 'probabilistic'
                     logger.info(
                         f"[ToolSelector] KEYWORD OVERRIDE: Detected Bayesian probability query -> 'probabilistic'"
                     )
-                
-                # SAT/FOL patterns (very specific)
-                elif any(keyword in problem_text for keyword in [
-                    'satisfiable', 'sat solver', 'cnf formula',
-                    'first-order logic', 'predicate logic',
-                    'forall', 'exists', '∀', '∃'
-                ]):
+                elif sat_pattern.search(problem_text):
                     keyword_override_tool = 'symbolic'
                     logger.info(
                         f"[ToolSelector] KEYWORD OVERRIDE: Detected SAT/FOL query -> 'symbolic'"
                     )
-                
-                # Causal inference patterns (very specific)
-                elif any(keyword in problem_text for keyword in [
-                    'causal graph', 'causal model', 'do-calculus',
-                    'confounding variable', 'intervention do(',
-                    'backdoor criterion', 'frontdoor criterion'
-                ]):
+                elif causal_pattern.search(problem_text):
                     keyword_override_tool = 'causal'
                     logger.info(
                         f"[ToolSelector] KEYWORD OVERRIDE: Detected causal inference query -> 'causal'"

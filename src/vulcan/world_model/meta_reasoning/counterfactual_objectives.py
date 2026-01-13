@@ -12,6 +12,7 @@ Uses VULCAN's causal reasoning and prediction engine for inference.
 Learns from validation history to improve predictions.
 """
 
+import hashlib
 import logging
 import threading
 import time
@@ -1398,6 +1399,11 @@ class CounterfactualObjectiveReasoner:
                 
                 # Predict outcome under alternative objective
                 context = {"scenario": scenario_str}
+                
+                # Track if cache is used
+                cache_key_for_check = f"{alternative_objective}_{hashlib.md5(str(context).encode()).hexdigest()}"
+                cache_was_used = cache_key_for_check in self.prediction_cache
+                
                 predicted_outcome = self.predict_under_objective(alternative_objective, context)
                 
                 # Build analysis result
@@ -1414,7 +1420,7 @@ class CounterfactualObjectiveReasoner:
                     'confidence': predicted_outcome.confidence,
                     'metadata': {
                         'computation_time_ms': predicted_outcome.computation_time_ms,
-                        'cache_used': False,  # Would be set if cache was hit
+                        'cache_used': cache_was_used,  # Now accurately reflects cache state
                     }
                 }
                 

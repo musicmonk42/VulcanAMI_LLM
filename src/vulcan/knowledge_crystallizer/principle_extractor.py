@@ -13,7 +13,7 @@ from collections import Counter, defaultdict, deque
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 
@@ -538,7 +538,8 @@ class CrystallizedPrinciple:
     # FIX: Add execution_logic field to prevent validation warnings
     # This field is checked by KnowledgeValidator.validate() and if missing,
     # it reduces confidence by 0.1. Adding it with None default prevents the warning.
-    execution_logic: Optional[Any] = None
+    # Type is Callable or dict for execution specification
+    execution_logic: Optional[Union[Callable[[Dict[str, Any]], Dict[str, Any]], Dict[str, Any]]] = None
 
     def apply(self, problem: Dict[str, Any]) -> Dict[str, Any]:
         """Apply principle to problem"""
