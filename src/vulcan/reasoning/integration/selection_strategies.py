@@ -392,10 +392,10 @@ def select_with_tool_selector(
                 )
                 
             selection_request = SelectionRequest(
-                query=query,
-                query_type=query_type,
+                problem=query,
                 mode=mode,
                 constraints=constraints,
+                context={'query_type': query_type},
             )
             selection = orchestrator._tool_selector.select_and_execute(selection_request)
             
