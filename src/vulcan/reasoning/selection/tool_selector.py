@@ -4474,6 +4474,70 @@ class ToolSelector:
                     )
 
             # ================================================================
+            # FIX: Add keyword-based routing for OBVIOUS query types
+            # ================================================================
+            # While the LLM classifier is the primary tool selection method,
+            # it's currently broken and always returns 'analogical'.
+            # Add conservative keyword detection for very obvious cases:
+            # - Mathematical: "Bayes", "P(", "probability", "calculate", "∑", "∫"
+            # - Symbolic: "SAT", "satisfiable", "prove", "∀", "∃", "CNF", "FOL"
+            # - Causal: "causation", "intervention", "Pearl", "causal graph"
+            #
+            # This only triggers when delegation is NOT active and only for
+            # unambiguous keywords that clearly indicate reasoning type.
+            # ================================================================
+            keyword_override_tool = None
+            if not delegation_active:
+                problem_text = str(request.problem).lower()
+                
+                # Mathematical patterns (very specific)
+                if any(keyword in problem_text for keyword in [
+                    'p(a|b)', 'p(a and b)', 'bayesian', 'bayes theorem',
+                    'calculate probability', 'compute probability',
+                    'prior probability', 'posterior probability',
+                    'likelihood ratio', 'conditional probability'
+                ]):
+                    keyword_override_tool = 'probabilistic'
+                    logger.info(
+                        f"[ToolSelector] KEYWORD OVERRIDE: Detected Bayesian probability query -> 'probabilistic'"
+                    )
+                
+                # SAT/FOL patterns (very specific)
+                elif any(keyword in problem_text for keyword in [
+                    'satisfiable', 'sat solver', 'cnf formula',
+                    'first-order logic', 'predicate logic',
+                    'forall', 'exists', '∀', '∃'
+                ]):
+                    keyword_override_tool = 'symbolic'
+                    logger.info(
+                        f"[ToolSelector] KEYWORD OVERRIDE: Detected SAT/FOL query -> 'symbolic'"
+                    )
+                
+                # Causal inference patterns (very specific)
+                elif any(keyword in problem_text for keyword in [
+                    'causal graph', 'causal model', 'do-calculus',
+                    'confounding variable', 'intervention do(',
+                    'backdoor criterion', 'frontdoor criterion'
+                ]):
+                    keyword_override_tool = 'causal'
+                    logger.info(
+                        f"[ToolSelector] KEYWORD OVERRIDE: Detected causal inference query -> 'causal'"
+                    )
+                
+                # If keyword override found, use it and skip classifier
+                if keyword_override_tool:
+                    candidates = [{'tool': keyword_override_tool, 'utility': 1.0, 'source': 'keyword_override'}]
+                    features = self._extract_features(request)
+                    
+                    result = self._execute_with_selected_tools(
+                        request=request,
+                        candidates=candidates,
+                        features=features,
+                        start_time=start_time
+                    )
+                    return result
+
+            # ================================================================
             # Note: REMOVED formal logic pattern override (Jan 9 2026)
             # ================================================================
             # The previous code here bypassed the LLM classifier when "formal logic"
