@@ -1684,5 +1684,82 @@ class TransparencyInterface:
 
         return stats_output
 
+    def explain_decision(
+        self,
+        decision: Any,
+        factors: Optional[Dict[str, Any]] = None,
+        reasoning_steps: Optional[List[str]] = None
+    ) -> Dict[str, Any]:
+        """
+        Generate a transparent explanation for a decision.
+        
+        This method provides machine-readable transparency for decisions made by
+        the reasoning system. It's used by the orchestrator for self-referential
+        meta-reasoning queries.
+        
+        Args:
+            decision: The decision to explain (string, dict, or other)
+            factors: Contributing factors to the decision
+            reasoning_steps: List of reasoning steps taken
+            
+        Returns:
+            Dict containing structured explanation with:
+            - decision_summary: Brief summary of the decision
+            - contributing_factors: Key factors that influenced the decision
+            - reasoning_trace: Steps taken during reasoning
+            - confidence: Overall confidence in the explanation
+        """
+        with self.lock:
+            try:
+                # Normalize inputs
+                if factors is None:
+                    factors = {}
+                if reasoning_steps is None:
+                    reasoning_steps = []
+                
+                # Extract decision summary
+                if isinstance(decision, str):
+                    decision_summary = decision
+                elif isinstance(decision, dict):
+                    decision_summary = decision.get('query', decision.get('decision', str(decision)))
+                else:
+                    decision_summary = str(decision)
+                
+                # Extract contributing factors
+                contributing_factors = []
+                for key, value in factors.items():
+                    if isinstance(value, dict):
+                        # Extract nested info
+                        factor_desc = f"{key}: {value.get('reason', value.get('description', str(value)))}"
+                    else:
+                        factor_desc = f"{key}: {value}"
+                    contributing_factors.append(factor_desc)
+                
+                # Build explanation
+                explanation = {
+                    'decision_summary': decision_summary,
+                    'contributing_factors': contributing_factors,
+                    'reasoning_trace': reasoning_steps,
+                    'confidence': 0.75,  # Default confidence for transparency explanations
+                    'factors_detail': self._make_serializable(factors),
+                    'timestamp': time.time(),
+                }
+                
+                # Update stats
+                self.stats['explanations_generated'] += 1
+                
+                return explanation
+                
+            except Exception as e:
+                logger.error(f"[TransparencyInterface] Failed to explain decision: {e}")
+                # Return minimal explanation on error
+                return {
+                    'decision_summary': str(decision),
+                    'contributing_factors': [],
+                    'reasoning_trace': reasoning_steps or [],
+                    'confidence': 0.5,
+                    'error': str(e),
+                }
+
 
 # Need math for float checks

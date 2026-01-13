@@ -1343,3 +1343,99 @@ class CounterfactualObjectiveReasoner:
                     self.prediction_accuracy_by_objective.keys()
                 ),
             }
+
+    def analyze_scenario(self, scenario: Any) -> Dict[str, Any]:
+        """
+        Analyze a counterfactual scenario.
+        
+        This method performs counterfactual analysis on a given scenario, typically
+        a query like "What if you were optimizing for X instead of Y?". It's used
+        by the orchestrator for self-referential meta-reasoning queries.
+        
+        Args:
+            scenario: The scenario to analyze (string query or dict)
+            
+        Returns:
+            Dict containing counterfactual analysis with:
+            - scenario_description: Description of the scenario
+            - alternative_objective: The alternative objective identified
+            - predicted_outcome: Predicted outcome under alternative objective
+            - comparison: Comparison with current objective (if applicable)
+            - confidence: Overall confidence in the analysis
+        """
+        with self.lock:
+            try:
+                # Normalize scenario to string
+                if isinstance(scenario, str):
+                    scenario_str = scenario
+                elif isinstance(scenario, dict):
+                    scenario_str = scenario.get('query', scenario.get('scenario', str(scenario)))
+                else:
+                    scenario_str = str(scenario)
+                
+                # Extract alternative objective from scenario
+                # Look for patterns like "if you were optimizing for X" or "would you prioritize X"
+                alternative_objective = "unknown"
+                scenario_lower = scenario_str.lower()
+                
+                if "optimizing for" in scenario_lower:
+                    # Extract text after "optimizing for"
+                    parts = scenario_lower.split("optimizing for")
+                    if len(parts) > 1:
+                        objective_text = parts[1].strip().split()[0:3]  # Take first few words
+                        alternative_objective = " ".join(objective_text).strip(",.?!")
+                elif "prioritize" in scenario_lower:
+                    # Extract text after "prioritize"
+                    parts = scenario_lower.split("prioritize")
+                    if len(parts) > 1:
+                        objective_text = parts[1].strip().split()[0:3]
+                        alternative_objective = " ".join(objective_text).strip(",.?!")
+                elif "focus on" in scenario_lower:
+                    parts = scenario_lower.split("focus on")
+                    if len(parts) > 1:
+                        objective_text = parts[1].strip().split()[0:3]
+                        alternative_objective = " ".join(objective_text).strip(",.?!")
+                
+                # Predict outcome under alternative objective
+                context = {"scenario": scenario_str}
+                predicted_outcome = self.predict_under_objective(alternative_objective, context)
+                
+                # Build analysis result
+                analysis = {
+                    'scenario_description': scenario_str,
+                    'alternative_objective': alternative_objective,
+                    'predicted_outcome': {
+                        'value': predicted_outcome.predicted_value,
+                        'confidence': predicted_outcome.confidence,
+                        'lower_bound': predicted_outcome.lower_bound,
+                        'upper_bound': predicted_outcome.upper_bound,
+                        'side_effects': predicted_outcome.side_effects,
+                    },
+                    'confidence': predicted_outcome.confidence,
+                    'metadata': {
+                        'computation_time_ms': predicted_outcome.computation_time_ms,
+                        'cache_used': False,  # Would be set if cache was hit
+                    }
+                }
+                
+                # Update stats
+                self.stats['scenarios_analyzed'] += 1
+                
+                return analysis
+                
+            except Exception as e:
+                logger.error(f"[CounterfactualObjectiveReasoner] Failed to analyze scenario: {e}")
+                # Return minimal analysis on error
+                return {
+                    'scenario_description': str(scenario),
+                    'alternative_objective': 'unknown',
+                    'predicted_outcome': {
+                        'value': 0.5,
+                        'confidence': 0.3,
+                        'lower_bound': 0.0,
+                        'upper_bound': 1.0,
+                        'side_effects': {},
+                    },
+                    'confidence': 0.3,
+                    'error': str(e),
+                }

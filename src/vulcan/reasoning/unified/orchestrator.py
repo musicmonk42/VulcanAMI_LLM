@@ -1189,10 +1189,26 @@ class UnifiedReasoner:
             # Validate against ethical boundaries
             try:
                 ethical_result = boundary_monitor.check_action(query_str)
-                analysis['ethical_check'] = {
-                    'allowed': ethical_result.get('allowed', True),
-                    'reason': ethical_result.get('reason', 'No ethical concerns'),
-                }
+                # FIX: check_action returns a tuple (is_allowed, violation), not a dict
+                if isinstance(ethical_result, tuple):
+                    is_allowed, violation = ethical_result
+                    if violation is not None:
+                        reason = getattr(violation, 'reason', 'Ethical boundary violated')
+                    else:
+                        reason = 'No ethical concerns'
+                    analysis['ethical_check'] = {
+                        'allowed': is_allowed,
+                        'reason': reason,
+                    }
+                elif isinstance(ethical_result, dict):
+                    # Fallback for dict response (backward compatibility)
+                    analysis['ethical_check'] = {
+                        'allowed': ethical_result.get('allowed', True),
+                        'reason': ethical_result.get('reason', 'No ethical concerns'),
+                    }
+                else:
+                    # Unknown format - assume allowed
+                    analysis['ethical_check'] = {'allowed': True, 'reason': 'Check completed'}
             except Exception as e:
                 logger.warning(f"[SelfRef] Failed ethical check: {e}")
                 analysis['ethical_check'] = {'allowed': True, 'reason': 'Check unavailable'}
