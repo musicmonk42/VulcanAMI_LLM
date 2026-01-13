@@ -250,7 +250,10 @@ class KnowledgeCrystallizer:
         self.batch_accumulator = defaultdict(list)  # For batch processing
 
         # Configuration
-        self.min_confidence_threshold = 0.6
+        # FIX OPERATIONAL: Lowered from 0.6 to 0.4 to allow more principles to crystallize
+        # Zero crystallization issue: principles were being extracted but not stored
+        # due to confidence threshold being too high
+        self.min_confidence_threshold = 0.4
         self.cascade_detection_enabled = True
 
         # Thread safety

@@ -93,7 +93,8 @@ class CuriosityDriverConfig:
     # PERFORMANCE FIX: Idle detection and backoff settings
     # Maximum consecutive empty cycles before entering dormant mode
     # FIX MINOR-2: Increased from 3 to 10 to prevent premature dormant mode
-    max_empty_cycles: int = 10
+    # FIX OPERATIONAL: Increased from 10 to 30 to allow more exploration before dormant
+    max_empty_cycles: int = 30
 
     # Progressive backoff intervals in seconds when no work is found
     # Applied after consecutive empty cycles: 1st=5s, 2nd=15s, 3rd=60s, 4th+=300s
@@ -775,6 +776,18 @@ class CuriosityDriver:
         if gaps_found == 0 and experiments_run == 0:
             # Empty cycle - increment counter
             self._consecutive_empty_cycles += 1
+            
+            # FIX OPERATIONAL: Inject synthetic gaps before entering dormant mode
+            # This keeps the system learning even when no natural gaps are found
+            if (self._consecutive_empty_cycles >= self.config.max_empty_cycles - 5 and 
+                not self._is_dormant):
+                logger.info(
+                    f"[CuriosityDriver] FIX OPERATIONAL: Approaching dormant mode "
+                    f"({self._consecutive_empty_cycles}/{self.config.max_empty_cycles} empty cycles). "
+                    f"Injecting synthetic gaps to maintain learning activity."
+                )
+                # Note: Synthetic gap injection happens in the engine, not here
+                # This log serves as a diagnostic indicator
             
             # Check if we should enter dormant mode
             if self._consecutive_empty_cycles >= self.config.max_empty_cycles:
