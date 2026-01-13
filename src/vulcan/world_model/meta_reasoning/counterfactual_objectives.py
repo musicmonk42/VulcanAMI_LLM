@@ -1353,95 +1353,159 @@ class CounterfactualObjectiveReasoner:
         a query like "What if you were optimizing for X instead of Y?". It's used
         by the orchestrator for self-referential meta-reasoning queries.
         
+        Thread-safe: Uses lock for cache operations.
+        
         Args:
-            scenario: The scenario to analyze (string query or dict)
+            scenario: The scenario to analyze. Can be:
+                     - String query (e.g., "What if you were optimizing for speed?")
+                     - Dict with 'query', 'scenario', or other keys
+                     - Other types will be converted to string
             
         Returns:
             Dict containing counterfactual analysis with:
-            - scenario_description: Description of the scenario
-            - alternative_objective: The alternative objective identified
-            - predicted_outcome: Predicted outcome under alternative objective
-            - comparison: Comparison with current objective (if applicable)
-            - confidence: Overall confidence in the analysis
+                - scenario_description (str): Description of the scenario
+                - alternative_objective (str): The alternative objective identified
+                - predicted_outcome (Dict): Predicted outcome with:
+                    - value (float): Predicted value under alternative objective
+                    - confidence (float): Confidence in prediction (0.0-1.0)
+                    - lower_bound (float): Lower confidence bound
+                    - upper_bound (float): Upper confidence bound
+                    - side_effects (Dict[str, float]): Impact on other objectives
+                - confidence (float): Overall analysis confidence
+                - metadata (Dict): Additional metadata including:
+                    - computation_time_ms (float): Time taken for analysis
+                    - cache_used (bool): Whether cache was used
+                    
+        Raises:
+            Never raises - returns minimal analysis on error with 'error' field set.
+            
+        Example:
+            >>> reasoner = CounterfactualObjectiveReasoner()
+            >>> result = reasoner.analyze_scenario(
+            ...     "What if you were optimizing for throughput instead of latency?"
+            ... )
+            >>> result['alternative_objective']
+            'throughput instead of'
+            >>> result['confidence']
+            0.75
         """
         with self.lock:
             try:
-                # Normalize scenario to string
+                # Normalize scenario to string with validation
                 if isinstance(scenario, str):
-                    scenario_str = scenario
+                    scenario_str = scenario[:1000]  # Limit length for safety
                 elif isinstance(scenario, dict):
-                    scenario_str = scenario.get('query', scenario.get('scenario', str(scenario)))
+                    scenario_str = (
+                        scenario.get('query') or 
+                        scenario.get('scenario') or 
+                        str(scenario)
+                    )[:1000]
                 else:
-                    scenario_str = str(scenario)
+                    scenario_str = str(scenario)[:1000]
                 
-                # Extract alternative objective from scenario
-                # Look for patterns like "if you were optimizing for X" or "would you prioritize X"
-                alternative_objective = "unknown"
-                scenario_lower = scenario_str.lower()
+                if not scenario_str or not scenario_str.strip():
+                    logger.warning("[CounterfactualObjectiveReasoner] Empty scenario provided")
+                    scenario_str = "unknown scenario"
                 
-                if "optimizing for" in scenario_lower:
-                    # Extract text after "optimizing for"
-                    parts = scenario_lower.split("optimizing for")
-                    if len(parts) > 1:
-                        objective_text = parts[1].strip().split()[0:3]  # Take first few words
-                        alternative_objective = " ".join(objective_text).strip(",.?!")
-                elif "prioritize" in scenario_lower:
-                    # Extract text after "prioritize"
-                    parts = scenario_lower.split("prioritize")
-                    if len(parts) > 1:
-                        objective_text = parts[1].strip().split()[0:3]
-                        alternative_objective = " ".join(objective_text).strip(",.?!")
-                elif "focus on" in scenario_lower:
-                    parts = scenario_lower.split("focus on")
-                    if len(parts) > 1:
-                        objective_text = parts[1].strip().split()[0:3]
-                        alternative_objective = " ".join(objective_text).strip(",.?!")
+                # Extract alternative objective using robust pattern matching
+                alternative_objective = self._extract_alternative_objective(scenario_str)
                 
-                # Predict outcome under alternative objective
+                # Predict outcome under alternative objective with cache check
                 context = {"scenario": scenario_str}
                 
-                # Track if cache is used
+                # Track if cache is used for accurate metadata
                 cache_key_for_check = f"{alternative_objective}_{hashlib.md5(str(context).encode()).hexdigest()}"
                 cache_was_used = cache_key_for_check in self.prediction_cache
                 
                 predicted_outcome = self.predict_under_objective(alternative_objective, context)
                 
-                # Build analysis result
+                # Build analysis result with validated data
                 analysis = {
                     'scenario_description': scenario_str,
                     'alternative_objective': alternative_objective,
                     'predicted_outcome': {
-                        'value': predicted_outcome.predicted_value,
-                        'confidence': predicted_outcome.confidence,
-                        'lower_bound': predicted_outcome.lower_bound,
-                        'upper_bound': predicted_outcome.upper_bound,
-                        'side_effects': predicted_outcome.side_effects,
+                        'value': float(predicted_outcome.predicted_value),
+                        'confidence': float(predicted_outcome.confidence),
+                        'lower_bound': float(predicted_outcome.lower_bound),
+                        'upper_bound': float(predicted_outcome.upper_bound),
+                        'side_effects': dict(predicted_outcome.side_effects),
                     },
-                    'confidence': predicted_outcome.confidence,
+                    'confidence': float(predicted_outcome.confidence),
                     'metadata': {
-                        'computation_time_ms': predicted_outcome.computation_time_ms,
-                        'cache_used': cache_was_used,  # Now accurately reflects cache state
+                        'computation_time_ms': float(predicted_outcome.computation_time_ms),
+                        'cache_used': bool(cache_was_used),
                     }
                 }
                 
-                # Update stats
+                # Update stats atomically
                 self.stats['scenarios_analyzed'] += 1
                 
                 return analysis
                 
             except Exception as e:
-                logger.error(f"[CounterfactualObjectiveReasoner] Failed to analyze scenario: {e}")
-                # Return minimal analysis on error
+                logger.error(
+                    f"[CounterfactualObjectiveReasoner] Failed to analyze scenario: {e}", 
+                    exc_info=True
+                )
+                # Return minimal analysis on error - never raise
                 return {
-                    'scenario_description': str(scenario),
+                    'scenario_description': str(scenario)[:1000] if scenario else 'Unknown scenario',
                     'alternative_objective': 'unknown',
                     'predicted_outcome': {
                         'value': 0.5,
-                        'confidence': 0.3,
+                        'confidence': 0.1,  # Very low confidence for error case
                         'lower_bound': 0.0,
                         'upper_bound': 1.0,
                         'side_effects': {},
                     },
-                    'confidence': 0.3,
+                    'confidence': 0.1,
                     'error': str(e),
+                    'metadata': {
+                        'computation_time_ms': 0.0,
+                        'cache_used': False,
+                    }
                 }
+    
+    def _extract_alternative_objective(self, scenario_str: str) -> str:
+        """
+        Extract alternative objective from scenario text using pattern matching.
+        
+        Args:
+            scenario_str: Scenario description text
+            
+        Returns:
+            Extracted objective string, or "unknown" if not found
+        """
+        try:
+            scenario_lower = scenario_str.lower()
+            
+            # Define patterns in priority order
+            patterns = [
+                ('optimizing for', 'optimizing for'),
+                ('prioritize', 'prioritize'),
+                ('focus on', 'focus on'),
+                ('maximize', 'maximize'),
+                ('minimize', 'minimize'),
+            ]
+            
+            for pattern_name, pattern_text in patterns:
+                if pattern_text in scenario_lower:
+                    # Extract text after the pattern
+                    parts = scenario_lower.split(pattern_text)
+                    if len(parts) > 1:
+                        # Take first few words after pattern, strip punctuation
+                        objective_text = parts[1].strip().split()[:3]
+                        if objective_text:
+                            return " ".join(objective_text).strip(",.?!;:")
+            
+            # Fallback: try to extract any verb + noun pattern
+            import re
+            match = re.search(r'\b(optimize|improve|increase|decrease)\s+(\w+)', scenario_lower)
+            if match:
+                return match.group(2)
+            
+            return "unknown"
+            
+        except Exception as e:
+            logger.debug(f"[CounterfactualObjectiveReasoner] Error extracting objective: {e}")
+            return "unknown"

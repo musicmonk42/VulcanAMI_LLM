@@ -1700,68 +1700,110 @@ class TransparencyInterface:
         the reasoning system. It's used by the orchestrator for self-referential
         meta-reasoning queries.
         
+        Thread-safe: Uses lock for cache operations.
+        
         Args:
             decision: The decision to explain (string, dict, or other)
-            factors: Contributing factors to the decision
-            reasoning_steps: List of reasoning steps taken
+            factors: Contributing factors to the decision. Keys are factor names,
+                    values can be strings, dicts with 'reason'/'description', or primitives.
+            reasoning_steps: List of reasoning steps taken, in execution order.
             
         Returns:
             Dict containing structured explanation with:
-            - decision_summary: Brief summary of the decision
-            - contributing_factors: Key factors that influenced the decision
-            - reasoning_trace: Steps taken during reasoning
-            - confidence: Overall confidence in the explanation
+                - decision_summary (str): Brief summary of the decision
+                - contributing_factors (List[str]): Key factors that influenced the decision
+                - reasoning_trace (List[str]): Steps taken during reasoning
+                - confidence (float): Overall confidence in the explanation (0.0-1.0)
+                - factors_detail (Dict): Serialized detailed factors
+                - timestamp (float): Unix timestamp when explanation was generated
+                
+        Raises:
+            Never raises - returns minimal explanation on error with 'error' field set.
+            
+        Example:
+            >>> interface = TransparencyInterface()
+            >>> explanation = interface.explain_decision(
+            ...     decision="Route to mathematical engine",
+            ...     factors={'query_type': 'bayesian', 'confidence': 0.85},
+            ...     reasoning_steps=['Parse query', 'Detect probability notation', 'Select engine']
+            ... )
+            >>> explanation['decision_summary']
+            'Route to mathematical engine'
+            >>> explanation['confidence']
+            0.75
         """
         with self.lock:
             try:
-                # Normalize inputs
+                # Validate and normalize inputs
                 if factors is None:
                     factors = {}
                 if reasoning_steps is None:
                     reasoning_steps = []
                 
-                # Extract decision summary
-                if isinstance(decision, str):
-                    decision_summary = decision
-                elif isinstance(decision, dict):
-                    decision_summary = decision.get('query', decision.get('decision', str(decision)))
-                else:
-                    decision_summary = str(decision)
+                # Validate types
+                if not isinstance(factors, dict):
+                    logger.warning(f"[TransparencyInterface] factors should be dict, got {type(factors)}")
+                    factors = {'raw_factors': str(factors)}
+                    
+                if not isinstance(reasoning_steps, list):
+                    logger.warning(f"[TransparencyInterface] reasoning_steps should be list, got {type(reasoning_steps)}")
+                    reasoning_steps = [str(reasoning_steps)]
                 
-                # Extract contributing factors
+                # Extract decision summary with sanitization
+                if isinstance(decision, str):
+                    decision_summary = decision[:500]  # Limit length
+                elif isinstance(decision, dict):
+                    decision_summary = decision.get('query', decision.get('decision', str(decision)))[:500]
+                else:
+                    decision_summary = str(decision)[:500]
+                
+                # Extract contributing factors with error handling
                 contributing_factors = []
                 for key, value in factors.items():
-                    if isinstance(value, dict):
-                        # Extract nested info
-                        factor_desc = f"{key}: {value.get('reason', value.get('description', str(value)))}"
-                    else:
-                        factor_desc = f"{key}: {value}"
-                    contributing_factors.append(factor_desc)
+                    try:
+                        if isinstance(value, dict):
+                            # Extract nested info safely
+                            factor_desc = f"{key}: {value.get('reason', value.get('description', str(value)[:100]))}"
+                        else:
+                            factor_desc = f"{key}: {str(value)[:100]}"
+                        contributing_factors.append(factor_desc)
+                    except Exception as e:
+                        logger.debug(f"[TransparencyInterface] Error processing factor {key}: {e}")
+                        contributing_factors.append(f"{key}: <unparseable>")
                 
-                # Build explanation
+                # Calculate confidence based on data availability and quality
+                confidence = self.default_explanation_confidence
+                if not factors:
+                    confidence *= 0.8  # Reduce confidence if no factors
+                if not reasoning_steps:
+                    confidence *= 0.9  # Reduce confidence if no trace
+                confidence = max(0.1, min(1.0, confidence))  # Clamp to valid range
+                
+                # Build explanation with defensive serialization
                 explanation = {
                     'decision_summary': decision_summary,
                     'contributing_factors': contributing_factors,
-                    'reasoning_trace': reasoning_steps,
-                    'confidence': self.default_explanation_confidence,  # Use configurable value
+                    'reasoning_trace': [str(step)[:200] for step in reasoning_steps],  # Sanitize steps
+                    'confidence': confidence,
                     'factors_detail': self._make_serializable(factors),
                     'timestamp': time.time(),
                 }
                 
-                # Update stats
+                # Update stats atomically
                 self.stats['explanations_generated'] += 1
                 
                 return explanation
                 
             except Exception as e:
-                logger.error(f"[TransparencyInterface] Failed to explain decision: {e}")
-                # Return minimal explanation on error
+                logger.error(f"[TransparencyInterface] Failed to explain decision: {e}", exc_info=True)
+                # Return minimal explanation on error - never raise
                 return {
-                    'decision_summary': str(decision),
+                    'decision_summary': str(decision)[:500] if decision else 'Unknown decision',
                     'contributing_factors': [],
                     'reasoning_trace': reasoning_steps or [],
-                    'confidence': 0.5,
+                    'confidence': 0.3,  # Low confidence for error case
                     'error': str(e),
+                    'timestamp': time.time(),
                 }
 
 
