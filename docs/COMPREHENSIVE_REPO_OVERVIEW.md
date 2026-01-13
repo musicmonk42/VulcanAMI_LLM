@@ -24,7 +24,7 @@
 
 ### Investment Profile
 
-- **Codebase Scale:** 505,772 LOC (Python across 557 files), ~3-4 person-years of development
+- **Codebase Scale:** 505,772 LOC (Python across 557 files)
 - **Total Code:** 613,479 LOC across all file types (Python, YAML, Shell, Markdown)
 - **Functions & Classes:** 21,523 functions and 4,353 classes analyzed
 - **Documentation:** 97 markdown files, 97,337 lines of technical documentation
