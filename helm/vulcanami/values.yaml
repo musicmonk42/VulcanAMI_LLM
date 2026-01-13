@@ -189,21 +189,17 @@ distillation:
 
 # Ray Configuration (Architectural Fix #3)
 # Ray Actors manage memory/CPU better than subprocess
-# NOTE: For shared memory in Kubernetes, set the following in your pod spec:
-#   volumes:
-#     - name: dshm
-#       emptyDir:
-#         medium: Memory
-#         sizeLimit: "10Gi"  # Recommended: at least 30% of available RAM
-#   volumeMounts:
-#     - name: dshm
-#       mountPath: /dev/shm
+# The shared memory volume (/dev/shm) is automatically mounted by the deployment template
 ray:
   enabled: false  # Set to true to enable Ray workers
   address: "auto"  # Ray cluster address or "auto" for local
   numCpus: 4
   numGpus: 0
   objectStoreMemory: 2000000000  # 2GB
+  # Shared memory size limit for Ray object store
+  # Ray recommends at least 30% of available RAM for object store
+  # This is automatically mounted at /dev/shm to prevent Ray warnings
+  shmSizeLimit: "4Gi"
   # Docker CPU warning suppression (always enabled to clean up logs)
   # Set RAY_DISABLE_DOCKER_CPU_WARNING=1 to suppress CPU detection warnings
 

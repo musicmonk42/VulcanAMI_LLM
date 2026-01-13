@@ -419,6 +419,9 @@ spec:
           mountPath: /tmp
         - name: app-data
           mountPath: /app/data
+        # Shared memory for Ray object store (prevents /dev/shm warning)
+        - name: dshm
+          mountPath: /dev/shm
         {{- if .Values.memorySystem.enabled }}
         - name: configs
           mountPath: /configs
@@ -437,6 +440,12 @@ spec:
         emptyDir: {}
       - name: app-data
         emptyDir: {}
+      # Shared memory for Ray object store (prevents /dev/shm warning)
+      # Ray recommends at least 30% of available RAM for object store
+      - name: dshm
+        emptyDir:
+          medium: Memory
+          sizeLimit: {{ .Values.ray.shmSizeLimit | default "4Gi" | quote }}
       {{- if .Values.memorySystem.enabled }}
       - name: configs
         configMap:
