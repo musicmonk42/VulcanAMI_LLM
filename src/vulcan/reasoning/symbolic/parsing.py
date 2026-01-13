@@ -127,12 +127,17 @@ class Lexer:
         Note: Preprocess natural language text before tokenization.
         Note: Handle commas and function notation in NL context.
         
+        FIX Issue #4: Detect mathematical notation patterns and skip aggressive
+        substitutions that would corrupt mathematical expressions like f(x)/g(x)
+        or d/dx. The "/" → " or " substitution corrupts calculus notation.
+        
         This method:
         1. Normalizes Unicode characters (em-dashes, smart quotes, etc.)
         2. Attempts to extract formal logic from natural language prose
         3. Handles function notation (SHA256, BLAKE2b, etc.) - replace with placeholders
         4. Handles commas that are NL punctuation vs. logical operators
-        5. Returns text suitable for the FOL lexer
+        5. **FIX Issue #4**: Detects mathematical notation and skips "/" substitution
+        6. Returns text suitable for the FOL lexer
         
         Args:
             text: Raw input text (may contain natural language)
@@ -143,10 +148,59 @@ class Lexer:
         if not text:
             return text
         
-        # Step 1: Apply character substitutions
-        result = text
-        for old_char, new_char in cls.CHAR_SUBSTITUTIONS.items():
-            result = result.replace(old_char, new_char)
+        # =================================================================
+        # FIX Issue #4: DETECT MATHEMATICAL NOTATION FIRST
+        # =================================================================
+        # Check for mathematical notation patterns that use "/" for fractions,
+        # derivatives, or division. If found, skip the aggressive "/" → " or "
+        # substitution that corrupts mathematical expressions.
+        # =================================================================
+        
+        math_notation_patterns = [
+            r'lim\s*_{[^}]+}',  # LaTeX limits: lim_{x→a}
+            r'lim\s+[a-z]→',    # Unicode limits: lim x→a
+            r'd\s*/\s*d[a-z]',  # Derivatives: d/dx, dy/dt
+            # FIX: Simplified regex to avoid nested quantifiers - more efficient
+            r'[a-z]\([^)]+\)\s*/\s*[a-z]\([^)]+\)',  # Fractions: f(x)/g(x)
+            r'\d+\s*/\s*\d+',   # Numeric fractions: 3/4, 10/2
+            r'[a-z]\s*/\s*[a-z]',  # Variable fractions: x/y
+        ]
+        
+        has_math_notation = any(
+            re.search(pattern, text, re.IGNORECASE) 
+            for pattern in math_notation_patterns
+        )
+        
+        if has_math_notation:
+            logger.debug(
+                f"[Lexer] FIX Issue #4: Mathematical notation detected, "
+                f"using safe substitutions only (preserving '/' for fractions/derivatives)"
+            )
+            # Use only safe substitutions that don't corrupt math
+            safe_substitutions = {
+                "—": "-",      # Em-dash to hyphen
+                "–": "-",      # En-dash to hyphen  
+                "−": "-",      # Minus sign to hyphen
+                # Skip "/" → " or " substitution!
+                "：": ":",     # Full-width colon
+                "．": ".",     # Full-width period
+                "，": ",",     # Full-width comma
+                """: '"',      # Smart quotes
+                """: '"',
+                "'": "'",
+                "'": "'",
+                "…": "...",    # Ellipsis
+            }
+            # Apply only safe substitutions
+            result = text
+            for old_char, new_char in safe_substitutions.items():
+                result = result.replace(old_char, new_char)
+        else:
+            # No math notation - apply all substitutions including "/" → " or "
+            # Step 1: Apply character substitutions
+            result = text
+            for old_char, new_char in cls.CHAR_SUBSTITUTIONS.items():
+                result = result.replace(old_char, new_char)
         
         # Step 2: Handle function notation (SHA256, BLAKE2b, etc.)
         # Replace cryptographic function calls with placeholders to avoid parse errors

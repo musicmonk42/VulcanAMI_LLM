@@ -54,6 +54,7 @@ class QueryCategory(Enum):
     ANALOGICAL = "ANALOGICAL"
     PHILOSOPHICAL = "PHILOSOPHICAL"
     CRYPTOGRAPHIC = "CRYPTOGRAPHIC"  # Cryptocurrency/hash/security technical queries
+    LANGUAGE = "LANGUAGE"  # FIX Issue #6: Language reasoning (FOL formalization, quantifier scope, etc.)
     COMPLEX_RESEARCH = "COMPLEX_RESEARCH"
     UNKNOWN = "UNKNOWN"
 
@@ -331,6 +332,62 @@ CRYPTOGRAPHIC_PATTERNS: Tuple[re.Pattern, ...] = (
     # Security reduction patterns
     re.compile(r"security\s+(?:of|reduction|proof)", re.IGNORECASE),
     re.compile(r"breaking\s+(?:requires|both)", re.IGNORECASE),
+)
+
+# ============================================================
+# FIX Issue #2: Mathematical Proof Patterns
+# ============================================================
+# Mathematical verification queries were being misrouted to CRYPTOGRAPHIC
+# because "proof" keyword triggered "security proof" pattern. These patterns
+# check for mathematical proof verification BEFORE cryptographic patterns.
+#
+# Example queries that were broken:
+# - "Mathematical Verification - Proof check with hidden flaw"
+# - "Verify this calculus proof: lim x→a [f(x)/g(x)]"
+# - "Check this proof sketch for errors"
+#
+# Fixed by checking mathematical proof patterns first, then cryptographic.
+
+MATHEMATICAL_PROOF_PATTERNS: Tuple[re.Pattern, ...] = (
+    # Mathematical verification patterns - checked FIRST before crypto
+    re.compile(r"mathematical\s+verification", re.IGNORECASE),
+    re.compile(r"proof\s+check", re.IGNORECASE),
+    re.compile(r"verify\s+(?:this\s+)?proof", re.IGNORECASE),
+    re.compile(r"check\s+(?:this\s+)?proof", re.IGNORECASE),
+    re.compile(r"proof\s+(?:sketch|step|verification)", re.IGNORECASE),
+    re.compile(r"validate\s+(?:this\s+)?proof", re.IGNORECASE),
+    # Calculus/analysis proof patterns
+    re.compile(r"calculus\s+proof", re.IGNORECASE),
+    re.compile(r"limit\s+proof", re.IGNORECASE),
+    re.compile(r"continuity\s+proof", re.IGNORECASE),
+    re.compile(r"differentiable\s+proof", re.IGNORECASE),
+)
+
+# ============================================================
+# FIX Issue #6: Language Reasoning (FOL) Patterns
+# ============================================================
+# Linguistic first-order logic queries were being misrouted to UNKNOWN
+# because there were no patterns for language reasoning tasks like
+# "quantifier scope ambiguity" or "FOL formalization of natural language".
+#
+# Example queries that were broken:
+# - "Language Reasoning - Formalize quantifier scope ambiguity in FOL"
+# - "Two readings: 'Every document has one author'"
+# - "FOL representation of 'Some student solved every problem'"
+#
+# Fixed by adding LANGUAGE category and patterns for linguistic FOL tasks.
+
+LANGUAGE_REASONING_PATTERNS: Tuple[re.Pattern, ...] = (
+    # Language reasoning patterns
+    re.compile(r"language\s+reasoning", re.IGNORECASE),
+    re.compile(r"quantifier\s+scope", re.IGNORECASE),
+    re.compile(r"scope\s+ambiguity", re.IGNORECASE),
+    re.compile(r"first[- ]order\s+logic\s+(?:formalization|representation)", re.IGNORECASE),
+    re.compile(r"fol\s+(?:formalization|representation)", re.IGNORECASE),
+    re.compile(r"two\s+readings", re.IGNORECASE),
+    re.compile(r"formalize.*(?:in|using)\s+fol", re.IGNORECASE),
+    re.compile(r"natural\s+language.*fol", re.IGNORECASE),
+    re.compile(r"linguistic.*(?:logic|fol)", re.IGNORECASE),
 )
 
 # ============================================================
@@ -1112,14 +1169,70 @@ class QueryClassifier:
                 )
         
         # =============================================================================
-        # Note: Check CRYPTOGRAPHIC keywords FIRST before factual patterns
+        # FIX Issue #2: Check MATHEMATICAL PROOF patterns BEFORE cryptographic
+        # =============================================================================
+        # Problem: "Mathematical Verification - Proof check" was routed to CRYPTOGRAPHIC
+        # because "proof" keyword triggered "security proof" pattern.
+        # 
+        # Solution: Check mathematical proof patterns FIRST, then cryptographic.
+        # Priority order: MATHEMATICAL_PROOF > CRYPTOGRAPHIC > FACTUAL
+        # =============================================================================
+        
+        # Check mathematical proof patterns first
+        for pattern in MATHEMATICAL_PROOF_PATTERNS:
+            if pattern.search(query_original):
+                logger.info(
+                    f"[QueryClassifier] FIX Issue #2: Detected MATHEMATICAL PROOF pattern - "
+                    f"routing to MATHEMATICAL (NOT cryptographic)"
+                )
+                return QueryClassification(
+                    category=QueryCategory.MATHEMATICAL.value,
+                    complexity=0.65,
+                    suggested_tools=["mathematical", "symbolic"],
+                    skip_reasoning=False,
+                    confidence=0.9,
+                    source="keyword",
+                )
+        
+        # =============================================================================
+        # FIX Issue #6: Check LANGUAGE REASONING patterns
+        # =============================================================================
+        # Problem: "Language Reasoning - quantifier scope ambiguity" routed to UNKNOWN
+        # because there were no patterns for linguistic FOL tasks.
+        #
+        # Solution: Add LANGUAGE_REASONING_PATTERNS and LANGUAGE category.
+        # =============================================================================
+        
+        # Check language reasoning patterns
+        for pattern in LANGUAGE_REASONING_PATTERNS:
+            if pattern.search(query_original):
+                logger.info(
+                    f"[QueryClassifier] FIX Issue #6: Detected LANGUAGE REASONING pattern - "
+                    f"routing to LANGUAGE (symbolic + language tools)"
+                )
+                return QueryClassification(
+                    category=QueryCategory.LANGUAGE.value,
+                    complexity=0.6,
+                    suggested_tools=["symbolic", "language"],
+                    skip_reasoning=False,
+                    confidence=0.9,
+                    source="keyword",
+                )
+        
+        # =============================================================================
+        # Note: Check CRYPTOGRAPHIC keywords AFTER proof/language patterns
         # =============================================================================
         # Problem: "What is the SHA-256 hash of..." was being classified as FACTUAL
         # because "What is" pattern matched before cryptographic keywords were checked.
         # This caused skip_reasoning=True and bypassed the cryptographic engine entirely.
         #
         # Solution: Check cryptographic keywords BEFORE factual patterns.
-        # Priority order: CRYPTOGRAPHIC > FACTUAL for queries containing hash/crypto keywords
+        # 
+        # Checking order (independent checks with early returns):
+        #   1. MATHEMATICAL_PROOF patterns (checked first)
+        #   2. LANGUAGE_REASONING patterns (checked second)
+        #   3. CRYPTOGRAPHIC patterns (checked third)
+        #   4. FACTUAL patterns (checked later in the method)
         #
         # FIX: Use word-boundary matching for short keywords to prevent false positives
         # like "mac" matching "machine" (experience machine → CRYPTOGRAPHIC instead of PHILOSOPHICAL)
@@ -1130,7 +1243,7 @@ class QueryClassifier:
         query_has_cryptographic = crypto_count > 0
         
         if query_has_cryptographic:
-            # Check cryptographic patterns first
+            # Check cryptographic patterns
             for pattern in CRYPTOGRAPHIC_PATTERNS:
                 if pattern.search(query_original):
                     logger.info(
