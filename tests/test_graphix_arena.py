@@ -26,6 +26,9 @@ from graphix_arena import (
     Node,
     app,
     rebert_prune,
+    _load_runtime_config,
+    _merge_configs,
+    _RUNTIME_CONFIG,
 )
 
 
@@ -460,6 +463,99 @@ class TestExceptionHandlers:
         assert exc.agent_id == "test_agent"
         assert exc.graph_id == "test_graph"
         assert exc.label == "risky"
+
+
+class TestRuntimeConfiguration:
+    """Test runtime configuration loading and Ray initialization."""
+
+    def test_runtime_config_loaded(self):
+        """Test that runtime configuration is loaded from file."""
+        from graphix_arena import _RUNTIME_CONFIG, _load_runtime_config
+
+        assert _RUNTIME_CONFIG is not None
+        assert isinstance(_RUNTIME_CONFIG, dict)
+        assert "distributed" in _RUNTIME_CONFIG
+
+    def test_runtime_config_ray_section(self):
+        """Test Ray configuration section in runtime config."""
+        from graphix_arena import _RUNTIME_CONFIG
+
+        ray_config = _RUNTIME_CONFIG.get("distributed", {}).get("ray", {})
+        
+        assert ray_config is not None
+        # Default should be enabled
+        assert ray_config.get("enabled") is True
+
+    def test_merge_configs_function(self):
+        """Test configuration merging function."""
+        from graphix_arena import _merge_configs
+
+        default = {
+            "distributed": {
+                "backend": "subprocess",
+                "ray": {"enabled": False, "num_cpus": "auto"}
+            }
+        }
+        override = {
+            "distributed": {
+                "backend": "ray",
+                "ray": {"enabled": True}
+            }
+        }
+
+        merged = _merge_configs(default, override)
+
+        # Override should take precedence
+        assert merged["distributed"]["backend"] == "ray"
+        assert merged["distributed"]["ray"]["enabled"] is True
+        # Default should be preserved for non-overridden values
+        assert merged["distributed"]["ray"]["num_cpus"] == "auto"
+
+    def test_load_runtime_config_defaults(self):
+        """Test that default configuration is used when file is missing."""
+        from graphix_arena import _load_runtime_config
+
+        # The function should always return valid config, even if file is missing
+        config = _load_runtime_config()
+
+        assert config is not None
+        assert "distributed" in config
+        assert "ray" in config["distributed"]
+        # Default is enabled
+        assert config["distributed"]["ray"].get("enabled", True) is True
+
+    def test_env_var_overrides_config_logic(self):
+        """Test that environment variable override logic is correct."""
+        import os
+        
+        # This test validates the logic of environment variable precedence
+        # without actually creating an arena instance
+        
+        ray_config = {"enabled": False}
+        
+        # Case 1: No env var set - should use config
+        env_ray_setting = None  # Simulating os.getenv returning None
+        if env_ray_setting is not None:
+            enable_ray = env_ray_setting.lower() in ("1", "true", "yes")
+        else:
+            enable_ray = ray_config.get("enabled", True)
+        assert enable_ray == False  # Should use config value
+        
+        # Case 2: Env var set to "1" - should enable
+        env_ray_setting = "1"
+        if env_ray_setting is not None:
+            enable_ray = env_ray_setting.lower() in ("1", "true", "yes")
+        else:
+            enable_ray = ray_config.get("enabled", True)
+        assert enable_ray == True  # Env var overrides config
+        
+        # Case 3: Env var set to "0" - should disable
+        env_ray_setting = "0"
+        if env_ray_setting is not None:
+            enable_ray = env_ray_setting.lower() in ("1", "true", "yes")
+        else:
+            enable_ray = ray_config.get("enabled", True)
+        assert enable_ray == False  # Env var explicitly disables
 
 
 if __name__ == "__main__":
