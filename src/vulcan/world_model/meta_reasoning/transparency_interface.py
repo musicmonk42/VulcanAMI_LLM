@@ -161,6 +161,12 @@ class TransparencyMetadata:
             self.timestamp = time.time()
 
 
+# Constants for input validation in explain_decision and related methods
+MAX_DECISION_SUMMARY_LENGTH = 500  # Maximum length for decision summaries
+MAX_FACTOR_VALUE_LENGTH = 100  # Maximum length for individual factor values
+MAX_REASONING_STEP_LENGTH = 200  # Maximum length for reasoning steps
+
+
 class TransparencyInterface:
     """
     Structured, machine-readable output for agent-to-agent communication
@@ -1751,11 +1757,11 @@ class TransparencyInterface:
                 
                 # Extract decision summary with sanitization
                 if isinstance(decision, str):
-                    decision_summary = decision[:500]  # Limit length
+                    decision_summary = decision[:MAX_DECISION_SUMMARY_LENGTH]
                 elif isinstance(decision, dict):
-                    decision_summary = decision.get('query', decision.get('decision', str(decision)))[:500]
+                    decision_summary = decision.get('query', decision.get('decision', str(decision)))[:MAX_DECISION_SUMMARY_LENGTH]
                 else:
-                    decision_summary = str(decision)[:500]
+                    decision_summary = str(decision)[:MAX_DECISION_SUMMARY_LENGTH]
                 
                 # Extract contributing factors with error handling
                 contributing_factors = []
@@ -1763,9 +1769,9 @@ class TransparencyInterface:
                     try:
                         if isinstance(value, dict):
                             # Extract nested info safely
-                            factor_desc = f"{key}: {value.get('reason', value.get('description', str(value)[:100]))}"
+                            factor_desc = f"{key}: {value.get('reason', value.get('description', str(value)[:MAX_FACTOR_VALUE_LENGTH]))}"
                         else:
-                            factor_desc = f"{key}: {str(value)[:100]}"
+                            factor_desc = f"{key}: {str(value)[:MAX_FACTOR_VALUE_LENGTH]}"
                         contributing_factors.append(factor_desc)
                     except Exception as e:
                         logger.debug(f"[TransparencyInterface] Error processing factor {key}: {e}")
@@ -1783,7 +1789,7 @@ class TransparencyInterface:
                 explanation = {
                     'decision_summary': decision_summary,
                     'contributing_factors': contributing_factors,
-                    'reasoning_trace': [str(step)[:200] for step in reasoning_steps],  # Sanitize steps
+                    'reasoning_trace': [str(step)[:MAX_REASONING_STEP_LENGTH] for step in reasoning_steps],
                     'confidence': confidence,
                     'factors_detail': self._make_serializable(factors),
                     'timestamp': time.time(),
@@ -1798,7 +1804,7 @@ class TransparencyInterface:
                 logger.error(f"[TransparencyInterface] Failed to explain decision: {e}", exc_info=True)
                 # Return minimal explanation on error - never raise
                 return {
-                    'decision_summary': str(decision)[:500] if decision else 'Unknown decision',
+                    'decision_summary': str(decision)[:MAX_DECISION_SUMMARY_LENGTH] if decision else 'Unknown decision',
                     'contributing_factors': [],
                     'reasoning_trace': reasoning_steps or [],
                     'confidence': 0.3,  # Low confidence for error case

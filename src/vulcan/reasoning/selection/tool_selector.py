@@ -3705,6 +3705,25 @@ class ToolSelector:
     """
     Main tool selector orchestrating all components
     """
+    
+    # Class-level compiled regex patterns for keyword matching (cached for performance)
+    # These are compiled once when the class is loaded, not on every method call
+    _MATH_PATTERN = re.compile(
+        r'p\(a\|b\)|p\(a and b\)|bayesian|bayes theorem|'
+        r'calculate probability|compute probability|prior probability|'
+        r'posterior probability|likelihood ratio|conditional probability',
+        re.IGNORECASE
+    )
+    _SAT_PATTERN = re.compile(
+        r'satisfiable|sat solver|cnf formula|first-order logic|'
+        r'predicate logic|forall|exists|∀|∃',
+        re.IGNORECASE
+    )
+    _CAUSAL_PATTERN = re.compile(
+        r'causal graph|causal model|do-calculus|confounding variable|'
+        r'intervention do\(|backdoor criterion|frontdoor criterion',
+        re.IGNORECASE
+    )
 
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         """
@@ -4490,29 +4509,20 @@ class ToolSelector:
             if not delegation_active:
                 problem_text = str(request.problem).lower()
                 
-                # Compile regex patterns for efficient matching (done once, cached by Python)
-                import re
+                # Use class-level compiled regex patterns (cached for performance)
+                # No need to import re or recompile - patterns are class attributes
                 
-                # Mathematical patterns (very specific)
-                math_pattern = re.compile(r'p\(a\|b\)|p\(a and b\)|bayesian|bayes theorem|calculate probability|compute probability|prior probability|posterior probability|likelihood ratio|conditional probability', re.IGNORECASE)
-                
-                # SAT/FOL patterns (very specific)
-                sat_pattern = re.compile(r'satisfiable|sat solver|cnf formula|first-order logic|predicate logic|forall|exists|∀|∃', re.IGNORECASE)
-                
-                # Causal inference patterns (very specific)
-                causal_pattern = re.compile(r'causal graph|causal model|do-calculus|confounding variable|intervention do\(|backdoor criterion|frontdoor criterion', re.IGNORECASE)
-                
-                if math_pattern.search(problem_text):
+                if self._MATH_PATTERN.search(problem_text):
                     keyword_override_tool = 'probabilistic'
                     logger.info(
                         f"[ToolSelector] KEYWORD OVERRIDE: Detected Bayesian probability query -> 'probabilistic'"
                     )
-                elif sat_pattern.search(problem_text):
+                elif self._SAT_PATTERN.search(problem_text):
                     keyword_override_tool = 'symbolic'
                     logger.info(
                         f"[ToolSelector] KEYWORD OVERRIDE: Detected SAT/FOL query -> 'symbolic'"
                     )
-                elif causal_pattern.search(problem_text):
+                elif self._CAUSAL_PATTERN.search(problem_text):
                     keyword_override_tool = 'causal'
                     logger.info(
                         f"[ToolSelector] KEYWORD OVERRIDE: Detected causal inference query -> 'causal'"

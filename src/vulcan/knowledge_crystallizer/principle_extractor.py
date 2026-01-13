@@ -538,7 +538,16 @@ class CrystallizedPrinciple:
     # FIX: Add execution_logic field to prevent validation warnings
     # This field is checked by KnowledgeValidator.validate() and if missing,
     # it reduces confidence by 0.1. Adding it with None default prevents the warning.
-    # Type is Callable or dict for execution specification
+    #
+    # Type: Callable or Dict for execution specification
+    # - Callable: A function that takes inputs (Dict[str, Any]) and returns outputs (Dict[str, Any])
+    # - Dict: A specification dict with keys like 'type', 'steps', 'conditions' for declarative execution
+    # - None: No executable logic defined yet (will cause validation warning, but allows principle creation)
+    #
+    # Usage:
+    #   principle.execution_logic = lambda inputs: {"result": process(inputs)}
+    #   or
+    #   principle.execution_logic = {"type": "pipeline", "steps": [...]}
     execution_logic: Optional[Union[Callable[[Dict[str, Any]], Dict[str, Any]], Dict[str, Any]]] = None
 
     def apply(self, problem: Dict[str, Any]) -> Dict[str, Any]:
