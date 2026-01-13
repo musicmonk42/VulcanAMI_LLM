@@ -2,6 +2,13 @@
 # ============================
 # Configuration for distributed computing and runtime execution
 # This file controls Ray initialization and subprocess execution settings
+#
+# CLOUD DEPLOYMENT NOTE:
+# Ray is automatically DISABLED in environments with limited /dev/shm
+# (Railway, Render, Heroku, etc.) because Ray requires substantial shared
+# memory for its object store. If /dev/shm is less than 500MB, Ray will
+# be auto-disabled regardless of the 'enabled' setting below.
+# To override, set environment variable: VULCAN_ENABLE_RAY=1
 
 distributed:
   # Backend type: 'ray' or 'subprocess'
@@ -12,6 +19,7 @@ distributed:
   # Ray-specific configuration
   ray:
     # Enable Ray when available (VULCAN_ENABLE_RAY env var takes precedence if set)
+    # NOTE: This is auto-disabled in cloud environments with limited /dev/shm
     enabled: true
     
     # Number of CPUs to use ('auto' = all available)

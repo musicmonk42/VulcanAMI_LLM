@@ -492,6 +492,50 @@ OUTPUT_END_MARKER = "###ARENA_OUTPUT_END###"
 # This enables Ray initialization based on configuration file settings
 # ============================================================
 
+def _is_limited_shm_environment() -> bool:
+    """
+    Detect if running in an environment with limited /dev/shm (shared memory).
+    
+    Cloud platforms like Railway, Render, and some Docker configurations have
+    very limited /dev/shm (e.g., 64MB), which causes Ray to emit warnings and
+    potentially hang during initialization.
+    
+    Returns:
+        True if running in an environment with limited /dev/shm, False otherwise.
+    """
+    # Check for cloud platform environment variables
+    cloud_platforms = [
+        "RAILWAY_ENVIRONMENT",      # Railway
+        "RAILWAY_SERVICE_NAME",     # Railway alternative
+        "RENDER",                   # Render.com
+        "RENDER_SERVICE_NAME",      # Render.com alternative
+        "HEROKU_APP_NAME",          # Heroku
+        "HEROKU_DYNO",              # Heroku alternative
+        "FLY_APP_NAME",             # Fly.io
+        "KUBERNETES_SERVICE_HOST",  # Kubernetes (may have limited /dev/shm)
+    ]
+    
+    for env_var in cloud_platforms:
+        if os.getenv(env_var):
+            return True
+    
+    # Check actual /dev/shm size on Linux
+    try:
+        import shutil
+        shm_path = "/dev/shm"
+        if os.path.exists(shm_path):
+            total, used, free = shutil.disk_usage(shm_path)
+            # If /dev/shm is less than 500MB, consider it limited
+            # Ray recommends at least 30% of available RAM (typically several GB)
+            if total < 500 * 1024 * 1024:  # 500MB
+                logger.debug(f"/dev/shm has only {total / (1024*1024):.0f}MB - considered limited")
+                return True
+    except Exception:
+        pass  # Can't check, assume not limited
+    
+    return False
+
+
 def _load_runtime_config() -> Dict[str, Any]:
     """
     Load runtime configuration from configs/runtime.yaml.
@@ -499,11 +543,15 @@ def _load_runtime_config() -> Dict[str, Any]:
     Returns:
         Dictionary with runtime configuration, or empty dict if not found.
     """
+    # Determine if we should default Ray to disabled
+    # In cloud environments with limited /dev/shm, Ray causes issues
+    ray_default_enabled = not _is_limited_shm_environment()
+    
     default_config = {
         "distributed": {
             "backend": "ray",
             "ray": {
-                "enabled": True,  # Note: Changed default to True for performance
+                "enabled": ray_default_enabled,  # Auto-disabled in limited /dev/shm environments
                 "num_cpus": "auto",
                 "object_store_memory": "auto",
                 "include_dashboard": False,
@@ -1191,22 +1239,39 @@ class GraphixArena:
         # ============================================================
         # Initialize Ray workers for distributed agent task execution.
         # Ray manages memory/CPU better than subprocess, preventing zombie processes.
-        # Configuration is loaded from configs/runtime.yaml (enabled by default).
-        # Override with VULCAN_ENABLE_RAY=0 to disable.
+        # 
+        # CLOUD DEPLOYMENT NOTE: Ray is AUTO-DISABLED in environments with limited
+        # /dev/shm (Railway, Render, Heroku, etc.) because Ray requires substantial
+        # shared memory. Override with VULCAN_ENABLE_RAY=1 to force enable.
+        # 
+        # Configuration is loaded from configs/runtime.yaml.
         self.ray_workers: Dict[str, Any] = {}
         self.use_ray = False
         
         # Load Ray configuration from runtime.yaml
         ray_config = _RUNTIME_CONFIG.get("distributed", {}).get("ray", {})
-        ray_enabled_in_config = ray_config.get("enabled", True)  # Default to True
+        ray_enabled_in_config = ray_config.get("enabled", False)  # Default from config (may be auto-disabled)
+        
+        # Check if running in limited /dev/shm environment
+        limited_shm = _is_limited_shm_environment()
         
         # Environment variable takes precedence over config file
         env_ray_setting = os.getenv("VULCAN_ENABLE_RAY")
         if env_ray_setting is not None:
             enable_ray = env_ray_setting.lower() in ("1", "true", "yes")
+            if enable_ray and limited_shm:
+                logger.warning(
+                    "⚠ Ray explicitly enabled via VULCAN_ENABLE_RAY=1 in limited /dev/shm environment. "
+                    "This may cause performance issues or startup delays."
+                )
         else:
-            # Use config file setting (default: enabled)
+            # Use config file setting (which is auto-disabled in limited /dev/shm environments)
             enable_ray = ray_enabled_in_config
+            if not enable_ray and limited_shm:
+                logger.info(
+                    "☁️ Ray auto-disabled: limited /dev/shm detected (cloud/container environment). "
+                    "Using subprocess execution. Set VULCAN_ENABLE_RAY=1 to override."
+                )
         
         if enable_ray and RAY_AVAILABLE and ray is not None and ArenaWorker is not None:
             try:

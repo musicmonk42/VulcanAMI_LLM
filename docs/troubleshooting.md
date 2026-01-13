@@ -87,6 +87,22 @@ Ray detects it's running in a Docker container and generates warnings about CPU 
 
 **Solution:**
 
+**For cloud platforms (Railway, Render, Heroku):**
+
+As of the latest update, Ray is **automatically disabled** in environments with limited `/dev/shm` (less than 500MB). Cloud platforms typically have very limited shared memory (e.g., Railway has only 64MB). When Ray is auto-disabled, you'll see:
+```
+☁️ Ray auto-disabled: limited /dev/shm detected (cloud/container environment). Using subprocess execution.
+```
+
+This is expected behavior and the application will work correctly using subprocess execution instead.
+
+To explicitly enable Ray on cloud platforms (not recommended unless you have a specific use case):
+```bash
+VULCAN_ENABLE_RAY=1
+```
+
+**For local Docker/self-hosted deployments:**
+
 1. **Suppress CPU detection warning** by setting the environment variable:
    ```bash
    RAY_DISABLE_DOCKER_CPU_WARNING=1
