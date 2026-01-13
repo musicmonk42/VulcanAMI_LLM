@@ -2265,6 +2265,31 @@ class CausalReasoner(EnhancedCausalReasoning):
                 dag.add_edge(cause, effect)
                 logger.debug(f"Pattern 2: {cause} -> {effect}")
         
+        # BUG #3 FIX: Additional observational patterns for more flexible matching
+        # Pattern 2b: "People who take X have lower/higher Y" (more flexible)
+        pattern2b = re.findall(
+            r'(?:people|patients|individuals|users)\s+(?:who|that)\s+(?:take|use|consume)\s+(?:\w+\s+)?([A-Z]).*?have\s+(?:lower|higher|less|more|reduced|increased)\s+(?:\w+\s+)?([A-Z])',
+            query_text, re.IGNORECASE
+        )
+        for cause, effect in pattern2b:
+            cause = cause.upper()
+            effect = effect.upper()
+            if cause != effect:
+                dag.add_edge(cause, effect)
+                logger.debug(f"Pattern 2b (observational): {cause} -> {effect}")
+        
+        # Pattern 2c: "X is associated with lower/higher Y"
+        pattern2c = re.findall(
+            r'([A-Z])\s+(?:is|are)\s+(?:associated|linked|correlated)\s+with\s+(?:lower|higher|less|more|reduced|increased)\s+(?:\w+\s+)?([A-Z])',
+            query_text, re.IGNORECASE
+        )
+        for cause, effect in pattern2c:
+            cause = cause.upper()
+            effect = effect.upper()
+            if cause != effect:
+                dag.add_edge(cause, effect)
+                logger.debug(f"Pattern 2c (association): {cause} -> {effect}")
+        
         # Pattern 3: "X causes Y" or "X leads to Y"
         pattern3 = re.findall(
             r'([A-Z])\s+(?:causes?|leads?\s+to|produces?|affects?)\s+([A-Z])',
