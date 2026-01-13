@@ -523,7 +523,11 @@ jobs:
       - name: Test Docker image
         run: |
           set -x
+          # Note: --shm-size and RAY_DISABLE_DOCKER_CPU_WARNING prevent Ray warnings
+          # about /dev/shm and CPU detection in containers
           docker run --rm \
+            --shm-size=1g \
+            -e RAY_DISABLE_DOCKER_CPU_WARNING=1 \
             -e JWT_SECRET_KEY=$(openssl rand -base64 48) \
             -e BOOTSTRAP_KEY=$(openssl rand -base64 32) \
             vulcanami-llm:test \
