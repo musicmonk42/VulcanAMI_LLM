@@ -484,7 +484,7 @@ class TestRuntimeConfiguration:
         
         assert ray_config is not None
         # Default should be enabled
-        assert ray_config.get("enabled") == True
+        assert ray_config.get("enabled") is True
 
     def test_merge_configs_function(self):
         """Test configuration merging function."""
@@ -507,7 +507,7 @@ class TestRuntimeConfiguration:
 
         # Override should take precedence
         assert merged["distributed"]["backend"] == "ray"
-        assert merged["distributed"]["ray"]["enabled"] == True
+        assert merged["distributed"]["ray"]["enabled"] is True
         # Default should be preserved for non-overridden values
         assert merged["distributed"]["ray"]["num_cpus"] == "auto"
 
@@ -522,7 +522,7 @@ class TestRuntimeConfiguration:
         assert "distributed" in config
         assert "ray" in config["distributed"]
         # Default is enabled
-        assert config["distributed"]["ray"].get("enabled", True) == True
+        assert config["distributed"]["ray"].get("enabled", True) is True
 
     def test_env_var_overrides_config_logic(self):
         """Test that environment variable override logic is correct."""

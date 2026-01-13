@@ -1247,9 +1247,8 @@ class GraphixArena:
                         elif isinstance(obj_store, int):
                             init_kwargs["object_store_memory"] = obj_store
                     
-                    # Set dashboard options
-                    if not ray_config.get("include_dashboard", False):
-                        init_kwargs["include_dashboard"] = False
+                    # Set dashboard options (always set the value from config)
+                    init_kwargs["include_dashboard"] = ray_config.get("include_dashboard", False)
                     
                     # Set temp directory if configured
                     temp_dir = ray_config.get("temp_dir")

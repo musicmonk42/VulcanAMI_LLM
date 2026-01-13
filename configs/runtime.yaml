@@ -11,7 +11,7 @@ distributed:
   
   # Ray-specific configuration
   ray:
-    # Enable Ray when available (overrides VULCAN_ENABLE_RAY env var if set)
+    # Enable Ray when available (VULCAN_ENABLE_RAY env var takes precedence if set)
     enabled: true
     
     # Number of CPUs to use ('auto' = all available)
