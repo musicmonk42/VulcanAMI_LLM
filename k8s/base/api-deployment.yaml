@@ -102,6 +102,9 @@ spec:
           mountPath: /tmp
         - name: app-data
           mountPath: /app/data
+        # Shared memory mount for Ray object store
+        - name: dshm
+          mountPath: /dev/shm
         - name: memory-store
           mountPath: /app/memory_store
         - name: cache
@@ -211,6 +214,12 @@ spec:
         emptyDir: {}
       - name: app-data
         emptyDir: {}
+      # Shared memory for Ray object store (prevents /dev/shm warning)
+      # Ray recommends at least 30% of available RAM for object store
+      - name: dshm
+        emptyDir:
+          medium: Memory
+          sizeLimit: "4Gi"
       - name: memory-store
         persistentVolumeClaim:
           claimName: vulcanami-memory-store
