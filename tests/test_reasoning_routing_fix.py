@@ -12,6 +12,35 @@ wrong reasoning engines (e.g., SAT queries → MathTool instead of SymbolicReaso
 import pytest
 from unittest.mock import Mock, MagicMock, patch
 
+# Try to import the actual constant from the implementation
+try:
+    from src.vulcan.reasoning.integration.apply_reasoning_impl import REASONING_CATEGORIES
+    REASONING_CATEGORIES_IMPORTED = True
+except (ImportError, AttributeError):
+    # Fallback: Define the constant if import fails (e.g., during isolated tests)
+    REASONING_CATEGORIES = frozenset([
+        'PROBABILISTIC', 'LOGICAL', 'CAUSAL', 'MATHEMATICAL', 'ANALOGICAL', 
+        'PHILOSOPHICAL', 'SYMBOLIC', 'LANGUAGE',
+        'probabilistic', 'logical', 'causal', 'mathematical', 'analogical',
+        'philosophical', 'symbolic', 'language',
+    ])
+    REASONING_CATEGORIES_IMPORTED = False
+
+
+# Common tool-to-reasoning-type mapping used across tests
+# This matches the mapping in agent_pool.py and orchestrator.py
+TOOL_TO_REASONING_TYPE_MAP = {
+    'symbolic': 'SYMBOLIC',
+    'probabilistic': 'PROBABILISTIC',
+    'causal': 'CAUSAL',
+    'analogical': 'ANALOGICAL',
+    'mathematical': 'MATHEMATICAL',
+    'philosophical': 'PHILOSOPHICAL',
+    'world_model': 'PHILOSOPHICAL',
+    'general': 'SYMBOLIC',
+    'multimodal': 'MULTIMODAL',
+}
+
 
 class TestReasoningRouting:
     """Test that queries route to correct reasoning engines."""
@@ -230,13 +259,8 @@ class TestApplyReasoningImplAuthority:
         the context is marked with classifier_is_authoritative and
         prevent_task_type_override flags.
         """
-        # Define REASONING_CATEGORIES as in apply_reasoning_impl.py
-        REASONING_CATEGORIES = frozenset([
-            'PROBABILISTIC', 'LOGICAL', 'CAUSAL', 'MATHEMATICAL', 'ANALOGICAL', 
-            'PHILOSOPHICAL', 'SYMBOLIC', 'LANGUAGE',
-            'probabilistic', 'logical', 'causal', 'mathematical', 'analogical',
-            'philosophical', 'symbolic', 'language',
-        ])
+        # Use the imported REASONING_CATEGORIES constant
+        # (Falls back to local definition if import failed)
         
         # Test that all reasoning categories trigger authority flags
         for category in ['PROBABILISTIC', 'CAUSAL', 'SYMBOLIC', 'ANALOGICAL']:
