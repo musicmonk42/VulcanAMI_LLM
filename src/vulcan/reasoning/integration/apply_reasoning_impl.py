@@ -323,8 +323,10 @@ def apply_reasoning(
                         # check for self-referential/ethical content that must escalate.
                         # Classifier may misclassify due to short length or simple phrasing.
                         # =================================================================
-                        if is_self_referential(query) or is_ethical_query(query):
-                            query_nature = 'self-referential' if is_self_referential(query) else 'ethical'
+                        is_self_ref_check = is_self_referential(query)
+                        is_ethical_check = is_ethical_query(query)
+                        if is_self_ref_check or is_ethical_check:
+                            query_nature = 'self-referential' if is_self_ref_check else 'ethical'
                             logger.warning(
                                 f"{LOG_PREFIX} DEFENSE-IN-DEPTH: Classifier skip attempted "
                                 f"(category={classification.category}) but {query_nature} query detected. "
@@ -333,7 +335,7 @@ def apply_reasoning(
                             
                             # Force category mutation to ensure proper routing
                             original_query_type = query_type
-                            query_type = 'self_introspection' if is_self_referential(query) else 'ethical'
+                            query_type = 'self_introspection' if is_self_ref_check else 'ethical'
                             
                             # Set context to guarantee world_model routing
                             if context is None:
@@ -633,8 +635,10 @@ def apply_reasoning(
                 # Even if pattern matching identifies a simple greeting, check for
                 # self-referential/ethical content that must route to world_model
                 # =================================================================
-                if is_self_referential(query) or is_ethical_query(query):
-                    query_nature = 'self-referential' if is_self_referential(query) else 'ethical'
+                is_self_ref_check = is_self_referential(query)
+                is_ethical_check = is_ethical_query(query)
+                if is_self_ref_check or is_ethical_check:
+                    query_nature = 'self-referential' if is_self_ref_check else 'ethical'
                     logger.warning(
                         f"{LOG_PREFIX} DEFENSE-IN-DEPTH: Pattern fallback attempted but "
                         f"{query_nature} query detected. Escalating to world_model/meta_reasoning. "
@@ -642,7 +646,7 @@ def apply_reasoning(
                     )
                     
                     # Force category mutation to ensure proper routing
-                    query_type = 'self_introspection' if is_self_referential(query) else 'ethical'
+                    query_type = 'self_introspection' if is_self_ref_check else 'ethical'
                     
                     # Set context to guarantee world_model routing
                     if context is None:
@@ -693,8 +697,10 @@ def apply_reasoning(
                 # - "Should I lie?" (simple but ethical)
                 # - "What are you?" (short but introspective)
                 # =================================================================
-                if is_self_referential(query) or is_ethical_query(query):
-                    query_nature = 'self-referential' if is_self_referential(query) else 'ethical'
+                is_self_ref_check = is_self_referential(query)
+                is_ethical_check = is_ethical_query(query)
+                if is_self_ref_check or is_ethical_check:
+                    query_nature = 'self-referential' if is_self_ref_check else 'ethical'
                     logger.warning(
                         f"{LOG_PREFIX} DEFENSE-IN-DEPTH: Fast path attempted (complexity={complexity:.2f}) "
                         f"but {query_nature} query detected. Escalating to world_model/meta_reasoning. "
@@ -703,7 +709,7 @@ def apply_reasoning(
                     
                     # Force category mutation to ensure proper routing
                     original_query_type = query_type
-                    query_type = 'self_introspection' if is_self_referential(query) else 'ethical'
+                    query_type = 'self_introspection' if is_self_ref_check else 'ethical'
                     
                     # Set context to guarantee world_model routing
                     if context is None:
