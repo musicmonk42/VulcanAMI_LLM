@@ -253,6 +253,62 @@ WORLD_MODEL_CONFIDENCE_THRESHOLD = 0.5
 # This applies to all reasoning engines (symbolic, probabilistic, causal, etc.), not just world_model.
 HIGH_CONFIDENCE_THRESHOLD = 0.5
 
+# ============================================================
+# PRIVILEGED RESULT DETECTION (Industry Standard AGI Safety)
+# ============================================================
+# Privileged results are those from world_model, meta-reasoning, or
+# philosophical_reasoning that MUST NOT be overridden by fallback logic,
+# consensus voting, or result blending. This ensures architectural
+# separation between system/meta reasoning and general task reasoning.
+# ============================================================
+
+
+def _is_privileged_result(reasoning_result) -> bool:
+    """
+    Detect if a ReasoningResult is privileged and must not be overridden.
+    
+    A result is privileged if:
+    1. selected_tools includes "world_model", OR
+    2. metadata includes 'is_self_introspection' or 'self_referential', OR  
+    3. reasoning_strategy is 'meta_reasoning' or 'philosophical_reasoning'
+    
+    Privileged results bypass ALL fallback, consensus, voting, and blending logic.
+    
+    Args:
+        reasoning_result: ReasoningResult object (or dict) from apply_reasoning
+        
+    Returns:
+        True if result is privileged, False otherwise
+    """
+    if reasoning_result is None:
+        return False
+    
+    # Handle both dict and object formats
+    if isinstance(reasoning_result, dict):
+        selected_tools = reasoning_result.get('selected_tools', [])
+        metadata = reasoning_result.get('metadata', {})
+        strategy = reasoning_result.get('reasoning_strategy', '')
+    else:
+        # Object with attributes
+        selected_tools = getattr(reasoning_result, 'selected_tools', [])
+        metadata = getattr(reasoning_result, 'metadata', {})
+        strategy = getattr(reasoning_result, 'reasoning_strategy', '')
+    
+    # Check condition 1: world_model tool selected
+    if 'world_model' in selected_tools:
+        return True
+    
+    # Check condition 2: self-introspection metadata flags
+    if metadata:
+        if metadata.get('is_self_introspection') or metadata.get('self_referential'):
+            return True
+    
+    # Check condition 3: meta or philosophical reasoning strategy
+    if strategy in ('meta_reasoning', 'philosophical_reasoning'):
+        return True
+    
+    return False
+
 # FIXED: Add cachetools import for LRU cache with TTL
 try:
     from cachetools import TTLCache
@@ -3086,6 +3142,110 @@ class AgentPoolManager:
                             f"This may indicate a configuration issue."
                         )
                     
+                    # =================================================================
+                    # PRIVILEGED RESULT CHECK (Industry Standard AGI Safety)
+                    # =================================================================
+                    # IMMEDIATELY return privileged results (world_model, meta-reasoning,
+                    # philosophical_reasoning) without ANY fallback, consensus, voting,
+                    # or blending. This ensures architectural separation for system/meta
+                    # reasoning and prevents LLM/HYBRID from clobbering intended answers.
+                    # =================================================================
+                    if _is_privileged_result(integration_result):
+                        privileged_type = "UNKNOWN"
+                        if 'world_model' in integration_result.selected_tools:
+                            privileged_type = "world_model"
+                        elif integration_result.reasoning_strategy in ('meta_reasoning', 'philosophical_reasoning'):
+                            privileged_type = integration_result.reasoning_strategy
+                        elif integration_result.metadata.get('is_self_introspection'):
+                            privileged_type = "self_introspection"
+                        elif integration_result.metadata.get('self_referential'):
+                            privileged_type = "self_referential"
+                        
+                        logger.info(
+                            f"[AgentPool] ⚠️ PRIVILEGED RESULT DETECTED: {privileged_type} - "
+                            f"IMMEDIATELY returning without fallback/consensus/blending. "
+                            f"tools={integration_result.selected_tools}, "
+                            f"strategy={integration_result.reasoning_strategy}, "
+                            f"confidence={integration_result.confidence:.2f}"
+                        )
+                        
+                        # Mark in metadata for audit trail
+                        if not integration_result.metadata:
+                            integration_result.metadata = {}
+                        integration_result.metadata['privileged_result'] = True
+                        integration_result.metadata['privileged_type'] = privileged_type
+                        integration_result.metadata['bypassed_fallback'] = True
+                        
+                        # IMMEDIATE RETURN - skip ALL subsequent processing
+                        # Build result directly from privileged response
+                        try:
+                            from vulcan.reasoning.reasoning_types import ReasoningResult as UR_ReasoningResult
+                            
+                            # Extract conclusion from metadata or rationale
+                            conclusion = integration_result.metadata.get(
+                                "conclusion",
+                                integration_result.metadata.get("world_model_response", integration_result.rationale)
+                            )
+                            
+                            reasoning_result = UR_ReasoningResult(
+                                conclusion=conclusion,
+                                confidence=integration_result.confidence,
+                                reasoning_type=integration_result.reasoning_strategy,
+                                explanation=integration_result.metadata.get("explanation", integration_result.rationale),
+                                metadata={
+                                    **integration_result.metadata,
+                                    "source": "privileged_path",
+                                    "selected_tools": integration_result.selected_tools,
+                                    "strategy": integration_result.reasoning_strategy,
+                                }
+                            )
+                        except ImportError:
+                            # Fallback if ReasoningResult not available
+                            class PrivilegedReasoningResult:
+                                def __init__(self, conclusion, confidence, reasoning_type, explanation, metadata):
+                                    self.conclusion = conclusion
+                                    self.confidence = confidence
+                                    self.reasoning_type = reasoning_type
+                                    self.explanation = explanation
+                                    self.metadata = metadata
+                            
+                            conclusion = integration_result.metadata.get(
+                                "conclusion",
+                                integration_result.metadata.get("world_model_response", integration_result.rationale)
+                            )
+                            
+                            reasoning_result = PrivilegedReasoningResult(
+                                conclusion=conclusion,
+                                confidence=integration_result.confidence,
+                                reasoning_type=integration_result.reasoning_strategy,
+                                explanation=integration_result.metadata.get("explanation", integration_result.rationale),
+                                metadata={
+                                    **integration_result.metadata,
+                                    "source": "privileged_path",
+                                }
+                            )
+                        
+                        # Build node results for privileged response
+                        reasoning_was_invoked = True
+                        for i, node in enumerate(nodes):
+                            node_id = node.get("id", f"node_{i}")
+                            node_type = node.get("type", "unknown")
+                            node_results[node_id] = {
+                                "status": "completed",
+                                "node_type": node_type,
+                                "reasoning_applied": True,
+                                "privileged_result": True,
+                                "selected_tools": integration_result.selected_tools,
+                                "reasoning_strategy": integration_result.reasoning_strategy,
+                            }
+                        
+                        # Continue to result extraction (skip all other reasoning paths)
+                        # The code after line 3700 will extract reasoning_output from reasoning_result
+                        logger.info(
+                            f"[AgentPool] ✅ Privileged result processing complete - "
+                            f"skipped fallback/consensus/blending for {privileged_type}"
+                        )
+                    
                     # =========================================================
                     # =================================================================
                     # CRITICAL FIX: High-Confidence Result Detection for All Engines
@@ -3101,17 +3261,22 @@ class AgentPoolManager:
                     # Fix: Check confidence threshold for ALL tools, not just world_model.
                     # This prevents valid reasoning results from being discarded and enables
                     # proper learning integration by calling observe_engine_result().
+                    # 
+                    # NOTE: Skip this check if already handled as privileged result above.
                     # =================================================================
                     
                     # Check if this is a high-confidence result from ANY reasoning engine
+                    is_privileged = _is_privileged_result(integration_result)
                     is_high_confidence_result = (
-                        integration_result.confidence >= HIGH_CONFIDENCE_THRESHOLD
+                        integration_result.confidence >= HIGH_CONFIDENCE_THRESHOLD and
+                        not is_privileged  # Skip if already handled as privileged
                     )
                     
                     # Special handling for world_model results (backward compatibility)
                     is_world_model_result = (
                         integration_result.selected_tools == ["world_model"] and
-                        integration_result.confidence >= WORLD_MODEL_CONFIDENCE_THRESHOLD
+                        integration_result.confidence >= WORLD_MODEL_CONFIDENCE_THRESHOLD and
+                        not is_privileged  # Skip if already handled as privileged
                     )
                     
                     # Log metadata flags for world model debugging but don't require them
@@ -3128,7 +3293,8 @@ class AgentPoolManager:
                             )
                     
                     # Use high-confidence results directly (world_model or any other engine)
-                    if is_high_confidence_result:
+                    # BUT skip if already handled as privileged result
+                    if is_high_confidence_result or (is_world_model_result and not is_privileged):
                         # Determine the primary reasoning engine from selected tools
                         primary_engine = integration_result.selected_tools[0] if integration_result.selected_tools else "general"
                         
