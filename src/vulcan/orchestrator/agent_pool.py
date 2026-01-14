@@ -3016,6 +3016,23 @@ class AgentPoolManager:
             reasoning_result = None
             node_results = {}
             reasoning_was_invoked = False  # Note: Track actual reasoning invocation
+            
+            # ═══════════════════════════════════════════════════════════════════
+            # BUG FIX: Import enum conversion helper for reasoning_type safety
+            # ═══════════════════════════════════════════════════════════════════
+            # PROBLEM: Reasoning results may have reasoning_type as string instead
+            # of ReasoningType enum, causing results to be discarded by orchestrator.
+            #
+            # SOLUTION: Import ensure_reasoning_type_enum() to convert strings to
+            # enums before processing results.
+            # ═══════════════════════════════════════════════════════════════════
+            try:
+                from vulcan.reasoning.integration.utils import ensure_reasoning_type_enum
+                TYPE_CONVERSION_AVAILABLE = True
+            except ImportError:
+                ensure_reasoning_type_enum = None
+                TYPE_CONVERSION_AVAILABLE = False
+                logger.warning("[AgentPool] Type conversion utility not available - may drop philosophical results")
 
             # ==================================================================
             # FIX TASK 6: Add validation and logging for diagnostic purposes
@@ -3108,6 +3125,27 @@ class AgentPoolManager:
                         complexity=complexity,
                         context=context,
                     )
+                    
+                    # ═══════════════════════════════════════════════════════════════════
+                    # BUG FIX: Convert reasoning_type to enum if needed
+                    # ═══════════════════════════════════════════════════════════════════
+                    # PROBLEM: integration_result.metadata may contain reasoning_type as
+                    # a string (e.g., "philosophical") which causes TypeError when passed
+                    # to components expecting ReasoningType enum.
+                    #
+                    # SOLUTION: Use ensure_reasoning_type_enum() to convert any string
+                    # values to proper enum before further processing.
+                    # ═══════════════════════════════════════════════════════════════════
+                    if TYPE_CONVERSION_AVAILABLE and ensure_reasoning_type_enum is not None:
+                        integration_result = ensure_reasoning_type_enum(integration_result, "agent_pool")
+                        # Also ensure metadata dict is converted
+                        if hasattr(integration_result, 'metadata') and integration_result.metadata:
+                            integration_result.metadata = ensure_reasoning_type_enum(
+                                integration_result.metadata, 
+                                "agent_pool:metadata"
+                            )
+                    else:
+                        logger.debug("[AgentPool] Type conversion skipped - utility not available")
                     
                     # =================================================================
                     # FIX: Track best result across all engine attempts
@@ -3508,6 +3546,17 @@ class AgentPoolManager:
                                     query={"query": query, "context": context, "task_type": task_type},
                                     reasoning_type=selected_tool_reasoning_type,
                                 )
+                                
+                                # ═══════════════════════════════════════════════════════════════════
+                                # BUG FIX: Convert reasoning_type in result from reasoner
+                                # ═══════════════════════════════════════════════════════════════════
+                                # PROBLEM: reasoner.reason() may return a result with string
+                                # reasoning_type instead of enum.
+                                #
+                                # SOLUTION: Apply ensure_reasoning_type_enum() to convert.
+                                # ═══════════════════════════════════════════════════════════════════
+                                if TYPE_CONVERSION_AVAILABLE and ensure_reasoning_type_enum is not None:
+                                    reasoning_result = ensure_reasoning_type_enum(reasoning_result, "agent_pool:reasoner")
                                 
                                 # FIX TASK 6: Validate reasoning result
                                 # BUG #3 FIX: Handle both dict and object results correctly
