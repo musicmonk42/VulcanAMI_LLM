@@ -26,37 +26,65 @@ except ImportError:
 
 # Optional Prometheus - soft dependency
 try:
-    from prometheus_client import Counter, Histogram
+    from prometheus_client import Counter, Histogram, REGISTRY
 
     PROMETHEUS_AVAILABLE = True
+    
+    def _get_or_create_metric(metric_class, name, description, labelnames=None):
+        """Get existing metric or create new one to avoid duplicate registration."""
+        try:
+            # Try to get existing metric from registry
+            for collector in list(REGISTRY._names_to_collectors.values()):
+                if hasattr(collector, '_name') and collector._name == name:
+                    return collector
+            # Create new metric if not found
+            if labelnames:
+                return metric_class(name, description, labelnames)
+            return metric_class(name, description)
+        except Exception:
+            # If anything goes wrong, return a no-op metric
+            return _NoOpMetric()
 except ImportError:
     PROMETHEUS_AVAILABLE = False
+    
+    def _get_or_create_metric(metric_class, name, description, labelnames=None):
+        return _NoOpMetric()
 
-    # No-op metrics classes
-    class _NoOpMetric:
-        def __init__(self, *args, **kwargs):
-            pass
+# No-op metrics class for when Prometheus is not available or registration fails
+class _NoOpMetric:
+    def __init__(self, *args, **kwargs):
+        pass
 
-        def observe(self, *args, **kwargs):
-            pass
+    def observe(self, *args, **kwargs):
+        pass
 
-        def inc(self, *args, **kwargs):
-            pass
+    def inc(self, *args, **kwargs):
+        pass
 
+if not PROMETHEUS_AVAILABLE:
     Histogram = Counter = _NoOpMetric  # type: ignore
 
 # Configure logging
 logger = logging.getLogger("ConsensusManager")
 logger.setLevel(logging.INFO)
 
-# Metrics
-consensus_latency = Histogram("consensus_latency_seconds", "Consensus latency (s)")
-quorum_achieved = Counter("quorum_achieved_total", "Quorum achieved")
-quorum_failed = Counter("quorum_failed_total", "Quorum failed")
-votes_cast = Counter("votes_cast_total", "Votes cast")
-deadlocks_metric = Counter("deadlocks_total", "Deadlocks detected")
-consensus_failures = Counter("consensus_failures_total", "Consensus exceptions")
-leader_elections = Counter("leader_elections_total", "Leader elections performed")
+# Metrics - use helper to avoid duplicate registration errors
+if PROMETHEUS_AVAILABLE:
+    consensus_latency = _get_or_create_metric(Histogram, "consensus_latency_seconds", "Consensus latency (s)")
+    quorum_achieved = _get_or_create_metric(Counter, "quorum_achieved_total", "Quorum achieved")
+    quorum_failed = _get_or_create_metric(Counter, "quorum_failed_total", "Quorum failed")
+    votes_cast = _get_or_create_metric(Counter, "votes_cast_total", "Votes cast")
+    deadlocks_metric = _get_or_create_metric(Counter, "deadlocks_total", "Deadlocks detected")
+    consensus_failures = _get_or_create_metric(Counter, "consensus_failures_total", "Consensus exceptions")
+    leader_elections = _get_or_create_metric(Counter, "leader_elections_total", "Leader elections performed")
+else:
+    consensus_latency = _NoOpMetric()
+    quorum_achieved = _NoOpMetric()
+    quorum_failed = _NoOpMetric()
+    votes_cast = _NoOpMetric()
+    deadlocks_metric = _NoOpMetric()
+    consensus_failures = _NoOpMetric()
+    leader_elections = _NoOpMetric()
 
 # Constants
 DEFAULT_TIMEOUT = 0.05

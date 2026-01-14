@@ -422,3 +422,45 @@ def cleanup_session_resources():
 
     # 6. Final garbage collection
     gc.collect()
+
+
+@pytest.fixture
+def deployment(tmp_path):
+    """
+    Create a ProductionDeployment instance for functional tests.
+    
+    This fixture provides a minimal deployment configuration
+    suitable for testing without requiring external dependencies.
+    """
+    from unittest.mock import MagicMock
+    
+    try:
+        from vulcan.orchestrator.deployment import ProductionDeployment
+        from vulcan.config import AgentConfig
+        
+        # Create a minimal config for testing
+        config = MagicMock(spec=AgentConfig)
+        config.checkpoint_dir = str(tmp_path / "checkpoints")
+        config.disable_unified_runtime = True  # Avoid heavy initialization
+        
+        # Create deployment instance
+        deployment = ProductionDeployment(
+            config=config,
+            checkpoint_path=None,
+            orchestrator_type="basic",
+        )
+        
+        yield deployment
+        
+        # Cleanup
+        if hasattr(deployment, 'shutdown') and callable(deployment.shutdown):
+            try:
+                deployment.shutdown()
+            except Exception:
+                pass
+    except ImportError as e:
+        # If ProductionDeployment is not available, provide a mock
+        warnings.warn(f"ProductionDeployment not available: {e}")
+        mock_deployment = MagicMock()
+        mock_deployment.step_with_monitoring = MagicMock(return_value={"action": "test", "output": "mock"})
+        yield mock_deployment

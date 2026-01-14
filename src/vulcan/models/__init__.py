@@ -27,6 +27,10 @@ from .model_registry import (
     RateLimitError,
 )
 
+# Import AgentConfig and ProductionDeployment for backwards compatibility
+from vulcan.config import AgentConfig
+from vulcan.orchestrator.deployment import ProductionDeployment
+
 __all__ = [
     # Core functions
     "get_sentence_transformer",
@@ -46,4 +50,8 @@ __all__ = [
     "ModelNotAvailableError",
     "ModelLoadFailedError",
     "RateLimitError",
+    
+    # Config and deployment classes
+    "AgentConfig",
+    "ProductionDeployment",
 ]
