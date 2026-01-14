@@ -137,6 +137,9 @@ PURE_ETHICAL_PHRASES: frozenset = frozenset({
     "is it permissible", "is it impermissible", "is it forbidden",
     "morally permissible", "morally wrong", "morally right",
     "ethically permissible", "ethically wrong", "ethically right",
+    # Right/wrong questions
+    "is it right", "is it wrong", "is that right", "is that wrong",
+    "right to", "wrong to",
     # Ethical framework questions
     "what would a utilitarian", "what would a deontologist",
     "from a virtue ethics", "consequentialist view",
@@ -146,6 +149,27 @@ PURE_ETHICAL_PHRASES: frozenset = frozenset({
     # Obligation language
     "do i have an obligation", "is there a duty",
     "moral obligation", "ethical obligation",
+    "should i", "ought i", "ought to",
+})
+
+# Philosophical phrases that indicate philosophical/metaphysical queries
+PHILOSOPHICAL_PHRASES: frozenset = frozenset({
+    # Metaphysical questions
+    "what is consciousness", "nature of consciousness", "what is reality",
+    "what is existence", "meaning of life", "purpose of existence",
+    "what is truth", "nature of truth", "what is knowledge",
+    # Epistemological questions
+    "how do we know", "can we know", "what can we know",
+    "limits of knowledge", "nature of belief",
+    # Mind/consciousness questions
+    "what is the mind", "mind-body problem", "hard problem of consciousness",
+    "qualia", "subjective experience", "phenomenal consciousness",
+    # Free will and determinism
+    "free will", "determinism", "do we have free will",
+    # Identity and self
+    "what is the self", "personal identity", "ship of theseus",
+    # Philosophy of language
+    "meaning of meaning", "reference", "sense and reference",
 })
 
 
@@ -500,6 +524,7 @@ __all__ = [
     "ACTION_VERBS",
     "ETHICAL_ANALYSIS_INDICATORS",
     "PURE_ETHICAL_PHRASES",
+    "PHILOSOPHICAL_PHRASES",
     # Enums
     "ReasoningStrategyType",
     # Mappings

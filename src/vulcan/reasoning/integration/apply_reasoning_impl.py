@@ -28,6 +28,7 @@ from .decomposition import process_with_decomposition
 from .query_analysis import (
     is_self_referential,
     is_ethical_query,
+    is_philosophical_query,
     consult_world_model_introspection,
 )
 from .cross_domain import apply_cross_domain_transfer
@@ -120,15 +121,26 @@ def apply_reasoning(
             # =================================================================
             is_self_ref = is_self_referential(query)
             is_ethical = is_ethical_query(query)
+            is_philosophical = is_philosophical_query(query)
             
             # Initialize wm_result to None - will be populated if world_model is consulted
             wm_result = None
             
-            if is_self_ref or is_ethical:
-                # Handle overlap: prioritize self-referential if both
-                query_type_label = 'self-referential' if is_self_ref else 'ethical'
-                if is_self_ref and is_ethical:
-                    query_type_label = 'self-referential and ethical'
+            if is_self_ref or is_ethical or is_philosophical:
+                # Handle overlap: prioritize self-referential if multiple
+                if is_self_ref:
+                    query_type_label = 'self-referential'
+                    if is_ethical:
+                        query_type_label += ' and ethical'
+                    if is_philosophical:
+                        query_type_label += ' and philosophical'
+                elif is_ethical:
+                    query_type_label = 'ethical'
+                    if is_philosophical:
+                        query_type_label += ' and philosophical'
+                else:
+                    query_type_label = 'philosophical'
+                    
                 logger.info(f"{LOG_PREFIX} Note: {query_type_label.capitalize()} query detected - consulting world model first")
                 wm_result = self._consult_world_model_introspection(query)
                 
@@ -264,6 +276,7 @@ def apply_reasoning(
                             "complexity": complexity,
                             "self_referential": is_self_ref,
                             "ethical_query": is_ethical,
+                            "philosophical_query": is_philosophical,
                             "world_model_response": world_model_response,
                             # Note: Add conclusion field so main.py can extract it
                             "conclusion": world_model_response,
@@ -273,6 +286,78 @@ def apply_reasoning(
                             "selection_time_ms": selection_time,
                             "classifier_is_authoritative": True,
                             "is_self_introspection": is_self_ref,
+                        },
+                    )
+                else:
+                    # ═══════════════════════════════════════════════════════════════════
+                    # SAFETY STANDARD (Jan 14 2026): PRIVILEGED QUERY NO-ANSWER PATH
+                    # ═══════════════════════════════════════════════════════════════════
+                    # World model returned None, low confidence, or cannot answer this
+                    # introspective/ethical/philosophical query. Per AGI safety standards,
+                    # we MUST NOT fall through to classifier/general tool selection.
+                    # 
+                    # Instead, return an explicit privileged "no answer" result that:
+                    # 1. Has selected_tools=['world_model'] to maintain privileged routing
+                    # 2. Has confidence=0.0 to signal inability to answer
+                    # 3. Has clear rationale explaining why no answer is provided
+                    # 4. Preserves all metadata for audit trail
+                    # 
+                    # This ensures NO classifier/LLM/general fallback for privileged queries.
+                    # ═══════════════════════════════════════════════════════════════════
+                    
+                    selection_time = (time.perf_counter() - selection_start) * 1000
+                    
+                    # Determine the failure reason for audit logging
+                    if wm_result is None:
+                        failure_reason = "World model returned None"
+                        wm_confidence = 0.0
+                    else:
+                        failure_reason = f"World model confidence {wm_result.get('confidence', 0):.2f} below threshold 0.5"
+                        wm_confidence = wm_result.get('confidence', 0.0)
+                    
+                    logger.warning(
+                        f"{LOG_PREFIX} PRIVILEGED QUERY NO-ANSWER PATH: {query_type_label} query "
+                        f"detected but world model cannot answer ({failure_reason}). "
+                        f"Returning privileged no-answer result. NO FALLBACK to classifier. "
+                        f"Query: '{query[:60]}...'"
+                    )
+                    
+                    # Audit log for monitoring and tracing
+                    logger.info(
+                        f"{LOG_PREFIX} AUDIT: Privileged query handled with no-answer path. "
+                        f"Type: {query_type_label}, World model result: {failure_reason}, "
+                        f"No classifier fallback permitted."
+                    )
+                    
+                    # Determine reasoning type: self-referential takes priority
+                    reasoning_type = "meta_reasoning" if is_self_ref else "philosophical_reasoning"
+                    strategy_type = ReasoningStrategyType.META_REASONING.value if is_self_ref else ReasoningStrategyType.PHILOSOPHICAL_REASONING.value
+                    
+                    return ReasoningResult(
+                        selected_tools=["world_model"],
+                        reasoning_strategy=strategy_type,
+                        confidence=0.0,  # Explicit 0.0 to signal no answer
+                        rationale=(
+                            f"World model/meta-reasoning could not answer this "
+                            f"{query_type_label} query at this time; no fallback to "
+                            f"classifier permitted."
+                        ),
+                        override_router_tools=True,  # Maintain privileged routing
+                        metadata={
+                            "query_type": query_type,
+                            "complexity": complexity,
+                            "self_referential": is_self_ref,
+                            "ethical_query": is_ethical,
+                            "philosophical_query": is_philosophical,
+                            "privileged_no_answer": True,
+                            "world_model_failure_reason": failure_reason,
+                            "world_model_confidence": wm_confidence,
+                            "reasoning_type": reasoning_type,
+                            "selection_time_ms": selection_time,
+                            "classifier_is_authoritative": True,
+                            "is_self_introspection": is_self_ref,
+                            "no_classifier_fallback": True,
+                            "safety_standard_applied": "privileged_query_no_fallback",
                         },
                     )
 
@@ -322,12 +407,19 @@ def apply_reasoning(
                         # DEFENSE-IN-DEPTH: Last-chance check before classifier skip
                         # =================================================================
                         # Critical safeguard: Even if classifier says skip_reasoning,
-                        # check for self-referential/ethical content that must escalate.
+                        # check for self-referential/ethical/philosophical content that must escalate.
                         # Classifier may misclassify due to short length or simple phrasing.
                         # Uses cached detection results from method entry.
                         # =================================================================
-                        if is_self_ref or is_ethical:
-                            query_nature = 'self-referential' if is_self_ref else 'ethical'
+                        if is_self_ref or is_ethical or is_philosophical:
+                            # Determine query nature for logging
+                            if is_self_ref:
+                                query_nature = 'self-referential'
+                            elif is_ethical:
+                                query_nature = 'ethical'
+                            else:
+                                query_nature = 'philosophical'
+                            
                             logger.warning(
                                 f"{LOG_PREFIX} DEFENSE-IN-DEPTH: Classifier skip attempted "
                                 f"(category={classification.category}) but {query_nature} query detected. "
@@ -336,7 +428,12 @@ def apply_reasoning(
                             
                             # Force category mutation to ensure proper routing
                             original_query_type = query_type
-                            query_type = 'self_introspection' if is_self_ref else 'ethical'
+                            if is_self_ref:
+                                query_type = 'self_introspection'
+                            elif is_ethical:
+                                query_type = 'ethical'
+                            else:
+                                query_type = 'philosophical'
                             
                             # Set context to guarantee world_model routing
                             if context is None:
@@ -635,11 +732,18 @@ def apply_reasoning(
                 # DEFENSE-IN-DEPTH: Last-chance check before pattern fallback
                 # =================================================================
                 # Even if pattern matching identifies a simple greeting, check for
-                # self-referential/ethical content that must route to world_model.
+                # self-referential/ethical/philosophical content that must route to world_model.
                 # Uses cached detection results from method entry.
                 # =================================================================
-                if is_self_ref or is_ethical:
-                    query_nature = 'self-referential' if is_self_ref else 'ethical'
+                if is_self_ref or is_ethical or is_philosophical:
+                    # Determine query nature for logging
+                    if is_self_ref:
+                        query_nature = 'self-referential'
+                    elif is_ethical:
+                        query_nature = 'ethical'
+                    else:
+                        query_nature = 'philosophical'
+                    
                     logger.warning(
                         f"{LOG_PREFIX} DEFENSE-IN-DEPTH: Pattern fallback attempted but "
                         f"{query_nature} query detected. Escalating to world_model/meta_reasoning. "
@@ -647,7 +751,12 @@ def apply_reasoning(
                     )
                     
                     # Force category mutation to ensure proper routing
-                    query_type = 'self_introspection' if is_self_ref else 'ethical'
+                    if is_self_ref:
+                        query_type = 'self_introspection'
+                    elif is_ethical:
+                        query_type = 'ethical'
+                    else:
+                        query_type = 'philosophical'
                     
                     # Set context to guarantee world_model routing
                     if context is None:
@@ -697,10 +806,18 @@ def apply_reasoning(
                 # - "Are you conscious?" (low complexity but self-referential)
                 # - "Should I lie?" (simple but ethical)
                 # - "What are you?" (short but introspective)
+                # - "What is consciousness?" (short but philosophical)
                 # Uses cached detection results from method entry.
                 # =================================================================
-                if is_self_ref or is_ethical:
-                    query_nature = 'self-referential' if is_self_ref else 'ethical'
+                if is_self_ref or is_ethical or is_philosophical:
+                    # Determine query nature for logging
+                    if is_self_ref:
+                        query_nature = 'self-referential'
+                    elif is_ethical:
+                        query_nature = 'ethical'
+                    else:
+                        query_nature = 'philosophical'
+                    
                     logger.warning(
                         f"{LOG_PREFIX} DEFENSE-IN-DEPTH: Fast path attempted (complexity={complexity:.2f}) "
                         f"but {query_nature} query detected. Escalating to world_model/meta_reasoning. "
@@ -709,7 +826,12 @@ def apply_reasoning(
                     
                     # Force category mutation to ensure proper routing
                     original_query_type = query_type
-                    query_type = 'self_introspection' if is_self_ref else 'ethical'
+                    if is_self_ref:
+                        query_type = 'self_introspection'
+                    elif is_ethical:
+                        query_type = 'ethical'
+                    else:
+                        query_type = 'philosophical'
                     
                     # Set context to guarantee world_model routing
                     if context is None:

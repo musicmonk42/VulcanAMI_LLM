@@ -12,6 +12,7 @@ from .types import (
     ACTION_VERBS,
     ETHICAL_ANALYSIS_INDICATORS,
     PURE_ETHICAL_PHRASES,
+    PHILOSOPHICAL_PHRASES,
 )
 
 # Import self-referential patterns from unified config
@@ -135,6 +136,63 @@ def is_ethical_query(query: str) -> bool:
     return False
 
 
+def is_philosophical_query(query: str) -> bool:
+    """
+    Detect if query requires philosophical or metaphysical reasoning.
+
+    Philosophical queries involve:
+    - Questions about consciousness, reality, existence, truth, knowledge
+    - Metaphysical and epistemological questions
+    - Questions about the nature of mind, self, or identity
+    - Free will and determinism
+    - Philosophy of language and meaning
+
+    Args:
+        query: The user query to analyze
+
+    Returns:
+        True if query requires philosophical analysis, False otherwise
+
+    Example:
+        >>> is_philosophical_query("What is consciousness?")
+        True
+        >>> is_philosophical_query("What is the capital of France?")
+        False
+    """
+    query_lower = query.lower()
+
+    # Check for philosophical phrases
+    for phrase in PHILOSOPHICAL_PHRASES:
+        if phrase in query_lower:
+            logger.debug(f"{LOG_PREFIX} Philosophical query detected (phrase): {phrase}")
+            return True
+
+    # Check for common philosophical question patterns
+    philosophical_patterns = [
+        r'\bwhat is (the )?nature of\b',
+        r'\bmeaning of (life|existence)\b',
+        r'\bhard problem\b',
+        r'\bmind[- ]body\b',
+        r'\bmind\s+(?:\w+\s+){0,5}body\b',  # Match "mind ... body" with up to 5 words in between
+        r'\bpersonal identity\b',
+        r'\bfree will\b',
+        r'\bconscious(ness)?\b.*\baware(ness)?\b',
+        r'\bsubjective experience\b',
+        r'\bphenomenal\b',
+        r'\bqualia\b',
+        # Add more patterns for queries asking about consciousness, reality, etc.
+        r'\b(explain|describe|what is|define)\s+(consciousness|reality|existence|truth|knowledge)\b',
+        r'\bconscious(ness)?\b',  # Any mention of consciousness is likely philosophical
+    ]
+
+    for pattern_str in philosophical_patterns:
+        if re.search(pattern_str, query_lower):
+            logger.debug(f"{LOG_PREFIX} Philosophical query detected (pattern): {pattern_str}")
+            return True
+
+    return False
+
+
 def consult_world_model_introspection(query: str) -> Optional[Dict[str, Any]]:
     """
     Consult world model for introspective queries about system capabilities.
@@ -219,5 +277,6 @@ def consult_world_model_introspection(query: str) -> Optional[Dict[str, Any]]:
 __all__ = [
     "is_self_referential",
     "is_ethical_query",
+    "is_philosophical_query",
     "consult_world_model_introspection",
 ]
