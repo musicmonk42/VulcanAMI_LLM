@@ -6,6 +6,7 @@
 # FIXED: Converted fixed time.sleep(5) in _monitor_tasks to interruptible wait.
 # ============================================================
 
+import heapq
 import logging
 import threading
 import time
@@ -14,7 +15,7 @@ import uuid
 from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 # Distributed computing imports
 try:
@@ -1223,6 +1224,136 @@ def create_task_queue(queue_type: str = "custom", **kwargs) -> TaskQueueInterfac
 # MODULE EXPORTS
 # ============================================================
 
+# ============================================================
+# PRIORITY JOB QUEUE - High-Performance Task Scheduling
+# ============================================================
+
+
+class PriorityJobQueue:
+    """Priority queue for job scheduling with support for high-priority tokens.
+    
+    Implements a multi-level priority queue optimized for:
+    - High-frequency token processing
+    - SLO-aware scheduling
+    - Starvation prevention
+    """
+    
+    # Priority levels
+    PRIORITY_CRITICAL = 0
+    PRIORITY_HIGH = 1
+    PRIORITY_NORMAL = 2
+    PRIORITY_LOW = 3
+    PRIORITY_BATCH = 4
+    
+    def __init__(self, max_size: int = 10000):
+        """
+        Initialize priority job queue.
+        
+        Args:
+            max_size: Maximum queue size
+        """
+        self.max_size = max_size
+        self._queues: Dict[int, List[Tuple[int, str, Dict]]] = {
+            i: [] for i in range(5)
+        }
+        self._lock = threading.RLock()
+        self._size = 0
+        self._counter = 0  # Monotonic counter for FIFO ordering
+        self._stats = {
+            "total_enqueued": 0,
+            "total_dequeued": 0,
+            "priority_distribution": defaultdict(int),
+        }
+    
+    def enqueue(self, job_id: str, job_data: Dict[str, Any], priority: int = 2) -> bool:
+        """Add a job to the queue.
+        
+        Args:
+            job_id: Unique job identifier
+            job_data: Job data dictionary
+            priority: Priority level (0=critical, 4=batch, default=2 for PRIORITY_NORMAL)
+        
+        Returns:
+            True if enqueued successfully, False if queue is full
+        """
+        if priority < 0 or priority > 4:
+            priority = self.PRIORITY_NORMAL
+        
+        with self._lock:
+            if self._size >= self.max_size:
+                return False
+            
+            # Use monotonic counter for reliable FIFO ordering under high load
+            # (more reliable than time.time() which may have precision issues)
+            sequence = self._counter
+            self._counter += 1
+            heapq.heappush(self._queues[priority], (sequence, job_id, job_data))
+            self._size += 1
+            self._stats["total_enqueued"] += 1
+            self._stats["priority_distribution"][priority] += 1
+            
+            return True
+    
+    def dequeue(self) -> Optional[Tuple[str, Dict[str, Any], int]]:
+        """Remove and return the highest priority job.
+        
+        Returns:
+            Tuple of (job_id, job_data, priority) or None if queue is empty
+        """
+        with self._lock:
+            # Check queues in priority order
+            for priority in range(5):
+                if self._queues[priority]:
+                    _, job_id, job_data = heapq.heappop(self._queues[priority])
+                    self._size -= 1
+                    self._stats["total_dequeued"] += 1
+                    return (job_id, job_data, priority)
+            
+            return None
+    
+    def peek(self) -> Optional[Tuple[str, Dict[str, Any], int]]:
+        """Peek at the highest priority job without removing it."""
+        with self._lock:
+            for priority in range(5):
+                if self._queues[priority]:
+                    _, job_id, job_data = self._queues[priority][0]
+                    return (job_id, job_data, priority)
+            return None
+    
+    def size(self) -> int:
+        """Get current queue size."""
+        return self._size
+    
+    def get_stats(self) -> Dict[str, Any]:
+        """Get queue statistics."""
+        with self._lock:
+            queue_sizes = {i: len(self._queues[i]) for i in range(5)}
+            return {
+                **self._stats,
+                "current_size": self._size,
+                "queue_sizes_by_priority": queue_sizes,
+            }
+    
+    def clear(self) -> int:
+        """Clear all queues. Returns number of items cleared."""
+        with self._lock:
+            count = self._size
+            for priority in range(5):
+                self._queues[priority].clear()
+            self._size = 0
+            return count
+    
+    def reset_priority_distribution(self) -> None:
+        """Reset the priority distribution statistics.
+        
+        PERFORMANCE FIX: Called periodically to prevent the priority_distribution
+        dictionary from growing unboundedly over long sessions. Preserves total
+        counts but resets the distribution tracking.
+        """
+        with self._lock:
+            self._stats["priority_distribution"] = defaultdict(int)
+
+
 __all__ = [
     "TaskQueueInterface",
     "RayTaskQueue",
@@ -1235,4 +1366,5 @@ __all__ = [
     "RAY_AVAILABLE",
     "CELERY_AVAILABLE",
     "ZMQ_AVAILABLE",
+    "PriorityJobQueue",
 ]

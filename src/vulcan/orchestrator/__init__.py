@@ -180,9 +180,13 @@ try:
     # Agent pool management
     from .agent_pool import (
         AgentPoolManager,
+        AGENT_SELECTION_TIMEOUT_SECONDS,
+    )
+    
+    # Auto-scaling and recovery (now in deployment module)
+    from .deployment import (
         AutoScaler,
         RecoveryManager,
-        AGENT_SELECTION_TIMEOUT_SECONDS,
     )
 
     # Main orchestrator
@@ -210,6 +214,8 @@ try:
         compute_percentile,
         compute_rate,
         create_metrics_collector,
+        ResponseTimeTracker,
+        SystemMetrics,
     )
 
     # Task queue implementations
@@ -225,6 +231,7 @@ try:
         TaskQueueInterface,
         TaskStatus,
         create_task_queue,
+        PriorityJobQueue,
     )
 
     # Orchestrator variants
@@ -335,6 +342,7 @@ __all__ = [
     "RAY_AVAILABLE",
     "CELERY_AVAILABLE",
     "ZMQ_AVAILABLE",
+    "PriorityJobQueue",
     # Agent Pool Management
     "AgentPoolManager",
     "AutoScaler",
@@ -348,6 +356,8 @@ __all__ = [
     "compute_percentile",
     "compute_moving_average",
     "compute_rate",
+    "ResponseTimeTracker",
+    "SystemMetrics",
     # Dependencies
     "EnhancedCollectiveDeps",
     "DependencyCategory",
