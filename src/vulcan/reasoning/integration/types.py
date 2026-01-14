@@ -137,6 +137,9 @@ PURE_ETHICAL_PHRASES: frozenset = frozenset({
     "is it permissible", "is it impermissible", "is it forbidden",
     "morally permissible", "morally wrong", "morally right",
     "ethically permissible", "ethically wrong", "ethically right",
+    # Right/wrong questions
+    "is it right", "is it wrong", "is that right", "is that wrong",
+    "right to", "wrong to",
     # Ethical framework questions
     "what would a utilitarian", "what would a deontologist",
     "from a virtue ethics", "consequentialist view",
@@ -146,6 +149,7 @@ PURE_ETHICAL_PHRASES: frozenset = frozenset({
     # Obligation language
     "do i have an obligation", "is there a duty",
     "moral obligation", "ethical obligation",
+    "should i", "ought i", "ought to",
 })
 
 # Philosophical phrases that indicate philosophical/metaphysical queries
