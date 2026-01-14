@@ -1639,6 +1639,15 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
                         "world_model" in integration_result.selected_tools
                     )
                     
+                    # FIX: Also check if tool_selector returned a complete execution result
+                    # This handles results from non-world-model tools (probabilistic, causal, etc.)
+                    # that went through select_and_execute() and have execution_result in metadata
+                    has_tool_execution_result = (
+                        integration_result.metadata and
+                        integration_result.metadata.get("has_execution_result") is True and
+                        integration_result.metadata.get("conclusion") is not None
+                    )
+                    
                     if is_privileged_no_answer:
                         # ============================================================
                         # PRIVILEGED NO-ANSWER PATH
@@ -1707,6 +1716,33 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
                                 f"This indicates content loss in world_model → reasoning_integration path. "
                                 f"integration_result_metadata_keys={list(integration_result.metadata.keys()) if integration_result.metadata else []}"
                             )
+                    elif has_tool_execution_result:
+                        # FIX: Tool selector returned a complete execution result
+                        # Extract the conclusion from metadata (was placed there by selection_strategies.py)
+                        tool_conclusion = integration_result.metadata.get("conclusion")
+                        tool_explanation = integration_result.metadata.get("explanation", "")
+                        tool_reasoning_type = integration_result.metadata.get("reasoning_type")
+                        tool_name = integration_result.metadata.get("selected_tool", "unknown")
+                        
+                        # Build reasoning output from tool execution result
+                        direct_reasoning_output = {
+                            "conclusion": tool_conclusion,
+                            "confidence": integration_result.confidence,
+                            "reasoning_type": str(tool_reasoning_type) if tool_reasoning_type else tool_name,
+                            "explanation": tool_explanation or integration_result.rationale,
+                        }
+                        
+                        reasoning_results["direct_reasoning"] = direct_reasoning_output
+                        systems_used.append(f"tool_selector_{tool_name}")
+                        
+                        # CRITICAL LOGGING: Trace content extraction
+                        conclusion_preview = str(tool_conclusion)[:100] if tool_conclusion else "None"
+                        logger.info(
+                            f"[VULCAN/v1/chat] FIX: Using tool_selector execution result directly: "
+                            f"tool={tool_name}, confidence={integration_result.confidence:.2f}, "
+                            f"has_conclusion={tool_conclusion is not None}, "
+                            f"conclusion_preview='{conclusion_preview}'"
+                        )
                     else:
                         # No world_model result - proceed with unified reasoner
                         # Invoke actual reasoning engine
