@@ -46,6 +46,31 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["chat"])
 
+# ============================================================
+# FEATURE FLAGS: Reasoning Execution Path Control
+# ============================================================
+# Industry Standard: Environment-based feature flags for safe rollout
+# These flags control the refactored reasoning execution architecture
+
+# TRUST_ROUTER_TOOL_SELECTION: When True, trust router's selected_tools
+# instead of second-guessing with endpoint-level heuristics.
+# Industry Standard: Single source of truth (Router decides, endpoint executes)
+TRUST_ROUTER_TOOL_SELECTION = os.environ.get(
+    "TRUST_ROUTER_TOOL_SELECTION", "true"
+).lower() in ("true", "1", "yes")
+
+# SINGLE_REASONING_PATH: When True, use EITHER agent pool OR parallel reasoning,
+# not both. Prevents redundant reasoning execution.
+# Industry Standard: DRY principle (Don't Repeat Yourself)
+SINGLE_REASONING_PATH = os.environ.get(
+    "SINGLE_REASONING_PATH", "true"
+).lower() in ("true", "1", "yes")
+
+logger.info(
+    f"[VULCAN/v1/chat] Feature Flags: TRUST_ROUTER_TOOL_SELECTION={TRUST_ROUTER_TOOL_SELECTION}, "
+    f"SINGLE_REASONING_PATH={SINGLE_REASONING_PATH}"
+)
+
 # Request counter for GC
 _gc_request_counter = 0
 
@@ -1268,6 +1293,33 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
         logger.info("[VULCAN/v1/chat] Starting parallel execution of cognitive steps 2-6")
         _parallel_start = time.perf_counter()
 
+        # ================================================================
+        # ARCHITECTURE: Gate Parallel Reasoning Based on Agent Pool Tasks
+        # ================================================================
+        # Industry Standard: Single execution path - avoid redundant work.
+        # If agent pool has reasoning tasks, skip parallel reasoning execution.
+        # ================================================================
+        skip_parallel_reasoning = False
+        if SINGLE_REASONING_PATH and routing_plan and routing_plan.agent_tasks:
+            # Check if any agent pool tasks are reasoning-related
+            reasoning_task_types = {'reasoning', 'symbolic', 'probabilistic', 'causal', 'analogical', 'mathematical'}
+            has_reasoning_tasks = any(
+                task.capability == 'reasoning' or 
+                any(rt in task.task_type.lower() for rt in reasoning_task_types)
+                for task in routing_plan.agent_tasks
+            )
+            
+            # Check if any tasks were actually submitted
+            has_submitted_jobs = bool(submitted_jobs)
+            
+            if has_reasoning_tasks and has_submitted_jobs:
+                skip_parallel_reasoning = True
+                logger.info(
+                    f"[VULCAN/v1/chat] SINGLE_REASONING_PATH: Skipping parallel reasoning - "
+                    f"agent pool has {len([t for t in routing_plan.agent_tasks if t.capability == 'reasoning'])} reasoning tasks, "
+                    f"{len(submitted_jobs)} jobs submitted"
+                )
+
         # FIX: Wrap each task with individual timing to identify bottlenecks
         async def _timed_task(name: str, coro):
             """Wrapper to time each parallel task and log if slow (>2s)."""
@@ -1286,12 +1338,28 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
                 logger.debug(f"[TIMING] {name} failed after {elapsed:.2f}s: {e}")
                 raise
 
-        parallel_results = await asyncio.gather(
+        # Build list of parallel tasks - conditionally skip reasoning
+        parallel_tasks = [
             _timed_task("memory_search", _memory_search_task()),
-            _timed_task("reasoning", _reasoning_task()),
+        ]
+        
+        # Only add reasoning task if not skipped
+        if not skip_parallel_reasoning:
+            parallel_tasks.append(_timed_task("reasoning", _reasoning_task()))
+        else:
+            # Add empty result as placeholder to keep indices consistent
+            async def _empty_reasoning():
+                return ({}, [], {})
+            parallel_tasks.append(_timed_task("reasoning", _empty_reasoning()))
+        
+        parallel_tasks.extend([
             _timed_task("planning", _planning_task()),
             _timed_task("world_model", _world_model_task()),
             _timed_task("semantic_bridge", _semantic_bridge_task()),
+        ])
+        
+        parallel_results = await asyncio.gather(
+            *parallel_tasks,
             return_exceptions=True
         )
 
