@@ -148,6 +148,26 @@ PURE_ETHICAL_PHRASES: frozenset = frozenset({
     "moral obligation", "ethical obligation",
 })
 
+# Philosophical phrases that indicate philosophical/metaphysical queries
+PHILOSOPHICAL_PHRASES: frozenset = frozenset({
+    # Metaphysical questions
+    "what is consciousness", "nature of consciousness", "what is reality",
+    "what is existence", "meaning of life", "purpose of existence",
+    "what is truth", "nature of truth", "what is knowledge",
+    # Epistemological questions
+    "how do we know", "can we know", "what can we know",
+    "limits of knowledge", "nature of belief",
+    # Mind/consciousness questions
+    "what is the mind", "mind-body problem", "hard problem of consciousness",
+    "qualia", "subjective experience", "phenomenal consciousness",
+    # Free will and determinism
+    "free will", "determinism", "do we have free will",
+    # Identity and self
+    "what is the self", "personal identity", "ship of theseus",
+    # Philosophy of language
+    "meaning of meaning", "reference", "sense and reference",
+})
+
 
 # =============================================================================
 # Enums
@@ -500,6 +520,7 @@ __all__ = [
     "ACTION_VERBS",
     "ETHICAL_ANALYSIS_INDICATORS",
     "PURE_ETHICAL_PHRASES",
+    "PHILOSOPHICAL_PHRASES",
     # Enums
     "ReasoningStrategyType",
     # Mappings
