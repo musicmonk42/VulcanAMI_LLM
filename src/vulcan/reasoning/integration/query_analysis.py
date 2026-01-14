@@ -173,7 +173,7 @@ def is_philosophical_query(query: str) -> bool:
         r'\bmeaning of (life|existence)\b',
         r'\bhard problem\b',
         r'\bmind[- ]body\b',
-        r'\bmind\s+.*\s+body\b',  # Match "mind ... body" with words in between
+        r'\bmind\s+(?:\w+\s+){0,5}body\b',  # Match "mind ... body" with up to 5 words in between
         r'\bpersonal identity\b',
         r'\bfree will\b',
         r'\bconscious(ness)?\b.*\baware(ness)?\b',
