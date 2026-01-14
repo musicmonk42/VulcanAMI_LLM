@@ -54,13 +54,28 @@ import os
 import threading
 import time
 import traceback
+import warnings
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+
+# Industry Standard: Import LLMMode from router for type safety and consistency
+try:
+    from vulcan.routing.query_router import LLMMode
+    LLM_MODE_AVAILABLE = True
+except ImportError:
+    try:
+        from src.vulcan.routing.query_router import LLMMode
+        LLM_MODE_AVAILABLE = True
+    except ImportError:
+        # Fallback: Define placeholder for backward compatibility
+        LLMMode = None
+        LLM_MODE_AVAILABLE = False
+        logger.debug("LLMMode not available - will use legacy mode parameter")
 
 # Module metadata
-__version__ = "1.5.0"
+__version__ = "1.6.0"  # Incremented for llm_mode parameter addition
 __author__ = "VULCAN-AGI Team"
 
 logger = logging.getLogger(__name__)
@@ -803,6 +818,17 @@ class HybridLLMExecutor:
         if self._distillation_enabled:
             self.logger.info("[HybridExecutor] Distillation capture enabled")
 
+    def _has_openai_key(self) -> bool:
+        """
+        Check if OpenAI API key is available.
+        
+        Industry Standard: Helper method for conditional behavior based on API availability.
+        
+        Returns:
+            True if OpenAI client is available, False otherwise
+        """
+        return self.openai_client is not None
+
     # ============================================================
     # MAIN EXECUTION METHOD
     # ============================================================
@@ -815,6 +841,7 @@ class HybridLLMExecutor:
         system_prompt: Optional[str] = None,
         enable_distillation: bool = True,
         conversation_history: Optional[List[Dict[str, str]]] = None,
+        llm_mode: Optional[Union[str, "LLMMode"]] = None,
     ) -> Dict[str, Any]:
         """
         Execute LLM request using configured mode.
@@ -828,6 +855,9 @@ class HybridLLMExecutor:
             conversation_history: Optional list of previous messages in the conversation.
                                  Each message should be a dict with 'role' and 'content' keys.
                                  This enables multi-turn conversation context.
+            llm_mode: Optional LLM execution mode from router (FORMAT_ONLY, GENERATE, ENHANCE).
+                     Industry Standard: Router decides LLM behavior, executor respects it.
+                     If None, uses legacy self.mode behavior with deprecation warning.
 
         Returns:
             Dict with 'text', 'source', 'systems_used', and optional 'metadata'
@@ -835,44 +865,85 @@ class HybridLLMExecutor:
         self._execution_count += 1
         loop = asyncio.get_running_loop()
         
+        # ARCHITECTURE: Respect llm_mode from caller (router)
+        # Industry Standard: Single source of truth - router decides, executor executes
+        if llm_mode is not None:
+            # Convert string to LLMMode enum if needed
+            if LLM_MODE_AVAILABLE and isinstance(llm_mode, str):
+                try:
+                    llm_mode = LLMMode(llm_mode)
+                except (ValueError, AttributeError):
+                    logger.warning(f"Invalid llm_mode '{llm_mode}', falling back to self.mode")
+                    llm_mode = None
+            
+            # Map LLMMode to execution strategy
+            if LLM_MODE_AVAILABLE and isinstance(llm_mode, type(LLMMode.FORMAT_ONLY if LLM_MODE_AVAILABLE else None)):
+                if llm_mode == LLMMode.FORMAT_ONLY:
+                    # Format only: Minimal LLM usage, just format output
+                    effective_mode = "local_first"
+                elif llm_mode == LLMMode.GENERATE:
+                    # Generate: LLM creates content (creative queries)
+                    effective_mode = "openai_first" if self._has_openai_key() else "local_first"
+                elif llm_mode == LLMMode.ENHANCE:
+                    # Enhance: LLM enhances simple responses
+                    effective_mode = "openai_first" if self._has_openai_key() else "local_first"
+                else:
+                    effective_mode = self.mode
+                    
+                logger.debug(f"[HybridExecutor] llm_mode={llm_mode.value} → effective_mode={effective_mode}")
+            else:
+                effective_mode = self.mode
+        else:
+            # DEPRECATED: Using self.mode when llm_mode not provided
+            # Industry Standard: Deprecation warnings for migration path
+            if self._execution_count == 1:  # Log once per executor instance
+                warnings.warn(
+                    "HybridLLMExecutor.execute() called without llm_mode parameter. "
+                    "This is deprecated. Router should pass llm_mode to control LLM behavior. "
+                    "Falling back to self.mode for backward compatibility.",
+                    DeprecationWarning,
+                    stacklevel=2
+                )
+            effective_mode = self.mode
+        
         # Use default system prompt if none provided
         # MEMORY FIX: Default prompt now allows conversation memory
         effective_system_prompt = system_prompt if system_prompt is not None else self.DEFAULT_SYSTEM_PROMPT
 
-        if self.mode == "local_first":
+        if effective_mode == "local_first":
             result = await self._execute_local_first(
                 loop, prompt, max_tokens, temperature, effective_system_prompt, conversation_history
             )
-        elif self.mode == "openai_first":
+        elif effective_mode == "openai_first":
             result = await self._execute_openai_first(
                 loop, prompt, max_tokens, temperature, effective_system_prompt, conversation_history
             )
-        elif self.mode == "parallel":
+        elif effective_mode == "parallel":
             result = await self._execute_parallel(
                 loop, prompt, max_tokens, temperature, effective_system_prompt, conversation_history
             )
-        elif self.mode == "ensemble":
+        elif effective_mode == "ensemble":
             result = await self._execute_ensemble(
                 loop, prompt, max_tokens, temperature, effective_system_prompt, conversation_history
             )
-        elif self.mode == "openai_only":
+        elif effective_mode == "openai_only":
             # Note: OpenAI-only mode for fast language generation (~3s instead of 120s timeout)
             # Reasoning engines still handle all thinking - this is just for language output
             result = await self._execute_openai_only(
                 loop, prompt, max_tokens, temperature, effective_system_prompt, conversation_history
             )
-        elif self.mode == "local_only":
+        elif effective_mode == "local_only":
             # Local-only mode when OpenAI is unavailable
             result = await self._execute_local_only(
                 loop, prompt, max_tokens, temperature, effective_system_prompt, conversation_history
             )
-        elif self.mode == "sequential":
+        elif effective_mode == "sequential":
             # Sequential mode: try OpenAI first (fast), fallback to local LLM if fails
             result = await self._execute_sequential(
                 loop, prompt, max_tokens, temperature, effective_system_prompt, conversation_history
             )
         else:
-            self.logger.warning(f"Unknown mode '{self.mode}', defaulting to openai_first")
+            self.logger.warning(f"Unknown mode '{effective_mode}', defaulting to openai_first")
             result = await self._execute_openai_first(
                 loop, prompt, max_tokens, temperature, effective_system_prompt, conversation_history
             )

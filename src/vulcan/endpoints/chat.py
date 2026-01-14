@@ -7,6 +7,7 @@ Uses VULCAN systems as PRIMARY intelligence with LLM fallback.
 
 import asyncio
 import logging
+import os
 import time
 from typing import Any, Dict, List, Optional
 
@@ -25,6 +26,32 @@ from vulcan.endpoints.utils import require_deployment
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["chat"])
+
+# ============================================================
+# FEATURE FLAGS: Reasoning Execution Path Control
+# ============================================================
+# Industry Standard: Environment-based feature flags for safe rollout
+# These flags control the refactored reasoning execution architecture
+
+# TRUST_ROUTER_TOOL_SELECTION: When True, trust router's selected_tools
+# instead of second-guessing with endpoint-level heuristics.
+# Industry Standard: Single source of truth (Router decides, endpoint executes)
+TRUST_ROUTER_TOOL_SELECTION = os.environ.get(
+    "TRUST_ROUTER_TOOL_SELECTION", "true"
+).lower() in ("true", "1", "yes")
+
+# SINGLE_REASONING_PATH: When True, use EITHER agent pool OR parallel reasoning,
+# not both. Prevents redundant reasoning execution.
+# Industry Standard: DRY principle (Don't Repeat Yourself)
+SINGLE_REASONING_PATH = os.environ.get(
+    "SINGLE_REASONING_PATH", "true"
+).lower() in ("true", "1", "yes")
+
+logger.info(
+    f"[VULCAN] Feature Flags: TRUST_ROUTER_TOOL_SELECTION={TRUST_ROUTER_TOOL_SELECTION}, "
+    f"SINGLE_REASONING_PATH={SINGLE_REASONING_PATH}"
+)
+
 
 
 def _calculate_aggregate_confidence_chat(reasoning_insights: Dict[str, Any]) -> float:
@@ -847,63 +874,27 @@ async def chat(request: Request) -> Dict[str, Any]:
         _systems = []
 
         # ================================================================
-        # Note: Determine which reasoning engines to run based on
-        # query classification. Default to minimal reasoning for unknown.
+        # ARCHITECTURE: Trust Router's Tool Selection (Single Source of Truth)
+        # ================================================================
+        # Industry Standard: Router is the ONLY decision-maker for tools.
+        # Endpoint ONLY executes what router decided, no second-guessing.
+        # 
+        # OLD APPROACH (Removed): endpoint had ~100 lines of heuristics that
+        # duplicated router logic and sometimes conflicted.
+        # 
+        # NEW APPROACH: Read selected_tools from router's telemetry_data
+        # and map to relevant reasoning engines.
         # ================================================================
         relevant_engines = set()
         
-        # Extract routing info from closure scope
-        if routing_plan is not None:
-            query_type = routing_plan.query_type.value.lower()
-            
-            # Extract selected_tools from telemetry if available
+        if TRUST_ROUTER_TOOL_SELECTION and routing_plan is not None:
+            # Extract selected_tools from router's decision
             selected_tools = []
             if hasattr(routing_plan, 'telemetry_data'):
                 selected_tools = routing_plan.telemetry_data.get("selected_tools", []) or []
             
-            # Map query types to relevant engines
-            if query_type in ('logical', 'symbolic', 'mathematical'):
-                relevant_engines.add('symbolic')
-            elif query_type in ('probabilistic',):
-                relevant_engines.add('probabilistic')
-            elif query_type in ('causal',):
-                relevant_engines.add('causal')
-            elif query_type in ('analogical', 'perception'):
-                relevant_engines.add('analogical')
-            elif query_type in ('reasoning',):
-                # Generic reasoning - use symbolic and causal
-                relevant_engines.update(['symbolic', 'causal'])
-            elif query_type in ('greeting', 'chitchat', 'conversational', 'creative', 'factual'):
-                # These don't need reasoning engines at all
-                # Note: Skip reasoning entirely for these categories
-                # Note: 'factual' queries are simple factual lookups, not probabilistic inference
-                logger.info(
-                    f"[VULCAN] Note: Skipping reasoning for query_type={query_type}"
-                )
-                return _reasoning, _systems
-            elif query_type in ('self_introspection',):
-                # Self-introspection uses world model, not these engines
-                logger.info(
-                    f"[VULCAN] Note: Skipping reasoning for self_introspection "
-                    f"(handled by world model)"
-                )
-                return _reasoning, _systems
-            else:
-                # Unknown type - check for specific indicators in query
-                if is_causal_query:
-                    relevant_engines.add('causal')
-                elif is_uncertain:
-                    relevant_engines.add('probabilistic')
-                # Default: minimal reasoning
-                if not relevant_engines:
-                    logger.debug(
-                        f"[VULCAN] No specific reasoning needed for query_type={query_type}"
-                    )
-                    return _reasoning, _systems
-            
-            # Override with selected_tools if specified
             if selected_tools:
-                relevant_engines = set()
+                # Map selected_tools to reasoning engines
                 for tool in selected_tools:
                     tool_lower = tool.lower()
                     if tool_lower in ('symbolic', 'mathematical', 'logical'):
@@ -914,25 +905,62 @@ async def chat(request: Request) -> Dict[str, Any]:
                         relevant_engines.add('causal')
                     elif tool_lower in ('analogical', 'analogy'):
                         relevant_engines.add('analogical')
-                    elif tool_lower in ('general', 'world_model'):
+                    elif tool_lower in ('general', 'world_model', 'factual'):
                         # These don't map to reasoning engines
                         pass
-        else:
-            # No routing plan - check local indicators
-            if is_causal_query:
-                relevant_engines.add('causal')
-            elif is_uncertain:
-                relevant_engines.add('probabilistic')
-            # Default: no reasoning if no indicators
-            if not relevant_engines:
-                logger.debug(
-                    f"[VULCAN] No routing plan and no indicators - skipping reasoning"
+                
+                logger.info(
+                    f"[VULCAN] TRUST_ROUTER: Using router's selected_tools={selected_tools}, "
+                    f"mapped to engines={relevant_engines}"
+                )
+            else:
+                # Router provided no tools - skip reasoning
+                logger.info(
+                    f"[VULCAN] TRUST_ROUTER: No selected_tools from router, "
+                    f"query_type={routing_plan.query_type.value}, skipping reasoning"
                 )
                 return _reasoning, _systems
+        else:
+            # Fallback to local heuristics (for backward compatibility or if flag disabled)
+            if routing_plan is not None:
+                query_type = routing_plan.query_type.value.lower()
+                
+                if query_type in ('logical', 'symbolic', 'mathematical'):
+                    relevant_engines.add('symbolic')
+                elif query_type in ('probabilistic',):
+                    relevant_engines.add('probabilistic')
+                elif query_type in ('causal',):
+                    relevant_engines.add('causal')
+                elif query_type in ('reasoning',):
+                    relevant_engines.update(['symbolic', 'causal'])
+                elif query_type in ('greeting', 'chitchat', 'conversational', 'creative', 'factual', 'self_introspection'):
+                    logger.info(f"[VULCAN] Local heuristic: Skipping reasoning for query_type={query_type}")
+                    return _reasoning, _systems
+                elif is_causal_query:
+                    relevant_engines.add('causal')
+                elif is_uncertain:
+                    relevant_engines.add('probabilistic')
+                
+                if not relevant_engines:
+                    logger.debug(f"[VULCAN] No reasoning engines selected")
+                    return _reasoning, _systems
+            else:
+                # No routing plan - use indicators
+                if is_causal_query:
+                    relevant_engines.add('causal')
+                elif is_uncertain:
+                    relevant_engines.add('probabilistic')
+                
+                if not relevant_engines:
+                    logger.debug("[VULCAN] No routing plan and no indicators - skipping reasoning")
+                    return _reasoning, _systems
         
-        logger.info(
-            f"[VULCAN] Note: Running only relevant engines: {relevant_engines}"
-        )
+        if not relevant_engines:
+            logger.info("[VULCAN] No relevant reasoning engines selected")
+            return _reasoning, _systems
+        
+        logger.info(f"[VULCAN] Running reasoning engines: {relevant_engines}")
+
 
         # Create subtasks for each reasoning type (only if relevant)
         async def _symbolic():
@@ -1405,6 +1433,33 @@ async def chat(request: Request) -> Dict[str, Any]:
     logger.info("[VULCAN] Starting parallel execution of cognitive steps 2-5")
     _parallel_start = time.perf_counter()
 
+    # ================================================================
+    # ARCHITECTURE: Gate Parallel Reasoning Based on Agent Pool Tasks
+    # ================================================================
+    # Industry Standard: Single execution path - avoid redundant work.
+    # If agent pool has reasoning tasks, skip parallel reasoning execution.
+    # ================================================================
+    skip_parallel_reasoning = False
+    if SINGLE_REASONING_PATH and routing_plan and routing_plan.agent_tasks:
+        # Check if any agent pool tasks are reasoning-related
+        reasoning_task_types = {'reasoning', 'symbolic', 'probabilistic', 'causal', 'analogical', 'mathematical'}
+        has_reasoning_tasks = any(
+            task.capability == 'reasoning' or 
+            any(rt in task.task_type.lower() for rt in reasoning_task_types)
+            for task in routing_plan.agent_tasks
+        )
+        
+        # Check if any tasks were actually submitted
+        has_submitted_jobs = bool(submitted_jobs)
+        
+        if has_reasoning_tasks and has_submitted_jobs:
+            skip_parallel_reasoning = True
+            logger.info(
+                f"[VULCAN] SINGLE_REASONING_PATH: Skipping parallel reasoning - "
+                f"agent pool has {len([t for t in routing_plan.agent_tasks if t.capability == 'reasoning'])} reasoning tasks, "
+                f"{len(submitted_jobs)} jobs submitted"
+            )
+
     # FIX: Wrap each task with individual timing to identify bottlenecks
     async def _timed_task(name: str, coro):
         """Wrapper to time each parallel task and log if slow (>2s)."""
@@ -1423,11 +1478,27 @@ async def chat(request: Request) -> Dict[str, Any]:
             logger.debug(f"[TIMING] {name} failed after {elapsed:.2f}s: {e}")
             raise
 
-    parallel_results = await asyncio.gather(
+    # Build list of parallel tasks - conditionally skip reasoning
+    parallel_tasks = [
         _timed_task("memory_search", _memory_search_task_process()),
-        _timed_task("reasoning", _reasoning_task_process()),
+    ]
+    
+    # Only add reasoning task if not skipped
+    if not skip_parallel_reasoning:
+        parallel_tasks.append(_timed_task("reasoning", _reasoning_task_process()))
+    else:
+        # Add empty result as placeholder to keep indices consistent
+        async def _empty_reasoning():
+            return ({}, [])
+        parallel_tasks.append(_timed_task("reasoning", _empty_reasoning()))
+    
+    parallel_tasks.extend([
         _timed_task("world_model", _world_model_task_process()),
         _timed_task("meta_reasoning", _meta_reasoning_task_process()),
+    ])
+    
+    parallel_results = await asyncio.gather(
+        *parallel_tasks,
         return_exceptions=True
     )
 
