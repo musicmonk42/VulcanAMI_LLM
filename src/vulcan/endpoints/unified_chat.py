@@ -1977,10 +1977,52 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
                 c.get('is_privileged', False) for c in candidates
             ) or unified_is_privileged or agent_is_privileged
             
-            # Select best candidate: highest confidence among those with valid content
+            # Select best candidate: prioritize domain-specific engines over meta/philosophical
+            # FIX: Don't just pick highest confidence - consider reasoning type priority
             # Use defensive programming: explicit check before max() to prevent ValueError
             if candidates:
-                best_candidate = max(candidates, key=lambda x: x['confidence'])
+                # Define reasoning type priority (higher = preferred)
+                # Domain-specific engines are preferred over meta/philosophical
+                REASONING_TYPE_PRIORITY = {
+                    'symbolic': 10,
+                    'mathematical': 10,
+                    'probabilistic': 9,
+                    'causal': 9,
+                    'analogical': 8,
+                    'multimodal': 8,
+                    'hybrid': 7,
+                    'philosophical': 5,
+                    'meta_reasoning': 5,
+                    'world_model': 5,
+                    'unknown': 3,
+                }
+                
+                # Score candidates: combine confidence with reasoning type priority
+                def score_candidate(c):
+                    # Base score from confidence
+                    confidence_score = c['confidence']
+                    
+                    # Priority boost based on reasoning type
+                    reasoning_type = str(c.get('reasoning_type', 'unknown')).lower()
+                    # Extract base type using efficient lookup
+                    priority_key = next((k for k in REASONING_TYPE_PRIORITY if k in reasoning_type), 'unknown')
+                    priority = REASONING_TYPE_PRIORITY[priority_key]
+                    
+                    # Boost domain-specific engines by up to 20% when confidence is similar
+                    # This ensures "symbolic 0.75" beats "philosophical 0.80"
+                    priority_boost = (priority / 10.0) * 0.20  # Max 20% boost for top priority
+                    
+                    total_score = confidence_score + priority_boost
+                    
+                    logger.debug(
+                        f"[VULCAN] Candidate scoring: source={c['source']}, "
+                        f"type={priority_key}, confidence={confidence_score:.2f}, "
+                        f"priority={priority}, boost={priority_boost:.2f}, total={total_score:.2f}"
+                    )
+                    
+                    return total_score
+                
+                best_candidate = max(candidates, key=score_candidate)
                 
                 # ROOT CAUSE FIX: Bypass confidence threshold for privileged results
                 is_privileged = best_candidate.get('is_privileged', False)
@@ -2039,6 +2081,10 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
                     "skip_llm_synthesis": True,
                     "conversation_id": body.conversation_id,
                     "routing": routing_stats,
+                    # FIX: Add transparency fields for provenance
+                    "engine": best_source,  # Which engine produced this result
+                    "tool": best_reasoning_type,  # Which reasoning tool was used
+                    "reasoning_source": best_source,  # unified/agent/direct
                     **metadata,
                 },
             )
