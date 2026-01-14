@@ -336,6 +336,15 @@ MATHEMATICAL_KEYWORDS: FrozenSet[str] = frozenset([
     "limit", "converge", "series",
 ])
 
+# BUG FIX #2: Calculus/Analysis proof indicators
+# These keywords indicate mathematical proof verification (calculus/analysis)
+# NOT logical/symbolic proof. When combined with "proof", route to MATHEMATICAL.
+MATHEMATICAL_PROOF_INDICATORS: FrozenSet[str] = frozenset([
+    'differentiable', 'continuous', 'continuity', 'limit', 'lim',
+    'derivative', 'integral', 'epsilon-delta', 'calculus', 'analysis',
+    'convergence', 'divergence', 'taylor', 'series', 'function',
+])
+
 # =============================================================================
 # Note: Mathematical Symbol Detection
 # =============================================================================
@@ -1440,6 +1449,28 @@ class QueryClassifier:
                     suggested_tools=["mathematical", "symbolic"],
                     skip_reasoning=False,
                     confidence=0.9,
+                    source="keyword",
+                )
+        
+        # BUG FIX #2: Check if query has "proof" + calculus indicator
+        # This catches queries like "All differentiable functions are continuous"
+        # that don't match exact patterns above but are clearly calculus proofs
+        if 'proof' in query_lower:
+            calculus_indicator_count = sum(
+                1 for indicator in MATHEMATICAL_PROOF_INDICATORS 
+                if indicator in query_lower
+            )
+            if calculus_indicator_count >= 1:
+                logger.info(
+                    f"[QueryClassifier] BUG FIX #2: Detected 'proof' + {calculus_indicator_count} "
+                    f"calculus indicators - routing to MATHEMATICAL (NOT logical)"
+                )
+                return QueryClassification(
+                    category=QueryCategory.MATHEMATICAL.value,
+                    complexity=0.65,
+                    suggested_tools=["mathematical", "symbolic"],
+                    skip_reasoning=False,
+                    confidence=0.85,
                     source="keyword",
                 )
         

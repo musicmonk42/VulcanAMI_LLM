@@ -781,12 +781,17 @@ class PortfolioExecutor:
         """
         Execute tools in cascade, each refining previous result
         CRITICAL: Proper future cleanup
+        BUG FIX #4: Track and preserve highest-confidence result
         """
 
         all_results = {}
         tools_used = []
         current_result = None
         start_time = time.time()
+
+        # BUG FIX #4: Track best result across all executions
+        best_result = None
+        best_confidence = 0.0
 
         # CRITICAL FIX: Track futures
         futures = []
@@ -817,6 +822,16 @@ class PortfolioExecutor:
                     tools_used.append(tool_name)
                     current_result = result
 
+                    # BUG FIX #4: Track highest-confidence result
+                    result_confidence = self._get_result_confidence(result)
+                    if result_confidence > best_confidence:
+                        best_confidence = result_confidence
+                        best_result = result
+                        logger.info(
+                            f"[PortfolioExecutor] BUG FIX #4: New best result from {tool_name} "
+                            f"(confidence={result_confidence:.2f})"
+                        )
+
                     # Check if we can stop early
                     if self._is_acceptable_result(result, monitor.min_confidence * 1.2):
                         break
@@ -838,9 +853,14 @@ class PortfolioExecutor:
                 else 0
             )
 
+            # BUG FIX #4: Use best_result instead of current_result (last result)
+            # This ensures high-confidence results from earlier tools aren't overwritten
+            # by lower-confidence results from fallback tools
+            primary_result = best_result if best_result is not None else current_result
+
             return PortfolioResult(
                 strategy=ExecutionStrategy.CASCADE,
-                primary_result=current_result,
+                primary_result=primary_result,
                 all_results=all_results,
                 execution_time=execution_time,
                 energy_used=energy,
@@ -1093,6 +1113,33 @@ class PortfolioExecutor:
         except Exception as e:
             logger.warning(f"Result scoring failed: {e}")
             return 0.5
+
+    def _get_result_confidence(self, result: Any) -> float:
+        """
+        Extract confidence score from a result.
+        BUG FIX #4: Helper method to get confidence for tracking best results.
+        
+        Args:
+            result: Result object (dict or object with confidence attribute)
+            
+        Returns:
+            Confidence score (0.0 to 1.0)
+        """
+        if result is None:
+            return 0.0
+        
+        try:
+            if isinstance(result, dict):
+                return float(result.get("confidence", result.get("score", result.get("probability", 0.0))))
+            elif hasattr(result, "confidence"):
+                return float(result.confidence)
+            elif hasattr(result, "score"):
+                return float(result.score)
+            elif hasattr(result, "probability"):
+                return float(result.probability)
+            return 0.0
+        except Exception:
+            return 0.0
 
     def _compute_consensus(self, results: Dict[str, Any]) -> Tuple[Any, float]:
         """Compute consensus from multiple results"""

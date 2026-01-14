@@ -302,28 +302,39 @@ def apply_reasoning(
                 # If classifier says skip reasoning (greetings, chitchat, simple factual)
                 # return immediately without invoking any reasoning engine
                 if classification.skip_reasoning:
-                    logger.info(
-                        f"{LOG_PREFIX} CLASSIFIER SKIP: '{query[:30]}' classified as "
-                        f"{classification.category} - skipping reasoning entirely"
-                    )
-                    with self._stats_lock:
-                        self._stats.fast_path_count += 1
-                    
-                    return ReasoningResult(
-                        selected_tools=classification.suggested_tools or ["general"],
-                        reasoning_strategy=ReasoningStrategyType.DIRECT.value,
-                        confidence=classification.confidence,
-                        rationale=f"Query classified as {classification.category} - no reasoning needed",
-                        metadata={
-                            "fast_path": True,
-                            "classifier_category": classification.category,
-                            "classifier_source": classification.source,
-                            "complexity": classification.complexity,
-                            "query_type": classification.category.lower(),
-                            "selection_time_ms": (time.perf_counter() - selection_start) * 1000,
-                            "needs_reasoning": False,
-                        },
-                    )
+                    # BUG FIX #3: PHILOSOPHICAL and SELF_INTROSPECTION queries ALWAYS need reasoning
+                    # Even if LLM classifier returns skip_reasoning=True, these categories must
+                    # invoke World Model for proper philosophical/ethical reasoning
+                    if classification.category in ["PHILOSOPHICAL", "SELF_INTROSPECTION"]:
+                        logger.info(
+                            f"{LOG_PREFIX} BUG FIX #3: {classification.category} queries always "
+                            f"invoke World Model despite skip_reasoning=True"
+                        )
+                        # Continue to reasoning instead of returning early
+                    else:
+                        # Only skip for truly trivial queries (GREETING, CHITCHAT)
+                        logger.info(
+                            f"{LOG_PREFIX} CLASSIFIER SKIP: '{query[:30]}' classified as "
+                            f"{classification.category} - skipping reasoning entirely"
+                        )
+                        with self._stats_lock:
+                            self._stats.fast_path_count += 1
+                        
+                        return ReasoningResult(
+                            selected_tools=classification.suggested_tools or ["general"],
+                            reasoning_strategy=ReasoningStrategyType.DIRECT.value,
+                            confidence=classification.confidence,
+                            rationale=f"Query classified as {classification.category} - no reasoning needed",
+                            metadata={
+                                "fast_path": True,
+                                "classifier_category": classification.category,
+                                "classifier_source": classification.source,
+                                "complexity": classification.complexity,
+                                "query_type": classification.category.lower(),
+                                "selection_time_ms": (time.perf_counter() - selection_start) * 1000,
+                                "needs_reasoning": False,
+                            },
+                        )
                 
                 # Classifier identified this needs reasoning - use its suggestions
                 # Override the heuristic complexity with LLM-derived complexity

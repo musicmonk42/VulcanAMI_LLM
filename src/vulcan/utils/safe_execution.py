@@ -438,6 +438,12 @@ class SafeCodeExecutor:
             namespace["__builtins__"]["_iter_unpack_sequence_"] = (
                 guarded_iter_unpack_sequence
             )
+            # BUG FIX #1: Add missing _unpack_sequence_ guard
+            # This guard is required for tuple unpacking operations like: a, b = func()
+            # Without it, code crashes with: "name '_unpack_sequence_' is not defined"
+            namespace["__builtins__"]["_unpack_sequence_"] = (
+                guarded_iter_unpack_sequence
+            )
 
         # SECURITY: Use our hardened getattr guard instead of safer_getattr
         # This prevents sandbox escape via class hierarchy traversal
