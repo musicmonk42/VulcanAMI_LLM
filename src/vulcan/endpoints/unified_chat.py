@@ -2351,6 +2351,25 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
                             }
                         }
                         
+                        # ROOT CAUSE FIX: Extract and preserve privileged flags from reasoning_results
+                        # Check all reasoning result sources for privileged status
+                        is_privileged = False
+                        privileged_source = None
+                        for source_name, result in reasoning_results.items():
+                            if isinstance(result, dict):
+                                if result.get('privileged_no_answer') or result.get('override_router_tools'):
+                                    is_privileged = True
+                                    privileged_source = source_name
+                                    # Copy privileged metadata to structured_reasoning
+                                    structured_reasoning['metadata']['privileged_no_answer'] = result.get('privileged_no_answer', False)
+                                    structured_reasoning['metadata']['override_router_tools'] = result.get('override_router_tools', False)
+                                    structured_reasoning['metadata']['privileged_source'] = source_name
+                                    logger.info(
+                                        f"[VULCAN] ROOT CAUSE FIX: Preserving privileged flags from {source_name} "
+                                        f"in structured_reasoning metadata"
+                                    )
+                                    break
+                        
                         # Add world model insights to the structured output
                         if world_model_insight:
                             structured_reasoning['metadata']['world_model_insight'] = world_model_insight

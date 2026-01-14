@@ -2728,18 +2728,29 @@ Output ONLY valid JSON, no other text.'''
         # VULCAN's authentic responses with generic AI disclaimers.
         #
         # Check if this is an introspection/self-awareness response that needs protection
+        # ROOT CAUSE FIX: Also check for privileged_no_answer and override_router_tools
         is_introspection = (
             hasattr(reasoning_output, 'metadata') and 
             reasoning_output.metadata and
             reasoning_output.metadata.get('is_introspection', False)
         )
         
-        # Use strict content preservation prompt for introspection queries
-        if is_introspection:
+        # ROOT CAUSE FIX: Check for privileged query flags
+        is_privileged = (
+            hasattr(reasoning_output, 'metadata') and 
+            reasoning_output.metadata and (
+                reasoning_output.metadata.get('privileged_no_answer', False) or
+                reasoning_output.metadata.get('override_router_tools', False)
+            )
+        )
+        
+        # Use strict content preservation prompt for introspection or privileged queries
+        if is_introspection or is_privileged:
             system_prompt = self.VULCAN_CONTENT_PRESERVATION_PROMPT
+            reason = "introspection" if is_introspection else "privileged"
             self.logger.info(
-                "[HybridExecutor] Using content preservation prompt for introspection query - "
-                "VULCAN's response will be protected from generic AI disclaimers"
+                f"[HybridExecutor] ROOT CAUSE FIX: Using content preservation prompt for {reason} query - "
+                f"VULCAN's response will be protected from LLM override"
             )
         else:
             # Standard formatting prompt for non-introspection queries
