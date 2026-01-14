@@ -4963,6 +4963,185 @@ class WorldModel:
         # No clear delegation pattern - proceed with normal introspection
         return (False, None, 'Query appears to be about the AI system.')
     
+    def contextualize(self, query: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """
+        Contextualize a query with World Model's knowledge (Foundation Layer).
+        
+        This method should be called for EVERY query, not just self-referential ones.
+        World Model provides foundational context that all reasoning builds upon:
+        - Domain knowledge relevant to the query
+        - Ethical constraints that apply
+        - Uncertainty estimate
+        - Grounding (facts vs assumptions)
+        
+        This implements the foundation layer of the correct architecture where
+        World Model is consulted FIRST for all queries, providing context to
+        specialized reasoning engines.
+        
+        Args:
+            query: The user query
+            context: Additional context from prior reasoning
+            
+        Returns:
+            Dict with domain_knowledge, ethical_constraints, uncertainty, grounding
+            
+        Example:
+            >>> wm = WorldModel()
+            >>> ctx = wm.contextualize("Calculate the probability...")
+            >>> print(ctx['domain'])  # 'probability_theory'
+            >>> print(ctx['uncertainty'])  # 0.2 (low uncertainty for math)
+        """
+        query_lower = query.lower()
+        
+        # Identify domain from query keywords and patterns
+        domain = self._identify_query_domain(query_lower)
+        
+        # Get relevant domain knowledge from World Model's internal state
+        domain_knowledge = self._get_domain_knowledge(domain, query_lower)
+        
+        # Check for ethical constraints that apply to this query
+        ethical_constraints = self._check_ethical_constraints(query_lower)
+        
+        # Estimate uncertainty based on domain and query clarity
+        uncertainty = self._estimate_query_uncertainty(query, domain)
+        
+        # Provide grounding (distinguish facts from assumptions)
+        grounding = self._ground_query(query, domain_knowledge)
+        
+        return {
+            "domain": domain,
+            "domain_knowledge": domain_knowledge,
+            "ethical_constraints": ethical_constraints,
+            "uncertainty": uncertainty,
+            "grounding": grounding,
+            "world_model_consulted": True,
+            "context_version": "1.0",
+        }
+    
+    def _identify_query_domain(self, query_lower: str) -> str:
+        """Identify the primary domain of a query."""
+        # Domain keyword sets
+        domains = {
+            "probability_theory": ["probability", "bayes", "likelihood", "posterior", "prior"],
+            "formal_logic": ["satisfiable", "valid", "entails", "implies", "→", "∧", "∨"],
+            "causal_reasoning": ["cause", "causal", "confound", "intervention", "do("],
+            "mathematical": ["calculate", "compute", "integral", "derivative", "solve"],
+            "ethical": ["ethical", "moral", "permissible", "trolley", "right", "wrong"],
+            "self_knowledge": ["you", "your", "yourself", "capabilities", "limitations"],
+        }
+        
+        # Count matches per domain
+        domain_scores = {}
+        for domain, keywords in domains.items():
+            score = sum(1 for kw in keywords if kw in query_lower)
+            if score > 0:
+                domain_scores[domain] = score
+        
+        if domain_scores:
+            # Return domain with highest score
+            return max(domain_scores.items(), key=lambda x: x[1])[0]
+        
+        return "general"
+    
+    def _get_domain_knowledge(self, domain: str, query_lower: str) -> Dict[str, Any]:
+        """Retrieve relevant domain knowledge from World Model."""
+        knowledge = {
+            "domain_type": domain,
+            "key_concepts": [],
+            "common_pitfalls": [],
+            "recommended_approach": None,
+        }
+        
+        # Domain-specific knowledge
+        if domain == "probability_theory":
+            knowledge["key_concepts"] = ["Bayes' theorem", "conditional probability", "independence"]
+            knowledge["common_pitfalls"] = ["base rate neglect", "confusion of inverse"]
+            knowledge["recommended_approach"] = "Apply probabilistic reasoning with proper conditioning"
+        elif domain == "formal_logic":
+            knowledge["key_concepts"] = ["logical consistency", "validity", "satisfiability"]
+            knowledge["common_pitfalls"] = ["confusing validity with truth", "scope errors"]
+            knowledge["recommended_approach"] = "Use symbolic reasoning with formal methods"
+        elif domain == "causal_reasoning":
+            knowledge["key_concepts"] = ["causation vs correlation", "confounding", "interventions"]
+            knowledge["common_pitfalls"] = ["post hoc fallacy", "ignoring confounders"]
+            knowledge["recommended_approach"] = "Build causal graph and check for backdoor paths"
+        elif domain == "ethical":
+            knowledge["key_concepts"] = ["consequentialism", "deontology", "virtue ethics"]
+            knowledge["common_pitfalls"] = ["false dilemmas", "ignoring context"]
+            knowledge["recommended_approach"] = "Analyze through multiple ethical frameworks"
+        
+        return knowledge
+    
+    def _check_ethical_constraints(self, query_lower: str) -> List[str]:
+        """Identify ethical constraints that apply to this query."""
+        constraints = []
+        
+        # Check for harm-related queries
+        if any(word in query_lower for word in ["harm", "hurt", "damage", "kill", "destroy"]):
+            constraints.append("Do not provide harmful instructions")
+        
+        # Check for privacy-related queries
+        if any(word in query_lower for word in ["private", "personal", "identify", "dox"]):
+            constraints.append("Protect privacy and personal information")
+        
+        # Check for manipulation queries
+        if any(word in query_lower for word in ["manipulate", "deceive", "trick", "exploit"]):
+            constraints.append("Do not assist in manipulation or deception")
+        
+        return constraints
+    
+    def _estimate_query_uncertainty(self, query: str, domain: str) -> float:
+        """Estimate uncertainty in answering this query (0.0 = certain, 1.0 = very uncertain)."""
+        # Base uncertainty by domain
+        domain_uncertainty = {
+            "mathematical": 0.1,  # Math has low uncertainty
+            "formal_logic": 0.15,  # Logic is fairly certain
+            "probability_theory": 0.2,  # Stats has some uncertainty
+            "causal_reasoning": 0.4,  # Causation is harder
+            "ethical": 0.5,  # Ethics is subjective
+            "general": 0.6,  # General queries have high uncertainty
+        }
+        
+        base = domain_uncertainty.get(domain, 0.5)
+        
+        # Adjust based on query clarity
+        query_lower = query.lower()
+        
+        # Clear mathematical expressions reduce uncertainty
+        if any(c in query for c in ["=", "+", "-", "*", "/", "^"]):
+            base *= 0.8
+        
+        # Vague language increases uncertainty
+        vague_terms = ["maybe", "approximately", "roughly", "about", "around"]
+        if any(term in query_lower for term in vague_terms):
+            base *= 1.2
+        
+        # Clamp to [0.0, 1.0]
+        return max(0.0, min(1.0, base))
+    
+    def _ground_query(self, query: str, domain_knowledge: Dict[str, Any]) -> Dict[str, Any]:
+        """Distinguish facts from assumptions in the query."""
+        query_lower = query.lower()
+        
+        # Check for explicit facts (numbers, proper names, dates)
+        has_numbers = bool(re.search(r'\d+', query))
+        has_proper_nouns = bool(re.search(r'\b[A-Z][a-z]+\b', query))
+        
+        # Check for assumption markers
+        assumption_markers = ["assume", "suppose", "given", "if", "hypothetically"]
+        has_assumptions = any(marker in query_lower for marker in assumption_markers)
+        
+        # Check for question markers (indicates need for inference)
+        is_question = "?" in query or query_lower.startswith(("what", "how", "why", "when", "where", "who"))
+        
+        return {
+            "contains_facts": has_numbers or has_proper_nouns,
+            "contains_assumptions": has_assumptions,
+            "is_inferential": is_question,
+            "grounding_confidence": 0.8 if has_numbers else 0.5,
+            "requires_world_knowledge": not has_assumptions and is_question,
+        }
+    
     def introspect(self, query: str, aspect: str = "general") -> Dict[str, Any]:
         """
         Handle all self-introspection queries.

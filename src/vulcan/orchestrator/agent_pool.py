@@ -3053,6 +3053,24 @@ class AgentPoolManager:
                         context=context,
                     )
                     
+                    # =================================================================
+                    # FIX: Track best result across all engine attempts
+                    # =================================================================
+                    # Problem: When multiple engines run (e.g., CausalEngine then ProbabilisticReasoner),
+                    # the last result replaces the best result even if it has lower confidence.
+                    # Example: CausalEngine confidence=0.70 replaced by ProbabilisticReasoner confidence=0.10
+                    # 
+                    # Solution: Track the best result (highest confidence) across all attempts.
+                    # =================================================================
+                    best_result = integration_result
+                    best_confidence = integration_result.confidence
+                    best_source = integration_result.selected_tools[0] if integration_result.selected_tools else "unknown"
+                    
+                    logger.info(
+                        f"[AgentPool] Initial result from '{best_source}': "
+                        f"confidence={best_confidence:.2f}"
+                    )
+                    
                     # FIX TASK 6: Log and validate result
                     logger.info(
                         f"Agent {agent_id} reasoning selection complete: "
@@ -3339,6 +3357,26 @@ class AgentPoolManager:
                                     f"Agent {agent_id} reasoning execution complete: "
                                     f"type={result_type}, confidence={result_confidence}"
                                 )
+                                
+                                # =================================================================
+                                # FIX: Update best result if this result is better
+                                # =================================================================
+                                if result_confidence > best_confidence:
+                                    # Get source info for logging
+                                    reasoning_source = selected_tool_reasoning_type if selected_tool_reasoning_type else "unified_reasoner"
+                                    logger.info(
+                                        f"[AgentPool] New best result from '{reasoning_source}': "
+                                        f"confidence={result_confidence:.2f} > {best_confidence:.2f}"
+                                    )
+                                    best_confidence = result_confidence
+                                    best_source = str(reasoning_source)
+                                    # Keep the reasoning_result for use below
+                                else:
+                                    logger.info(
+                                        f"[AgentPool] Keeping previous best result from '{best_source}': "
+                                        f"confidence={best_confidence:.2f} >= {result_confidence:.2f}"
+                                    )
+                                # =================================================================
                                 
                                 # FIX TASK 6: Warn if result type is UNKNOWN
                                 if str(result_type).upper() == 'UNKNOWN' or str(result_type) == 'ReasoningType.UNKNOWN':

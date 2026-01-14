@@ -209,6 +209,7 @@ try:
     from RestrictedPython import compile_restricted_exec
     from RestrictedPython.Guards import (
         guarded_iter_unpack_sequence,
+        guarded_unpack_sequence,
     )
     from RestrictedPython.Eval import (
         default_guarded_getiter,
@@ -221,6 +222,7 @@ except ImportError:
     logger.warning("RestrictedPython not available. Safe code execution disabled.")
     compile_restricted_exec = None
     guarded_iter_unpack_sequence = None
+    guarded_unpack_sequence = None
     default_guarded_getiter = None
     default_guarded_getitem = None
 
@@ -437,6 +439,10 @@ class SafeCodeExecutor:
         if guarded_iter_unpack_sequence is not None:
             namespace["__builtins__"]["_iter_unpack_sequence_"] = (
                 guarded_iter_unpack_sequence
+            )
+        if guarded_unpack_sequence is not None:
+            namespace["__builtins__"]["_unpack_sequence_"] = (
+                guarded_unpack_sequence
             )
 
         # SECURITY: Use our hardened getattr guard instead of safer_getattr

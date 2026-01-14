@@ -1937,8 +1937,23 @@ class ProbabilisticToolWrapper:
             if hasattr(self.engine, 'clear_state'):
                 self.engine.clear_state()
             
+            # =================================================================
+            # FIX: Extract structured query envelope from problem if available
+            # =================================================================
+            # The problem dict may contain a 'query_structure' key with LLM-extracted
+            # parameters. This allows us to avoid error-prone regex parsing.
+            query_structure = None
+            if isinstance(problem, dict):
+                query_structure = problem.get('query_structure')
+                # Also check for nested context structure
+                if not query_structure and 'context' in problem:
+                    context = problem.get('context', {})
+                    if isinstance(context, dict):
+                        query_structure = context.get('query_structure')
+            
             # Note: Try Bayesian calculation first for explicit probability queries
-            bayes_result = self._try_bayesian_calculation(problem)
+            # Pass query_structure if available to avoid re-parsing
+            bayes_result = self._try_bayesian_calculation(problem, query_structure=query_structure)
             if bayes_result is not None:
                 return bayes_result
             
@@ -2044,17 +2059,133 @@ class ProbabilisticToolWrapper:
         
         return ''
     
-    def _try_bayesian_calculation(self, problem: Any) -> Optional[Dict[str, Any]]:
+    def _compute_bayes(self, sensitivity: float, specificity: float, prevalence: float) -> Dict[str, Any]:
+        """
+        Helper method to compute Bayes' theorem given validated parameters.
+        
+        Computes P(Disease|Positive) using:
+        P(D|+) = [P(+|D) * P(D)] / [P(+|D)*P(D) + P(+|¬D)*P(¬D)]
+        
+        Args:
+            sensitivity: P(+|D) - probability of positive test given disease
+            specificity: P(-|¬D) - probability of negative test given no disease
+            prevalence: P(D) - base rate of disease
+            
+        Returns:
+            Dict with posterior probability and computation details
+        """
+        # Validate parameters
+        if not (0 <= sensitivity <= 1 and 0 <= specificity <= 1 and 0 <= prevalence <= 1):
+            logger.warning(
+                f"[ProbabilisticEngine] Invalid Bayes parameters: "
+                f"sens={sensitivity}, spec={specificity}, prev={prevalence}"
+            )
+            return None
+        
+        # Compute Bayes' theorem: P(Disease|Positive)
+        p_positive_given_disease = sensitivity
+        p_positive_given_no_disease = 1 - specificity
+        p_disease = prevalence
+        p_no_disease = 1 - prevalence
+        
+        # P(Positive) = P(+|D)*P(D) + P(+|¬D)*P(¬D)
+        p_positive = (p_positive_given_disease * p_disease) + \
+                    (p_positive_given_no_disease * p_no_disease)
+        
+        # Avoid division by zero
+        if p_positive == 0:
+            posterior = 0.0
+        else:
+            # P(Disease|Positive) = P(+|D) * P(D) / P(+)
+            posterior = (p_positive_given_disease * p_disease) / p_positive
+        
+        logger.info(
+            f"[ProbabilisticEngine] Bayesian calculation: "
+            f"sens={sensitivity}, spec={specificity}, prev={prevalence} -> "
+            f"P(D|+) = {posterior:.6f}"
+        )
+        
+        return {
+            "tool": self.name,
+            "result": {
+                "posterior": posterior,
+                "parameters": {
+                    "sensitivity": sensitivity,
+                    "specificity": specificity,
+                    "prevalence": prevalence,
+                }
+            },
+            "probability": posterior,
+            "posterior": posterior,
+            "distribution": {True: posterior, False: 1 - posterior},
+            "confidence": 0.95,  # High confidence for exact calculation
+            "calculation_type": "bayes_theorem",
+            "execution_time_ms": 0.0,
+            "engine": "BayesianCalculator",
+        }
+    
+    def _try_bayesian_calculation(self, problem: Any, query_structure: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
         """
         Note: Detect and compute explicit Bayesian probability queries.
+        
+        FIX: Now accepts structured query envelope from LLM classifier to avoid re-parsing.
         
         This handles queries like:
         - "P1 — Bayes: Sensitivity=0.99, Specificity=0.95, Prevalence=0.01"
         - "Probabilistic Reasoning - compute posterior with sens=0.99..."
         
+        Args:
+            problem: The query text or problem dict
+            query_structure: Optional structured query envelope from LLM classifier with:
+                {
+                    "type": "bayes_theorem",
+                    "parameters": {
+                        "sensitivity": 0.99,
+                        "specificity": 0.95,
+                        "prevalence": 0.01
+                    },
+                    "question": "Compute P(X|+)"
+                }
+        
         Returns:
             Dict with result if this is a Bayesian calculation, None otherwise
         """
+        # =========================================================================
+        # FIX: Check for structured query envelope from LLM FIRST
+        # =========================================================================
+        # If the LLM classifier already extracted parameters, use them directly
+        # to avoid error-prone regex parsing. This is the highest priority source.
+        if query_structure and query_structure.get("type") == "bayes_theorem":
+            params = query_structure.get("parameters", {})
+            if all(k in params for k in ["sensitivity", "specificity", "prevalence"]):
+                try:
+                    sensitivity = float(params["sensitivity"])
+                    specificity = float(params["specificity"])
+                    prevalence = float(params["prevalence"])
+                    
+                    # Validate parameters
+                    if not (0 <= sensitivity <= 1 and 0 <= specificity <= 1 and 0 <= prevalence <= 1):
+                        logger.warning(
+                            f"[ProbabilisticEngine] Invalid structured Bayes parameters: "
+                            f"sens={sensitivity}, spec={specificity}, prev={prevalence}"
+                        )
+                        return None
+                    
+                    logger.info(
+                        f"[ProbabilisticEngine] Using structured query envelope (no regex parsing): "
+                        f"sens={sensitivity}, spec={specificity}, prev={prevalence}"
+                    )
+                    
+                    # Compute Bayes' theorem directly with structured parameters
+                    return self._compute_bayes(sensitivity, specificity, prevalence)
+                    
+                except (ValueError, KeyError, TypeError) as e:
+                    logger.warning(f"[ProbabilisticEngine] Structured parameters invalid: {e}")
+                    # Fall through to regex parsing
+        
+        # =========================================================================
+        # FALLBACK: Regex parsing when no structured query envelope available
+        # =========================================================================
         if not isinstance(problem, str):
             if isinstance(problem, dict):
                 problem_text = problem.get("text") or problem.get("query") or str(problem)
@@ -2063,7 +2194,7 @@ class ProbabilisticToolWrapper:
         else:
             problem_text = problem
         
-        # Try to extract parameters first
+        # Try to extract parameters using regex
         sens_match = self._SENSITIVITY_PATTERN.search(problem_text)
         spec_match = self._SPECIFICITY_PATTERN.search(problem_text)
         prev_match = self._PREVALENCE_PATTERN.search(problem_text)
@@ -2101,47 +2232,12 @@ class ProbabilisticToolWrapper:
                 )
                 return None
             
-            # Compute Bayes' theorem: P(Disease|Positive)
-            p_positive_given_disease = sensitivity
-            p_positive_given_no_disease = 1 - specificity
-            p_disease = prevalence
-            p_no_disease = 1 - prevalence
-            
-            # P(Positive) = P(+|D)*P(D) + P(+|¬D)*P(¬D)
-            p_positive = (p_positive_given_disease * p_disease) + \
-                        (p_positive_given_no_disease * p_no_disease)
-            
-            # Avoid division by zero
-            if p_positive == 0:
-                posterior = 0.0
-            else:
-                # P(Disease|Positive) = P(+|D) * P(D) / P(+)
-                posterior = (p_positive_given_disease * p_disease) / p_positive
-            
+            # Use helper method to compute Bayes' theorem
             logger.info(
-                f"[ProbabilisticEngine] Bayesian calculation: "
-                f"sens={sensitivity}, spec={specificity}, prev={prevalence} -> "
-                f"P(D|+) = {posterior:.6f}"
+                f"[ProbabilisticEngine] Bayesian calculation (regex parsing): "
+                f"sens={sensitivity}, spec={specificity}, prev={prevalence}"
             )
-            
-            return {
-                "tool": self.name,
-                "result": {
-                    "posterior": posterior,
-                    "parameters": {
-                        "sensitivity": sensitivity,
-                        "specificity": specificity,
-                        "prevalence": prevalence,
-                    }
-                },
-                "probability": posterior,
-                "posterior": posterior,
-                "distribution": {True: posterior, False: 1 - posterior},
-                "confidence": 0.95,  # High confidence for exact calculation
-                "calculation_type": "bayes_theorem",
-                "execution_time_ms": 0.0,
-                "engine": "BayesianCalculator",
-            }
+            return self._compute_bayes(sensitivity, specificity, prevalence)
             
         except (ValueError, ZeroDivisionError) as e:
             logger.warning(f"[ProbabilisticEngine] Bayesian calculation failed: {e}")
