@@ -1,7 +1,7 @@
 VULCAN-AMI Learning Module
 Overview
 The Learning Module in VULCAN-AMI provides a unified framework for advanced learning paradigms, integrating continual learning, curriculum progression, meta-learning, reinforcement learning from human feedback (RLHF), world modeling, metacognition, and parameter auditing. It enables AI systems to learn continuously from experiences, adapt to new tasks, self-improve through reflection, plan actions via predictive models, and incorporate human preferences—all while maintaining audit trails for transparency and safety.
-The core orchestrator, UnifiedLearningSystem, coordinates these components for , scalable learning. It supports modes like supervised, reinforcement, and online learning, with features for task detection, adaptive pacing, and hierarchical memory.
+The core orchestrator, UnifiedLearningSystem, coordinates these components for scalable learning. It supports modes like supervised, reinforcement, and online learning, with features for task detection, adaptive pacing, and hierarchical memory.
 Key Features
 
 Continual Learning: Handles catastrophic forgetting via Elastic Weight Consolidation (EWC), experience replay, progressive networks, and hierarchical memory.

@@ -484,4 +484,4 @@ For issues or questions:
 
 ---
 
-**Vulcan Persistent Memory v46** persistent memory with privacy-preserving unlearning
+**Vulcan Persistent Memory v46** - Persistent memory with privacy-preserving unlearning

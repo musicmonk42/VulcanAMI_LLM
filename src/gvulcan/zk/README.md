@@ -251,7 +251,7 @@ For most projects, we recommend:
 Real Groth16 is slower (1-10s for proof generation) but provides cryptographic guarantees.
 
 ### Q: Is the code secure?
-**A:** The code uses real cryptographic primitives (py_ecc) but the overall protocol is **not audited** and **not **. Use at your own risk for non-security-critical applications only.
+**A:** The code uses real cryptographic primitives (py_ecc) but the overall protocol is **not audited** and **not suitable for production**. Use at your own risk for non-security-critical applications only.
 
 ### Q: Can I integrate this with Ethereum?
 **A:** No. The proofs are not compatible with Ethereum's zk-SNARK verification contracts. For Ethereum, use circom + snarkjs.
