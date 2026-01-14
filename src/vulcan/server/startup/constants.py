@@ -207,3 +207,46 @@ DEFAULT_CHECKPOINT_DIR = "checkpoints"
 
 LLM_CONFIG_PATH = "configs/llm_config.yaml"
 """Default path to LLM configuration file."""
+
+
+# ============================================================
+# Startup Phase Configuration
+# ============================================================
+
+class StartupPhaseConfig:
+    """
+    Configuration for startup phase timeouts and dependencies.
+    
+    Defines timeout values for each startup phase and which phases
+    are critical (must complete for server to be operational).
+    """
+    
+    # Phase timeout values in seconds
+    CONFIGURATION_TIMEOUT = 30
+    """Timeout for configuration loading phase."""
+    
+    CORE_SERVICES_TIMEOUT = 45
+    """Timeout for core services initialization."""
+    
+    REASONING_SYSTEMS_TIMEOUT = 60
+    """Timeout for reasoning systems initialization."""
+    
+    MEMORY_SYSTEMS_TIMEOUT = 60
+    """Timeout for memory systems initialization."""
+    
+    PRELOADING_TIMEOUT = 120
+    """Timeout for model preloading phase (longest due to model loading)."""
+    
+    MONITORING_TIMEOUT = 30
+    """Timeout for monitoring systems initialization."""
+    
+    # Critical phases that must complete for server to start
+    CRITICAL_PHASES = {"CONFIGURATION", "CORE_SERVICES"}
+    """Set of phase names that are critical for startup."""
+    
+    # Phases that can run in parallel
+    PARALLEL_GROUPS = {
+        "services": ["REASONING_SYSTEMS", "MEMORY_SYSTEMS"],
+        "optional": ["PRELOADING", "MONITORING"],
+    }
+    """Groups of phases that can run in parallel."""

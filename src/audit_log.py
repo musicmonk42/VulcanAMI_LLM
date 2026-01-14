@@ -322,26 +322,51 @@ class TamperEvidentLogger:
         """Initialize Prometheus metrics if enabled."""
         if not self.config.metrics_enabled or not prometheus_client:
             return {}
+        
+        def _get_or_create_metric(metric_class, name, description, labelnames=None, buckets=None):
+            """Get existing metric or create new one to avoid duplicate registration."""
+            try:
+                # Try to get existing metric from registry
+                for collector in list(prometheus_client.REGISTRY._names_to_collectors.values()):
+                    if hasattr(collector, '_name') and collector._name == name:
+                        return collector
+                # Create new metric if not found
+                if buckets:
+                    return metric_class(name, description, buckets=buckets)
+                elif labelnames:
+                    return metric_class(name, description, labelnames)
+                return metric_class(name, description)
+            except Exception:
+                # If anything goes wrong, return None
+                return None
+        
         return {
-            "log_events_total": prometheus_client.Counter(
+            "log_events_total": _get_or_create_metric(
+                prometheus_client.Counter,
                 "audit_log_events_total",
                 "Total number of audit log events",
                 ["event_type"],
             ),
-            "dlt_failures_total": prometheus_client.Counter(
-                "audit_dlt_failures_total", "Total number of DLT anchoring failures"
+            "dlt_failures_total": _get_or_create_metric(
+                prometheus_client.Counter,
+                "audit_dlt_failures_total", 
+                "Total number of DLT anchoring failures"
             ),
-            "integrity_checks_failed": prometheus_client.Counter(
+            "integrity_checks_failed": _get_or_create_metric(
+                prometheus_client.Counter,
                 "audit_integrity_checks_failed_total",
                 "Total number of failed integrity checks",
             ),
-            "log_latency_seconds": prometheus_client.Histogram(
+            "log_latency_seconds": _get_or_create_metric(
+                prometheus_client.Histogram,
                 "audit_log_latency_seconds",
                 "Latency of log operations",
                 buckets=[0.001, 0.01, 0.1, 0.5, 1, 5],
             ),
-            "batch_size": prometheus_client.Gauge(
-                "audit_log_batch_size", "Current size of the batch queue"
+            "batch_size": _get_or_create_metric(
+                prometheus_client.Gauge,
+                "audit_log_batch_size", 
+                "Current size of the batch queue"
             ),
         }
 

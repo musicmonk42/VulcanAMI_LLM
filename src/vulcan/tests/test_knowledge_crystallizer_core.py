@@ -363,7 +363,9 @@ class TestKnowledgeCrystallizer:
 
     def test_initialization(self, crystallizer):
         """Test crystallizer initialization"""
-        assert crystallizer.min_confidence_threshold == 0.6
+        # NOTE: min_confidence_threshold was lowered from 0.6 to 0.4 
+        # to allow more principles to crystallize (see knowledge_crystallizer_core.py)
+        assert crystallizer.min_confidence_threshold == 0.4
         assert crystallizer.cascade_detection_enabled is True
         assert crystallizer.has_memory is False
         assert crystallizer.has_semantic is False

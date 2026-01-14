@@ -966,6 +966,10 @@ class ToolConfidenceCalibrator:
                 )  # nosec B301 - Internal data structure
 
 
+# Alias for backwards compatibility with tests expecting CalibratedDecisionMaker
+CalibratedDecisionMaker = ToolConfidenceCalibrator
+
+
 # ==============================================================================
 # 4. Full Implementation for ValueOfInformationGate
 # ==============================================================================
