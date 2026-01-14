@@ -406,8 +406,13 @@ def select_with_tool_selector(
             selected_tool = getattr(selection, 'selected_tool', 'general')
             tools = [selected_tool] if selected_tool else ['general']
             strategy = getattr(selection, 'strategy_used', 'direct')
-            if hasattr(strategy, 'value'):  # Handle ExecutionStrategy enum
+            # Handle ExecutionStrategy enum robustly - use str() for any object
+            if hasattr(strategy, 'value'):
                 strategy = strategy.value
+            elif hasattr(strategy, 'name'):
+                strategy = strategy.name
+            else:
+                strategy = str(strategy)
             confidence = getattr(selection, 'confidence', 0.5)
             
             # FIX: Extract the actual reasoning result from execution_result
@@ -420,16 +425,32 @@ def select_with_tool_selector(
             if execution_result is not None:
                 # Extract conclusion from the execution result
                 if isinstance(execution_result, dict):
-                    conclusion = execution_result.get('result') or execution_result.get('conclusion')
-                    explanation = execution_result.get('explanation') or execution_result.get('rationale')
-                    reasoning_type = execution_result.get('reasoning_type') or execution_result.get('tool')
+                    # Use explicit None checks to allow empty strings as valid values
+                    conclusion = execution_result.get('result')
+                    if conclusion is None:
+                        conclusion = execution_result.get('conclusion')
+                    explanation = execution_result.get('explanation')
+                    if explanation is None:
+                        explanation = execution_result.get('rationale')
+                    reasoning_type = execution_result.get('reasoning_type')
+                    if reasoning_type is None:
+                        reasoning_type = execution_result.get('tool')
                 elif hasattr(execution_result, 'conclusion'):
                     conclusion = getattr(execution_result, 'conclusion', None)
                     explanation = getattr(execution_result, 'explanation', '')
                     reasoning_type = getattr(execution_result, 'reasoning_type', None)
                 else:
                     # execution_result is the conclusion itself
-                    conclusion = execution_result
+                    # Validate it's a reasonable type for a conclusion
+                    if isinstance(execution_result, (str, int, float, bool, list)):
+                        conclusion = execution_result
+                    elif hasattr(execution_result, '__str__'):
+                        # Convert to string if it has str representation
+                        conclusion = str(execution_result)
+                    else:
+                        # Unknown type - store as-is but log warning
+                        logger.warning(f"{LOG_PREFIX} Unexpected execution_result type: {type(execution_result)}")
+                        conclusion = execution_result
             
             # Build rationale from explanation or provide meaningful fallback
             if explanation:
