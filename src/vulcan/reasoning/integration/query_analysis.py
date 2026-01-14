@@ -197,8 +197,9 @@ def consult_world_model_introspection(query: str) -> Optional[Dict[str, Any]]:
     """
     Consult world model for introspective queries about system capabilities.
 
-    This handles meta-queries about what the system can or cannot do,
-    returning appropriate responses without invoking heavy reasoning.
+    ROOT CAUSE FIX: This function was returning None for ethical/philosophical queries,
+    causing them to trigger the PRIVILEGED NO-ANSWER PATH. Now it actually invokes
+    the WorldModel for such queries.
 
     Args:
         query: The user query
@@ -213,7 +214,7 @@ def consult_world_model_introspection(query: str) -> Optional[Dict[str, Any]]:
     """
     query_lower = query.lower()
 
-    # Capability query patterns
+    # Capability query patterns (simple hardcoded responses)
     capability_patterns = {
         'general_capability': r'\bwhat\b.*\byou\b.*\b(can|do|capable)\b',
         'limitations': r'\bwhat\b.*\byou\b.*\b(cannot|can\'t|limitations)\b',
@@ -270,6 +271,75 @@ def consult_world_model_introspection(query: str) -> Optional[Dict[str, Any]]:
                     'confidence': 0.85,
                     'introspection_type': 'design',
                 }
+
+    # ROOT CAUSE FIX: For ethical/philosophical queries, invoke WorldModel
+    # Check if this is an ethical or philosophical query that needs WorldModel reasoning
+    if is_ethical_query(query) or is_philosophical_query(query) or is_self_referential(query):
+        logger.info(
+            f"{LOG_PREFIX} ROOT CAUSE FIX: Detected ethical/philosophical/introspective query, "
+            f"invoking WorldModel for actual reasoning (not returning None)"
+        )
+        
+        try:
+            # Import WorldModel from singletons to avoid circular import
+            from vulcan.reasoning.singletons import get_singleton
+            
+            world_model = get_singleton("world_model")
+            
+            if world_model is not None:
+                # Invoke world model's philosophical reasoning
+                result = world_model.reason(query, mode="philosophical")
+                
+                if result and isinstance(result, dict):
+                    # Extract response from world_model result
+                    response_text = result.get("response") or result.get("conclusion") or result.get("reasoning", "")
+                    confidence = result.get("confidence", 0.7)
+                    
+                    if response_text:
+                        logger.info(
+                            f"{LOG_PREFIX} ROOT CAUSE FIX: WorldModel returned response "
+                            f"(confidence={confidence:.2f}, len={len(response_text)})"
+                        )
+                        return {
+                            'response': response_text,
+                            'confidence': confidence,
+                            'reasoning': result.get('reasoning', ''),
+                            'introspection_type': 'ethical_philosophical',
+                            'world_model_invoked': True,
+                        }
+                    else:
+                        logger.warning(
+                            f"{LOG_PREFIX} ROOT CAUSE FIX: WorldModel returned result but no response text"
+                        )
+                else:
+                    logger.warning(
+                        f"{LOG_PREFIX} ROOT CAUSE FIX: WorldModel returned None or non-dict result"
+                    )
+            else:
+                logger.warning(
+                    f"{LOG_PREFIX} ROOT CAUSE FIX: WorldModel not available in singletons"
+                )
+                
+        except Exception as e:
+            logger.error(
+                f"{LOG_PREFIX} ROOT CAUSE FIX: Error invoking WorldModel: {e}",
+                exc_info=True
+            )
+        
+        # If WorldModel invocation failed, return explicit "cannot answer" instead of None
+        # This preserves privileged routing with explicit rationale
+        logger.info(
+            f"{LOG_PREFIX} ROOT CAUSE FIX: WorldModel unavailable or returned no response, "
+            f"returning explicit 'cannot answer' (not None)"
+        )
+        return {
+            'response': None,  # Signal no response available
+            'confidence': 0.0,
+            'reasoning': 'WorldModel is not available or could not provide a response for this privileged query.',
+            'introspection_type': 'no_answer',
+            'world_model_invoked': True,
+            'cannot_answer': True,  # Explicit flag
+        }
 
     return None
 

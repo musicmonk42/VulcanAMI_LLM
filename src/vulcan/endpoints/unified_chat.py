@@ -1622,13 +1622,59 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
                     # "if you could become self aware would you?" were getting
                     # causal/probabilistic analysis instead of world_model responses.
                     # ================================================================
+                    
+                    # PRIVILEGED QUERY FIX: Check for privileged_no_answer FIRST
+                    # These are introspective/ethical/philosophical queries where world_model
+                    # explicitly returned "no answer" with privileged routing.
+                    # We MUST preserve this and NOT fall back to general reasoning/LLM.
+                    is_privileged_no_answer = (
+                        integration_result.metadata and 
+                        integration_result.metadata.get("privileged_no_answer") is True
+                    )
+                    
+                    # Check if world_model returned a complete response
                     has_world_model_result = (
                         integration_result.metadata and 
                         integration_result.metadata.get("world_model_response") and
                         "world_model" in integration_result.selected_tools
                     )
                     
-                    if has_world_model_result:
+                    if is_privileged_no_answer:
+                        # ============================================================
+                        # PRIVILEGED NO-ANSWER PATH
+                        # ============================================================
+                        # World model/meta-reasoning explicitly could not answer this
+                        # privileged query. Return the "no answer" result directly
+                        # WITHOUT falling back to classifier/LLM/general reasoning.
+                        # ============================================================
+                        
+                        failure_reason = integration_result.metadata.get("world_model_failure_reason", "Unknown reason")
+                        rationale = integration_result.rationale or f"Unable to answer this privileged query: {failure_reason}"
+                        
+                        logger.warning(
+                            f"[VULCAN/v1/chat] PRIVILEGED NO-ANSWER: World model cannot answer "
+                            f"privileged query. Reason: {failure_reason}. "
+                            f"Returning explicit no-answer (NO FALLBACK)"
+                        )
+                        
+                        # Build a privileged no-answer response
+                        direct_reasoning_output = {
+                            "conclusion": f"I cannot provide a complete answer to this question at this time. {rationale}",
+                            "confidence": 0.0,  # Explicit 0.0 to signal no answer
+                            "reasoning_type": integration_result.metadata.get("reasoning_type", "meta_reasoning"),
+                            "explanation": rationale,
+                            "privileged_no_answer": True,
+                            "override_router_tools": True,
+                        }
+                        
+                        reasoning_results["direct_reasoning"] = direct_reasoning_output
+                        systems_used.append("privileged_no_answer")
+                        
+                        logger.info(
+                            f"[VULCAN/v1/chat] Privileged no-answer preserved in reasoning_results"
+                        )
+                    
+                    elif has_world_model_result:
                         # World model already provided a response - use it directly
                         wm_conclusion = integration_result.metadata.get("conclusion") or integration_result.metadata.get("world_model_response")
                         wm_explanation = integration_result.metadata.get("explanation", "")
@@ -1833,6 +1879,13 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
                 unified.get("not_applicable") is True or 
                 unified.get("applicable") is False
             )
+            
+            # ROOT CAUSE FIX: Check for privileged flags that bypass confidence threshold
+            unified_is_privileged = (
+                unified.get("privileged_no_answer") is True or
+                unified.get("override_router_tools") is True
+            )
+            
             if (unified_conclusion is not None and isinstance(unified_conclusion, str) and 
                 unified_conclusion.strip() and not unified_is_not_applicable):
                 candidates.append({
@@ -1841,6 +1894,7 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
                     'confidence': unified_confidence,
                     'reasoning_type': unified.get("reasoning_type", "unknown"),
                     'explanation': unified.get("explanation", ""),
+                    'is_privileged': unified_is_privileged,  # ROOT CAUSE FIX: Track privileged status
                 })
             elif unified_is_not_applicable:
                 logger.debug(
@@ -1854,6 +1908,13 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
                 agent.get("not_applicable") is True or 
                 agent.get("applicable") is False
             )
+            
+            # ROOT CAUSE FIX: Check for privileged flags that bypass confidence threshold
+            agent_is_privileged = (
+                agent.get("privileged_no_answer") is True or
+                agent.get("override_router_tools") is True
+            )
+            
             if (agent_conclusion is not None and isinstance(agent_conclusion, str) and 
                 agent_conclusion.strip() and not agent_is_not_applicable):
                 candidates.append({
@@ -1862,6 +1923,7 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
                     'confidence': agent_confidence,
                     'reasoning_type': agent.get("reasoning_type", "unknown"),
                     'explanation': agent.get("explanation", ""),
+                    'is_privileged': agent_is_privileged,  # ROOT CAUSE FIX: Track privileged status
                 })
             elif agent_is_not_applicable:
                 logger.debug(
@@ -1875,6 +1937,13 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
                 direct.get("not_applicable") is True or 
                 direct.get("applicable") is False
             )
+            
+            # ROOT CAUSE FIX: Check for privileged flags that bypass confidence threshold
+            direct_is_privileged = (
+                direct.get("privileged_no_answer") is True or
+                direct.get("override_router_tools") is True
+            )
+            
             if (direct_conclusion is not None and isinstance(direct_conclusion, str) and 
                 direct_conclusion.strip() and not direct_is_not_applicable):
                 candidates.append({
@@ -1883,6 +1952,7 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
                     'confidence': direct_confidence,
                     'reasoning_type': direct.get("reasoning_type", "unknown"),
                     'explanation': direct.get("explanation", ""),
+                    'is_privileged': direct_is_privileged,  # ROOT CAUSE FIX: Track privileged status
                 })
             elif direct_is_not_applicable:
                 logger.debug(
@@ -1890,18 +1960,48 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
                     f"(not_applicable=True) - will try next engine"
                 )
             
+            # ROOT CAUSE FIX: Check for privileged results that bypass confidence threshold
+            # Privileged queries (introspective/ethical/philosophical) MUST use their
+            # designated routing even if confidence is 0.0 (explicit no-answer)
+            unified_is_privileged = (
+                unified.get("privileged_no_answer") is True or
+                unified.get("override_router_tools") is True
+            )
+            agent_is_privileged = (
+                agent.get("privileged_no_answer") is True or
+                agent.get("override_router_tools") is True
+            )
+            
+            # Track if ANY candidate is privileged
+            has_privileged_candidate = any(
+                c.get('is_privileged', False) for c in candidates
+            ) or unified_is_privileged or agent_is_privileged
+            
             # Select best candidate: highest confidence among those with valid content
             # Use defensive programming: explicit check before max() to prevent ValueError
             if candidates:
                 best_candidate = max(candidates, key=lambda x: x['confidence'])
-                if best_candidate['confidence'] >= MIN_REASONING_CONFIDENCE_THRESHOLD:
+                
+                # ROOT CAUSE FIX: Bypass confidence threshold for privileged results
+                is_privileged = best_candidate.get('is_privileged', False)
+                meets_threshold = best_candidate['confidence'] >= MIN_REASONING_CONFIDENCE_THRESHOLD
+                
+                if is_privileged or meets_threshold:
                     best_conclusion = best_candidate['conclusion']
                     best_confidence = best_candidate['confidence']
                     best_source = best_candidate['source']
                     best_reasoning_type = best_candidate['reasoning_type']
                     best_explanation = best_candidate['explanation']
+                    
+                    if is_privileged and not meets_threshold:
+                        logger.info(
+                            f"[VULCAN] ROOT CAUSE FIX: Using privileged result with confidence "
+                            f"{best_confidence:.2f} (below threshold {MIN_REASONING_CONFIDENCE_THRESHOLD}) "
+                            f"- privileged routing bypasses threshold"
+                        )
             
-            if best_conclusion is not None and best_confidence >= MIN_REASONING_CONFIDENCE_THRESHOLD:
+            # ROOT CAUSE FIX: Check privileged status OR confidence threshold
+            if best_conclusion is not None and (has_privileged_candidate or best_confidence >= MIN_REASONING_CONFIDENCE_THRESHOLD):
                 use_reasoning_directly = True
                 
                 # Format the reasoning result as the final response
@@ -2250,6 +2350,25 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
                                 'memory_context': len(memory_context) if memory_context else 0,
                             }
                         }
+                        
+                        # ROOT CAUSE FIX: Extract and preserve privileged flags from reasoning_results
+                        # Check all reasoning result sources for privileged status
+                        is_privileged = False
+                        privileged_source = None
+                        for source_name, result in reasoning_results.items():
+                            if isinstance(result, dict):
+                                if result.get('privileged_no_answer') or result.get('override_router_tools'):
+                                    is_privileged = True
+                                    privileged_source = source_name
+                                    # Copy privileged metadata to structured_reasoning
+                                    structured_reasoning['metadata']['privileged_no_answer'] = result.get('privileged_no_answer', False)
+                                    structured_reasoning['metadata']['override_router_tools'] = result.get('override_router_tools', False)
+                                    structured_reasoning['metadata']['privileged_source'] = source_name
+                                    logger.info(
+                                        f"[VULCAN] ROOT CAUSE FIX: Preserving privileged flags from {source_name} "
+                                        f"in structured_reasoning metadata"
+                                    )
+                                    break
                         
                         # Add world model insights to the structured output
                         if world_model_insight:
