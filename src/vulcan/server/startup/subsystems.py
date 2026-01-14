@@ -51,17 +51,19 @@ class SubsystemManager:
     P2 Fix: Issue #13 - Thread-safe list modifications.
     """
     
-    def __init__(self, deployment: Any):
+    def __init__(self, deployment: Any, trace_logger: Optional[Any] = None):
         """
         Initialize subsystem manager.
         
         Args:
             deployment: ProductionDeployment instance
+            trace_logger: Optional startup trace logger for auditable logging
         """
         self.deployment = deployment
         self.activated: List[str] = []
         self.failed: List[Dict[str, str]] = []
         self._lock = Lock()  # P2 Fix: Issue #13 - Thread safety
+        self.trace = trace_logger  # For auditable registration tracking
     
     def _activate_single(self, config: SubsystemConfig) -> bool:
         """
