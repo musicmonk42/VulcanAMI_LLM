@@ -111,24 +111,15 @@ def apply_reasoning(
             # =================================================================
             # DEFENSE-IN-DEPTH: Early detection for all checkpoints
             # =================================================================
-            # Check ONCE at method entry to avoid redundant calls across the
-            # three defense checkpoints below. This cached result is reused
-            # in classifier skip, pattern fallback, and fast path defenses.
+            # Check ONCE at method entry to avoid redundant calls. This cached
+            # result is reused in:
+            # 1. World model introspection check (below)
+            # 2. Classifier skip defense checkpoint
+            # 3. Pattern fallback defense checkpoint
+            # 4. Fast path defense checkpoint
             # =================================================================
-            is_self_ref_defense = is_self_referential(query)
-            is_ethical_defense = is_ethical_query(query)
-            
-            # =================================================================
-            # Note: Check for self-referential queries FIRST
-            # Note: Also check for ethical queries that need world model
-            # =================================================================
-            # World model handles queries about VULCAN's self directly.
-            # For ALL queries that are about VULCAN itself (capabilities,
-            # preferences, self-awareness, etc.), consult world model first.
-            # Ethical queries also benefit from world model's ethical framework.
-            # =================================================================
-            is_self_ref = self._is_self_referential(query)
-            is_ethical = self._is_ethical_query(query)
+            is_self_ref = is_self_referential(query)
+            is_ethical = is_ethical_query(query)
             
             # Initialize wm_result to None - will be populated if world_model is consulted
             wm_result = None
@@ -335,8 +326,8 @@ def apply_reasoning(
                         # Classifier may misclassify due to short length or simple phrasing.
                         # Uses cached detection results from method entry.
                         # =================================================================
-                        if is_self_ref_defense or is_ethical_defense:
-                            query_nature = 'self-referential' if is_self_ref_defense else 'ethical'
+                        if is_self_ref or is_ethical:
+                            query_nature = 'self-referential' if is_self_ref else 'ethical'
                             logger.warning(
                                 f"{LOG_PREFIX} DEFENSE-IN-DEPTH: Classifier skip attempted "
                                 f"(category={classification.category}) but {query_nature} query detected. "
@@ -345,7 +336,7 @@ def apply_reasoning(
                             
                             # Force category mutation to ensure proper routing
                             original_query_type = query_type
-                            query_type = 'self_introspection' if is_self_ref_defense else 'ethical'
+                            query_type = 'self_introspection' if is_self_ref else 'ethical'
                             
                             # Set context to guarantee world_model routing
                             if context is None:
@@ -647,8 +638,8 @@ def apply_reasoning(
                 # self-referential/ethical content that must route to world_model.
                 # Uses cached detection results from method entry.
                 # =================================================================
-                if is_self_ref_defense or is_ethical_defense:
-                    query_nature = 'self-referential' if is_self_ref_defense else 'ethical'
+                if is_self_ref or is_ethical:
+                    query_nature = 'self-referential' if is_self_ref else 'ethical'
                     logger.warning(
                         f"{LOG_PREFIX} DEFENSE-IN-DEPTH: Pattern fallback attempted but "
                         f"{query_nature} query detected. Escalating to world_model/meta_reasoning. "
@@ -656,7 +647,7 @@ def apply_reasoning(
                     )
                     
                     # Force category mutation to ensure proper routing
-                    query_type = 'self_introspection' if is_self_ref_defense else 'ethical'
+                    query_type = 'self_introspection' if is_self_ref else 'ethical'
                     
                     # Set context to guarantee world_model routing
                     if context is None:
@@ -708,8 +699,8 @@ def apply_reasoning(
                 # - "What are you?" (short but introspective)
                 # Uses cached detection results from method entry.
                 # =================================================================
-                if is_self_ref_defense or is_ethical_defense:
-                    query_nature = 'self-referential' if is_self_ref_defense else 'ethical'
+                if is_self_ref or is_ethical:
+                    query_nature = 'self-referential' if is_self_ref else 'ethical'
                     logger.warning(
                         f"{LOG_PREFIX} DEFENSE-IN-DEPTH: Fast path attempted (complexity={complexity:.2f}) "
                         f"but {query_nature} query detected. Escalating to world_model/meta_reasoning. "
@@ -718,7 +709,7 @@ def apply_reasoning(
                     
                     # Force category mutation to ensure proper routing
                     original_query_type = query_type
-                    query_type = 'self_introspection' if is_self_ref_defense else 'ethical'
+                    query_type = 'self_introspection' if is_self_ref else 'ethical'
                     
                     # Set context to guarantee world_model routing
                     if context is None:
