@@ -6,6 +6,7 @@ components and implements the primary interface.
 """
 
 import logging
+import re
 import time
 from typing import Any, Dict, List, Optional
 
@@ -108,6 +109,19 @@ def apply_reasoning(
         with self._stats_lock:
             self._stats.invocations += 1
 
+        # AUDIT LOG: Query received
+        # Note: Only log first 80 chars and redact potential PII patterns
+        query_preview = query[:80].replace('\n', ' ')
+        # Simple PII redaction: mask email-like patterns and phone numbers
+        query_preview = re.sub(r'\b[\w\.-]+@[\w\.-]+\.\w+\b', '[EMAIL]', query_preview)
+        query_preview = re.sub(r'\b\d{3}[-.]?\d{3}[-.]?\d{4}\b', '[PHONE]', query_preview)
+        
+        logger.info(
+            f"{LOG_PREFIX} [AUDIT] Query received: "
+            f"type={query_type}, complexity={complexity:.2f}, "
+            f"query_preview='{query_preview}...'"
+        )
+
         try:
             # =================================================================
             # DEFENSE-IN-DEPTH: Early detection for all checkpoints
@@ -122,6 +136,13 @@ def apply_reasoning(
             is_self_ref = is_self_referential(query)
             is_ethical = is_ethical_query(query)
             is_philosophical = is_philosophical_query(query)
+            
+            # AUDIT LOG: Query analysis
+            logger.info(
+                f"{LOG_PREFIX} [AUDIT] Query analysis: "
+                f"self_referential={is_self_ref}, ethical={is_ethical}, "
+                f"philosophical={is_philosophical}"
+            )
             
             # Initialize wm_result to None - will be populated if world_model is consulted
             wm_result = None
@@ -1044,6 +1065,14 @@ def apply_reasoning(
                 # Learning is non-critical - log but don't fail
                 logger.debug(f"{LOG_PREFIX} Learning step failed (non-critical): {e}")
 
+            # AUDIT LOG: Final result
+            logger.info(
+                f"{LOG_PREFIX} [AUDIT] Tool selection complete: "
+                f"tools={result.selected_tools}, strategy={result.reasoning_strategy}, "
+                f"confidence={result.confidence:.2f}, "
+                f"time={selection_time:.3f}ms"
+            )
+
             return result
 
         except Exception as e:
@@ -1053,7 +1082,7 @@ def apply_reasoning(
                 self._stats.last_error = str(e)
 
             logger.error(
-                f"{LOG_PREFIX} Reasoning application failed: {e}",
+                f"{LOG_PREFIX} [AUDIT] Reasoning application failed: {e}",
                 exc_info=True
             )
 
