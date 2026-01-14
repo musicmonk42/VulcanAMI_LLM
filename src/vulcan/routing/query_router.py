@@ -1732,6 +1732,34 @@ class GovernanceSensitivity(str, Enum):
     CRITICAL = "critical"
 
 
+class LLMMode(str, Enum):
+    """
+    LLM execution modes for hybrid executor.
+    
+    ARCHITECTURE: QueryRouter determines LLM mode based on query type.
+    This ensures consistent behavior and prevents runtime mode selection.
+    
+    Modes:
+        FORMAT_ONLY: LLM only formats VULCAN's reasoning output into natural language.
+                     Used when reasoning engines provide the answer (most queries).
+                     Examples: mathematical, logical, symbolic queries
+        
+        GENERATE: LLM generates creative/conversational content.
+                  Used when no reasoning engines are needed.
+                  Examples: creative writing, storytelling, open-ended questions
+        
+        ENHANCE: LLM enhances simple responses with context and polish.
+                 Used for simple/conversational queries that need human-like responses.
+                 Examples: greetings, chitchat, simple factual questions
+    
+    Industry Standard: Enum for type safety, extensibility, and clear intent.
+    """
+    
+    FORMAT_ONLY = "format_only"  # Default: LLM formats reasoning output
+    GENERATE = "generate"         # LLM generates content (creative queries)
+    ENHANCE = "enhance"          # LLM enhances simple responses (chitchat)
+
+
 # ============================================================
 # THREAD POOL FOR ASYNC OPERATIONS
 # ============================================================
@@ -1969,6 +1997,14 @@ class ProcessingPlan:
     adversarial_anomaly_score: Optional[float] = None
     adversarial_details: Dict[str, Any] = field(default_factory=dict)
 
+    # LLM mode control (Phase 1: Router decides LLM behavior)
+    # ARCHITECTURE: QueryRouter is the ONLY decision-maker for LLM mode
+    # - FORMAT_ONLY: LLM just formats reasoning output (default for tool-using queries)
+    # - GENERATE: LLM generates creative/conversational content (for creative queries)
+    # - ENHANCE: LLM enhances simple responses (for simple/chitchat queries)
+    # Industry Standard: Enum for type safety, backward compatibility via default
+    llm_mode: LLMMode = LLMMode.FORMAT_ONLY
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
@@ -1999,6 +2035,7 @@ class ProcessingPlan:
             "adversarial_checked": self.adversarial_checked,
             "adversarial_safe": self.adversarial_safe,
             "adversarial_anomaly_score": self.adversarial_anomaly_score,
+            "llm_mode": self.llm_mode.value,  # Industry standard: serialize enum value
         }
 
     def validate_routing_integrity(self) -> Tuple[bool, List[str]]:
@@ -3256,6 +3293,61 @@ class QueryAnalyzer:
             # Don't let curiosity engine failures affect query processing
             logger.debug(f"[QueryRouter] Failed to report to CuriosityEngine: {e}")
 
+    @staticmethod
+    def _determine_llm_mode(
+        query_type: QueryType,
+        has_selected_tools: bool,
+        complexity_score: float = 0.0
+    ) -> LLMMode:
+        """
+        Determine LLM execution mode based on query characteristics.
+        
+        ARCHITECTURE: Router is the single source of truth for LLM behavior.
+        This centralizes the decision logic instead of having it scattered
+        across multiple layers (endpoint, executor, etc.).
+        
+        Industry Standard: Static method for testability and reusability.
+        Pure function with no side effects.
+        
+        Decision Logic:
+            1. CREATIVE/PHILOSOPHICAL queries → GENERATE (LLM creates content)
+            2. Queries with reasoning tools → FORMAT_ONLY (LLM formats reasoning output)
+            3. CONVERSATIONAL/FACTUAL queries → ENHANCE (LLM enhances simple responses)
+            4. Default fallback → FORMAT_ONLY (safest option)
+        
+        Args:
+            query_type: The classified query type
+            has_selected_tools: Whether reasoning tools were selected
+            complexity_score: Query complexity (0.0-1.0), optional
+            
+        Returns:
+            LLMMode enum value for the executor
+            
+        Examples:
+            >>> QueryAnalyzer._determine_llm_mode(QueryType.MATHEMATICAL, True, 0.8)
+            LLMMode.FORMAT_ONLY
+            >>> QueryAnalyzer._determine_llm_mode(QueryType.CONVERSATIONAL, False, 0.0)
+            LLMMode.ENHANCE
+        """
+        # Creative/philosophical queries: LLM generates content
+        if query_type in (QueryType.PHILOSOPHICAL,):
+            return LLMMode.GENERATE
+        
+        # Queries with reasoning tools: LLM only formats output
+        if has_selected_tools:
+            return LLMMode.FORMAT_ONLY
+        
+        # Simple conversational queries: LLM enhances response
+        if query_type in (QueryType.CONVERSATIONAL, QueryType.FACTUAL, QueryType.IDENTITY):
+            return LLMMode.ENHANCE
+        
+        # High complexity queries likely use reasoning: LLM formats output
+        if complexity_score >= 0.5:
+            return LLMMode.FORMAT_ONLY
+        
+        # Default: FORMAT_ONLY (safest option - assumes reasoning happened)
+        return LLMMode.FORMAT_ONLY
+
     def analyze(self, query: str, session_id: Optional[str] = None) -> QueryPlan:
         """
         Analyze user query and determine which VULCAN systems to activate.
@@ -3443,9 +3535,18 @@ class QueryAnalyzer:
                     )
                 ]
                 
+                # ARCHITECTURE: Set LLM mode based on query characteristics
+                # Industry Standard: Router is single source of truth for LLM behavior
+                plan.llm_mode = self._determine_llm_mode(
+                    query_type=plan.query_type,
+                    has_selected_tools=bool(plan.telemetry_data.get("selected_tools")),
+                    complexity_score=plan.complexity_score
+                )
+                
                 logger.info(
                     f"[QueryRouter] {query_id}: CRYPTO-FAST-PATH source={source}, "
-                    f"operation={result['operation']}, result={result['result'][:20]}..."
+                    f"operation={result['operation']}, result={result['result'][:20]}..., "
+                    f"llm_mode={plan.llm_mode.value}"
                 )
                 return plan
             else:
@@ -3579,9 +3680,17 @@ class QueryAnalyzer:
                     )
                 ]
                 
+                # ARCHITECTURE: Set LLM mode based on query characteristics
+                plan.llm_mode = self._determine_llm_mode(
+                    query_type=plan.query_type,
+                    has_selected_tools=bool(plan.telemetry_data.get("selected_tools")),
+                    complexity_score=plan.complexity_score
+                )
+                
                 logger.info(
                     f"[QueryRouter] {query_id}: SELF-INTROSPECTION-FAST-PATH "
-                    f"source={source}, tools=['world_model'], safety_bypass=True"
+                    f"source={source}, tools=['world_model'], safety_bypass=True, "
+                    f"llm_mode={plan.llm_mode.value}"
                 )
                 return plan
                 
@@ -3743,9 +3852,17 @@ class QueryAnalyzer:
                 plan.telemetry_data["selected_tools"] = tools_to_use
                 plan.telemetry_data["reasoning_strategy"] = f"classifier_{classification.category.lower()}"
                 
+                # ARCHITECTURE: Set LLM mode based on query characteristics
+                plan.llm_mode = self._determine_llm_mode(
+                    query_type=plan.query_type,
+                    has_selected_tools=bool(tools_to_use),
+                    complexity_score=plan.complexity_score
+                )
+                
                 logger.info(
                     f"[QueryRouter] {query_id}: CLASSIFIER-FAST-PATH ({classification.category}) "
-                    f"source={source}, complexity={classification.complexity:.2f}"
+                    f"source={source}, complexity={classification.complexity:.2f}, "
+                    f"llm_mode={plan.llm_mode.value}"
                 )
                 return plan
                 
@@ -3806,9 +3923,16 @@ class QueryAnalyzer:
                 )
             ]
 
+            # ARCHITECTURE: Set LLM mode based on query characteristics
+            plan.llm_mode = self._determine_llm_mode(
+                query_type=plan.query_type,
+                has_selected_tools=False,  # Trivial query with no tools
+                complexity_score=plan.complexity_score
+            )
+
             logger.info(
                 f"[QueryRouter] {query_id}: FAST-PATH source={source}, "
-                f"tasks=1, complexity=0.00"
+                f"tasks=1, complexity=0.00, llm_mode={plan.llm_mode.value}"
             )
             return plan
 
@@ -3904,10 +4028,18 @@ class QueryAnalyzer:
             plan.telemetry_data["reasoning_strategy"] = "complex_physics_full_derivation"
             plan.telemetry_data["timeout_seconds"] = COMPLEX_PHYSICS_TIMEOUT_SECONDS
 
+            # ARCHITECTURE: Set LLM mode based on query characteristics
+            plan.llm_mode = self._determine_llm_mode(
+                query_type=plan.query_type,
+                has_selected_tools=bool(plan.telemetry_data.get("selected_tools")),
+                complexity_score=plan.complexity_score
+            )
+
             logger.info(
                 f"[QueryRouter] {query_id}: COMPLEX-PHYSICS-PATH source={source}, "
                 f"tasks=1, complexity={COMPLEX_PHYSICS_MIN_COMPLEXITY:.2f}, "
-                f"timeout={COMPLEX_PHYSICS_TIMEOUT_SECONDS}s, tools=ALL"
+                f"timeout={COMPLEX_PHYSICS_TIMEOUT_SECONDS}s, tools=ALL, "
+                f"llm_mode={plan.llm_mode.value}"
             )
             return plan
 
@@ -4007,9 +4139,17 @@ class QueryAnalyzer:
             plan.telemetry_data["selected_tools"] = creative_tools
             plan.telemetry_data["reasoning_strategy"] = "creative_llm"  # BUG #14 FIX: Changed from "creative_analogical"
             
+            # ARCHITECTURE: Set LLM mode based on query characteristics
+            plan.llm_mode = self._determine_llm_mode(
+                query_type=plan.query_type,
+                has_selected_tools=bool(creative_tools),
+                complexity_score=plan.complexity_score
+            )
+            
             logger.info(
                 f"[QueryRouter] {query_id}: CREATIVE-FAST-PATH source={source}, "
-                f"tasks=1, tools={creative_tools}, complexity=0.40"
+                f"tasks=1, tools={creative_tools}, complexity=0.40, "
+                f"llm_mode={plan.llm_mode.value}"
             )
             return plan
 
@@ -4098,9 +4238,17 @@ class QueryAnalyzer:
             ]
             plan.telemetry_data["reasoning_strategy"] = "mathematical_execution"
 
+            # ARCHITECTURE: Set LLM mode based on query characteristics
+            plan.llm_mode = self._determine_llm_mode(
+                query_type=plan.query_type,
+                has_selected_tools=bool(plan.telemetry_data.get("selected_tools")),
+                complexity_score=plan.complexity_score
+            )
+
             logger.info(
                 f"[QueryRouter] {query_id}: MATH-FAST-PATH source={source}, "
-                f"tasks=1, complexity=0.30, timeout={MATH_QUERY_TIMEOUT_SECONDS}s"
+                f"tasks=1, complexity=0.30, timeout={MATH_QUERY_TIMEOUT_SECONDS}s, "
+                f"llm_mode={plan.llm_mode.value}"
             )
             return plan
 
@@ -4310,9 +4458,17 @@ class QueryAnalyzer:
             plan.telemetry_data["selected_tools"] = ["world_model", "causal", "analogical"]
             plan.telemetry_data["reasoning_strategy"] = "world_model_philosophical"
 
+            # ARCHITECTURE: Set LLM mode based on query characteristics
+            plan.llm_mode = self._determine_llm_mode(
+                query_type=plan.query_type,
+                has_selected_tools=bool(plan.telemetry_data.get("selected_tools")),
+                complexity_score=plan.complexity_score
+            )
+
             logger.info(
                 f"[QueryRouter] {query_id}: PHILOSOPHICAL-FAST-PATH source={source}, "
-                f"tasks=1, complexity=0.20, timeout={PHILOSOPHICAL_TIMEOUT_SECONDS}s"
+                f"tasks=1, complexity=0.20, timeout={PHILOSOPHICAL_TIMEOUT_SECONDS}s, "
+                f"llm_mode={plan.llm_mode.value}"
             )
             return plan
 
@@ -4379,9 +4535,17 @@ class QueryAnalyzer:
             plan.telemetry_data["selected_tools"] = ["factual"]
             plan.telemetry_data["reasoning_strategy"] = "identity_factual"
 
+            # ARCHITECTURE: Set LLM mode based on query characteristics
+            plan.llm_mode = self._determine_llm_mode(
+                query_type=plan.query_type,
+                has_selected_tools=bool(plan.telemetry_data.get("selected_tools")),
+                complexity_score=plan.complexity_score
+            )
+
             logger.info(
                 f"[QueryRouter] {query_id}: IDENTITY-FAST-PATH source={source}, "
-                f"tasks=1, complexity=0.10, timeout={IDENTITY_TIMEOUT_SECONDS}s"
+                f"tasks=1, complexity=0.10, timeout={IDENTITY_TIMEOUT_SECONDS}s, "
+                f"llm_mode={plan.llm_mode.value}"
             )
             return plan
 
@@ -4448,9 +4612,17 @@ class QueryAnalyzer:
             plan.telemetry_data["selected_tools"] = ["general"]
             plan.telemetry_data["reasoning_strategy"] = "conversational_lightweight"
 
+            # ARCHITECTURE: Set LLM mode based on query characteristics
+            plan.llm_mode = self._determine_llm_mode(
+                query_type=plan.query_type,
+                has_selected_tools=bool(plan.telemetry_data.get("selected_tools")),
+                complexity_score=plan.complexity_score
+            )
+
             logger.info(
                 f"[QueryRouter] {query_id}: CONVERSATIONAL-FAST-PATH source={source}, "
-                f"tasks=1, complexity=0.00, timeout={CONVERSATIONAL_TIMEOUT_SECONDS}s"
+                f"tasks=1, complexity=0.00, timeout={CONVERSATIONAL_TIMEOUT_SECONDS}s, "
+                f"llm_mode={plan.llm_mode.value}"
             )
             return plan
 
@@ -4517,9 +4689,17 @@ class QueryAnalyzer:
             plan.telemetry_data["selected_tools"] = ["factual"]
             plan.telemetry_data["reasoning_strategy"] = "factual_lookup"
 
+            # ARCHITECTURE: Set LLM mode based on query characteristics
+            plan.llm_mode = self._determine_llm_mode(
+                query_type=plan.query_type,
+                has_selected_tools=bool(plan.telemetry_data.get("selected_tools")),
+                complexity_score=plan.complexity_score
+            )
+
             logger.info(
                 f"[QueryRouter] {query_id}: FACTUAL-FAST-PATH source={source}, "
-                f"tasks=1, complexity=0.10, timeout={FACTUAL_TIMEOUT_SECONDS}s"
+                f"tasks=1, complexity=0.10, timeout={FACTUAL_TIMEOUT_SECONDS}s, "
+                f"llm_mode={plan.llm_mode.value}"
             )
             return plan
 
@@ -4713,6 +4893,23 @@ class QueryAnalyzer:
                 )
             except Exception:
                 pass  # Don't let learning failures affect routing
+
+        # ARCHITECTURE: Set LLM mode based on query characteristics (main path)
+        # Industry Standard: Router is single source of truth for LLM behavior
+        plan.llm_mode = self._determine_llm_mode(
+            query_type=plan.query_type,
+            has_selected_tools=bool(plan.telemetry_data.get("selected_tools")),
+            complexity_score=plan.complexity_score
+        )
+
+        logger.info(
+            f"[QueryRouter] {query_id}: source={source}, mode={learning_mode.value}, "
+            f"type={query_type.value}, tasks={len(plan.agent_tasks)}, "
+            f"collab={collaboration_needed}, arena={arena_participation}, "
+            f"complexity={complexity_score:.2f}, uncertainty={uncertainty_score:.2f}, "
+            f"safety_passed={plan.safety_passed}, risk_level={plan.safety_risk_level}, "
+            f"adversarial_safe={plan.adversarial_safe}, llm_mode={plan.llm_mode.value}"
+        )
 
         return plan
 
@@ -6249,6 +6446,7 @@ async def route_query_async(
             loop.run_in_executor(executor, route_query, query, source, session_id),
             timeout=effective_timeout,
         )
+        # Note: llm_mode is already set by route_query before returning
         return plan
 
     except asyncio.TimeoutError:
@@ -6341,9 +6539,13 @@ def _create_fallback_plan(
     if timeout_exceeded:
         plan.detected_patterns.append("routing_timeout")
 
+    # ARCHITECTURE: Set LLM mode for fallback plan
+    # Industry Standard: Even fallback plans have proper LLM mode
+    plan.llm_mode = LLMMode.FORMAT_ONLY  # Safe default for fallback
+
     logger.info(
         f"[QueryRouter] Fallback plan created: {query_id}, source={source}, "
-        f"tasks=1, timeout_exceeded={timeout_exceeded}"
+        f"tasks=1, timeout_exceeded={timeout_exceeded}, llm_mode={plan.llm_mode.value}"
     )
 
     return plan
