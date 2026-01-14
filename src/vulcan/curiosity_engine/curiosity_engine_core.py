@@ -2281,11 +2281,17 @@ class CuriosityEngine:
         1. Removing already resolved gaps
         2. Enforcing cooldown period per gap type
         3. Limiting gaps per type (MAX_GAPS_PER_TYPE)
+        4. Clearing the gap graph at the start to prevent accumulation across cycles
         """
 
         try:
             if strategy is None:
                 strategy = self.select_exploration_strategy()
+
+            # FIX: Clear gap graph at start of each gap identification cycle
+            # This prevents gaps from accumulating across learning cycles,
+            # which was causing "Found 112 gaps: ['exploration', ...]" logs
+            self.gap_graph.clear()
 
             raw_gaps = []
             
