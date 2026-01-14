@@ -299,6 +299,12 @@ STRONG_LOGICAL_INDICATORS: FrozenSet[str] = frozenset([
     "propositional",  # Propositional logic
 ])
 
+# Logical symbols for quick detection of formal logic queries
+LOGICAL_SYMBOLS: Tuple[str, ...] = ('→', '∧', '∨', '¬', '↔', '⊢', '⊨', '∀', '∃')
+
+# Domain-specific symbols used in pre-check before self-introspection
+DOMAIN_SYMBOLS: Tuple[str, ...] = ('→', '∧', '∨', '¬', '↔', 'P(', 'do(')
+
 # Probabilistic/Bayesian indicators - complexity 0.5+, tools=['probabilistic']
 PROBABILISTIC_KEYWORDS: FrozenSet[str] = frozenset([
     "probability", "p(", "bayes", "bayesian",
@@ -1770,7 +1776,7 @@ class QueryClassifier:
         # =============================================================================
         logical_count = sum(1 for kw in LOGICAL_KEYWORDS if kw in query_lower)
         has_strong_logical = any(ind in query_lower for ind in STRONG_LOGICAL_INDICATORS)
-        has_logical_symbols = any(sym in query_original for sym in ['→', '∧', '∨', '¬', '↔', '⊢', '⊨', '∀', '∃'])
+        has_logical_symbols = any(sym in query_original for sym in LOGICAL_SYMBOLS)
 
         if logical_count >= LOGICAL_KEYWORD_THRESHOLD or has_strong_logical or has_logical_symbols:
             logger.info(
@@ -2044,7 +2050,7 @@ class QueryClassifier:
             sum(1 for kw in CAUSAL_KEYWORDS if kw in query_lower) >= 2 or
             sum(1 for kw in LOGICAL_KEYWORDS if kw in query_lower) >= 2 or
             sum(1 for kw in PROBABILISTIC_KEYWORDS if kw in query_lower) >= 2 or
-            any(sym in query_original for sym in ['→', '∧', '∨', '¬', '↔', 'P(', 'do('])
+            any(sym in query_original for sym in DOMAIN_SYMBOLS)
         )
 
         if has_domain_keywords:
