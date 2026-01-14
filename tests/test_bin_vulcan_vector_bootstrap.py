@@ -135,7 +135,7 @@ class TestVulcanVectorBootstrap:
 
     def test_bootstrap_default(self):
         """Test default bootstrap (all tiers)"""
-        result = run_vulcan_bootstrap([], timeout=30)
+        result = run_vulcan_bootstrap([], timeout=20)
         assert result.returncode == 0
         output = result.stdout + result.stderr
         assert (
@@ -146,22 +146,22 @@ class TestVulcanVectorBootstrap:
 
     def test_bootstrap_all_tiers(self):
         """Test bootstrapping all tiers"""
-        result = run_vulcan_bootstrap(["--tier", "all"], timeout=30)
+        result = run_vulcan_bootstrap(["--tier", "all"], timeout=20)
         assert result.returncode == 0
 
     def test_bootstrap_hot_tier(self):
         """Test bootstrapping hot tier"""
-        result = run_vulcan_bootstrap(["--tier", "hot"], timeout=30)
+        result = run_vulcan_bootstrap(["--tier", "hot"], timeout=20)
         assert result.returncode == 0
 
     def test_bootstrap_warm_tier(self):
         """Test bootstrapping warm tier"""
-        result = run_vulcan_bootstrap(["--tier", "warm"], timeout=30)
+        result = run_vulcan_bootstrap(["--tier", "warm"], timeout=20)
         assert result.returncode == 0
 
     def test_bootstrap_cold_tier(self):
         """Test bootstrapping cold tier"""
-        result = run_vulcan_bootstrap(["--tier", "cold"], timeout=30)
+        result = run_vulcan_bootstrap(["--tier", "cold"], timeout=20)
         assert result.returncode == 0
 
     def test_bootstrap_with_dimension(self):
@@ -185,62 +185,62 @@ class TestVulcanVectorBootstrap:
 
     def test_bootstrap_with_l2_metric(self):
         """Test L2 distance metric"""
-        result = run_vulcan_bootstrap(["--metric", "L2", "--tier", "hot"], timeout=30)
+        result = run_vulcan_bootstrap(["--metric", "L2", "--tier", "hot"], timeout=20)
         assert result.returncode == 0
 
     def test_bootstrap_with_ip_metric(self):
         """Test IP (inner product) metric"""
-        result = run_vulcan_bootstrap(["--metric", "IP", "--tier", "hot"], timeout=30)
+        result = run_vulcan_bootstrap(["--metric", "IP", "--tier", "hot"], timeout=20)
         assert result.returncode == 0
 
     def test_bootstrap_with_cosine_metric(self):
         """Test COSINE metric"""
         result = run_vulcan_bootstrap(
-            ["--metric", "COSINE", "--tier", "hot"], timeout=30
+            ["--metric", "COSINE", "--tier", "hot"], timeout=20
         )
         assert result.returncode == 0
 
     def test_bootstrap_with_flat_index(self):
         """Test FLAT index type"""
         result = run_vulcan_bootstrap(
-            ["--index-type", "FLAT", "--tier", "hot"], timeout=30
+            ["--index-type", "FLAT", "--tier", "hot"], timeout=20
         )
         assert result.returncode == 0
 
     def test_bootstrap_with_ivf_flat_index(self):
         """Test IVF_FLAT index type"""
         result = run_vulcan_bootstrap(
-            ["--index-type", "IVF_FLAT", "--tier", "hot"], timeout=30
+            ["--index-type", "IVF_FLAT", "--tier", "hot"], timeout=20
         )
         assert result.returncode == 0
 
     def test_bootstrap_with_ivf_sq8_index(self):
         """Test IVF_SQ8 index type"""
         result = run_vulcan_bootstrap(
-            ["--index-type", "IVF_SQ8", "--tier", "hot"], timeout=30
+            ["--index-type", "IVF_SQ8", "--tier", "hot"], timeout=20
         )
         assert result.returncode == 0
 
     def test_bootstrap_with_hnsw_index(self):
         """Test HNSW index type"""
         result = run_vulcan_bootstrap(
-            ["--index-type", "HNSW", "--tier", "hot"], timeout=30
+            ["--index-type", "HNSW", "--tier", "hot"], timeout=20
         )
         assert result.returncode == 0
 
     def test_bootstrap_with_drop_existing(self):
         """Test --drop-existing flag"""
-        result = run_vulcan_bootstrap(["--drop-existing", "--tier", "hot"], timeout=30)
+        result = run_vulcan_bootstrap(["--drop-existing", "--tier", "hot"], timeout=20)
         assert result.returncode == 0
 
     def test_bootstrap_verbose_mode(self):
         """Test verbose mode"""
-        result = run_vulcan_bootstrap(["--verbose", "--tier", "hot"], timeout=30)
+        result = run_vulcan_bootstrap(["--verbose", "--tier", "hot"], timeout=20)
         assert result.returncode == 0
 
     def test_bootstrap_quiet_mode(self):
         """Test quiet mode"""
-        result = run_vulcan_bootstrap(["--quiet", "--tier", "hot"], timeout=30)
+        result = run_vulcan_bootstrap(["--quiet", "--tier", "hot"], timeout=20)
         assert result.returncode == 0
 
     def test_bootstrap_with_json_output(self):
@@ -249,7 +249,7 @@ class TestVulcanVectorBootstrap:
             json_output = os.path.join(tmpdir, "bootstrap.json")
 
             result = run_vulcan_bootstrap(
-                ["--tier", "hot", "--json", json_output], timeout=30
+                ["--tier", "hot", "--json", json_output], timeout=20
             )
 
             assert result.returncode == 0
@@ -264,24 +264,24 @@ class TestVulcanVectorBootstrap:
 
     def test_bootstrap_displays_summary(self):
         """Test that bootstrap displays summary"""
-        result = run_vulcan_bootstrap(["--tier", "hot"], timeout=30)
+        result = run_vulcan_bootstrap(["--tier", "hot"], timeout=20)
 
         output = result.stdout + result.stderr
         assert "Bootstrap" in output or "Collection" in output or "Summary" in output
 
     def test_bootstrap_invalid_tier(self):
         """Test invalid tier is rejected"""
-        result = run_vulcan_bootstrap(["--tier", "invalid"], timeout=30)
+        result = run_vulcan_bootstrap(["--tier", "invalid"], timeout=20)
         assert result.returncode != 0
 
     def test_bootstrap_invalid_metric(self):
         """Test invalid metric is rejected"""
-        result = run_vulcan_bootstrap(["--metric", "INVALID"], timeout=30)
+        result = run_vulcan_bootstrap(["--metric", "INVALID"], timeout=20)
         assert result.returncode != 0
 
     def test_bootstrap_invalid_index_type(self):
         """Test invalid index type is rejected"""
-        result = run_vulcan_bootstrap(["--index-type", "INVALID"], timeout=30)
+        result = run_vulcan_bootstrap(["--index-type", "INVALID"], timeout=20)
         assert result.returncode != 0
 
     def test_bootstrap_with_all_options(self):
@@ -303,7 +303,7 @@ class TestVulcanVectorBootstrap:
                     "--json",
                     json_output,
                 ],
-                timeout=30,
+                timeout=20,
             )
 
             assert result.returncode == 0
@@ -313,5 +313,5 @@ class TestVulcanVectorBootstrap:
         """Test bootstrapping multiple tiers"""
         tiers = ["hot", "warm", "cold"]
         for tier in tiers:
-            result = run_vulcan_bootstrap(["--tier", tier, "--quiet"], timeout=30)
+            result = run_vulcan_bootstrap(["--tier", tier, "--quiet"], timeout=20)
             assert result.returncode == 0
