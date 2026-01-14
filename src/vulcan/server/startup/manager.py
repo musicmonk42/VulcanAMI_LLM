@@ -678,7 +678,7 @@ class StartupManager:
             # We log the available engine types for audit trail
             try:
                 from vulcan.reasoning import REASONING_ENGINES
-                for engine_name in REASONING_ENGINES.keys():
+                for engine_name in REASONING_ENGINES:
                     self.trace.log_tool_registration(
                         tool_name=engine_name,
                         tool_type="reasoning_engine",

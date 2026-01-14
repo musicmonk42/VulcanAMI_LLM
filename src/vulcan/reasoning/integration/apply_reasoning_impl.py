@@ -6,6 +6,7 @@ components and implements the primary interface.
 """
 
 import logging
+import re
 import time
 from typing import Any, Dict, List, Optional
 
@@ -112,7 +113,6 @@ def apply_reasoning(
         # Note: Only log first 80 chars and redact potential PII patterns
         query_preview = query[:80].replace('\n', ' ')
         # Simple PII redaction: mask email-like patterns and phone numbers
-        import re
         query_preview = re.sub(r'\b[\w\.-]+@[\w\.-]+\.\w+\b', '[EMAIL]', query_preview)
         query_preview = re.sub(r'\b\d{3}[-.]?\d{3}[-.]?\d{4}\b', '[PHONE]', query_preview)
         
