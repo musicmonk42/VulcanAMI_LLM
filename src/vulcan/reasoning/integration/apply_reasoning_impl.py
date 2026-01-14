@@ -109,10 +109,17 @@ def apply_reasoning(
             self._stats.invocations += 1
 
         # AUDIT LOG: Query received
+        # Note: Only log first 80 chars and redact potential PII patterns
+        query_preview = query[:80].replace('\n', ' ')
+        # Simple PII redaction: mask email-like patterns and phone numbers
+        import re
+        query_preview = re.sub(r'\b[\w\.-]+@[\w\.-]+\.\w+\b', '[EMAIL]', query_preview)
+        query_preview = re.sub(r'\b\d{3}[-.]?\d{3}[-.]?\d{4}\b', '[PHONE]', query_preview)
+        
         logger.info(
             f"{LOG_PREFIX} [AUDIT] Query received: "
             f"type={query_type}, complexity={complexity:.2f}, "
-            f"query_preview='{query[:100]}...'"
+            f"query_preview='{query_preview}...'"
         )
 
         try:

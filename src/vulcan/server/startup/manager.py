@@ -583,7 +583,13 @@ class StartupManager:
             self._initialize_routing(deployment, manager)
             
             # CRITICAL: Register callbacks between components
-            # This ensures proper workflow orchestration after modular refactoring
+            # This ensures proper workflow orchestration after modular refactoring.
+            # Callbacks established:
+            # 1. agent_pool → reasoning_integration: Job execution results
+            # 2. reasoning_integration → telemetry_recorder: Tool selection metrics
+            # 3. reasoning_integration → governance_logger: Audit trail for decisions
+            # 4. world_model → audit_logger: Meta-reasoning decisions (if available)
+            # These callbacks restore the data flow that was implicit in the monolithic main.py
             self._register_cognitive_callbacks(deployment)
             
             self.phase_results[phase] = True
