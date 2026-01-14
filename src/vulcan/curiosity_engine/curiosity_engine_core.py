@@ -2550,6 +2550,14 @@ class CuriosityEngine:
                 # High error rates suggest causal analysis is needed
                 # (understanding why queries are failing)
                 experiments = self.experiment_generator.generate_causal_experiment(gap)
+            elif gap.type == "exploration":
+                # Exploration gaps are synthetic gaps generated for continuous learning
+                # Use lower complexity decomposition experiments to explore efficiently
+                experiments = (
+                    self.experiment_generator.generate_decomposition_experiment(
+                        gap, complexity=0.3
+                    )
+                )
             else:
                 # Note: Instead of returning empty list, generate generic experiments
                 # This ensures gaps are never silently ignored
