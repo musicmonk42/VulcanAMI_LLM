@@ -26,6 +26,8 @@ Security-critical ceilings not overridable (e.g., raising risk threshold beyond 
 | REPLAY_WINDOW_SECONDS | No | Replay protection window | 60 |
 | ENABLE_INTRINSIC_DRIVES | No | Self-improvement toggle | "false" |
 | OPENAI_API_KEY | Optional | AI provider | "" |
+| TRUST_ROUTER_TOOL_SELECTION | No | Trust router's tool selection (single source of truth) | "true" |
+| SINGLE_REASONING_PATH | No | Use EITHER agent pool OR parallel reasoning, not both | "true" |
 
 ### 2.1 Reasoning System Configuration (Singleton Pattern)
 
@@ -191,6 +193,42 @@ of user queries. This feature addresses the "brittleness" of keyword-based class
 - Security violations are blocked deterministically (never sent to LLM)
 - Greetings use fast-path (no LLM call overhead)
 - All results cached to prevent repeated LLM calls
+
+**Reasoning Execution Architecture Control:**
+
+VULCAN enforces a single source of truth architecture where QueryRouter is the ONLY
+decision-maker for what reasoning runs. These feature flags control the refactored
+execution paths to eliminate redundant parallel reasoning execution.
+
+- **TRUST_ROUTER_TOOL_SELECTION**: When "true" (default), chat endpoints trust the
+  QueryRouter's selected_tools instead of second-guessing with endpoint-level heuristics.
+  
+  **ARCHITECTURE**: Router decides → Endpoint executes (single source of truth)
+  
+  When "false" (legacy behavior), endpoints use local heuristics that can conflict
+  with router decisions, causing unpredictable behavior.
+  
+  **Industry Standard**: Separation of concerns - router makes decisions, executor
+  executes them without modification.
+
+- **SINGLE_REASONING_PATH**: When "true" (default), use EITHER agent pool OR parallel
+  reasoning execution, not both. This prevents redundant reasoning that was causing
+  2-3x duplicate work.
+  
+  **ARCHITECTURE**: DRY principle - reasoning runs once, not multiple times
+  
+  When "false" (legacy behavior), both agent pool reasoning tasks AND parallel
+  reasoning execution run simultaneously, wasting compute resources and causing
+  race conditions in result merging.
+  
+  **Expected Impact**: 
+  * Queries that ran reasoning 2-3 times now run once
+  * Faster response times (no redundant work)
+  * More predictable execution paths
+  * Better resource utilization
+
+**Migration Note**: These flags default to "true" for new deployments. Existing
+deployments can set to "false" for gradual rollout if needed.
 
 ## 3. Profiles
 development:

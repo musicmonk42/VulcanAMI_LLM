@@ -430,6 +430,11 @@ services:
       # Hybrid Executor Timeout for parallel LLM execution (seconds)
       # Both local LLM and OpenAI run concurrently; first successful response wins
       - HYBRID_EXECUTOR_TIMEOUT=${HYBRID_EXECUTOR_TIMEOUT:-30.0}
+      # Reasoning Execution Architecture Control
+      # TRUST_ROUTER_TOOL_SELECTION: Trust router's tool selection (single source of truth)
+      - TRUST_ROUTER_TOOL_SELECTION=${TRUST_ROUTER_TOOL_SELECTION:-true}
+      # SINGLE_REASONING_PATH: Use EITHER agent pool OR parallel reasoning, not both
+      - SINGLE_REASONING_PATH=${SINGLE_REASONING_PATH:-true}
       # Tool Monitor Configuration
       # Set to "false" to disable tool monitoring for resource-constrained environments
       - TOOL_MONITOR_ENABLED=${TOOL_MONITOR_ENABLED:-true}
