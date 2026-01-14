@@ -299,6 +299,12 @@ STRONG_LOGICAL_INDICATORS: FrozenSet[str] = frozenset([
     "propositional",  # Propositional logic
 ])
 
+# Logical symbols for quick detection of formal logic queries
+LOGICAL_SYMBOLS: Tuple[str, ...] = ('→', '∧', '∨', '¬', '↔', '⊢', '⊨', '∀', '∃')
+
+# Domain-specific symbols used in pre-check before self-introspection
+DOMAIN_SYMBOLS: Tuple[str, ...] = ('→', '∧', '∨', '¬', '↔', 'P(', 'do(')
+
 # Probabilistic/Bayesian indicators - complexity 0.5+, tools=['probabilistic']
 PROBABILISTIC_KEYWORDS: FrozenSet[str] = frozenset([
     "probability", "p(", "bayes", "bayesian",
@@ -1135,11 +1141,15 @@ class QueryClassifier:
                             "[QueryClassifier] Auto-initialized LLM client for LLM-first classification"
                         )
                     except Exception as e:
-                        logger.warning(
-                            f"[QueryClassifier] Failed to auto-initialize LLM client: {e}. "
-                            "Falling back to keyword-only classification."
+                        logger.error(
+                            f"[QueryClassifier] CRITICAL: Failed to initialize LLM client: {e}. "
+                            f"Falling back to keyword-only classification. "
+                            f"LLM-first mode is ENABLED but LLM is UNAVAILABLE. "
+                            f"Check HybridLLMExecutor configuration."
                         )
                         self.llm_client = None
+                        # Track this in stats for monitoring
+                        self._stats["llm_init_failures"] = self._stats.get("llm_init_failures", 0) + 1
                 else:
                     self.llm_client = None
             except ImportError:
@@ -1723,45 +1733,6 @@ class QueryClassifier:
                 )
         
         # =============================================================================
-        # Note: Check self-introspection patterns BEFORE reasoning patterns
-        # =============================================================================
-        # Questions about Vulcan's capabilities, goals, limitations should route to
-        # World Model's SelfModel, NOT to ProbabilisticEngine or other reasoning tools.
-        # 
-        # NOTE: This check MUST come AFTER creative patterns check. If a query contains
-        # both creative keywords (poem, story, write) AND introspection keywords (self-aware),
-        # it should be classified as CREATIVE, not SELF_INTROSPECTION.
-        # Example: "write a poem about the minute you become self-aware" -> CREATIVE
-        for pattern in SELF_INTROSPECTION_PATTERNS:
-            if pattern.search(query_original):
-                return QueryClassification(
-                    category=QueryCategory.SELF_INTROSPECTION.value,
-                    complexity=0.3,  # Medium-low complexity - World Model can handle
-                    suggested_tools=["world_model"],  # Route to World Model SelfModel
-                    skip_reasoning=False,  # Use reasoning path but with world_model tool
-                    confidence=0.9,
-                    source="keyword",
-                )
-        
-        # Check self-introspection keywords (questions about "you" with certain keywords)
-        # FIX: Exclude queries that contain creative writing keywords to prevent
-        # misclassification of creative prompts with AI/self-awareness themes
-        if any(word in query_lower for word in ['you', 'your', 'yourself']):
-            # Check if query is about creative writing - don't classify as introspection
-            has_creative_keywords = any(kw in query_lower for kw in CREATIVE_KEYWORDS)
-            if not has_creative_keywords:
-                introspection_count = sum(1 for kw in SELF_INTROSPECTION_KEYWORDS if kw in query_lower)
-                if introspection_count >= 1:
-                    return QueryClassification(
-                        category=QueryCategory.SELF_INTROSPECTION.value,
-                        complexity=0.3,
-                        suggested_tools=["world_model"],
-                        skip_reasoning=False,
-                        confidence=0.8,
-                        source="keyword",
-                    )
-        
-        # =============================================================================
         # SPECULATION FIX: Check speculation/counterfactual patterns
         # =============================================================================
         # Speculation queries are semantically complex (require counterfactual reasoning,
@@ -1794,6 +1765,51 @@ class QueryClassifier:
                 suggested_tools=["causal"],
                 skip_reasoning=False,
                 confidence=0.85,
+                source="keyword",
+            )
+        
+        # =============================================================================
+        # FIX: Add missing LOGICAL keyword classification
+        # =============================================================================
+        # CRITICAL BUG: LOGICAL_KEYWORDS and LOGICAL_KEYWORD_THRESHOLD were defined
+        # but never used! This caused SAT/FOL queries to fall through to wrong categories.
+        # =============================================================================
+        logical_count = sum(1 for kw in LOGICAL_KEYWORDS if kw in query_lower)
+        has_strong_logical = any(ind in query_lower for ind in STRONG_LOGICAL_INDICATORS)
+        has_logical_symbols = any(sym in query_original for sym in LOGICAL_SYMBOLS)
+
+        if logical_count >= LOGICAL_KEYWORD_THRESHOLD or has_strong_logical or has_logical_symbols:
+            logger.info(
+                f"[QueryClassifier] LOGICAL classification - "
+                f"keywords={logical_count}, strong={has_strong_logical}, symbols={has_logical_symbols}"
+            )
+            return QueryClassification(
+                category=QueryCategory.LOGICAL.value,
+                complexity=0.7 + min(0.2, logical_count * 0.03),
+                suggested_tools=["symbolic"],
+                skip_reasoning=False,
+                confidence=0.95 if has_logical_symbols else (0.9 if has_strong_logical else 0.85),
+                source="keyword",
+            )
+        
+        # =============================================================================
+        # FIX: Add PROBABILISTIC keyword classification
+        # =============================================================================
+        # PROBABILISTIC queries were not being classified by keywords, causing them
+        # to fall through to UNKNOWN or get misclassified.
+        # =============================================================================
+        prob_count = sum(1 for kw in PROBABILISTIC_KEYWORDS if kw in query_lower)
+        if prob_count >= PROBABILISTIC_KEYWORD_THRESHOLD or "p(" in query_lower or "bayes" in query_lower:
+            logger.info(
+                f"[QueryClassifier] PROBABILISTIC classification - "
+                f"keywords={prob_count}"
+            )
+            return QueryClassification(
+                category=QueryCategory.PROBABILISTIC.value,
+                complexity=0.5 + min(0.3, prob_count * 0.05),
+                suggested_tools=["probabilistic"],
+                skip_reasoning=False,
+                confidence=0.9 if "bayes" in query_lower else 0.85,
                 source="keyword",
             )
         
@@ -2017,6 +2033,69 @@ class QueryClassifier:
                         confidence=0.9,
                         source="keyword",
                     )
+        
+        # =============================================================================
+        # FIX: Check self-introspection patterns AFTER specialized domain checks
+        # =============================================================================
+        # Problem: Self-introspection check was firing too early, hijacking specialized
+        # domain queries (causal, logical, probabilistic) that happen to contain "you".
+        #
+        # Solution: Check for domain keywords BEFORE self-introspection and skip if found.
+        # This ensures queries like "Confounding vs causation - you observe..." route to
+        # CAUSAL, not SELF_INTROSPECTION.
+        # =============================================================================
+        
+        # Domain keyword pre-check
+        has_domain_keywords = (
+            sum(1 for kw in CAUSAL_KEYWORDS if kw in query_lower) >= 2 or
+            sum(1 for kw in LOGICAL_KEYWORDS if kw in query_lower) >= 2 or
+            sum(1 for kw in PROBABILISTIC_KEYWORDS if kw in query_lower) >= 2 or
+            any(sym in query_original for sym in DOMAIN_SYMBOLS)
+        )
+
+        if has_domain_keywords:
+            logger.info(
+                f"[QueryClassifier] Skipping self-introspection check - "
+                f"domain reasoning keywords detected"
+            )
+            # Fall through to default classification below
+        else:
+            # Only check self-introspection if no domain keywords present
+            # Questions about Vulcan's capabilities, goals, limitations should route to
+            # World Model's SelfModel, NOT to ProbabilisticEngine or other reasoning tools.
+            # 
+            # NOTE: This check MUST come AFTER creative patterns check. If a query contains
+            # both creative keywords (poem, story, write) AND introspection keywords (self-aware),
+            # it should be classified as CREATIVE, not SELF_INTROSPECTION.
+            # Example: "write a poem about the minute you become self-aware" -> CREATIVE
+            for pattern in SELF_INTROSPECTION_PATTERNS:
+                if pattern.search(query_original):
+                    return QueryClassification(
+                        category=QueryCategory.SELF_INTROSPECTION.value,
+                        complexity=0.3,  # Medium-low complexity - World Model can handle
+                        suggested_tools=["world_model"],  # Route to World Model SelfModel
+                        skip_reasoning=False,  # Use reasoning path but with world_model tool
+                        confidence=0.9,
+                        source="keyword",
+                    )
+            
+            # Check self-introspection keywords (questions about "you" with certain keywords)
+            # FIX: Exclude queries that contain creative writing keywords to prevent
+            # misclassification of creative prompts with AI/self-awareness themes
+            if any(word in query_lower for word in ['you', 'your', 'yourself']):
+                # Check if query is about creative writing - don't classify as introspection
+                has_creative_keywords = any(kw in query_lower for kw in CREATIVE_KEYWORDS)
+                if not has_creative_keywords:
+                    introspection_count = sum(1 for kw in SELF_INTROSPECTION_KEYWORDS if kw in query_lower)
+                    if introspection_count >= 1:
+                        return QueryClassification(
+                            category=QueryCategory.SELF_INTROSPECTION.value,
+                            complexity=0.3,
+                            suggested_tools=["world_model"],
+                            skip_reasoning=False,
+                            confidence=0.8,
+                            source="keyword",
+                        )
         
         # No confident match - return low-confidence result based on length/complexity heuristics
         word_count = len(query_lower.split())
