@@ -303,7 +303,7 @@ def apply_reasoning(
                     # The "meta_reasoning" string is not a valid enum member, and philosophical
                     # reasoning is the appropriate type for both self-referential and ethical queries.
                     # ═══════════════════════════════════════════════════════════════════
-                    if REASONING_TYPE_ENUM_AVAILABLE and ReasoningType is not None:
+                    if REASONING_TYPE_ENUM_AVAILABLE:
                         reasoning_type_enum = ReasoningType.PHILOSOPHICAL
                     else:
                         # Fallback if enum not available - this will be caught by validation

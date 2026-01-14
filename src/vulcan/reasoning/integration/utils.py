@@ -414,7 +414,7 @@ def convert_reasoning_type_to_enum(
         ReasoningType.PHILOSOPHICAL
         
         >>> convert_reasoning_type_to_enum("meta_reasoning", "orchestrator")
-        None  # Not in enum, logs warning
+        ReasoningType.PHILOSOPHICAL  # Alias mapped to PHILOSOPHICAL
         
         >>> convert_reasoning_type_to_enum(ReasoningType.CAUSAL, "orchestrator")
         ReasoningType.CAUSAL  # Already enum, pass through
@@ -458,7 +458,7 @@ def convert_reasoning_type_to_enum(
             "ethical_reasoning": ReasoningType.PHILOSOPHICAL,
             "math": ReasoningType.MATHEMATICAL,
             "causal_reasoning": ReasoningType.CAUSAL,
-            "world_model": ReasoningType.PHILOSOPHICAL,  # World model uses philosophical
+            "world_model": ReasoningType.PHILOSOPHICAL,  # World model introspection maps to philosophical reasoning
         }
         
         if reasoning_type_lower in alias_map:

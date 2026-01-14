@@ -21,14 +21,14 @@ from typing import Any, Dict, Optional
 
 # Test imports - these should work even if some components are unavailable
 try:
-    from src.vulcan.reasoning.reasoning_types import ReasoningType
+    from vulcan.reasoning.reasoning_types import ReasoningType
     REASONING_TYPE_AVAILABLE = True
 except ImportError:
     ReasoningType = None
     REASONING_TYPE_AVAILABLE = False
 
 try:
-    from src.vulcan.reasoning.integration.utils import (
+    from vulcan.reasoning.integration.utils import (
         convert_reasoning_type_to_enum,
         ensure_reasoning_type_enum,
     )

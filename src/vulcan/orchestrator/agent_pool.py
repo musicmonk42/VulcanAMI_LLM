@@ -120,6 +120,23 @@ IntegrationReasoningResult = None  # Lazy-loaded
 REASONING_AVAILABLE = False  # Updated by lazy import
 _reasoning_import_attempted = False  # Track if we've tried to import
 
+# ═══════════════════════════════════════════════════════════════════
+# BUG FIX: Import enum conversion helper for reasoning_type safety
+# ═══════════════════════════════════════════════════════════════════
+# Import at module level to avoid repeated import attempts in hot path.
+# This is safe because it doesn't cause circular imports - utils.py
+# only depends on reasoning_types.py which is a leaf module.
+# ═══════════════════════════════════════════════════════════════════
+try:
+    from vulcan.reasoning.integration.utils import ensure_reasoning_type_enum
+    TYPE_CONVERSION_AVAILABLE = True
+except ImportError:
+    ensure_reasoning_type_enum = None
+    TYPE_CONVERSION_AVAILABLE = False
+    logging.getLogger(__name__).warning(
+        "[AgentPool] Type conversion utility not available - may drop philosophical results"
+    )
+
 
 def _lazy_import_reasoning():
     """
@@ -3017,22 +3034,7 @@ class AgentPoolManager:
             node_results = {}
             reasoning_was_invoked = False  # Note: Track actual reasoning invocation
             
-            # ═══════════════════════════════════════════════════════════════════
-            # BUG FIX: Import enum conversion helper for reasoning_type safety
-            # ═══════════════════════════════════════════════════════════════════
-            # PROBLEM: Reasoning results may have reasoning_type as string instead
-            # of ReasoningType enum, causing results to be discarded by orchestrator.
-            #
-            # SOLUTION: Import ensure_reasoning_type_enum() to convert strings to
-            # enums before processing results.
-            # ═══════════════════════════════════════════════════════════════════
-            try:
-                from vulcan.reasoning.integration.utils import ensure_reasoning_type_enum
-                TYPE_CONVERSION_AVAILABLE = True
-            except ImportError:
-                ensure_reasoning_type_enum = None
-                TYPE_CONVERSION_AVAILABLE = False
-                logger.warning("[AgentPool] Type conversion utility not available - may drop philosophical results")
+
 
             # ==================================================================
             # FIX TASK 6: Add validation and logging for diagnostic purposes
@@ -3136,7 +3138,7 @@ class AgentPoolManager:
                     # SOLUTION: Use ensure_reasoning_type_enum() to convert any string
                     # values to proper enum before further processing.
                     # ═══════════════════════════════════════════════════════════════════
-                    if TYPE_CONVERSION_AVAILABLE and ensure_reasoning_type_enum is not None:
+                    if TYPE_CONVERSION_AVAILABLE:
                         integration_result = ensure_reasoning_type_enum(integration_result, "agent_pool")
                         # Also ensure metadata dict is converted
                         if hasattr(integration_result, 'metadata') and integration_result.metadata:
@@ -3555,7 +3557,7 @@ class AgentPoolManager:
                                 #
                                 # SOLUTION: Apply ensure_reasoning_type_enum() to convert.
                                 # ═══════════════════════════════════════════════════════════════════
-                                if TYPE_CONVERSION_AVAILABLE and ensure_reasoning_type_enum is not None:
+                                if TYPE_CONVERSION_AVAILABLE:
                                     reasoning_result = ensure_reasoning_type_enum(reasoning_result, "agent_pool:reasoner")
                                 
                                 # FIX TASK 6: Validate reasoning result
