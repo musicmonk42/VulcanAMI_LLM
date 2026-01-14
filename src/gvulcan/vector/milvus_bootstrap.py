@@ -245,13 +245,13 @@ def create_index_for_collection(
         raise
 
 
-def load_collection(coll_name: str, timeout: float = 30.0) -> Collection:
+def load_collection(coll_name: str, timeout: float = 10.0) -> Collection:
     """
     Load collection into memory.
 
     Args:
         coll_name: Collection name
-        timeout: Load timeout in seconds
+        timeout: Load timeout in seconds (reduced from 30s to 10s for faster feedback)
 
     Returns:
         Loaded collection
@@ -262,20 +262,24 @@ def load_collection(coll_name: str, timeout: float = 30.0) -> Collection:
         logger.info(f"Loading collection: {coll_name}")
         coll.load()
 
-        # Wait for load to complete
+        # Wait for load to complete with shorter intervals for faster feedback
         start_time = time.time()
+        check_interval = 0.2  # Check every 200ms instead of 500ms
         while time.time() - start_time < timeout:
-            if (
-                coll.num_entities > 0
-                or utility.get_loading_progress(coll_name).get("progress", 0) == 100
-            ):
-                logger.info(
-                    f"Collection loaded: {coll_name} ({coll.num_entities} entities)"
-                )
-                return coll
-            time.sleep(0.5)
+            try:
+                progress = utility.get_loading_progress(coll_name).get("progress", 0)
+                if coll.num_entities > 0 or progress == 100:
+                    logger.info(
+                        f"Collection loaded: {coll_name} ({coll.num_entities} entities)"
+                    )
+                    return coll
+            except Exception as e:
+                # If we can't check progress, log but continue waiting
+                logger.debug(f"Progress check failed: {e}")
+            
+            time.sleep(check_interval)
 
-        logger.warning(f"Collection load may not be complete: {coll_name}")
+        logger.warning(f"Collection load may not be complete after {timeout}s: {coll_name}")
         return coll
 
     except Exception as e:
