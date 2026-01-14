@@ -399,22 +399,76 @@ def select_with_tool_selector(
             )
             selection = orchestrator._tool_selector.select_and_execute(selection_request)
             
-            # Convert to ReasoningResult
-            tools = selection.selected_tools if hasattr(selection, 'selected_tools') else ['general']
-            strategy = selection.strategy if hasattr(selection, 'strategy') else 'direct'
-            confidence = selection.confidence if hasattr(selection, 'confidence') else 0.5
-            rationale = selection.rationale if hasattr(selection, 'rationale') else 'Tool selection completed'
+            # Convert SelectionResult to ReasoningResult
+            # FIX: SelectionResult has 'selected_tool' (singular), not 'selected_tools' (plural)
+            # FIX: Extract actual answer from execution_result instead of ignoring it
+            # FIX: Use strategy_used instead of strategy
+            selected_tool = getattr(selection, 'selected_tool', 'general')
+            tools = [selected_tool] if selected_tool else ['general']
+            strategy = getattr(selection, 'strategy_used', 'direct')
+            if hasattr(strategy, 'value'):  # Handle ExecutionStrategy enum
+                strategy = strategy.value
+            confidence = getattr(selection, 'confidence', 0.5)
+            
+            # FIX: Extract the actual reasoning result from execution_result
+            # This is the KEY FIX - execution_result contains the actual answer!
+            execution_result = getattr(selection, 'execution_result', None)
+            conclusion = None
+            explanation = None
+            reasoning_type = None
+            
+            if execution_result is not None:
+                # Extract conclusion from the execution result
+                if isinstance(execution_result, dict):
+                    conclusion = execution_result.get('result') or execution_result.get('conclusion')
+                    explanation = execution_result.get('explanation') or execution_result.get('rationale')
+                    reasoning_type = execution_result.get('reasoning_type') or execution_result.get('tool')
+                elif hasattr(execution_result, 'conclusion'):
+                    conclusion = getattr(execution_result, 'conclusion', None)
+                    explanation = getattr(execution_result, 'explanation', '')
+                    reasoning_type = getattr(execution_result, 'reasoning_type', None)
+                else:
+                    # execution_result is the conclusion itself
+                    conclusion = execution_result
+            
+            # Build rationale from explanation or provide meaningful fallback
+            if explanation:
+                rationale = explanation
+            elif conclusion:
+                rationale = f"Reasoning completed with {selected_tool} engine"
+            else:
+                rationale = f"Tool selection completed - {selected_tool} selected"
+            
+            # Include metadata from selection result
+            metadata = {
+                "query_type": query_type,
+                "complexity": complexity,
+                "tool_selector_used": True,
+                "selected_tool": selected_tool,
+                "execution_time_ms": getattr(selection, 'execution_time_ms', 0.0),
+            }
+            
+            # Merge any metadata from selection
+            if hasattr(selection, 'metadata') and isinstance(selection.metadata, dict):
+                metadata.update(selection.metadata)
+            
+            # FIX: Include conclusion and reasoning_type in metadata for downstream extraction
+            # Note: ReasoningResult doesn't have conclusion/reasoning_type fields,
+            # so we store them in metadata where they can be extracted by unified_chat.py
+            if conclusion is not None:
+                metadata['conclusion'] = conclusion
+                metadata['has_execution_result'] = True
+            if reasoning_type is not None:
+                metadata['reasoning_type'] = reasoning_type
+            if explanation:
+                metadata['explanation'] = explanation
             
             return ReasoningResult(
                 selected_tools=tools,
-                reasoning_strategy=strategy,
+                reasoning_strategy=str(strategy),
                 confidence=confidence,
                 rationale=rationale,
-                metadata={
-                    "query_type": query_type,
-                    "complexity": complexity,
-                    "tool_selector_used": True,
-                }
+                metadata=metadata,
             )
         except Exception as e:
             logger.warning(f"{LOG_PREFIX} ToolSelector failed: {e}, using fallback")
