@@ -35,11 +35,16 @@ def run_vulcan_bootstrap(args, **kwargs):
     # Extract timeout from kwargs, default to 20 seconds (reduced from 30 for faster feedback)
     timeout = kwargs.pop("timeout", 20)
     
-    # Ensure we capture output
-    kwargs.setdefault("capture_output", True)
-    kwargs.setdefault("text", True)
-    kwargs.setdefault("stdout", subprocess.PIPE)
-    kwargs.setdefault("stderr", subprocess.PIPE)
+    # Remove capture_output if present (not supported by Popen)
+    kwargs.pop("capture_output", None)
+    
+    # Ensure we capture output - Popen requires explicit stdout/stderr
+    if "stdout" not in kwargs:
+        kwargs["stdout"] = subprocess.PIPE
+    if "stderr" not in kwargs:
+        kwargs["stderr"] = subprocess.PIPE
+    if "text" not in kwargs:
+        kwargs["text"] = True
     
     # Log the command being run for debugging
     print(f"[TEST] Running: {' '.join(command)}")
