@@ -438,9 +438,9 @@ MULTIMODAL_TIME_BUDGET_MULTIPLIER = 3.0  # Allow multimodal more time headroom
 #
 # When semantic matching returns {causal: 0.70, symbolic: 0.08, ...}, we should
 # only run the clearly winning tool, not all 5 tools.
-CANDIDATE_PRIOR_THRESHOLD = 0.15  # Minimum prior probability to be a candidate
-CANDIDATE_MAX_COUNT = 2  # Maximum number of candidates (1-2 tools, not 5)
-CANDIDATE_DOMINANCE_RATIO = 2.0  # If top tool has 2x the prior, use only that tool
+CANDIDATE_PRIOR_THRESHOLD = 0.20  # Minimum prior probability to be a candidate (increased from 0.15)
+CANDIDATE_MAX_COUNT = 1  # Maximum number of candidates (reduced from 2 to strongly prefer single tool)
+CANDIDATE_DOMINANCE_RATIO = 1.8  # If top tool has 1.8x the prior, use only that tool (reduced from 2.0)
 
 # ==============================================================================
 # LLM Classification Integration Configuration
@@ -5586,6 +5586,20 @@ class ToolSelector:
                     continue
                 
                 quality_estimate = 0.5 + prior
+                
+                # FIX: Reduce quality/utility for meta/world_model tools when domain-specific tools exist
+                # This ensures domain-specific engines are preferred over meta-reasoning
+                is_meta_tool = tool_name in ('world_model', 'philosophical')
+                has_domain_tools = any(t in safe_tools for t in ('symbolic', 'mathematical', 'probabilistic', 'causal'))
+                
+                if is_meta_tool and has_domain_tools:
+                    # Reduce quality estimate by 15% when domain tools are available
+                    quality_penalty = 0.85
+                    quality_estimate *= quality_penalty
+                    logger.debug(
+                        f"[ToolSelector] Meta tool penalty applied to {tool_name}: "
+                        f"quality reduced by {(1-quality_penalty)*100:.0f}% when domain tools available"
+                    )
                 
                 candidates.append({
                     "tool": tool_name,
