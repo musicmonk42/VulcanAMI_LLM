@@ -728,7 +728,7 @@ def create_job_provenance(
     Returns:
         JobProvenance instance
     """
-    return JobProvenance(
+    prov = JobProvenance(
         job_id=job_id,
         agent_id="",  # Will be assigned later
         graph_id=graph_id,
@@ -744,6 +744,14 @@ def create_job_provenance(
         timeout_seconds=timeout_seconds,
         parent_job_id=parent_job_id,
     )
+    
+    # AUDIT LOG: Provenance record created
+    logger.info(
+        f"[AUDIT/PROVENANCE] Record created: "
+        f"job_id={job_id}, graph_id={graph_id}, priority={priority}"
+    )
+    
+    return prov
 
 
 def validate_state_machine():
