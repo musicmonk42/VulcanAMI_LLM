@@ -10,12 +10,23 @@ import argparse
 import json
 import logging
 import os
+import signal
 import sys
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 VERSION = "4.6.0"
+
+# Global flag for graceful shutdown
+_shutdown_requested = False
+
+def _signal_handler(signum, frame):
+    """Handle shutdown signals gracefully."""
+    global _shutdown_requested
+    _shutdown_requested = True
+    logger.warning(f"Received signal {signum}, initiating graceful shutdown...")
+    sys.exit(1)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -137,11 +148,12 @@ class VectorBootstrap:
         
         try:
             logger.info(f"Connecting to Milvus at {self.milvus_host}:{self.milvus_port}...")
+            # Reduced timeout from 10s to 5s for faster failure detection
             connections.connect(
                 alias="default",
                 host=self.milvus_host,
                 port=str(self.milvus_port),
-                timeout=10
+                timeout=5
             )
             self.connected = True
             logger.info("✅ Connected to Milvus successfully")
@@ -162,7 +174,8 @@ class VectorBootstrap:
                 logger.info("Disconnected from Milvus")
                 self.connected = False
             except Exception as e:
-                logger.warning(f"Error during disconnect: {e}")
+                logger.debug(f"Error during disconnect (may be already disconnected): {e}")
+                self.connected = False
     
     def bootstrap(
         self,
@@ -378,6 +391,10 @@ class VectorBootstrap:
 
 def main():
     """Main entry point with comprehensive argument parsing."""
+    # Register signal handlers for graceful shutdown
+    signal.signal(signal.SIGTERM, _signal_handler)
+    signal.signal(signal.SIGINT, _signal_handler)
+    
     parser = argparse.ArgumentParser(
         description='VulcanAMI Vector Bootstrap v' + VERSION,
         formatter_class=argparse.RawDescriptionHelpFormatter,
