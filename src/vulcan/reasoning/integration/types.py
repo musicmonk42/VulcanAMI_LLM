@@ -59,6 +59,9 @@ FAST_PATH_COMPLEXITY_THRESHOLD = 0.3  # Below this, use fast path
 LOW_COMPLEXITY_THRESHOLD = 0.4  # Below this, use FAST mode
 HIGH_COMPLEXITY_THRESHOLD = 0.7  # Above this, use ACCURATE mode
 
+# Defense-in-depth: Complexity override for escalated queries
+DEFENSE_COMPLEXITY_OVERRIDE = 0.1  # Amount to add when forcing reasoning
+
 # CONFIGURABLE: Set VULCAN_DECOMPOSITION_THRESHOLD environment variable to override
 try:
     DECOMPOSITION_COMPLEXITY_THRESHOLD = float(
