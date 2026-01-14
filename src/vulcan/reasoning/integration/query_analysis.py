@@ -173,12 +173,16 @@ def is_philosophical_query(query: str) -> bool:
         r'\bmeaning of (life|existence)\b',
         r'\bhard problem\b',
         r'\bmind[- ]body\b',
+        r'\bmind\s+.*\s+body\b',  # Match "mind ... body" with words in between
         r'\bpersonal identity\b',
         r'\bfree will\b',
         r'\bconscious(ness)?\b.*\baware(ness)?\b',
         r'\bsubjective experience\b',
         r'\bphenomenal\b',
         r'\bqualia\b',
+        # Add more patterns for queries asking about consciousness, reality, etc.
+        r'\b(explain|describe|what is|define)\s+(consciousness|reality|existence|truth|knowledge)\b',
+        r'\bconscious(ness)?\b',  # Any mention of consciousness is likely philosophical
     ]
 
     for pattern_str in philosophical_patterns:
