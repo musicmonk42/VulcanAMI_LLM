@@ -1222,5 +1222,81 @@ class TestPerformance:
 # Run Tests
 # ============================================================================
 
+
+class TestGraphClear:
+    """Tests for graph clear functionality (fix for gap accumulation issue)"""
+
+    def test_graph_storage_clear(self, graph_storage):
+        """Test clearing graph storage"""
+        # Add some nodes and edges
+        gap1 = KnowledgeGap(
+            type="test1", domain="d1", priority=0.8, estimated_cost=10.0
+        )
+        gap2 = KnowledgeGap(
+            type="test2", domain="d2", priority=0.7, estimated_cost=15.0
+        )
+        
+        graph_storage.add_node(str(gap1.id), gap1)
+        graph_storage.add_node(str(gap2.id), gap2)
+        
+        # Verify nodes were added
+        assert graph_storage.node_count() == 2
+        
+        # Clear the storage
+        graph_storage.clear()
+        
+        # Verify storage is empty
+        assert graph_storage.node_count() == 0
+        assert graph_storage.edge_count() == 0
+        
+    def test_dependency_graph_clear(self, dependency_graph):
+        """Test clearing dependency graph"""
+        # Add nodes and edges
+        gap1 = KnowledgeGap(
+            type="test1", domain="d1", priority=0.8, estimated_cost=10.0
+        )
+        gap2 = KnowledgeGap(
+            type="test2", domain="d2", priority=0.7, estimated_cost=15.0
+        )
+        
+        dependency_graph.add_node(gap1)
+        dependency_graph.add_node(gap2)
+        dependency_graph.add_edge(gap1, gap2)
+        
+        # Verify items were added
+        stats = dependency_graph.get_statistics()
+        assert stats["nodes"] >= 2
+        assert stats["edges"] >= 1
+        
+        # Clear the graph
+        dependency_graph.clear()
+        
+        # Verify graph is empty
+        stats_after = dependency_graph.get_statistics()
+        assert stats_after["nodes"] == 0
+        assert stats_after["edges"] == 0
+
+    def test_graph_clear_reusable(self, dependency_graph):
+        """Test that cleared graph can be reused"""
+        # Add initial nodes
+        gap1 = KnowledgeGap(
+            type="test1", domain="d1", priority=0.8, estimated_cost=10.0
+        )
+        dependency_graph.add_node(gap1)
+        
+        # Clear
+        dependency_graph.clear()
+        
+        # Add new nodes after clear
+        gap2 = KnowledgeGap(
+            type="test2", domain="d2", priority=0.7, estimated_cost=15.0
+        )
+        dependency_graph.add_node(gap2)
+        
+        # Should only have the new node
+        stats = dependency_graph.get_statistics()
+        assert stats["nodes"] == 1
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "--tb=short"])

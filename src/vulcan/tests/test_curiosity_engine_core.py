@@ -835,6 +835,37 @@ class TestEdgeCases:
         assert isinstance(priorities, list)
         assert len(priorities) == 0
 
+    def test_gap_accumulation_fix(self, curiosity_engine):
+        """Test that gaps don't accumulate across learning cycles.
+        
+        This is a regression test for the bug where 112 'exploration' gaps
+        were being logged due to gaps accumulating in the gap_graph across
+        multiple learning cycles.
+        """
+        # Run first learning cycle
+        summary1 = curiosity_engine.run_learning_cycle(max_experiments=2)
+        gaps_identified_cycle1 = summary1.get("gaps_identified", 0)
+        
+        # Run second learning cycle
+        summary2 = curiosity_engine.run_learning_cycle(max_experiments=2)
+        gaps_identified_cycle2 = summary2.get("gaps_identified", 0)
+        
+        # Run third learning cycle
+        summary3 = curiosity_engine.run_learning_cycle(max_experiments=2)
+        gaps_identified_cycle3 = summary3.get("gaps_identified", 0)
+        
+        # With the fix, gap count should NOT grow unboundedly
+        # Without the fix, cycle 3 would have cycle1 + cycle2 + cycle3 gaps
+        # The gap count should be roughly similar across cycles (not accumulating)
+        max_gap_count = max(gaps_identified_cycle1, gaps_identified_cycle2, gaps_identified_cycle3)
+        
+        # If gaps are accumulating, the count would grow significantly
+        # We check that it doesn't exceed a reasonable threshold
+        assert max_gap_count < 50, (
+            f"Gap accumulation detected: cycle1={gaps_identified_cycle1}, "
+            f"cycle2={gaps_identified_cycle2}, cycle3={gaps_identified_cycle3}"
+        )
+
     def test_zero_budget(self, curiosity_engine):
         """Test behavior with zero budget"""
         # Consume all budget

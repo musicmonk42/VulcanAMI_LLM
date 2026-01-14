@@ -263,6 +263,17 @@ class GraphStorage:
             except Exception as e:
                 return 0.0
 
+    def clear(self):
+        """Clear all nodes and edges from storage"""
+        with self.lock:
+            self.nodes.clear()
+            self.edges.clear()
+            self.adjacency.clear()
+            self.reverse_adjacency.clear()
+            self.weak_edges.clear()
+            self.node_creation_times.clear()
+            self.nx_graph.clear()
+
 
 class PathFinder:
     """Finds paths and relationships in graph - SEPARATED CONCERN"""
@@ -1136,6 +1147,17 @@ class CycleAwareDependencyGraph:
         except Exception as e:
             logger.error("Error getting statistics: %s", e)
             return {}
+
+    def clear(self):
+        """Clear all nodes and edges from the graph.
+        
+        This resets the graph to an empty state, useful at the start of
+        a new learning cycle to prevent gap accumulation across cycles.
+        """
+        with self.lock:
+            self.storage.clear()
+            self.cache.invalidate_all()
+            logger.debug("Cleared dependency graph")
 
     def _get_node_id(self, node) -> str:
         """Get stable, immutable node ID from node object or ID string"""
