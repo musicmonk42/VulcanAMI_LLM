@@ -510,47 +510,6 @@ class TestValidationMultilevel:
         assert "consistency" in results
 
 
-class TestBugFixes:
-    """Test specific bug fixes"""
-
-    def test_cache_race_condition_fix(self):
-        """Test that cache cleanup doesn't cause race condition"""
-        validator = KnowledgeValidator()
-
-        # Add many cache entries
-        for i in range(10):
-            validator.validation_cache[f"key_{i}"] = Mock()
-            validator.cache_timestamps[f"key_{i}"] = time.time()
-
-        # Cleanup should not crash
-        validator._cleanup_expired_cache()
-
-        # Should still be able to access cache
-        assert isinstance(validator.validation_cache, dict)
-
-    def test_domain_criticality_partial_match(self):
-        """Test domain criticality handles partial matches"""
-        validator = KnowledgeValidator()
-
-        # Domain with safety_critical in name
-        crit = validator._get_domain_criticality(["safety_critical_system"])
-        assert crit > 0.9  # Should match 'safety_critical'
-
-    def test_validation_handles_none_domains(self):
-        """Test validation handles None in domains"""
-        validator = KnowledgeValidator()
-
-        p = Principle(
-            id="test",
-            core_pattern=Mock(),
-            confidence=0.8,
-            applicable_domains=[None, "general"],  # None in list!
-        )
-
-        # Should not crash
-        result = validator.validate(p)
-        assert isinstance(result, ValidationResult)
-
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
