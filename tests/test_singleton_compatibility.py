@@ -115,10 +115,10 @@ class TestGetSingletonBasicFunctionality:
         
         # Act & Assert
         for name in registered_names:
-            # Should not raise ValueError
+            # Should not raise ValueError - if it does, test will fail
+            # CODE REVIEW FIX: Removed tautology, now just verifying call succeeds
             result = get_singleton(name)
-            # Result may be None if dependencies missing, but call should succeed
-            assert result is None or result is not None  # Either state is valid
+            # Success is defined as: no ValueError raised (result can be None or instance)
 
 
 class TestGetSingletonErrorHandling:
@@ -176,8 +176,9 @@ class TestGetSingletonErrorHandling:
         # Act
         result = get_singleton("world_model")
         
-        # Assert - either value is acceptable
-        assert result is None or result is not None
+        # Assert - CODE REVIEW FIX: Removed tautology
+        # Success is defined as: no exception raised (result can be None or instance)
+        # The function call itself is the test - if it doesn't raise, test passes
 
 
 class TestGetSingletonDeprecationWarning:

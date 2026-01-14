@@ -1288,6 +1288,33 @@ def set_llm_client(client: Any) -> None:
 # LEGACY COMPATIBILITY FUNCTION
 # ============================================
 
+# Module-level constant registry for efficient singleton dispatch
+# CODE REVIEW FIX: Moved from function body to module level to avoid recreating
+# the dictionary on every call, improving performance and memory efficiency
+_SINGLETON_REGISTRY: dict[str, Callable[[], Optional[Any]]] = {
+    "world_model": get_world_model,
+    "curiosity_engine": get_curiosity_engine,
+    "unified_runtime": get_unified_runtime,
+    "self_improvement_drive": get_self_improvement_drive,
+    "ai_runtime": get_ai_runtime,
+    "multimodal_engine": get_multimodal_engine,
+    "hierarchical_memory": get_hierarchical_memory,
+    "unified_learning_system": get_unified_learning_system,
+    "tool_selector": get_tool_selector,
+    "reasoning_integration": get_reasoning_integration,
+    "portfolio_executor": get_portfolio_executor,
+    "bayesian_prior": get_bayesian_prior,
+    "warm_pool": get_warm_pool,
+    "cost_model": get_cost_model,
+    "semantic_matcher": get_semantic_matcher,
+    "problem_decomposer": get_problem_decomposer,
+    "semantic_bridge": get_semantic_bridge,
+    "unified_reasoner": get_unified_reasoner,
+    "math_verification_engine": get_math_verification_engine,
+    "llm_client": get_llm_client,
+}
+
+
 def get_singleton(name: str) -> Optional[Any]:
     """
     Get a singleton instance by name (legacy compatibility function).
@@ -1341,6 +1368,11 @@ def get_singleton(name: str) -> Optional[Any]:
         This function emits a deprecation warning to help track usage during
         refactoring. The warning is logged at DEBUG level to avoid cluttering
         production logs while still being visible during development.
+        
+        CODE REVIEW NOTE: While the return type is Optional[Any], this is
+        intentional for backward compatibility. Legacy code expects a flexible
+        return type. New code should use the typed getter functions directly
+        (e.g., get_world_model()) for full type safety benefits.
     """
     # Emit deprecation warning for tracking during refactor
     logger.debug(
@@ -1348,41 +1380,16 @@ def get_singleton(name: str) -> Optional[Any]:
         f"Consider using get_{name}() directly for better type safety and performance."
     )
     
-    # String-to-function dispatch mapping
-    # This provides O(1) lookup and is more maintainable than if/elif chains
-    singleton_registry = {
-        "world_model": get_world_model,
-        "curiosity_engine": get_curiosity_engine,
-        "unified_runtime": get_unified_runtime,
-        "self_improvement_drive": get_self_improvement_drive,
-        "ai_runtime": get_ai_runtime,
-        "multimodal_engine": get_multimodal_engine,
-        "hierarchical_memory": get_hierarchical_memory,
-        "unified_learning_system": get_unified_learning_system,
-        "tool_selector": get_tool_selector,
-        "reasoning_integration": get_reasoning_integration,
-        "portfolio_executor": get_portfolio_executor,
-        "bayesian_prior": get_bayesian_prior,
-        "warm_pool": get_warm_pool,
-        "cost_model": get_cost_model,
-        "semantic_matcher": get_semantic_matcher,
-        "problem_decomposer": get_problem_decomposer,
-        "semantic_bridge": get_semantic_bridge,
-        "unified_reasoner": get_unified_reasoner,
-        "math_verification_engine": get_math_verification_engine,
-        "llm_client": get_llm_client,
-    }
-    
-    # Validate singleton name
-    if name not in singleton_registry:
-        available_names = ", ".join(sorted(singleton_registry.keys()))
+    # Validate singleton name using module-level registry
+    if name not in _SINGLETON_REGISTRY:
+        available_names = ", ".join(sorted(_SINGLETON_REGISTRY.keys()))
         raise ValueError(
             f"No singleton registered for '{name}'. "
             f"Available singletons: {available_names}"
         )
     
     # Retrieve and call the appropriate getter function
-    getter_function = singleton_registry[name]
+    getter_function = _SINGLETON_REGISTRY[name]
     try:
         instance = getter_function()
         if instance is None:
