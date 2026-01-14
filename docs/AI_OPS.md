@@ -1,7 +1,7 @@
 # Graphix & VULCAN-AI: AI-Native Operations Guide
 
-**Version:** 2.2.0  
-**Last Updated:** December 23, 2024  
+**Version:** 2.2.0 
+**Last Updated:** December 23, 2024 
 **Authors:** Core Engineering Collective (musicmonk42, contributors)
 
 > See also: [OPERATIONS.md](OPERATIONS.md) for comprehensive operations guide
@@ -110,11 +110,11 @@ uvicorn src.graphix_arena:app --reload
 
 ## 7. Governance / Evolution Flow
 
-1. Proposal submission (`ProposalNode` or API)  
-2. Validator pipeline (structure → ontology → semantics → security → alignment → safety)  
-3. Consensus threshold check (trust-weighted)  
-4. Apply & hash chain update  
-5. Post-run observation & pattern mining  
+1. Proposal submission (`ProposalNode` or API) 
+2. Validator pipeline (structure → ontology → semantics → security → alignment → safety) 
+3. Consensus threshold check (trust-weighted) 
+4. Apply & hash chain update 
+5. Post-run observation & pattern mining 
 6. Autonomous optimizer may propose refinement if fitness < threshold
 
 Ensure all proposals log fingerprint + risk vector; assert uniqueness inside replay window (configurable TTL).
@@ -160,9 +160,9 @@ Recovery: restore DB snapshot → re-verify audit hashes → replay last applied
 
 ## 11. Security Hygiene
 
-- Never commit real API keys.  
-- Use mock placeholders for demos.  
-- Prevent unreviewed ontology or grammar edits by gating branch protections.  
+- Never commit real API keys. 
+- Use mock placeholders for demos. 
+- Prevent unreviewed ontology or grammar edits by gating branch protections. 
 - Audit chain mismatch → immediate containment.
 
 ---

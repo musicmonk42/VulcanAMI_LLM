@@ -1,6 +1,6 @@
 # ⚠️ DEPRECATED
 
-**This document has been consolidated.**  
+**This document has been consolidated.** 
 **Archived:** December 23, 2024
 
 ## Migration Path
@@ -11,7 +11,7 @@ For SERVICE_OVERVIEW.md content → See [COMPLETE_SERVICE_CATALOG.md](../../COMP
 
 # Service Overview and Architecture
 
-**Last Updated:** December 15, 2024  
+**Last Updated:** December 15, 2024 
 **Platform Version:** v2.1.0
 
 This document provides a high-level overview of all services in the VulcanAMI LLM platform, organized by functional area.
@@ -36,21 +36,21 @@ This document provides a high-level overview of all services in the VulcanAMI LL
 - **Purpose:** Main Flask application providing Registry API
 - **Functions:** JWT authentication, agent onboarding, proposal submission, audit logs
 - **Key Endpoints:**
-  - `/registry/bootstrap` - Initialize first admin
-  - `/auth/login` - JWT authentication
-  - `/registry/onboard` - Register agents
-  - `/ir/propose` - Submit graph proposals
-  - `/audit/logs` - Query audit trail
-  - `/health`, `/metrics` - Health and monitoring
+ - `/registry/bootstrap` - Initialize first admin
+ - `/auth/login` - JWT authentication
+ - `/registry/onboard` - Register agents
+ - `/ir/propose` - Submit graph proposals
+ - `/audit/logs` - Query audit trail
+ - `/health`, `/metrics` - Health and monitoring
 
 ### 2. **graphix_arena.py** - Arena API Service (FastAPI)
 - **Purpose:** High-performance graph execution API
 - **Functions:** Graph execution, status tracking, cancellation, metrics
 - **Key Endpoints:**
-  - `/execute/graph` - Execute validated graphs
-  - `/execution/{id}/status` - Check execution status
-  - `/execution/{id}/cancel` - Cancel execution
-  - `/health`, `/ready`, `/metrics` - Health and monitoring
+ - `/execute/graph` - Execute validated graphs
+ - `/execution/{id}/status` - Check execution status
+ - `/execution/{id}/cancel` - Cancel execution
+ - `/health`, `/ready`, `/metrics` - Health and monitoring
 
 ### 3. **api_server.py** - Unified API Gateway
 - **Functions:** 87 functions, 15 classes
@@ -69,7 +69,7 @@ This document provides a high-level overview of all services in the VulcanAMI LL
 
 ---
 
-## VULCAN-AGI Core (src/vulcan/) ⭐
+## VULCAN-AMI Core (src/vulcan/) ⭐
 
 **The crown jewel of the platform - 285,000+ LOC of cognitive architecture**
 
@@ -84,58 +84,58 @@ This document provides a high-level overview of all services in the VulcanAMI LL
 #### 1. **World Model** (src/vulcan/world_model/)
 - **Purpose:** Causal reasoning and state prediction
 - **Key Components:**
-  - `world_model_core.py` - Main orchestrator (EXAMINE→SELECT→APPLY→REMEMBER)
-  - `causal_graph.py` - Causal DAG for intervention planning
-  - `prediction_engine.py` - Temporal forecasting
-  - `intervention_manager.py` - Safe action execution
-  - `confidence_calibrator.py` - Uncertainty quantification
-  - `dynamics_model.py` - State transition modeling
-  - `invariant_detector.py` - Cross-domain knowledge transfer
+ - `world_model_core.py` - Main orchestrator (EXAMINE→SELECT→APPLY→REMEMBER)
+ - `causal_graph.py` - Causal DAG for intervention planning
+ - `prediction_engine.py` - Temporal forecasting
+ - `intervention_manager.py` - Safe action execution
+ - `confidence_calibrator.py` - Uncertainty quantification
+ - `dynamics_model.py` - State transition modeling
+ - `invariant_detector.py` - Cross-domain knowledge transfer
 
 #### 2. **Meta-Reasoning** (src/vulcan/world_model/meta_reasoning/)
 - **Purpose:** Self-awareness and self-improvement
 - **Key Components:**
-  - `motivational_introspection.py` - Goal awareness
-  - `self_improvement_drive.py` - Autonomous enhancement
-  - `preference_learner.py` - RLHF integration
-  - `internal_critic.py` - Self-evaluation
-  - `ethical_boundary_monitor.py` - Ethics enforcement
-  - `csiu_enforcement.py` - CSIU framework (Curiosity, Safety, Impact, Uncertainty)
+ - `motivational_introspection.py` - Goal awareness
+ - `self_improvement_drive.py` - Autonomous enhancement
+ - `preference_learner.py` - RLHF integration
+ - `internal_critic.py` - Self-evaluation
+ - `ethical_boundary_monitor.py` - Ethics enforcement
+ - `csiu_enforcement.py` - CSIU framework (Curiosity, Safety, Impact, Uncertainty)
 
 #### 3. **Reasoning Systems** (src/vulcan/reasoning/)
 - **Purpose:** Multi-modal reasoning capabilities
 - **Key Components:**
-  - `symbolic.py` - Logic and formal verification
-  - `causal.py` - Causal inference (69,502 LOC)
-  - `analogical.py` - Transfer learning (90,428 LOC)
-  - `multimodal.py` - Cross-modal inference (107,700 LOC)
-  - `probabilistic.py` - Bayesian inference (61,099 LOC)
-  - `contextual_bandits.py` - Exploration-exploitation (54,127 LOC)
-  - `unified.py` - Reasoning orchestration (119,871 LOC)
+ - `symbolic.py` - Logic and formal verification
+ - `causal.py` - Causal inference (69,502 LOC)
+ - `analogical.py` - Transfer learning (90,428 LOC)
+ - `multimodal.py` - Cross-modal inference (107,700 LOC)
+ - `probabilistic.py` - Bayesian inference (61,099 LOC)
+ - `contextual_bandits.py` - Exploration-exploitation (54,127 LOC)
+ - `unified.py` - Reasoning orchestration (119,871 LOC)
 
 #### 4. **Memory Systems** (src/vulcan/memory/)
 - **Purpose:** Hierarchical memory architecture
 - **Key Components:**
-  - `hierarchical.py` - Multi-level storage
-  - `specialized.py` - Domain-specific memory (97,779 LOC)
-  - `distributed.py` - Sharding and replication (42,622 LOC)
-  - `consolidation.py` - Knowledge integration (47,694 LOC)
-  - `retrieval.py` - Associative recall (48,274 LOC)
+ - `hierarchical.py` - Multi-level storage
+ - `specialized.py` - Domain-specific memory (97,779 LOC)
+ - `distributed.py` - Sharding and replication (42,622 LOC)
+ - `consolidation.py` - Knowledge integration (47,694 LOC)
+ - `retrieval.py` - Associative recall (48,274 LOC)
 
 #### 5. **Planning Engine** (src/vulcan/planning/)
 - **Purpose:** Strategic planning and goal decomposition
 - **Key Components:**
-  - `planning.py` - Task decomposition
-  - `main.py` - Orchestration logic
-  - `processing.py` - Data processing pipelines
+ - `planning.py` - Task decomposition
+ - `main.py` - Orchestration logic
+ - `processing.py` - Data processing pipelines
 
 #### 6. **Safety Systems** (src/vulcan/safety/)
 - **Purpose:** Safety validation and constraint enforcement
 - **Key Components:**
-  - Safety validators
-  - Adversarial testing
-  - Formal verification interfaces
-  - Ethical boundary monitoring
+ - Safety validators
+ - Adversarial testing
+ - Formal verification interfaces
+ - Ethical boundary monitoring
 
 ---
 
@@ -472,9 +472,9 @@ This document provides a high-level overview of all services in the VulcanAMI LL
 ### 2. **Stress Tests** (stress_tests/)
 - **Purpose:** Load and stress testing
 - **Components:**
-  - `load_test.py` - Load testing (31 functions, 10 classes)
-  - Scalability validation
-  - Resource limit testing
+ - `load_test.py` - Load testing (31 functions, 10 classes)
+ - Scalability validation
+ - Resource limit testing
 
 ### 3. **Validation**
 - `run_validation_test.py` - System validation (23 functions)
@@ -558,23 +558,23 @@ This document provides a high-level overview of all services in the VulcanAMI LL
 ### Request Flow
 ```
 User → API Gateway → Authentication → Service Router → Core Service
-                                                      ↓
-                                         VULCAN-AGI (reasoning)
-                                                      ↓
-                                         Graph Compiler (optimization)
-                                                      ↓
-                                         Unified Runtime (execution)
-                                                      ↓
-                                         Persistent Memory (storage)
-                                                      ↓
-                                         Response → User
+ ↓
+ VULCAN-AMI (reasoning)
+ ↓
+ Graph Compiler (optimization)
+ ↓
+ Unified Runtime (execution)
+ ↓
+ Persistent Memory (storage)
+ ↓
+ Response → User
 ```
 
 ### Cognitive Cycle (VULCAN Integration)
 ```
 EXAMINE → SELECT → APPLY → REMEMBER
-   ↓         ↓       ↓         ↓
-  Memory  Reasoning Execution Storage
+ ↓ ↓ ↓ ↓
+ Memory Reasoning Execution Storage
 ```
 
 ---
@@ -603,30 +603,30 @@ EXAMINE → SELECT → APPLY → REMEMBER
 ## Service Startup Order
 
 1. **Infrastructure Services**
-   - Redis
-   - Database (SQLite/PostgreSQL)
-   - MinIO (if using S3 storage)
+ - Redis
+ - Database (SQLite/PostgreSQL)
+ - MinIO (if using S3 storage)
 
 2. **Core Services**
-   - Audit Log Service
-   - Agent Registry
-   - Observability Manager
+ - Audit Log Service
+ - Agent Registry
+ - Observability Manager
 
 3. **API Services**
-   - Registry API (Flask) - Port 5000
-   - Arena API (FastAPI) - Port 8000
-   - API Gateway (if used)
+ - Registry API (Flask) - Port 5000
+ - Arena API (FastAPI) - Port 8000
+ - API Gateway (if used)
 
 4. **Execution Services**
-   - VULCAN-AGI Core
-   - Graph Compiler
-   - Unified Runtime
-   - LLM Core
+ - VULCAN-AMI Core
+ - Graph Compiler
+ - Unified Runtime
+ - LLM Core
 
 5. **Supporting Services**
-   - Governance Loop
-   - Security Audit Engine
-   - Hardware Dispatcher
+ - Governance Loop
+ - Security Audit Engine
+ - Hardware Dispatcher
 
 ---
 
@@ -656,7 +656,7 @@ All services expose health check endpoints:
 - `arena_execution_duration_seconds` - Execution duration
 - `arena_active_executions` - Active executions
 
-**VULCAN-AGI:**
+**VULCAN-AMI:**
 - `vulcan_reasoning_cycles` - Reasoning cycles
 - `vulcan_world_model_updates` - State updates
 - `vulcan_confidence_scores` - Confidence distribution
@@ -760,11 +760,11 @@ These components are initialized during platform startup in `src/full_platform.p
 - **Status:** ✅ Verified at startup
 - **Initialization:** Imports and verifies all subsystems
 - **Subsystems:**
-  - LSM tree with Merkle DAG
-  - Graph RAG with hybrid retrieval
-  - Unlearning module (gradient surgery, SISA, influence)
-  - ZK proofs (Groth16, PLONK)
-  - S3/CloudFront storage backend
+ - LSM tree with Merkle DAG
+ - Graph RAG with hybrid retrieval
+ - Unlearning module (gradient surgery, SISA, influence)
+ - ZK proofs (Groth16, PLONK)
+ - S3/CloudFront storage backend
 - **Log Message:** `✓ Persistent Memory v46.0.0 initialized`
 - **Purpose:** Advanced persistent storage with privacy-preserving unlearning
 
@@ -824,30 +824,30 @@ These components are verified for availability but not initialized until first u
 
 When running as mounted sub-apps in `full_platform.py`, the following apps have their own initialization:
 
-#### 1. **VULCAN-AGI** (`src/vulcan/main.py`)
+#### 1. **VULCAN-AMI** (`src/vulcan/main.py`)
 - **Lifespan:** Yes (FastAPI lifespan)
 - **Components Initialized:**
-  - World Model (causal reasoning, prediction)
-  - Reasoning Systems (symbolic, probabilistic, causal, analogical)
-  - Memory Systems (LTM, associative memory)
-  - Learning Systems (continual, meta-learning)
-  - Safety Validator
-  - Curiosity Engine
-  - Knowledge Crystallizer
-  - Problem Decomposer
-  - Semantic Bridge
+ - World Model (causal reasoning, prediction)
+ - Reasoning Systems (symbolic, probabilistic, causal, analogical)
+ - Memory Systems (LTM, associative memory)
+ - Learning Systems (continual, meta-learning)
+ - Safety Validator
+ - Curiosity Engine
+ - Knowledge Crystallizer
+ - Problem Decomposer
+ - Semantic Bridge
 - **Self-Improvement:** Optional, enabled via config
 - **Log Messages:** `✓ [Component] activated` for each subsystem
 
 #### 2. **Arena** (`src/graphix_arena.py`)
 - **Lifespan:** No (standalone FastAPI app)
 - **Components Initialized:**
-  - DriftDetector
-  - TournamentManager
-  - InterpretabilityEngine (lazy)
-  - DataAugmentor
-  - NSOAligner
-  - ObservabilityManager
+ - DriftDetector
+ - TournamentManager
+ - InterpretabilityEngine (lazy)
+ - DataAugmentor
+ - NSOAligner
+ - ObservabilityManager
 - **Log Messages:** `✓ [Component] initialized in Arena`
 
 #### 3. **Registry** (`app.py`)
@@ -885,32 +885,32 @@ During startup, the platform logs a comprehensive summary:
 PLATFORM STARTUP SUMMARY
 ======================================================================
 Services:
-  ✅ vulcan: MOUNTED (path /vulcan)
-  ✅ arena: MOUNTED (path /arena)
-  ✅ registry: MOUNTED (path /registry)
-  ✅ api_server: RUNNING (PID: 12345)
-  ✅ registry_grpc: RUNNING (PID: 12346)
-  ✅ listener: RUNNING (PID: 12347)
+ ✅ vulcan: MOUNTED (path /vulcan)
+ ✅ arena: MOUNTED (path /arena)
+ ✅ registry: MOUNTED (path /registry)
+ ✅ api_server: RUNNING (PID: 12345)
+ ✅ registry_grpc: RUNNING (PID: 12346)
+ ✅ listener: RUNNING (PID: 12347)
 
 Core Components:
-  ✅ VULCAN World Model
-  ✅ Reasoning (5/5)
-  ✅ Semantic Bridge
-  ✅ Agent Pool
-  ✅ Unified Runtime
-  ✅ Hardware Dispatcher
-  ✅ Governance Loop
-  ✅ Consensus Engine
-  ✅ Security Audit Engine
-  ✅ Graph Compiler
-  ✅ Persistent Memory v46
-  ✅ Conformal Prediction
-  ✅ Drift Detector
-  ✅ Pattern Matcher
-  ✅ Superoptimizer
-  ✅ Interpretability Engine
-  ✅ Tournament Manager
-  ✅ Evolution Engine
+ ✅ VULCAN World Model
+ ✅ Reasoning (5/5)
+ ✅ Semantic Bridge
+ ✅ Agent Pool
+ ✅ Unified Runtime
+ ✅ Hardware Dispatcher
+ ✅ Governance Loop
+ ✅ Consensus Engine
+ ✅ Security Audit Engine
+ ✅ Graph Compiler
+ ✅ Persistent Memory v46
+ ✅ Conformal Prediction
+ ✅ Drift Detector
+ ✅ Pattern Matcher
+ ✅ Superoptimizer
+ ✅ Interpretability Engine
+ ✅ Tournament Manager
+ ✅ Evolution Engine
 
 ======================================================================
 Services: 9/9 running
@@ -930,6 +930,6 @@ Components: 18/18 initialized
 
 ---
 
-**Document Version:** 1.0  
-**Last Updated:** December 2024  
+**Document Version:** 1.0 
+**Last Updated:** December 2024 
 **Platform Version:** v1.0

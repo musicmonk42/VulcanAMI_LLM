@@ -1,7 +1,7 @@
-VULCAN-AGI Learning Module
+VULCAN-AMI Learning Module
 Overview
-The Learning Module in VULCAN-AGI provides a unified framework for advanced learning paradigms, integrating continual learning, curriculum progression, meta-learning, reinforcement learning from human feedback (RLHF), world modeling, metacognition, and parameter auditing. It enables AI systems to learn continuously from experiences, adapt to new tasks, self-improve through reflection, plan actions via predictive models, and incorporate human preferences—all while maintaining audit trails for transparency and safety.
-The core orchestrator, UnifiedLearningSystem, coordinates these components for production-ready, scalable learning. It supports modes like supervised, reinforcement, and online learning, with features for task detection, adaptive pacing, and hierarchical memory.
+The Learning Module in VULCAN-AMI provides a unified framework for advanced learning paradigms, integrating continual learning, curriculum progression, meta-learning, reinforcement learning from human feedback (RLHF), world modeling, metacognition, and parameter auditing. It enables AI systems to learn continuously from experiences, adapt to new tasks, self-improve through reflection, plan actions via predictive models, and incorporate human preferences—all while maintaining audit trails for transparency and safety.
+The core orchestrator, UnifiedLearningSystem, coordinates these components for , scalable learning. It supports modes like supervised, reinforcement, and online learning, with features for task detection, adaptive pacing, and hierarchical memory.
 Key Features
 
 Continual Learning: Handles catastrophic forgetting via Elastic Weight Consolidation (EWC), experience replay, progressive networks, and hierarchical memory.
@@ -30,19 +30,19 @@ mathematical_accuracy_integration.py: Connects mathematical verification with le
 
 The system uses locks for thread safety, deques for efficient buffering, and optional libraries for advanced features (with fallbacks).
 Installation and Dependencies
-This module is part of the VULCAN-AGI project. To use it:
+This module is part of the VULCAN-AMI project. To use it:
 
 Clone the repository (or integrate into your project).
 Install required dependencies:
 
-bash   pip install torch numpy scipy scikit-learn networkx aiohttp psutil
+bash pip install torch numpy scipy scikit-learn networkx aiohttp psutil
 Core: torch, numpy, logging, typing, dataclasses, collections, time, pathlib, enum, threading, asyncio, aiohttp, json, pickle, queue.
 Optional: scipy (stats), sklearn (clustering), networkx (graphs), psutil (monitoring).
 Fallbacks for missing optionals.
 
 Import the module:
 
-python   from vulcan.learning import UnifiedLearningSystem
+python from vulcan.learning import UnifiedLearningSystem
 Usage Example
 Basic Setup
 pythonimport logging
@@ -54,44 +54,44 @@ logging.basicConfig(level=logging.INFO)
 
 # Custom config (optional)
 config = LearningConfig(
-    learning_rate=0.0005, 
-    replay_buffer_size=5000,
-    rlhf_enabled=True
+ learning_rate=0.0005, 
+ replay_buffer_size=5000,
+ rlhf_enabled=True
 )
 
 # Initialize the system (use context manager for proper cleanup)
 with UnifiedLearningSystem(config=config, embedding_dim=512) as system:
-    # Process an experience (e.g., in reinforcement mode)
-    experience = {
-        'embedding': torch.randn(512),
-        'action': torch.tensor([1]),
-        'reward': 1.0,
-        'next_embedding': torch.randn(512),
-        'modality': 'TEXT',
-        'metadata': {'task_id': 'navigation'}
-    }
-    result = system.process_experience(experience)
-    print("Learning Result:", result)
-    
-    # System will shutdown automatically when context exits
+ # Process an experience (e.g., in reinforcement mode)
+ experience = {
+ 'embedding': torch.randn(512),
+ 'action': torch.tensor([1]),
+ 'reward': 1.0,
+ 'next_embedding': torch.randn(512),
+ 'modality': 'TEXT',
+ 'metadata': {'task_id': 'navigation'}
+ }
+ result = system.process_experience(experience)
+ print("Learning Result:", result)
+ 
+ # System will shutdown automatically when context exits
 Processing Query Outcomes
 pythonimport asyncio
 import time
 
 async def process_learning():
-    # Learning from query outcomes (typical usage in VULCAN)
-    outcome = {
-        'query_id': 'q123',
-        'status': 'success',
-        'routing_ms': 45,
-        'total_ms': 150,
-        'tools': ['probabilistic', 'mathematical'],
-        'query_type': 'bayesian_inference',
-        'confidence': 0.95,
-        'timestamp': time.time()
-    }
-    
-    await system.process_outcome(outcome)
+ # Learning from query outcomes (typical usage in VULCAN)
+ outcome = {
+ 'query_id': 'q123',
+ 'status': 'success',
+ 'routing_ms': 45,
+ 'total_ms': 150,
+ 'tools': ['probabilistic', 'mathematical'],
+ 'query_type': 'bayesian_inference',
+ 'confidence': 0.95,
+ 'timestamp': time.time()
+ }
+ 
+ await system.process_outcome(outcome)
 
 # Run async processing
 asyncio.run(process_learning())
@@ -103,10 +103,10 @@ initial_state = torch.randn(512)
 candidate_actions = [torch.randn(512) for _ in range(5)]
 
 best_action, plan_info = system.plan_with_world_model(
-    initial_state, 
-    candidate_actions,
-    algorithm=PlanningAlgorithm.MCTS,
-    horizon=5
+ initial_state, 
+ candidate_actions,
+ algorithm=PlanningAlgorithm.MCTS,
+ horizon=5
 )
 print("Best Action:", best_action)
 print("Plan Info:", plan_info)
@@ -116,25 +116,25 @@ import time
 
 # Submit feedback
 feedback = FeedbackData(
-    feedback_id="fb_001",
-    timestamp=time.time(),
-    feedback_type="thumbs_up",
-    content="Great response!",
-    context={'query_id': 'q123'},
-    agent_response="Generated text",
-    human_preference=None,
-    reward_signal=1.0,
-    metadata={'source': 'web_ui'}
+ feedback_id="fb_001",
+ timestamp=time.time(),
+ feedback_type="thumbs_up",
+ content="Great response!",
+ context={'query_id': 'q123'},
+ agent_response="Generated text",
+ human_preference=None,
+ reward_signal=1.0,
+ metadata={'source': 'web_ui'}
 )
 
 system.continual_learner.receive_feedback(feedback)
 Mathematical Accuracy Integration
 pythonfrom vulcan.learning.mathematical_accuracy_integration import (
-    MathematicalAccuracyIntegration
+ MathematicalAccuracyIntegration
 )
 from vulcan.reasoning.mathematical_verification import (
-    BayesianProblem,
-    MathematicalVerificationEngine
+ BayesianProblem,
+ MathematicalVerificationEngine
 )
 
 # Initialize math verification
@@ -143,10 +143,10 @@ math_integration = MathematicalAccuracyIntegration(math_engine)
 
 # Verify and learn from mathematical calculation
 problem = BayesianProblem(
-    prior=0.01,
-    sensitivity=0.95,
-    specificity=0.90,
-    description="Medical test accuracy"
+ prior=0.01,
+ sensitivity=0.95,
+ specificity=0.90,
+ description="Medical test accuracy"
 )
 
 # Tool produced this answer
@@ -154,10 +154,10 @@ claimed_answer = 0.087
 
 # Verify and apply learning feedback
 verification, feedback = await math_integration.verify_and_learn(
-    problem=problem,
-    claimed_answer=claimed_answer,
-    tool_name="probabilistic",
-    learning_system=system
+ problem=problem,
+ claimed_answer=claimed_answer,
+ tool_name="probabilistic",
+ learning_system=system
 )
 
 print(f"Verified: {verification.is_valid()}")
@@ -222,43 +222,43 @@ Recommended Usage Patterns
 
 Always Use Context Manager
 
-python   with UnifiedLearningSystem(config) as system:
-       # Your code here
-       pass
-   # Automatic cleanup on exit
+python with UnifiedLearningSystem(config) as system:
+ # Your code here
+ pass
+ # Automatic cleanup on exit
 
 Monitor Statistics Regularly
 
-python   stats = system.get_unified_stats()
-   print(f"Total samples: {stats['continual']['total_experiences']}")
-   print(f"Tool weights: {system.tool_weight_adjustments}")
-   
-   # Check for weight corruption
-   persistence_stats = system.get_persistence_stats()
-   print(f"Persistence status: {persistence_stats}")
+python stats = system.get_unified_stats()
+ print(f"Total samples: {stats['continual']['total_experiences']}")
+ print(f"Tool weights: {system.tool_weight_adjustments}")
+ 
+ # Check for weight corruption
+ persistence_stats = system.get_persistence_stats()
+ print(f"Persistence status: {persistence_stats}")
 
 Handle Async Properly
 
-python   # Process outcomes asynchronously
-   async def learn():
-       await system.process_outcome(outcome)
-   
-   # Don't block the main thread
-   asyncio.create_task(learn())
+python # Process outcomes asynchronously
+ async def learn():
+ await system.process_outcome(outcome)
+ 
+ # Don't block the main thread
+ asyncio.create_task(learn())
 
 Checkpoint Regularly
 
-python   # Save state every N steps
-   if step % 1000 == 0:
-       system.save_complete_state(f"checkpoint_{step}")
+python # Save state every N steps
+ if step % 1000 == 0:
+ system.save_complete_state(f"checkpoint_{step}")
 
 Clean Shutdown
 
-python   try:
-       # Your learning loop
-       pass
-   finally:
-       system.shutdown(timeout=30.0)  # Graceful shutdown with timeout
+python try:
+ # Your learning loop
+ pass
+ finally:
+ system.shutdown(timeout=30.0) # Graceful shutdown with timeout
 What to Avoid
 ❌ Don't create multiple UnifiedLearningSystem instances simultaneously
 ❌ Don't load untrusted checkpoint files without validation
@@ -288,16 +288,16 @@ Total: ~6 daemon threads (cleaned up on shutdown)
 Performance Tuning
 python# For low-latency applications
 config = LearningConfig(
-    replay_buffer_size=1000,
-    consolidation_threshold=50,  # Consolidate more frequently
-    checkpoint_frequency=0  # Disable auto-checkpointing
+ replay_buffer_size=1000,
+ consolidation_threshold=50, # Consolidate more frequently
+ checkpoint_frequency=0 # Disable auto-checkpointing
 )
 
 # For memory-constrained environments
 system = UnifiedLearningSystem(
-    config=config,
-    enable_world_model=False,  # Save ~1 GB
-    enable_metacognition=False  # Reduce complexity
+ config=config,
+ enable_world_model=False, # Save ~1 GB
+ enable_metacognition=False # Reduce complexity
 )
 Advanced Features
 Curriculum Learning
@@ -312,44 +312,44 @@ print(f"Stage performance: {curriculum_stats['avg_stage_performance']}")
 Meta-Learning
 python# Fast adaptation to new task
 support_set = {
-    'x': torch.randn(32, 512),  # 32 examples
-    'y': torch.randint(0, 10, (32,))  # Labels
+ 'x': torch.randn(32, 512), # 32 examples
+ 'y': torch.randint(0, 10, (32,)) # Labels
 }
 
 adapted_model, adaptation_stats = system.meta_learner.adapt(
-    support_set,
-    num_steps=5,
-    task_id='new_task_123'
+ support_set,
+ num_steps=5,
+ task_id='new_task_123'
 )
 
 print(f"Adaptation loss: {adaptation_stats['final_loss']}")
 Metacognitive Monitoring
 python# Analyze reasoning quality
 reasoning_trace = [
-    {'phase': 'perception', 'confidence': 0.8, 'content': '...', 'timestamp': time.time()},
-    {'phase': 'planning', 'confidence': 0.9, 'content': '...', 'timestamp': time.time()},
-    {'phase': 'execution', 'confidence': 0.85, 'content': '...', 'timestamp': time.time()}
+ {'phase': 'perception', 'confidence': 0.8, 'content': '...', 'timestamp': time.time()},
+ {'phase': 'planning', 'confidence': 0.9, 'content': '...', 'timestamp': time.time()},
+ {'phase': 'execution', 'confidence': 0.85, 'content': '...', 'timestamp': time.time()}
 ]
 
 if system.continual_learner and hasattr(system.continual_learner, 'meta_cognitive'):
-    analysis = system.continual_learner.meta_cognitive.introspect_reasoning(reasoning_trace)
-    print(f"Reasoning quality: {analysis['quality_score']}")
-    print(f"Issues: {analysis['issues']}")
-    print(f"Suggestions: {analysis['suggestions']}")
+ analysis = system.continual_learner.meta_cognitive.introspect_reasoning(reasoning_trace)
+ print(f"Reasoning quality: {analysis['quality_score']}")
+ print(f"Issues: {analysis['issues']}")
+ print(f"Suggestions: {analysis['suggestions']}")
 Knowledge Crystallization
 python# Crystallize knowledge from successful execution
 if system.continual_learner:
-    crystallization_result = system.continual_learner.crystallize_from_execution(
-        query="How to solve X?",
-        response="Solution involves Y and Z",
-        success=True,
-        tools_used=['mathematical', 'symbolic'],
-        strategy='multi_step_reasoning',
-        metadata={'complexity': 0.8}
-    )
-    
-    if crystallization_result:
-        print(f"Crystallized {crystallization_result['principles']} principles")
+ crystallization_result = system.continual_learner.crystallize_from_execution(
+ query="How to solve X?",
+ response="Solution involves Y and Z",
+ success=True,
+ tools_used=['mathematical', 'symbolic'],
+ strategy='multi_step_reasoning',
+ metadata={'complexity': 0.8}
+ )
+ 
+ if crystallization_result:
+ print(f"Crystallized {crystallization_result['principles']} principles")
 Monitoring and Diagnostics
 System Statistics
 python# Get comprehensive statistics
@@ -361,18 +361,18 @@ print(f"Total experiences: {unified_stats['continual']['total_experiences']}")
 
 print("\n=== Curriculum ===")
 if 'curriculum' in unified_stats:
-    print(f"Current stage: {unified_stats['curriculum']['current_stage']}")
-    print(f"Stages completed: {unified_stats['curriculum']['stages_completed']}")
+ print(f"Current stage: {unified_stats['curriculum']['current_stage']}")
+ print(f"Stages completed: {unified_stats['curriculum']['stages_completed']}")
 
 print("\n=== Meta-Learning ===")
 if 'meta_learning' in unified_stats:
-    print(f"Adaptations: {unified_stats['meta_learning']['num_adaptations']}")
-    print(f"Avg task loss: {unified_stats['meta_learning']['avg_task_loss']}")
+ print(f"Adaptations: {unified_stats['meta_learning']['num_adaptations']}")
+ print(f"Avg task loss: {unified_stats['meta_learning']['avg_task_loss']}")
 
 print("\n=== RLHF ===")
 if 'rlhf' in unified_stats:
-    print(f"Total feedback: {unified_stats['rlhf']['total_feedback']}")
-    print(f"Positive/Negative: {unified_stats['rlhf']['positive_feedback']}/{unified_stats['rlhf']['negative_feedback']}")
+ print(f"Total feedback: {unified_stats['rlhf']['total_feedback']}")
+ print(f"Positive/Negative: {unified_stats['rlhf']['positive_feedback']}/{unified_stats['rlhf']['negative_feedback']}")
 Recovery Statistics
 python# Monitor automatic recovery from slow routing
 recovery_stats = system.get_recovery_stats()
@@ -382,22 +382,22 @@ print(f"Recoveries successful: {recovery_stats['total_recoveries_successful']}")
 Tool Weight Analysis
 python# Analyze learned tool weights
 for tool, adjustment in system.tool_weight_adjustments.items():
-    base_weight = 1.0
-    actual_weight = base_weight + adjustment
-    print(f"{tool}: {actual_weight:.4f} (adjustment: {adjustment:+.4f})")
+ base_weight = 1.0
+ actual_weight = base_weight + adjustment
+ print(f"{tool}: {actual_weight:.4f} (adjustment: {adjustment:+.4f})")
 Mathematical Accuracy Stats
 python# Get mathematical verification statistics
 if hasattr(system, 'math_integration'):
-    math_stats = system.math_integration.get_statistics()
-    print(f"Total verifications: {math_stats['total_verifications']}")
-    print(f"Overall accuracy: {math_stats['overall_accuracy']:.2%}")
-    print(f"Tool accuracy: {math_stats['tool_accuracy']}")
+ math_stats = system.math_integration.get_statistics()
+ print(f"Total verifications: {math_stats['total_verifications']}")
+ print(f"Overall accuracy: {math_stats['overall_accuracy']:.2%}")
+ print(f"Tool accuracy: {math_stats['tool_accuracy']}")
 Debugging
 Enable Verbose Logging
 pythonimport logging
 logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+ level=logging.DEBUG,
+ format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 Common Issues and Solutions
 Issue: Tool weights become negative or near-zero
@@ -409,33 +409,33 @@ Solution: Reduce buffer sizes in config. System uses bounded deques to prevent u
 Issue: CUDA out of memory
 Solution:
 python# Reduce batch size
-config.batch_size = 16  # Down from 32
+config.batch_size = 16 # Down from 32
 
 # Disable resource-intensive features
 system = UnifiedLearningSystem(
-    config=config,
-    enable_world_model=False
+ config=config,
+ enable_world_model=False
 )
 Issue: Checkpoints fail to save
 Solution: Check disk space and permissions. System uses atomic writes with retry logic.
 Diagnostics Commands
 python# Check if continual learner is available
 if system.continual_learner:
-    print("Continual learning: ENABLED")
-    
-    # Check RLHF status
-    feedback_stats = system.continual_learner.get_feedback_stats()
-    print(f"RLHF enabled: {feedback_stats['rlhf_enabled']}")
-    
-    # Check knowledge crystallizer
-    crystallizer_stats = system.continual_learner.get_crystallizer_stats()
-    print(f"Crystallizer available: {crystallizer_stats['available']}")
+ print("Continual learning: ENABLED")
+ 
+ # Check RLHF status
+ feedback_stats = system.continual_learner.get_feedback_stats()
+ print(f"RLHF enabled: {feedback_stats['rlhf_enabled']}")
+ 
+ # Check knowledge crystallizer
+ crystallizer_stats = system.continual_learner.get_crystallizer_stats()
+ print(f"Crystallizer available: {crystallizer_stats['available']}")
 
 # Check world model
 if system.world_model:
-    world_stats = system.world_model.get_training_stats()
-    print(f"World model steps: {world_stats['total_steps']}")
-    print(f"Avg dynamics loss: {world_stats.get('avg_dynamics_loss', 'N/A')}")
+ world_stats = system.world_model.get_training_stats()
+ print(f"World model steps: {world_stats['total_steps']}")
+ print(f"Avg dynamics loss: {world_stats.get('avg_dynamics_loss', 'N/A')}")
 Migration Guide
 From Legacy ContinualLearner
 python# Old code
@@ -445,9 +445,9 @@ learner = ContinualLearner()
 # New code
 from vulcan.learning import UnifiedLearningSystem
 system = UnifiedLearningSystem(
-    enable_world_model=False,
-    enable_curriculum=False,
-    enable_metacognition=False
+ enable_world_model=False,
+ enable_curriculum=False,
+ enable_metacognition=False
 )
 # Access continual learner
 learner = system.continual_learner
@@ -456,7 +456,7 @@ Old checkpoints may not be compatible. To migrate:
 python# Load old checkpoint manually
 import pickle
 with open('old_checkpoint.pkl', 'rb') as f:
-    old_state = pickle.load(f)
+ old_state = pickle.load(f)
 
 # Extract relevant state
 tool_weights = old_state.get('tool_weights', {})
@@ -482,11 +482,11 @@ API Reference
 UnifiedLearningSystem
 Constructor:
 pythonUnifiedLearningSystem(
-    config: Optional[LearningConfig] = None,
-    embedding_dim: int = 384,
-    enable_world_model: bool = True,
-    enable_curriculum: bool = True,
-    enable_metacognition: bool = True
+ config: Optional[LearningConfig] = None,
+ embedding_dim: int = 384,
+ enable_world_model: bool = True,
+ enable_curriculum: bool = True,
+ enable_metacognition: bool = True
 )
 Key Methods:
 
@@ -504,27 +504,27 @@ LearningConfig
 Parameters:
 python@dataclass
 class LearningConfig:
-    learning_rate: float = 0.001
-    batch_size: int = 32
-    ewc_lambda: float = 100.0
-    meta_lr: float = 0.001
-    inner_lr: float = 0.01
-    replay_buffer_size: int = 10000
-    consolidation_threshold: int = 100
-    curriculum_stages: int = 5
-    task_detection_threshold: float = 0.3
-    memory_strength: float = 0.5
-    adaptation_steps: int = 5
-    meta_batch_size: int = 4
-    rlhf_enabled: bool = True
-    feedback_buffer_size: int = 5000
-    reward_model_update_freq: int = 100
-    ppo_epochs: int = 4
-    ppo_clip: float = 0.2
-    kl_penalty: float = 0.01
-    checkpoint_frequency: int = 1000
-    max_checkpoints: int = 100
-    audit_trail_enabled: bool = True
+ learning_rate: float = 0.001
+ batch_size: int = 32
+ ewc_lambda: float = 100.0
+ meta_lr: float = 0.001
+ inner_lr: float = 0.01
+ replay_buffer_size: int = 10000
+ consolidation_threshold: int = 100
+ curriculum_stages: int = 5
+ task_detection_threshold: float = 0.3
+ memory_strength: float = 0.5
+ adaptation_steps: int = 5
+ meta_batch_size: int = 4
+ rlhf_enabled: bool = True
+ feedback_buffer_size: int = 5000
+ reward_model_update_freq: int = 100
+ ppo_epochs: int = 4
+ ppo_clip: float = 0.2
+ kl_penalty: float = 0.01
+ checkpoint_frequency: int = 1000
+ max_checkpoints: int = 100
+ audit_trail_enabled: bool = True
 Contributing
 When contributing to this module:
 
@@ -553,9 +553,8 @@ Feature Requests: Discussion in project repository
 Security Issues: Report privately to security team
 
 License
-Part of VULCAN-AGI project. See main repository for license details.
+Part of VULCAN-AMI project. See main repository for license details.
 
 Last Updated: 2025-01-06
 Version: 2.0.0
-Status: Production Ready
-Maintainers: VULCAN-AGI Core TeamClaude is AI and can make mistakes. Please double-check responses.
+Maintainers: VULCAN-AMI Core TeamClaude is AI and can make mistakes. Please double-check responses.

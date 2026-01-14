@@ -1,7 +1,7 @@
 # VulcanAMI API Documentation
 
-**Version:** 1.0.0  
-**Last Updated:** December 2024  
+**Version:** 1.0.0 
+**Last Updated:** December 2024 
 **Copyright © 2024 Novatrax Labs LTD. All rights reserved.**
 
 ---
@@ -66,44 +66,44 @@ VulcanAMI follows a layered microservices architecture with two primary API laye
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                           CLIENT APPLICATIONS                               │
+│ CLIENT APPLICATIONS │
 └─────────────────────────────────────────────────────────────────────────────┘
-                                     │
-                    ┌────────────────┴────────────────┐
-                    ▼                                 ▼
-┌───────────────────────────────┐   ┌───────────────────────────────┐
-│     GATEWAY API (aiohttp)     │   │      CORE API (HTTP Server)   │
-│   Port 8080 (Default)         │   │      Port 8000 (Default)      │
-├───────────────────────────────┤   ├───────────────────────────────┤
-│ • Authentication/Authorization│   │ • Graph Submission            │
-│ • Rate Limiting               │   │ • Proposal Management         │
-│ • Circuit Breakers            │   │ • Voting System               │
-│ • Caching                     │   │ • Reasoning Engine            │
-│ • Service Discovery           │   │ • Direct DB Access            │
-│ • WebSocket Support           │   │ • Audit Logging               │
-│ • GraphQL Interface           │   │ • Agent Management            │
-└───────────────────────────────┘   └───────────────────────────────┘
-                    │                                 │
-                    └────────────────┬────────────────┘
-                                     ▼
+ │
+ ┌────────────────┴────────────────┐
+ ▼ ▼
+┌───────────────────────────────┐ ┌───────────────────────────────┐
+│ GATEWAY API (aiohttp) │ │ CORE API (HTTP Server) │
+│ Port 8080 (Default) │ │ Port 8000 (Default) │
+├───────────────────────────────┤ ├───────────────────────────────┤
+│ • Authentication/Authorization│ │ • Graph Submission │
+│ • Rate Limiting │ │ • Proposal Management │
+│ • Circuit Breakers │ │ • Voting System │
+│ • Caching │ │ • Reasoning Engine │
+│ • Service Discovery │ │ • Direct DB Access │
+│ • WebSocket Support │ │ • Audit Logging │
+│ • GraphQL Interface │ │ • Agent Management │
+└───────────────────────────────┘ └───────────────────────────────┘
+ │ │
+ └────────────────┬────────────────┘
+ ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                        VULCAN-AGI CORE (285,000+ LOC)                       │
+│ VULCAN-AMI CORE (285,000+ LOC) │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│ ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │
-│ │  Reasoning  │  │ World Model │  │   Memory    │  │   Safety    │         │
-│ │   Systems   │  │  (Causal)   │  │  Hierarchy  │  │  Validator  │         │
-│ └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘         │
-│ ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │
-│ │  Planning   │  │  Learning   │  │  Semantic   │  │  Consensus  │         │
-│ │   Engine    │  │   Systems   │  │   Bridge    │  │   Engine    │         │
-│ └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘         │
+│ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ │
+│ │ Reasoning │ │ World Model │ │ Memory │ │ Safety │ │
+│ │ Systems │ │ (Causal) │ │ Hierarchy │ │ Validator │ │
+│ └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘ │
+│ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ │
+│ │ Planning │ │ Learning │ │ Semantic │ │ Consensus │ │
+│ │ Engine │ │ Systems │ │ Bridge │ │ Engine │ │
+│ └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘ │
 └─────────────────────────────────────────────────────────────────────────────┘
-                                     │
-                                     ▼
+ │
+ ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                     PERSISTENCE & OBSERVABILITY                             │
+│ PERSISTENCE & OBSERVABILITY │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│  SQLite/PostgreSQL │ Redis │ Prometheus │ Grafana │ Audit Logs │ S3/CDN   │
+│ SQLite/PostgreSQL │ Redis │ Prometheus │ Grafana │ Audit Logs │ S3/CDN │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -138,21 +138,21 @@ POST /auth/login-gateway
 **Request:**
 ```json
 {
-  "username": "admin",
-  "password": "your-secure-password"
+ "username": "admin",
+ "password": "your-secure-password"
 }
 ```
 
 **Response (200 OK):**
 ```json
 {
-  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InZ1bGNhbi1rZXktMSJ9...",
-  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InZ1bGNhbi1rZXktMSJ9...",
-  "token_type": "Bearer",
-  "expires_in": 1800,
-  "user_id": "admin",
-  "roles": ["admin"],
-  "scopes": ["read", "write", "admin"]
+ "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InZ1bGNhbi1rZXktMSJ9...",
+ "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InZ1bGNhbi1rZXktMSJ9...",
+ "token_type": "Bearer",
+ "expires_in": 1800,
+ "user_id": "admin",
+ "roles": ["admin"],
+ "scopes": ["read", "write", "admin"]
 }
 ```
 
@@ -172,17 +172,17 @@ POST /auth/refresh
 **Request:**
 ```json
 {
-  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InZ1bGNhbi1rZXktMSJ9..."
+ "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InZ1bGNhbi1rZXktMSJ9..."
 }
 ```
 
 **Response (200 OK):**
 ```json
 {
-  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InZ1bGNhbi1rZXktMSJ9...",
-  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InZ1bGNhbi1rZXktMSJ9...",
-  "token_type": "Bearer",
-  "expires_in": 1800
+ "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InZ1bGNhbi1rZXktMSJ9...",
+ "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InZ1bGNhbi1rZXktMSJ9...",
+ "token_type": "Bearer",
+ "expires_in": 1800
 }
 ```
 
@@ -208,30 +208,30 @@ POST /auth/login-core
 **Request:**
 ```json
 {
-  "api_key": "your-api-key",
-  "password": "your-password"
+ "api_key": "your-api-key",
+ "password": "your-password"
 }
 ```
 
 Or with mutual proof (challenge-response):
 ```json
 {
-  "api_key": "your-api-key",
-  "nonce": "random-nonce",
-  "timestamp": "2024-12-14T10:30:00Z",
-  "proof": "base64-encoded-hmac-signature"
+ "api_key": "your-api-key",
+ "nonce": "random-nonce",
+ "timestamp": "2024-12-14T10:30:00Z",
+ "proof": "base64-encoded-hmac-signature"
 }
 ```
 
 **Response (200 OK):**
 ```json
 {
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "agent_id": "agent_abc12345",
-  "expires_in": 86400,
-  "issuer": "graphix-api",
-  "audience": "graphix-clients",
-  "kid": "abc123def456"
+ "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+ "agent_id": "agent_abc12345",
+ "expires_in": 86400,
+ "issuer": "graphix-api",
+ "audience": "graphix-clients",
+ "kid": "abc123def456"
 }
 ```
 
@@ -240,16 +240,16 @@ Or with mutual proof (challenge-response):
 **JWT Claims:**
 ```json
 {
-  "sub": "user_id",
-  "user_id": "user_id",
-  "roles": ["user", "admin"],
-  "scopes": ["read", "write"],
-  "type": "access",
-  "jti": "unique-token-id",
-  "iss": "vulcan-agi-gateway",
-  "aud": "vulcan-clients",
-  "iat": 1702540800,
-  "exp": 1702542600
+ "sub": "user_id",
+ "user_id": "user_id",
+ "roles": ["user", "admin"],
+ "scopes": ["read", "write"],
+ "type": "access",
+ "jti": "unique-token-id",
+ "iss": "vulcan-ami-gateway",
+ "aud": "vulcan-clients",
+ "iat": 1702540800,
+ "exp": 1702542600
 }
 ```
 
@@ -285,34 +285,34 @@ Base URL: `https://gateway.example.com` (or `http://localhost:8080` for developm
 **Response (200 OK):**
 ```json
 {
-  "timestamp": 1702540800.123,
-  "service": "vulcan-api-gateway",
-  "version": "1.0.0",
-  "components": {
-    "api_gateway": true,
-    "service_registry": true,
-    "auth_manager": true,
-    "cache_manager": true,
-    "rate_limiter": true,
-    "redis_client": true,
-    "websocket_support": true,
-    "graphql_support": true
-  },
-  "degraded_mode": {
-    "auth": false,
-    "cache": false,
-    "rate_limiter": false
-  },
-  "registered_services": 5,
-  "statistics": {
-    "total": 8,
-    "available": 8,
-    "missing": 0
-  },
-  "health_summary": {
-    "status": "healthy",
-    "components_health": "8/8 available"
-  }
+ "timestamp": 1702540800.123,
+ "service": "vulcan-api-gateway",
+ "version": "1.0.0",
+ "components": {
+ "api_gateway": true,
+ "service_registry": true,
+ "auth_manager": true,
+ "cache_manager": true,
+ "rate_limiter": true,
+ "redis_client": true,
+ "websocket_support": true,
+ "graphql_support": true
+ },
+ "degraded_mode": {
+ "auth": false,
+ "cache": false,
+ "rate_limiter": false
+ },
+ "registered_services": 5,
+ "statistics": {
+ "total": 8,
+ "available": 8,
+ "missing": 0
+ },
+ "health_summary": {
+ "status": "healthy",
+ "components_health": "8/8 available"
+ }
 }
 ```
 
@@ -360,21 +360,21 @@ api_gateway_cache_hits_total{cache_type="memory"} 8923
 **Request:**
 ```json
 {
-  "username": "alice",
-  "password": "secure-password-123"
+ "username": "alice",
+ "password": "secure-password-123"
 }
 ```
 
 **Response (200 OK):**
 ```json
 {
-  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InZ1bGNhbi1rZXktMSJ9...",
-  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InZ1bGNhbi1rZXktMSJ9...",
-  "token_type": "Bearer",
-  "expires_in": 1800,
-  "user_id": "alice",
-  "roles": ["user"],
-  "scopes": ["read", "write"]
+ "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InZ1bGNhbi1rZXktMSJ9...",
+ "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InZ1bGNhbi1rZXktMSJ9...",
+ "token_type": "Bearer",
+ "expires_in": 1800,
+ "user_id": "alice",
+ "roles": ["user"],
+ "scopes": ["read", "write"]
 }
 ```
 
@@ -395,17 +395,17 @@ api_gateway_cache_hits_total{cache_type="memory"} 8923
 **Request:**
 ```json
 {
-  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InZ1bGNhbi1rZXktMSJ9..."
+ "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InZ1bGNhbi1rZXktMSJ9..."
 }
 ```
 
 **Response (200 OK):**
 ```json
 {
-  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InZ1bGNhbi1rZXktMSJ9...",
-  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InZ1bGNhbi1rZXktMSJ9...",
-  "token_type": "Bearer",
-  "expires_in": 1800
+ "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InZ1bGNhbi1rZXktMSJ9...",
+ "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InZ1bGNhbi1rZXktMSJ9...",
+ "token_type": "Bearer",
+ "expires_in": 1800
 }
 ```
 
@@ -424,14 +424,14 @@ api_gateway_cache_hits_total{cache_type="memory"} 8923
 **Request:**
 ```json
 {
-  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InZ1bGNhbi1rZXktMSJ9..."
+ "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InZ1bGNhbi1rZXktMSJ9..."
 }
 ```
 
 **Response (200 OK):**
 ```json
 {
-  "message": "Logged out successfully"
+ "message": "Logged out successfully"
 }
 ```
 
@@ -450,31 +450,31 @@ api_gateway_cache_hits_total{cache_type="memory"} 8923
 **Request:**
 ```json
 {
-  "input": "What is the capital of France?"
+ "input": "What is the capital of France?"
 }
 ```
 
 Or with structured input:
 ```json
 {
-  "input": {
-    "text": "Analyze this data",
-    "data": [1, 2, 3, 4, 5],
-    "type": "numerical_analysis"
-  }
+ "input": {
+ "text": "Analyze this data",
+ "data": [1, 2, 3, 4, 5],
+ "type": "numerical_analysis"
+ }
 }
 ```
 
 **Response (200 OK):**
 ```json
 {
-  "embedding": [0.123, -0.456, 0.789, ...],
-  "modality": "text",
-  "uncertainty": 0.15,
-  "metadata": {
-    "token_count": 7,
-    "processing_time_ms": 45
-  }
+ "embedding": [0.123, -0.456, 0.789, ...],
+ "modality": "text",
+ "uncertainty": 0.15,
+ "metadata": {
+ "token_count": 7,
+ "processing_time_ms": 45
+ }
 }
 ```
 
@@ -491,47 +491,47 @@ Or with structured input:
 **Request:**
 ```json
 {
-  "goal": "Deploy a machine learning model to production",
-  "context": {
-    "model_type": "classification",
-    "infrastructure": "kubernetes",
-    "constraints": {
-      "max_latency_ms": 100,
-      "min_accuracy": 0.95
-    }
-  }
+ "goal": "Deploy a machine learning model to production",
+ "context": {
+ "model_type": "classification",
+ "infrastructure": "kubernetes",
+ "constraints": {
+ "max_latency_ms": 100,
+ "min_accuracy": 0.95
+ }
+ }
 }
 ```
 
 **Response (200 OK):**
 ```json
 {
-  "plan_id": "plan_abc123",
-  "steps": [
-    {
-      "step_id": "step_1",
-      "action": "validate_model",
-      "dependencies": [],
-      "estimated_duration_seconds": 60
-    },
-    {
-      "step_id": "step_2",
-      "action": "create_container",
-      "dependencies": ["step_1"],
-      "estimated_duration_seconds": 120
-    },
-    {
-      "step_id": "step_3",
-      "action": "deploy_to_cluster",
-      "dependencies": ["step_2"],
-      "estimated_duration_seconds": 180
-    }
-  ],
-  "total_estimated_duration_seconds": 360,
-  "risk_assessment": {
-    "score": 0.25,
-    "factors": ["infrastructure_complexity"]
-  }
+ "plan_id": "plan_abc123",
+ "steps": [
+ {
+ "step_id": "step_1",
+ "action": "validate_model",
+ "dependencies": [],
+ "estimated_duration_seconds": 60
+ },
+ {
+ "step_id": "step_2",
+ "action": "create_container",
+ "dependencies": ["step_1"],
+ "estimated_duration_seconds": 120
+ },
+ {
+ "step_id": "step_3",
+ "action": "deploy_to_cluster",
+ "dependencies": ["step_2"],
+ "estimated_duration_seconds": 180
+ }
+ ],
+ "total_estimated_duration_seconds": 360,
+ "risk_assessment": {
+ "score": 0.25,
+ "factors": ["infrastructure_complexity"]
+ }
 }
 ```
 
@@ -548,35 +548,35 @@ Or with structured input:
 **Request:**
 ```json
 {
-  "plan": {
-    "plan_id": "plan_abc123",
-    "steps": [
-      {
-        "step_id": "step_1",
-        "action": "validate_model"
-      }
-    ]
-  }
+ "plan": {
+ "plan_id": "plan_abc123",
+ "steps": [
+ {
+ "step_id": "step_1",
+ "action": "validate_model"
+ }
+ ]
+ }
 }
 ```
 
 **Response (200 OK):**
 ```json
 {
-  "execution_id": "exec_xyz789",
-  "status": "completed",
-  "results": {
-    "step_1": {
-      "status": "success",
-      "output": {"validation_passed": true},
-      "duration_ms": 1234
-    }
-  },
-  "metrics": {
-    "total_duration_ms": 1234,
-    "steps_completed": 1,
-    "steps_failed": 0
-  }
+ "execution_id": "exec_xyz789",
+ "status": "completed",
+ "results": {
+ "step_1": {
+ "status": "success",
+ "output": {"validation_passed": true},
+ "duration_ms": 1234
+ }
+ },
+ "metrics": {
+ "total_duration_ms": 1234,
+ "steps_completed": 1,
+ "steps_failed": 0
+ }
 }
 ```
 
@@ -593,28 +593,28 @@ Or with structured input:
 **Request:**
 ```json
 {
-  "experience": {
-    "input": "User query about machine learning",
-    "output": "Generated response about ML concepts",
-    "feedback": {
-      "rating": 4.5,
-      "helpful": true,
-      "corrections": null
-    }
-  }
+ "experience": {
+ "input": "User query about machine learning",
+ "output": "Generated response about ML concepts",
+ "feedback": {
+ "rating": 4.5,
+ "helpful": true,
+ "corrections": null
+ }
+ }
 }
 ```
 
 **Response (200 OK):**
 ```json
 {
-  "adapted": true,
-  "loss": 0.023,
-  "metadata": {
-    "experience_id": "exp_123",
-    "learning_rate": 0.001,
-    "samples_processed": 1
-  }
+ "adapted": true,
+ "loss": 0.023,
+ "metadata": {
+ "experience_id": "exp_123",
+ "learning_rate": 0.001,
+ "samples_processed": 1
+ }
 }
 ```
 
@@ -631,43 +631,43 @@ Or with structured input:
 **Request (Probabilistic Reasoning):**
 ```json
 {
-  "query": "What is the probability of success?",
-  "type": "probabilistic",
-  "input": [0.8, 0.6, 0.9]
+ "query": "What is the probability of success?",
+ "type": "probabilistic",
+ "input": [0.8, 0.6, 0.9]
 }
 ```
 
 **Request (Symbolic Reasoning):**
 ```json
 {
-  "query": "IF weather = sunny AND temperature > 70 THEN activity = outdoor",
-  "type": "symbolic"
+ "query": "IF weather = sunny AND temperature > 70 THEN activity = outdoor",
+ "type": "symbolic"
 }
 ```
 
 **Request (Causal Reasoning):**
 ```json
 {
-  "query": "estimate_effect",
-  "type": "causal",
-  "treatment": "marketing_campaign",
-  "outcome": "sales_increase"
+ "query": "estimate_effect",
+ "type": "causal",
+ "treatment": "marketing_campaign",
+ "outcome": "sales_increase"
 }
 ```
 
 **Response (200 OK):**
 ```json
 {
-  "result": {
-    "mean": 0.85,
-    "std": 0.12,
-    "confidence_interval": [0.73, 0.97],
-    "reasoning_trace": [
-      "Analyzed input probabilities",
-      "Applied Bayesian inference",
-      "Computed posterior distribution"
-    ]
-  }
+ "result": {
+ "mean": 0.85,
+ "std": 0.12,
+ "confidence_interval": [0.73, 0.97],
+ "reasoning_trace": [
+ "Analyzed input probabilities",
+ "Applied Bayesian inference",
+ "Computed posterior distribution"
+ ]
+ }
 }
 ```
 
@@ -695,24 +695,24 @@ GET /v1/memory/search?q=machine+learning+deployment&k=5
 **Response (200 OK):**
 ```json
 {
-  "results": [
-    {
-      "id": "mem_001",
-      "score": 0.95,
-      "metadata": {
-        "content_type": "documentation",
-        "created_at": "2024-12-01T10:00:00Z"
-      }
-    },
-    {
-      "id": "mem_002",
-      "score": 0.87,
-      "metadata": {
-        "content_type": "conversation",
-        "created_at": "2024-12-10T15:30:00Z"
-      }
-    }
-  ]
+ "results": [
+ {
+ "id": "mem_001",
+ "score": 0.95,
+ "metadata": {
+ "content_type": "documentation",
+ "created_at": "2024-12-01T10:00:00Z"
+ }
+ },
+ {
+ "id": "mem_002",
+ "score": 0.87,
+ "metadata": {
+ "content_type": "conversation",
+ "created_at": "2024-12-10T15:30:00Z"
+ }
+ }
+ ]
 }
 ```
 
@@ -729,20 +729,20 @@ GET /v1/memory/search?q=machine+learning+deployment&k=5
 **Request:**
 ```json
 {
-  "content": "Best practices for deploying ML models include containerization, CI/CD pipelines, and monitoring.",
-  "metadata": {
-    "content_type": "documentation",
-    "source": "internal_wiki",
-    "tags": ["ml", "deployment", "best-practices"]
-  }
+ "content": "Best practices for deploying ML models include containerization, CI/CD pipelines, and monitoring.",
+ "metadata": {
+ "content_type": "documentation",
+ "source": "internal_wiki",
+ "tags": ["ml", "deployment", "best-practices"]
+ }
 }
 ```
 
 **Response (200 OK):**
 ```json
 {
-  "id": "mem_003",
-  "stored": true
+ "id": "mem_003",
+ "stored": true
 }
 ```
 
@@ -761,25 +761,25 @@ GET /v1/memory/search?q=machine+learning+deployment&k=5
 **Response (200 OK):**
 ```json
 {
-  "status": "active",
-  "version": "2.1.0",
-  "uptime_seconds": 86400,
-  "components": {
-    "world_model": "active",
-    "reasoning_engines": {
-      "symbolic": "active",
-      "probabilistic": "active",
-      "causal": "active"
-    },
-    "memory": "active",
-    "planner": "active",
-    "learner": "active"
-  },
-  "metrics": {
-    "requests_processed": 15432,
-    "avg_latency_ms": 45,
-    "error_rate": 0.002
-  }
+ "status": "active",
+ "version": "2.1.0",
+ "uptime_seconds": 86400,
+ "components": {
+ "world_model": "active",
+ "reasoning_engines": {
+ "symbolic": "active",
+ "probabilistic": "active",
+ "causal": "active"
+ },
+ "memory": "active",
+ "planner": "active",
+ "learner": "active"
+ },
+ "metrics": {
+ "requests_processed": 15432,
+ "avg_latency_ms": 45,
+ "error_rate": 0.002
+ }
 }
 ```
 
@@ -796,21 +796,21 @@ GET /v1/memory/search?q=machine+learning+deployment&k=5
 **Request:**
 ```json
 {
-  "enable_learning": true,
-  "max_workers": 8,
-  "cache_ttl_seconds": 3600
+ "enable_learning": true,
+ "max_workers": 8,
+ "cache_ttl_seconds": 3600
 }
 ```
 
 **Response (200 OK):**
 ```json
 {
-  "configured": true,
-  "settings": {
-    "enable_learning": true,
-    "max_workers": 8,
-    "cache_ttl_seconds": 3600
-  }
+ "configured": true,
+ "settings": {
+ "enable_learning": true,
+ "max_workers": 8,
+ "cache_ttl_seconds": 3600
+ }
 }
 ```
 
@@ -827,18 +827,18 @@ GET /v1/memory/search?q=machine+learning+deployment&k=5
 **Request:**
 ```json
 {
-  "query": "query { status memorySearch(query: \"deployment\", k: 5) }",
-  "variables": {}
+ "query": "query { status memorySearch(query: \"deployment\", k: 5) }",
+ "variables": {}
 }
 ```
 
 **Response (200 OK):**
 ```json
 {
-  "data": {
-    "status": "healthy",
-    "memorySearch": ["mem_001", "mem_002", "mem_003"]
-  }
+ "data": {
+ "status": "healthy",
+ "memorySearch": ["mem_001", "mem_002", "mem_003"]
+ }
 }
 ```
 
@@ -855,8 +855,8 @@ GET /v1/memory/search?q=machine+learning+deployment&k=5
 **Response (200 OK):**
 ```json
 {
-  "status": "healthy",
-  "timestamp": "2024-12-14T10:30:00Z"
+ "status": "healthy",
+ "timestamp": "2024-12-14T10:30:00Z"
 }
 ```
 
@@ -877,20 +877,20 @@ Base URL: `https://core-api.example.com` (or `http://localhost:8000` for develop
 **Request:**
 ```json
 {
-  "api_key": "your-api-key-here",
-  "password": "your-password"
+ "api_key": "your-api-key-here",
+ "password": "your-password"
 }
 ```
 
 **Response (200 OK):**
 ```json
 {
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "agent_id": "agent_abc12345",
-  "expires_in": 86400,
-  "issuer": "graphix-api",
-  "audience": "graphix-clients",
-  "kid": "abc123def456"
+ "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+ "agent_id": "agent_abc12345",
+ "expires_in": 86400,
+ "issuer": "graphix-api",
+ "audience": "graphix-clients",
+ "kid": "abc123def456"
 }
 ```
 
@@ -905,8 +905,8 @@ Base URL: `https://core-api.example.com` (or `http://localhost:8000` for develop
 **Response (200 OK):**
 ```json
 {
-  "status": "revoked",
-  "jti": "token-id"
+ "status": "revoked",
+ "jti": "token-id"
 }
 ```
 
@@ -923,52 +923,52 @@ Base URL: `https://core-api.example.com` (or `http://localhost:8000` for develop
 **Request:**
 ```json
 {
-  "graph": {
-    "id": "my-workflow",
-    "type": "Graph",
-    "nodes": [
-      {
-        "id": "input_1",
-        "type": "INPUT",
-        "params": {"value": [1, 2, 3, 4, 5]}
-      },
-      {
-        "id": "transform_1",
-        "type": "TRANSFORM",
-        "params": {"operation": "multiply", "factor": 2}
-      },
-      {
-        "id": "output_1",
-        "type": "OUTPUT",
-        "params": {}
-      }
-    ],
-    "edges": [
-      {"from": "input_1", "to": "transform_1"},
-      {"from": "transform_1", "to": "output_1"}
-    ]
-  },
-  "priority": 5,
-  "timeout": 120,
-  "callback": "https://my-service.example.com/webhook"
+ "graph": {
+ "id": "my-workflow",
+ "type": "Graph",
+ "nodes": [
+ {
+ "id": "input_1",
+ "type": "INPUT",
+ "params": {"value": [1, 2, 3, 4, 5]}
+ },
+ {
+ "id": "transform_1",
+ "type": "TRANSFORM",
+ "params": {"operation": "multiply", "factor": 2}
+ },
+ {
+ "id": "output_1",
+ "type": "OUTPUT",
+ "params": {}
+ }
+ ],
+ "edges": [
+ {"from": "input_1", "to": "transform_1"},
+ {"from": "transform_1", "to": "output_1"}
+ ]
+ },
+ "priority": 5,
+ "timeout": 120,
+ "callback": "https://my-service.example.com/webhook"
 }
 ```
 
 **Response (200 OK):**
 ```json
 {
-  "status": "submitted",
-  "graph_id": "graph_xyz789",
-  "queue_position": 3
+ "status": "submitted",
+ "graph_id": "graph_xyz789",
+ "queue_position": 3
 }
 ```
 
 **Validation Errors (400 Bad Request):**
 ```json
 {
-  "error": "Invalid graph: Missing required field: id",
-  "code": 400,
-  "timestamp": "2024-12-14T10:30:00Z"
+ "error": "Invalid graph: Missing required field: id",
+ "code": 400,
+ "timestamp": "2024-12-14T10:30:00Z"
 }
 ```
 
@@ -985,27 +985,27 @@ Base URL: `https://core-api.example.com` (or `http://localhost:8000` for develop
 **Response (200 OK):**
 ```json
 {
-  "id": "graph_xyz789",
-  "agent_id": "agent_abc12345",
-  "status": "completed",
-  "submitted_at": "2024-12-14T10:30:00Z",
-  "started_at": "2024-12-14T10:30:05Z",
-  "completed_at": "2024-12-14T10:30:15Z",
-  "result": {
-    "nodes_processed": 3,
-    "edges_processed": 2,
-    "output": "Processed graph graph_xyz789",
-    "metrics": {
-      "execution_time_ms": 10000,
-      "memory_used_mb": 50
-    }
-  },
-  "error": null,
-  "metadata": {
-    "version": "1.0.0",
-    "priority": 5,
-    "timeout": 120
-  }
+ "id": "graph_xyz789",
+ "agent_id": "agent_abc12345",
+ "status": "completed",
+ "submitted_at": "2024-12-14T10:30:00Z",
+ "started_at": "2024-12-14T10:30:05Z",
+ "completed_at": "2024-12-14T10:30:15Z",
+ "result": {
+ "nodes_processed": 3,
+ "edges_processed": 2,
+ "output": "Processed graph graph_xyz789",
+ "metrics": {
+ "execution_time_ms": 10000,
+ "memory_used_mb": 50
+ }
+ },
+ "error": null,
+ "metadata": {
+ "version": "1.0.0",
+ "priority": 5,
+ "timeout": 120
+ }
 }
 ```
 
@@ -1024,24 +1024,24 @@ Base URL: `https://core-api.example.com` (or `http://localhost:8000` for develop
 **Request:**
 ```json
 {
-  "title": "Add new ML pipeline node",
-  "description": "Proposal to add a new feature extraction node to the ML pipeline",
-  "graph": {
-    "id": "ml-pipeline-v2",
-    "type": "Graph",
-    "nodes": [
-      {"id": "feature_extractor", "type": "TRANSFORM"}
-    ],
-    "edges": []
-  }
+ "title": "Add new ML pipeline node",
+ "description": "Proposal to add a new feature extraction node to the ML pipeline",
+ "graph": {
+ "id": "ml-pipeline-v2",
+ "type": "Graph",
+ "nodes": [
+ {"id": "feature_extractor", "type": "TRANSFORM"}
+ ],
+ "edges": []
+ }
 }
 ```
 
 **Response (200 OK):**
 ```json
 {
-  "id": "prop_2024_00123",
-  "status": "created"
+ "id": "prop_2024_00123",
+ "status": "created"
 }
 ```
 
@@ -1058,7 +1058,7 @@ Base URL: `https://core-api.example.com` (or `http://localhost:8000` for develop
 **Request:**
 ```json
 {
-  "vote": "for"
+ "vote": "for"
 }
 ```
 
@@ -1067,7 +1067,7 @@ Valid votes: `for`, `against`
 **Response (200 OK):**
 ```json
 {
-  "success": true
+ "success": true
 }
 ```
 
@@ -1086,8 +1086,8 @@ Valid votes: `for`, `against`
 **Request:**
 ```json
 {
-  "query": "What factors contribute to customer churn?",
-  "reasoning_type": "causal"
+ "query": "What factors contribute to customer churn?",
+ "reasoning_type": "causal"
 }
 ```
 
@@ -1096,17 +1096,17 @@ Valid reasoning types: `symbolic`, `probabilistic`, `causal`, `analogical`, `uni
 **Response (200 OK):**
 ```json
 {
-  "conclusion": "Customer churn is primarily driven by price sensitivity and service quality",
-  "confidence": 0.87,
-  "reasoning_type": "causal",
-  "explanation": "Causal analysis identified three main pathways...",
-  "uncertainty": 0.13,
-  "metadata": {
-    "variables_analyzed": 15,
-    "data_points": 10000,
-    "method": "do-calculus"
-  },
-  "safety_status": "approved"
+ "conclusion": "Customer churn is primarily driven by price sensitivity and service quality",
+ "confidence": 0.87,
+ "reasoning_type": "causal",
+ "explanation": "Causal analysis identified three main pathways...",
+ "uncertainty": 0.13,
+ "metadata": {
+ "variables_analyzed": 15,
+ "data_points": 10000,
+ "method": "do-calculus"
+ },
+ "safety_status": "approved"
 }
 ```
 
@@ -1125,15 +1125,15 @@ Valid reasoning types: `symbolic`, `probabilistic`, `causal`, `analogical`, `uni
 **Request:**
 ```json
 {
-  "query": "query { status }"
+ "query": "query { status }"
 }
 ```
 
 **Response (200 OK):**
 ```json
 {
-  "message": "GraphQL endpoint (integration pending)",
-  "query_preview": "query { status }"
+ "message": "GraphQL endpoint (integration pending)",
+ "query_preview": "query { status }"
 }
 ```
 
@@ -1167,15 +1167,15 @@ graphix_rss_mb 210.5
 **Response (200 OK):**
 ```json
 {
-  "vulcan_enabled": true,
-  "world_model_active": true,
-  "reasoning_enabled": true,
-  "capabilities": [
-    "temporal_reasoning",
-    "safety_validation",
-    "goal_alignment",
-    "proposal_evaluation"
-  ]
+ "vulcan_enabled": true,
+ "world_model_active": true,
+ "reasoning_enabled": true,
+ "capabilities": [
+ "temporal_reasoning",
+ "safety_validation",
+ "goal_alignment",
+ "proposal_evaluation"
+ ]
 }
 ```
 
@@ -1190,33 +1190,33 @@ graphix_rss_mb 210.5
 **Response (200 OK):**
 ```json
 {
-  "status": "active",
-  "version": "2.2.0",
-  "uptime_seconds": 86400,
-  "start_time": "2024-12-13T10:30:00Z",
-  "graphs": {
-    "submitted": 1500,
-    "completed": 1450,
-    "failed": 50,
-    "executing": 5
-  },
-  "proposals": {
-    "total": 25,
-    "open": 3,
-    "approved": 20
-  },
-  "agents": {
-    "registered": 15
-  },
-  "auth": {
-    "failures": 12,
-    "success": 5000,
-    "revoked_tokens": 50
-  },
-  "requests": {
-    "total": 50000,
-    "errors": 100
-  }
+ "status": "active",
+ "version": "2.2.0",
+ "uptime_seconds": 86400,
+ "start_time": "2024-12-13T10:30:00Z",
+ "graphs": {
+ "submitted": 1500,
+ "completed": 1450,
+ "failed": 50,
+ "executing": 5
+ },
+ "proposals": {
+ "total": 25,
+ "open": 3,
+ "approved": 20
+ },
+ "agents": {
+ "registered": 15
+ },
+ "auth": {
+ "failures": 12,
+ "success": 5000,
+ "revoked_tokens": 50
+ },
+ "requests": {
+ "total": 50000,
+ "errors": 100
+ }
 }
 ```
 
@@ -1229,19 +1229,19 @@ graphix_rss_mb 210.5
 ```bash
 # Step 1: Login to get access token
 curl -X POST https://gateway.example.com/auth/login-gateway \
-  -H "Content-Type: application/json" \
-  -d '{"username": "your-username", "password": "your-password"}'
+ -H "Content-Type: application/json" \
+ -d '{"username": "your-username", "password": "your-password"}'
 
 # Step 2: Use the access token in subsequent requests
 export TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 
 curl -X GET https://gateway.example.com/v1/status \
-  -H "Authorization: Bearer $TOKEN"
+ -H "Authorization: Bearer $TOKEN"
 
 # Step 3: Refresh token when it expires
 curl -X POST https://gateway.example.com/auth/refresh \
-  -H "Content-Type: application/json" \
-  -d '{"refresh_token": "your-refresh-token"}'
+ -H "Content-Type: application/json" \
+ -d '{"refresh_token": "your-refresh-token"}'
 ```
 
 ### 6.2 Submitting a Graph for Processing
@@ -1249,52 +1249,52 @@ curl -X POST https://gateway.example.com/auth/refresh \
 ```bash
 # Step 1: Authenticate
 TOKEN=$(curl -s -X POST https://core-api.example.com/auth/login-core \
-  -H "Content-Type: application/json" \
-  -d '{"api_key": "your-api-key", "password": "your-password"}' \
-  | jq -r '.token')
+ -H "Content-Type: application/json" \
+ -d '{"api_key": "your-api-key", "password": "your-password"}' \
+ | jq -r '.token')
 
 # Step 2: Submit the graph
 RESPONSE=$(curl -s -X POST https://core-api.example.com/graphs/submit \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "graph": {
-      "id": "my-graph",
-      "type": "Graph",
-      "nodes": [
-        {"id": "n1", "type": "INPUT", "params": {"value": 10}},
-        {"id": "n2", "type": "TRANSFORM", "params": {"operation": "double"}},
-        {"id": "n3", "type": "OUTPUT"}
-      ],
-      "edges": [
-        {"from": "n1", "to": "n2"},
-        {"from": "n2", "to": "n3"}
-      ]
-    },
-    "priority": 5,
-    "timeout": 60
-  }')
+ -H "Authorization: Bearer $TOKEN" \
+ -H "Content-Type: application/json" \
+ -d '{
+ "graph": {
+ "id": "my-graph",
+ "type": "Graph",
+ "nodes": [
+ {"id": "n1", "type": "INPUT", "params": {"value": 10}},
+ {"id": "n2", "type": "TRANSFORM", "params": {"operation": "double"}},
+ {"id": "n3", "type": "OUTPUT"}
+ ],
+ "edges": [
+ {"from": "n1", "to": "n2"},
+ {"from": "n2", "to": "n3"}
+ ]
+ },
+ "priority": 5,
+ "timeout": 60
+ }')
 
 GRAPH_ID=$(echo $RESPONSE | jq -r '.graph_id')
 echo "Submitted graph: $GRAPH_ID"
 
 # Step 3: Poll for completion
 while true; do
-  STATUS=$(curl -s -X GET "https://core-api.example.com/graphs/$GRAPH_ID" \
-    -H "Authorization: Bearer $TOKEN" | jq -r '.status')
-  
-  echo "Status: $STATUS"
-  
-  if [ "$STATUS" = "completed" ] || [ "$STATUS" = "failed" ]; then
-    break
-  fi
-  
-  sleep 5
+ STATUS=$(curl -s -X GET "https://core-api.example.com/graphs/$GRAPH_ID" \
+ -H "Authorization: Bearer $TOKEN" | jq -r '.status')
+ 
+ echo "Status: $STATUS"
+ 
+ if [ "$STATUS" = "completed" ] || [ "$STATUS" = "failed" ]; then
+ break
+ fi
+ 
+ sleep 5
 done
 
 # Step 4: Get results
 curl -s -X GET "https://core-api.example.com/graphs/$GRAPH_ID" \
-  -H "Authorization: Bearer $TOKEN"
+ -H "Authorization: Bearer $TOKEN"
 ```
 
 ### 6.3 Using the Reasoning API
@@ -1302,33 +1302,33 @@ curl -s -X GET "https://core-api.example.com/graphs/$GRAPH_ID" \
 ```bash
 # Symbolic reasoning
 curl -X POST https://gateway.example.com/v1/reason \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query": "IF temperature > 30 AND humidity > 80 THEN comfort = low",
-    "type": "symbolic"
-  }'
+ -H "Authorization: Bearer $TOKEN" \
+ -H "Content-Type: application/json" \
+ -d '{
+ "query": "IF temperature > 30 AND humidity > 80 THEN comfort = low",
+ "type": "symbolic"
+ }'
 
 # Causal reasoning
 curl -X POST https://gateway.example.com/v1/reason \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query": "estimate_effect",
-    "type": "causal",
-    "treatment": "price_reduction",
-    "outcome": "sales_volume"
-  }'
+ -H "Authorization: Bearer $TOKEN" \
+ -H "Content-Type: application/json" \
+ -d '{
+ "query": "estimate_effect",
+ "type": "causal",
+ "treatment": "price_reduction",
+ "outcome": "sales_volume"
+ }'
 
 # Probabilistic reasoning
 curl -X POST https://gateway.example.com/v1/reason \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query": "predict_with_uncertainty",
-    "type": "probabilistic",
-    "input": [0.8, 0.6, 0.9, 0.7]
-  }'
+ -H "Authorization: Bearer $TOKEN" \
+ -H "Content-Type: application/json" \
+ -d '{
+ "query": "predict_with_uncertainty",
+ "type": "probabilistic",
+ "input": [0.8, 0.6, 0.9, 0.7]
+ }'
 ```
 
 ### 6.4 Querying Memory/Insights
@@ -1336,16 +1336,16 @@ curl -X POST https://gateway.example.com/v1/reason \
 ```bash
 # Store knowledge
 curl -X POST https://gateway.example.com/v1/memory/store \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "content": "Machine learning models should be validated before deployment",
-    "metadata": {"category": "best-practices", "source": "internal"}
-  }'
+ -H "Authorization: Bearer $TOKEN" \
+ -H "Content-Type: application/json" \
+ -d '{
+ "content": "Machine learning models should be validated before deployment",
+ "metadata": {"category": "best-practices", "source": "internal"}
+ }'
 
 # Search knowledge
 curl -X GET "https://gateway.example.com/v1/memory/search?q=deployment+validation&k=5" \
-  -H "Authorization: Bearer $TOKEN"
+ -H "Authorization: Bearer $TOKEN"
 ```
 
 ### 6.5 Creating and Voting on Proposals
@@ -1353,24 +1353,24 @@ curl -X GET "https://gateway.example.com/v1/memory/search?q=deployment+validatio
 ```bash
 # Create a proposal (requires 'govern' role)
 curl -X POST https://core-api.example.com/proposals/create \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "title": "Add data validation node",
-    "description": "Proposal to add input validation to the ML pipeline",
-    "graph": {
-      "id": "validation-node",
-      "type": "Graph",
-      "nodes": [{"id": "validator", "type": "VALIDATE"}],
-      "edges": []
-    }
-  }'
+ -H "Authorization: Bearer $TOKEN" \
+ -H "Content-Type: application/json" \
+ -d '{
+ "title": "Add data validation node",
+ "description": "Proposal to add input validation to the ML pipeline",
+ "graph": {
+ "id": "validation-node",
+ "type": "Graph",
+ "nodes": [{"id": "validator", "type": "VALIDATE"}],
+ "edges": []
+ }
+ }'
 
 # Vote on a proposal
 curl -X POST https://core-api.example.com/proposals/prop_2024_00123/vote \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"vote": "for"}'
+ -H "Authorization: Bearer $TOKEN" \
+ -H "Content-Type: application/json" \
+ -d '{"vote": "for"}'
 ```
 
 ---
@@ -1383,10 +1383,10 @@ All API endpoints return errors in a consistent format:
 
 ```json
 {
-  "error": "Human-readable error message",
-  "code": 400,
-  "timestamp": "2024-12-14T10:30:00.000Z",
-  "request_id": "req_abc123xyz"
+ "error": "Human-readable error message",
+ "code": 400,
+ "timestamp": "2024-12-14T10:30:00.000Z",
+ "request_id": "req_abc123xyz"
 }
 ```
 
@@ -1423,32 +1423,32 @@ import requests
 import time
 
 def make_request_with_retry(url, headers, data, max_retries=3):
-    for attempt in range(max_retries):
-        response = requests.post(url, headers=headers, json=data)
-        
-        if response.status_code == 200:
-            return response.json()
-        
-        if response.status_code == 429:
-            # Rate limited - wait and retry
-            retry_after = int(response.headers.get('Retry-After', 60))
-            time.sleep(retry_after)
-            continue
-        
-        if response.status_code == 401:
-            # Token expired - refresh and retry
-            headers['Authorization'] = f"Bearer {refresh_token()}"
-            continue
-        
-        if response.status_code >= 500:
-            # Server error - exponential backoff
-            time.sleep(2 ** attempt)
-            continue
-        
-        # Client error - don't retry
-        raise Exception(f"Error {response.status_code}: {response.json()}")
-    
-    raise Exception("Max retries exceeded")
+ for attempt in range(max_retries):
+ response = requests.post(url, headers=headers, json=data)
+ 
+ if response.status_code == 200:
+ return response.json()
+ 
+ if response.status_code == 429:
+ # Rate limited - wait and retry
+ retry_after = int(response.headers.get('Retry-After', 60))
+ time.sleep(retry_after)
+ continue
+ 
+ if response.status_code == 401:
+ # Token expired - refresh and retry
+ headers['Authorization'] = f"Bearer {refresh_token()}"
+ continue
+ 
+ if response.status_code >= 500:
+ # Server error - exponential backoff
+ time.sleep(2 ** attempt)
+ continue
+ 
+ # Client error - don't retry
+ raise Exception(f"Error {response.status_code}: {response.json()}")
+ 
+ raise Exception("Max retries exceeded")
 ```
 
 ---
@@ -1479,8 +1479,8 @@ X-RateLimit-Reset: 1702540860
 
 ```json
 {
-  "error": "Rate limit exceeded",
-  "retry_after_seconds": 30
+ "error": "Rate limit exceeded",
+ "retry_after_seconds": 30
 }
 ```
 
@@ -1508,12 +1508,12 @@ X-Request-ID: req_abc123xyz
 
 ```graphql
 type Query {
-  status: String!
-  memorySearch(query: String!, k: Int = 10): [String!]!
+ status: String!
+ memorySearch(query: String!, k: Int = 10): [String!]!
 }
 
 type Mutation {
-  process(input: String!): String!
+ process(input: String!): String!
 }
 ```
 
@@ -1522,17 +1522,17 @@ type Mutation {
 ```graphql
 # Query status
 query {
-  status
+ status
 }
 
 # Search memory
 query SearchMemory($q: String!, $limit: Int) {
-  memorySearch(query: $q, k: $limit)
+ memorySearch(query: $q, k: $limit)
 }
 
 # Process input
 mutation ProcessInput($input: String!) {
-  process(input: $input)
+ process(input: $input)
 }
 ```
 
@@ -1546,18 +1546,18 @@ mutation ProcessInput($input: String!) {
 const ws = new WebSocket('wss://gateway.example.com/ws?token=YOUR_ACCESS_TOKEN');
 
 ws.onopen = () => {
-  console.log('Connected');
-  
-  // Subscribe to topics
-  ws.send(JSON.stringify({
-    type: 'subscribe',
-    topics: ['execution', 'proposals']
-  }));
+ console.log('Connected');
+ 
+ // Subscribe to topics
+ ws.send(JSON.stringify({
+ type: 'subscribe',
+ topics: ['execution', 'proposals']
+ }));
 };
 
 ws.onmessage = (event) => {
-  const data = JSON.parse(event.data);
-  console.log('Received:', data);
+ const data = JSON.parse(event.data);
+ console.log('Received:', data);
 };
 ```
 
@@ -1566,27 +1566,27 @@ ws.onmessage = (event) => {
 **Subscribe:**
 ```json
 {
-  "type": "subscribe",
-  "topics": ["execution", "proposals", "system"]
+ "type": "subscribe",
+ "topics": ["execution", "proposals", "system"]
 }
 ```
 
 **Process:**
 ```json
 {
-  "type": "process",
-  "input": "Your input data"
+ "type": "process",
+ "input": "Your input data"
 }
 ```
 
 **Response:**
 ```json
 {
-  "type": "result",
-  "data": {
-    "embedding": [...],
-    "modality": "text"
-  }
+ "type": "result",
+ "data": {
+ "embedding": [...],
+ "modality": "text"
+ }
 }
 ```
 

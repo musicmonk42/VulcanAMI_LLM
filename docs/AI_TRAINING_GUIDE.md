@@ -1,6 +1,6 @@
 # 🧠 AI Training & Self-Evolution Guide (Graphix / VULCAN-AI)
 
-**Version:** 2.2.0  
+**Version:** 2.2.0 
 **Updated:** 2024-11-11
 
 ---
@@ -28,7 +28,7 @@ pip install -r requirements-dev.txt
 export PYTHONPATH=.
 ```
 
-Optional RL components (ensure `torchrl` availability).  
+Optional RL components (ensure `torchrl` availability). 
 Set dataset path for RLHF:
 
 ```bash
@@ -53,7 +53,7 @@ Evolution Cycle:
 3. Select champions
 4. Persist `evolution_champions/gen_*_champion.json`
 
-Fitness Considerations:  
+Fitness Considerations: 
 `score = accuracy - alpha*(latency_ms) - beta*(energy_nj)`
 
 Adjust alpha/beta in script for hardware-aware minimization.

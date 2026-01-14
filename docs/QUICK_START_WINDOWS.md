@@ -1,14 +1,14 @@
 # Graphix IR Quick Start (Windows + Git Bash)
 
-**Audience:** Developers & evaluators needing a fast setup path  
+**Audience:** Developers & evaluators needing a fast setup path 
 **Python Targets:** 3.11+ (required)
 
 ---
 
 ## 0) Prerequisites
 
-- Windows + Git Bash  
-- Python 3.11+ installed  
+- Windows + Git Bash 
+- Python 3.11+ installed 
 - `py` launcher available (comes with Python for Windows)
 
 ---
@@ -53,29 +53,29 @@ export PYTHONPATH=.
 
 ## 3) Smoke Test (≈10 min)
 
-**A) Start Registry API**  
+**A) Start Registry API** 
 ```bash
 python app.py
 ```
 
-**B) Interact (new terminal)**  
+**B) Interact (new terminal)** 
 ```bash
 source .venv/Scripts/activate
 export API_KEY=$(grep -E '^GRAPHIX_API_KEY=' .env | cut -d= -f2-)
 curl http://localhost:5000/health
 curl -X POST http://localhost:5000/registry/onboard \
-  -H "X-API-Key: $API_KEY" -H "Content-Type: application/json" \
-  -d '{"id":"test_agent","roles":["executor"]}'
+ -H "X-API-Key: $API_KEY" -H "Content-Type: application/json" \
+ -d '{"id":"test_agent","roles":["executor"]}'
 ```
 
-**C) Evolution & Governance**  
+**C) Evolution & Governance** 
 ```bash
 python scripts/run_sentiment_tournament.py --mode offline --generations 3 --population 6
 python src/governance_loop.py --equiv-check
 pytest -q tests/test_graph_validation.py
 ```
 
-**D) Photonic Dispatch (Emulated)**  
+**D) Photonic Dispatch (Emulated)** 
 ```bash
 python -m src.hardware_dispatcher --test_mvm --provider Lightmatter --model tensor_core
 ```

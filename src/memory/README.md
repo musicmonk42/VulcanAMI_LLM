@@ -1,28 +1,16 @@
 \# Upgraded Modules - Usage Guide
 
-
-
 This document provides comprehensive documentation for the upgraded `governed\_unlearning.py` and `cost\_optimizer.py` modules.
-
-
 
 ---
 
-
-
 \## 1. Governed Unlearning System
-
-
 
 \### Overview
 
 The `GovernedUnlearning` system provides enterprise-grade memory unlearning with governance controls, audit trails, and zero-knowledge proofs.
 
-
-
 \### Key Features
-
-
 
 \#### 🎯 Core Capabilities
 
@@ -44,8 +32,6 @@ The `GovernedUnlearning` system provides enterprise-grade memory unlearning with
 
 \- \*\*Real-time metrics tracking\*\*
 
-
-
 \#### 🔐 Unlearning Methods
 
 1\. \*\*Gradient Surgery\*\* - Default, balanced approach (≤6h)
@@ -58,11 +44,7 @@ The `GovernedUnlearning` system provides enterprise-grade memory unlearning with
 
 5\. \*\*Differential Privacy\*\* - Privacy-preserving removal (≤8h)
 
-
-
 \### Usage Examples
-
-
 
 \#### Basic Usage
 
@@ -70,51 +52,43 @@ The `GovernedUnlearning` system provides enterprise-grade memory unlearning with
 
 from governed\_unlearning import GovernedUnlearning, UrgencyLevel, UnlearningMethod
 
-
-
 \# Initialize
 
 unlearning = GovernedUnlearning(
 
-&nbsp;   persistent\_memory=memory\_system,
+&nbsp; persistent\_memory=memory\_system,
 
-&nbsp;   consensus\_engine=consensus,  # Optional, uses SimpleConsensusEngine if not provided
+&nbsp; consensus\_engine=consensus, # Optional, uses SimpleConsensusEngine if not provided
 
-&nbsp;   max\_workers=4,
+&nbsp; max\_workers=4,
 
-&nbsp;   audit\_log\_file="/var/log/unlearning\_audit.jsonl"
+&nbsp; audit\_log\_file="/var/log/unlearning\_audit.jsonl"
 
 )
-
-
 
 \# Request unlearning
 
 result = unlearning.request\_unlearning(
 
-&nbsp;   pattern="user\_data\_12345",
+&nbsp; pattern="user\_data\_12345",
 
-&nbsp;   requester\_id="admin@company.com",
+&nbsp; requester\_id="admin@company.com",
 
-&nbsp;   urgency=UrgencyLevel.HIGH,
+&nbsp; urgency=UrgencyLevel.HIGH,
 
-&nbsp;   method=UnlearningMethod.GRADIENT\_SURGERY,
+&nbsp; method=UnlearningMethod.GRADIENT\_SURGERY,
 
-&nbsp;   justification="GDPR right to be forgotten request",
+&nbsp; justification="GDPR right to be forgotten request",
 
-&nbsp;   affected\_entities=\["user\_profile", "user\_messages"]
+&nbsp; affected\_entities=\["user\_profile", "user\_messages"]
 
 )
-
-
 
 print(f"Status: {result.status.value}")
 
 print(f"Proposal ID: {result.proposal\_id}")
 
 ```
-
-
 
 \#### Batch Unlearning
 
@@ -124,37 +98,31 @@ print(f"Proposal ID: {result.proposal\_id}")
 
 patterns = \[
 
-&nbsp;   "user\_data\_12345",
+&nbsp; "user\_data\_12345",
 
-&nbsp;   "user\_data\_67890",
+&nbsp; "user\_data\_67890",
 
-&nbsp;   "user\_data\_11111"
+&nbsp; "user\_data\_11111"
 
 ]
 
-
-
 results = unlearning.request\_batch\_unlearning(
 
-&nbsp;   patterns=patterns,
+&nbsp; patterns=patterns,
 
-&nbsp;   requester\_id="admin@company.com",
+&nbsp; requester\_id="admin@company.com",
 
-&nbsp;   urgency=UrgencyLevel.NORMAL,
+&nbsp; urgency=UrgencyLevel.NORMAL,
 
-&nbsp;   method=UnlearningMethod.EXACT\_REMOVAL
+&nbsp; method=UnlearningMethod.EXACT\_REMOVAL
 
 )
 
-
-
 for result in results:
 
-&nbsp;   print(f"Pattern: {result.proposal\_id} - Status: {result.status.value}")
+&nbsp; print(f"Pattern: {result.proposal\_id} - Status: {result.status.value}")
 
 ```
-
-
 
 \#### Task Monitoring
 
@@ -166,25 +134,21 @@ task = unlearning.get\_task\_status("task\_abc123")
 
 if task:
 
-&nbsp;   print(f"Progress: {task.progress \* 100:.1f}%")
+&nbsp; print(f"Progress: {task.progress \* 100:.1f}%")
 
-&nbsp;   print(f"Status: {task.status.value}")
+&nbsp; print(f"Status: {task.status.value}")
 
-&nbsp;   if task.completed\_at:
+&nbsp; if task.completed\_at:
 
-&nbsp;       print(f"Duration: {task.get\_duration():.2f}s")
-
-
+&nbsp; print(f"Duration: {task.get\_duration():.2f}s")
 
 \# Cancel a task
 
 if unlearning.cancel\_task("task\_abc123"):
 
-&nbsp;   print("Task cancelled successfully")
+&nbsp; print("Task cancelled successfully")
 
 ```
-
-
 
 \#### Verification
 
@@ -202,8 +166,6 @@ print(f"Status: {verification\['status']}")
 
 ```
 
-
-
 \#### Metrics and Audit
 
 ```python
@@ -220,19 +182,15 @@ print(f"Average execution time: {metrics.average\_execution\_time:.2f}s")
 
 print(f"Total savings: {metrics.total\_patterns\_removed} patterns removed")
 
-
-
 \# Get audit trail
 
 audit\_entries = unlearning.get\_audit\_trail(n=50)
 
 for entry in audit\_entries:
 
-&nbsp;   print(f"{entry\['type']}: {entry\['timestamp']}")
+&nbsp; print(f"{entry\['type']}: {entry\['timestamp']}")
 
 ```
-
-
 
 \#### Custom Callbacks
 
@@ -242,27 +200,21 @@ for entry in audit\_entries:
 
 def on\_approval(proposal, result):
 
-&nbsp;   print(f"✅ Approved: {proposal.pattern}")
+&nbsp; print(f"✅ Approved: {proposal.pattern}")
 
-&nbsp;   # Send notification, update dashboard, etc.
-
-
+&nbsp; # Send notification, update dashboard, etc.
 
 def on\_completion(task):
 
-&nbsp;   print(f"✅ Completed: {task.pattern}")
+&nbsp; print(f"✅ Completed: {task.pattern}")
 
-&nbsp;   # Log completion, trigger next steps, etc.
-
-
+&nbsp; # Log completion, trigger next steps, etc.
 
 def on\_failure(task):
 
-&nbsp;   print(f"❌ Failed: {task.pattern} - {task.error}")
+&nbsp; print(f"❌ Failed: {task.pattern} - {task.error}")
 
-&nbsp;   # Alert administrators, retry logic, etc.
-
-
+&nbsp; # Alert administrators, retry logic, etc.
 
 unlearning.on\_approval.append(on\_approval)
 
@@ -272,29 +224,23 @@ unlearning.on\_failure.append(on\_failure)
 
 ```
 
-
-
 \#### Custom Consensus Engine
 
 ```python
 
 from governed\_unlearning import SimpleConsensusEngine
 
-
-
 \# Configure consensus
 
 consensus = SimpleConsensusEngine(
 
-&nbsp;   auto\_approve\_threshold=0.67,  # 67% approval needed
+&nbsp; auto\_approve\_threshold=0.67, # 67% approval needed
 
-&nbsp;   quorum\_required=3,             # Need 3 votes
+&nbsp; quorum\_required=3, # Need 3 votes
 
-&nbsp;   admin\_override\_enabled=True
+&nbsp; admin\_override\_enabled=True
 
 )
-
-
 
 \# Add voters
 
@@ -303,8 +249,6 @@ consensus.add\_voter("alice@company.com")
 consensus.add\_voter("bob@company.com")
 
 consensus.add\_voter("charlie@company.com")
-
-
 
 \# Vote on proposal
 
@@ -316,11 +260,7 @@ result = consensus.vote("proposal\_123", "bob@company.com", approve=True)
 
 ```
 
-
-
 \### Data Structures
-
-
 
 \#### IRProposal
 
@@ -330,25 +270,23 @@ result = consensus.vote("proposal\_123", "bob@company.com", approve=True)
 
 class IRProposal:
 
-&nbsp;   proposal\_id: str
+&nbsp; proposal\_id: str
 
-&nbsp;   ir\_content: Dict\[str, Any]
+&nbsp; ir\_content: Dict\[str, Any]
 
-&nbsp;   proposer\_id: str
+&nbsp; proposer\_id: str
 
-&nbsp;   timestamp: float
+&nbsp; timestamp: float
 
-&nbsp;   urgency: UrgencyLevel
+&nbsp; urgency: UrgencyLevel
 
-&nbsp;   justification: str
+&nbsp; justification: str
 
-&nbsp;   affected\_entities: List\[str]
+&nbsp; affected\_entities: List\[str]
 
-&nbsp;   metadata: Dict\[str, Any]
+&nbsp; metadata: Dict\[str, Any]
 
 ```
-
-
 
 \#### GovernanceResult
 
@@ -358,41 +296,31 @@ class IRProposal:
 
 class GovernanceResult:
 
-&nbsp;   proposal\_id: str
+&nbsp; proposal\_id: str
 
-&nbsp;   status: ProposalStatus
+&nbsp; status: ProposalStatus
 
-&nbsp;   details: Dict\[str, Any]
+&nbsp; details: Dict\[str, Any]
 
-&nbsp;   votes: Dict\[str, bool]
+&nbsp; votes: Dict\[str, bool]
 
-&nbsp;   approval\_timestamp: Optional\[float]
+&nbsp; approval\_timestamp: Optional\[float]
 
-&nbsp;   rejection\_reason: Optional\[str]
+&nbsp; rejection\_reason: Optional\[str]
 
-&nbsp;   execution\_result: Optional\[Dict\[str, Any]]
+&nbsp; execution\_result: Optional\[Dict\[str, Any]]
 
 ```
 
-
-
 ---
 
-
-
 \## 2. Cost Optimizer
-
-
 
 \### Overview
 
 The `CostOptimizer` provides comprehensive cost analysis, optimization, and budget management for memory storage systems.
 
-
-
 \### Key Features
-
-
 
 \#### 💰 Core Capabilities
 
@@ -414,8 +342,6 @@ The `CostOptimizer` provides comprehensive cost analysis, optimization, and budg
 
 \- \*\*Rollback support\*\* for failed optimizations
 
-
-
 \#### 📊 Optimization Strategies
 
 1\. \*\*Aggressive\*\* - Maximum savings, may impact performance
@@ -428,11 +354,7 @@ The `CostOptimizer` provides comprehensive cost analysis, optimization, and budg
 
 5\. \*\*Performance-Focused\*\* - Maintain performance, optimize only where it helps
 
-
-
 \### Usage Examples
-
-
 
 \#### Basic Usage
 
@@ -440,55 +362,47 @@ The `CostOptimizer` provides comprehensive cost analysis, optimization, and budg
 
 from cost\_optimizer import CostOptimizer, OptimizationStrategy, BudgetConfig
 
-
-
 \# Configure budget
 
 budget = BudgetConfig(
 
-&nbsp;   monthly\_budget=1000.0,
+&nbsp; monthly\_budget=1000.0,
 
-&nbsp;   storage\_limit\_gb=1000.0,
+&nbsp; storage\_limit\_gb=1000.0,
 
-&nbsp;   bandwidth\_limit\_gb=5000.0,
+&nbsp; bandwidth\_limit\_gb=5000.0,
 
-&nbsp;   alert\_threshold=0.8,    # Alert at 80%
+&nbsp; alert\_threshold=0.8, # Alert at 80%
 
-&nbsp;   hard\_limit\_threshold=0.95  # Hard stop at 95%
+&nbsp; hard\_limit\_threshold=0.95 # Hard stop at 95%
 
 )
-
-
 
 \# Initialize optimizer
 
 optimizer = CostOptimizer(
 
-&nbsp;   persistent\_memory=memory\_system,
+&nbsp; persistent\_memory=memory\_system,
 
-&nbsp;   budget\_config=budget,
+&nbsp; budget\_config=budget,
 
-&nbsp;   default\_strategy=OptimizationStrategy.BALANCED,
+&nbsp; default\_strategy=OptimizationStrategy.BALANCED,
 
-&nbsp;   auto\_optimize=True,      # Enable automatic optimization
+&nbsp; auto\_optimize=True, # Enable automatic optimization
 
-&nbsp;   optimization\_interval=3600  # Run every hour
+&nbsp; optimization\_interval=3600 # Run every hour
 
 )
-
-
 
 \# Run optimization
 
 report = optimizer.optimize\_storage(
 
-&nbsp;   strategy=OptimizationStrategy.BALANCED,
+&nbsp; strategy=OptimizationStrategy.BALANCED,
 
-&nbsp;   dry\_run=False
+&nbsp; dry\_run=False
 
 )
-
-
 
 print(f"Savings: ${report.savings:.2f}")
 
@@ -498,8 +412,6 @@ print(f"Actions: {', '.join(report.actions\_taken)}")
 
 ```
 
-
-
 \#### Dry Run (Safe Testing)
 
 ```python
@@ -508,27 +420,21 @@ print(f"Actions: {', '.join(report.actions\_taken)}")
 
 report = optimizer.optimize\_storage(
 
-&nbsp;   strategy=OptimizationStrategy.AGGRESSIVE,
+&nbsp; strategy=OptimizationStrategy.AGGRESSIVE,
 
-&nbsp;   dry\_run=True
+&nbsp; dry\_run=True
 
 )
-
-
 
 print("Recommendations:")
 
 for rec in report.recommendations:
 
-&nbsp;   print(f"  - {rec}")
-
-
+&nbsp; print(f" - {rec}")
 
 print("\\nNo changes were made (dry run)")
 
 ```
-
-
 
 \#### Full Optimization
 
@@ -538,25 +444,21 @@ print("\\nNo changes were made (dry run)")
 
 reports = optimizer.optimize\_full(
 
-&nbsp;   strategy=OptimizationStrategy.COST\_FOCUSED,
+&nbsp; strategy=OptimizationStrategy.COST\_FOCUSED,
 
-&nbsp;   dry\_run=False
+&nbsp; dry\_run=False
 
 )
 
-
-
 for report in reports:
 
-&nbsp;   print(f"\\n{report.optimization\_id}:")
+&nbsp; print(f"\\n{report.optimization\_id}:")
 
-&nbsp;   print(f"  Savings: ${report.savings:.2f}")
+&nbsp; print(f" Savings: ${report.savings:.2f}")
 
-&nbsp;   print(f"  Duration: {report.get\_duration():.2f}s")
+&nbsp; print(f" Duration: {report.get\_duration():.2f}s")
 
 ```
-
-
 
 \#### Budget Management
 
@@ -576,23 +478,19 @@ print(f"Usage: {status\['usage\_percentage']:.1f}%")
 
 print(f"Status: {status\['status']}")
 
-
-
 \# Forecast future costs
 
 forecast = optimizer.forecast\_costs(days=30)
 
 print(f"\\nCost forecast (30 days):")
 
-print(f"  Current daily: ${forecast\['current\_daily\_cost']:.2f}")
+print(f" Current daily: ${forecast\['current\_daily\_cost']:.2f}")
 
-print(f"  Projected total: ${forecast\['projected\_total']:.2f}")
+print(f" Projected total: ${forecast\['projected\_total']:.2f}")
 
-print(f"  Trend: {forecast\['trend']}")
+print(f" Trend: {forecast\['trend']}")
 
 ```
-
-
 
 \#### What-If Analysis
 
@@ -602,13 +500,11 @@ print(f"  Trend: {forecast\['trend']}")
 
 changes = {
 
-&nbsp;   'reduce\_storage\_by\_gb': 200,      # Reduce storage by 200 GB
+&nbsp; 'reduce\_storage\_by\_gb': 200, # Reduce storage by 200 GB
 
-&nbsp;   'increase\_cdn\_hit\_rate': 0.15     # Improve CDN hit rate by 15%
+&nbsp; 'increase\_cdn\_hit\_rate': 0.15 # Improve CDN hit rate by 15%
 
 }
-
-
 
 analysis = optimizer.what\_if\_analysis(changes)
 
@@ -621,8 +517,6 @@ print(f"Potential savings: ${analysis\['potential\_savings']:.2f}")
 print(f"Savings %: {analysis\['savings\_percentage']:.1f}%")
 
 ```
-
-
 
 \#### Metrics and History
 
@@ -642,19 +536,15 @@ print(f"GB saved: {metrics.total\_gb\_saved:.1f} GB")
 
 print(f"Avg savings: {metrics.average\_savings\_percentage:.1f}%")
 
-
-
 \# Get optimization history
 
 history = optimizer.get\_optimization\_history(n=10)
 
 for report in history:
 
-&nbsp;   print(f"{report.optimization\_id}: ${report.savings:.2f} ({report.status.value})")
+&nbsp; print(f"{report.optimization\_id}: ${report.savings:.2f} ({report.status.value})")
 
 ```
-
-
 
 \#### Custom Callbacks
 
@@ -664,27 +554,21 @@ for report in history:
 
 def on\_optimization\_complete(report):
 
-&nbsp;   print(f"✅ Optimization complete: ${report.savings:.2f} saved")
+&nbsp; print(f"✅ Optimization complete: ${report.savings:.2f} saved")
 
-&nbsp;   # Update dashboard, send notification, etc.
-
-
+&nbsp; # Update dashboard, send notification, etc.
 
 def on\_budget\_alert(level, status):
 
-&nbsp;   print(f"⚠️  Budget alert ({level}): {status\['message']}")
+&nbsp; print(f"⚠️ Budget alert ({level}): {status\['message']}")
 
-&nbsp;   # Send alert to admins, trigger emergency optimizations, etc.
-
-
+&nbsp; # Send alert to admins, trigger emergency optimizations, etc.
 
 optimizer.on\_optimization\_complete.append(on\_optimization\_complete)
 
 optimizer.on\_budget\_alert.append(on\_budget\_alert)
 
 ```
-
-
 
 \#### Cost Analysis
 
@@ -706,25 +590,19 @@ print(f"CDN: ${breakdown.cdn\_cost:.2f}")
 
 print(f"Total: ${breakdown.total\_cost:.2f}")
 
-
-
 \# Identify opportunities
 
 opportunities = optimizer.analyzer.identify\_optimization\_opportunities()
 
 for opp in opportunities:
 
-&nbsp;   print(f"{opp\['type']} ({opp\['priority']}): {opp.get('potential\_savings\_gb', 0):.1f} GB")
-
-
+&nbsp; print(f"{opp\['type']} ({opp\['priority']}): {opp.get('potential\_savings\_gb', 0):.1f} GB")
 
 \# Estimate savings
 
 estimated = optimizer.analyzer.estimate\_savings(opportunities)
 
 print(f"Total potential savings: ${estimated:.2f}")
-
-
 
 \# Get cost trends
 
@@ -738,11 +616,7 @@ print(f"Change: {trends\['change\_percentage']:.1f}%")
 
 ```
 
-
-
 \### Data Structures
-
-
 
 \#### CostBreakdown
 
@@ -752,23 +626,21 @@ print(f"Change: {trends\['change\_percentage']:.1f}%")
 
 class CostBreakdown:
 
-&nbsp;   storage\_cost: float
+&nbsp; storage\_cost: float
 
-&nbsp;   bandwidth\_cost: float
+&nbsp; bandwidth\_cost: float
 
-&nbsp;   compute\_cost: float
+&nbsp; compute\_cost: float
 
-&nbsp;   api\_cost: float
+&nbsp; api\_cost: float
 
-&nbsp;   cdn\_cost: float
+&nbsp; cdn\_cost: float
 
-&nbsp;   total\_cost: float
+&nbsp; total\_cost: float
 
-&nbsp;   timestamp: float
+&nbsp; timestamp: float
 
 ```
-
-
 
 \#### OptimizationReport
 
@@ -778,35 +650,33 @@ class CostBreakdown:
 
 class OptimizationReport:
 
-&nbsp;   optimization\_id: str
+&nbsp; optimization\_id: str
 
-&nbsp;   strategy: OptimizationStrategy
+&nbsp; strategy: OptimizationStrategy
 
-&nbsp;   phase: OptimizationPhase
+&nbsp; phase: OptimizationPhase
 
-&nbsp;   started\_at: float
+&nbsp; started\_at: float
 
-&nbsp;   completed\_at: Optional\[float]
+&nbsp; completed\_at: Optional\[float]
 
-&nbsp;   cost\_before: Optional\[CostBreakdown]
+&nbsp; cost\_before: Optional\[CostBreakdown]
 
-&nbsp;   cost\_after: Optional\[CostBreakdown]
+&nbsp; cost\_after: Optional\[CostBreakdown]
 
-&nbsp;   savings: float
+&nbsp; savings: float
 
-&nbsp;   savings\_percentage: float
+&nbsp; savings\_percentage: float
 
-&nbsp;   actions\_taken: List\[str]
+&nbsp; actions\_taken: List\[str]
 
-&nbsp;   recommendations: List\[str]
+&nbsp; recommendations: List\[str]
 
-&nbsp;   warnings: List\[str]
+&nbsp; warnings: List\[str]
 
-&nbsp;   metadata: Dict\[str, Any]
+&nbsp; metadata: Dict\[str, Any]
 
 ```
-
-
 
 \#### BudgetConfig
 
@@ -816,27 +686,21 @@ class OptimizationReport:
 
 class BudgetConfig:
 
-&nbsp;   monthly\_budget: float = 1000.0
+&nbsp; monthly\_budget: float = 1000.0
 
-&nbsp;   storage\_limit\_gb: float = 1000.0
+&nbsp; storage\_limit\_gb: float = 1000.0
 
-&nbsp;   bandwidth\_limit\_gb: float = 5000.0
+&nbsp; bandwidth\_limit\_gb: float = 5000.0
 
-&nbsp;   alert\_threshold: float = 0.8
+&nbsp; alert\_threshold: float = 0.8
 
-&nbsp;   hard\_limit\_threshold: float = 0.95
+&nbsp; hard\_limit\_threshold: float = 0.95
 
 ```
 
-
-
 ---
 
-
-
 \## Integration Examples
-
-
 
 \### Combined Usage
 
@@ -846,73 +710,59 @@ class BudgetConfig:
 
 unlearning = GovernedUnlearning(
 
-&nbsp;   persistent\_memory=memory\_system,
+&nbsp; persistent\_memory=memory\_system,
 
-&nbsp;   audit\_log\_file="/var/log/unlearning.jsonl"
+&nbsp; audit\_log\_file="/var/log/unlearning.jsonl"
 
 )
-
-
 
 optimizer = CostOptimizer(
 
-&nbsp;   persistent\_memory=memory\_system,
+&nbsp; persistent\_memory=memory\_system,
 
-&nbsp;   budget\_config=BudgetConfig(monthly\_budget=5000.0),
+&nbsp; budget\_config=BudgetConfig(monthly\_budget=5000.0),
 
-&nbsp;   auto\_optimize=True
+&nbsp; auto\_optimize=True
 
 )
-
-
 
 \# Callback: Optimize after unlearning completes
 
 def optimize\_after\_unlearning(task):
 
-&nbsp;   if task.status == ProposalStatus.COMPLETED:
+&nbsp; if task.status == ProposalStatus.COMPLETED:
 
-&nbsp;       print("Unlearning completed, running optimization...")
+&nbsp; print("Unlearning completed, running optimization...")
 
-&nbsp;       optimizer.optimize\_storage(strategy=OptimizationStrategy.BALANCED)
-
-
+&nbsp; optimizer.optimize\_storage(strategy=OptimizationStrategy.BALANCED)
 
 unlearning.on\_completion.append(optimize\_after\_unlearning)
-
-
 
 \# Callback: Alert on budget issues
 
 def handle\_budget\_alert(level, status):
 
-&nbsp;   if level == 'critical':
+&nbsp; if level == 'critical':
 
-&nbsp;       # Emergency optimization
+&nbsp; # Emergency optimization
 
-&nbsp;       print("Critical budget alert! Running aggressive optimization...")
+&nbsp; print("Critical budget alert! Running aggressive optimization...")
 
-&nbsp;       optimizer.optimize\_full(strategy=OptimizationStrategy.AGGRESSIVE)
-
-
+&nbsp; optimizer.optimize\_full(strategy=OptimizationStrategy.AGGRESSIVE)
 
 optimizer.on\_budget\_alert.append(handle\_budget\_alert)
-
-
 
 \# Regular operations
 
 result = unlearning.request\_unlearning(
 
-&nbsp;   pattern="old\_data\_\*",
+&nbsp; pattern="old\_data\_\*",
 
-&nbsp;   requester\_id="system",
+&nbsp; requester\_id="system",
 
-&nbsp;   urgency=UrgencyLevel.NORMAL
+&nbsp; urgency=UrgencyLevel.NORMAL
 
 )
-
-
 
 \# Check costs
 
@@ -920,11 +770,9 @@ budget\_status = optimizer.check\_budget()
 
 if budget\_status\['status'] == 'warning':
 
-&nbsp;   print("Budget warning - consider optimization")
+&nbsp; print("Budget warning - consider optimization")
 
 ```
-
-
 
 \### Shutdown
 
@@ -938,19 +786,11 @@ optimizer.shutdown()
 
 ```
 
-
-
 ---
-
-
 
 \## Advanced Features
 
-
-
 \### Governed Unlearning
-
-
 
 \#### Custom Urgency Thresholds
 
@@ -958,19 +798,17 @@ optimizer.shutdown()
 
 unlearning.urgency\_thresholds = {
 
-&nbsp;   UrgencyLevel.CRITICAL: timedelta(minutes=30),
+&nbsp; UrgencyLevel.CRITICAL: timedelta(minutes=30),
 
-&nbsp;   UrgencyLevel.HIGH: timedelta(hours=2),
+&nbsp; UrgencyLevel.HIGH: timedelta(hours=2),
 
-&nbsp;   UrgencyLevel.NORMAL: timedelta(hours=12),
+&nbsp; UrgencyLevel.NORMAL: timedelta(hours=12),
 
-&nbsp;   UrgencyLevel.LOW: timedelta(days=3)
+&nbsp; UrgencyLevel.LOW: timedelta(days=3)
 
 }
 
 ```
-
-
 
 \#### Pattern Conflict Resolution
 
@@ -982,15 +820,11 @@ conflicts = unlearning.\_check\_pattern\_conflicts("user\_data\_\*")
 
 if conflicts:
 
-&nbsp;   print(f"Warning: Conflicts with {len(conflicts)} existing patterns")
+&nbsp; print(f"Warning: Conflicts with {len(conflicts)} existing patterns")
 
 ```
 
-
-
 \### Cost Optimizer
-
-
 
 \#### Custom Pricing
 
@@ -1000,25 +834,23 @@ if conflicts:
 
 optimizer.analyzer.pricing = {
 
-&nbsp;   'storage\_hot\_gb\_month': 0.30,
+&nbsp; 'storage\_hot\_gb\_month': 0.30,
 
-&nbsp;   'storage\_warm\_gb\_month': 0.12,
+&nbsp; 'storage\_warm\_gb\_month': 0.12,
 
-&nbsp;   'storage\_cold\_gb\_month': 0.03,
+&nbsp; 'storage\_cold\_gb\_month': 0.03,
 
-&nbsp;   'bandwidth\_gb': 0.10,
+&nbsp; 'bandwidth\_gb': 0.10,
 
-&nbsp;   'compute\_hour': 0.08,
+&nbsp; 'compute\_hour': 0.08,
 
-&nbsp;   'api\_call': 0.0002,
+&nbsp; 'api\_call': 0.0002,
 
-&nbsp;   'cdn\_request': 0.000002
+&nbsp; 'cdn\_request': 0.000002
 
 }
 
 ```
-
-
 
 \#### Manual Optimization Planning
 
@@ -1028,37 +860,27 @@ optimizer.analyzer.pricing = {
 
 opportunities = optimizer.analyzer.identify\_optimization\_opportunities()
 
-
-
 \# Create custom plan
 
 plan = optimizer.\_create\_optimization\_plan(
 
-&nbsp;   opportunities,
+&nbsp; opportunities,
 
-&nbsp;   OptimizationStrategy.COST\_FOCUSED
+&nbsp; OptimizationStrategy.COST\_FOCUSED
 
 )
-
-
 
 \# Review before execution
 
 for step in plan:
 
-&nbsp;   print(f"Will execute: {step\['description']}")
+&nbsp; print(f"Will execute: {step\['description']}")
 
 ```
 
-
-
 ---
 
-
-
 \## Best Practices
-
-
 
 \### Governed Unlearning
 
@@ -1076,8 +898,6 @@ for step in plan:
 
 7\. \*\*Configure consensus\*\* with appropriate stakeholders
 
-
-
 \### Cost Optimizer
 
 1\. \*\*Run dry-runs first\*\* before production optimizations
@@ -1094,19 +914,11 @@ for step in plan:
 
 7\. \*\*Test callbacks\*\* before deploying to production
 
-
-
 ---
-
-
 
 \## Error Handling
 
-
-
 Both modules include comprehensive error handling and logging. Monitor logs for issues:
-
-
 
 ```python
 
@@ -1120,15 +932,9 @@ logger = logging.getLogger('cost\_optimizer')
 
 ```
 
-
-
 ---
 
-
-
 \## Performance Considerations
-
-
 
 \- \*\*Governed Unlearning\*\*: Parallel execution with configurable max\_workers
 
@@ -1140,17 +946,11 @@ logger = logging.getLogger('cost\_optimizer')
 
 \- \*\*Graceful Shutdown\*\*: Both support clean shutdown procedures
 
-
-
 ---
-
-
 
 \## License \& Support
 
-
-
-These upgraded modules are production-ready implementations with enterprise-grade features. For support:
+These upgraded modules are implementations with enterprise-grade features. For support:
 
 \- Review logs for detailed error messages
 

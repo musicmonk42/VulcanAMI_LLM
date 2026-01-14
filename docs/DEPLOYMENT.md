@@ -18,9 +18,9 @@ Before deploying to any environment, run the comprehensive test suite to ensure 
 ./test_full_cicd.sh
 
 # Test specific components
-./quick_test.sh docker      # Docker configurations
-./quick_test.sh k8s         # Kubernetes manifests
-./quick_test.sh security    # Security settings
+./quick_test.sh docker # Docker configurations
+./quick_test.sh k8s # Kubernetes manifests
+./quick_test.sh security # Security settings
 
 # Run pytest test suite
 pytest tests/test_cicd_reproducibility.py -v
@@ -87,13 +87,13 @@ make logs-compose
 
 **Full Mode (Production)**:
 - Requires ONE of these environment variables:
-  - `JWT_SECRET`
-  - `JWT_SECRET_KEY`  
-  - `GRAPHIX_JWT_SECRET`
+ - `JWT_SECRET`
+ - `JWT_SECRET_KEY` 
+ - `GRAPHIX_JWT_SECRET`
 - Secret requirements:
-  - Minimum 32 characters
-  - No weak patterns (password, 123456, etc.)
-  - URL-safe characters recommended
+ - Minimum 32 characters
+ - No weak patterns (password, 123456, etc.)
+ - URL-safe characters recommended
 - All features enabled including authentication
 
 **Generate a secure JWT secret**:
@@ -121,8 +121,8 @@ JWT_SECRET=$(openssl rand -base64 48 | tr -d '+/')
 ✅ Verified JWT secret in variable: JWT_SECRET (rotate secrets periodically)
 
 # Without valid JWT (LIMITED MODE):
-⚠️  WARNING: No valid JWT secret provided.
-⚠️  Application will start in LIMITED MODE without JWT authentication
+⚠️ WARNING: No valid JWT secret provided.
+⚠️ Application will start in LIMITED MODE without JWT authentication
 ```
 
 #### Production Docker Compose
@@ -185,7 +185,7 @@ For reproducible deployments, the kustomize overlays use `IMAGE_TAG` as a placeh
 
 ```bash
 # Option 1: Edit kustomization.yaml directly
-cd k8s/overlays/<environment>  # development, staging, or production
+cd k8s/overlays/<environment> # development, staging, or production
 # Edit kustomization.yaml and replace IMAGE_TAG with your version (e.g., v1.0.0)
 
 # Option 2: Use kustomize edit command for specific environment
@@ -198,13 +198,13 @@ kustomize edit set image ghcr.io/musicmonk42/vulcanami_llm-api:develop-abc1234
 
 # Option 3: Use sed for automated replacement (works for any overlay)
 VERSION=v1.0.0
-ENVIRONMENT=production  # or development, staging
+ENVIRONMENT=production # or development, staging
 sed -i "s|newTag: IMAGE_TAG|newTag: $VERSION|g" k8s/overlays/$ENVIRONMENT/kustomization.yaml
 
 # Option 4: Replace in all overlays at once
 VERSION=v1.0.0
 for env in development staging production; do
-  sed -i "s|newTag: IMAGE_TAG|newTag: $VERSION|g" k8s/overlays/$env/kustomization.yaml
+ sed -i "s|newTag: IMAGE_TAG|newTag: $VERSION|g" k8s/overlays/$env/kustomization.yaml
 done
 ```
 
@@ -294,25 +294,25 @@ Secrets must be created before deployment. You have three options:
 
 # For production with custom API keys
 ./scripts/generate-secrets.sh | \
-  sed 's/OPENAI_API_KEY: ""/OPENAI_API_KEY: "sk-your-key"/' | \
-  kubectl apply -f - -n vulcanami-production
+ sed 's/OPENAI_API_KEY: ""/OPENAI_API_KEY: "sk-your-key"/' | \
+ kubectl apply -f - -n vulcanami-production
 ```
 
 **Option 2: Manual creation with kubectl**
 ```bash
 kubectl create secret generic vulcanami-secrets \
-  --from-literal=JWT_SECRET_KEY=$(openssl rand -base64 48) \
-  --from-literal=BOOTSTRAP_KEY=$(openssl rand -base64 32) \
-  --from-literal=POSTGRES_PASSWORD=$(openssl rand -base64 32) \
-  --from-literal=REDIS_PASSWORD=$(openssl rand -base64 32) \
-  --from-literal=MINIO_ROOT_USER=minioadmin \
-  --from-literal=MINIO_ROOT_PASSWORD=$(openssl rand -base64 32) \
-  --from-literal=MINIO_SECRET_KEY=$(openssl rand -base64 24) \
-  --from-literal=OPENAI_API_KEY=sk-your-openai-api-key \
-  --from-literal=VULCAN_LLM_API_KEY=sk-your-openai-api-key \
-  --from-literal=AWS_ACCESS_KEY_ID=minioadmin \
-  --from-literal=AWS_SECRET_ACCESS_KEY=$(openssl rand -base64 32) \
-  -n vulcanami-development
+ --from-literal=JWT_SECRET_KEY=$(openssl rand -base64 48) \
+ --from-literal=BOOTSTRAP_KEY=$(openssl rand -base64 32) \
+ --from-literal=POSTGRES_PASSWORD=$(openssl rand -base64 32) \
+ --from-literal=REDIS_PASSWORD=$(openssl rand -base64 32) \
+ --from-literal=MINIO_ROOT_USER=minioadmin \
+ --from-literal=MINIO_ROOT_PASSWORD=$(openssl rand -base64 32) \
+ --from-literal=MINIO_SECRET_KEY=$(openssl rand -base64 24) \
+ --from-literal=OPENAI_API_KEY=sk-your-openai-api-key \
+ --from-literal=VULCAN_LLM_API_KEY=sk-your-openai-api-key \
+ --from-literal=AWS_ACCESS_KEY_ID=minioadmin \
+ --from-literal=AWS_SECRET_ACCESS_KEY=$(openssl rand -base64 32) \
+ -n vulcanami-development
 ```
 
 **Option 3: External Secret Manager (Production)**
@@ -340,12 +340,12 @@ kubectl apply -f https://raw.githubusercontent.com/external-secrets/external-sec
 # Create namespace (kustomize will create vulcanami-development)
 # Create secrets in development namespace
 kubectl create secret generic vulcanami-secrets \
-  --from-literal=JWT_SECRET_KEY=$(openssl rand -base64 48) \
-  --from-literal=BOOTSTRAP_KEY=$(openssl rand -base64 32) \
-  --from-literal=POSTGRES_PASSWORD=$(openssl rand -base64 32) \
-  --from-literal=REDIS_PASSWORD=$(openssl rand -base64 32) \
-  --from-literal=MINIO_SECRET_KEY=$(openssl rand -base64 24) \
-  -n vulcanami-development
+ --from-literal=JWT_SECRET_KEY=$(openssl rand -base64 48) \
+ --from-literal=BOOTSTRAP_KEY=$(openssl rand -base64 32) \
+ --from-literal=POSTGRES_PASSWORD=$(openssl rand -base64 32) \
+ --from-literal=REDIS_PASSWORD=$(openssl rand -base64 32) \
+ --from-literal=MINIO_SECRET_KEY=$(openssl rand -base64 24) \
+ -n vulcanami-development
 
 # Apply development configuration
 kubectl apply -k k8s/overlays/development/
@@ -365,12 +365,12 @@ kubectl logs -f deployment/dev-vulcanami-api -n vulcanami-development
 ```bash
 # Create secrets in production namespace
 kubectl create secret generic vulcanami-secrets \
-  --from-literal=JWT_SECRET_KEY=$(openssl rand -base64 48) \
-  --from-literal=BOOTSTRAP_KEY=$(openssl rand -base64 32) \
-  --from-literal=POSTGRES_PASSWORD=$(openssl rand -base64 32) \
-  --from-literal=REDIS_PASSWORD=$(openssl rand -base64 32) \
-  --from-literal=MINIO_SECRET_KEY=$(openssl rand -base64 24) \
-  -n vulcanami-production
+ --from-literal=JWT_SECRET_KEY=$(openssl rand -base64 48) \
+ --from-literal=BOOTSTRAP_KEY=$(openssl rand -base64 32) \
+ --from-literal=POSTGRES_PASSWORD=$(openssl rand -base64 32) \
+ --from-literal=REDIS_PASSWORD=$(openssl rand -base64 32) \
+ --from-literal=MINIO_SECRET_KEY=$(openssl rand -base64 24) \
+ -n vulcanami-production
 
 # Apply production configuration
 kubectl apply -k k8s/overlays/production/
@@ -402,51 +402,51 @@ cat > values-prod.yaml << 'EOF'
 replicaCount: 5
 
 image:
-  tag: "v1.0.0"
+ tag: "v1.0.0"
 
 ingress:
-  enabled: true
-  hosts:
-    - host: api.vulcanami.example.com
-      paths:
-        - path: /
-          pathType: Prefix
+ enabled: true
+ hosts:
+ - host: api.vulcanami.example.com
+ paths:
+ - path: /
+ pathType: Prefix
 
 resources:
-  requests:
-    cpu: 1000m
-    memory: 2Gi
-  limits:
-    cpu: 4000m
-    memory: 8Gi
+ requests:
+ cpu: 1000m
+ memory: 2Gi
+ limits:
+ cpu: 4000m
+ memory: 8Gi
 
 autoscaling:
-  enabled: true
-  minReplicas: 3
-  maxReplicas: 20
+ enabled: true
+ minReplicas: 3
+ maxReplicas: 20
 
 config:
-  environment: production
-  logLevel: INFO
+ environment: production
+ logLevel: INFO
 
 secrets:
-  jwtSecretKey: "your-secret"
-  bootstrapKey: "your-secret"
-  postgresPassword: "your-secret"
-  redisPassword: "your-secret"
-  minioSecretKey: "your-secret"
+ jwtSecretKey: "your-secret"
+ bootstrapKey: "your-secret"
+ postgresPassword: "your-secret"
+ redisPassword: "your-secret"
+ minioSecretKey: "your-secret"
 EOF
 
 # Install
 helm install vulcanami . \
-  --namespace vulcanami \
-  --create-namespace \
-  --values values-prod.yaml
+ --namespace vulcanami \
+ --create-namespace \
+ --values values-prod.yaml
 
 # Upgrade
 helm upgrade vulcanami . \
-  --namespace vulcanami \
-  --values values-prod.yaml
+ --namespace vulcanami \
+ --values values-prod.yaml
 
 # Uninstall
 helm uninstall vulcanami -n vulcanami
@@ -457,14 +457,14 @@ helm uninstall vulcanami -n vulcanami
 ```bash
 # Create EKS cluster
 eksctl create cluster \
-  --name vulcanami-prod \
-  --region us-east-1 \
-  --nodegroup-name standard-workers \
-  --node-type t3.xlarge \
-  --nodes 3 \
-  --nodes-min 2 \
-  --nodes-max 10 \
-  --managed
+ --name vulcanami-prod \
+ --region us-east-1 \
+ --nodegroup-name standard-workers \
+ --node-type t3.xlarge \
+ --nodes 3 \
+ --nodes-min 2 \
+ --nodes-max 10 \
+ --managed
 
 # Configure kubectl
 aws eks update-kubeconfig --region us-east-1 --name vulcanami-prod
@@ -501,19 +501,19 @@ az group create --name vulcanami-prod --location eastus
 
 # Create Azure Container Registry (ACR)
 az acr create \
-  --resource-group vulcanami-prod \
-  --name vulcanamiregistry \
-  --sku Standard
+ --resource-group vulcanami-prod \
+ --name vulcanamiregistry \
+ --sku Standard
 
 # Create AKS cluster
 az aks create \
-  --resource-group vulcanami-prod \
-  --name vulcanami-cluster \
-  --node-count 3 \
-  --node-vm-size Standard_D4s_v3 \
-  --enable-managed-identity \
-  --attach-acr vulcanamiregistry \
-  --generate-ssh-keys
+ --resource-group vulcanami-prod \
+ --name vulcanami-cluster \
+ --node-count 3 \
+ --node-vm-size Standard_D4s_v3 \
+ --enable-managed-identity \
+ --attach-acr vulcanamiregistry \
+ --generate-ssh-keys
 
 # Get credentials
 az aks get-credentials --resource-group vulcanami-prod --name vulcanami-cluster
@@ -521,8 +521,8 @@ az aks get-credentials --resource-group vulcanami-prod --name vulcanami-cluster
 # Install ingress
 helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
 helm install ingress-nginx ingress-nginx/ingress-nginx \
-  --create-namespace \
-  --namespace ingress-nginx
+ --create-namespace \
+ --namespace ingress-nginx
 
 # Deploy application
 kubectl apply -k k8s/overlays/production/
@@ -543,18 +543,18 @@ az account show --query id --output tsv
 
 # Create Service Principal with Contributor role
 az ad sp create-for-rbac \
-  --name "github-actions-vulcanami" \
-  --role contributor \
-  --scopes /subscriptions/{YOUR_SUBSCRIPTION_ID} \
-  --sdk-auth
+ --name "github-actions-vulcanami" \
+ --role contributor \
+ --scopes /subscriptions/{YOUR_SUBSCRIPTION_ID} \
+ --sdk-auth
 
 # Output will show:
 # {
-#   "clientId": "xxxx",
-#   "clientSecret": "xxxx",
-#   "subscriptionId": "xxxx",
-#   "tenantId": "xxxx",
-#   ...
+# "clientId": "xxxx",
+# "clientSecret": "xxxx",
+# "subscriptionId": "xxxx",
+# "tenantId": "xxxx",
+# ...
 # }
 ```
 
@@ -578,12 +578,12 @@ Edit `.github/workflows/azure-kubernetes-service-helm.yml` and update environmen
 
 ```yaml
 env:
-  AZURE_CONTAINER_REGISTRY: "vulcanamiregistry"  # Your ACR name (without .azurecr.io)
-  CONTAINER_NAME: "vulcanami-llm"                 # Your container image name
-  RESOURCE_GROUP: "vulcanami-prod"                # Your resource group name
-  CLUSTER_NAME: "vulcanami-cluster"               # Your AKS cluster name
-  CHART_PATH: "helm/vulcanami"                    # Path to your Helm chart
-  CHART_OVERRIDE_PATH: "helm/vulcanami/values-prod.yaml"  # Values override file
+ AZURE_CONTAINER_REGISTRY: "vulcanamiregistry" # Your ACR name (without .azurecr.io)
+ CONTAINER_NAME: "vulcanami-llm" # Your container image name
+ RESOURCE_GROUP: "vulcanami-prod" # Your resource group name
+ CLUSTER_NAME: "vulcanami-cluster" # Your AKS cluster name
+ CHART_PATH: "helm/vulcanami" # Path to your Helm chart
+ CHART_OVERRIDE_PATH: "helm/vulcanami/values-prod.yaml" # Values override file
 ```
 
 **Step 4: Trigger Deployment**
@@ -604,12 +604,12 @@ The workflow automatically runs on:
 ```bash
 # Create cluster
 gcloud container clusters create vulcanami-prod \
-  --zone us-central1-a \
-  --num-nodes 3 \
-  --machine-type n1-standard-4 \
-  --enable-autoscaling \
-  --min-nodes 2 \
-  --max-nodes 10
+ --zone us-central1-a \
+ --num-nodes 3 \
+ --machine-type n1-standard-4 \
+ --enable-autoscaling \
+ --min-nodes 2 \
+ --max-nodes 10
 
 # Get credentials
 gcloud container clusters get-credentials vulcanami-prod --zone us-central1-a
@@ -659,13 +659,13 @@ PYTHONUNBUFFERED=1
 ```bash
 # Using kubectl (development)
 kubectl create secret generic vulcanami-secrets \
-  --from-env-file=.env \
-  -n vulcanami-development
+ --from-env-file=.env \
+ -n vulcanami-development
 
 # Using kubectl (production)
 kubectl create secret generic vulcanami-secrets \
-  --from-env-file=.env \
-  -n vulcanami-production
+ --from-env-file=.env \
+ -n vulcanami-production
 
 # Using sealed-secrets
 kubeseal --format yaml < secret.yaml > sealed-secret.yaml
@@ -678,22 +678,22 @@ kubectl apply -f sealed-secret.yaml
 apiVersion: external-secrets.io/v1beta1
 kind: ExternalSecret
 metadata:
-  name: vulcanami-secrets
-  namespace: vulcanami-production  # or vulcanami-development
+ name: vulcanami-secrets
+ namespace: vulcanami-production # or vulcanami-development
 spec:
-  refreshInterval: 1h
-  secretStoreRef:
-    name: aws-secretsmanager
-    kind: SecretStore
-  target:
-    name: vulcanami-secrets
-  data:
-  - secretKey: JWT_SECRET_KEY
-    remoteRef:
-      key: vulcanami/jwt-secret
-  - secretKey: POSTGRES_PASSWORD
-    remoteRef:
-      key: vulcanami/postgres-password
+ refreshInterval: 1h
+ secretStoreRef:
+ name: aws-secretsmanager
+ kind: SecretStore
+ target:
+ name: vulcanami-secrets
+ data:
+ - secretKey: JWT_SECRET_KEY
+ remoteRef:
+ key: vulcanami/jwt-secret
+ - secretKey: POSTGRES_PASSWORD
+ remoteRef:
+ key: vulcanami/postgres-password
 ```
 
 ## Monitoring
@@ -777,12 +777,12 @@ Update resource limits:
 
 ```yaml
 resources:
-  requests:
-    cpu: 2000m
-    memory: 4Gi
-  limits:
-    cpu: 4000m
-    memory: 8Gi
+ requests:
+ cpu: 2000m
+ memory: 4Gi
+ limits:
+ cpu: 4000m
+ memory: 8Gi
 ```
 
 ## Backup and Restore
@@ -819,7 +819,7 @@ mc mirror ./backup/ minio/vulcanami-hot
 
 ```bash
 # Check pod status (replace namespace as needed)
-kubectl describe pod <pod-name> -n vulcanami-development  # or vulcanami-production
+kubectl describe pod <pod-name> -n vulcanami-development # or vulcanami-production
 
 # Check events
 kubectl get events -n vulcanami-development --sort-by='.lastTimestamp'
@@ -832,7 +832,7 @@ kubectl logs <pod-name> -n vulcanami-development
 
 ```bash
 # Check service (replace namespace as needed)
-kubectl get svc -n vulcanami-development  # or vulcanami-production
+kubectl get svc -n vulcanami-development # or vulcanami-production
 
 # Check ingress
 kubectl get ingress -n vulcanami-development
@@ -854,14 +854,14 @@ curl http://prod-vulcanami-api.vulcanami-production.svc.cluster.local:8000/healt
 ```bash
 # Test database connectivity (development)
 kubectl run -it --rm psql --image=postgres:14 --restart=Never -n vulcanami-development -- \
-  psql -h postgres-service.vulcanami-development.svc.cluster.local -U vulcanami -d vulcanami
+ psql -h postgres-service.vulcanami-development.svc.cluster.local -U vulcanami -d vulcanami
 
 # Test database connectivity (production)
 kubectl run -it --rm psql --image=postgres:14 --restart=Never -n vulcanami-production -- \
-  psql -h postgres-service.vulcanami-production.svc.cluster.local -U vulcanami -d vulcanami
+ psql -h postgres-service.vulcanami-production.svc.cluster.local -U vulcanami -d vulcanami
 
 # Check database logs (replace namespace as needed)
-kubectl logs -n vulcanami-development postgres-0  # or vulcanami-production
+kubectl logs -n vulcanami-development postgres-0 # or vulcanami-production
 ```
 
 ## Security Hardening
@@ -888,13 +888,13 @@ kubectl logs -n vulcanami-development postgres-0  # or vulcanami-production
 ```bash
 # Update image version (development)
 kubectl set image deployment/dev-vulcanami-api \
-  api=ghcr.io/musicmonk42/vulcanami_llm-api:v1.1.0 \
-  -n vulcanami-development
+ api=ghcr.io/musicmonk42/vulcanami_llm-api:v1.1.0 \
+ -n vulcanami-development
 
 # Update image version (production)
 kubectl set image deployment/prod-vulcanami-api \
-  api=ghcr.io/musicmonk42/vulcanami_llm-api:v1.1.0 \
-  -n vulcanami-production
+ api=ghcr.io/musicmonk42/vulcanami_llm-api:v1.1.0 \
+ -n vulcanami-production
 
 # Check rollout status (development)
 kubectl rollout status deployment/dev-vulcanami-api -n vulcanami-development
@@ -936,8 +936,8 @@ kubectl exec -n vulcanami-development deploy/vulcanami-api -- curl -s http://loc
 **Symptoms:**
 ```bash
 $ kubectl get pods -n vulcanami-development
-NAME                           READY   STATUS    RESTARTS   AGE
-vulcanami-api-xxx             0/1     Pending   0          5m
+NAME READY STATUS RESTARTS AGE
+vulcanami-api-xxx 0/1 Pending 0 5m
 ```
 
 **Diagnosis:**
@@ -985,7 +985,7 @@ kubectl logs -n vulcanami-development -l app=milvus --tail=100
 
 # 4. Test connectivity from API pod
 kubectl exec -n vulcanami-development deploy/vulcanami-api -- \
-  nc -zv milvus-service 19530
+ nc -zv milvus-service 19530
 ```
 
 #### Issue: MinIO bucket not created
@@ -1006,9 +1006,9 @@ kubectl logs -n vulcanami-development job/minio-bucket-setup
 
 # 3. Manually create bucket if job failed
 kubectl exec -n vulcanami-development -it sts/minio -- \
-  mc alias set myminio http://localhost:9000 minioadmin <password>
+ mc alias set myminio http://localhost:9000 minioadmin <password>
 kubectl exec -n vulcanami-development -it sts/minio -- \
-  mc mb myminio/vulcanami-memory
+ mc mb myminio/vulcanami-memory
 
 # 4. Restart the bucket setup job
 kubectl delete job minio-bucket-setup -n vulcanami-development
@@ -1033,15 +1033,15 @@ kubectl get secrets -n vulcanami-development
 
 # 3. Create image pull secret if needed
 kubectl create secret docker-registry ghcr-secret \
-  --docker-server=ghcr.io \
-  --docker-username=<your-username> \
-  --docker-password=<your-token> \
-  -n vulcanami-development
+ --docker-server=ghcr.io \
+ --docker-username=<your-username> \
+ --docker-password=<your-token> \
+ -n vulcanami-development
 
 # 4. Patch service account to use secret
 kubectl patch serviceaccount default \
-  -n vulcanami-development \
-  -p '{"imagePullSecrets": [{"name": "ghcr-secret"}]}'
+ -n vulcanami-development \
+ -p '{"imagePullSecrets": [{"name": "ghcr-secret"}]}'
 ```
 
 #### Issue: Secrets contain placeholder values
@@ -1062,7 +1062,7 @@ kubectl delete secret vulcanami-secrets -n vulcanami-development
 
 # Or update specific secret keys
 kubectl patch secret vulcanami-secrets -n vulcanami-development \
-  -p="{\"data\":{\"POSTGRES_PASSWORD\":\"$(echo -n 'your-password' | base64)\"}}"
+ -p="{\"data\":{\"POSTGRES_PASSWORD\":\"$(echo -n 'your-password' | base64)\"}}"
 ```
 
 #### Issue: Network policy blocking connections
@@ -1093,8 +1093,8 @@ kubectl apply -k k8s/overlays/development/
 **Symptoms:**
 ```bash
 $ kubectl get pvc -n vulcanami-development
-NAME                    STATUS    VOLUME   CAPACITY
-milvus-storage-milvus-0 Pending            
+NAME STATUS VOLUME CAPACITY
+milvus-storage-milvus-0 Pending 
 ```
 
 **Solutions:**
@@ -1121,7 +1121,7 @@ kubectl get all -n vulcanami-development
 # Check pod logs
 kubectl logs -n vulcanami-development <pod-name>
 kubectl logs -n vulcanami-development <pod-name> -c <container-name>
-kubectl logs -n vulcanami-development <pod-name> --previous  # Previous container
+kubectl logs -n vulcanami-development <pod-name> --previous # Previous container
 
 # Follow logs in real-time
 kubectl logs -f -n vulcanami-development -l app=vulcanami-api
@@ -1175,9 +1175,9 @@ helm repo update
 
 # Install kube-prometheus-stack
 helm install prometheus prometheus-community/kube-prometheus-stack \
-  --namespace monitoring \
-  --create-namespace \
-  --set prometheus.prometheusSpec.serviceMonitorSelectorNilUsesHelmValues=false
+ --namespace monitoring \
+ --create-namespace \
+ --set prometheus.prometheusSpec.serviceMonitorSelectorNilUsesHelmValues=false
 
 # Access Grafana dashboard
 kubectl port-forward -n monitoring svc/prometheus-grafana 3000:80
@@ -1232,16 +1232,16 @@ helm repo update
 
 # Install Elasticsearch
 helm install elasticsearch elastic/elasticsearch \
-  --namespace logging \
-  --create-namespace
+ --namespace logging \
+ --create-namespace
 
 # Install Fluentd
 kubectl apply -f https://raw.githubusercontent.com/fluent/fluentd-kubernetes-daemonset/master/fluentd-daemonset-elasticsearch.yaml
 
 # Install Kibana
 helm install kibana elastic/kibana \
-  --namespace logging \
-  --set elasticsearchHosts=http://elasticsearch-master:9200
+ --namespace logging \
+ --set elasticsearchHosts=http://elasticsearch-master:9200
 ```
 
 ## Rollback Procedures
@@ -1321,7 +1321,7 @@ kubectl rollout status deployment/prod-vulcanami-api -n vulcanami-production
 
 # 6. Verify health
 kubectl exec -n vulcanami-production deploy/prod-vulcanami-api -- \
-  curl -s http://localhost:8000/health/ready
+ curl -s http://localhost:8000/health/ready
 ```
 
 ### Major Version Upgrade
@@ -1339,7 +1339,7 @@ kubectl exec -n vulcanami-development deploy/vulcanami-api -- python -m pytest /
 
 # 4. Backup production data
 kubectl exec -n vulcanami-production sts/postgres-0 -- \
-  pg_dump -U vulcanami vulcanami > backup-$(date +%Y%m%d).sql
+ pg_dump -U vulcanami vulcanami > backup-$(date +%Y%m%d).sql
 
 # 5. Schedule maintenance window
 
@@ -1358,8 +1358,8 @@ kubectl scale deployment vulcanami-api -n vulcanami-production --replicas=5
 
 # 2. Update image with rolling update strategy
 kubectl set image deployment/vulcanami-api \
-  api=ghcr.io/musicmonk42/vulcanami_llm-api:v1.1.0 \
-  -n vulcanami-production
+ api=ghcr.io/musicmonk42/vulcanami_llm-api:v1.1.0 \
+ -n vulcanami-production
 
 # 3. Monitor rollout
 kubectl rollout status deployment/vulcanami-api -n vulcanami-production
@@ -1378,9 +1378,9 @@ kubectl top pods -n vulcanami-production
 
 # Adjust resource requests/limits based on actual usage
 kubectl set resources deployment vulcanami-api \
-  -n vulcanami-production \
-  --limits=cpu=4000m,memory=8Gi \
-  --requests=cpu=1000m,memory=2Gi
+ -n vulcanami-production \
+ --limits=cpu=4000m,memory=8Gi \
+ --requests=cpu=1000m,memory=2Gi
 ```
 
 ### Horizontal Pod Autoscaling
@@ -1388,38 +1388,38 @@ kubectl set resources deployment vulcanami-api \
 ```bash
 # Create HPA based on CPU
 kubectl autoscale deployment vulcanami-api \
-  -n vulcanami-production \
-  --cpu-percent=70 \
-  --min=3 \
-  --max=20
+ -n vulcanami-production \
+ --cpu-percent=70 \
+ --min=3 \
+ --max=20
 
 # Or create HPA based on custom metrics
 cat <<EOF | kubectl apply -f -
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: vulcanami-api-hpa
-  namespace: vulcanami-production
+ name: vulcanami-api-hpa
+ namespace: vulcanami-production
 spec:
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: vulcanami-api
-  minReplicas: 3
-  maxReplicas: 20
-  metrics:
-  - type: Resource
-    resource:
-      name: cpu
-      target:
-        type: Utilization
-        averageUtilization: 70
-  - type: Resource
-    resource:
-      name: memory
-      target:
-        type: Utilization
-        averageUtilization: 80
+ scaleTargetRef:
+ apiVersion: apps/v1
+ kind: Deployment
+ name: vulcanami-api
+ minReplicas: 3
+ maxReplicas: 20
+ metrics:
+ - type: Resource
+ resource:
+ name: cpu
+ target:
+ type: Utilization
+ averageUtilization: 70
+ - type: Resource
+ resource:
+ name: memory
+ target:
+ type: Utilization
+ averageUtilization: 80
 EOF
 
 # Check HPA status

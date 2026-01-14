@@ -1,8 +1,8 @@
 # FIXES_APPLIED_SUMMARY.md
 
-**Date**: November 22, 2025  
-**PR**: Deep Audit and Analysis with Security Fixes  
-**Status**: All Critical Issues Addressed  
+**Date**: November 22, 2025 
+**PR**: Deep Audit and Analysis with Security Fixes 
+**Status**: All Critical Issues Addressed 
 
 ---
 
@@ -10,9 +10,9 @@
 
 This PR delivers a comprehensive deep audit of the VULCAN-AMI reasoning, world model, and meta-reasoning systems, along with fixes for all critical security vulnerabilities and correctness issues identified.
 
-**Total Analysis**: ~75,000 lines of code across 47 modules  
-**Issues Identified**: 3 Critical, 5 High, 8 Medium, 4 Low  
-**Issues Fixed**: All Critical + High priority items  
+**Total Analysis**: ~75,000 lines of code across 47 modules 
+**Issues Identified**: 3 Critical, 5 High, 8 Medium, 4 Low 
+**Issues Fixed**: All Critical + High priority items 
 
 ---
 
@@ -107,12 +107,12 @@ Analysis of fundamental design tension:
 **Key Features**:
 ```python
 class CSIUEnforcement:
-    - enforce_pressure_cap(): Caps at ±5%
-    - check_cumulative_influence(): Tracks hourly window
-    - should_block_influence(): Prevents cap violations
-    - record_influence(): Audit trail
-    - apply_regularization_with_enforcement(): Safe application
-    - export_audit_trail(): Engineering access only
+ - enforce_pressure_cap(): Caps at ±5%
+ - check_cumulative_influence(): Tracks hourly window
+ - should_block_influence(): Prevents cap violations
+ - record_influence(): Audit trail
+ - apply_regularization_with_enforcement(): Safe application
+ - export_audit_trail(): Engineering access only
 ```
 
 **Security Guarantees**:
@@ -149,14 +149,14 @@ class CSIUEnforcement:
 **Key Features**:
 ```python
 class SafeExecutor:
-    ALLOWED_COMMANDS = {'pytest', 'black', 'mypy', 'git', ...}
-    RESTRICTED_COMMANDS = {'git': ['status', 'diff', ...]}  # Read-only
-    DANGEROUS_PATTERNS = ['|', ';', '&', '$', '`', '>', '<']
-    
-    - is_command_allowed(): Whitelist validation
-    - validate_working_directory(): Path safety
-    - execute_safe(): NEVER shell=True, always list args
-    - execute_improvement_action(): Safe action execution
+ ALLOWED_COMMANDS = {'pytest', 'black', 'mypy', 'git', ...}
+ RESTRICTED_COMMANDS = {'git': ['status', 'diff', ...]} # Read-only
+ DANGEROUS_PATTERNS = ['|', ';', '&', '$', '`', '>', '<']
+ 
+ - is_command_allowed(): Whitelist validation
+ - validate_working_directory(): Path safety
+ - execute_safe(): NEVER shell=True, always list args
+ - execute_improvement_action(): Safe action execution
 ```
 
 **Security Guarantees**:
@@ -171,8 +171,8 @@ class SafeExecutor:
 **Example Usage**:
 ```python
 executor = SafeExecutor(timeout=60)
-result = executor.execute_safe(['pytest', 'tests/'])  # SAFE
-# Never: subprocess.run(cmd, shell=True)  # BLOCKED
+result = executor.execute_safe(['pytest', 'tests/']) # SAFE
+# Never: subprocess.run(cmd, shell=True) # BLOCKED
 ```
 
 ---
@@ -193,7 +193,7 @@ result = executor.execute_safe(['pytest', 'tests/'])  # SAFE
 ```python
 # Fix float comparison bugs throughout codebase
 def float_equals(a, b, epsilon=1e-9): 
-    return abs(a - b) < epsilon
+ return abs(a - b) < epsilon
 
 # Instead of: if value == target
 # Use: if float_equals(value, target)
@@ -231,10 +231,10 @@ def float_equals(a, b, epsilon=1e-9):
 **Example**:
 ```python
 # Before: self.history = deque()
-# After:  self.history = deque(maxlen=10000)
+# After: self.history = deque(maxlen=10000)
 
 # Before: while open_branches: ...
-# After:  while open_branches and iterations < MAX_ITER: ...
+# After: while open_branches and iterations < MAX_ITER: ...
 ```
 
 ---
@@ -246,7 +246,7 @@ def float_equals(a, b, epsilon=1e-9):
 **Current Issue**:
 ```python
 # unified_reasoning.py - BAD
-SelectionCache.__init__ = patched_init  # Monkey-patch at import
+SelectionCache.__init__ = patched_init # Monkey-patch at import
 ```
 
 **Recommended Fix**:
@@ -302,7 +302,7 @@ self.cache = SelectionCache(cache_config)
 ```python
 # Direct CSIU application
 if self._csiu_enabled:
-    action = self._csiu_regularize_plan(action, pressure, metrics)
+ action = self._csiu_regularize_plan(action, pressure, metrics)
 ```
 
 **After**:
@@ -311,11 +311,11 @@ from .csiu_enforcement import get_csiu_enforcer
 
 enforcer = get_csiu_enforcer()
 action = enforcer.apply_regularization_with_enforcement(
-    plan=action,
-    pressure=pressure,
-    metrics=metrics,
-    plan_id=action.get('id'),
-    action_type='improvement'
+ plan=action,
+ pressure=pressure,
+ metrics=metrics,
+ plan_id=action.get('id'),
+ action_type='improvement'
 )
 ```
 
@@ -333,21 +333,21 @@ from .safe_execution import get_safe_executor
 
 executor = get_safe_executor()
 result = executor.execute_safe(
-    command=['pytest', 'tests/'],
-    timeout=60
+ command=['pytest', 'tests/'],
+ timeout=60
 )
 if result.success:
-    logger.info(f"Success: {result.stdout}")
+ logger.info(f"Success: {result.stdout}")
 else:
-    logger.error(f"Failed: {result.error}")
+ logger.error(f"Failed: {result.error}")
 ```
 
 ### For Using Numeric Utils
 
 **Before**:
 ```python
-if predicted_value == target_value:  # WRONG - float comparison
-    status = ObjectiveStatus.ALIGNED
+if predicted_value == target_value: # WRONG - float comparison
+ status = ObjectiveStatus.ALIGNED
 ```
 
 **After**:
@@ -355,7 +355,7 @@ if predicted_value == target_value:  # WRONG - float comparison
 from vulcan.utils.numeric_utils import float_equals
 
 if float_equals(predicted_value, target_value):
-    status = ObjectiveStatus.ALIGNED
+ status = ObjectiveStatus.ALIGNED
 ```
 
 ---
@@ -382,17 +382,17 @@ if float_equals(predicted_value, target_value):
 
 ```bash
 # CSIU Kill Switches (default: enabled)
-export INTRINSIC_CSIU_OFF=0              # Set to 1 to disable entirely
-export INTRINSIC_CSIU_CALC_OFF=0         # Set to 1 to disable calculations
-export INTRINSIC_CSIU_REGS_OFF=0         # Set to 1 to disable regularizations
-export INTRINSIC_CSIU_HIST_OFF=0         # Set to 1 to disable history tracking
+export INTRINSIC_CSIU_OFF=0 # Set to 1 to disable entirely
+export INTRINSIC_CSIU_CALC_OFF=0 # Set to 1 to disable calculations
+export INTRINSIC_CSIU_REGS_OFF=0 # Set to 1 to disable regularizations
+export INTRINSIC_CSIU_HIST_OFF=0 # Set to 1 to disable history tracking
 
 # Safe Executor
-export VULCAN_SAFE_EXECUTOR_TIMEOUT=60   # Default command timeout
+export VULCAN_SAFE_EXECUTOR_TIMEOUT=60 # Default command timeout
 
 # Logging (CRITICAL: Keep CSIU hidden)
-export VULCAN_LOG_LEVEL=INFO             # Never DEBUG in production
-export VULCAN_INTERNAL_LOG_PATH=/var/log/vulcan/internal.log  # Restricted access
+export VULCAN_LOG_LEVEL=INFO # Never DEBUG in production
+export VULCAN_INTERNAL_LOG_PATH=/var/log/vulcan/internal.log # Restricted access
 ```
 
 ---
@@ -513,7 +513,7 @@ This PR delivers:
 
 ---
 
-**Author**: GitHub Copilot Advanced Coding Agent  
-**Review Required**: Senior Engineer, Security Lead, CTO, Legal  
-**Deployment Approval**: CTO + Legal Counsel  
+**Author**: GitHub Copilot Advanced Coding Agent 
+**Review Required**: Senior Engineer, Security Lead, CTO, Legal 
+**Deployment Approval**: CTO + Legal Counsel 
 **Next Steps**: Code review, integration, testing, approval

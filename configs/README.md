@@ -14,36 +14,36 @@ The configuration system is centralized, versioned, and validated. All configs i
 
 ```
 configs/
-├── __init__.py                      # Python package initialization
-├── validate_configs.py              # Validation script
-├── test_integration.py              # Integration tests
-├── README.md                        # This file
+├── __init__.py # Python package initialization
+├── validate_configs.py # Validation script
+├── test_integration.py # Integration tests
+├── README.md # This file
 │
 ├── Core Configurations
-├── graphix_core_manifest.json       # Graphix IR component manifest
-├── graphix_core_ontology.json       # Graphix IR ontology definitions
-├── hardware_profiles.json           # Hardware backend profiles
-├── intrinsic_drives.json            # Agent intrinsic motivation config
-├── platform_mapping.json/.yaml      # API endpoint mappings
-├── type_system_manifest.json        # Type system definitions
-├── crew_config.yaml                 # Agent crew configuration
-├── tool_selection.yaml              # Tool selection defaults
-├── auto_apply_policy.yaml           # Auto-apply policies
-├── helm_chart.yaml                  # Kubernetes Helm chart
+├── graphix_core_manifest.json # Graphix IR component manifest
+├── graphix_core_ontology.json # Graphix IR ontology definitions
+├── hardware_profiles.json # Hardware backend profiles
+├── intrinsic_drives.json # Agent intrinsic motivation config
+├── platform_mapping.json/.yaml # API endpoint mappings
+├── type_system_manifest.json # Type system definitions
+├── crew_config.yaml # Agent crew configuration
+├── tool_selection.yaml # Tool selection defaults
+├── auto_apply_policy.yaml # Auto-apply policies
+├── helm_chart.yaml # Kubernetes Helm chart
 │
 ├── Profiles
-├── profile_development.json         # Development environment profile
-├── profile_testing.json             # Testing environment profile
+├── profile_development.json # Development environment profile
+├── profile_testing.json # Testing environment profile
 │
 └── Subsystem Configurations
-    ├── cloudfront/                  # CloudFront cache policies
-    ├── dqs/                         # Data quality service configs
-    ├── nginx/                       # Nginx configurations
-    ├── opa/                         # Open Policy Agent bundles
-    ├── packer/                      # Packer image build configs
-    ├── redis/                       # Redis configurations
-    ├── vector/                      # Vector database (Milvus) configs
-    └── zk/                          # Zero-knowledge proof circuits
+ ├── cloudfront/ # CloudFront cache policies
+ ├── dqs/ # Data quality service configs
+ ├── nginx/ # Nginx configurations
+ ├── opa/ # Open Policy Agent bundles
+ ├── packer/ # Packer image build configs
+ ├── redis/ # Redis configurations
+ ├── vector/ # Vector database (Milvus) configs
+ └── zk/ # Zero-knowledge proof circuits
 ```
 
 ## Core Configuration Files
@@ -95,7 +95,7 @@ Configuration for agent intrinsic motivation and self-improvement:
 ### platform_mapping.json / .yaml
 API endpoint mappings for different services:
 - `submit_run`: POST /api/arena/run/generator
-- `submit_feedback`: POST /api/arena/feedback_dispatch  
+- `submit_feedback`: POST /api/arena/feedback_dispatch 
 - `improve`: POST /improve
 - `sse_stream`: GET /v1/stream
 - `metrics`: GET /api/arena/metrics
@@ -223,10 +223,10 @@ Zero-knowledge proof circuit configurations
 
 ```python
 from vulcan.config import (
-    ConfigurationManager,
-    ProfileType,
-    get_config,
-    load_profile,
+ ConfigurationManager,
+ ProfileType,
+ get_config,
+ load_profile,
 )
 
 # Load a profile
@@ -285,19 +285,19 @@ Configuration files should include versioning information:
 
 ```json
 {
-  "versioning": {
-    "config_version": "1.0.0",
-    "schema_version": "1.0.0",
-    "last_updated": "2025-11-23T10:00:00Z",
-    "updated_by": "username",
-    "changelog": [
-      {
-        "version": "1.0.0",
-        "date": "2025-11-23",
-        "changes": ["Initial version"]
-      }
-    ]
-  }
+ "versioning": {
+ "config_version": "1.0.0",
+ "schema_version": "1.0.0",
+ "last_updated": "2025-11-23T10:00:00Z",
+ "updated_by": "username",
+ "changelog": [
+ {
+ "version": "1.0.0",
+ "date": "2025-11-23",
+ "changes": ["Initial version"]
+ }
+ ]
+ }
 }
 ```
 

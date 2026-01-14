@@ -1,7 +1,7 @@
 # VULCAN System Performance Audit Report
 
-**Date:** December 2024  
-**Auditor:** Code Agent  
+**Date:** December 2024 
+**Auditor:** Code Agent 
 **Scope:** Performance and Output Quality Analysis
 
 ---
@@ -11,20 +11,20 @@
 This audit analyzed the VULCAN codebase for performance bottlenecks and output quality issues. The investigation found:
 
 1. **Performance Architecture is Sound**: The `encode()` and `get_logits()` operations are **NOT redundant forward passes** - they are correctly separated:
-   - `encode()` computes hidden states through transformer layers
-   - `get_logits()` applies the LM head projection to hidden states
-   
+ - `encode()` computes hidden states through transformer layers
+ - `get_logits()` applies the LM head projection to hidden states
+ 
 2. **Caching is Already Implemented**: The codebase has comprehensive caching:
-   - `_encoding_cache` for hidden states
-   - `_logits_cache` for logits
-   - `_cached_context` for context retrieval
-   - KV cache in the executor
+ - `_encoding_cache` for hidden states
+ - `_logits_cache` for logits
+ - `_cached_context` for context retrieval
+ - KV cache in the executor
 
 3. **Sampling Parameters are Correctly Configured**: The sampling configuration includes:
-   - Temperature: 0.7 (default)
-   - Top-k: 50 (default)
-   - Top-p: 0.9 (default)
-   - Repetition penalty: 1.1 (default, window of 50 tokens)
+ - Temperature: 0.7 (default)
+ - Top-k: 50 (default)
+ - Top-p: 0.9 (default)
+ - Repetition penalty: 1.1 (default, window of 50 tokens)
 
 4. **Agent Pool is Designed for Task Orchestration, Not Token Generation**: The AgentPoolManager is for distributed task execution, not parallel token generation.
 
@@ -47,40 +47,40 @@ This audit analyzed the VULCAN codebase for performance bottlenecks and output q
 
 ```
 User Prompt
-    │
-    ▼
+ │
+ ▼
 CognitiveLoop.generate()
-    │
-    ├─► _tokenize() - Convert prompt to tokens
-    │
-    └─► _step() loop (per token):
-         │
-         ├─► bridge.before_execution() - Context retrieval (cached)
-         │
-         ├─► transformer.encode() - Forward pass (cached)
-         │      │
-         │      ▼
-         │   GraphixExecutor.execute()
-         │      ├─► _execute_embeddings()
-         │      ├─► _execute_layer() × num_layers
-         │      │      ├─► _apply_layer_norm()
-         │      │      ├─► _execute_attention() (with KV cache)
-         │      │      └─► _execute_ffn()
-         │      └─► _apply_layer_norm() (final)
-         │
-         ├─► _obtain_logits() - LM head projection
-         │      │
-         │      ▼
-         │   GraphixExecutor.get_logits()
-         │      └─► _linear(hidden_state, lm_head)
-         │
-         ├─► _sample_optimized() - Token selection
-         │      ├─► apply_top_k()
-         │      ├─► apply_top_p()
-         │      ├─► penalize_repetition()
-         │      └─► choose_token()
-         │
-         └─► yield token
+ │
+ ├─► _tokenize() - Convert prompt to tokens
+ │
+ └─► _step() loop (per token):
+ │
+ ├─► bridge.before_execution() - Context retrieval (cached)
+ │
+ ├─► transformer.encode() - Forward pass (cached)
+ │ │
+ │ ▼
+ │ GraphixExecutor.execute()
+ │ ├─► _execute_embeddings()
+ │ ├─► _execute_layer() × num_layers
+ │ │ ├─► _apply_layer_norm()
+ │ │ ├─► _execute_attention() (with KV cache)
+ │ │ └─► _execute_ffn()
+ │ └─► _apply_layer_norm() (final)
+ │
+ ├─► _obtain_logits() - LM head projection
+ │ │
+ │ ▼
+ │ GraphixExecutor.get_logits()
+ │ └─► _linear(hidden_state, lm_head)
+ │
+ ├─► _sample_optimized() - Token selection
+ │ ├─► apply_top_k()
+ │ ├─► apply_top_p()
+ │ ├─► penalize_repetition()
+ │ └─► choose_token()
+ │
+ └─► yield token
 ```
 
 ---
@@ -105,20 +105,20 @@ t_enc = time.time()
 # OPTIMIZATION: Check encoding cache first
 cached_hidden = self._encoding_cache.get(prompt_tokens)
 if cached_hidden is not None:
-    hidden_state = cached_hidden
-    sub_times["encode_ms"] = 0.1  # Cache hit
-    sub_times["encode_cache_hit"] = True
-    self._perf_metrics["encoding_cache_hits"] += 1
-    logger.info("[DIAG] _step: Encoding cache HIT")
+ hidden_state = cached_hidden
+ sub_times["encode_ms"] = 0.1 # Cache hit
+ sub_times["encode_cache_hit"] = True
+ self._perf_metrics["encoding_cache_hits"] += 1
+ logger.info("[DIAG] _step: Encoding cache HIT")
 else:
-    hidden_state = await self._async_safe(
-        self.transformer.encode, prompt_tokens, None
-    )
-    # Store in cache for future use
-    if hidden_state is not None:
-        self._encoding_cache.put(prompt_tokens, hidden_state)
-    sub_times["encode_ms"] = (time.time() - t_enc) * 1000
-    sub_times["encode_cache_hit"] = False
+ hidden_state = await self._async_safe(
+ self.transformer.encode, prompt_tokens, None
+ )
+ # Store in cache for future use
+ if hidden_state is not None:
+ self._encoding_cache.put(prompt_tokens, hidden_state)
+ sub_times["encode_ms"] = (time.time() - t_enc) * 1000
+ sub_times["encode_cache_hit"] = False
 ```
 
 ### 2.2 Transformer Operations
@@ -129,17 +129,17 @@ else:
 ```python
 # graphix_transformer.py:786-820
 def forward(self, tokens: TokensLike) -> Dict[str, Any]:
-    """Forward pass - computes hidden states through all layers"""
-    token_ids = self._normalize_tokens(tokens)
-    result = self.executor.execute(graph_ir, inputs=inputs)
-    return result  # Contains hidden_states
+ """Forward pass - computes hidden states through all layers"""
+ token_ids = self._normalize_tokens(tokens)
+ result = self.executor.execute(graph_ir, inputs=inputs)
+ return result # Contains hidden_states
 
 # graphix_executor.py:1041-1061
 def get_logits(self, hidden_state: Any, tokens: List[Any]) -> List[float]:
-    """Apply LM head to convert hidden states to vocabulary logits"""
-    lm_head_weight = self.weights.get("lm_head", [])
-    logits = self._linear(hidden_state, lm_head_weight, ...)
-    return logits
+ """Apply LM head to convert hidden states to vocabulary logits"""
+ lm_head_weight = self.weights.get("lm_head", [])
+ logits = self._linear(hidden_state, lm_head_weight, ...)
+ return logits
 ```
 
 **Analysis:**
@@ -154,15 +154,15 @@ def get_logits(self, hidden_state: Any, tokens: List[Any]) -> List[float]:
 **Current Design (agent_pool.py:368-500):**
 ```python
 class AgentPoolManager:
-    """
-    Manages pools of agents with lifecycle control and proper resource management
-    
-    Key Features:
-    - Automatic agent spawning and retirement
-    - State machine validation for all state transitions
-    - Memory-bounded provenance tracking with TTL
-    - Stale task cleanup to prevent memory leaks
-    """
+ """
+ Manages pools of agents with lifecycle control and proper resource management
+ 
+ Key Features:
+ - Automatic agent spawning and retirement
+ - State machine validation for all state transitions
+ - Memory-bounded provenance tracking with TTL
+ - Stale task cleanup to prevent memory leaks
+ """
 ```
 
 **Purpose:** Executes computation graphs (not individual token generation steps).
@@ -176,16 +176,16 @@ class AgentPoolManager:
 ```python
 @dataclass
 class LoopSamplingConfig:
-    temperature: float = 0.7          # ✅ Good default
-    top_k: int = 50                    # ✅ Reasonable
-    top_p: float = 0.9                 # ✅ Standard nucleus sampling
-    max_tokens: int = 128
-    min_tokens: int = 1
-    stop_tokens: Tuple[Token, ...] = field(default_factory=lambda: ("</s>",))
-    stop_strings: Tuple[str, ...] = field(default_factory=lambda: ("\n\n",))
-    allow_repetition: bool = False     # ✅ Repetition prevention enabled
-    repetition_window: int = 50        # ✅ Reasonable window
-    repetition_penalty: float = 1.1    # ✅ Standard penalty
+ temperature: float = 0.7 # ✅ Good default
+ top_k: int = 50 # ✅ Reasonable
+ top_p: float = 0.9 # ✅ Standard nucleus sampling
+ max_tokens: int = 128
+ min_tokens: int = 1
+ stop_tokens: Tuple[Token, ...] = field(default_factory=lambda: ("</s>",))
+ stop_strings: Tuple[str, ...] = field(default_factory=lambda: ("\n\n",))
+ allow_repetition: bool = False # ✅ Repetition prevention enabled
+ repetition_window: int = 50 # ✅ Reasonable window
+ repetition_penalty: float = 1.1 # ✅ Standard penalty
 ```
 
 ### 3.2 Sampling Functions (cognitive_loop.py:139-263)
@@ -211,17 +211,17 @@ Add a performance timing decorator for granular profiling:
 import functools
 
 def timed_async(name: str):
-    """Decorator to time async functions with diagnostic logging."""
-    def decorator(func):
-        @functools.wraps(func)
-        async def wrapper(*args, **kwargs):
-            start = time.time()
-            result = await func(*args, **kwargs)
-            elapsed_ms = (time.time() - start) * 1000
-            logger.info(f"[PERF] {name}: {elapsed_ms:.1f}ms")
-            return result
-        return wrapper
-    return decorator
+ """Decorator to time async functions with diagnostic logging."""
+ def decorator(func):
+ @functools.wraps(func)
+ async def wrapper(*args, **kwargs):
+ start = time.time()
+ result = await func(*args, **kwargs)
+ elapsed_ms = (time.time() - start) * 1000
+ logger.info(f"[PERF] {name}: {elapsed_ms:.1f}ms")
+ return result
+ return wrapper
+ return decorator
 ```
 
 ### Medium Priority: Response Time Tracking Integration

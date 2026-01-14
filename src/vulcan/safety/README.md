@@ -1,14 +1,12 @@
-VULCAN-AGI Safety Module
+VULCAN-AMI Safety Module
 
 Overview
 
-The Safety Module in the VULCAN-AGI system provides a comprehensive, production-grade framework for ensuring safe, ethical, and compliant AI operations. It orchestrates multiple safety mechanisms, including domain-specific validation, adversarial robustness testing, formal verification, neural-based safety prediction, compliance checking, bias detection, governance oversight, value alignment, rollback capabilities, audit logging, and tool-specific safety contracts. The module is designed for robustness, with thread-safe operations, bounded memory usage, interruptible threads, and fallbacks for optional libraries to prevent failures in diverse environments.
+The Safety Module in the VULCAN-AMI system provides a comprehensive, production-grade framework for ensuring safe, ethical, and compliant AI operations. It orchestrates multiple safety mechanisms, including domain-specific validation, adversarial robustness testing, formal verification, neural-based safety prediction, compliance checking, bias detection, governance oversight, value alignment, rollback capabilities, audit logging, and tool-specific safety contracts. The module is designed for robustness, with thread-safe operations, bounded memory usage, interruptible threads, and fallbacks for optional libraries to prevent failures in diverse environments.
 
 The core orchestrator, EnhancedSafetyValidator, integrates all components to validate actions, states, and outputs, generating detailed safety reports and enabling interventions like vetoes or rollbacks. It supports regulatory standards (e.g., GDPR, AI Act) and multi-stakeholder governance, ensuring alignment with human values and ethical principles.
 
 Key Features
-
-
 
 Action Validation: Real-time safety checks on actions, states, and outputs using multi-model consensus and uncertainty quantification.
 
@@ -30,13 +28,9 @@ Explainability: Generates human-readable explanations for safety decisions using
 
 Performance Optimization: Bounded deques, memory-limited caches, and daemon threads for efficient resource use.
 
-
-
 Architecture and Components
 
 The module consists of interconnected classes, exported via \_\_init\_\_.py:
-
-
 
 safety\_types.py: Defines core enums (SafetyViolationType, ComplianceStandard, GovernanceLevel, StakeholderType, AlignmentMetric) and dataclasses (SafetyReport, SafetyConfig, SafetyMetrics, RollbackSnapshot, ToolSafetyContract, SafetyConstraint).
 
@@ -58,15 +52,11 @@ safety\_validator.py: Core EnhancedSafetyValidator orchestrates all components, 
 
 \_\_init\_\_.py: Empty module initializer (for package structure).
 
-
-
 The system uses locks for thread safety, deques for bounded histories, and optional libraries (Torch, NumPy, SciPy) with fallbacks.
 
 Installation and Dependencies
 
-This module is part of the VULCAN-AGI project. To use it:
-
-
+This module is part of the VULCAN-AMI project. To use it:
 
 Clone the repository (or integrate into your project).
 
@@ -74,25 +64,15 @@ Install required dependencies:
 
 textpip install numpy torch scipy statsmodels
 
-
-
 Core: numpy, logging, typing, collections, dataclasses, time, json, pathlib, enum, hashlib, uuid, copy, re, threading, sqlite3, pickle, zlib, atexit, gc, asyncio, concurrent.futures, sys, os, datetime, random, itertools.
 
 Optional: torch (neural models), scipy/statsmodels (stats/bias detection).
 
 Fallbacks: Mock implementations for missing optionals (e.g., simple stats for SciPy).
 
-
-
-
-
 Import the module:
 
 pythonfrom vulcan.safety import EnhancedSafetyValidator
-
-
-
-
 
 Usage Example
 
@@ -100,41 +80,35 @@ pythonimport logging
 
 from vulcan.safety import EnhancedSafetyValidator, SafetyConfig
 
-
-
 \# Set up logging
 
 logging.basicConfig(level=logging.INFO)
-
-
 
 \# Initialize validator with custom config
 
 config = SafetyConfig(
 
-&nbsp;   enable\_adversarial\_testing=True,
+&nbsp; enable\_adversarial\_testing=True,
 
-&nbsp;   enable\_compliance\_checking=True,
+&nbsp; enable\_compliance\_checking=True,
 
-&nbsp;   enable\_bias\_detection=True,
+&nbsp; enable\_bias\_detection=True,
 
-&nbsp;   enable\_rollback=True
+&nbsp; enable\_rollback=True
 
 )
 
 validator = EnhancedSafetyValidator(config=config)
 
-
-
 \# Validate an action
 
 action = {
 
-&nbsp;   'type': 'model\_inference',
+&nbsp; 'type': 'model\_inference',
 
-&nbsp;   'parameters': {'input\_data': np.random.rand(10)},
+&nbsp; 'parameters': {'input\_data': np.random.rand(10)},
 
-&nbsp;   'context': {'domain': 'prediction'}
+&nbsp; 'context': {'domain': 'prediction'}
 
 }
 
@@ -144,19 +118,17 @@ print(f"Safe: {report.safe}, Confidence: {report.confidence}")
 
 print(f"Explanation: {report.explanation}")
 
-
-
 \# Tool safety example
 
 tool\_contract = {
 
-&nbsp;   'tool\_name': 'classifier',
+&nbsp; 'tool\_name': 'classifier',
 
-&nbsp;   'required\_inputs': {'data'},
+&nbsp; 'required\_inputs': {'data'},
 
-&nbsp;   'max\_execution\_time\_ms': 1000,
+&nbsp; 'max\_execution\_time\_ms': 1000,
 
-&nbsp;   'min\_confidence': 0.8
+&nbsp; 'min\_confidence': 0.8
 
 }
 
@@ -168,8 +140,6 @@ tool\_report = validator.tool\_safety\_manager.validate\_tool\_usage(tool\_actio
 
 print(f"Tool Safe: {tool\_report.safe}")
 
-
-
 \# Formal verification
 
 formal\_action = {'type': 'update\_state', 'new\_state': {'value': 42}}
@@ -178,15 +148,11 @@ formal\_report = validator.formal\_verifier.verify\_action(formal\_action, curre
 
 print(f"Formal Safe: {formal\_report.safe}")
 
-
-
 \# Shutdown
 
 validator.shutdown()
 
 Configuration
-
-
 
 SafetyConfig: Toggle features like enable\_adversarial\_testing, enable\_bias\_detection; set thresholds (e.g., uncertainty\_max=0.9); configure rollback (max\_snapshots=100) and audit (log\_path='safety\_audit').
 
@@ -200,11 +166,7 @@ Compliance: Specify compliance\_standards (e.g., \[GDPR, AI\_ACT]) in config.
 
 Bias Thresholds: Adjust per type (e.g., demographic\_parity=0.2).
 
-
-
 Notes
-
-
 
 Thread Safety: Reentrant locks, daemon threads, and interruptible cleanup prevent hangs and leaks.
 
@@ -216,7 +178,5 @@ Extensibility: Register custom validators via DomainValidatorRegistry, add polic
 
 Limitations: Neural features require Torch; full bias detection needs SciPy. Shutdown uses safe\_log to avoid closed handler errors.
 
-
-
-For contributions or issues, refer to the VULCAN-AGI project repository.
+For contributions or issues, refer to the VULCAN-AMI project repository.
 

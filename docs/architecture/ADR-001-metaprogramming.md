@@ -1,13 +1,13 @@
 # ADR-001: Metaprogramming Node Integration
 
-**Status**: Implemented  
-**Date**: 2026-01-12  
-**Authors**: VulcanAMI Development Team  
+**Status**: Implemented 
+**Date**: 2026-01-12 
+**Authors**: VulcanAMI Development Team 
 **Reviewers**: Security Team, Architecture Team
 
 ## Context
 
-VulcanAMI-LLM has 285,000+ LOC of production-ready VULCAN-AGI with sophisticated reasoning systems including:
+VulcanAMI-LLM has 285,000+ LOC of VULCAN-AMI with sophisticated reasoning systems including:
 - World Model with causal and probabilistic reasoning
 - Meta-Reasoning capabilities
 - Safety systems (NSOAligner, EthicalBoundaryMonitor)
@@ -71,36 +71,36 @@ All handlers are:
 
 ```
 ┌─────────────────────────────────────────┐
-│         Modification Request             │
+│ Modification Request │
 └──────────────┬──────────────────────────┘
-               │
-               ▼
+ │
+ ▼
 ┌─────────────────────────────────────────┐
-│     NSO_MODIFY (Authorization Gate)      │
-│   - Checks self-referential operations  │
-│   - Requires multi-model audit          │
-│   - Fail-safe: deny by default          │
+│ NSO_MODIFY (Authorization Gate) │
+│ - Checks self-referential operations │
+│ - Requires multi-model audit │
+│ - Fail-safe: deny by default │
 └──────────────┬──────────────────────────┘
-               │
-               ▼
+ │
+ ▼
 ┌─────────────────────────────────────────┐
-│    ETHICAL_LABEL (Human Review Gate)    │
-│   - Labels: safe/review/restricted      │
-│   - Integration with boundary monitor   │
-│   - Transparency interface events       │
+│ ETHICAL_LABEL (Human Review Gate) │
+│ - Labels: safe/review/restricted │
+│ - Integration with boundary monitor │
+│ - Transparency interface events │
 └──────────────┬──────────────────────────┘
-               │
-               ▼
+ │
+ ▼
 ┌─────────────────────────────────────────┐
-│    GRAPH_COMMIT (Final Security Check)  │
-│   - Validates both gates passed          │
-│   - Creates audit log entry              │
-│   - Content-addressable versioning       │
-│   - Rollback capability                  │
+│ GRAPH_COMMIT (Final Security Check) │
+│ - Validates both gates passed │
+│ - Creates audit log entry │
+│ - Content-addressable versioning │
+│ - Rollback capability │
 └──────────────┬──────────────────────────┘
-               │
-               ▼
-        [Modified Graph]
+ │
+ ▼
+ [Modified Graph]
 ```
 
 **Key Safety Features:**
@@ -132,9 +132,9 @@ Uses simplified pattern matching with variable binding support:
 Example:
 ```json
 {
-  "nodes": [
-    {"id": "?gen", "type": "GENERATE"}
-  ]
+ "nodes": [
+ {"id": "?gen", "type": "GENERATE"}
+ ]
 }
 ```
 
@@ -233,7 +233,7 @@ Handlers registered in `src/unified_runtime/node_handlers.py`:
 from .metaprogramming_handlers import get_metaprogramming_handlers
 
 handlers = get_node_handlers()
-handlers.update(get_metaprogramming_handlers())  # Adds 8 handlers
+handlers.update(get_metaprogramming_handlers()) # Adds 8 handlers
 ```
 
 ### Safety Systems
@@ -315,12 +315,12 @@ commit_result = await graph_commit_node(..., nso, label)
 
 ```json
 {
-  "type": "graph_commit",
-  "graph_id": "test_graph",
-  "modifier": "agent_123",
-  "ethical_label": "safe",
-  "nso_authorized": true,
-  "timestamp": 1705082412.5
+ "type": "graph_commit",
+ "graph_id": "test_graph",
+ "modifier": "agent_123",
+ "ethical_label": "safe",
+ "nso_authorized": true,
+ "timestamp": 1705082412.5
 }
 ```
 
@@ -398,6 +398,6 @@ commit_result = await graph_commit_node(..., nso, label)
 
 ---
 
-**Document Version**: 1.0  
-**Last Updated**: 2026-01-12  
+**Document Version**: 1.0 
+**Last Updated**: 2026-01-12 
 **Next Review**: 2026-02-12

@@ -1,8 +1,8 @@
 # CSIU_DESIGN_CONFLICT.md - CONFIDENTIAL ENGINEERING ONLY
 
-**Classification**: CONFIDENTIAL - Senior Engineering/Security Only  
-**Date**: November 22, 2025  
-**Subject**: CSIU Design Conflict - Security vs. Ethics  
+**Classification**: CONFIDENTIAL - Senior Engineering/Security Only 
+**Date**: November 22, 2025 
+**Subject**: CSIU Design Conflict - Security vs. Ethics 
 
 ---
 
@@ -33,7 +33,7 @@ If users know CSIU exists and how it works, they could:
 ```
 User discovers: "CSIU adjusts based on approval rates"
 User strategy: "I'll approve everything for 1 hour to shift CSIU positively,
-               then make my real request that benefits from the shift"
+ then make my real request that benefits from the shift"
 ```
 
 ### Why This Matters
@@ -98,7 +98,7 @@ Settings > Advanced > AI Behavior
 ### Option 3: Delayed Disclosure
 ```
 In month 1: Hidden
-In month 2: Mentioned in privacy policy  
+In month 2: Mentioned in privacy policy 
 In month 3: Mentioned in help docs
 In month 6: Added to settings (view-only)
 In month 12: Made configurable
@@ -346,9 +346,9 @@ This document should be:
 - Referenced if discovery occurs
 - Provided to regulators if requested (with legal review)
 
-**Last Review**: 2025-11-22  
-**Next Review**: 2026-02-22  
-**Owner**: Principal Engineer, AI Systems  
+**Last Review**: 2025-11-22 
+**Next Review**: 2026-02-22 
+**Owner**: Principal Engineer, AI Systems 
 **Reviewers**: CTO, VP Engineering, Legal Counsel, Ethics Committee
 
 ---

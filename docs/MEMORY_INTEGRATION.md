@@ -1,9 +1,7 @@
 # Memory System Integration Guide
 
-**Version:** 1.0.0  
-**Last Updated:** 2026-01-12  
-**Status:** Production-Ready
-
+**Version:** 1.0.0 
+**Last Updated:** 2026-01-12 
 ---
 
 ## Overview
@@ -17,20 +15,20 @@ VulcanAMI_LLM features a unified memory integration layer that connects three di
 The system integrates three specialized memory components:
 
 1. **`src/persistant_memory_v46/`** - Production Storage Backend
-   - **GraphRAG**: Graph-based Retrieval Augmented Generation with semantic search
-   - **MerkleLSM**: Log-structured merge tree with Merkle proofs for versioning
-   - **PackfileStore**: S3-backed persistent storage with CloudFront CDN
-   - **ZKProver**: Zero-knowledge proof generation for compliance
-   - **UnlearningEngine**: GDPR-compliant machine unlearning
+ - **GraphRAG**: Graph-based Retrieval Augmented Generation with semantic search
+ - **MerkleLSM**: Log-structured merge tree with Merkle proofs for versioning
+ - **PackfileStore**: S3-backed persistent storage with CloudFront CDN
+ - **ZKProver**: Zero-knowledge proof generation for compliance
+ - **UnlearningEngine**: GDPR-compliant machine unlearning
 
 2. **`src/memory/`** - Governance & Optimization
-   - **GovernedUnlearning**: Consensus-based unlearning with proposals
-   - **CostOptimizer**: Budget-aware storage optimization
+ - **GovernedUnlearning**: Consensus-based unlearning with proposals
+ - **CostOptimizer**: Budget-aware storage optimization
 
 3. **`src/vulcan/memory/`** - Core Hierarchical Memory
-   - **HierarchicalMemory**: Multi-level memory (short-term, working, long-term)
-   - **Retrieval & Consolidation**: Memory search and consolidation
-   - **Tool Selection**: Learning-based tool selection history
+ - **HierarchicalMemory**: Multi-level memory (short-term, working, long-term)
+ - **Retrieval & Consolidation**: Memory search and consolidation
+ - **Tool Selection**: Learning-based tool selection history
 
 ### Integration Bridges
 
@@ -44,8 +42,7 @@ Two bridge components provide unified access:
 - Unified API across all memory subsystems
 - Graceful degradation when components unavailable
 - Thread-safe operations
-- Context manager support
-- Production-ready logging and metrics
+- Context manager support logging and metrics
 
 **Example Usage:**
 ```python
@@ -53,10 +50,10 @@ from src.integration import MemoryBridge, MemoryBridgeConfig
 
 # Create bridge with configuration
 config = MemoryBridgeConfig(
-    s3_bucket="my-memory-bucket",
-    enable_zk_proofs=True,
-    enable_governed_unlearning=True,
-    embedding_model="all-MiniLM-L6-v2"  # Valid model
+ s3_bucket="my-memory-bucket",
+ enable_zk_proofs=True,
+ enable_governed_unlearning=True,
+ embedding_model="all-MiniLM-L6-v2" # Valid model
 )
 
 bridge = MemoryBridge(config)
@@ -96,28 +93,28 @@ bridge.shutdown()
 from src.integration import GVulcanBridge
 
 bridge = GVulcanBridge({
-    "dqs_reject_threshold": 0.3,
-    "dqs_quarantine_threshold": 0.4,
-    "opa_cache_enabled": True
+ "dqs_reject_threshold": 0.3,
+ "dqs_quarantine_threshold": 0.4,
+ "opa_cache_enabled": True
 })
 
 # Validate data quality
 quality = bridge.validate_data_quality(
-    pii_confidence=0.05,
-    graph_completeness=0.95,
-    syntactic_completeness=0.98
+ pii_confidence=0.05,
+ graph_completeness=0.95,
+ syntactic_completeness=0.98
 )
 
 if quality["gate_decision"] == "accept":
-    # Check policy compliance
-    allowed = bridge.check_write_barrier(
-        dqs_score=quality["score"],
-        context={"source": "user_input"}
-    )
-    
-    if allowed:
-        # Proceed with write operation
-        perform_write()
+ # Check policy compliance
+ allowed = bridge.check_write_barrier(
+ dqs_score=quality["score"],
+ context={"source": "user_input"}
+ )
+ 
+ if allowed:
+ # Proceed with write operation
+ perform_write()
 ```
 
 ---
@@ -130,26 +127,26 @@ if quality["gate_decision"] == "accept":
 from src.integration import MemoryBridgeConfig
 
 config = MemoryBridgeConfig(
-    # Storage configuration
-    s3_bucket="my-memory-bucket",         # S3 bucket for PackfileStore
-    region="us-east-1",                    # AWS region
-    compression="zstd",                    # zstd, zlib, lz4, none
-    encryption="AES256",                   # AES256 or aws:kms
-    
-    # Memory configuration
-    max_memories=100000,                   # Maximum memories in hierarchical storage
-    default_importance=0.5,                # Default importance [0.0-1.0]
-    decay_rate=0.001,                      # Memory decay rate
-    embedding_model="all-MiniLM-L6-v2",   # Valid sentence-transformers model
-    
-    # Operations configuration
-    enable_governed_unlearning=True,       # Enable governed unlearning
-    enable_cost_optimization=True,         # Enable cost optimization
-    auto_optimize=False,                   # Auto-optimize in background
-    
-    # Feature flags
-    enable_zk_proofs=True,                 # Enable zero-knowledge proofs
-    enable_graph_rag=True,                 # Enable graph-based RAG
+ # Storage configuration
+ s3_bucket="my-memory-bucket", # S3 bucket for PackfileStore
+ region="us-east-1", # AWS region
+ compression="zstd", # zstd, zlib, lz4, none
+ encryption="AES256", # AES256 or aws:kms
+ 
+ # Memory configuration
+ max_memories=100000, # Maximum memories in hierarchical storage
+ default_importance=0.5, # Default importance [0.0-1.0]
+ decay_rate=0.001, # Memory decay rate
+ embedding_model="all-MiniLM-L6-v2", # Valid sentence-transformers model
+ 
+ # Operations configuration
+ enable_governed_unlearning=True, # Enable governed unlearning
+ enable_cost_optimization=True, # Enable cost optimization
+ auto_optimize=False, # Auto-optimize in background
+ 
+ # Feature flags
+ enable_zk_proofs=True, # Enable zero-knowledge proofs
+ enable_graph_rag=True, # Enable graph-based RAG
 )
 ```
 
@@ -197,50 +194,50 @@ Update `helm/vulcanami/values.yaml`:
 
 ```yaml
 memorySystem:
-  enabled: true
-  
-  # Integration bridges
-  bridges:
-    memory:
-      enabled: true
-      s3Bucket: vulcanami-memory
-      region: us-east-1
-      compression: zstd
-      encryption: AES256
-      embeddingModel: all-MiniLM-L6-v2
-    
-    gvulcan:
-      enabled: true
-      dqsRejectThreshold: 0.3
-      dqsQuarantineThreshold: 0.4
-      opaCacheEnabled: true
-  
-  # Existing configuration...
-  milvus:
-    host: milvus-service
-    port: 19530
-  
-  s3:
-    bucket: vulcanami-memory
-    region: us-east-1
-  
-  packfile:
-    sizeMb: 32
-    compression: zstd
-    encryption: AES256
-  
-  lsm:
-    compactionStrategy: adaptive
-    bloomFilter: true
-  
-  indexType: disk_based_tier_c
-  
-  unlearning:
-    method: gradient_surgery
-    enableVerification: true
-  
-  zk:
-    proofSystem: groth16
+ enabled: true
+ 
+ # Integration bridges
+ bridges:
+ memory:
+ enabled: true
+ s3Bucket: vulcanami-memory
+ region: us-east-1
+ compression: zstd
+ encryption: AES256
+ embeddingModel: all-MiniLM-L6-v2
+ 
+ gvulcan:
+ enabled: true
+ dqsRejectThreshold: 0.3
+ dqsQuarantineThreshold: 0.4
+ opaCacheEnabled: true
+ 
+ # Existing configuration...
+ milvus:
+ host: milvus-service
+ port: 19530
+ 
+ s3:
+ bucket: vulcanami-memory
+ region: us-east-1
+ 
+ packfile:
+ sizeMb: 32
+ compression: zstd
+ encryption: AES256
+ 
+ lsm:
+ compactionStrategy: adaptive
+ bloomFilter: true
+ 
+ indexType: disk_based_tier_c
+ 
+ unlearning:
+ method: gradient_surgery
+ enableVerification: true
+ 
+ zk:
+ proofSystem: groth16
 ```
 
 ### ConfigMap
@@ -251,26 +248,26 @@ The Helm chart includes `configmap-memory.yaml` which configures the memory syst
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "vulcanami.fullname" . }}-memory-config
+ name: {{ include "vulcanami.fullname" . }}-memory-config
 data:
-  # Memory Bridge Configuration
-  MEMORY_BRIDGE_ENABLED: "true"
-  EMBEDDING_MODEL: "all-MiniLM-L6-v2"
-  ENABLE_GOVERNED_UNLEARNING: "true"
-  ENABLE_COST_OPTIMIZATION: "true"
-  ENABLE_ZK_PROOFS: "true"
-  ENABLE_GRAPH_RAG: "true"
-  
-  # GVulcan Bridge Configuration
-  GVULCAN_BRIDGE_ENABLED: "true"
-  DQS_REJECT_THRESHOLD: "0.3"
-  DQS_QUARANTINE_THRESHOLD: "0.4"
-  OPA_CACHE_ENABLED: "true"
-  
-  # Existing configuration...
-  MILVUS_HOST: {{ .Values.memorySystem.milvus.host | quote }}
-  S3_BUCKET: {{ .Values.memorySystem.s3.bucket | quote }}
-  # ... etc
+ # Memory Bridge Configuration
+ MEMORY_BRIDGE_ENABLED: "true"
+ EMBEDDING_MODEL: "all-MiniLM-L6-v2"
+ ENABLE_GOVERNED_UNLEARNING: "true"
+ ENABLE_COST_OPTIMIZATION: "true"
+ ENABLE_ZK_PROOFS: "true"
+ ENABLE_GRAPH_RAG: "true"
+ 
+ # GVulcan Bridge Configuration
+ GVULCAN_BRIDGE_ENABLED: "true"
+ DQS_REJECT_THRESHOLD: "0.3"
+ DQS_QUARANTINE_THRESHOLD: "0.4"
+ OPA_CACHE_ENABLED: "true"
+ 
+ # Existing configuration...
+ MILVUS_HOST: {{ .Values.memorySystem.milvus.host | quote }}
+ S3_BUCKET: {{ .Values.memorySystem.s3.bucket | quote }}
+ # ... etc
 ```
 
 ---
@@ -281,30 +278,30 @@ Update `docker-compose.prod.yml` to include memory bridge environment variables:
 
 ```yaml
 services:
-  full-platform:
-    environment:
-      # Memory Bridge Configuration
-      - MEMORY_BRIDGE_ENABLED=true
-      - S3_BUCKET=vulcanami-memory
-      - AWS_REGION=us-east-1
-      - COMPRESSION=zstd
-      - ENCRYPTION=AES256
-      - EMBEDDING_MODEL=all-MiniLM-L6-v2
-      - ENABLE_GOVERNED_UNLEARNING=true
-      - ENABLE_COST_OPTIMIZATION=true
-      - ENABLE_ZK_PROOFS=true
-      - ENABLE_GRAPH_RAG=true
-      
-      # GVulcan Bridge Configuration
-      - GVULCAN_BRIDGE_ENABLED=true
-      - DQS_REJECT_THRESHOLD=0.3
-      - DQS_QUARANTINE_THRESHOLD=0.4
-      - OPA_CACHE_ENABLED=true
-      
-      # S3/MinIO Configuration
-      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER}
-      - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
-      - S3_ENDPOINT_URL=http://minio:9000
+ full-platform:
+ environment:
+ # Memory Bridge Configuration
+ - MEMORY_BRIDGE_ENABLED=true
+ - S3_BUCKET=vulcanami-memory
+ - AWS_REGION=us-east-1
+ - COMPRESSION=zstd
+ - ENCRYPTION=AES256
+ - EMBEDDING_MODEL=all-MiniLM-L6-v2
+ - ENABLE_GOVERNED_UNLEARNING=true
+ - ENABLE_COST_OPTIMIZATION=true
+ - ENABLE_ZK_PROOFS=true
+ - ENABLE_GRAPH_RAG=true
+ 
+ # GVulcan Bridge Configuration
+ - GVULCAN_BRIDGE_ENABLED=true
+ - DQS_REJECT_THRESHOLD=0.3
+ - DQS_QUARANTINE_THRESHOLD=0.4
+ - OPA_CACHE_ENABLED=true
+ 
+ # S3/MinIO Configuration
+ - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER}
+ - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
+ - S3_ENDPOINT_URL=http://minio:9000
 ```
 
 ---
@@ -328,20 +325,20 @@ test-gvulcan-bridge: ## Test gvulcan bridge
 memory-bridge-status: ## Check memory bridge status
 	@echo "$(GREEN)Checking memory bridge status...$(NC)"
 	python -c "from src.integration import create_memory_bridge; \
-	           bridge = create_memory_bridge(); \
-	           status = bridge.get_status(); \
-	           import json; \
-	           print(json.dumps(status, indent=2))"
+	 bridge = create_memory_bridge(); \
+	 status = bridge.get_status(); \
+	 import json; \
+	 print(json.dumps(status, indent=2))"
 
 .PHONY: gvulcan-bridge-status
 gvulcan-bridge-status: ## Check gvulcan bridge status
 	@echo "$(GREEN)Checking gvulcan bridge status...$(NC)"
 	python -c "from src.integration import create_gvulcan_bridge; \
-	           bridge = create_gvulcan_bridge(); \
-	           if bridge: \
-	               status = bridge.get_status(); \
-	               import json; \
-	               print(json.dumps(status, indent=2))"
+	 bridge = create_gvulcan_bridge(); \
+	 if bridge: \
+	 status = bridge.get_status(); \
+	 import json; \
+	 print(json.dumps(status, indent=2))"
 ```
 
 ---
@@ -350,7 +347,7 @@ gvulcan-bridge-status: ## Check gvulcan bridge status
 
 ### Migrating from gvulcan Storage Components
 
-**DEPRECATED:** `gvulcan.BloomFilter` and `gvulcan.MerkleLSMDAG`  
+**DEPRECATED:** `gvulcan.BloomFilter` and `gvulcan.MerkleLSMDAG` 
 **USE INSTEAD:** `persistant_memory_v46.lsm.BloomFilter` and `persistant_memory_v46.lsm.MerkleLSM`
 
 #### Before (Deprecated):
@@ -388,8 +385,8 @@ unlearning = GovernedUnlearning(memory_ref)
 from src.integration import create_memory_bridge
 
 bridge = create_memory_bridge({
-    "enable_graph_rag": True,
-    "enable_governed_unlearning": True
+ "enable_graph_rag": True,
+ "enable_governed_unlearning": True
 })
 
 # Unified API across all backends
@@ -416,18 +413,18 @@ The governed unlearning system provides legally compliant data removal:
 ```python
 # Submit unlearning request
 result = bridge.unlearn(
-    pattern="user_email@example.com",
-    method="gradient_surgery",
-    urgency="high",
-    requester_id="gdpr_officer"
+ pattern="user_email@example.com",
+ method="gradient_surgery",
+ urgency="high",
+ requester_id="gdpr_officer"
 )
 
 # Generate cryptographic proof
 if result["status"] == "completed":
-    proof = bridge.generate_unlearning_proof(
-        items=[result["removed_items"]]
-    )
-    # Store proof for compliance audit
+ proof = bridge.generate_unlearning_proof(
+ items=[result["removed_items"]]
+ )
+ # Store proof for compliance audit
 ```
 
 ### Security Best Practices
@@ -465,10 +462,10 @@ Add memory bridge metrics to your Prometheus scrape config:
 
 ```yaml
 scrape_configs:
-  - job_name: 'vulcanami-memory'
-    static_configs:
-      - targets: ['vulcanami-api:9148']
-    metrics_path: '/metrics'
+ - job_name: 'vulcanami-memory'
+ static_configs:
+ - targets: ['vulcanami-api:9148']
+ metrics_path: '/metrics'
 ```
 
 ### Grafana Dashboards
@@ -501,8 +498,8 @@ bridge = create_memory_bridge()
 status = bridge.get_status()
 
 for component, initialized in status.items():
-    if not initialized and component.endswith("_initialized"):
-        print(f"⚠️  {component} failed to initialize")
+ if not initialized and component.endswith("_initialized"):
+ print(f"⚠️ {component} failed to initialize")
 ```
 
 ### Graceful Degradation
@@ -516,11 +513,11 @@ bridge = create_memory_bridge()
 # Check what's available
 status = bridge.get_status()
 if status["graph_rag_initialized"]:
-    # Use semantic search
-    results = bridge.retrieve("query")
+ # Use semantic search
+ results = bridge.retrieve("query")
 else:
-    # Fall back to direct LSM lookup
-    # (handled automatically by bridge)
+ # Fall back to direct LSM lookup
+ # (handled automatically by bridge)
 ```
 
 ### Performance Issues
@@ -542,74 +539,74 @@ else:
 ### Configuration
 
 1. **Use Specific Model Names:** Always use valid sentence-transformers models
-   ```python
-   # ✓ Good
-   embedding_model="all-MiniLM-L6-v2"
-   
-   # ✗ Bad
-   embedding_model="llm_embeddings"  # Invalid model name
-   ```
+ ```python
+ # ✓ Good
+ embedding_model="all-MiniLM-L6-v2"
+ 
+ # ✗ Bad
+ embedding_model="llm_embeddings" # Invalid model name
+ ```
 
 2. **Set Appropriate Limits:**
-   ```python
-   config = MemoryBridgeConfig(
-       max_memories=100000,      # Based on available memory
-       default_importance=0.5,   # Reasonable default
-       decay_rate=0.001,         # Slow decay for stable importance
-   )
-   ```
+ ```python
+ config = MemoryBridgeConfig(
+ max_memories=100000, # Based on available memory
+ default_importance=0.5, # Reasonable default
+ decay_rate=0.001, # Slow decay for stable importance
+ )
+ ```
 
 3. **Enable Features Selectively:**
-   ```python
-   config = MemoryBridgeConfig(
-       enable_zk_proofs=True,           # If compliance required
-       enable_governed_unlearning=True, # If GDPR compliance needed
-       enable_cost_optimization=True,   # Always recommended
-   )
-   ```
+ ```python
+ config = MemoryBridgeConfig(
+ enable_zk_proofs=True, # If compliance required
+ enable_governed_unlearning=True, # If GDPR compliance needed
+ enable_cost_optimization=True, # Always recommended
+ )
+ ```
 
 ### Operations
 
 1. **Use Context Managers:**
-   ```python
-   with create_memory_bridge(config) as bridge:
-       bridge.store("key", "value")
-       results = bridge.retrieve("query")
-   # Automatic cleanup on exit
-   ```
+ ```python
+ with create_memory_bridge(config) as bridge:
+ bridge.store("key", "value")
+ results = bridge.retrieve("query")
+ # Automatic cleanup on exit
+ ```
 
 2. **Handle Errors Gracefully:**
-   ```python
-   result = bridge.store("key", "value")
-   if not result:
-       logger.error("Storage failed, using fallback")
-       # Implement fallback strategy
-   ```
+ ```python
+ result = bridge.store("key", "value")
+ if not result:
+ logger.error("Storage failed, using fallback")
+ # Implement fallback strategy
+ ```
 
 3. **Monitor Resource Usage:**
-   ```python
-   stats = bridge.get_statistics()
-   if stats.get("cost", {}).get("usage_percentage", 0) > 80:
-       bridge.optimize_storage()
-   ```
+ ```python
+ stats = bridge.get_statistics()
+ if stats.get("cost", {}).get("usage_percentage", 0) > 80:
+ bridge.optimize_storage()
+ ```
 
 ### Testing
 
 1. **Mock Unavailable Components:**
-   ```python
-   # Test with minimal configuration
-   config = MemoryBridgeConfig(
-       enable_zk_proofs=False,  # Skip if not needed for test
-       enable_graph_rag=False,
-   )
-   ```
+ ```python
+ # Test with minimal configuration
+ config = MemoryBridgeConfig(
+ enable_zk_proofs=False, # Skip if not needed for test
+ enable_graph_rag=False,
+ )
+ ```
 
 2. **Verify Graceful Degradation:**
-   ```python
-   # Test that operations work even when components fail
-   bridge = create_memory_bridge()
-   assert bridge.store("key", "value")  # Should work with any backend
-   ```
+ ```python
+ # Test that operations work even when components fail
+ bridge = create_memory_bridge()
+ assert bridge.store("key", "value") # Should work with any backend
+ ```
 
 ---
 
@@ -629,7 +626,7 @@ Choose model based on requirements:
 
 ```python
 config = MemoryBridgeConfig(
-    max_memories=100000,  # Increase for more caching
+ max_memories=100000, # Increase for more caching
 )
 
 # GraphRAG also has internal caching
@@ -684,6 +681,5 @@ For issues or questions:
 
 ---
 
-**Last Updated:** 2026-01-12  
-**Status:** Production-Ready  
+**Last Updated:** 2026-01-12 
 **Version:** 1.0.0

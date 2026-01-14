@@ -32,8 +32,8 @@ Contains the same dependencies as requirements.txt but with SHA256 hashes:
 ```
 # Example format (auto-generated)
 Flask==3.1.2 \
-    --hash=sha256:abc123... \
-    --hash=sha256:def456...
+ --hash=sha256:abc123... \
+ --hash=sha256:def456...
 ```
 
 **Purpose**: 
@@ -193,8 +193,8 @@ git commit -m "Add new-package==1.2.3"
 
 ### 1. Always Use Pinned Versions
 
-❌ **Bad**: `flask`  
-❌ **Bad**: `flask>=2.0`  
+❌ **Bad**: `flask` 
+❌ **Bad**: `flask>=2.0` 
 ✅ **Good**: `flask==3.1.2`
 
 **Why**: Unpinned versions lead to non-reproducible builds and potential security issues.
@@ -243,9 +243,9 @@ The CI/CD pipeline uses hashed requirements for security:
 
 ```yaml
 - name: Install dependencies
-  run: |
-    pip install --upgrade pip
-    pip install --require-hashes -r requirements-hashed.txt
+ run: |
+ pip install --upgrade pip
+ pip install --require-hashes -r requirements-hashed.txt
 ```
 
 ### Docker Builds
@@ -320,7 +320,7 @@ make lint-security
 
 # Verify hashed requirements are current
 pip-compile --generate-hashes requirements.txt -o requirements-hashed.txt
-git diff requirements-hashed.txt  # Should show no changes if current
+git diff requirements-hashed.txt # Should show no changes if current
 ```
 
 ### Before Releasing
@@ -347,9 +347,9 @@ git commit -m "Update dependencies for release X.Y.Z"
 
 ```bash
 # Install dependencies
-pip install -r requirements.txt                    # Production
-pip install -r requirements-dev.txt                # Development
-pip install --require-hashes -r requirements-hashed.txt  # Secure
+pip install -r requirements.txt # Production
+pip install -r requirements-dev.txt # Development
+pip install --require-hashes -r requirements-hashed.txt # Secure
 
 # Update hashed requirements
 pip-compile --generate-hashes requirements.txt -o requirements-hashed.txt
@@ -382,7 +382,7 @@ If you encounter issues with dependency management:
 2. Review the [TESTING_GUIDE.md](../TESTING_GUIDE.md)
 3. Check the [CI_CD.md](../CI_CD.md) documentation
 4. Open an issue in the repository with:
-   - Your Python version
-   - Your pip and pip-tools versions
-   - The exact error message
-   - Steps to reproduce
+ - Your Python version
+ - Your pip and pip-tools versions
+ - The exact error message
+ - Steps to reproduce

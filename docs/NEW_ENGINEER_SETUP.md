@@ -94,11 +94,11 @@ kubectl create namespace vulcanami
 
 # 2. Create secrets
 kubectl create secret generic vulcanami-secrets \
-  --from-literal=jwt-secret-key=$(openssl rand -base64 48) \
-  --from-literal=bootstrap-key=$(openssl rand -base64 32) \
-  --from-literal=postgres-password=$(openssl rand -base64 32) \
-  --from-literal=redis-password=$(openssl rand -base64 32) \
-  -n vulcanami
+ --from-literal=jwt-secret-key=$(openssl rand -base64 48) \
+ --from-literal=bootstrap-key=$(openssl rand -base64 32) \
+ --from-literal=postgres-password=$(openssl rand -base64 32) \
+ --from-literal=redis-password=$(openssl rand -base64 32) \
+ -n vulcanami
 
 # 3. Deploy with kustomize
 kubectl apply -k k8s/overlays/development
@@ -125,12 +125,12 @@ kubectl create namespace vulcanami
 
 # 2. Install chart with secrets
 helm install vulcanami ./helm/vulcanami \
-  --namespace vulcanami \
-  --set image.tag=v1.0.0 \
-  --set secrets.jwtSecretKey=$(openssl rand -base64 48 | tr -d '\n') \
-  --set secrets.bootstrapKey=$(openssl rand -base64 32 | tr -d '\n') \
-  --set secrets.postgresPassword=$(openssl rand -base64 32 | tr -d '\n') \
-  --set secrets.redisPassword=$(openssl rand -base64 32 | tr -d '\n')
+ --namespace vulcanami \
+ --set image.tag=v1.0.0 \
+ --set secrets.jwtSecretKey=$(openssl rand -base64 48 | tr -d '\n') \
+ --set secrets.bootstrapKey=$(openssl rand -base64 32 | tr -d '\n') \
+ --set secrets.postgresPassword=$(openssl rand -base64 32 | tr -d '\n') \
+ --set secrets.redisPassword=$(openssl rand -base64 32 | tr -d '\n')
 
 # 3. Check deployment
 helm status vulcanami -n vulcanami
@@ -167,27 +167,27 @@ This repository includes a GitHub Actions workflow for automated deployment to A
 # 1. Create Azure Service Principal
 az login
 az ad sp create-for-rbac \
-  --name "github-actions-vulcanami" \
-  --role contributor \
-  --scopes /subscriptions/{YOUR_SUBSCRIPTION_ID} \
-  --sdk-auth
+ --name "github-actions-vulcanami" \
+ --role contributor \
+ --scopes /subscriptions/{YOUR_SUBSCRIPTION_ID} \
+ --sdk-auth
 
 # 2. Copy the output (clientId, tenantId, subscriptionId)
 # 3. Add these secrets to your GitHub repository:
-#    Settings > Secrets and variables > Actions > Repository secrets
-#    - AZURE_CLIENT_ID (from clientId)
-#    - AZURE_TENANT_ID (from tenantId)
-#    - AZURE_SUBSCRIPTION_ID (from subscriptionId)
+# Settings > Secrets and variables > Actions > Repository secrets
+# - AZURE_CLIENT_ID (from clientId)
+# - AZURE_TENANT_ID (from tenantId)
+# - AZURE_SUBSCRIPTION_ID (from subscriptionId)
 
 # 4. Update workflow configuration
 # Edit .github/workflows/azure-kubernetes-service-helm.yml
 # Update these environment variables:
-#   - AZURE_CONTAINER_REGISTRY
-#   - CONTAINER_NAME
-#   - RESOURCE_GROUP
-#   - CLUSTER_NAME
-#   - CHART_PATH
-#   - CHART_OVERRIDE_PATH
+# - AZURE_CONTAINER_REGISTRY
+# - CONTAINER_NAME
+# - RESOURCE_GROUP
+# - CLUSTER_NAME
+# - CHART_PATH
+# - CHART_OVERRIDE_PATH
 ```
 
 **Trigger Deployment:**
@@ -279,10 +279,10 @@ docker compose -f docker-compose.dev.yml up -d
 
 ```bash
 helm install vulcanami ./helm/vulcanami \
-  --set secrets.jwtSecretKey=YOUR_SECRET \
-  --set secrets.bootstrapKey=YOUR_SECRET \
-  --set secrets.postgresPassword=YOUR_SECRET \
-  --set secrets.redisPassword=YOUR_SECRET
+ --set secrets.jwtSecretKey=YOUR_SECRET \
+ --set secrets.bootstrapKey=YOUR_SECRET \
+ --set secrets.postgresPassword=YOUR_SECRET \
+ --set secrets.redisPassword=YOUR_SECRET
 ```
 
 ### Issue: Port already in use
@@ -388,30 +388,30 @@ openssl rand -base64 32 | tr -d '+/'
 ## Next Steps
 
 1. **Read the documentation:**
-   - [DEPLOYMENT.md](DEPLOYMENT.md) - Detailed deployment guide
-   - [DOCKER_BUILD_GUIDE.md](DOCKER_BUILD_GUIDE.md) - Docker build details
-   - [INFRASTRUCTURE_SECURITY_GUIDE.md](INFRASTRUCTURE_SECURITY_GUIDE.md) - Security best practices
+ - [DEPLOYMENT.md](DEPLOYMENT.md) - Detailed deployment guide
+ - [DOCKER_BUILD_GUIDE.md](DOCKER_BUILD_GUIDE.md) - Docker build details
+ - [INFRASTRUCTURE_SECURITY_GUIDE.md](INFRASTRUCTURE_SECURITY_GUIDE.md) - Security best practices
 
 2. **Explore the codebase:**
-   - `src/` - Application source code
-   - `docker/` - Service-specific Dockerfiles
-   - `k8s/` - Kubernetes manifests
-   - `helm/` - Helm charts
-   - `configs/` - Configuration files
+ - `src/` - Application source code
+ - `docker/` - Service-specific Dockerfiles
+ - `k8s/` - Kubernetes manifests
+ - `helm/` - Helm charts
+ - `configs/` - Configuration files
 
 3. **Run tests:**
-   ```bash
-   # Quick test
-   ./quick_test.sh
-   
-   # Full test suite
-   ./test_full_cicd.sh
-   ```
+ ```bash
+ # Quick test
+ ./quick_test.sh
+ 
+ # Full test suite
+ ./test_full_cicd.sh
+ ```
 
 4. **Set up your IDE:**
-   - Install Python 3.10+
-   - Install dependencies: `pip install -r requirements.txt`
-   - Configure linting: `pylint`, `black`, `mypy`
+ - Install Python 3.10+
+ - Install dependencies: `pip install -r requirements.txt`
+ - Configure linting: `pylint`, `black`, `mypy`
 
 ## Getting Help
 
@@ -424,28 +424,28 @@ openssl rand -base64 32 | tr -d '+/'
 
 ```bash
 # Docker Compose
-docker compose -f docker-compose.dev.yml up -d    # Start services
-docker compose -f docker-compose.dev.yml down     # Stop services
-docker compose -f docker-compose.dev.yml ps       # Check status
-docker compose -f docker-compose.dev.yml logs -f  # View logs
+docker compose -f docker-compose.dev.yml up -d # Start services
+docker compose -f docker-compose.dev.yml down # Stop services
+docker compose -f docker-compose.dev.yml ps # Check status
+docker compose -f docker-compose.dev.yml logs -f # View logs
 
 # Kubernetes
-kubectl get pods -n vulcanami                     # List pods
-kubectl describe pod POD_NAME -n vulcanami        # Pod details
-kubectl logs POD_NAME -n vulcanami                # Pod logs
-kubectl port-forward svc/SERVICE 8000:8000        # Port forward
+kubectl get pods -n vulcanami # List pods
+kubectl describe pod POD_NAME -n vulcanami # Pod details
+kubectl logs POD_NAME -n vulcanami # Pod logs
+kubectl port-forward svc/SERVICE 8000:8000 # Port forward
 
 # Helm
-helm list -n vulcanami                            # List releases
-helm status RELEASE -n vulcanami                  # Release status
-helm upgrade RELEASE ./helm/vulcanami             # Upgrade
-helm rollback RELEASE -n vulcanami                # Rollback
+helm list -n vulcanami # List releases
+helm status RELEASE -n vulcanami # Release status
+helm upgrade RELEASE ./helm/vulcanami # Upgrade
+helm rollback RELEASE -n vulcanami # Rollback
 
 # Docker
-docker ps                                         # List containers
-docker images                                     # List images
-docker logs CONTAINER_NAME                        # Container logs
-docker exec -it CONTAINER_NAME bash               # Shell access
+docker ps # List containers
+docker images # List images
+docker logs CONTAINER_NAME # Container logs
+docker exec -it CONTAINER_NAME bash # Shell access
 ```
 
 ## Summary
@@ -461,10 +461,10 @@ cd VulcanAMI_LLM
 ./scripts/validate-all.sh
 
 # 3. Start services (pick one)
-docker compose -f docker-compose.dev.yml up -d    # Docker Compose
+docker compose -f docker-compose.dev.yml up -d # Docker Compose
 # OR
-kubectl apply -k k8s/overlays/development         # Kubernetes
-# OR  
+kubectl apply -k k8s/overlays/development # Kubernetes
+# OR 
 helm install vulcanami ./helm/vulcanami --set... # Helm
 
 # 4. Access the application

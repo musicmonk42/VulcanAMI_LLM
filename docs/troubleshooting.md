@@ -1,6 +1,6 @@
 # VulcanAMI Platform Troubleshooting Guide
 
-**Version:** 2.4.0  
+**Version:** 2.4.0 
 **Last Updated:** January 1, 2026
 
 This guide provides solutions for common issues encountered when developing, deploying, and operating the VulcanAMI/GraphixVulcan platform.
@@ -104,27 +104,27 @@ VULCAN_ENABLE_RAY=1
 **For local Docker/self-hosted deployments:**
 
 1. **Suppress CPU detection warning** by setting the environment variable:
-   ```bash
-   RAY_DISABLE_DOCKER_CPU_WARNING=1
-   ```
+ ```bash
+ RAY_DISABLE_DOCKER_CPU_WARNING=1
+ ```
 
 2. **Fix shared memory warning** by adding `shm_size` to your Docker Compose configuration:
-   ```yaml
-   services:
-     your-service:
-       shm_size: '10gb'  # Recommended: at least 30% of available RAM
-   ```
+ ```yaml
+ services:
+ your-service:
+ shm_size: '10gb' # Recommended: at least 30% of available RAM
+ ```
 
 For Kubernetes deployments, mount an emptyDir with Memory medium as `/dev/shm`:
 ```yaml
 volumes:
-  - name: dshm
-    emptyDir:
-      medium: Memory
-      sizeLimit: "4Gi"
+ - name: dshm
+ emptyDir:
+ medium: Memory
+ sizeLimit: "4Gi"
 volumeMounts:
-  - name: dshm
-    mountPath: /dev/shm
+ - name: dshm
+ mountPath: /dev/shm
 ```
 
 These configurations are already applied in the repository's Docker Compose and Kubernetes manifests.
@@ -149,11 +149,11 @@ docker build --build-arg REJECT_INSECURE_JWT=ack -t vulcanami:latest .
 For docker-compose:
 ```yaml
 services:
-  your-service:
-    build:
-      context: .
-      args:
-        REJECT_INSECURE_JWT: ack
+ your-service:
+ build:
+ context: .
+ args:
+ REJECT_INSECURE_JWT: ack
 ```
 
 For Railway deployment:
@@ -337,9 +337,9 @@ kind create cluster
 # Enable Kubernetes in Docker Desktop settings
 
 # Get credentials for cloud clusters
-aws eks update-kubeconfig --region us-east-1 --name vulcanami-prod  # AWS
-az aks get-credentials --resource-group vulcanami-prod --name vulcanami-cluster  # Azure
-gcloud container clusters get-credentials vulcanami-prod --zone us-central1-a  # GCP
+aws eks update-kubeconfig --region us-east-1 --name vulcanami-prod # AWS
+az aks get-credentials --resource-group vulcanami-prod --name vulcanami-cluster # Azure
+gcloud container clusters get-credentials vulcanami-prod --zone us-central1-a # GCP
 ```
 
 ---
@@ -368,9 +368,9 @@ kubectl get events -n vulcanami --sort-by='.lastTimestamp'
 # Common fixes:
 # 1. Missing secrets
 kubectl create secret generic vulcanami-secrets \
-  --from-literal=JWT_SECRET_KEY=$(openssl rand -base64 48) \
-  --from-literal=BOOTSTRAP_KEY=$(openssl rand -base64 32) \
-  -n vulcanami
+ --from-literal=JWT_SECRET_KEY=$(openssl rand -base64 48) \
+ --from-literal=BOOTSTRAP_KEY=$(openssl rand -base64 32) \
+ -n vulcanami
 
 # 2. Resource constraints - check limits in deployment
 kubectl edit deployment <deployment-name> -n vulcanami
@@ -390,16 +390,16 @@ Create Kubernetes secrets:
 ```bash
 # From literal values
 kubectl create secret generic vulcanami-secrets \
-  --from-literal=JWT_SECRET_KEY=$(openssl rand -base64 48) \
-  --from-literal=BOOTSTRAP_KEY=$(openssl rand -base64 32) \
-  --from-literal=POSTGRES_PASSWORD=$(openssl rand -base64 32) \
-  --from-literal=REDIS_PASSWORD=$(openssl rand -base64 32) \
-  -n vulcanami
+ --from-literal=JWT_SECRET_KEY=$(openssl rand -base64 48) \
+ --from-literal=BOOTSTRAP_KEY=$(openssl rand -base64 32) \
+ --from-literal=POSTGRES_PASSWORD=$(openssl rand -base64 32) \
+ --from-literal=REDIS_PASSWORD=$(openssl rand -base64 32) \
+ -n vulcanami
 
 # From env file
 kubectl create secret generic vulcanami-secrets \
-  --from-env-file=.env \
-  -n vulcanami
+ --from-env-file=.env \
+ -n vulcanami
 
 # Verify secrets exist
 kubectl get secrets -n vulcanami
@@ -421,11 +421,11 @@ Helm values for secrets are not provided.
 These warnings are informational. Provide secrets during install:
 ```bash
 helm install vulcanami ./helm/vulcanami \
-  --namespace vulcanami \
-  --set secrets.jwtSecretKey=$(openssl rand -base64 48 | tr -d '\n') \
-  --set secrets.bootstrapKey=$(openssl rand -base64 32 | tr -d '\n') \
-  --set secrets.postgresPassword=$(openssl rand -base64 32 | tr -d '\n') \
-  --set secrets.redisPassword=$(openssl rand -base64 32 | tr -d '\n')
+ --namespace vulcanami \
+ --set secrets.jwtSecretKey=$(openssl rand -base64 48 | tr -d '\n') \
+ --set secrets.bootstrapKey=$(openssl rand -base64 32 | tr -d '\n') \
+ --set secrets.postgresPassword=$(openssl rand -base64 32 | tr -d '\n') \
+ --set secrets.redisPassword=$(openssl rand -base64 32 | tr -d '\n')
 ```
 
 ---
@@ -442,8 +442,8 @@ helm install vulcanami ./helm/vulcanami \
 
 ```bash
 # Ensure you're in the virtual environment
-source .venv/bin/activate  # Linux/Mac
-.venv\Scripts\activate  # Windows
+source .venv/bin/activate # Linux/Mac
+.venv\Scripts\activate # Windows
 
 # Install dependencies
 pip install -r requirements.txt
@@ -494,10 +494,10 @@ pip-compile --generate-hashes requirements.txt -o requirements-hashed.txt
 python3.11 -m venv .venv
 
 # Verify activation
-which python  # Should point to .venv/bin/python
+which python # Should point to .venv/bin/python
 
 # Verify Python version
-python --version  # Should be 3.11+
+python --version # Should be 3.11+
 ```
 
 ---
@@ -519,9 +519,9 @@ docker compose -f docker-compose.dev.yml ps
 docker compose -f docker-compose.dev.yml logs api-gateway
 
 # Local development
-python app.py  # Registry API on port 5000
+python app.py # Registry API on port 5000
 # or
-uvicorn src.graphix_arena:app --host 127.0.0.1 --port 8000  # Arena API
+uvicorn src.graphix_arena:app --host 127.0.0.1 --port 8000 # Arena API
 ```
 
 ---
@@ -603,16 +603,16 @@ Ensure the LLM client is properly registered by checking startup logs for:
 For Helm deployments, verify `values.yaml` has:
 ```yaml
 llm:
-  openai:
-    enabled: true
+ openai:
+ enabled: true
 ```
 
 For test environments, set `SKIP_OPENAI=false` to enable OpenAI fallback:
 ```yaml
 # In scalability_test.yml or your CI workflow
 env:
-  SKIP_OPENAI: 'false'
-  OPENAI_LANGUAGE_FORMATTING: 'true'
+ SKIP_OPENAI: 'false'
+ OPENAI_LANGUAGE_FORMATTING: 'true'
 ```
 
 ---
@@ -634,8 +634,8 @@ env:
 1. Enable OpenAI fallback in your CI/CD workflow:
 ```yaml
 env:
-  SKIP_OPENAI: 'false'
-  OPENAI_LANGUAGE_FORMATTING: 'true'
+ SKIP_OPENAI: 'false'
+ OPENAI_LANGUAGE_FORMATTING: 'true'
 ```
 
 2. Ensure OpenAI API key is set:
@@ -736,11 +736,11 @@ VULCAN_LLM_TIMEOUT=15.0
 ```yaml
 # In values.yaml under the llm section
 llm:
-  # ... other llm settings ...
-  graphixVulcan:
-    generationTimeout: 60.0
-    vulcanTimeout: 15.0
-    verboseLogging: false
+ # ... other llm settings ...
+ graphixVulcan:
+ generationTimeout: 60.0
+ vulcanTimeout: 15.0
+ verboseLogging: false
 ```
 
 ---
@@ -796,9 +796,9 @@ PROVENANCE_TTL_SECONDS=1800
 # Increase container limits if needed
 # In docker-compose.yml:
 deploy:
-  resources:
-    limits:
-      memory: 8G
+ resources:
+ limits:
+ memory: 8G
 ```
 
 ---
@@ -980,9 +980,9 @@ python src/full_platform.py
 ./scripts/validate-all.sh
 
 # Step 2: Check prerequisites
-python --version  # Should be 3.11+
-docker --version  # Should be 20.10+
-docker compose version  # Should be v2+
+python --version # Should be 3.11+
+docker --version # Should be 20.10+
+docker compose version # Should be v2+
 
 # Step 3: Install dependencies
 pip install -r requirements.txt
@@ -1057,5 +1057,5 @@ For more detailed information, see:
 
 ---
 
-**Document Version:** 2.4.0  
+**Document Version:** 2.4.0 
 **Last Updated:** January 1, 2026

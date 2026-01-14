@@ -1,12 +1,12 @@
 # Knowledge Crystallizer
 
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/vulcan-agi/knowledge-crystallizer)
+[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/vulcan-ami/knowledge-crystallizer)
 [![Python](https://img.shields.io/badge/python-3.8+-green.svg)](https://python.org)
 [![License](https://img.shields.io/badge/license-Proprietary-red.svg)](LICENSE)
 
 ## Overview
 
-The **Knowledge Crystallizer** is a core module of the VULCAN-AGI system designed to distill raw execution traces into reusable, validated knowledge principles. It enables AI systems to:
+The **Knowledge Crystallizer** is a core module of the VULCAN-AMI system designed to distill raw execution traces into reusable, validated knowledge principles. It enables AI systems to:
 
 - **Learn** generalizable "crystallized" knowledge from specific execution instances
 - **Validate** principles across domains with multi-level testing
@@ -66,31 +66,31 @@ The module follows the **EXAMINE → SELECT → APPLY → REMEMBER** pattern for
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                      KnowledgeCrystallizer                          │
-│                    (Main Orchestrator)                              │
+│ KnowledgeCrystallizer │
+│ (Main Orchestrator) │
 ├─────────────────────────────────────────────────────────────────────┤
-│                                                                     │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────────┐  │
-│  │Crystallization│  │  Principle   │  │   Knowledge              │  │
-│  │   Selector   │──│  Extractor   │──│   Validator              │  │
-│  └──────────────┘  └──────────────┘  └──────────────────────────┘  │
-│         │                │                      │                   │
-│         ▼                ▼                      ▼                   │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────────┐  │
-│  │  Selection   │  │   Pattern    │  │     Domain               │  │
-│  │  Strategies  │  │   Detector   │  │     Validator            │  │
-│  └──────────────┘  └──────────────┘  └──────────────────────────┘  │
-│                                                                     │
+│ │
+│ ┌──────────────┐ ┌──────────────┐ ┌──────────────────────────┐ │
+│ │Crystallization│ │ Principle │ │ Knowledge │ │
+│ │ Selector │──│ Extractor │──│ Validator │ │
+│ └──────────────┘ └──────────────┘ └──────────────────────────┘ │
+│ │ │ │ │
+│ ▼ ▼ ▼ │
+│ ┌──────────────┐ ┌──────────────┐ ┌──────────────────────────┐ │
+│ │ Selection │ │ Pattern │ │ Domain │ │
+│ │ Strategies │ │ Detector │ │ Validator │ │
+│ └──────────────┘ └──────────────┘ └──────────────────────────┘ │
+│ │
 ├─────────────────────────────────────────────────────────────────────┤
-│                                                                     │
-│  ┌──────────────────────────┐  ┌─────────────────────────────────┐ │
-│  │  Contraindication        │  │  Versioned Knowledge Base       │ │
-│  │  Tracker                 │  │  (SQLite/FAISS/Memory)          │ │
-│  │  ├─ Database             │  │  ├─ Version Control             │ │
-│  │  ├─ Graph                │  │  ├─ Knowledge Index             │ │
-│  │  └─ Cascade Analyzer     │  │  └─ Knowledge Pruner            │ │
-│  └──────────────────────────┘  └─────────────────────────────────┘ │
-│                                                                     │
+│ │
+│ ┌──────────────────────────┐ ┌─────────────────────────────────┐ │
+│ │ Contraindication │ │ Versioned Knowledge Base │ │
+│ │ Tracker │ │ (SQLite/FAISS/Memory) │ │
+│ │ ├─ Database │ │ ├─ Version Control │ │
+│ │ ├─ Graph │ │ ├─ Knowledge Index │ │
+│ │ └─ Cascade Analyzer │ │ └─ Knowledge Pruner │ │
+│ └──────────────────────────┘ └─────────────────────────────────┘ │
+│ │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -137,15 +137,15 @@ pip install numpy scipy networkx faiss-cpu
 
 ```python
 from vulcan.knowledge_crystallizer import (
-    KnowledgeCrystallizer,
-    ExecutionTrace,
-    CrystallizationMode,
-    KNOWLEDGE_CRYSTALLIZER_AVAILABLE
+ KnowledgeCrystallizer,
+ ExecutionTrace,
+ CrystallizationMode,
+ KNOWLEDGE_CRYSTALLIZER_AVAILABLE
 )
 
 # Check availability
 if KNOWLEDGE_CRYSTALLIZER_AVAILABLE:
-    crystallizer = KnowledgeCrystallizer()
+ crystallizer = KnowledgeCrystallizer()
 ```
 
 ## Quick Start
@@ -155,8 +155,8 @@ if KNOWLEDGE_CRYSTALLIZER_AVAILABLE:
 ```python
 import logging
 from vulcan.knowledge_crystallizer import (
-    KnowledgeCrystallizer,
-    ExecutionTrace,
+ KnowledgeCrystallizer,
+ ExecutionTrace,
 )
 
 # Configure logging
@@ -167,17 +167,17 @@ crystallizer = KnowledgeCrystallizer()
 
 # Create an execution trace
 trace = ExecutionTrace(
-    trace_id="example_001",
-    actions=[
-        {"type": "fetch_data", "source": "api"},
-        {"type": "transform", "operation": "normalize"},
-        {"type": "validate", "schema": "v1"},
-        {"type": "store", "destination": "db"}
-    ],
-    outcomes={"success": True, "records_processed": 1000},
-    context={"domain": "data_pipeline", "environment": "production"},
-    success=True,
-    domain="data_pipeline"
+ trace_id="example_001",
+ actions=[
+ {"type": "fetch_data", "source": "api"},
+ {"type": "transform", "operation": "normalize"},
+ {"type": "validate", "schema": "v1"},
+ {"type": "store", "destination": "db"}
+ ],
+ outcomes={"success": True, "records_processed": 1000},
+ context={"domain": "data_pipeline", "environment": "production"},
+ success=True,
+ domain="data_pipeline"
 )
 
 # Crystallize the trace
@@ -193,20 +193,20 @@ print(f"Method used: {result.method_used}")
 ```python
 # Define a problem
 problem = {
-    "domain": "data_pipeline",
-    "type": "process",
-    "context": {"scale": "large"}
+ "domain": "data_pipeline",
+ "type": "process",
+ "context": {"scale": "large"}
 }
 
 # Apply crystallized knowledge
 application = crystallizer.apply_knowledge(problem, confidence_required=0.7)
 
 if application.principle_used:
-    print(f"Applied principle: {application.principle_used.id}")
-    print(f"Solution: {application.solution}")
-    print(f"Confidence: {application.confidence:.2f}")
+ print(f"Applied principle: {application.principle_used.id}")
+ print(f"Solution: {application.solution}")
+ print(f"Confidence: {application.confidence:.2f}")
 else:
-    print("No applicable principles found")
+ print("No applicable principles found")
 ```
 
 ### Providing Feedback
@@ -214,11 +214,11 @@ else:
 ```python
 # Update principle based on application outcome
 crystallizer.update_from_feedback(
-    principle_id=application.principle_used.id,
-    outcome={
-        "success": True,
-        "performance": {"latency_ms": 150}
-    }
+ principle_id=application.principle_used.id,
+ outcome={
+ "success": True,
+ "performance": {"latency_ms": 150}
+ }
 )
 ```
 
@@ -231,14 +231,14 @@ An `ExecutionTrace` represents a recorded execution with:
 ```python
 @dataclass
 class ExecutionTrace:
-    trace_id: str                      # Unique identifier
-    actions: List[Dict[str, Any]]      # Sequence of actions performed
-    outcomes: Dict[str, Any]           # Results and metrics
-    context: Dict[str, Any]            # Environmental context
-    success: bool = True               # Overall success status
-    domain: str = "general"            # Domain classification
-    metadata: Dict[str, Any] = {}      # Additional metadata
-    iteration: Optional[int] = None    # For incremental learning
+ trace_id: str # Unique identifier
+ actions: List[Dict[str, Any]] # Sequence of actions performed
+ outcomes: Dict[str, Any] # Results and metrics
+ context: Dict[str, Any] # Environmental context
+ success: bool = True # Overall success status
+ domain: str = "general" # Domain classification
+ metadata: Dict[str, Any] = {} # Additional metadata
+ iteration: Optional[int] = None # For incremental learning
 ```
 
 ### Crystallization Modes
@@ -256,11 +256,11 @@ class ExecutionTrace:
 
 ```python
 class ValidationLevel(Enum):
-    BASIC = "basic"              # Structure and type checks
-    CONSISTENCY = "consistency"   # Internal coherence
-    DOMAIN_SPECIFIC = "domain"   # Domain compatibility
-    GENERALIZATION = "general"   # Cross-domain applicability
-    COMPREHENSIVE = "full"       # All validation levels
+ BASIC = "basic" # Structure and type checks
+ CONSISTENCY = "consistency" # Internal coherence
+ DOMAIN_SPECIFIC = "domain" # Domain compatibility
+ GENERALIZATION = "general" # Cross-domain applicability
+ COMPREHENSIVE = "full" # All validation levels
 ```
 
 ### Domain Criticality
@@ -282,105 +282,105 @@ The system automatically adjusts validation rigor based on domain criticality:
 
 ```python
 class KnowledgeCrystallizer:
-    def __init__(
-        self,
-        vulcan_memory=None,           # Optional VULCAN memory system
-        semantic_bridge=None          # Optional semantic bridge
-    )
-    
-    def crystallize(
-        self,
-        execution_trace: ExecutionTrace,
-        context: Optional[Dict[str, Any]] = None
-    ) -> CrystallizationResult:
-        """Main crystallization entry point."""
-    
-    def apply_knowledge(
-        self,
-        problem: Dict[str, Any],
-        confidence_required: float = 0.7
-    ) -> ApplicationResult:
-        """Apply crystallized knowledge to solve a problem."""
-    
-    def update_from_feedback(
-        self,
-        principle_id: str,
-        outcome: Dict[str, Any]
-    ) -> None:
-        """Update knowledge from application feedback."""
-    
-    def validate_stratified(
-        self,
-        candidate: Principle
-    ) -> ValidationResult:
-        """Perform multi-level validation."""
+ def __init__(
+ self,
+ vulcan_memory=None, # Optional VULCAN memory system
+ semantic_bridge=None # Optional semantic bridge
+ )
+ 
+ def crystallize(
+ self,
+ execution_trace: ExecutionTrace,
+ context: Optional[Dict[str, Any]] = None
+ ) -> CrystallizationResult:
+ """Main crystallization entry point."""
+ 
+ def apply_knowledge(
+ self,
+ problem: Dict[str, Any],
+ confidence_required: float = 0.7
+ ) -> ApplicationResult:
+ """Apply crystallized knowledge to solve a problem."""
+ 
+ def update_from_feedback(
+ self,
+ principle_id: str,
+ outcome: Dict[str, Any]
+ ) -> None:
+ """Update knowledge from application feedback."""
+ 
+ def validate_stratified(
+ self,
+ candidate: Principle
+ ) -> ValidationResult:
+ """Perform multi-level validation."""
 ```
 
 ### PrincipleExtractor
 
 ```python
 class PrincipleExtractor:
-    def __init__(
-        self,
-        min_evidence_count: int = 3,
-        min_confidence: float = 0.6,
-        strategy: ExtractionStrategy = ExtractionStrategy.BALANCED
-    )
-    
-    def extract_from_trace(
-        self,
-        execution_trace: ExecutionTrace
-    ) -> List[CrystallizedPrinciple]:
-        """Extract principles from a single trace."""
-    
-    def extract_from_batch(
-        self,
-        traces: List[ExecutionTrace]
-    ) -> List[CrystallizedPrinciple]:
-        """Extract principles from multiple traces."""
+ def __init__(
+ self,
+ min_evidence_count: int = 3,
+ min_confidence: float = 0.6,
+ strategy: ExtractionStrategy = ExtractionStrategy.BALANCED
+ )
+ 
+ def extract_from_trace(
+ self,
+ execution_trace: ExecutionTrace
+ ) -> List[CrystallizedPrinciple]:
+ """Extract principles from a single trace."""
+ 
+ def extract_from_batch(
+ self,
+ traces: List[ExecutionTrace]
+ ) -> List[CrystallizedPrinciple]:
+ """Extract principles from multiple traces."""
 ```
 
 ### VersionedKnowledgeBase
 
 ```python
 class VersionedKnowledgeBase:
-    def __init__(
-        self,
-        backend: StorageBackend = StorageBackend.MEMORY,
-        storage_path: Optional[Path] = None,
-        compression: CompressionType = CompressionType.NONE,
-        auto_save: bool = True,
-        max_versions: int = 100
-    )
-    
-    def store(
-        self,
-        principle,
-        author: Optional[str] = None,
-        message: Optional[str] = None
-    ) -> str:
-        """Store a principle with version control."""
-    
-    def get(
-        self,
-        principle_id: str,
-        version: Optional[int] = None
-    ) -> Optional[Principle]:
-        """Retrieve a principle by ID."""
-    
-    def rollback(
-        self,
-        principle_id: str,
-        target_version: int
-    ) -> bool:
-        """Rollback to a previous version."""
-    
-    def find_similar(
-        self,
-        principle,
-        threshold: float = 0.7
-    ) -> List[Principle]:
-        """Find similar principles using vector search."""
+ def __init__(
+ self,
+ backend: StorageBackend = StorageBackend.MEMORY,
+ storage_path: Optional[Path] = None,
+ compression: CompressionType = CompressionType.NONE,
+ auto_save: bool = True,
+ max_versions: int = 100
+ )
+ 
+ def store(
+ self,
+ principle,
+ author: Optional[str] = None,
+ message: Optional[str] = None
+ ) -> str:
+ """Store a principle with version control."""
+ 
+ def get(
+ self,
+ principle_id: str,
+ version: Optional[int] = None
+ ) -> Optional[Principle]:
+ """Retrieve a principle by ID."""
+ 
+ def rollback(
+ self,
+ principle_id: str,
+ target_version: int
+ ) -> bool:
+ """Rollback to a previous version."""
+ 
+ def find_similar(
+ self,
+ principle,
+ threshold: float = 0.7
+ ) -> List[Principle]:
+ """Find similar principles using vector search."""
 ```
 
 ## Configuration
@@ -389,24 +389,24 @@ class VersionedKnowledgeBase:
 
 ```python
 from vulcan.knowledge_crystallizer import (
-    VersionedKnowledgeBase,
-    StorageBackend,
-    CompressionType
+ VersionedKnowledgeBase,
+ StorageBackend,
+ CompressionType
 )
 
 # SQLite backend with compression
 kb = VersionedKnowledgeBase(
-    backend=StorageBackend.SQLITE,
-    storage_path=Path("./knowledge.db"),
-    compression=CompressionType.GZIP,
-    max_versions=50
+ backend=StorageBackend.SQLITE,
+ storage_path=Path("./knowledge.db"),
+ compression=CompressionType.GZIP,
+ max_versions=50
 )
 
 # Hybrid backend (memory + persistence)
 kb = VersionedKnowledgeBase(
-    backend=StorageBackend.HYBRID,
-    storage_path=Path("./knowledge"),
-    auto_save=True
+ backend=StorageBackend.HYBRID,
+ storage_path=Path("./knowledge"),
+ auto_save=True
 )
 ```
 
@@ -414,20 +414,20 @@ kb = VersionedKnowledgeBase(
 
 ```python
 from vulcan.knowledge_crystallizer import (
-    PrincipleExtractor,
-    ExtractionStrategy
+ PrincipleExtractor,
+ ExtractionStrategy
 )
 
 # Conservative: High confidence required (0.8+)
 extractor = PrincipleExtractor(
-    strategy=ExtractionStrategy.CONSERVATIVE,
-    min_evidence_count=5
+ strategy=ExtractionStrategy.CONSERVATIVE,
+ min_evidence_count=5
 )
 
 # Exploratory: Lower thresholds for novel domains
 extractor = PrincipleExtractor(
-    strategy=ExtractionStrategy.EXPLORATORY,
-    min_confidence=0.3
+ strategy=ExtractionStrategy.EXPLORATORY,
+ min_confidence=0.3
 )
 ```
 
@@ -437,18 +437,18 @@ extractor = PrincipleExtractor(
 from vulcan.knowledge_crystallizer import KnowledgeValidator
 
 validator = KnowledgeValidator(
-    min_confidence=0.6,
-    consistency_threshold=0.7
+ min_confidence=0.6,
+ consistency_threshold=0.7
 )
 
 # Multi-level validation with context
 results = validator.validate_principle_multilevel(
-    principle,
-    context={
-        "time_budget_ms": 5000,
-        "quality_requirement": "high",
-        "force_comprehensive": True
-    }
+ principle,
+ context={
+ "time_budget_ms": 5000,
+ "quality_requirement": "high",
+ "force_comprehensive": True
+ }
 )
 ```
 
@@ -459,14 +459,14 @@ results = validator.validate_principle_multilevel(
 ```python
 # Provide additional context for method selection
 result = crystallizer.crystallize(
-    trace,
-    context={
-        "batch_size": 10,
-        "cascade_failures_detected": True,
-        "previous_iterations": 5,
-        "refinement_requested": True,
-        "known_domains": ["optimization", "analysis"]
-    }
+ trace,
+ context={
+ "batch_size": 10,
+ "cascade_failures_detected": True,
+ "previous_iterations": 5,
+ "refinement_requested": True,
+ "known_domains": ["optimization", "analysis"]
+ }
 )
 ```
 
@@ -474,9 +474,9 @@ result = crystallizer.crystallize(
 
 ```python
 from vulcan.knowledge_crystallizer import (
-    CascadeAnalyzer,
-    ContraindicationDatabase,
-    ContraindicationGraph
+ CascadeAnalyzer,
+ ContraindicationDatabase,
+ ContraindicationGraph
 )
 
 # Initialize cascade analyzer
@@ -500,11 +500,11 @@ print(f"Mitigation Strategies: {impact.mitigation_strategies}")
 traces = [trace1, trace2, trace3, ...]
 
 result = crystallizer.crystallize(
-    traces[0],
-    context={
-        "batch_traces_available": len(traces),
-        "batch_size": 20
-    }
+ traces[0],
+ context={
+ "batch_traces_available": len(traces),
+ "batch_size": 20
+ }
 )
 
 # Or use batch extraction directly
@@ -520,7 +520,7 @@ kb.store(principle, author="system", message="Initial extraction")
 # Get version history
 history = kb.get_history(principle_id)
 for version in history:
-    print(f"v{version.version}: {version.commit_message} by {version.author}")
+ print(f"v{version.version}: {version.commit_message} by {version.author}")
 
 # Rollback to previous version
 kb.rollback(principle_id, target_version=2)
@@ -588,11 +588,11 @@ All major components use `threading.RLock` for concurrent access:
 from concurrent.futures import ThreadPoolExecutor
 
 with ThreadPoolExecutor(max_workers=4) as executor:
-    futures = [
-        executor.submit(crystallizer.crystallize, trace)
-        for trace in traces
-    ]
-    results = [f.result() for f in futures]
+ futures = [
+ executor.submit(crystallizer.crystallize, trace)
+ for trace in traces
+ ]
+ results = [f.result() for f in futures]
 ```
 
 ## Availability Flags
@@ -601,16 +601,16 @@ Check component availability before use:
 
 ```python
 from vulcan.knowledge_crystallizer import (
-    KNOWLEDGE_CRYSTALLIZER_AVAILABLE,
-    PRINCIPLE_EXTRACTOR_AVAILABLE,
-    VALIDATION_ENGINE_AVAILABLE,
-    KNOWLEDGE_STORAGE_AVAILABLE,
-    CRYSTALLIZATION_SELECTOR_AVAILABLE,
-    CONTRAINDICATION_TRACKER_AVAILABLE
+ KNOWLEDGE_CRYSTALLIZER_AVAILABLE,
+ PRINCIPLE_EXTRACTOR_AVAILABLE,
+ VALIDATION_ENGINE_AVAILABLE,
+ KNOWLEDGE_STORAGE_AVAILABLE,
+ CRYSTALLIZATION_SELECTOR_AVAILABLE,
+ CONTRAINDICATION_TRACKER_AVAILABLE
 )
 
 if not KNOWLEDGE_CRYSTALLIZER_AVAILABLE:
-    print("Knowledge Crystallizer not available - check numpy installation")
+ print("Knowledge Crystallizer not available - check numpy installation")
 ```
 
 ## Error Handling
@@ -619,12 +619,12 @@ The module uses graceful degradation:
 
 ```python
 try:
-    result = crystallizer.crystallize(trace)
+ result = crystallizer.crystallize(trace)
 except Exception as e:
-    # Automatic fallback to simpler methods
-    # Check result.metadata for error details
-    if result.confidence == 0.0:
-        print(f"Crystallization failed: {result.metadata.get('error')}")
+ # Automatic fallback to simpler methods
+ # Check result.metadata for error details
+ if result.confidence == 0.0:
+ print(f"Crystallization failed: {result.metadata.get('error')}")
 ```
 
 ## Logging
@@ -641,8 +641,6 @@ logging.getLogger("vulcan.knowledge_crystallizer").setLevel(logging.DEBUG)
 logging.getLogger("vulcan.knowledge_crystallizer.principle_extractor").setLevel(logging.INFO)
 logging.getLogger("vulcan.knowledge_crystallizer.validation_engine").setLevel(logging.WARNING)
 ```
-
-
 
 ### Code Style
 
@@ -667,4 +665,4 @@ Proprietary - See [LICENSE](LICENSE) for complete terms.
 
 ---
 
-For issues, feature requests, or contributions, please refer to the [VULCAN-AGI project repository](https://github.com/vulcan-agi).
+For issues, feature requests, or contributions, please refer to the [VULCAN-AMI project repository](https://github.com/vulcan-ami).

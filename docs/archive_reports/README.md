@@ -10,7 +10,7 @@ These documents represent various stages of development, audits, and system anal
 
 For current documentation, please refer to the main repository:
 - README.md - Project overview
-- CI_CD.md - CI/CD pipeline documentation  
+- CI_CD.md - CI/CD pipeline documentation 
 - DEPLOYMENT.md - Deployment procedures
 - QUICKSTART.md - Quick start guide
 - TEST_RESULTS_REPORT.md - Current test results

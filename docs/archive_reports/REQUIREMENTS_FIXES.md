@@ -80,9 +80,9 @@ COPY src/ ./src/
 
 # Install local package if setup.py exists
 RUN if [ -f setup.py ]; then \
-        echo "Installing local package from setup.py"; \
-        pip install --no-cache-dir -e .; \
-    fi
+ echo "Installing local package from setup.py"; \
+ pip install --no-cache-dir -e .; \
+ fi
 
 # Download spacy language model if spacy is installed
 RUN python -m spacy download en_core_web_sm || echo "Spacy model download failed (non-critical)"
@@ -116,10 +116,10 @@ Improved documentation for production deployments:
 # requirements using pip-tools:
 #
 # Installation:
-#   pip install pip-tools
+# pip install pip-tools
 #
 # Generate hashed requirements:
-#   pip-compile --generate-hashes requirements.txt -o requirements-hashed.txt
+# pip-compile --generate-hashes requirements.txt -o requirements-hashed.txt
 # =============================================================================
 ```
 
@@ -167,7 +167,7 @@ RUN pip install --no-cache-dir --trusted-host pypi.org --trusted-host files.pyth
 - `requirements-hashed.txt` - Improved documentation
 - `Dockerfile` - Added pip upgrade, setup.py copy, local install, spacy download
 - `docker/api/Dockerfile` - Same enhancements
-- `docker/dqs/Dockerfile` - Same enhancements  
+- `docker/dqs/Dockerfile` - Same enhancements 
 - `docker/pii/Dockerfile` - Same enhancements
 - `Makefile` - Enhanced install target with local package and spacy model
 

@@ -1,11 +1,9 @@
 # VULCAN World Model & Meta-Reasoning System
 ## Complete Technical Documentation
 
-**Version:** 0.1.0  
-**Last Updated:** January 2026  
-**Status:** ⚠️ RESEARCH/DEVELOPMENT - NOT PRODUCTION READY
-
----
+**Version:** 0.1.0 
+**Last Updated:** January 2026 
+**Status:** ⚠️ RESEARCH/DEVELOPMENT - NOT ---
 
 ## Table of Contents
 
@@ -50,30 +48,30 @@ The VULCAN World Model is an advanced AGI reasoning system that combines:
 
 ```
 External Environment
-         ↓
+ ↓
 WorldModelRouter (Intelligent Routing)
-         ↓
+ ↓
 ┌────────────────────────────────────┐
-│    World Model Core Components     │
+│ World Model Core Components │
 ├────────────────────────────────────┤
-│ • CausalDAG                        │
-│ • DynamicsModel                    │
-│ • CorrelationTracker               │
-│ • InterventionManager              │
-│ • PredictionEngine                 │
-│ • InvariantDetector                │
-│ • ConfidenceCalibrator             │
+│ • CausalDAG │
+│ • DynamicsModel │
+│ • CorrelationTracker │
+│ • InterventionManager │
+│ • PredictionEngine │
+│ • InvariantDetector │
+│ • ConfidenceCalibrator │
 └────────────────────────────────────┘
-         ↓
+ ↓
 ┌────────────────────────────────────┐
-│   Meta-Reasoning Layer (Optional)  │
+│ Meta-Reasoning Layer (Optional) │
 ├────────────────────────────────────┤
-│ • MotivationalIntrospection        │
-│ • ObjectiveHierarchy               │
-│ • GoalConflictDetector             │
-│ • ValidationTracker                │
-│ • SelfImprovementDrive             │
-│ • CSIU Enforcement                 │
+│ • MotivationalIntrospection │
+│ • ObjectiveHierarchy │
+│ • GoalConflictDetector │
+│ • ValidationTracker │
+│ • SelfImprovementDrive │
+│ • CSIU Enforcement │
 └────────────────────────────────────┘
 ```
 
@@ -109,17 +107,17 @@ threading (stdlib)
 
 **Optional Dependencies (with fallbacks):**
 ```
-scipy>=1.10.0          # Statistical functions
-sklearn>=1.3.0         # ML models
-pandas>=2.0.0          # Data manipulation
-networkx>=3.0          # Advanced graph operations
-statsmodels>=0.14.0    # Time series analysis
+scipy>=1.10.0 # Statistical functions
+sklearn>=1.3.0 # ML models
+pandas>=2.0.0 # Data manipulation
+networkx>=3.0 # Advanced graph operations
+statsmodels>=0.14.0 # Time series analysis
 ```
 
 **Safety (Recommended):**
 ```
-safety_validator       # Constraint checking
-safety_types          # Configuration types
+safety_validator # Constraint checking
+safety_types # Configuration types
 ```
 
 ---
@@ -154,11 +152,11 @@ dag.add_node('rain', domain='weather')
 
 # Add causal edges
 edge = CausalEdge(
-    source='temperature',
-    target='humidity',
-    strength=0.7,
-    confidence=0.85,
-    evidence_type=EvidenceType.OBSERVATIONAL
+ source='temperature',
+ target='humidity',
+ strength=0.7,
+ confidence=0.85,
+ evidence_type=EvidenceType.OBSERVATIONAL
 )
 dag.add_edge(edge)
 
@@ -196,9 +194,9 @@ calibrator = ConfidenceCalibrator(method='isotonic')
 
 # Train with historical predictions
 records = [
-    PredictionRecord(predicted=0.8, actual=1.0, timestamp=t1),
-    PredictionRecord(predicted=0.6, actual=0.0, timestamp=t2),
-    # ... more records
+ PredictionRecord(predicted=0.8, actual=1.0, timestamp=t1),
+ PredictionRecord(predicted=0.6, actual=0.0, timestamp=t2),
+ # ... more records
 ]
 calibrator.fit(records)
 
@@ -239,15 +237,15 @@ tracker.update('response_time', 250, timestamp=time.time())
 
 # Get correlation
 corr = tracker.get_correlation(
-    'cpu_usage', 
-    'response_time',
-    method=CorrelationMethod.PEARSON
+ 'cpu_usage', 
+ 'response_time',
+ method=CorrelationMethod.PEARSON
 )
 # Returns: {
-#   'coefficient': 0.82,
-#   'p_value': 0.001,
-#   'significant': True,
-#   'method': 'pearson'
+# 'coefficient': 0.82,
+# 'p_value': 0.001,
+# 'significant': True,
+# 'method': 'pearson'
 # }
 ```
 
@@ -287,9 +285,9 @@ model = DynamicsModel()
 
 # Create state
 state = State(
-    timestamp=time.time(),
-    variables={'temperature': 25.0, 'pressure': 1013.0},
-    domain='weather'
+ timestamp=time.time(),
+ variables={'temperature': 25.0, 'pressure': 1013.0},
+ domain='weather'
 )
 
 # Update model
@@ -297,8 +295,8 @@ model.update(state)
 
 # Predict next state
 prediction = model.predict_next_state(
-    current_state=state,
-    time_horizon=3600  # 1 hour ahead
+ current_state=state,
+ time_horizon=3600 # 1 hour ahead
 )
 # Returns predicted state with uncertainty
 ```
@@ -333,19 +331,19 @@ prediction = model.predict_next_state(
 **Example Usage:**
 ```python
 from vulcan.world_model import (
-    InterventionManager, 
-    InterventionCandidate,
-    InterventionType
+ InterventionManager, 
+ InterventionCandidate,
+ InterventionType
 )
 
 manager = InterventionManager(causal_dag)
 
 # Create candidate intervention
 candidate = InterventionCandidate(
-    target='temperature',
-    intervention_type=InterventionType.DO_INTERVENTION,
-    value=30.0,
-    estimated_cost=10.0
+ target='temperature',
+ intervention_type=InterventionType.DO_INTERVENTION,
+ value=30.0,
+ estimated_cost=10.0
 )
 
 # Prioritize interventions
@@ -385,15 +383,15 @@ detector = InvariantDetector()
 
 # Feed observations
 for obs in observations:
-    detector.update(obs)
+ detector.update(obs)
 
 # Detect invariants
 invariants = detector.detect_invariants()
 
 for inv in invariants:
-    print(f"{inv.type}: {inv.expression}")
-    print(f"Confidence: {inv.confidence}")
-    print(f"Violations: {inv.violation_count}")
+ print(f"{inv.type}: {inv.expression}")
+ print(f"Confidence: {inv.confidence}")
+ print(f"Violations: {inv.violation_count}")
 ```
 
 **Key Features:**
@@ -427,21 +425,21 @@ for inv in invariants:
 **Example Usage:**
 ```python
 from vulcan.world_model import (
-    EnsemblePredictor,
-    CombinationMethod
+ EnsemblePredictor,
+ CombinationMethod
 )
 
 predictor = EnsemblePredictor(
-    causal_dag=dag,
-    dynamics_model=dynamics,
-    combination_method=CombinationMethod.WEIGHTED_AVERAGE
+ causal_dag=dag,
+ dynamics_model=dynamics,
+ combination_method=CombinationMethod.WEIGHTED_AVERAGE
 )
 
 # Make prediction
 prediction = predictor.predict(
-    target='temperature',
-    evidence={'humidity': 0.8, 'pressure': 1013.0},
-    time_horizon=3600
+ target='temperature',
+ evidence={'humidity': 0.8, 'pressure': 1013.0},
+ time_horizon=3600
 )
 
 print(f"Expected: {prediction.expected}")
@@ -478,20 +476,20 @@ from vulcan.world_model import WorldModel, Observation
 
 # Initialize
 config = {
-    'safety_config': {'max_nodes': 1000},
-    'bootstrap_mode': True,
-    'enable_meta_reasoning': False
+ 'safety_config': {'max_nodes': 1000},
+ 'bootstrap_mode': True,
+ 'enable_meta_reasoning': False
 }
 world_model = WorldModel(config=config)
 
 # Create observation
 obs = Observation(
-    timestamp=time.time(),
-    variables={
-        'temperature': 25.0,
-        'humidity': 0.8
-    },
-    domain='environment'
+ timestamp=time.time(),
+ variables={
+ 'temperature': 25.0,
+ 'humidity': 0.8
+ },
+ domain='environment'
 )
 
 # Update model
@@ -499,8 +497,8 @@ result = world_model.update_from_observation(obs)
 
 # Make prediction
 prediction = world_model.predict_with_calibrated_uncertainty(
-    action='increase_heating',
-    context=context
+ action='increase_heating',
+ context=context
 )
 
 # Validate consistency
@@ -545,8 +543,8 @@ router = WorldModelRouter(world_model)
 
 # Plan updates
 plan = router.plan_updates(
-    observation=obs,
-    strategy=UpdateStrategy.COST_OPTIMIZED
+ observation=obs,
+ strategy=UpdateStrategy.COST_OPTIMIZED
 )
 
 # Execute plan
@@ -599,38 +597,38 @@ MotivationalIntrospection (Coordinator)
 **Key Functions:**
 ```python
 from vulcan.world_model.meta_reasoning import (
-    create_meta_reasoning_system,
-    MotivationalIntrospection
+ create_meta_reasoning_system,
+ MotivationalIntrospection
 )
 
 # Create system
 design_spec = {
-    "objectives": {
-        "safety": {
-            "weight": 1.0,
-            "target": 1.0,
-            "constraints": {"min": 1.0, "max": 1.0},
-            "priority": 0  # Critical
-        },
-        "efficiency": {
-            "weight": 0.7,
-            "target": 0.8,
-            "constraints": {"min": 0.0, "max": 1.0},
-            "priority": 1
-        }
-    }
+ "objectives": {
+ "safety": {
+ "weight": 1.0,
+ "target": 1.0,
+ "constraints": {"min": 1.0, "max": 1.0},
+ "priority": 0 # Critical
+ },
+ "efficiency": {
+ "weight": 0.7,
+ "target": 0.8,
+ "constraints": {"min": 0.0, "max": 1.0},
+ "priority": 1
+ }
+ }
 }
 
 mi = create_meta_reasoning_system(world_model, design_spec)
 
 # Validate proposal
 proposal = {
-    "id": "optimize-cache",
-    "objective": "efficiency",
-    "predicted_outcomes": {
-        "efficiency": 0.85,
-        "safety": 1.0
-    }
+ "id": "optimize-cache",
+ "objective": "efficiency",
+ "predicted_outcomes": {
+ "efficiency": 0.85,
+ "safety": 1.0
+ }
 }
 
 validation = mi.validate_proposal_alignment(proposal)
@@ -660,15 +658,15 @@ validation = mi.validate_proposal_alignment(proposal)
 **Objective Structure:**
 ```python
 {
-    "name": "prediction_accuracy",
-    "weight": 1.0,
-    "target": 0.95,
-    "constraints": {
-        "min": 0.0,
-        "max": 1.0
-    },
-    "priority": 1,  # 0 = critical, higher = less critical
-    "dependencies": ["data_quality", "model_capacity"]
+ "name": "prediction_accuracy",
+ "weight": 1.0,
+ "target": 0.95,
+ "constraints": {
+ "min": 0.0,
+ "max": 1.0
+ },
+ "priority": 1, # 0 = critical, higher = less critical
+ "dependencies": ["data_quality", "model_capacity"]
 }
 ```
 
@@ -712,8 +710,8 @@ validation = mi.validate_proposal_alignment(proposal)
 ```python
 # Simulate alternative objectives
 alternatives = reasoner.reason_about_alternatives(
-    current_objectives,
-    proposal
+ current_objectives,
+ proposal
 )
 
 # Each alternative includes:
@@ -746,9 +744,9 @@ alternatives = reasoner.reason_about_alternatives(
 **Example:**
 ```python
 negotiation = negotiator.negotiate(
-    objectives=objectives,
-    conflicts=conflicts,
-    strategy=NegotiationStrategy.WEIGHTED
+ objectives=objectives,
+ conflicts=conflicts,
+ strategy=NegotiationStrategy.WEIGHTED
 )
 
 # Returns:
@@ -838,7 +836,7 @@ bundle = transparency.export_full_bundle()
 # - negotiations: List[NegotiationResult]
 # - boundary_violations: List[Violation]
 # - timestamp: float
-# - signature: Optional[str]  # For tamper detection
+# - signature: Optional[str] # For tamper detection
 ```
 
 ---
@@ -855,11 +853,11 @@ bundle = transparency.export_full_bundle()
 
 ```python
 class TriggerType(Enum):
-    ON_STARTUP = "on_startup"  # Activates on boot
-    ON_ERROR = "on_error_detected"  # Responds to errors
-    ON_PERFORMANCE_DEGRADATION = "on_performance_degradation"
-    PERIODIC = "periodic"  # Regular intervals
-    ON_LOW_ACTIVITY = "on_low_activity"  # Opportunistic
+ ON_STARTUP = "on_startup" # Activates on boot
+ ON_ERROR = "on_error_detected" # Responds to errors
+ ON_PERFORMANCE_DEGRADATION = "on_performance_degradation"
+ PERIODIC = "periodic" # Regular intervals
+ ON_LOW_ACTIVITY = "on_low_activity" # Opportunistic
 ```
 
 #### Improvement Pipeline
@@ -882,26 +880,26 @@ class TriggerType(Enum):
 from vulcan.world_model.meta_reasoning import create_self_improvement_system
 
 drive = create_self_improvement_system(
-    world_model=world_model,
-    config_path="configs/intrinsic_drives.json"
+ world_model=world_model,
+ config_path="configs/intrinsic_drives.json"
 )
 
 # Check if should trigger
 ctx = {"on_startup": True}
 if drive.should_trigger(ctx):
-    # Generate improvement plan
-    plan = drive.step(ctx)
-    
-    if plan and plan.get('_pending_approval'):
-        print("Awaiting approval:", plan['_pending_approval'])
+ # Generate improvement plan
+ plan = drive.step(ctx)
+ 
+ if plan and plan.get('_pending_approval'):
+ print("Awaiting approval:", plan['_pending_approval'])
 ```
 
 #### Protected Files
 
 ```python
 PROTECTED_FILES = {
-    "src/module_a.py",
-    "src/module_b.py",
+ "src/module_a.py",
+ "src/module_b.py",
 }
 ```
 
@@ -926,20 +924,20 @@ PROTECTED_FILES = {
 ```python
 # Whitelist of allowed commands
 ALLOWED_COMMANDS = {
-    "pytest", "python", "python3",
-    "black", "flake8", "mypy", "pylint",
-    "git", "pip"
+ "pytest", "python", "python3",
+ "black", "flake8", "mypy", "pylint",
+ "git", "pip"
 }
 
 # Restricted operations
 RESTRICTED_COMMANDS = {
-    "git": ["status", "diff", "log", "show", "branch"],  # Read-only
-    "pip": ["list", "show", "check"]  # Informational only
+ "git": ["status", "diff", "log", "show", "branch"], # Read-only
+ "pip": ["list", "show", "check"] # Informational only
 }
 
 # Dangerous patterns blocked
 DANGEROUS_PATTERNS = [
-    "|", ";", "&", "$", "`", ">", "<", "(", ")"
+ "|", ";", "&", "$", "`", ">", "<", "(", ")"
 ]
 ```
 
@@ -952,15 +950,15 @@ executor = get_safe_executor(timeout=60)
 
 # Execute command safely
 result = executor.execute_safe(
-    command=["pytest", "tests/"],
-    working_dir=Path("/project"),
-    timeout=120
+ command=["pytest", "tests/"],
+ working_dir=Path("/project"),
+ timeout=120
 )
 
 if result.success:
-    print(result.stdout)
+ print(result.stdout)
 else:
-    print(f"Failed: {result.error}")
+ print(f"Failed: {result.error}")
 ```
 
 **What's Protected:**
@@ -1005,11 +1003,11 @@ CSIU calculates "pressure" from human feedback metrics and uses it to regularize
 ```python
 # Calculate utility from metrics
 metrics = {
-    'approval_rate': 0.85,
-    'avg_confidence': 0.78,
-    'alignment_divergence': 0.12,
-    'interaction_clarity': 0.91,
-    'intent_precision': 0.88
+ 'approval_rate': 0.85,
+ 'avg_confidence': 0.78,
+ 'alignment_divergence': 0.12,
+ 'interaction_clarity': 0.91,
+ 'intent_precision': 0.88
 }
 
 # Apply weights (adaptive via EWMA)
@@ -1032,9 +1030,9 @@ audit_trail.append(CSIUInfluenceRecord(...))
 ```python
 @dataclass
 class CSIUEnforcementConfig:
-    max_single_influence: float = 0.05  # 5% cap per application
-    max_cumulative_influence_window: float = 0.10  # 10% per hour
-    cumulative_window_seconds: float = 3600.0
+ max_single_influence: float = 0.05 # 5% cap per application
+ max_cumulative_influence_window: float = 0.10 # 10% per hour
+ cumulative_window_seconds: float = 3600.0
 ```
 
 #### Kill Switches
@@ -1044,9 +1042,9 @@ class CSIUEnforcementConfig:
 export INTRINSIC_CSIU_OFF=1
 
 # Disable specific components
-export INTRINSIC_CSIU_CALC_OFF=1  # Calculation
-export INTRINSIC_CSIU_REGS_OFF=1  # Regularization
-export INTRINSIC_CSIU_HIST_OFF=1  # History tracking
+export INTRINSIC_CSIU_CALC_OFF=1 # Calculation
+export INTRINSIC_CSIU_REGS_OFF=1 # Regularization
+export INTRINSIC_CSIU_HIST_OFF=1 # History tracking
 ```
 
 #### Concerns
@@ -1122,13 +1120,13 @@ Layer 5: Meta-Reasoning Validation
 ```python
 # Minimal configuration
 config = {
-    'safety_config': {
-        'max_nodes': 1000,
-        'max_edges': 5000
-    },
-    'bootstrap_mode': True,
-    'simulation_mode': True,
-    'enable_meta_reasoning': False  # RECOMMENDED: Keep disabled
+ 'safety_config': {
+ 'max_nodes': 1000,
+ 'max_edges': 5000
+ },
+ 'bootstrap_mode': True,
+ 'simulation_mode': True,
+ 'enable_meta_reasoning': False # RECOMMENDED: Keep disabled
 }
 
 world_model = WorldModel(config=config)
@@ -1139,37 +1137,37 @@ world_model = WorldModel(config=config)
 ```json
 // configs/intrinsic_drives.json
 {
-    "drives": {
-        "self_improvement": {
-            "enabled": false,  // RECOMMENDED: Keep disabled
-            "triggers": {
-                "on_startup": {
-                    "enabled": false,
-                    "cooldown_seconds": 3600
-                },
-                "on_error": {
-                    "enabled": true,
-                    "threshold": 3
-                },
-                "periodic": {
-                    "enabled": false,
-                    "interval_seconds": 86400
-                }
-            },
-            "constraints": {
-                "max_improvements_per_session": 5,
-                "require_approval": true,  // CRITICAL: Always true
-                "max_files_per_improvement": 3,
-                "max_loc_per_improvement": 100
-            }
-        }
-    },
-    "global_settings": {
-        "llm": {
-            "cost_tracking_window_hours": 24,
-            "max_tokens_per_session": 100000
-        }
-    }
+ "drives": {
+ "self_improvement": {
+ "enabled": false, // RECOMMENDED: Keep disabled
+ "triggers": {
+ "on_startup": {
+ "enabled": false,
+ "cooldown_seconds": 3600
+ },
+ "on_error": {
+ "enabled": true,
+ "threshold": 3
+ },
+ "periodic": {
+ "enabled": false,
+ "interval_seconds": 86400
+ }
+ },
+ "constraints": {
+ "max_improvements_per_session": 5,
+ "require_approval": true, // CRITICAL: Always true
+ "max_files_per_improvement": 3,
+ "max_loc_per_improvement": 100
+ }
+ }
+ },
+ "global_settings": {
+ "llm": {
+ "cost_tracking_window_hours": 24,
+ "max_tokens_per_session": 100000
+ }
+ }
 }
 ```
 
@@ -1177,33 +1175,33 @@ world_model = WorldModel(config=config)
 
 ```yaml
 # policies/auto_apply.yaml
-enabled: false  # RECOMMENDED: Keep disabled
+enabled: false # RECOMMENDED: Keep disabled
 
 allow:
-  - pattern: "tests/**/*.py"
-    max_loc: 50
-  - pattern: "docs/**/*.md"
-    max_loc: 200
+ - pattern: "tests/**/*.py"
+ max_loc: 50
+ - pattern: "docs/**/*.md"
+ max_loc: 200
 
 deny:
-  - pattern: "src/vulcan/world_model/meta_reasoning/**"
-  - pattern: "src/vulcan/safety/**"
-  - pattern: "configs/**"
+ - pattern: "src/vulcan/world_model/meta_reasoning/**"
+ - pattern: "src/vulcan/safety/**"
+ - pattern: "configs/**"
 
 gates:
-  - name: "pytest"
-    command: ["pytest", "-v"]
-    required: true
-  - name: "black"
-    command: ["black", "--check", "."]
-    required: true
-  - name: "mypy"
-    command: ["mypy", "."]
-    required: false
+ - name: "pytest"
+ command: ["pytest", "-v"]
+ required: true
+ - name: "black"
+ command: ["black", "--check", "."]
+ required: true
+ - name: "mypy"
+ command: ["mypy", "."]
+ required: false
 
 trusted_providers:
-  - "local_llm"
-  - "vulcan_local_llm"
+ - "local_llm"
+ - "vulcan_local_llm"
 ```
 
 ### Deployment Recommendations
@@ -1211,12 +1209,12 @@ trusted_providers:
 **For Research/Development:**
 ```python
 config = {
-    'simulation_mode': True,  # Don't affect real systems
-    'enable_meta_reasoning': False,  # Disable self-modification
-    'safety_config': {
-        'strict_mode': True,
-        'audit_logging': True
-    }
+ 'simulation_mode': True, # Don't affect real systems
+ 'enable_meta_reasoning': False, # Disable self-modification
+ 'safety_config': {
+ 'strict_mode': True,
+ 'audit_logging': True
+ }
 }
 ```
 
@@ -1224,14 +1222,14 @@ config = {
 ```python
 # If you MUST deploy (highly discouraged):
 config = {
-    'simulation_mode': False,
-    'enable_meta_reasoning': False,  # CRITICAL: Keep disabled
-    'safety_config': {
-        'strict_mode': True,
-        'audit_logging': True,
-        'require_approval': True,
-        'max_safety_violations': 0
-    }
+ 'simulation_mode': False,
+ 'enable_meta_reasoning': False, # CRITICAL: Keep disabled
+ 'safety_config': {
+ 'strict_mode': True,
+ 'audit_logging': True,
+ 'require_approval': True,
+ 'max_safety_violations': 0
+ }
 }
 
 # Additional safeguards:
@@ -1251,31 +1249,31 @@ config = {
 
 ```python
 class WorldModel:
-    def __init__(
-        self,
-        config: Optional[Dict[str, Any]] = None,
-        safety_validator: Optional[Any] = None
-    ): ...
-    
-    def update_from_observation(
-        self,
-        observation: Observation
-    ) -> Dict[str, Any]: ...
-    
-    def predict_with_calibrated_uncertainty(
-        self,
-        action: str,
-        context: ModelContext
-    ) -> Prediction: ...
-    
-    def get_causal_structure(self) -> Dict[str, Any]: ...
-    
-    def validate_model_consistency(self) -> Dict[str, Any]: ...
-    
-    def evaluate_agent_proposal(
-        self,
-        proposal: Dict[str, Any]
-    ) -> Dict[str, Any]: ...
+ def __init__(
+ self,
+ config: Optional[Dict[str, Any]] = None,
+ safety_validator: Optional[Any] = None
+ ): ...
+ 
+ def update_from_observation(
+ self,
+ observation: Observation
+ ) -> Dict[str, Any]: ...
+ 
+ def predict_with_calibrated_uncertainty(
+ self,
+ action: str,
+ context: ModelContext
+ ) -> Prediction: ...
+ 
+ def get_causal_structure(self) -> Dict[str, Any]: ...
+ 
+ def validate_model_consistency(self) -> Dict[str, Any]: ...
+ 
+ def evaluate_agent_proposal(
+ self,
+ proposal: Dict[str, Any]
+ ) -> Dict[str, Any]: ...
 ```
 
 ### Observation
@@ -1283,12 +1281,12 @@ class WorldModel:
 ```python
 @dataclass
 class Observation:
-    timestamp: float
-    variables: Dict[str, Any]
-    domain: str
-    confidence: float = 1.0
-    source: str = "unknown"
-    metadata: Dict[str, Any] = field(default_factory=dict)
+ timestamp: float
+ variables: Dict[str, Any]
+ domain: str
+ confidence: float = 1.0
+ source: str = "unknown"
+ metadata: Dict[str, Any] = field(default_factory=dict)
 ```
 
 ### ModelContext
@@ -1296,10 +1294,10 @@ class Observation:
 ```python
 @dataclass
 class ModelContext:
-    domain: str
-    targets: List[str]
-    constraints: Dict[str, Any] = field(default_factory=dict)
-    time_horizon: Optional[float] = None
+ domain: str
+ targets: List[str]
+ constraints: Dict[str, Any] = field(default_factory=dict)
+ time_horizon: Optional[float] = None
 ```
 
 ### Prediction
@@ -1307,12 +1305,12 @@ class ModelContext:
 ```python
 @dataclass
 class Prediction:
-    expected: float
-    variance: float
-    confidence: float
-    lower_bound: float
-    upper_bound: float
-    metadata: Dict[str, Any] = field(default_factory=dict)
+ expected: float
+ variance: float
+ confidence: float
+ lower_bound: float
+ upper_bound: float
+ metadata: Dict[str, Any] = field(default_factory=dict)
 ```
 
 ---
@@ -1392,39 +1390,39 @@ pytest tests/
 ```
 vulcan/
 ├── world_model/
-│   ├── __init__.py
-│   ├── causal_graph.py
-│   ├── confidence_calibrator.py
-│   ├── correlation_tracker.py
-│   ├── dynamics_model.py
-│   ├── intervention_manager.py
-│   ├── invariant_detector.py
-│   ├── prediction_engine.py
-│   ├── world_model_core.py
-│   ├── world_model_router.py
-│   └── meta_reasoning/
-│       ├── __init__.py
-│       ├── motivational_introspection.py
-│       ├── objective_hierarchy.py
-│       ├── goal_conflict_detector.py
-│       ├── counterfactual_objectives.py
-│       ├── objective_negotiator.py
-│       ├── validation_tracker.py
-│       ├── internal_critic.py
-│       ├── ethical_boundary_monitor.py
-│       ├── transparency_interface.py
-│       ├── self_improvement_drive.py
-│       ├── csiu_enforcement.py
-│       ├── safe_execution.py
-│       ├── auto_apply_policy.py
-│       ├── preference_learner.py
-│       ├── curiosity_reward_shaper.py
-│       └── value_evolution_tracker.py
+│ ├── __init__.py
+│ ├── causal_graph.py
+│ ├── confidence_calibrator.py
+│ ├── correlation_tracker.py
+│ ├── dynamics_model.py
+│ ├── intervention_manager.py
+│ ├── invariant_detector.py
+│ ├── prediction_engine.py
+│ ├── world_model_core.py
+│ ├── world_model_router.py
+│ └── meta_reasoning/
+│ ├── __init__.py
+│ ├── motivational_introspection.py
+│ ├── objective_hierarchy.py
+│ ├── goal_conflict_detector.py
+│ ├── counterfactual_objectives.py
+│ ├── objective_negotiator.py
+│ ├── validation_tracker.py
+│ ├── internal_critic.py
+│ ├── ethical_boundary_monitor.py
+│ ├── transparency_interface.py
+│ ├── self_improvement_drive.py
+│ ├── csiu_enforcement.py
+│ ├── safe_execution.py
+│ ├── auto_apply_policy.py
+│ ├── preference_learner.py
+│ ├── curiosity_reward_shaper.py
+│ └── value_evolution_tracker.py
 ├── safety/
-│   ├── safety_validator.py
-│   └── safety_types.py
+│ ├── safety_validator.py
+│ └── safety_types.py
 └── tests/
-    └── ...
+ └── ...
 ```
 
 ### Contributing Guidelines
@@ -1594,11 +1592,11 @@ The SystemObserver connects the reasoning integration layer to meta-reasoning co
 
 ```python
 from vulcan.world_model import (
-    get_system_observer,
-    observe_query_start,
-    observe_engine_result,
-    observe_outcome,
-    observe_error,
+ get_system_observer,
+ observe_query_start,
+ observe_engine_result,
+ observe_outcome,
+ observe_error,
 )
 
 # Automatically called by reasoning_integration.py during query processing
@@ -1611,10 +1609,10 @@ observe_outcome(query_id, response, user_feedback)
 
 ```python
 from vulcan.world_model import (
-    get_recent_reasoning_activity,
-    get_reasoning_success_rates,
-    get_failure_patterns_for_improvement,
-    get_recent_outcomes,
+ get_recent_reasoning_activity,
+ get_reasoning_success_rates,
+ get_failure_patterns_for_improvement,
+ get_recent_outcomes,
 )
 
 # Get recent engine executions
@@ -1631,8 +1629,8 @@ patterns = get_failure_patterns_for_improvement()
 
 ```python
 from vulcan.world_model import (
-    get_learning_insights,
-    get_tool_performance_history,
+ get_learning_insights,
+ get_tool_performance_history,
 )
 
 # Get tool weights, trends, recommendations
@@ -1646,16 +1644,16 @@ history = get_tool_performance_history('mathematical')
 
 ```python
 from vulcan.world_model import (
-    get_memory_access,
-    store_meta_reasoning_insight,
-    retrieve_meta_reasoning_insights,
+ get_memory_access,
+ store_meta_reasoning_insight,
+ retrieve_meta_reasoning_insights,
 )
 
 # Store insights about self
 store_meta_reasoning_insight(
-    insight_type='failure_pattern',
-    content={'engine': 'mathematical', 'issue': 'syntax errors'},
-    importance=0.8
+ insight_type='failure_pattern',
+ content={'engine': 'mathematical', 'issue': 'syntax errors'},
+ importance=0.8
 )
 
 # Recall past learnings
@@ -1671,7 +1669,7 @@ from vulcan.world_model import get_self_understanding
 understanding = get_self_understanding()
 # Returns:
 # - reasoning_activity: What engines are being used, success rates
-# - learning_insights: What the system has learned about tool performance  
+# - learning_insights: What the system has learned about tool performance 
 # - stored_insights: What meta-reasoning remembers about itself
 # - overall_health: Is the system performing well?
 # - health_score: 0.0 to 1.0 health metric
@@ -1681,17 +1679,17 @@ understanding = get_self_understanding()
 
 ## License & Attribution
 
-**Version:** 0.1.0  
+**Version:** 0.1.0 
 **Authors:** Brian Anderson 
 **Last Updated:** January 2026
 
-**⚠️ DISCLAIMER:** This is research-grade code. NOT production ready. Use at your own risk.
+**⚠️ DISCLAIMER:** This is research-grade code. NOT . Use at your own risk.
 
 ---
 
 ## Contact & Support
 
-For issues, questions, or contributions, please contact the VULCAN-AGI development team.
+For issues, questions, or contributions, please contact the VULCAN-AMI development team.
 
 **Remember:** This system can modify its own code. Always maintain human oversight and never deploy without extensive additional safety work.
 

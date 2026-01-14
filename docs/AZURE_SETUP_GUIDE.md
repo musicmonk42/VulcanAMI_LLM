@@ -18,20 +18,20 @@ echo "Subscription ID: $SUBSCRIPTION_ID"
 
 # Create Service Principal with contributor role
 az ad sp create-for-rbac \
-  --name "github-actions-vulcanami" \
-  --role contributor \
-  --scopes /subscriptions/$SUBSCRIPTION_ID \
-  --sdk-auth
+ --name "github-actions-vulcanami" \
+ --role contributor \
+ --scopes /subscriptions/$SUBSCRIPTION_ID \
+ --sdk-auth
 ```
 
 **Expected Output:**
 ```json
 {
-  "clientId": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
-  "clientSecret": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-  "subscriptionId": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
-  "tenantId": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
-  ...
+ "clientId": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+ "clientSecret": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+ "subscriptionId": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+ "tenantId": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+ ...
 }
 ```
 
@@ -53,12 +53,12 @@ Edit `.github/workflows/azure-kubernetes-service-helm.yml` and update these envi
 
 ```yaml
 env:
-  AZURE_CONTAINER_REGISTRY: "your-acr-name"           # Without .azurecr.io
-  CONTAINER_NAME: "vulcanami-llm"                     # Your image name
-  RESOURCE_GROUP: "vulcanami-prod"                    # Your resource group
-  CLUSTER_NAME: "vulcanami-cluster"                   # Your AKS cluster
-  CHART_PATH: "helm/vulcanami"                        # Path to Helm chart
-  CHART_OVERRIDE_PATH: "helm/vulcanami/values-prod.yaml"  # Values file
+ AZURE_CONTAINER_REGISTRY: "your-acr-name" # Without .azurecr.io
+ CONTAINER_NAME: "vulcanami-llm" # Your image name
+ RESOURCE_GROUP: "vulcanami-prod" # Your resource group
+ CLUSTER_NAME: "vulcanami-cluster" # Your AKS cluster
+ CHART_PATH: "helm/vulcanami" # Path to Helm chart
+ CHART_OVERRIDE_PATH: "helm/vulcanami/values-prod.yaml" # Values file
 ```
 
 ### 4. Create Azure Resources
@@ -77,19 +77,19 @@ az group create --name $RESOURCE_GROUP --location $LOCATION
 
 # Create Azure Container Registry
 az acr create \
-  --resource-group $RESOURCE_GROUP \
-  --name $ACR_NAME \
-  --sku Standard
+ --resource-group $RESOURCE_GROUP \
+ --name $ACR_NAME \
+ --sku Standard
 
 # Create AKS cluster
 az aks create \
-  --resource-group $RESOURCE_GROUP \
-  --name $AKS_NAME \
-  --node-count 3 \
-  --node-vm-size Standard_D4s_v3 \
-  --enable-managed-identity \
-  --attach-acr $ACR_NAME \
-  --generate-ssh-keys
+ --resource-group $RESOURCE_GROUP \
+ --name $AKS_NAME \
+ --node-count 3 \
+ --node-vm-size Standard_D4s_v3 \
+ --enable-managed-identity \
+ --attach-acr $ACR_NAME \
+ --generate-ssh-keys
 
 # Get credentials for local access
 az aks get-credentials --resource-group $RESOURCE_GROUP --name $AKS_NAME
@@ -127,16 +127,16 @@ The workflow now includes a validation step that checks if all required secrets 
 
 ```yaml
 - name: Check Azure credentials
-  run: |
-    if [ -z "${{ secrets.AZURE_CLIENT_ID }}" ] || [ -z "${{ secrets.AZURE_TENANT_ID }}" ] || [ -z "${{ secrets.AZURE_SUBSCRIPTION_ID }}" ]; then
-      echo "ERROR: Required Azure secrets are not configured."
-      echo "Please set the following secrets in your repository:"
-      echo "  - AZURE_CLIENT_ID"
-      echo "  - AZURE_TENANT_ID"
-      echo "  - AZURE_SUBSCRIPTION_ID"
-      exit 1
-    fi
-    echo "✓ All required Azure secrets are configured"
+ run: |
+ if [ -z "${{ secrets.AZURE_CLIENT_ID }}" ] || [ -z "${{ secrets.AZURE_TENANT_ID }}" ] || [ -z "${{ secrets.AZURE_SUBSCRIPTION_ID }}" ]; then
+ echo "ERROR: Required Azure secrets are not configured."
+ echo "Please set the following secrets in your repository:"
+ echo " - AZURE_CLIENT_ID"
+ echo " - AZURE_TENANT_ID"
+ echo " - AZURE_SUBSCRIPTION_ID"
+ exit 1
+ fi
+ echo "✓ All required Azure secrets are configured"
 ```
 
 This step runs **before** the Azure login attempt and provides a clear error message if any secrets are missing.
@@ -184,8 +184,8 @@ If you're using self-hosted runners, uncomment the "Install Azure CLI" step in t
 
 ```yaml
 - name: Install Azure CLI
-  run: |
-    curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+ run: |
+ curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
 ```
 
 This step appears twice (once in each job). GitHub-hosted runners have Azure CLI pre-installed.

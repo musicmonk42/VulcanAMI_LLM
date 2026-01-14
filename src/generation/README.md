@@ -2,23 +2,23 @@
 
 ## Overview
 
-This package contains three production-ready, fully implemented modules for advanced LLM token generation with safety, explainability, and unified reasoning capabilities.
+This package contains three , fully implemented modules for advanced LLM token generation with safety, explainability, and unified reasoning capabilities.
 
 ## Modules
 
 ### 1. safe_generation.py
 **Comprehensive Multi-Layered Safety System**
 
-A production-ready safety filtering system with enterprise-grade features:
+A safety filtering system with enterprise-grade features:
 
 #### Core Features
 - **Multi-tier validation pipeline** with 6+ validator types:
-  - Toxicity detection (severe/moderate/mild severity levels)
-  - Hallucination detection with confidence scoring
-  - Prompt injection prevention (15+ pattern types)
-  - PII detection (email, phone, SSN, credit card, IP)
-  - Bias and stereotype detection
-  - Consistency validation
+ - Toxicity detection (severe/moderate/mild severity levels)
+ - Hallucination detection with confidence scoring
+ - Prompt injection prevention (15+ pattern types)
+ - PII detection (email, phone, SSN, credit card, IP)
+ - Bias and stereotype detection
+ - Consistency validation
 
 #### Advanced Capabilities
 - **Contextual risk assessment** with domain-specific adjustments
@@ -41,29 +41,29 @@ from safe_generation import SafeGeneration, ValidationCategory
 
 # Initialize with custom policy
 sg = SafeGeneration(
-    world_model=world_model,
-    observability=obs_manager,
-    audit=audit_logger,
-    policy={
-        "mode": "keep_safe",
-        "max_k": 3,
-        "high_risk_threshold": 0.9,
-        "replacement_strategy": "suggest",
-        "enable_adaptive_thresholds": True,
-    },
-    enable_caching=True,
-    cache_size=2000,
+ world_model=world_model,
+ observability=obs_manager,
+ audit=audit_logger,
+ policy={
+ "mode": "keep_safe",
+ "max_k": 3,
+ "high_risk_threshold": 0.9,
+ "replacement_strategy": "suggest",
+ "enable_adaptive_thresholds": True,
+ },
+ enable_caching=True,
+ cache_size=2000,
 )
 
 # Filter candidates
 safe_candidates = sg.filter(
-    candidates=[{"token": tok, "prob": p} for tok, p in candidates],
-    context={
-        "prompt": user_prompt,
-        "domain": "medical",
-        "user_type": "general",
-    },
-    top_k=3
+ candidates=[{"token": tok, "prob": p} for tok, p in candidates],
+ context={
+ "prompt": user_prompt,
+ "domain": "medical",
+ "user_type": "general",
+ },
+ top_k=3
 )
 
 # Get metrics for monitoring
@@ -80,26 +80,26 @@ audit_log = sg.export_audit_log()
 ### 2. explainable_generation.py
 **Comprehensive AI Explainability System**
 
-A production-ready explainability system with multi-level analysis:
+A explainability system with multi-level analysis:
 
 #### Core Features
 - **Multi-level explanations**:
-  - Minimal: Just the choice
-  - Basic: Choice + alternatives
-  - Standard: + factors + confidence
-  - Detailed: + attributions + context
-  - Comprehensive: Everything + counterfactuals
+ - Minimal: Just the choice
+ - Basic: Choice + alternatives
+ - Standard: + factors + confidence
+ - Detailed: + attributions + context
+ - Comprehensive: Everything + counterfactuals
 
 #### Advanced Analysis
 - **Attention visualization** and attribution
 - **Causal reasoning chains** with dependency tracking
 - **Counterfactual analysis** ("what-if" scenarios)
 - **Feature importance** using multiple attribution methods:
-  - Gradient-based
-  - Attention-based
-  - Integrated gradients
-  - SHAPLEY values
-  - LIME approximation
+ - Gradient-based
+ - Attention-based
+ - Integrated gradients
+ - SHAPLEY values
+ - LIME approximation
 
 #### Confidence & Uncertainty
 - **Calibrated confidence scores** combining multiple signals
@@ -114,11 +114,11 @@ A production-ready explainability system with multi-level analysis:
 
 #### Interactive Analysis
 - **Q&A interface** for explanation exploration:
-  - "Why was this chosen?"
-  - "Why not alternative X?"
-  - "What factors influenced this?"
-  - "How was context used?"
-  - "Were there safety concerns?"
+ - "Why was this chosen?"
+ - "Why not alternative X?"
+ - "What factors influenced this?"
+ - "How was context used?"
+ - "Were there safety concerns?"
 
 #### Usage Example
 ```python
@@ -126,27 +126,27 @@ from explainable_generation import ExplainableGeneration, ExplanationLevel
 
 # Initialize explainer
 explainer = ExplainableGeneration(
-    bridge=bridge,
-    transformer=transformer,
-    tokenizer=tokenizer,
-    vocab=vocab,
-    explanation_level=ExplanationLevel.COMPREHENSIVE,
-    enable_counterfactuals=True,
-    enable_attribution=True,
-    enable_attention_viz=True,
-    top_k_alts=5,
+ bridge=bridge,
+ transformer=transformer,
+ tokenizer=tokenizer,
+ vocab=vocab,
+ explanation_level=ExplanationLevel.COMPREHENSIVE,
+ enable_counterfactuals=True,
+ enable_attribution=True,
+ enable_attention_viz=True,
+ top_k_alts=5,
 )
 
 # Generate explanation
 explanation = explainer.explain(
-    token=selected_token,
-    chain=cognitive_chain,
-    hidden_state=hidden_state,
-    logits=logits,
-    candidates=candidates,
-    prompt_tokens=prompt_tokens,
-    attention_weights=attention,
-    gradients=gradients,
+ token=selected_token,
+ chain=cognitive_chain,
+ hidden_state=hidden_state,
+ logits=logits,
+ candidates=candidates,
+ prompt_tokens=prompt_tokens,
+ attention_weights=attention,
+ gradients=gradients,
 )
 
 # Access different explanation formats
@@ -160,16 +160,16 @@ print(f"Counterfactuals: {explanation['counterfactuals']}")
 
 # Interactive Q&A
 answer = explainer.get_interactive_analysis(
-    explanation=explanation,
-    query="Why was this token chosen over the alternatives?"
+ explanation=explanation,
+ query="Why was this token chosen over the alternatives?"
 )
 print(answer["answer"])
 
 # Explain entire sequence
 sequence_explanation = explainer.explain_sequence(
-    tokens=generated_tokens,
-    chains=cognitive_chains,
-    hidden_states=hidden_states,
+ tokens=generated_tokens,
+ chains=cognitive_chains,
+ hidden_states=hidden_states,
 )
 print(f"Sequence coherence: {sequence_explanation['sequence_analysis']['coherence_score']}")
 ```
@@ -179,44 +179,44 @@ print(f"Sequence coherence: {sequence_explanation['sequence_analysis']['coherenc
 ### 3. unified_generation.py
 **Advanced Multi-Strategy Reasoning Ensemble**
 
-A production-ready ensemble system combining multiple reasoning strategies:
+A ensemble system combining multiple reasoning strategies:
 
 #### Core Features
 - **9+ reasoning strategies** supported:
-  - Symbolic reasoning
-  - Probabilistic reasoning
-  - Causal reasoning
-  - Analogical reasoning
-  - Language model reasoning
-  - Meta-cognitive reasoning
-  - Evolutionary strategies
-  - Adversarial reasoning
-  - Hierarchical reasoning
+ - Symbolic reasoning
+ - Probabilistic reasoning
+ - Causal reasoning
+ - Analogical reasoning
+ - Language model reasoning
+ - Meta-cognitive reasoning
+ - Evolutionary strategies
+ - Adversarial reasoning
+ - Hierarchical reasoning
 
 #### Fusion Strategies
 - **5 fusion methods**:
-  - Weighted sum (default)
-  - Product (geometric mean)
-  - Max (highest score wins)
-  - Reciprocal Rank Fusion (RRF)
-  - Borda count voting
+ - Weighted sum (default)
+ - Product (geometric mean)
+ - Max (highest score wins)
+ - Reciprocal Rank Fusion (RRF)
+ - Borda count voting
 
 #### Advanced Capabilities
 - **Dynamic weight adaptation**:
-  - Context-based (domain-specific)
-  - Confidence-based
-  - Performance-based (rewards fast, reliable modules)
+ - Context-based (domain-specific)
+ - Confidence-based
+ - Performance-based (rewards fast, reliable modules)
 
 - **Cross-module interaction modeling**:
-  - Boost consensus candidates
-  - Track module agreement
-  - Interaction-aware fusion
+ - Boost consensus candidates
+ - Track module agreement
+ - Interaction-aware fusion
 
 - **Ensemble metrics**:
-  - Confidence scoring
-  - Uncertainty quantification
-  - Diversity scoring
-  - Module agreement tracking
+ - Confidence scoring
+ - Uncertainty quantification
+ - Diversity scoring
+ - Module agreement tracking
 
 #### Optimization
 - **Performance caching** (LRU eviction)
@@ -236,17 +236,17 @@ from unified_generation import UnifiedGeneration, UnifiedGenConfig, FusionStrate
 
 # Configure ensemble
 config = UnifiedGenConfig(
-    max_candidates=10,
-    fusion_strategy=FusionStrategy.WEIGHTED_SUM,
-    normalization_method=NormalizationMethod.SOFTMAX,
-    temperature=0.8,
-    diversity_penalty=0.1,
-    enable_dynamic_weights=True,
-    enable_cross_module_interaction=True,
-    enable_confidence_scaling=True,
-    enable_caching=True,
-    cache_size=2000,
-    min_module_agreement=2,  # Require at least 2 modules to agree
+ max_candidates=10,
+ fusion_strategy=FusionStrategy.WEIGHTED_SUM,
+ normalization_method=NormalizationMethod.SOFTMAX,
+ temperature=0.8,
+ diversity_penalty=0.1,
+ enable_dynamic_weights=True,
+ enable_cross_module_interaction=True,
+ enable_confidence_scaling=True,
+ enable_caching=True,
+ cache_size=2000,
+ min_module_agreement=2, # Require at least 2 modules to agree
 )
 
 # Initialize
@@ -254,39 +254,39 @@ unified_gen = UnifiedGeneration(config)
 
 # Generate candidates
 candidates = unified_gen.generate_candidates(
-    hidden_state=hidden_state,
-    reasoning_modules={
-        # Reasoning modules
-        "symbolic": symbolic_reasoner,
-        "causal": causal_reasoner,
-        "probabilistic": probabilistic_reasoner,
-        "language": language_model,
-        "meta_cognitive": meta_reasoner,
-        
-        # Configuration overrides
-        "context": {
-            "domain": "mathematics",
-            "prompt": user_prompt,
-        },
-        "weights": {
-            "symbolic": 1.5,  # Boost for math domain
-            "causal": 1.3,
-        },
-        "max_candidates": 15,
-        "temperature": 0.7,
-        "diversity_penalty": 0.15,
-    }
+ hidden_state=hidden_state,
+ reasoning_modules={
+ # Reasoning modules
+ "symbolic": symbolic_reasoner,
+ "causal": causal_reasoner,
+ "probabilistic": probabilistic_reasoner,
+ "language": language_model,
+ "meta_cognitive": meta_reasoner,
+ 
+ # Configuration overrides
+ "context": {
+ "domain": "mathematics",
+ "prompt": user_prompt,
+ },
+ "weights": {
+ "symbolic": 1.5, # Boost for math domain
+ "causal": 1.3,
+ },
+ "max_candidates": 15,
+ "temperature": 0.7,
+ "diversity_penalty": 0.15,
+ }
 )
 
 # Access rich metadata
 for i, cand in enumerate(candidates[:3], 1):
-    print(f"{i}. Token: {cand['token_str']}")
-    print(f"   Probability: {cand['prob']:.4f}")
-    print(f"   Confidence: {cand['confidence']:.4f}")
-    print(f"   Uncertainty: {cand['uncertainty']:.4f}")
-    print(f"   Module agreement: {cand['module_agreement']}")
-    print(f"   Diversity score: {cand['diversity_score']:.4f}")
-    print(f"   Provenance: {cand['provenance']}")
+ print(f"{i}. Token: {cand['token_str']}")
+ print(f" Probability: {cand['prob']:.4f}")
+ print(f" Confidence: {cand['confidence']:.4f}")
+ print(f" Uncertainty: {cand['uncertainty']:.4f}")
+ print(f" Module agreement: {cand['module_agreement']}")
+ print(f" Diversity score: {cand['diversity_score']:.4f}")
+ print(f" Provenance: {cand['provenance']}")
 
 # Get performance statistics
 stats = unified_gen.get_performance_stats()
@@ -307,35 +307,35 @@ from unified_generation import UnifiedGeneration, UnifiedGenConfig
 
 # 1. Generate candidates using unified reasoning
 unified_gen = UnifiedGeneration(UnifiedGenConfig(
-    enable_dynamic_weights=True,
-    temperature=0.8,
+ enable_dynamic_weights=True,
+ temperature=0.8,
 ))
 
 raw_candidates = unified_gen.generate_candidates(
-    hidden_state=hidden_state,
-    reasoning_modules={
-        "symbolic": symbolic_reasoner,
-        "causal": causal_reasoner,
-        "probabilistic": prob_reasoner,
-        "language": lm,
-        "context": context,
-    }
+ hidden_state=hidden_state,
+ reasoning_modules={
+ "symbolic": symbolic_reasoner,
+ "causal": causal_reasoner,
+ "probabilistic": prob_reasoner,
+ "language": lm,
+ "context": context,
+ }
 )
 
 # 2. Apply safety filtering
 safe_gen = SafeGeneration(
-    world_model=world_model,
-    policy={
-        "mode": "keep_safe",
-        "max_k": 5,
-        "enable_adaptive_thresholds": True,
-    }
+ world_model=world_model,
+ policy={
+ "mode": "keep_safe",
+ "max_k": 5,
+ "enable_adaptive_thresholds": True,
+ }
 )
 
 safe_candidates = safe_gen.filter(
-    candidates=raw_candidates,
-    context=context,
-    top_k=5,
+ candidates=raw_candidates,
+ context=context,
+ top_k=5,
 )
 
 # 3. Select best candidate
@@ -343,17 +343,17 @@ selected = safe_candidates[0]
 
 # 4. Generate comprehensive explanation
 explainer = ExplainableGeneration(
-    explanation_level=ExplanationLevel.COMPREHENSIVE,
-    enable_counterfactuals=True,
+ explanation_level=ExplanationLevel.COMPREHENSIVE,
+ enable_counterfactuals=True,
 )
 
 explanation = explainer.explain(
-    token=selected["token"],
-    chain=cognitive_chain,
-    hidden_state=hidden_state,
-    logits=logits,
-    candidates=raw_candidates,
-    prompt_tokens=prompt_tokens,
+ token=selected["token"],
+ chain=cognitive_chain,
+ hidden_state=hidden_state,
+ logits=logits,
+ candidates=raw_candidates,
+ prompt_tokens=prompt_tokens,
 )
 
 # 5. Present to user with full transparency
@@ -436,28 +436,28 @@ print(f"Alternatives considered: {[a['token_str'] for a in explanation['alternat
 ```python
 # High-reliability, comprehensive safety
 safe_config = {
-    "mode": "keep_safe",
-    "high_risk_threshold": 0.85,  # Stricter
-    "enable_adaptive_thresholds": True,
-    "enable_caching": True,
-    "cache_size": 5000,
+ "mode": "keep_safe",
+ "high_risk_threshold": 0.85, # Stricter
+ "enable_adaptive_thresholds": True,
+ "enable_caching": True,
+ "cache_size": 5000,
 }
 
 # Detailed explainability
 explain_config = {
-    "explanation_level": ExplanationLevel.DETAILED,
-    "enable_counterfactuals": True,
-    "enable_attribution": True,
-    "top_k_alts": 5,
+ "explanation_level": ExplanationLevel.DETAILED,
+ "enable_counterfactuals": True,
+ "enable_attribution": True,
+ "top_k_alts": 5,
 }
 
 # Robust ensemble
 unified_config = UnifiedGenConfig(
-    fusion_strategy=FusionStrategy.WEIGHTED_SUM,
-    enable_dynamic_weights=True,
-    enable_cross_module_interaction=True,
-    min_module_agreement=2,
-    cache_size=2000,
+ fusion_strategy=FusionStrategy.WEIGHTED_SUM,
+ enable_dynamic_weights=True,
+ enable_cross_module_interaction=True,
+ min_module_agreement=2,
+ cache_size=2000,
 )
 ```
 
@@ -465,17 +465,17 @@ unified_config = UnifiedGenConfig(
 ```python
 # Fast iteration, detailed feedback
 safe_config = {
-    "mode": "first_safe",
-    "allow_explanation": True,  # Attach metadata
+ "mode": "first_safe",
+ "allow_explanation": True, # Attach metadata
 }
 
 explain_config = {
-    "explanation_level": ExplanationLevel.COMPREHENSIVE,
-    "enable_counterfactuals": True,
+ "explanation_level": ExplanationLevel.COMPREHENSIVE,
+ "enable_counterfactuals": True,
 }
 
 unified_config = UnifiedGenConfig(
-    enable_caching=False,  # Disable for debugging
+ enable_caching=False, # Disable for debugging
 )
 ```
 
@@ -483,20 +483,20 @@ unified_config = UnifiedGenConfig(
 ```python
 # Maximum detail and analysis
 safe_config = {
-    "policy": {"allow_explanation": True},
+ "policy": {"allow_explanation": True},
 }
 
 explain_config = {
-    "explanation_level": ExplanationLevel.COMPREHENSIVE,
-    "enable_counterfactuals": True,
-    "enable_attribution": True,
-    "enable_attention_viz": True,
+ "explanation_level": ExplanationLevel.COMPREHENSIVE,
+ "enable_counterfactuals": True,
+ "enable_attribution": True,
+ "enable_attention_viz": True,
 }
 
 unified_config = UnifiedGenConfig(
-    attach_logits=True,
-    enable_dynamic_weights=True,
-    enable_cross_module_interaction=True,
+ attach_logits=True,
+ enable_dynamic_weights=True,
+ enable_cross_module_interaction=True,
 )
 ```
 
@@ -514,30 +514,30 @@ All modules include:
 ### Example Test
 ```python
 def test_integrated_pipeline():
-    # Setup
-    unified = UnifiedGeneration()
-    safe = SafeGeneration()
-    explainer = ExplainableGeneration()
-    
-    # Generate
-    candidates = unified.generate_candidates(
-        hidden_state=test_hidden,
-        reasoning_modules=test_modules,
-    )
-    
-    # Filter
-    safe_candidates = safe.filter(candidates, context=test_context)
-    
-    # Explain
-    explanation = explainer.explain(
-        token=safe_candidates[0]["token"],
-        chain=test_chain,
-    )
-    
-    # Validate
-    assert len(safe_candidates) > 0
-    assert explanation["decision"]["confidence"] > 0
-    assert len(explanation["explanation"]) > 0
+ # Setup
+ unified = UnifiedGeneration()
+ safe = SafeGeneration()
+ explainer = ExplainableGeneration()
+ 
+ # Generate
+ candidates = unified.generate_candidates(
+ hidden_state=test_hidden,
+ reasoning_modules=test_modules,
+ )
+ 
+ # Filter
+ safe_candidates = safe.filter(candidates, context=test_context)
+ 
+ # Explain
+ explanation = explainer.explain(
+ token=safe_candidates[0]["token"],
+ chain=test_chain,
+ )
+ 
+ # Validate
+ assert len(safe_candidates) > 0
+ assert explanation["decision"]["confidence"] > 0
+ assert len(explanation["explanation"]) > 0
 ```
 
 ---
@@ -572,8 +572,7 @@ For questions or issues, contact your development team.
 
 **v1.0.0** (Current)
 - Fully implemented all three modules
-- Comprehensive feature set
-- Production-ready with optimization
+- Comprehensive feature set with optimization
 - Full test coverage
 - Complete documentation
 

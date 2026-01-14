@@ -123,24 +123,24 @@ The baseline file (`perf/baseline.json`) defines expected performance:
 
 ```json
 {
-  "benchmarks": {
-    "end_to_end": {
-      "pipeline": {
-        "avg_latency_max_seconds": 0.5,
-        "p95_latency_max_seconds": 1.0,
-        "min_throughput_qps": 2.0
-      }
-    },
-    "concurrency": {
-      "threadpool": {
-        "concurrency_10": {
-          "min_throughput_qps": 5.0,
-          "max_latency_p95_seconds": 2.0,
-          "min_success_rate": 0.95
-        }
-      }
-    }
-  }
+ "benchmarks": {
+ "end_to_end": {
+ "pipeline": {
+ "avg_latency_max_seconds": 0.5,
+ "p95_latency_max_seconds": 1.0,
+ "min_throughput_qps": 2.0
+ }
+ },
+ "concurrency": {
+ "threadpool": {
+ "concurrency_10": {
+ "min_throughput_qps": 5.0,
+ "max_latency_p95_seconds": 2.0,
+ "min_success_rate": 0.95
+ }
+ }
+ }
+ }
 }
 ```
 
@@ -149,9 +149,9 @@ The baseline file (`perf/baseline.json`) defines expected performance:
 To update baselines after verified performance improvements:
 
 1. Run performance tests with current code:
-   ```bash
-   pytest tests/perf/ -m perf -v
-   ```
+ ```bash
+ pytest tests/perf/ -m perf -v
+ ```
 
 2. Review results in `perf/results.json`
 
@@ -164,9 +164,9 @@ To update baselines after verified performance improvements:
 ```bash
 # Compare current results against baseline
 python scripts/compare_perf.py \
-  --results perf/results.json \
-  --baseline perf/baseline.json \
-  --output perf/comparison.md
+ --results perf/results.json \
+ --baseline perf/baseline.json \
+ --output perf/comparison.md
 
 # Informational run (don't fail on regression)
 python scripts/compare_perf.py --no-fail
@@ -227,9 +227,9 @@ Override thresholds in CI via workflow inputs or environment variables:
 
 ```yaml
 env:
-  PERF_ITERATIONS: '100'  # Fewer iterations for faster CI
-  PERF_CONCURRENCY_LEVELS: '10,25'  # Skip highest concurrency
-  PERF_MAX_RSS_GROWTH_MB: '75'  # More lenient for CI
+ PERF_ITERATIONS: '100' # Fewer iterations for faster CI
+ PERF_CONCURRENCY_LEVELS: '10,25' # Skip highest concurrency
+ PERF_MAX_RSS_GROWTH_MB: '75' # More lenient for CI
 ```
 
 ### Handling Flaky Tests
@@ -291,27 +291,27 @@ If tests show degradation over iterations:
 ```python
 @pytest.mark.perf
 def test_my_component_throughput(
-    perf_config: PerfConfig,
-    result_collector: PerfResultCollector,
+ perf_config: PerfConfig,
+ result_collector: PerfResultCollector,
 ):
-    """Test throughput of my component."""
-    num_iterations = perf_config.iterations
+ """Test throughput of my component."""
+ num_iterations = perf_config.iterations
 
-    for i in range(num_iterations):
-        start = time.perf_counter()
-        result = my_component.process(input_data)
-        latency = time.perf_counter() - start
+ for i in range(num_iterations):
+ start = time.perf_counter()
+ result = my_component.process(input_data)
+ latency = time.perf_counter() - start
 
-        result_collector.add_result({
-            "iteration": i,
-            "latency_seconds": latency,
-            "success": result.success,
-        })
+ result_collector.add_result({
+ "iteration": i,
+ "latency_seconds": latency,
+ "success": result.success,
+ })
 
-    # Assertions
-    latencies = result_collector.get_latencies()
-    avg_latency = sum(latencies) / len(latencies)
-    assert avg_latency < 1.0, f"Average latency too high: {avg_latency}"
+ # Assertions
+ latencies = result_collector.get_latencies()
+ avg_latency = sum(latencies) / len(latencies)
+ assert avg_latency < 1.0, f"Average latency too high: {avg_latency}"
 ```
 
 ## Related Documentation

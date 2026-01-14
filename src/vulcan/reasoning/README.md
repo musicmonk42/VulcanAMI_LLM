@@ -1,11 +1,9 @@
 # VULCAN Reasoning Module
 ## Comprehensive Technical Documentation
 
-**Version:** 1.0.0  
-**Component:** `vulcan.reasoning`  
-**Lines of Code:** ~95,000+  
-**Status:** Production-Ready
-
+**Version:** 1.0.0 
+**Component:** `vulcan.reasoning` 
+**Lines of Code:** ~95,000+ 
 ---
 
 ## Table of Contents
@@ -24,9 +22,9 @@
 12. [Troubleshooting](#troubleshooting)
 13. [API Reference](#api-reference)
 14. [Appendix](#appendix)
-    - [Recent Bug Fixes](#recent-bug-fixes-and-improvements-january-2026)
-    - [Glossary](#glossary)
-    - [License](#license)
+ - [Recent Bug Fixes](#recent-bug-fixes-and-improvements-january-2026)
+ - [Glossary](#glossary)
+ - [License](#license)
 
 ---
 
@@ -58,35 +56,35 @@ The VULCAN Reasoning Module is a **production-grade, multi-paradigm reasoning sy
 
 ```
 User Query
-    ↓
+ ↓
 ┌─────────────────────────────────────────────┐
-│   INTELLIGENT TOOL SELECTION (~12K lines)   │
-│                                             │
+│ INTELLIGENT TOOL SELECTION (~12K lines) │
+│ │
 │ ToolSelector decides which engine(s) to use│
-│ • Multi-armed bandits                       │
-│ • Cost/utility optimization                 │
+│ • Multi-armed bandits │
+│ • Cost/utility optimization │
 │ • Portfolio execution (parallel/sequential) │
-│ • Safety governor validation                │
+│ • Safety governor validation │
 └──────────────────┬──────────────────────────┘
-                   ↓
+ ↓
 ┌─────────────────────────────────────────────┐
-│    REASONING ENGINES (~83K lines)           │
-│                                             │
-│ 18 Specialized Engines:                    │
-│ • Symbolic, Causal, Probabilistic          │
-│ • Analogical, Mathematical, Philosophical  │
-│ • Multimodal, Language, and more           │
-│                                             │
-│ Each engine validated for safety           │
+│ REASONING ENGINES (~83K lines) │
+│ │
+│ 18 Specialized Engines: │
+│ • Symbolic, Causal, Probabilistic │
+│ • Analogical, Mathematical, Philosophical │
+│ • Multimodal, Language, and more │
+│ │
+│ Each engine validated for safety │
 └──────────────────┬──────────────────────────┘
-                   ↓
+ ↓
 ┌─────────────────────────────────────────────┐
-│  FORMAL FOUNDATION (~7K lines)              │
-│                                             │
-│ First-Order Logic + Theorem Proving        │
-│ • Provably correct reasoning               │
-│ • Multiple proof methods                   │
-│ • Formal verification                      │
+│ FORMAL FOUNDATION (~7K lines) │
+│ │
+│ First-Order Logic + Theorem Proving │
+│ • Provably correct reasoning │
+│ • Multiple proof methods │
+│ • Formal verification │
 └─────────────────────────────────────────────┘
 ```
 
@@ -126,15 +124,15 @@ from vulcan.reasoning import apply_reasoning
 
 # Causal reasoning
 result = apply_reasoning(
-    query="What causes X to affect Y?",
-    query_type="causal",
-    complexity=0.7
+ query="What causes X to affect Y?",
+ query_type="causal",
+ complexity=0.7
 )
 
 # Probabilistic reasoning
 result = apply_reasoning(
-    query="What's the probability of event E given evidence D?",
-    query_type="probabilistic"
+ query="What's the probability of event E given evidence D?",
+ query_type="probabilistic"
 )
 ```
 
@@ -167,12 +165,12 @@ from vulcan.reasoning.selection import ToolSelector
 
 selector = ToolSelector()
 result = selector.select(
-    query="Explain the causal relationship between A and B",
-    context={
-        'domain': 'science',
-        'complexity': 0.8,
-        'time_budget_ms': 5000
-    }
+ query="Explain the causal relationship between A and B",
+ context={
+ 'domain': 'science',
+ 'complexity': 0.8,
+ 'time_budget_ms': 5000
+ }
 )
 # Automatically selects: ['causal', 'symbolic']
 # Executes in portfolio, combines results
@@ -206,13 +204,13 @@ from vulcan.reasoning import SymbolicReasoner
 
 reasoner = SymbolicReasoner()
 result = reasoner.reason({
-    'query': 'If all humans are mortal, and Socrates is human, is Socrates mortal?',
-    'context': {}
+ 'query': 'If all humans are mortal, and Socrates is human, is Socrates mortal?',
+ 'context': {}
 })
 
-print(result.conclusion)  # "Yes, Socrates is mortal"
-print(result.confidence)  # 0.95
-print(result.reasoning_chain)  # Step-by-step explanation
+print(result.conclusion) # "Yes, Socrates is mortal"
+print(result.confidence) # 0.95
+print(result.reasoning_chain) # Step-by-step explanation
 ```
 
 **Key Features:**
@@ -241,26 +239,26 @@ engine = causal_reasoning.CausalReasoningEngine()
 
 # Discover causal structure from data
 result = engine.discover_structure(data={
-    'temperature': [20, 25, 30, 35],
-    'ice_cream_sales': [100, 150, 200, 250],
-    'drowning_incidents': [5, 7, 9, 11]
+ 'temperature': [20, 25, 30, 35],
+ 'ice_cream_sales': [100, 150, 200, 250],
+ 'drowning_incidents': [5, 7, 9, 11]
 })
 
 # Infer causality
 causal_result = engine.infer_causality(
-    cause='temperature',
-    effect='ice_cream_sales',
-    data=result.graph
+ cause='temperature',
+ effect='ice_cream_sales',
+ data=result.graph
 )
 
-print(causal_result.strength)  # 0.87 (strong causal link)
-print(causal_result.mechanism)  # "Temperature → Demand"
+print(causal_result.strength) # 0.87 (strong causal link)
+print(causal_result.mechanism) # "Temperature → Demand"
 
 # Plan intervention
 intervention = engine.plan_intervention(
-    target='drowning_incidents',
-    desired_change=-5,
-    graph=result.graph
+ target='drowning_incidents',
+ desired_change=-5,
+ graph=result.graph
 )
 ```
 
@@ -291,17 +289,17 @@ engine = probabilistic_reasoning.ProbabilisticReasoningEngine()
 
 # Bayesian inference
 result = engine.bayesian_inference(
-    hypothesis='disease',
-    evidence={'symptom_1': True, 'symptom_2': False},
-    priors={'disease': 0.01},
-    likelihoods={
-        'symptom_1': {'disease': 0.9, 'no_disease': 0.1},
-        'symptom_2': {'disease': 0.3, 'no_disease': 0.05}
-    }
+ hypothesis='disease',
+ evidence={'symptom_1': True, 'symptom_2': False},
+ priors={'disease': 0.01},
+ likelihoods={
+ 'symptom_1': {'disease': 0.9, 'no_disease': 0.1},
+ 'symptom_2': {'disease': 0.3, 'no_disease': 0.05}
+ }
 )
 
-print(result.posterior['disease'])  # Updated probability
-print(result.confidence)  # Confidence in estimate
+print(result.posterior['disease']) # Updated probability
+print(result.confidence) # Confidence in estimate
 ```
 
 **Key Features:**
@@ -330,24 +328,24 @@ from vulcan.reasoning import analogical_reasoning
 engine = analogical_reasoning.AnalogicalReasoningEngine()
 
 result = engine.reason_by_analogy(
-    source={
-        'domain': 'atom',
-        'structure': {
-            'nucleus': 'center',
-            'electrons': 'orbit around nucleus'
-        }
-    },
-    target={
-        'domain': 'solar_system',
-        'structure': {
-            'sun': 'center',
-            'planets': '?'
-        }
-    }
+ source={
+ 'domain': 'atom',
+ 'structure': {
+ 'nucleus': 'center',
+ 'electrons': 'orbit around nucleus'
+ }
+ },
+ target={
+ 'domain': 'solar_system',
+ 'structure': {
+ 'sun': 'center',
+ 'planets': '?'
+ }
+ }
 )
 
-print(result.mapping)  # {'nucleus': 'sun', 'electrons': 'planets'}
-print(result.conclusion)  # "Planets orbit around sun"
+print(result.mapping) # {'nucleus': 'sun', 'electrons': 'planets'}
+print(result.conclusion) # "Planets orbit around sun"
 ```
 
 **Key Features:**
@@ -380,13 +378,13 @@ x = Symbol('x')
 result = integrate(x**2, x)
 """)
 
-print(result.result)  # x**3/3
-print(result.latex)  # LaTeX representation
+print(result.result) # x**3/3
+print(result.latex) # LaTeX representation
 
 # Numerical computation
 numeric_result = engine.evaluate(
-    expression='sin(pi/2) + cos(0)',
-    precision=10
+ expression='sin(pi/2) + cos(0)',
+ precision=10
 )
 ```
 
@@ -416,17 +414,17 @@ from vulcan.reasoning import philosophical_reasoning
 engine = philosophical_reasoning.PhilosophicalReasoningEngine()
 
 result = engine.reason({
-    'query': 'Is it permissible to lie to save a life?',
-    'framework': 'consequentialism',
-    'context': {
-        'situation': 'medical emergency',
-        'stakeholders': ['patient', 'family']
-    }
+ 'query': 'Is it permissible to lie to save a life?',
+ 'framework': 'consequentialism',
+ 'context': {
+ 'situation': 'medical emergency',
+ 'stakeholders': ['patient', 'family']
+ }
 })
 
-print(result.conclusion)  # Ethical analysis
-print(result.framework_analysis)  # Different ethical perspectives
-print(result.confidence)  # Confidence in reasoning
+print(result.conclusion) # Ethical analysis
+print(result.framework_analysis) # Different ethical perspectives
+print(result.confidence) # Confidence in reasoning
 ```
 
 **Key Features:**
@@ -454,17 +452,17 @@ from vulcan.reasoning import multimodal_reasoning
 engine = multimodal_reasoning.MultimodalReasoningEngine()
 
 result = engine.reason({
-    'modalities': {
-        'vision': image_data,
-        'language': text_description,
-        'audio': audio_features
-    },
-    'query': 'What is happening in this scene?',
-    'fusion_strategy': 'attention'
+ 'modalities': {
+ 'vision': image_data,
+ 'language': text_description,
+ 'audio': audio_features
+ },
+ 'query': 'What is happening in this scene?',
+ 'fusion_strategy': 'attention'
 })
 
-print(result.conclusion)  # Integrated understanding
-print(result.modality_contributions)  # How each modality contributed
+print(result.conclusion) # Integrated understanding
+print(result.modality_contributions) # How each modality contributed
 ```
 
 **Key Features:**
@@ -545,10 +543,10 @@ reasoner.add_fact("Greek(Socrates)")
 # Prove theorem
 result = reasoner.query("Mortal(Socrates)", timeout=5.0)
 
-print(result['proven'])  # True
-print(result['confidence'])  # 0.95
-print(result['proof_tree'])  # Full proof structure
-print(result['steps'])  # Step-by-step proof
+print(result['proven']) # True
+print(result['confidence']) # 0.95
+print(result['proof_tree']) # Full proof structure
+print(result['steps']) # Step-by-step proof
 ```
 
 #### 4. Constraint Satisfaction
@@ -569,7 +567,7 @@ solver.add_constraint('Y', 'Z', lambda y, z: y < z)
 
 # Solve
 solution = solver.solve()
-print(solution)  # {'X': 1, 'Y': 2, 'Z': 3}
+print(solution) # {'X': 1, 'Y': 2, 'Z': 3}
 ```
 
 #### 5. Bayesian Networks
@@ -593,7 +591,7 @@ bn.set_cpd('Rain', {(): {'yes': 0.2, 'no': 0.8}})
 
 # Inference
 result = bn.query('GrassWet', evidence={'Rain': 'yes'})
-print(result)  # Probability distribution
+print(result) # Probability distribution
 ```
 
 ---
@@ -608,10 +606,10 @@ The selection subsystem uses **multi-armed bandits** and **portfolio optimizatio
 
 ```
 Query → PreProcessor → ToolSelector → Portfolio → Result
-           ↓              ↓              ↓
-     Extract formal   Bandit +      Parallel/
-     syntax          utility       sequential
-                     optimization   execution
+ ↓ ↓ ↓
+ Extract formal Bandit + Parallel/
+ syntax utility sequential
+ optimization execution
 ```
 
 ### Components
@@ -625,19 +623,19 @@ selector = ToolSelector()
 
 # Automatic selection
 result = selector.select(
-    query="What causes temperature to affect ice cream sales?",
-    context={
-        'domain': 'economics',
-        'complexity': 0.7,
-        'time_budget_ms': 5000,
-        'min_confidence': 0.7
-    },
-    mode=SelectionMode.BALANCED  # FAST, BALANCED, or ACCURATE
+ query="What causes temperature to affect ice cream sales?",
+ context={
+ 'domain': 'economics',
+ 'complexity': 0.7,
+ 'time_budget_ms': 5000,
+ 'min_confidence': 0.7
+ },
+ mode=SelectionMode.BALANCED # FAST, BALANCED, or ACCURATE
 )
 
-print(result.selected_tools)  # ['causal', 'probabilistic']
-print(result.reasoning_strategy)  # 'causal_reasoning'
-print(result.confidence)  # 0.85
+print(result.selected_tools) # ['causal', 'probabilistic']
+print(result.reasoning_strategy) # 'causal_reasoning'
+print(result.confidence) # 0.85
 ```
 
 **Selection Modes:**
@@ -653,15 +651,15 @@ from vulcan.reasoning.selection import PortfolioExecutor, ExecutionStrategy
 executor = PortfolioExecutor()
 
 result = executor.execute(
-    tools=['causal', 'symbolic', 'probabilistic'],
-    query="Complex multi-step problem",
-    strategy=ExecutionStrategy.PARALLEL,  # or SEQUENTIAL, PIPELINE
-    timeout=10.0
+ tools=['causal', 'symbolic', 'probabilistic'],
+ query="Complex multi-step problem",
+ strategy=ExecutionStrategy.PARALLEL, # or SEQUENTIAL, PIPELINE
+ timeout=10.0
 )
 
-print(result.outputs)  # Results from each tool
-print(result.ensemble_result)  # Combined result
-print(result.confidence)  # Aggregated confidence
+print(result.outputs) # Results from each tool
+print(result.ensemble_result) # Combined result
+print(result.confidence) # Aggregated confidence
 ```
 
 **Execution Strategies:**
@@ -677,24 +675,24 @@ from vulcan.reasoning.selection import StochasticCostModel, UtilityModel
 # Cost estimation
 cost_model = StochasticCostModel()
 cost_estimate = cost_model.estimate(
-    tool='causal',
-    query_complexity=0.7,
-    data_size=1000
+ tool='causal',
+ query_complexity=0.7,
+ data_size=1000
 )
 
-print(cost_estimate.time_ms)  # Estimated time
-print(cost_estimate.energy_mj)  # Estimated energy
-print(cost_estimate.confidence)  # Estimate confidence
+print(cost_estimate.time_ms) # Estimated time
+print(cost_estimate.energy_mj) # Estimated energy
+print(cost_estimate.confidence) # Estimate confidence
 
 # Utility calculation
 utility_model = UtilityModel()
 utility = utility_model.calculate(
-    tool='causal',
-    context={
-        'accuracy_weight': 0.7,
-        'speed_weight': 0.2,
-        'cost_weight': 0.1
-    }
+ tool='causal',
+ context={
+ 'accuracy_weight': 0.7,
+ 'speed_weight': 0.2,
+ 'cost_weight': 0.1
+ }
 )
 ```
 
@@ -707,19 +705,19 @@ prior = BayesianMemoryPrior()
 
 # Update with outcomes
 prior.update(
-    tool='causal',
-    query_signature='cause-effect-relationship',
-    success=True,
-    confidence=0.9
+ tool='causal',
+ query_signature='cause-effect-relationship',
+ success=True,
+ confidence=0.9
 )
 
 # Get prior for new query
 prior_prob = prior.get_prior(
-    query_signature='similar-cause-effect',
-    candidate_tools=['causal', 'symbolic', 'probabilistic']
+ query_signature='similar-cause-effect',
+ candidate_tools=['causal', 'symbolic', 'probabilistic']
 )
 
-print(prior_prob)  # {'causal': 0.7, 'symbolic': 0.2, 'probabilistic': 0.1}
+print(prior_prob) # {'causal': 0.7, 'symbolic': 0.2, 'probabilistic': 0.1}
 ```
 
 #### 5. Safety Governor
@@ -731,26 +729,26 @@ governor = SafetyGovernor()
 
 # Define tool contract
 contract = ToolContract(
-    tool_name='causal',
-    required_inputs=['data', 'variables'],
-    forbidden_inputs=['passwords', 'pii'],
-    output_constraints={
-        'max_size': 1000000,
-        'allowed_types': ['graph', 'dict']
-    }
+ tool_name='causal',
+ required_inputs=['data', 'variables'],
+ forbidden_inputs=['passwords', 'pii'],
+ output_constraints={
+ 'max_size': 1000000,
+ 'allowed_types': ['graph', 'dict']
+ }
 )
 
 # Validate selection
 validation = governor.validate_selection(
-    tool='causal',
-    query="What causes X to affect Y?",
-    context={},
-    contract=contract
+ tool='causal',
+ query="What causes X to affect Y?",
+ context={},
+ contract=contract
 )
 
 if not validation.approved:
-    print(validation.veto_reason)  # Why it was vetoed
-    print(validation.alternative_tools)  # Suggested alternatives
+ print(validation.veto_reason) # Why it was vetoed
+ print(validation.alternative_tools) # Suggested alternatives
 ```
 
 **Safety Features:**
@@ -770,17 +768,17 @@ admission = AdmissionControlIntegration()
 
 # Check if request can be admitted
 admitted = admission.admit_request(
-    request_id='req-123',
-    priority=RequestPriority.HIGH,
-    estimated_cost_ms=5000
+ request_id='req-123',
+ priority=RequestPriority.HIGH,
+ estimated_cost_ms=5000
 )
 
 if admitted:
-    # Process request
-    result = process_query(...)
-    admission.release_request('req-123')
+ # Process request
+ result = process_query(...)
+ admission.release_request('req-123')
 else:
-    print("System overloaded, request queued")
+ print("System overloaded, request queued")
 ```
 
 #### 7. Selection Cache
@@ -789,20 +787,20 @@ else:
 from vulcan.reasoning.selection import SelectionCache
 
 cache = SelectionCache(
-    max_size=1000,
-    ttl_seconds=3600
+ max_size=1000,
+ ttl_seconds=3600
 )
 
 # Check cache
 cached = cache.get(query_signature='hash-123')
 if cached:
-    return cached
+ return cached
 
 # Store result
 cache.put(
-    query_signature='hash-123',
-    result=result,
-    metadata={'tools': ['causal'], 'confidence': 0.9}
+ query_signature='hash-123',
+ result=result,
+ metadata={'tools': ['causal'], 'confidence': 0.9}
 )
 ```
 
@@ -812,8 +810,8 @@ cache.put(
 from vulcan.reasoning.selection import WarmStartPool
 
 pool = WarmStartPool(
-    tools=['causal', 'symbolic', 'probabilistic'],
-    pool_size=3
+ tools=['causal', 'symbolic', 'probabilistic'],
+ pool_size=3
 )
 
 # Get pre-initialized tool
@@ -834,15 +832,15 @@ pool.release('causal', tool)
 
 ```
 Layer 1: ReasoningExplainer
-    ↓ Validates each reasoning step
+ ↓ Validates each reasoning step
 Layer 2: SafetyGovernor
-    ↓ Enforces tool contracts
+ ↓ Enforces tool contracts
 Layer 3: SafetyValidator (from safety module)
-    ↓ System-wide safety checks
+ ↓ System-wide safety checks
 Layer 4: EthicalBoundaryMonitor (from meta-reasoning)
-    ↓ Ethical constraints
+ ↓ Ethical constraints
 Layer 5: Human Oversight
-    ↓ Final approval for critical decisions
+ ↓ Final approval for critical decisions
 ```
 
 ### ReasoningExplainer
@@ -854,7 +852,7 @@ explainer = ReasoningExplainer()
 
 # Explain reasoning step
 explanation = explainer.explain_step(step)
-print(explanation)  # Human-readable explanation
+print(explanation) # Human-readable explanation
 
 # Explain entire chain
 chain_explanation = explainer.explain_chain(reasoning_chain)
@@ -862,7 +860,7 @@ chain_explanation = explainer.explain_chain(reasoning_chain)
 # Validate safety
 safety_check = explainer.validate_safety(reasoning_result)
 if not safety_check.safe:
-    print(safety_check.violations)  # What safety rules were violated
+ print(safety_check.violations) # What safety rules were violated
 ```
 
 ### Safety-Aware Reasoning
@@ -874,9 +872,9 @@ from vulcan.reasoning import SafetyAwareReasoning
 result = engine.reason(query, safety_checks=True)
 
 if result.safety_violations:
-    print(result.safety_violations)  # Specific violations
-    print(result.safety_level)  # Overall safety level
-    # Handle violation appropriately
+ print(result.safety_violations) # Specific violations
+ print(result.safety_level) # Overall safety level
+ # Handle violation appropriately
 ```
 
 ---
@@ -922,7 +920,7 @@ cd vulcan-ami
 
 # Create virtual environment
 python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+source venv/bin/activate # On Windows: venv\Scripts\activate
 
 # Install core dependencies
 pip install -r requirements.txt
@@ -955,8 +953,8 @@ from vulcan.reasoning import apply_reasoning
 
 # Let the system automatically select the best reasoning engine
 result = apply_reasoning(
-    query="If all birds can fly, and penguins are birds, can penguins fly?",
-    query_type="symbolic"
+ query="If all birds can fly, and penguins are birds, can penguins fly?",
+ query_type="symbolic"
 )
 
 print(f"Conclusion: {result.conclusion}")
@@ -970,12 +968,12 @@ print(f"Reasoning: {result.explanation}")
 from vulcan.reasoning import apply_reasoning
 
 result = apply_reasoning(
-    query="What is the causal relationship between smoking and lung cancer?",
-    query_type="causal",
-    context={
-        'domain': 'medical',
-        'data_available': True
-    }
+ query="What is the causal relationship between smoking and lung cancer?",
+ query_type="causal",
+ context={
+ 'domain': 'medical',
+ 'data_available': True
+ }
 )
 
 print(f"Causal strength: {result.metadata['causal_strength']}")
@@ -990,10 +988,10 @@ from vulcan.reasoning import run_portfolio_reasoning
 
 # Use multiple reasoning engines for complex problems
 result = run_portfolio_reasoning(
-    query="Analyze the economic impact of climate change on agriculture",
-    tools=['causal', 'probabilistic', 'analogical'],
-    strategy='parallel',
-    min_confidence=0.8
+ query="Analyze the economic impact of climate change on agriculture",
+ tools=['causal', 'probabilistic', 'analogical'],
+ strategy='parallel',
+ min_confidence=0.8
 )
 
 print(f"Ensemble result: {result.conclusion}")
@@ -1016,7 +1014,7 @@ x = Symbol('x')
 result = solve(diff(diff(y(x), x), x) + y(x), y(x))
 """)
 
-print(result.result)  # Solution to differential equation
+print(result.result) # Solution to differential equation
 ```
 
 ### Example 5: With Explicit Tool Selection
@@ -1028,12 +1026,12 @@ selector = ToolSelector()
 
 # Get recommended tools
 selection = selector.select(
-    query="Complex scientific problem requiring multiple approaches",
-    context={
-        'complexity': 0.9,
-        'accuracy_critical': True,
-        'time_budget_ms': 30000
-    }
+ query="Complex scientific problem requiring multiple approaches",
+ context={
+ 'complexity': 0.9,
+ 'accuracy_critical': True,
+ 'time_budget_ms': 30000
+ }
 )
 
 print(f"Recommended tools: {selection.selected_tools}")
@@ -1053,23 +1051,23 @@ result = selection.execute()
 from vulcan.reasoning import BaseReasoningEngine, ReasoningResult
 
 class CustomReasoningEngine(BaseReasoningEngine):
-    """Custom reasoning engine for domain-specific logic"""
-    
-    def __init__(self):
-        super().__init__()
-        self.reasoning_type = 'custom'
-    
-    def reason(self, query: dict) -> ReasoningResult:
-        """Implement custom reasoning logic"""
-        # Your logic here
-        
-        return ReasoningResult(
-            conclusion="Custom conclusion",
-            confidence=0.9,
-            reasoning_type='custom',
-            explanation="How we arrived at this conclusion",
-            metadata={}
-        )
+ """Custom reasoning engine for domain-specific logic"""
+ 
+ def __init__(self):
+ super().__init__()
+ self.reasoning_type = 'custom'
+ 
+ def reason(self, query: dict) -> ReasoningResult:
+ """Implement custom reasoning logic"""
+ # Your logic here
+ 
+ return ReasoningResult(
+ conclusion="Custom conclusion",
+ confidence=0.9,
+ reasoning_type='custom',
+ explanation="How we arrived at this conclusion",
+ metadata={}
+ )
 
 # Register custom engine
 from vulcan.reasoning import register_engine
@@ -1077,8 +1075,8 @@ register_engine('custom', CustomReasoningEngine)
 
 # Use custom engine
 result = apply_reasoning(
-    query="Domain-specific problem",
-    query_type="custom"
+ query="Domain-specific problem",
+ query_type="custom"
 )
 ```
 
@@ -1088,26 +1086,26 @@ result = apply_reasoning(
 from vulcan.reasoning.selection import PortfolioExecutor, ExecutionStrategy
 
 executor = PortfolioExecutor(
-    timeout=30.0,
-    max_workers=4,
-    fallback_on_failure=True
+ timeout=30.0,
+ max_workers=4,
+ fallback_on_failure=True
 )
 
 # Pipeline execution (sequential with data flow)
 result = executor.execute(
-    tools=['causal', 'symbolic', 'probabilistic'],
-    query="Multi-stage reasoning problem",
-    strategy=ExecutionStrategy.PIPELINE,
-    pipeline_config={
-        'causal': {
-            'output_to': 'symbolic',
-            'extract': ['graph_structure']
-        },
-        'symbolic': {
-            'output_to': 'probabilistic',
-            'extract': ['logical_constraints']
-        }
-    }
+ tools=['causal', 'symbolic', 'probabilistic'],
+ query="Multi-stage reasoning problem",
+ strategy=ExecutionStrategy.PIPELINE,
+ pipeline_config={
+ 'causal': {
+ 'output_to': 'symbolic',
+ 'extract': ['graph_structure']
+ },
+ 'symbolic': {
+ 'output_to': 'probabilistic',
+ 'extract': ['logical_constraints']
+ }
+ }
 )
 ```
 
@@ -1120,13 +1118,13 @@ bandit = AdaptiveBanditOrchestrator()
 
 # Select tool based on context
 selection = bandit.select_tool(
-    context={
-        'query_type': 'causal',
-        'domain': 'economics',
-        'complexity': 0.7,
-        'user_preference': 'accuracy'
-    },
-    candidate_tools=['causal', 'symbolic', 'probabilistic']
+ context={
+ 'query_type': 'causal',
+ 'domain': 'economics',
+ 'complexity': 0.7,
+ 'user_preference': 'accuracy'
+ },
+ candidate_tools=['causal', 'symbolic', 'probabilistic']
 )
 
 # Execute
@@ -1134,10 +1132,10 @@ result = execute_tool(selection.tool, query)
 
 # Update bandit with outcome
 bandit.update(
-    context=selection.context,
-    tool=selection.tool,
-    reward=compute_reward(result),  # Based on accuracy, speed, cost
-    outcome=result
+ context=selection.context,
+ tool=selection.tool,
+ reward=compute_reward(result), # Based on accuracy, speed, cost
+ outcome=result
 )
 ```
 
@@ -1152,20 +1150,20 @@ world_model = WorldModel()
 
 # Use reasoning to discover causal relationships
 causal_result = apply_reasoning(
-    query="Discover causal structure in this data",
-    query_type="causal",
-    data=observations
+ query="Discover causal structure in this data",
+ query_type="causal",
+ data=observations
 )
 
 # Integrate into world model
 world_model.update_causal_structure(
-    causal_result.metadata['causal_graph']
+ causal_result.metadata['causal_graph']
 )
 
 # Use world model for predictions
 prediction = world_model.predict(
-    target='variable_y',
-    evidence={'variable_x': 10}
+ target='variable_y',
+ evidence={'variable_x': 10}
 )
 ```
 
@@ -1177,8 +1175,8 @@ prediction = world_model.predict(
 
 ```bash
 # Tool selection
-export VULCAN_SELECTION_MODE=balanced  # fast, balanced, accurate
-export VULCAN_DEFAULT_TIMEOUT=10000  # milliseconds
+export VULCAN_SELECTION_MODE=balanced # fast, balanced, accurate
+export VULCAN_DEFAULT_TIMEOUT=10000 # milliseconds
 export VULCAN_MAX_WORKERS=4
 
 # Cost optimization
@@ -1186,7 +1184,7 @@ export VULCAN_TIME_BUDGET_MS=5000
 export VULCAN_ENERGY_BUDGET_MJ=1000
 
 # Safety
-export VULCAN_SAFETY_LEVEL=strict  # permissive, normal, strict
+export VULCAN_SAFETY_LEVEL=strict # permissive, normal, strict
 export VULCAN_ENABLE_SAFETY_GOVERNOR=true
 
 # Caching
@@ -1203,43 +1201,43 @@ export VULCAN_LOG_REASONING_STEPS=true
 **config/reasoning.yaml:**
 ```yaml
 reasoning:
-  default_mode: balanced
-  timeout_ms: 10000
-  
-  engines:
-    symbolic:
-      enabled: true
-      prover: parallel
-      timeout: 5.0
-    
-    causal:
-      enabled: true
-      discovery_method: pc
-      max_lag: 5
-    
-    probabilistic:
-      enabled: true
-      inference_method: variational
-      num_samples: 1000
+ default_mode: balanced
+ timeout_ms: 10000
+ 
+ engines:
+ symbolic:
+ enabled: true
+ prover: parallel
+ timeout: 5.0
+ 
+ causal:
+ enabled: true
+ discovery_method: pc
+ max_lag: 5
+ 
+ probabilistic:
+ enabled: true
+ inference_method: variational
+ num_samples: 1000
 
 selection:
-  bandit:
-    algorithm: thompson_sampling
-    exploration_rate: 0.1
-  
-  portfolio:
-    max_tools: 3
-    default_strategy: parallel
-  
-  safety:
-    level: strict
-    enable_contracts: true
-    enable_validation: true
+ bandit:
+ algorithm: thompson_sampling
+ exploration_rate: 0.1
+ 
+ portfolio:
+ max_tools: 3
+ default_strategy: parallel
+ 
+ safety:
+ level: strict
+ enable_contracts: true
+ enable_validation: true
 
 performance:
-  cache_enabled: true
-  warm_pool_size: 3
-  max_concurrent_requests: 10
+ cache_enabled: true
+ warm_pool_size: 3
+ max_concurrent_requests: 10
 ```
 
 ### Loading Configuration
@@ -1264,9 +1262,9 @@ from vulcan.reasoning.selection import SelectionCache
 
 # Enable aggressive caching
 cache = SelectionCache(
-    max_size=10000,
-    ttl_seconds=7200,
-    enable_semantic_matching=True
+ max_size=10000,
+ ttl_seconds=7200,
+ enable_semantic_matching=True
 )
 
 # Cache hit rates
@@ -1282,12 +1280,12 @@ from vulcan.reasoning.selection import WarmStartPool
 
 # Pre-initialize expensive engines
 pool = WarmStartPool(
-    tools=['causal', 'symbolic', 'probabilistic'],
-    pool_size=5,
-    initialization_config={
-        'causal': {'preload_algorithms': True},
-        'symbolic': {'precompile_rules': True}
-    }
+ tools=['causal', 'symbolic', 'probabilistic'],
+ pool_size=5,
+ initialization_config={
+ 'causal': {'preload_algorithms': True},
+ 'symbolic': {'precompile_rules': True}
+ }
 )
 ```
 
@@ -1298,15 +1296,15 @@ from vulcan.reasoning.selection import PortfolioExecutor
 
 # Maximize parallelism
 executor = PortfolioExecutor(
-    max_workers=8,  # Use more workers
-    enable_async=True,
-    timeout=30.0
+ max_workers=8, # Use more workers
+ enable_async=True,
+ timeout=30.0
 )
 
 result = executor.execute(
-    tools=['causal', 'symbolic', 'probabilistic', 'analogical'],
-    query=query,
-    strategy=ExecutionStrategy.PARALLEL
+ tools=['causal', 'symbolic', 'probabilistic', 'analogical'],
+ query=query,
+ strategy=ExecutionStrategy.PARALLEL
 )
 ```
 
@@ -1317,9 +1315,9 @@ from vulcan.reasoning import apply_reasoning
 
 # For simple queries, use fast mode
 result = apply_reasoning(
-    query="Simple factual question",
-    mode='fast',  # Single tool, minimal overhead
-    max_complexity=0.3
+ query="Simple factual question",
+ mode='fast', # Single tool, minimal overhead
+ max_complexity=0.3
 )
 ```
 
@@ -1330,15 +1328,15 @@ from vulcan.reasoning import batch_reasoning
 
 # Process multiple queries efficiently
 queries = [
-    "Query 1: Causal question",
-    "Query 2: Logical puzzle",
-    "Query 3: Probabilistic inference"
+ "Query 1: Causal question",
+ "Query 2: Logical puzzle",
+ "Query 3: Probabilistic inference"
 ]
 
 results = batch_reasoning(
-    queries=queries,
-    batch_size=10,
-    parallel=True
+ queries=queries,
+ batch_size=10,
+ parallel=True
 )
 ```
 
@@ -1402,13 +1400,13 @@ pip install sentence-transformers
 from vulcan.reasoning import get_reasoning_statistics
 
 stats = get_reasoning_statistics()
-print(stats['tool_success_rates'])  # Should be > 0.5
+print(stats['tool_success_rates']) # Should be > 0.5
 
 # Use multiple tools for higher confidence
 result = run_portfolio_reasoning(
-    query=query,
-    tools=['causal', 'symbolic', 'probabilistic'],
-    strategy='parallel'
+ query=query,
+ tools=['causal', 'symbolic', 'probabilistic'],
+ strategy='parallel'
 )
 ```
 
@@ -1421,8 +1419,8 @@ result = run_portfolio_reasoning(
 # Check violation reason
 result = selector.select(query)
 if not result.approved:
-    print(result.veto_reason)
-    print(result.alternative_tools)
+ print(result.veto_reason)
+ print(result.alternative_tools)
 
 # Adjust safety level if appropriate
 from vulcan.reasoning.selection import SafetyGovernor, SafetyLevel
@@ -1445,8 +1443,8 @@ cache = SelectionCache(max_size=1000)
 
 # Reduce time budget
 result = selector.select(
-    query=query,
-    context={'time_budget_ms': 2000}
+ query=query,
+ context={'time_budget_ms': 2000}
 )
 
 # Check system load
@@ -1465,51 +1463,51 @@ print(metrics)
 
 ```python
 def apply_reasoning(
-    query: str,
-    query_type: Optional[str] = None,
-    context: Optional[Dict] = None,
-    mode: str = 'balanced',
-    complexity: Optional[float] = None,
-    **kwargs
+ query: str,
+ query_type: Optional[str] = None,
+ context: Optional[Dict] = None,
+ mode: str = 'balanced',
+ complexity: Optional[float] = None,
+ **kwargs
 ) -> ReasoningResult:
-    """
-    Main entry point for reasoning.
-    
-    Args:
-        query: The query string
-        query_type: Optional reasoning type hint
-        context: Additional context
-        mode: Selection mode ('fast', 'balanced', 'accurate')
-        complexity: Query complexity (0-1)
-        
-    Returns:
-        ReasoningResult with conclusion, confidence, explanation
-    """
+ """
+ Main entry point for reasoning.
+ 
+ Args:
+ query: The query string
+ query_type: Optional reasoning type hint
+ context: Additional context
+ mode: Selection mode ('fast', 'balanced', 'accurate')
+ complexity: Query complexity (0-1)
+ 
+ Returns:
+ ReasoningResult with conclusion, confidence, explanation
+ """
 ```
 
 #### run_portfolio_reasoning()
 
 ```python
 def run_portfolio_reasoning(
-    query: str,
-    tools: List[str],
-    strategy: str = 'parallel',
-    min_confidence: float = 0.5,
-    timeout: float = 30.0
+ query: str,
+ tools: List[str],
+ strategy: str = 'parallel',
+ min_confidence: float = 0.5,
+ timeout: float = 30.0
 ) -> PortfolioResult:
-    """
-    Execute multiple reasoning tools and combine results.
-    
-    Args:
-        query: The query string
-        tools: List of tool names to use
-        strategy: Execution strategy
-        min_confidence: Minimum acceptable confidence
-        timeout: Maximum execution time
-        
-    Returns:
-        PortfolioResult with ensemble result
-    """
+ """
+ Execute multiple reasoning tools and combine results.
+ 
+ Args:
+ query: The query string
+ tools: List of tool names to use
+ strategy: Execution strategy
+ min_confidence: Minimum acceptable confidence
+ timeout: Maximum execution time
+ 
+ Returns:
+ PortfolioResult with ensemble result
+ """
 ```
 
 ### Classes
@@ -1518,21 +1516,21 @@ def run_portfolio_reasoning(
 
 ```python
 class ToolSelector:
-    def __init__(
-        self,
-        config: Optional[Dict] = None,
-        enable_semantic_matching: bool = True,
-        enable_safety: bool = True
-    ):
-        """Initialize tool selector"""
-        
-    def select(
-        self,
-        query: str,
-        context: Optional[Dict] = None,
-        mode: SelectionMode = SelectionMode.BALANCED
-    ) -> SelectionResult:
-        """Select best tools for query"""
+ def __init__(
+ self,
+ config: Optional[Dict] = None,
+ enable_semantic_matching: bool = True,
+ enable_safety: bool = True
+ ):
+ """Initialize tool selector"""
+ 
+ def select(
+ self,
+ query: str,
+ context: Optional[Dict] = None,
+ mode: SelectionMode = SelectionMode.BALANCED
+ ) -> SelectionResult:
+ """Select best tools for query"""
 ```
 
 #### ReasoningResult
@@ -1540,19 +1538,18 @@ class ToolSelector:
 ```python
 @dataclass
 class ReasoningResult:
-    conclusion: str
-    confidence: float
-    reasoning_type: str
-    explanation: str
-    reasoning_chain: List[ReasoningStep]
-    metadata: Dict[str, Any]
-    safety_checks: List[SafetyCheck]
+ conclusion: str
+ confidence: float
+ reasoning_type: str
+ explanation: str
+ reasoning_chain: List[ReasoningStep]
+ metadata: Dict[str, Any]
+ safety_checks: List[SafetyCheck]
 ```
 
 ---
 
 ## Appendix
-
 
 ### Recent Bug Fixes and Improvements (January 2026)
 
@@ -1584,7 +1581,7 @@ result = reasoner.reason("Every engineer reviewed a document")
 from vulcan.reasoning import ProbabilisticReasoner
 
 reasoner = ProbabilisticReasoner()
-reasoner.reset_state(seed=42)  # Deterministic results
+reasoner.reset_state(seed=42) # Deterministic results
 result = reasoner.reason(query)
 ```
 
@@ -1619,8 +1616,8 @@ result = compute_crypto("Calculate SHA-256 of 'Hello, World!'")
 
 ```python
 # Constants in tool_selector.py:
-UNVERIFIED_QUALITY_PENALTY = 0.7  # Reduce to 70% of claimed confidence
-FALLBACK_QUALITY_PENALTY = 0.3   # Reduce fallback rewards to 30%
+UNVERIFIED_QUALITY_PENALTY = 0.7 # Reduce to 70% of claimed confidence
+FALLBACK_QUALITY_PENALTY = 0.3 # Reduce fallback rewards to 30%
 ```
 
 #### BUG #7: Fallback Reporting Lies
@@ -1653,7 +1650,6 @@ FALLBACK_QUALITY_PENALTY = 0.3   # Reduce fallback rewards to 30%
 # "Discuss welfare ethics" → philosophical
 ```
 
-
 ### Glossary
 
 - **Reasoning Engine:** Specialized module for a particular type of reasoning (causal, symbolic, etc.)
@@ -1673,8 +1669,8 @@ See `LICENSE.txt` for complete terms.
 
 ---
 
-**Maintainers:** Brian Anderson  
-**Last Updated:** January 2026  
+**Maintainers:** Brian Anderson 
+**Last Updated:** January 2026 
 **Version:** 1.1.0
 
 ---

@@ -1,6 +1,6 @@
 # Ultra Deep Dive Examination of Vulcan's Internal LLM
 
-**Version:** 3.0.0  
+**Version:** 3.0.0 
 **Last Updated:** December 30, 2024
 
 This document provides an ultra deep dive examination into the VulcanAMI platform's internal Large Language Model (LLM) architecture, covering all components from the low-level IR representation to the high-level cognitive reasoning systems. This is an exhaustive technical reference for developers, researchers, and operators.
@@ -12,37 +12,37 @@ This document provides an ultra deep dive examination into the VulcanAMI platfor
 1. [Executive Summary](#1-executive-summary)
 2. [Architecture Overview](#2-architecture-overview)
 3. [Core LLM Components](#3-core-llm-components)
-   - [3.1 GraphixTransformer](#31-graphixtransformer)
-   - [3.2 IR (Intermediate Representation) System](#32-ir-intermediate-representation-system)
-   - [3.3 GraphixExecutor - Production IR Engine](#33-graphixexecutor---production-ir-engine)
-   - [3.4 Local GPT Provider](#34-local-gpt-provider)
-   - [3.5 GPT Training Model](#35-gpt-training-model)
+ - [3.1 GraphixTransformer](#31-graphixtransformer)
+ - [3.2 IR (Intermediate Representation) System](#32-ir-intermediate-representation-system)
+ - [3.3 GraphixExecutor - Production IR Engine](#33-graphixexecutor---production-ir-engine)
+ - [3.4 Local GPT Provider](#34-local-gpt-provider)
+ - [3.5 GPT Training Model](#35-gpt-training-model)
 4. [Attention Mechanisms](#4-attention-mechanisms)
 5. [Feed-Forward Networks](#5-feed-forward-networks)
 6. [Normalization Layers](#6-normalization-layers)
 7. [Embedding System](#7-embedding-system)
 8. [Persistent Context Management](#8-persistent-context-management)
 9. [Memory Architecture](#9-memory-architecture)
-   - [9.1 Hierarchical Memory System](#91-hierarchical-memory-system)
-   - [9.2 Persistent Memory with ZK Proofs](#92-persistent-memory-with-zk-proofs)
-   - [9.3 Tool Selection Memory](#93-tool-selection-memory)
+ - [9.1 Hierarchical Memory System](#91-hierarchical-memory-system)
+ - [9.2 Persistent Memory with ZK Proofs](#92-persistent-memory-with-zk-proofs)
+ - [9.3 Tool Selection Memory](#93-tool-selection-memory)
 10. [Reasoning Systems](#10-reasoning-systems)
-    - [10.1 Unified Reasoning Interface](#101-unified-reasoning-interface)
-    - [10.2 Reasoning Types](#102-reasoning-types)
-    - [10.3 Mathematical Verification](#103-mathematical-verification)
+ - [10.1 Unified Reasoning Interface](#101-unified-reasoning-interface)
+ - [10.2 Reasoning Types](#102-reasoning-types)
+ - [10.3 Mathematical Verification](#103-mathematical-verification)
 11. [World Model Integration](#11-world-model-integration)
-    - [11.1 Core Components](#111-core-components)
-    - [11.2 Meta-Reasoning](#112-meta-reasoning)
+ - [11.1 Core Components](#111-core-components)
+ - [11.2 Meta-Reasoning](#112-meta-reasoning)
 12. [Training Infrastructure](#12-training-infrastructure)
-    - [12.1 Governed Trainer](#121-governed-trainer)
-    - [12.2 Continual Learning](#122-continual-learning)
-    - [12.3 Meta-Learning](#123-meta-learning)
-    - [12.4 RLHF Integration](#124-rlhf-integration)
+ - [12.1 Governed Trainer](#121-governed-trainer)
+ - [12.2 Continual Learning](#122-continual-learning)
+ - [12.3 Meta-Learning](#123-meta-learning)
+ - [12.4 RLHF Integration](#124-rlhf-integration)
 13. [Tool Selection System](#13-tool-selection-system)
-    - [13.1 Production Tool Selector](#131-production-tool-selector)
-    - [13.2 Cost Model](#132-cost-model)
-    - [13.3 Utility Model](#133-utility-model)
-    - [13.4 Safety Governor](#134-safety-governor)
+ - [13.1 Production Tool Selector](#131-production-tool-selector)
+ - [13.2 Cost Model](#132-cost-model)
+ - [13.3 Utility Model](#133-utility-model)
+ - [13.4 Safety Governor](#134-safety-governor)
 14. [Unified Generation System](#14-unified-generation-system)
 15. [Graph Compiler Infrastructure](#15-graph-compiler-infrastructure)
 16. [Self-Improvement System](#16-self-improvement-system)
@@ -65,7 +65,7 @@ The Vulcan Internal LLM is a sophisticated, multi-layered language model archite
 - **RoPE Positional Encoding**: Rotary Position Embeddings for improved context handling
 - **Multi-Modal Reasoning**: 8+ reasoning types with unified orchestration
 - **Self-Improving World Model**: Autonomous improvement with safety constraints and kill switches
-- **Production-Ready RAG**: Hierarchical memory with GraphRAG, Merkle LSM compaction, and ZK proofs
+- ** RAG**: Hierarchical memory with GraphRAG, Merkle LSM compaction, and ZK proofs
 - **Mathematical Verification**: Bayesian calculation verification with learning integration
 - **Local GPT Provider**: Fine-tuned model serving with streaming, perplexity, and confidence calibration
 
@@ -93,48 +93,48 @@ The Vulcan Internal LLM is a sophisticated, multi-layered language model archite
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                    VULCAN INTERNAL LLM ARCHITECTURE                     │
+│ VULCAN INTERNAL LLM ARCHITECTURE │
 ├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │                    APPLICATION LAYER                             │   │
-│  │   Text Generation │ Reasoning │ Question Answering │ Analysis    │   │
-│  └───────────────────────────┬─────────────────────────────────────┘   │
-│                              │                                          │
-│  ┌───────────────────────────▼─────────────────────────────────────┐   │
-│  │                    UNIFIED REASONING LAYER                       │   │
-│  │  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌───────────┐  │   │
-│  │  │ Symbolic   │  │ Causal     │  │ Probabilis │  │ Analogical│  │   │
-│  │  │ Reasoning  │  │ Reasoning  │  │ tic        │  │ Reasoning │  │   │
-│  │  └────────────┘  └────────────┘  └────────────┘  └───────────┘  │   │
-│  └───────────────────────────┬─────────────────────────────────────┘   │
-│                              │                                          │
-│  ┌───────────────────────────▼─────────────────────────────────────┐   │
-│  │                    WORLD MODEL LAYER                             │   │
-│  │   Causal DAG │ Prediction Engine │ Intervention Manager          │   │
-│  │   Correlation Tracker │ Self-Improvement Drive                   │   │
-│  └───────────────────────────┬─────────────────────────────────────┘   │
-│                              │                                          │
-│  ┌───────────────────────────▼─────────────────────────────────────┐   │
-│  │                    GRAPHIX TRANSFORMER CORE                      │   │
-│  │  ┌────────────────────────────────────────────────────────────┐ │   │
-│  │  │  Token Embeddings (RoPE) → Transformer Layers (N layers)   │ │   │
-│  │  │  → Layer Norm → Output Projection → Token Prediction       │ │   │
-│  │  └────────────────────────────────────────────────────────────┘ │   │
-│  └───────────────────────────┬─────────────────────────────────────┘   │
-│                              │                                          │
-│  ┌───────────────────────────▼─────────────────────────────────────┐   │
-│  │                    IR EXECUTION ENGINE                           │   │
-│  │   IR Attention │ IR FeedForward │ IR LayerNorm │ IR Embeddings   │   │
-│  │   KV Cache │ Sparse Patterns │ Hybrid Attention │ MoE Gating    │   │
-│  └───────────────────────────┬─────────────────────────────────────┘   │
-│                              │                                          │
-│  ┌───────────────────────────▼─────────────────────────────────────┐   │
-│  │                    MEMORY & CONTEXT LAYER                        │   │
-│  │   Persistent Context │ Graph RAG │ Hierarchical Memory           │   │
-│  │   Embedding Cache │ Relevance Scoring │ Compression              │   │
-│  └─────────────────────────────────────────────────────────────────┘   │
-│                                                                         │
+│ │
+│ ┌─────────────────────────────────────────────────────────────────┐ │
+│ │ APPLICATION LAYER │ │
+│ │ Text Generation │ Reasoning │ Question Answering │ Analysis │ │
+│ └───────────────────────────┬─────────────────────────────────────┘ │
+│ │ │
+│ ┌───────────────────────────▼─────────────────────────────────────┐ │
+│ │ UNIFIED REASONING LAYER │ │
+│ │ ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌───────────┐ │ │
+│ │ │ Symbolic │ │ Causal │ │ Probabilis │ │ Analogical│ │ │
+│ │ │ Reasoning │ │ Reasoning │ │ tic │ │ Reasoning │ │ │
+│ │ └────────────┘ └────────────┘ └────────────┘ └───────────┘ │ │
+│ └───────────────────────────┬─────────────────────────────────────┘ │
+│ │ │
+│ ┌───────────────────────────▼─────────────────────────────────────┐ │
+│ │ WORLD MODEL LAYER │ │
+│ │ Causal DAG │ Prediction Engine │ Intervention Manager │ │
+│ │ Correlation Tracker │ Self-Improvement Drive │ │
+│ └───────────────────────────┬─────────────────────────────────────┘ │
+│ │ │
+│ ┌───────────────────────────▼─────────────────────────────────────┐ │
+│ │ GRAPHIX TRANSFORMER CORE │ │
+│ │ ┌────────────────────────────────────────────────────────────┐ │ │
+│ │ │ Token Embeddings (RoPE) → Transformer Layers (N layers) │ │ │
+│ │ │ → Layer Norm → Output Projection → Token Prediction │ │ │
+│ │ └────────────────────────────────────────────────────────────┘ │ │
+│ └───────────────────────────┬─────────────────────────────────────┘ │
+│ │ │
+│ ┌───────────────────────────▼─────────────────────────────────────┐ │
+│ │ IR EXECUTION ENGINE │ │
+│ │ IR Attention │ IR FeedForward │ IR LayerNorm │ IR Embeddings │ │
+│ │ KV Cache │ Sparse Patterns │ Hybrid Attention │ MoE Gating │ │
+│ └───────────────────────────┬─────────────────────────────────────┘ │
+│ │ │
+│ ┌───────────────────────────▼─────────────────────────────────────┐ │
+│ │ MEMORY & CONTEXT LAYER │ │
+│ │ Persistent Context │ Graph RAG │ Hierarchical Memory │ │
+│ │ Embedding Cache │ Relevance Scoring │ Compression │ │
+│ └─────────────────────────────────────────────────────────────────┘ │
+│ │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -146,40 +146,40 @@ The Vulcan Internal LLM is a sophisticated, multi-layered language model archite
 
 **Location:** `graphix_vulcan_llm.py` (root level)
 
-The GraphixVulcanLLM is the **main entry point** and orchestrator for the entire Vulcan LLM system. It integrates all components into a unified, production-ready interface.
+The GraphixVulcanLLM is the **main entry point** and orchestrator for the entire Vulcan LLM system. It integrates all components into a unified interface.
 
 #### Architecture:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    GRAPHIX VULCAN LLM                            │
+│ GRAPHIX VULCAN LLM │
 ├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  Application API                                                │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │ generate() │ stream() │ generate_async() │ generate_text()│  │
-│  │ train() │ fine_tune_step() │ self_improve()              │  │
-│  └──────────────────────────────────────────────────────────┘  │
-│                              │                                  │
-│  ┌───────────────────────────▼───────────────────────────────┐ │
-│  │                COGNITIVE LOOP                              │ │
-│  │  Prompt → Encode → Generate → Safety → Consensus → Output  │ │
-│  └───────────────────────────┬───────────────────────────────┘ │
-│                              │                                  │
-│  ┌──────────────┬────────────┼────────────┬──────────────────┐ │
-│  │              │            │            │                   │ │
-│  ▼              ▼            ▼            ▼                   │ │
-│  GraphixTransformer  GraphixVulcanBridge  SafeGeneration      │ │
-│  (Model Core)        (World Model)        (Safety)            │ │
-│  │              │            │            │                   │ │
-│  ▼              ▼            ▼            ▼                   │ │
-│  LanguageReasoning   HierarchicalContext  EnhancedValidator   │ │
-│  (Generation)        (Memory)             (Validation)        │ │
-│                                                                │ │
-│  ┌───────────────────────────────────────────────────────────┐ │
-│  │ UTILITIES: Cache │ Monitor │ Explainer │ Self-Improvement │ │
-│  └───────────────────────────────────────────────────────────┘ │
-│                                                                 │
+│ │
+│ Application API │
+│ ┌──────────────────────────────────────────────────────────┐ │
+│ │ generate() │ stream() │ generate_async() │ generate_text()│ │
+│ │ train() │ fine_tune_step() │ self_improve() │ │
+│ └──────────────────────────────────────────────────────────┘ │
+│ │ │
+│ ┌───────────────────────────▼───────────────────────────────┐ │
+│ │ COGNITIVE LOOP │ │
+│ │ Prompt → Encode → Generate → Safety → Consensus → Output │ │
+│ └───────────────────────────┬───────────────────────────────┘ │
+│ │ │
+│ ┌──────────────┬────────────┼────────────┬──────────────────┐ │
+│ │ │ │ │ │ │
+│ ▼ ▼ ▼ ▼ │ │
+│ GraphixTransformer GraphixVulcanBridge SafeGeneration │ │
+│ (Model Core) (World Model) (Safety) │ │
+│ │ │ │ │ │ │
+│ ▼ ▼ ▼ ▼ │ │
+│ LanguageReasoning HierarchicalContext EnhancedValidator │ │
+│ (Generation) (Memory) (Validation) │ │
+│ │ │
+│ ┌───────────────────────────────────────────────────────────┐ │
+│ │ UTILITIES: Cache │ Monitor │ Explainer │ Self-Improvement │ │
+│ └───────────────────────────────────────────────────────────┘ │
+│ │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -203,37 +203,37 @@ The GraphixVulcanLLM is the **main entry point** and orchestrator for the entire
 
 ```python
 default_config = {
-    "transformer": GraphixTransformerConfig(
-        num_layers=6,
-        hidden_size=512,
-        num_heads=8,
-        vocab_size=50257,
-        max_position_embeddings=2048,
-        dropout=0.1,
-    ),
-    "generation": {
-        "max_tokens": 2000,
-        "temperature": 0.7,
-        "top_k": 50,
-        "top_p": 0.9,
-        "repetition_penalty": 1.0,
-        "enable_streaming": True,
-    },
-    "safety": {
-        "mode": "first_safe",
-        "enable_validation": True,
-        "max_retries": 3,
-    },
-    "training": {
-        "max_grad_norm": 5.0,
-        "learning_rate": 1e-4,
-        "batch_size": 8,
-    },
-    "performance": {
-        "enable_caching": True,
-        "cache_size_mb": 512,
-        "enable_batching": True,
-    },
+ "transformer": GraphixTransformerConfig(
+ num_layers=6,
+ hidden_size=512,
+ num_heads=8,
+ vocab_size=50257,
+ max_position_embeddings=2048,
+ dropout=0.1,
+ ),
+ "generation": {
+ "max_tokens": 2000,
+ "temperature": 0.7,
+ "top_k": 50,
+ "top_p": 0.9,
+ "repetition_penalty": 1.0,
+ "enable_streaming": True,
+ },
+ "safety": {
+ "mode": "first_safe",
+ "enable_validation": True,
+ "max_retries": 3,
+ },
+ "training": {
+ "max_grad_norm": 5.0,
+ "learning_rate": 1e-4,
+ "batch_size": 8,
+ },
+ "performance": {
+ "enable_caching": True,
+ "cache_size_mb": 512,
+ "enable_batching": True,
+ },
 }
 ```
 
@@ -242,15 +242,15 @@ default_config = {
 ```python
 # Basic generation
 result = llm.generate(
-    prompt="Hello, world!",
-    max_tokens=100,
-    explain=True,
-    use_cache=True,
+ prompt="Hello, world!",
+ max_tokens=100,
+ explain=True,
+ use_cache=True,
 )
 
 # Streaming generation
 for token in llm.stream(prompt, max_tokens=100, callback=my_callback):
-    print(token, end="")
+ print(token, end="")
 
 # Async generation
 result = await llm.generate_async(prompt, max_tokens=100)
@@ -264,15 +264,15 @@ tokens = llm.quick_generate(prompt, max_tokens=32)
 ```python
 @dataclass
 class GenerationResult:
-    tokens: List[int]              # Generated token IDs
-    text: str                      # Decoded text
-    reasoning_trace: List[Dict]    # Step-by-step reasoning
-    safety_events: List[Dict]      # Safety interventions
-    explanation: Optional[Dict]    # Explainability data
-    metrics: Dict[str, Any]        # Performance metrics
-    stopped_reason: str            # Why generation stopped
-    duration_seconds: float        # Total time
-    metadata: Dict[str, Any]       # Additional data
+ tokens: List[int] # Generated token IDs
+ text: str # Decoded text
+ reasoning_trace: List[Dict] # Step-by-step reasoning
+ safety_events: List[Dict] # Safety interventions
+ explanation: Optional[Dict] # Explainability data
+ metrics: Dict[str, Any] # Performance metrics
+ stopped_reason: str # Why generation stopped
+ duration_seconds: float # Total time
+ metadata: Dict[str, Any] # Additional data
 ```
 
 #### Training API:
@@ -292,30 +292,30 @@ improvement = llm.self_improve(context)
 
 ```python
 class PerformanceMonitor:
-    """Tracks system performance metrics."""
-    
-    # Metrics tracked:
-    # - total_tokens
-    # - total_duration
-    # - generation_count
-    # - error_count
-    # - cache_hits / cache_misses
-    # - avg_tokens_per_generation
-    # - overall_throughput_tokens_per_sec
-    # - error_rate
+ """Tracks system performance metrics."""
+ 
+ # Metrics tracked:
+ # - total_tokens
+ # - total_duration
+ # - generation_count
+ # - error_count
+ # - cache_hits / cache_misses
+ # - avg_tokens_per_generation
+ # - overall_throughput_tokens_per_sec
+ # - error_rate
 ```
 
 #### Cache Management:
 
 ```python
 class CacheManager:
-    """LRU cache for generation results."""
-    
-    # Features:
-    # - LRU eviction policy
-    # - Thread-safe operations
-    # - Configurable max_size
-    # - Key includes prompt + generation params
+ """LRU cache for generation results."""
+ 
+ # Features:
+ # - LRU eviction policy
+ # - Thread-safe operations
+ # - Configurable max_size
+ # - Key includes prompt + generation params
 ```
 
 #### Async Generator Handling (Critical Fix):
@@ -324,26 +324,26 @@ The v2.0.2 release includes a critical fix for handling async generators from Co
 
 ```python
 def generate(self, prompt, ...):
-    # CognitiveLoop.generate() may return:
-    # 1. Direct result object (has .tokens attribute)
-    # 2. Coroutine (needs await)
-    # 3. Async generator (needs iteration)
-    
-    gen_result = self.cog_loop.generate(prompt, ...)
-    
-    # Detect and handle each case:
-    if inspect.iscoroutine(gen_result):
-        loop_result = loop.run_until_complete(gen_result)
-        # May return async generator after await!
-        if hasattr(loop_result, "__anext__"):
-            # Consume nested async generator
-            loop_result = loop.run_until_complete(consume_nested_generator())
-    elif hasattr(gen_result, "__anext__"):
-        # Direct async generator
-        loop_result = loop.run_until_complete(consume_generator())
-    else:
-        # Direct result
-        loop_result = gen_result
+ # CognitiveLoop.generate() may return:
+ # 1. Direct result object (has .tokens attribute)
+ # 2. Coroutine (needs await)
+ # 3. Async generator (needs iteration)
+ 
+ gen_result = self.cog_loop.generate(prompt, ...)
+ 
+ # Detect and handle each case:
+ if inspect.iscoroutine(gen_result):
+ loop_result = loop.run_until_complete(gen_result)
+ # May return async generator after await!
+ if hasattr(loop_result, "__anext__"):
+ # Consume nested async generator
+ loop_result = loop.run_until_complete(consume_nested_generator())
+ elif hasattr(gen_result, "__anext__"):
+ # Direct async generator
+ loop_result = loop.run_until_complete(consume_generator())
+ else:
+ # Direct result
+ loop_result = gen_result
 ```
 
 ### 3.1 GraphixTransformer
@@ -364,18 +364,18 @@ The GraphixTransformer is the main transformer model class that orchestrates all
 ```python
 @dataclass
 class GraphixTransformerConfig:
-    num_layers: int = 6              # Number of transformer layers
-    hidden_size: int = 256           # Hidden dimension size
-    num_heads: int = 4               # Number of attention heads
-    vocab_size: int = 4096           # Vocabulary size
-    max_position_embeddings: int = 1024  # Maximum sequence length
-    dropout: float = 0.1             # Dropout probability
-    layer_norm_eps: float = 1e-5     # Layer norm epsilon
-    seed: Optional[int] = 1234       # Random seed
-    gradient_checkpointing: bool = False  # Memory optimization
-    dtype: str = "float32"           # Data type
-    lora_rank: int = 0               # LoRA rank (0 = disabled)
-    lora_alpha: float = 1.0          # LoRA scaling factor
+ num_layers: int = 6 # Number of transformer layers
+ hidden_size: int = 256 # Hidden dimension size
+ num_heads: int = 4 # Number of attention heads
+ vocab_size: int = 4096 # Vocabulary size
+ max_position_embeddings: int = 1024 # Maximum sequence length
+ dropout: float = 0.1 # Dropout probability
+ layer_norm_eps: float = 1e-5 # Layer norm epsilon
+ seed: Optional[int] = 1234 # Random seed
+ gradient_checkpointing: bool = False # Memory optimization
+ dtype: str = "float32" # Data type
+ lora_rank: int = 0 # LoRA rank (0 = disabled)
+ lora_alpha: float = 1.0 # LoRA scaling factor
 ```
 
 #### Core Methods:
@@ -490,30 +490,30 @@ The GraphixExecutor is the production-grade IR execution engine with comprehensi
 
 ```python
 class KVCacheManager:
-    """Manages KV cache with eviction policies."""
-    
-    # Eviction Policies:
-    # - LRU: Least Recently Used (default)
-    # - LFU: Least Frequently Used
-    # - FIFO: First In First Out
-    # - ADAPTIVE: Weighted recency + frequency
-    
-    def get(self, layer_idx, head_idx, position) -> Optional[KVCacheEntry]
-    def put(self, layer_idx, head_idx, position, keys, values) -> None
-    def get_stats(self) -> Dict[str, Any]
+ """Manages KV cache with eviction policies."""
+ 
+ # Eviction Policies:
+ # - LRU: Least Recently Used (default)
+ # - LFU: Least Frequently Used
+ # - FIFO: First In First Out
+ # - ADAPTIVE: Weighted recency + frequency
+ 
+ def get(self, layer_idx, head_idx, position) -> Optional[KVCacheEntry]
+ def put(self, layer_idx, head_idx, position, keys, values) -> None
+ def get_stats(self) -> Dict[str, Any]
 ```
 
 #### Quantization Support:
 
 ```python
 class QuantizationManager:
-    """Manages quantization and dequantization."""
-    
-    def quantize(tensor, key) -> Tuple[List[int], float, float]:
-        """Quantize tensor to INT8 with scale/zero-point."""
-        
-    def dequantize(quantized, scale, zero_point) -> List[float]:
-        """Dequantize back to float."""
+ """Manages quantization and dequantization."""
+ 
+ def quantize(tensor, key) -> Tuple[List[int], float, float]:
+ """Quantize tensor to INT8 with scale/zero-point."""
+ 
+ def dequantize(quantized, scale, zero_point) -> List[float]:
+ """Dequantize back to float."""
 ```
 
 #### Performance Instrumentation:
@@ -522,21 +522,21 @@ class QuantizationManager:
 # Decorator for timing operations
 @timed_operation("GraphixExecutor.execute")
 def execute(self, graph_ir, inputs):
-    ...
+ ...
 
 # Global performance stats
 _PERF_STATS = {
-    "operation_name": {
-        "count": 0,
-        "total_ms": 0.0,
-        "min_ms": float("inf"),
-        "max_ms": 0.0
-    }
+ "operation_name": {
+ "count": 0,
+ "total_ms": 0.0,
+ "min_ms": float("inf"),
+ "max_ms": 0.0
+ }
 }
 
 # Performance summary
 def log_performance_summary():
-    """Log hottest operations sorted by total time."""
+ """Log hottest operations sorted by total time."""
 ```
 
 #### Executor Configuration:
@@ -544,53 +544,53 @@ def log_performance_summary():
 ```python
 @dataclass
 class ExecutorConfig:
-    mode: ExecutionMode = ExecutionMode.INFERENCE
-    precision: PrecisionMode = PrecisionMode.FP32
-    attention_impl: AttentionImpl = AttentionImpl.FLASH
-    use_flash_attention: bool = True
-    use_kernel_fusion: bool = True
-    use_kv_cache: bool = True
-    kv_cache_size: int = 2048
-    kv_cache_eviction: CacheEvictionPolicy = CacheEvictionPolicy.LRU
-    max_batch_size: int = 32
-    gradient_checkpointing: bool = False
-    enable_profiling: bool = False
-    enable_audit: bool = True
-    use_quantization: bool = False
-    quantization_bits: int = 8
-    compile_graphs: bool = True
-    optimize_memory: bool = True
+ mode: ExecutionMode = ExecutionMode.INFERENCE
+ precision: PrecisionMode = PrecisionMode.FP32
+ attention_impl: AttentionImpl = AttentionImpl.FLASH
+ use_flash_attention: bool = True
+ use_kernel_fusion: bool = True
+ use_kv_cache: bool = True
+ kv_cache_size: int = 2048
+ kv_cache_eviction: CacheEvictionPolicy = CacheEvictionPolicy.LRU
+ max_batch_size: int = 32
+ gradient_checkpointing: bool = False
+ enable_profiling: bool = False
+ enable_audit: bool = True
+ use_quantization: bool = False
+ quantization_bits: int = 8
+ compile_graphs: bool = True
+ optimize_memory: bool = True
 ```
 
 #### Execution Pipeline:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    GRAPHIX EXECUTOR PIPELINE                    │
+│ GRAPHIX EXECUTOR PIPELINE │
 ├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  Inputs ──► Audit Log ──► Stage 1: Embeddings                   │
-│                               │                                 │
-│                               ▼                                 │
-│                      Stage 2: Transformer Layers (Loop)         │
-│                         ┌─────────────────────────────┐         │
-│                         │ Pre-LN ──► Attention        │         │
-│                         │    │         │              │         │
-│                         │    │    KV Cache Lookup     │         │
-│                         │    │         │              │         │
-│                         │    └──► Residual            │         │
-│                         │              │              │         │
-│                         │ Pre-LN ──► FFN (SwiGLU)     │         │
-│                         │    │         │              │         │
-│                         │    └──► Residual ─────────►│         │
-│                         └─────────────────────────────┘         │
-│                               │                                 │
-│                               ▼                                 │
-│                      Stage 3: Final Layer Norm                  │
-│                               │                                 │
-│                               ▼                                 │
-│                      Metrics Update ──► Result                  │
-│                                                                 │
+│ │
+│ Inputs ──► Audit Log ──► Stage 1: Embeddings │
+│ │ │
+│ ▼ │
+│ Stage 2: Transformer Layers (Loop) │
+│ ┌─────────────────────────────┐ │
+│ │ Pre-LN ──► Attention │ │
+│ │ │ │ │ │
+│ │ │ KV Cache Lookup │ │
+│ │ │ │ │ │
+│ │ └──► Residual │ │
+│ │ │ │ │
+│ │ Pre-LN ──► FFN (SwiGLU) │ │
+│ │ │ │ │ │
+│ │ └──► Residual ─────────►│ │
+│ └─────────────────────────────┘ │
+│ │ │
+│ ▼ │
+│ Stage 3: Final Layer Norm │
+│ │ │
+│ ▼ │
+│ Metrics Update ──► Result │
+│ │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -605,23 +605,23 @@ The LocalGPTProvider serves fine-tuned GPT models with production features:
 ```python
 @dataclass
 class ProviderInitConfig:
-    model_path: str              # Path to llm_best_model.pt
-    vocab_path: str              # Path to vocab.json
-    device: str = "cpu"          # cpu, cuda, cuda:0, etc.
-    seq_len: int = 256           # Maximum sequence length
-    dim: int = 384               # Model dimension
-    n_layers: int = 6            # Number of layers
-    n_heads: int = 8             # Number of attention heads
-    ff_mult: int = 4             # FFN expansion factor
-    dropout: float = 0.0         # Dropout rate
-    dtype: str = "float32"       # float32, float16, bfloat16
-    use_autocast: bool = False   # Enable automatic mixed precision
-    calibration_path: Optional[str] = None  # Confidence calibration
-    temperature: float = 0.9     # Sampling temperature
-    top_k: int = 64              # Top-K sampling
-    top_p: float = 0.95          # Nucleus sampling
-    repetition_penalty: float = 1.05  # Repetition penalty
-    eos_token: Optional[str] = None   # End of sequence token
+ model_path: str # Path to llm_best_model.pt
+ vocab_path: str # Path to vocab.json
+ device: str = "cpu" # cpu, cuda, cuda:0, etc.
+ seq_len: int = 256 # Maximum sequence length
+ dim: int = 384 # Model dimension
+ n_layers: int = 6 # Number of layers
+ n_heads: int = 8 # Number of attention heads
+ ff_mult: int = 4 # FFN expansion factor
+ dropout: float = 0.0 # Dropout rate
+ dtype: str = "float32" # float32, float16, bfloat16
+ use_autocast: bool = False # Enable automatic mixed precision
+ calibration_path: Optional[str] = None # Confidence calibration
+ temperature: float = 0.9 # Sampling temperature
+ top_k: int = 64 # Top-K sampling
+ top_p: float = 0.95 # Nucleus sampling
+ repetition_penalty: float = 1.05 # Repetition penalty
+ eos_token: Optional[str] = None # End of sequence token
 ```
 
 #### API Methods:
@@ -638,34 +638,34 @@ class ProviderInitConfig:
 
 ```python
 class OptionalCalibrator:
-    """Remaps model confidences for better calibration."""
-    
-    # Supported calibration types:
-    # - kind="scale": p' = scale * p + bias
-    # - kind="temperature": p' = sigmoid(logit(p) / T)
-    # - kind="isotonic": Piecewise linear mapping (future)
-    
-    def calibrate_prob(self, p: float) -> float:
-        """Apply calibration to probability."""
+ """Remaps model confidences for better calibration."""
+ 
+ # Supported calibration types:
+ # - kind="scale": p' = scale * p + bias
+ # - kind="temperature": p' = sigmoid(logit(p) / T)
+ # - kind="isotonic": Piecewise linear mapping (future)
+ 
+ def calibrate_prob(self, p: float) -> float:
+ """Apply calibration to probability."""
 ```
 
 #### Streaming Generation:
 
 ```python
 def generate_stream(
-    self,
-    prompt: str,
-    max_new_tokens: int = 128,
-    chunk_size: int = 1,
+ self,
+ prompt: str,
+ max_new_tokens: int = 128,
+ chunk_size: int = 1,
 ) -> Generator[Tuple[str, Dict[str, Any]], None, None]:
-    """
-    Yields (partial_text, meta) every chunk_size new tokens.
-    
-    Meta includes:
-    - new_ids: Newly generated token IDs
-    - total_len: Total sequence length
-    - emitted: Total tokens emitted
-    """
+ """
+ Yields (partial_text, meta) every chunk_size new tokens.
+ 
+ Meta includes:
+ - new_ids: Newly generated token IDs
+ - total_len: Total sequence length
+ - emitted: Total tokens emitted
+ """
 ```
 
 ### 3.5 GPT Training Model
@@ -678,36 +678,36 @@ A patched minimal causal Transformer (GPT-like) for token-level language modelin
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    GPT MODEL ARCHITECTURE                        │
+│ GPT MODEL ARCHITECTURE │
 ├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  Token IDs ──► Token Embedding ──► Positional Embedding         │
-│                                           │                     │
-│                                           ▼                     │
-│                                      Dropout                    │
-│                                           │                     │
-│                     ┌─────────────────────┼─────────────────┐   │
-│                     │         N × Transformer Blocks         │   │
-│                     │  ┌──────────────────────────────────┐ │   │
-│                     │  │ Pre-LN ──► Multi-Head Self-Attn  │ │   │
-│                     │  │     (with causal mask caching)   │ │   │
-│                     │  │              + Residual          │ │   │
-│                     │  ├──────────────────────────────────┤ │   │
-│                     │  │ Pre-LN ──► FeedForward (GELU)    │ │   │
-│                     │  │              + Residual          │ │   │
-│                     │  └──────────────────────────────────┘ │   │
-│                     └───────────────────┬───────────────────┘   │
-│                                         │                       │
-│                                         ▼                       │
-│                                  Final LayerNorm                │
-│                                         │                       │
-│                                         ▼                       │
-│                              Output Projection (LM Head)        │
-│                                  (weight-tied)                  │
-│                                         │                       │
-│                                         ▼                       │
-│                                      Logits                     │
-│                                                                 │
+│ │
+│ Token IDs ──► Token Embedding ──► Positional Embedding │
+│ │ │
+│ ▼ │
+│ Dropout │
+│ │ │
+│ ┌─────────────────────┼─────────────────┐ │
+│ │ N × Transformer Blocks │ │
+│ │ ┌──────────────────────────────────┐ │ │
+│ │ │ Pre-LN ──► Multi-Head Self-Attn │ │ │
+│ │ │ (with causal mask caching) │ │ │
+│ │ │ + Residual │ │ │
+│ │ ├──────────────────────────────────┤ │ │
+│ │ │ Pre-LN ──► FeedForward (GELU) │ │ │
+│ │ │ + Residual │ │ │
+│ │ └──────────────────────────────────┘ │ │
+│ └───────────────────┬───────────────────┘ │
+│ │ │
+│ ▼ │
+│ Final LayerNorm │
+│ │ │
+│ ▼ │
+│ Output Projection (LM Head) │
+│ (weight-tied) │
+│ │ │
+│ ▼ │
+│ Logits │
+│ │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -716,22 +716,22 @@ A patched minimal causal Transformer (GPT-like) for token-level language modelin
 ```python
 @dataclass
 class GPTConfig:
-    vocab_size: int
-    seq_len: int
-    dim: int = 512
-    n_layers: int = 6
-    n_heads: int = 8
-    ff_mult: int = 4
-    dropout: float = 0.1
-    tied_embeddings: bool = True       # Weight tying
-    layer_norm_eps: float = 1e-5
-    device: str = "cuda" if torch.cuda.is_available() else "cpu"
-    
-    # Training options
-    loss_reduction: str = "mean"       # 'mean' or 'sum'
-    label_smoothing: float = 0.0       # Label smoothing coefficient
-    return_loss_dict: bool = False     # Return detailed loss metrics
-    enforce_safe_softmax: bool = True  # Guard against NaN in generation
+ vocab_size: int
+ seq_len: int
+ dim: int = 512
+ n_layers: int = 6
+ n_heads: int = 8
+ ff_mult: int = 4
+ dropout: float = 0.1
+ tied_embeddings: bool = True # Weight tying
+ layer_norm_eps: float = 1e-5
+ device: str = "cuda" if torch.cuda.is_available() else "cpu"
+ 
+ # Training options
+ loss_reduction: str = "mean" # 'mean' or 'sum'
+ label_smoothing: float = 0.0 # Label smoothing coefficient
+ return_loss_dict: bool = False # Return detailed loss metrics
+ enforce_safe_softmax: bool = True # Guard against NaN in generation
 ```
 
 #### Training Features:
@@ -759,23 +759,23 @@ class GPTConfig:
 ```python
 @torch.no_grad()
 def generate(
-    self,
-    start_ids: List[int],
-    max_new_tokens: int,
-    temperature: float = 1.0,
-    top_k: int = 50,
-    top_p: float = 0.95,
-    repetition_penalty: float = 1.1,
-    eos_id: Optional[int] = None,
-    greedy_threshold: float = 1e-8,
+ self,
+ start_ids: List[int],
+ max_new_tokens: int,
+ temperature: float = 1.0,
+ top_k: int = 50,
+ top_p: float = 0.95,
+ repetition_penalty: float = 1.1,
+ eos_id: Optional[int] = None,
+ greedy_threshold: float = 1e-8,
 ) -> List[int]:
-    """
-    Autoregressive token generation.
-    
-    - Context cropped to last config.seq_len tokens
-    - NaN-safe softmax with fallback to uniform
-    - Logarithmic repetition penalty
-    """
+ """
+ Autoregressive token generation.
+ 
+ - Context cropped to last config.seq_len tokens
+ - NaN-safe softmax with fallback to uniform
+ - Logarithmic repetition penalty
+ """
 ```
 
 #### Stable Initialization (GPT-2 Style):
@@ -806,27 +806,27 @@ The attention system implements a sophisticated hybrid attention mechanism:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    ATTENTION MECHANISM                          │
+│ ATTENTION MECHANISM │
 ├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  Input ──► Q Projection ──┐                                     │
-│                           ▼                                     │
-│  Input ──► K Projection ──► Hybrid Attention ──► Softmax        │
-│                           ▲       │                  │          │
-│  Input ──► V Projection ──┘       │                  │          │
-│                                   │                  │          │
-│                                   ▼                  ▼          │
-│                           KV Cache          Attention Dropout   │
-│                                                      │          │
-│                                                      ▼          │
-│                                              Weighted Values    │
-│                                                      │          │
-│                                                      ▼          │
-│                                              Spike Gate         │
-│                                                      │          │
-│                                                      ▼          │
-│                                              Output Projection  │
-│                                                                 │
+│ │
+│ Input ──► Q Projection ──┐ │
+│ ▼ │
+│ Input ──► K Projection ──► Hybrid Attention ──► Softmax │
+│ ▲ │ │ │
+│ Input ──► V Projection ──┘ │ │ │
+│ │ │ │
+│ ▼ ▼ │
+│ KV Cache Attention Dropout │
+│ │ │
+│ ▼ │
+│ Weighted Values │
+│ │ │
+│ ▼ │
+│ Spike Gate │
+│ │ │
+│ ▼ │
+│ Output Projection │
+│ │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -865,20 +865,20 @@ The attention system implements a sophisticated hybrid attention mechanism:
 
 ```json
 {
-  "type": "attention_subgraph",
-  "params": {
-    "num_heads": 4,
-    "hidden_size": 256,
-    "num_kv_heads": null,
-    "causal_masking": true,
-    "sparse": "windowed",
-    "window_size": 128
-  },
-  "metadata": {
-    "semantic": "hybrid_grouped_attention",
-    "inference": "kv_cache_supported",
-    "sampling": {"type": "top_p", "p": 0.9}
-  }
+ "type": "attention_subgraph",
+ "params": {
+ "num_heads": 4,
+ "hidden_size": 256,
+ "num_kv_heads": null,
+ "causal_masking": true,
+ "sparse": "windowed",
+ "window_size": 128
+ },
+ "metadata": {
+ "semantic": "hybrid_grouped_attention",
+ "inference": "kv_cache_supported",
+ "sampling": {"type": "top_p", "p": 0.9}
+ }
 }
 ```
 
@@ -894,24 +894,24 @@ The FFN uses a SwiGLU architecture with Mixture-of-Experts (MoE) capabilities:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    FEED-FORWARD NETWORK (SwiGLU + MoE)          │
+│ FEED-FORWARD NETWORK (SwiGLU + MoE) │
 ├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  Input ──► Dynamic Gate ──┬──► Linear Gate ──┐                  │
-│               (MoE)       │                  ▼                  │
-│                           └──► Linear Expand ──► SwiGLU         │
-│                                                    │            │
-│                                                    ▼            │
-│                                              Linear Project     │
-│                                                    │            │
-│                                                    ▼            │
-│                                               Dropout           │
-│                                                    │            │
-│  Input ─────────────────────────────────────────► + (Residual)  │
-│                                                    │            │
-│                                                    ▼            │
-│                                                 Output          │
-│                                                                 │
+│ │
+│ Input ──► Dynamic Gate ──┬──► Linear Gate ──┐ │
+│ (MoE) │ ▼ │
+│ └──► Linear Expand ──► SwiGLU │
+│ │ │
+│ ▼ │
+│ Linear Project │
+│ │ │
+│ ▼ │
+│ Dropout │
+│ │ │
+│ Input ─────────────────────────────────────────► + (Residual) │
+│ │ │
+│ ▼ │
+│ Output │
+│ │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -925,8 +925,8 @@ The FFN uses a SwiGLU architecture with Mixture-of-Experts (MoE) capabilities:
 #### 2. Mixture-of-Experts (MoE) Gating
 - Dynamic expert selection
 - Parameters:
-  - `moe_experts`: 4 (number of experts)
-  - `moe_top_k`: 2 (experts activated per token)
+ - `moe_experts`: 4 (number of experts)
+ - `moe_top_k`: 2 (experts activated per token)
 - Mode: `top_k_select`
 
 #### 3. Scaled Residual Connection
@@ -941,12 +941,12 @@ The FFN uses a SwiGLU architecture with Mixture-of-Experts (MoE) capabilities:
 
 ```python
 "params": {
-    "hidden_size": 256,
-    "intermediate": 1024,  # hidden_size * 4
-    "dropout_p": 0.1,
-    "residual_scale": 0.5,
-    "moe_experts": 4,
-    "moe_top_k": 2
+ "hidden_size": 256,
+ "intermediate": 1024, # hidden_size * 4
+ "dropout_p": 0.1,
+ "residual_scale": 0.5,
+ "moe_experts": 4,
+ "moe_top_k": 2
 }
 ```
 
@@ -986,15 +986,15 @@ Supports multiple normalization strategies:
 
 ```json
 {
-  "type": "layer_norm_subgraph",
-  "params": {
-    "hidden_size": 256,
-    "eps": 1e-5,
-    "type": "rmsnorm",
-    "groups": null,
-    "eps_schedule": "learned",
-    "position": "pre"
-  }
+ "type": "layer_norm_subgraph",
+ "params": {
+ "hidden_size": 256,
+ "eps": 1e-5,
+ "type": "rmsnorm",
+ "groups": null,
+ "eps_schedule": "learned",
+ "position": "pre"
+ }
 }
 ```
 
@@ -1018,12 +1018,12 @@ Unlike traditional additive position embeddings, Vulcan uses RoPE:
 
 ```python
 "params": {
-    "vocab_size": 4096,
-    "hidden_size": 256,
-    "max_positions": 1024,
-    "pos_mode": "rotary",
-    "pos_base": 10000,  # Base frequency for RoPE
-    "prune_vocab_below_freq": 5  # Dynamic vocab pruning hint
+ "vocab_size": 4096,
+ "hidden_size": 256,
+ "max_positions": 1024,
+ "pos_mode": "rotary",
+ "pos_base": 10000, # Base frequency for RoPE
+ "prune_vocab_below_freq": 5 # Dynamic vocab pruning hint
 }
 ```
 
@@ -1031,8 +1031,8 @@ Unlike traditional additive position embeddings, Vulcan uses RoPE:
 
 ```
 Token IDs ──► Token Lookup ──► Dropout ──► Norm Scale ──► Output
-                  │
-                  └── (RoPE applied later in Attention Q/K)
+ │
+ └── (RoPE applied later in Attention Q/K)
 ```
 
 ---
@@ -1041,34 +1041,34 @@ Token IDs ──► Token Lookup ──► Dropout ──► Norm Scale ──�
 
 **Location:** `src/llm_core/persistant_context.py`
 
-A production-ready RAG (Retrieval-Augmented Generation) implementation:
+A RAG (Retrieval-Augmented Generation) implementation:
 
 ### Architecture:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│               PERSISTENT CONTEXT MANAGER                         │
+│ PERSISTENT CONTEXT MANAGER │
 ├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  Query ──► Embedding ──► Retrieval ──► Chunking ──► Scoring     │
-│                              │             │           │        │
-│                              ▼             ▼           ▼        │
-│                         Memory System   Strategies  Relevance   │
-│                              │             │           │        │
-│                              └─────────────┴───────────┘        │
-│                                           │                     │
-│                                           ▼                     │
-│                      Parent-Child Expansion ──► Reranking       │
-│                                                      │          │
-│                                                      ▼          │
-│                                              Compression        │
-│                                                      │          │
-│                                                      ▼          │
-│                                              Token Budget Fit   │
-│                                                      │          │
-│                                                      ▼          │
-│                                              Final Context      │
-│                                                                 │
+│ │
+│ Query ──► Embedding ──► Retrieval ──► Chunking ──► Scoring │
+│ │ │ │ │
+│ ▼ ▼ ▼ │
+│ Memory System Strategies Relevance │
+│ │ │ │ │
+│ └─────────────┴───────────┘ │
+│ │ │
+│ ▼ │
+│ Parent-Child Expansion ──► Reranking │
+│ │ │
+│ ▼ │
+│ Compression │
+│ │ │
+│ ▼ │
+│ Token Budget Fit │
+│ │ │
+│ ▼ │
+│ Final Context │
+│ │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -1107,19 +1107,19 @@ A production-ready RAG (Retrieval-Augmented Generation) implementation:
 ```python
 @dataclass
 class ContextConfig:
-    max_context_tokens: int = 8192
-    retrieval_k: int = 50
-    rerank_top_k: int = 20
-    chunking_strategy: ChunkingStrategy = ChunkingStrategy.HIERARCHICAL
-    chunk_size: int = 512
-    chunk_overlap: int = 128
-    reranking_method: RerankingMethod = RerankingMethod.RECIPROCAL_RANK_FUSION
-    compression_method: CompressionMethod = CompressionMethod.EXTRACTIVE
-    compression_ratio: float = 0.5
-    use_parent_child_context: bool = True
-    temporal_decay_factor: float = 0.95
-    diversity_threshold: float = 0.8
-    cache_size: int = 1000
+ max_context_tokens: int = 8192
+ retrieval_k: int = 50
+ rerank_top_k: int = 20
+ chunking_strategy: ChunkingStrategy = ChunkingStrategy.HIERARCHICAL
+ chunk_size: int = 512
+ chunk_overlap: int = 128
+ reranking_method: RerankingMethod = RerankingMethod.RECIPROCAL_RANK_FUSION
+ compression_method: CompressionMethod = CompressionMethod.EXTRACTIVE
+ compression_ratio: float = 0.5
+ use_parent_child_context: bool = True
+ temporal_decay_factor: float = 0.95
+ diversity_threshold: float = 0.8
+ cache_size: int = 1000
 ```
 
 ---
@@ -1146,16 +1146,16 @@ The HierarchicalMemory class implements a multi-level memory system with tool se
 ```python
 @dataclass
 class MemoryLevel:
-    name: str
-    capacity: int
-    decay_rate: float
-    consolidation_threshold: float
-    memories: Dict[str, Memory]
-    access_queue: deque  # Track access order for LRU
-    
-    def add(self, memory: Memory) -> bool
-    def remove_least_salient(self, n: int) -> List[Memory]
-    def get_candidates_for_consolidation(self) -> List[Memory]
+ name: str
+ capacity: int
+ decay_rate: float
+ consolidation_threshold: float
+ memories: Dict[str, Memory]
+ access_queue: deque # Track access order for LRU
+ 
+ def add(self, memory: Memory) -> bool
+ def remove_least_salient(self, n: int) -> List[Memory]
+ def get_candidates_for_consolidation(self) -> List[Memory]
 ```
 
 #### Embedding Models:
@@ -1167,9 +1167,9 @@ The system supports multiple embedding backends with automatic fallback:
 1. Global Model Registry (singleton, shared across components)
 2. memory_prior.get_global_embedding_model() - Module-level singleton
 3. SentenceTransformer models:
-   - "all-MiniLM-L6-v2" (fast, 384 dimensions)
-   - "all-mpnet-base-v2" (better quality, 768 dimensions)
-   - "paraphrase-MiniLM-L6-v2" (alternative)
+ - "all-MiniLM-L6-v2" (fast, 384 dimensions)
+ - "all-mpnet-base-v2" (better quality, 768 dimensions)
+ - "paraphrase-MiniLM-L6-v2" (alternative)
 4. Hash-based fallback (128 dimensions)
 ```
 
@@ -1188,35 +1188,35 @@ The system supports multiple embedding backends with automatic fallback:
 
 ```python
 class AttentionMechanism:
-    """Computes attention weights for memory retrieval."""
-    
-    def __init__(self, hidden_dim, input_dim):
-        # Learnable attention weights
-        
-    def compute_attention(self, query_embedding, memory_embeddings):
-        """Compute attention-weighted relevance scores."""
+ """Computes attention weights for memory retrieval."""
+ 
+ def __init__(self, hidden_dim, input_dim):
+ # Learnable attention weights
+ 
+ def compute_attention(self, query_embedding, memory_embeddings):
+ """Compute attention-weighted relevance scores."""
 ```
 
 #### LLM Context Integration:
 
 ```python
 def retrieve_context_for_generation(self, query_tokens, max_tokens=2048):
-    """
-    Retrieve relevant context from memory for LLM generation.
-    
-    Returns merged context from:
-    1. Episodic: Recent conversation (short_term level)
-    2. Semantic: Relevant concepts (long_term level)
-    3. Procedural: Matching patterns with tools and utility scores
-    """
+ """
+ Retrieve relevant context from memory for LLM generation.
+ 
+ Returns merged context from:
+ 1. Episodic: Recent conversation (short_term level)
+ 2. Semantic: Relevant concepts (long_term level)
+ 3. Procedural: Matching patterns with tools and utility scores
+ """
 
 def store_generation(self, prompt, generated, reasoning_trace):
-    """
-    Store generation in memory, updating all levels:
-    - Procedural: Pattern extraction from reasoning trace
-    - Episodic: Full prompt/response with timestamp
-    - Semantic: Extracted concepts
-    """
+ """
+ Store generation in memory, updating all levels:
+ - Procedural: Pattern extraction from reasoning trace
+ - Episodic: Full prompt/response with timestamp
+ - Semantic: Extracted concepts
+ """
 ```
 
 ### 9.2 Persistent Memory with ZK Proofs
@@ -1229,24 +1229,24 @@ The PersistentHierarchicalMemory extends hierarchical memory with durable storag
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    MEMORY STORAGE TIERS                         │
+│ MEMORY STORAGE TIERS │
 ├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  HOT TIER (Episodic Memory)                                     │
-│  ├── In-memory deque                                            │
-│  ├── Recent items (last 24 hours)                               │
-│  └── Fastest access                                             │
-│                                                                 │
-│  WARM TIER (Local Disk)                                         │
-│  ├── Pickle serialization                                       │
-│  ├── Frequently accessed items                                  │
-│  └── ./local_memory_cache/*.pkl                                 │
-│                                                                 │
-│  COLD TIER (Persistent Store)                                   │
-│  ├── PackfileStore with S3/CloudFront                           │
-│  ├── MerkleLSM compaction                                       │
-│  └── Long-term archival                                         │
-│                                                                 │
+│ │
+│ HOT TIER (Episodic Memory) │
+│ ├── In-memory deque │
+│ ├── Recent items (last 24 hours) │
+│ └── Fastest access │
+│ │
+│ WARM TIER (Local Disk) │
+│ ├── Pickle serialization │
+│ ├── Frequently accessed items │
+│ └── ./local_memory_cache/*.pkl │
+│ │
+│ COLD TIER (Persistent Store) │
+│ ├── PackfileStore with S3/CloudFront │
+│ ├── MerkleLSM compaction │
+│ └── Long-term archival │
+│ │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -1265,21 +1265,21 @@ The PersistentHierarchicalMemory extends hierarchical memory with durable storag
 
 ```python
 def store_interaction(
-    self,
-    query_id: str,
-    query: str,
-    answer: str,
-    tools_used: Optional[List[str]] = None,
-    success: bool = True,
-    latency_ms: float = 0.0,
-    metadata: Optional[Dict[str, Any]] = None,
+ self,
+ query_id: str,
+ query: str,
+ answer: str,
+ tools_used: Optional[List[str]] = None,
+ success: bool = True,
+ latency_ms: float = 0.0,
+ metadata: Optional[Dict[str, Any]] = None,
 ) -> None:
-    """
-    Store interaction across all tiers:
-    1. GraphRAG for semantic retrieval
-    2. Episodic memory for quick access
-    3. LearningStatePersistence for recovery
-    """
+ """
+ Store interaction across all tiers:
+ 1. GraphRAG for semantic retrieval
+ 2. Episodic memory for quick access
+ 3. LearningStatePersistence for recovery
+ """
 ```
 
 ### 9.3 Tool Selection Memory
@@ -1291,17 +1291,17 @@ The HierarchicalMemory includes specialized storage for tool selection decisions
 ```python
 @dataclass
 class ToolSelectionRecord:
-    record_id: str
-    timestamp: float
-    problem_features: np.ndarray
-    problem_description: str
-    selected_tools: List[str]
-    execution_strategy: str
-    performance_metrics: Dict[str, float]  # latency, accuracy, energy
-    context: Dict[str, Any]
-    success: bool
-    utility_score: float
-    metadata: Dict[str, Any]
+ record_id: str
+ timestamp: float
+ problem_features: np.ndarray
+ problem_description: str
+ selected_tools: List[str]
+ execution_strategy: str
+ performance_metrics: Dict[str, float] # latency, accuracy, energy
+ context: Dict[str, Any]
+ success: bool
+ utility_score: float
+ metadata: Dict[str, Any]
 ```
 
 #### Problem Pattern Discovery:
@@ -1309,37 +1309,37 @@ class ToolSelectionRecord:
 ```python
 @dataclass
 class ProblemPattern:
-    pattern_id: str
-    feature_signature: np.ndarray  # Centroid of similar problems
-    typical_tools: List[str]       # Most successful tools
-    success_rate: float            # Historical success rate
-    avg_utility: float             # Average utility score
-    occurrence_count: int          # Number of matching problems
-    examples: List[str]            # Sample problem IDs
+ pattern_id: str
+ feature_signature: np.ndarray # Centroid of similar problems
+ typical_tools: List[str] # Most successful tools
+ success_rate: float # Historical success rate
+ avg_utility: float # Average utility score
+ occurrence_count: int # Number of matching problems
+ examples: List[str] # Sample problem IDs
 ```
 
 #### Tool Recommendation:
 
 ```python
 def get_recommended_tools(
-    self,
-    problem_features: np.ndarray,
-    problem_description: Optional[str] = None,
-    max_recommendations: int = 5,
+ self,
+ problem_features: np.ndarray,
+ problem_description: Optional[str] = None,
+ max_recommendations: int = 5,
 ) -> List[Dict[str, Any]]:
-    """
-    Get tool recommendations based on:
-    1. Similar successful problems
-    2. Discovered problem patterns
-    
-    Returns recommendations with:
-    - tool: Tool name
-    - confidence: Utility-based confidence
-    - success_rate: Historical success rate
-    - occurrence_count: How often used
-    - pattern_match: Whether matches a known pattern
-    - score: Combined ranking score
-    """
+ """
+ Get tool recommendations based on:
+ 1. Similar successful problems
+ 2. Discovered problem patterns
+ 
+ Returns recommendations with:
+ - tool: Tool name
+ - confidence: Utility-based confidence
+ - success_rate: Historical success rate
+ - occurrence_count: How often used
+ - pattern_match: Whether matches a known pattern
+ - score: Combined ranking score
+ """
 ```
 
 #### Background Tasks:
@@ -1353,10 +1353,10 @@ The system runs two background threads:
 # Pattern mining algorithm:
 1. Group records by feature similarity (threshold: 0.8)
 2. For each group with >= 3 records:
-   - Compute centroid feature signature
-   - Calculate success rate and average utility
-   - Identify typical tools from successful records
-   - Create ProblemPattern
+ - Compute centroid feature signature
+ - Calculate success rate and average utility
+ - Identify typical tools from successful records
+ - Create ProblemPattern
 ```
 
 ---
@@ -1373,13 +1373,13 @@ The UnifiedReasoner orchestrates all reasoning capabilities with production-grad
 
 ```python
 class UnifiedReasoner:
-    def __init__(
-        self,
-        enable_learning: bool = True,     # Enable continuous learning
-        enable_safety: bool = True,       # Enable safety validation
-        max_workers: Optional[int] = None,  # Thread pool size (env: VULCAN_MAX_WORKERS)
-        config: Optional[Dict[str, Any]] = None,
-    ):
+ def __init__(
+ self,
+ enable_learning: bool = True, # Enable continuous learning
+ enable_safety: bool = True, # Enable safety validation
+ max_workers: Optional[int] = None, # Thread pool size (env: VULCAN_MAX_WORKERS)
+ config: Optional[Dict[str, Any]] = None,
+ ):
 ```
 
 #### Reasoning Strategies:
@@ -1399,17 +1399,17 @@ class UnifiedReasoner:
 
 ```python
 class ToolWeightManager:
-    """Singleton manager for tool weights shared between Learning and Ensemble.
-    
-    Note: Learning system was updating tool weights in its own dictionary,
-    but Ensemble was reading from a separate dictionary. Weights never propagated.
-    This singleton ensures both systems use the same weight storage.
-    """
-    
-    def get_weight(self, tool: str, default: float = 1.0) -> float
-    def set_weight(self, tool: str, value: float) -> None
-    def adjust_weight(self, tool: str, delta: float) -> None
-    def get_all_weights(self, tools: List[str]) -> Dict[str, float]
+ """Singleton manager for tool weights shared between Learning and Ensemble.
+ 
+ Note: Learning system was updating tool weights in its own dictionary,
+ but Ensemble was reading from a separate dictionary. Weights never propagated.
+ This singleton ensures both systems use the same weight storage.
+ """
+ 
+ def get_weight(self, tool: str, default: float = 1.0) -> float
+ def set_weight(self, tool: str, value: float) -> None
+ def adjust_weight(self, tool: str, delta: float) -> None
+ def get_all_weights(self, tools: List[str]) -> Dict[str, float]
 
 # Usage:
 get_weight_manager().adjust_weight("causal", 0.01)
@@ -1419,23 +1419,23 @@ get_weight_manager().adjust_weight("causal", 0.01)
 
 ```python
 def _is_test_environment() -> bool:
-    """
-    Determine if running in test environment.
-    
-    Bug #3 Fix: Default to PRODUCTION for safety.
-    Only return True if explicitly in test mode.
-    
-    Explicit TEST indicators:
-    - PYTEST_CURRENT_TEST is set
-    - VULCAN_TEST_MODE=true
-    - VULCAN_ENV=test
-    
-    Explicit PRODUCTION indicators (override test):
-    - VULCAN_PRODUCTION=true
-    - VULCAN_FORCE_PRODUCTION_REASONING=true
-    - VULCAN_ENV=production
-    - ENVIRONMENT=production
-    """
+ """
+ Determine if running in test environment.
+ 
+ Bug #3 Fix: Default to PRODUCTION for safety.
+ Only return True if explicitly in test mode.
+ 
+ Explicit TEST indicators:
+ - PYTEST_CURRENT_TEST is set
+ - VULCAN_TEST_MODE=true
+ - VULCAN_ENV=test
+ 
+ Explicit PRODUCTION indicators (override test):
+ - VULCAN_PRODUCTION=true
+ - VULCAN_FORCE_PRODUCTION_REASONING=true
+ - VULCAN_ENV=production
+ - ENVIRONMENT=production
+ """
 ```
 
 #### Utility Context:
@@ -1443,45 +1443,45 @@ def _is_test_environment() -> bool:
 ```python
 @dataclass
 class UtilityContext:
-    mode: ContextMode      # RUSH, ACCURATE, EFFICIENT, BALANCED
-    time_budget: float     # Milliseconds
-    energy_budget: float   # Millijoules
-    min_quality: float     # Minimum acceptable quality
-    max_risk: float        # Maximum acceptable risk
-    user_preferences: Dict[str, Any]
+ mode: ContextMode # RUSH, ACCURATE, EFFICIENT, BALANCED
+ time_budget: float # Milliseconds
+ energy_budget: float # Millijoules
+ min_quality: float # Minimum acceptable quality
+ max_risk: float # Maximum acceptable risk
+ user_preferences: Dict[str, Any]
 ```
 
 #### Main Reasoning Method:
 
 ```python
 def reason(
-    self,
-    input_data: Any,
-    query: Optional[Dict[str, Any]] = None,
-    reasoning_type: Optional[ReasoningType] = None,
-    strategy: ReasoningStrategy = ReasoningStrategy.ADAPTIVE,
-    confidence_threshold: Optional[float] = None,
-    constraints: Optional[Dict[str, Any]] = None,
+ self,
+ input_data: Any,
+ query: Optional[Dict[str, Any]] = None,
+ reasoning_type: Optional[ReasoningType] = None,
+ strategy: ReasoningStrategy = ReasoningStrategy.ADAPTIVE,
+ confidence_threshold: Optional[float] = None,
+ constraints: Optional[Dict[str, Any]] = None,
 ) -> ReasoningResult:
-    """
-    Enhanced reasoning interface with production tool selection.
-    
-    Pipeline:
-    1. Shutdown check
-    2. Create reasoning chain
-    3. Safety input validation
-    4. Distribution shift detection
-    5. Reasoning type determination
-    6. VOI (Value of Information) gate
-    7. Plan optimization
-    8. Tool selection for portfolio/utility strategies
-    9. Strategy execution with timeout
-    10. Confidence calibration
-    11. Post-processing with mathematical verification
-    12. Safety output validation
-    13. Learning update
-    14. Metrics and caching
-    """
+ """
+ Enhanced reasoning interface with production tool selection.
+ 
+ Pipeline:
+ 1. Shutdown check
+ 2. Create reasoning chain
+ 3. Safety input validation
+ 4. Distribution shift detection
+ 5. Reasoning type determination
+ 6. VOI (Value of Information) gate
+ 7. Plan optimization
+ 8. Tool selection for portfolio/utility strategies
+ 9. Strategy execution with timeout
+ 10. Confidence calibration
+ 11. Post-processing with mathematical verification
+ 12. Safety output validation
+ 13. Learning update
+ 14. Metrics and caching
+ """
 ```
 
 ### 10.2 Reasoning Types
@@ -1518,28 +1518,28 @@ self.multimodal.register_modality_reasoner(ModalityType.CODE, symbolic_reasoner)
 
 ```python
 def _ensemble_reasoning(self, plan, reasoning_chain) -> ReasoningResult:
-    """Ensemble reasoning with weighted voting."""
-    
-    for reasoning_type, result in results:
-        # Base weight from confidence
-        base_weight = result.confidence
-        
-        # Type weight from historical performance
-        type_weight = self._get_reasoning_type_weight(reasoning_type)
-        
-        # Utility weight if context available
-        if utility_context:
-            execution_time_ms = result.metadata.get("execution_time_ms", 100)
-            utility_weight = self._calculate_result_utility(
-                result, utility_context, execution_time_ms
-            )
-            weights.append(base_weight * type_weight * utility_weight)
-        else:
-            weights.append(base_weight * type_weight)
-    
-    # Issue #53 Fix: Handle zero weights gracefully
-    if sum(weights) <= 0:
-        weights = [1.0 / len(results)] * len(results)
+ """Ensemble reasoning with weighted voting."""
+ 
+ for reasoning_type, result in results:
+ # Base weight from confidence
+ base_weight = result.confidence
+ 
+ # Type weight from historical performance
+ type_weight = self._get_reasoning_type_weight(reasoning_type)
+ 
+ # Utility weight if context available
+ if utility_context:
+ execution_time_ms = result.metadata.get("execution_time_ms", 100)
+ utility_weight = self._calculate_result_utility(
+ result, utility_context, execution_time_ms
+ )
+ weights.append(base_weight * type_weight * utility_weight)
+ else:
+ weights.append(base_weight * type_weight)
+ 
+ # Issue #53 Fix: Handle zero weights gracefully
+ if sum(weights) <= 0:
+ weights = [1.0 / len(results)] * len(results)
 ```
 
 ### 10.3 Mathematical Verification
@@ -1552,10 +1552,10 @@ The MathematicalVerificationEngine validates calculation results:
 
 ```python
 class MathVerificationStatus(Enum):
-    VERIFIED = "verified"
-    ERROR_DETECTED = "error_detected"
-    UNCERTAIN = "uncertain"
-    NOT_APPLICABLE = "not_applicable"
+ VERIFIED = "verified"
+ ERROR_DETECTED = "error_detected"
+ UNCERTAIN = "uncertain"
+ NOT_APPLICABLE = "not_applicable"
 ```
 
 #### Bayesian Calculation Verification:
@@ -1563,73 +1563,73 @@ class MathVerificationStatus(Enum):
 ```python
 @dataclass
 class BayesianProblem:
-    prior: float           # P(H)
-    sensitivity: float     # P(E|H)
-    specificity: float     # P(¬E|¬H)
+ prior: float # P(H)
+ sensitivity: float # P(E|H)
+ specificity: float # P(¬E|¬H)
 
 def verify_bayesian_calculation(
-    self,
-    problem: BayesianProblem,
-    computed_posterior: float,
+ self,
+ problem: BayesianProblem,
+ computed_posterior: float,
 ) -> VerificationResult:
-    """
-    Verify Bayesian calculation using Bayes' theorem:
-    P(H|E) = P(E|H) * P(H) / P(E)
-    
-    where P(E) = P(E|H)*P(H) + P(E|¬H)*P(¬H)
-    """
+ """
+ Verify Bayesian calculation using Bayes' theorem:
+ P(H|E) = P(E|H) * P(H) / P(E)
+ 
+ where P(E) = P(E|H)*P(H) + P(E|¬H)*P(¬H)
+ """
 ```
 
 #### Arithmetic Verification:
 
 ```python
 def verify_arithmetic(
-    self,
-    expression: str,
-    computed_result: float,
-    variables: Dict[str, float],
+ self,
+ expression: str,
+ computed_result: float,
+ variables: Dict[str, float],
 ) -> VerificationResult:
-    """Verify arithmetic expression evaluation."""
+ """Verify arithmetic expression evaluation."""
 ```
 
 #### Learning Integration:
 
 ```python
 # Constants for learning feedback
-MATH_VERIFICATION_CONFIDENCE_BOOST = 1.1  # Boost for verified correct
-MATH_ERROR_CONFIDENCE_PENALTY = 0.5       # Penalty for error detected
-MATH_ACCURACY_REWARD = 0.015              # Learning reward for accuracy
-MATH_ACCURACY_PENALTY = -0.01             # Learning penalty for errors
-MATH_WEIGHT_ADJUSTMENT_PENALTY = -0.01    # Tool weight adjustment
+MATH_VERIFICATION_CONFIDENCE_BOOST = 1.1 # Boost for verified correct
+MATH_ERROR_CONFIDENCE_PENALTY = 0.5 # Penalty for error detected
+MATH_ACCURACY_REWARD = 0.015 # Learning reward for accuracy
+MATH_ACCURACY_PENALTY = -0.01 # Learning penalty for errors
+MATH_WEIGHT_ADJUSTMENT_PENALTY = -0.01 # Tool weight adjustment
 
 def _apply_verification_to_result(self, result, verification, task):
-    """Apply verification results and update learning system."""
-    
-    if verification.status == MathVerificationStatus.VERIFIED:
-        # Boost confidence
-        result.confidence *= MATH_VERIFICATION_CONFIDENCE_BOOST
-        
-        # Reward tool through learning
-        if self._math_accuracy_integration:
-            self._math_accuracy_integration.reward_tool(tool_name, self.learner)
-            
-    elif verification.status == MathVerificationStatus.ERROR_DETECTED:
-        # Apply corrections
-        result.conclusion['math_correction'] = {
-            'original': result.conclusion,
-            'corrected': verification.corrections.get('correct_result'),
-            'errors': [e.value for e in verification.errors],
-        }
-        
-        # Reduce confidence
-        result.confidence *= MATH_ERROR_CONFIDENCE_PENALTY
-        
-        # Penalize tool through learning
-        for error in verification.errors:
-            self._math_accuracy_integration.penalize_tool(tool_name, error, self.learner)
-        
-        # Update shared weight manager
-        get_weight_manager().adjust_weight(tool_name, MATH_WEIGHT_ADJUSTMENT_PENALTY)
+ """Apply verification results and update learning system."""
+ 
+ if verification.status == MathVerificationStatus.VERIFIED:
+ # Boost confidence
+ result.confidence *= MATH_VERIFICATION_CONFIDENCE_BOOST
+ 
+ # Reward tool through learning
+ if self._math_accuracy_integration:
+ self._math_accuracy_integration.reward_tool(tool_name, self.learner)
+ 
+ elif verification.status == MathVerificationStatus.ERROR_DETECTED:
+ # Apply corrections
+ result.conclusion['math_correction'] = {
+ 'original': result.conclusion,
+ 'corrected': verification.corrections.get('correct_result'),
+ 'errors': [e.value for e in verification.errors],
+ }
+ 
+ # Reduce confidence
+ result.confidence *= MATH_ERROR_CONFIDENCE_PENALTY
+ 
+ # Penalize tool through learning
+ for error in verification.errors:
+ self._math_accuracy_integration.penalize_tool(tool_name, error, self.learner)
+ 
+ # Update shared weight manager
+ get_weight_manager().adjust_weight(tool_name, MATH_WEIGHT_ADJUSTMENT_PENALTY)
 ```
 
 ---
@@ -1658,49 +1658,49 @@ The World Model provides the cognitive foundation for understanding and predicti
 
 ```python
 class CausalGraph:
-    """Directed acyclic graph of causal relationships."""
-    
-    # Evidence types for edge creation
-    evidence_types = ["observational", "intervention", "linguistic"]
-    
-    # Methods
-    def add_edge(self, cause, effect, strength, evidence_type)
-    def remove_edge(self, cause, effect)
-    def get_causal_path(self, start, end) -> List[str]
-    def detect_cycles(self) -> List[List[str]]
-    def break_cycles(self) -> int
+ """Directed acyclic graph of causal relationships."""
+ 
+ # Evidence types for edge creation
+ evidence_types = ["observational", "intervention", "linguistic"]
+ 
+ # Methods
+ def add_edge(self, cause, effect, strength, evidence_type)
+ def remove_edge(self, cause, effect)
+ def get_causal_path(self, start, end) -> List[str]
+ def detect_cycles(self) -> List[List[str]]
+ def break_cycles(self) -> int
 ```
 
 #### Prediction Engine:
 
 ```python
 class PredictionEngine:
-    """Ensemble prediction with uncertainty quantification."""
-    
-    def predict(self, variables, context) -> Prediction:
-        """
-        Returns:
-        - value: Predicted value
-        - confidence: Calibrated confidence score
-        - uncertainty: Uncertainty estimate
-        - causal_paths: Relevant causal paths used
-        """
+ """Ensemble prediction with uncertainty quantification."""
+ 
+ def predict(self, variables, context) -> Prediction:
+ """
+ Returns:
+ - value: Predicted value
+ - confidence: Calibrated confidence score
+ - uncertainty: Uncertainty estimate
+ - causal_paths: Relevant causal paths used
+ """
 ```
 
 #### Intervention Manager:
 
 ```python
 class InterventionManager:
-    """Prioritized intervention scheduling with safety validation."""
-    
-    def schedule_intervention(self, intervention) -> bool:
-        """
-        Validates safety constraints before scheduling.
-        Returns True if intervention was scheduled.
-        """
-    
-    def execute_pending(self) -> List[InterventionResult]:
-        """Execute scheduled interventions in priority order."""
+ """Prioritized intervention scheduling with safety validation."""
+ 
+ def schedule_intervention(self, intervention) -> bool:
+ """
+ Validates safety constraints before scheduling.
+ Returns True if intervention was scheduled.
+ """
+ 
+ def execute_pending(self) -> List[InterventionResult]:
+ """Execute scheduled interventions in priority order."""
 ```
 
 ### 11.2 Meta-Reasoning
@@ -1713,33 +1713,33 @@ The meta-reasoning system enables self-reflection and improvement:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    COGNITIVE CYCLE                              │
+│ COGNITIVE CYCLE │
 ├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  1. EXAMINE                                                     │
-│     - Validate and analyze observations                         │
-│     - Extract variables and patterns                            │
-│     - Detect interventions and anomalies                        │
-│     - Analyze characteristics (complexity, uncertainty)         │
-│                                                                 │
-│  2. SELECT                                                      │
-│     - Route updates through WorldModelRouter                    │
-│     - Prioritize based on constraints                           │
-│     - Choose optimal execution plan                             │
-│     - Apply VOI (Value of Information) gating                   │
-│                                                                 │
-│  3. APPLY                                                       │
-│     - Execute selected updates                                  │
-│     - Update causal graph                                       │
-│     - Run interventions if scheduled                            │
-│     - Track correlations                                        │
-│                                                                 │
-│  4. REMEMBER                                                    │
-│     - Update state counters                                     │
-│     - Validate consistency                                      │
-│     - Persist changes                                           │
-│     - Update learning weights                                   │
-│                                                                 │
+│ │
+│ 1. EXAMINE │
+│ - Validate and analyze observations │
+│ - Extract variables and patterns │
+│ - Detect interventions and anomalies │
+│ - Analyze characteristics (complexity, uncertainty) │
+│ │
+│ 2. SELECT │
+│ - Route updates through WorldModelRouter │
+│ - Prioritize based on constraints │
+│ - Choose optimal execution plan │
+│ - Apply VOI (Value of Information) gating │
+│ │
+│ 3. APPLY │
+│ - Execute selected updates │
+│ - Update causal graph │
+│ - Run interventions if scheduled │
+│ - Track correlations │
+│ │
+│ 4. REMEMBER │
+│ - Update state counters │
+│ - Validate consistency │
+│ - Persist changes │
+│ - Update learning weights │
+│ │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -1787,29 +1787,29 @@ The GovernedTrainer provides a comprehensive training loop with governance:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    GOVERNED TRAINING STEP                       │
+│ GOVERNED TRAINING STEP │
 ├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  1. Forward Pass ──► Compute Loss                               │
-│                         │                                       │
-│  2. Gradient Computation ──► Anomaly Detection                  │
-│                         │                                       │
-│  3. Gradient Clipping ──► Accumulation (if enabled)             │
-│                         │                                       │
-│  4. Safety Gate ──► Pre-Update Validation                       │
-│                         │                                       │
-│  5. Optimizer Step ──► Compute Adam Updates                     │
-│                         │                                       │
-│  6. Governance Proposal ──► Consensus Engine                    │
-│                         │                                       │
-│  7. Approval Check ──► Apply/Reject Update                      │
-│                         │                                       │
-│  8. Post-Update ──► Divergence Check                            │
-│                         │                                       │
-│  9. Rollback (if needed) ──► Restore Checkpoint                 │
-│                         │                                       │
-│  10. Integration Updates ──► World Model, RLHF, Memory          │
-│                                                                 │
+│ │
+│ 1. Forward Pass ──► Compute Loss │
+│ │ │
+│ 2. Gradient Computation ──► Anomaly Detection │
+│ │ │
+│ 3. Gradient Clipping ──► Accumulation (if enabled) │
+│ │ │
+│ 4. Safety Gate ──► Pre-Update Validation │
+│ │ │
+│ 5. Optimizer Step ──► Compute Adam Updates │
+│ │ │
+│ 6. Governance Proposal ──► Consensus Engine │
+│ │ │
+│ 7. Approval Check ──► Apply/Reject Update │
+│ │ │
+│ 8. Post-Update ──► Divergence Check │
+│ │ │
+│ 9. Rollback (if needed) ──► Restore Checkpoint │
+│ │ │
+│ 10. Integration Updates ──► World Model, RLHF, Memory │
+│ │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -1817,19 +1817,19 @@ The GovernedTrainer provides a comprehensive training loop with governance:
 
 ```python
 trainer = GovernedTrainer(
-    agent_id="trainer-0",
-    learning_rate=0.001,
-    beta1=0.9,
-    beta2=0.999,
-    weight_decay=0.01,
-    max_grad_norm=1.0,
-    gradient_accumulation_steps=4,
-    lr_schedule="cosine",
-    warmup_steps=1000,
-    total_steps=100000,
-    safety_check_interval=10,
-    rollback_window=50,
-    divergence_threshold=2.0,
+ agent_id="trainer-0",
+ learning_rate=0.001,
+ beta1=0.9,
+ beta2=0.999,
+ weight_decay=0.01,
+ max_grad_norm=1.0,
+ gradient_accumulation_steps=4,
+ lr_schedule="cosine",
+ warmup_steps=1000,
+ total_steps=100000,
+ safety_check_interval=10,
+ rollback_window=50,
+ divergence_threshold=2.0,
 )
 ```
 
@@ -1841,27 +1841,27 @@ trainer = GovernedTrainer(
 
 ```python
 class ContinualLearner:
-    """Basic continual learner for backward compatibility."""
-    
-    def process_experience(self, experience: Dict) -> Dict
-    def update(self, experience: Dict)
-    def consolidate_knowledge()
-    async def learn_from_outcome(self, outcome: Dict)
+ """Basic continual learner for backward compatibility."""
+ 
+ def process_experience(self, experience: Dict) -> Dict
+ def update(self, experience: Dict)
+ def consolidate_knowledge()
+ async def learn_from_outcome(self, outcome: Dict)
 ```
 
 #### EnhancedContinualLearner:
 
 ```python
 class EnhancedContinualLearner(nn.Module):
-    """Enhanced continual learning with:
-    - Task detection and clustering
-    - EWC (Elastic Weight Consolidation)
-    - Progressive Neural Networks
-    - PackNet parameter isolation
-    - Experience replay with intelligent sampling
-    - RLHF integration
-    - Knowledge Crystallizer
-    """
+ """Enhanced continual learning with:
+ - Task detection and clustering
+ - EWC (Elastic Weight Consolidation)
+ - Progressive Neural Networks
+ - PackNet parameter isolation
+ - Experience replay with intelligent sampling
+ - RLHF integration
+ - Knowledge Crystallizer
+ """
 ```
 
 #### Continual Learning Metrics:
@@ -1869,11 +1869,11 @@ class EnhancedContinualLearner(nn.Module):
 ```python
 @dataclass
 class ContinualMetrics:
-    backward_transfer: float  # Performance change on old tasks
-    forward_transfer: float   # Performance on new tasks
-    average_accuracy: float   # Average across all tasks
-    forgetting_measure: float # Amount of forgetting
-    task_accuracies: Dict[str, float]
+ backward_transfer: float # Performance change on old tasks
+ forward_transfer: float # Performance on new tasks
+ average_accuracy: float # Average across all tasks
+ forgetting_measure: float # Amount of forgetting
+ task_accuracies: Dict[str, float]
 ```
 
 #### EWC (Elastic Weight Consolidation):
@@ -1883,7 +1883,7 @@ class ContinualMetrics:
 2. Compute Fisher Information Matrix for Task A
 3. Store optimal parameters θ_A*
 4. Train on Task B with penalty:
-   Loss_B + λ * Σ F_A * (θ - θ_A*)²
+ Loss_B + λ * Σ F_A * (θ - θ_A*)²
 5. Repeat for each new task
 ```
 
@@ -1891,24 +1891,24 @@ class ContinualMetrics:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                PROGRESSIVE NEURAL NETWORK                        │
+│ PROGRESSIVE NEURAL NETWORK │
 ├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  Column 1 (Task A)    Column 2 (Task B)    Column 3 (Task C)    │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐      │
-│  │   Layer 3    │────│   Layer 3    │────│   Layer 3    │      │
-│  ├──────────────┤    ├──────────────┤    ├──────────────┤      │
-│  │   Layer 2    │────│   Layer 2    │────│   Layer 2    │      │
-│  ├──────────────┤    ├──────────────┤    ├──────────────┤      │
-│  │   Layer 1    │────│   Layer 1    │────│   Layer 1    │      │
-│  └──────────────┘    └──────────────┘    └──────────────┘      │
-│        ↑              ↑ (+ lateral)       ↑ (+ lateral)        │
-│      Input           Input                Input                 │
-│                                                                 │
-│  - Each task gets frozen column                                 │
-│  - New tasks add lateral connections                            │
-│  - No catastrophic forgetting                                   │
-│                                                                 │
+│ │
+│ Column 1 (Task A) Column 2 (Task B) Column 3 (Task C) │
+│ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ │
+│ │ Layer 3 │────│ Layer 3 │────│ Layer 3 │ │
+│ ├──────────────┤ ├──────────────┤ ├──────────────┤ │
+│ │ Layer 2 │────│ Layer 2 │────│ Layer 2 │ │
+│ ├──────────────┤ ├──────────────┤ ├──────────────┤ │
+│ │ Layer 1 │────│ Layer 1 │────│ Layer 1 │ │
+│ └──────────────┘ └──────────────┘ └──────────────┘ │
+│ ↑ ↑ (+ lateral) ↑ (+ lateral) │
+│ Input Input Input │
+│ │
+│ - Each task gets frozen column │
+│ - New tasks add lateral connections │
+│ - No catastrophic forgetting │
+│ │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -1930,23 +1930,23 @@ class ContinualMetrics:
 
 ```python
 class TaskDetector:
-    """Detect and track learning tasks with persistence and clustering."""
-    
-    def detect_task(self, experience: Dict) -> str
-    def get_related_tasks(self, task_id: str, k: int = 5) -> List[str]
-    def predict_next_task(self) -> Optional[str]
-    def get_task_difficulty(self, task_id: str) -> float
+ """Detect and track learning tasks with persistence and clustering."""
+ 
+ def detect_task(self, experience: Dict) -> str
+ def get_related_tasks(self, task_id: str, k: int = 5) -> List[str]
+ def predict_next_task(self) -> Optional[str]
+ def get_task_difficulty(self, task_id: str) -> float
 ```
 
 #### MetaLearner:
 
 ```python
 class MetaLearner:
-    """Enhanced Model-Agnostic Meta-Learning."""
-    
-    def adapt(self, support_set, num_steps, task_id) -> Tuple[nn.Module, Dict]
-    def meta_update(self, tasks: List[Dict])
-    def online_meta_update(self, experience: Dict)
+ """Enhanced Model-Agnostic Meta-Learning."""
+ 
+ def adapt(self, support_set, num_steps, task_id) -> Tuple[nn.Module, Dict]
+ def meta_update(self, tasks: List[Dict])
+ def online_meta_update(self, experience: Dict)
 ```
 
 #### Task-Specific Learning Rates:
@@ -1954,13 +1954,13 @@ class MetaLearner:
 ```python
 # Adaptive learning rate per task based on adaptation performance
 def _update_task_learning_rate(self, task_id, adapt_stats):
-    losses = [step["loss"] for step in adapt_stats["trajectory"]]
-    loss_decrease = losses[0] - losses[-1]
-    
-    if loss_decrease < 0.01:  # Not decreasing enough
-        new_lr = min(current_lr * 1.2, 0.1)
-    elif loss_decrease > 1.0:  # Too fast (unstable)
-        new_lr = max(current_lr * 0.8, 1e-5)
+ losses = [step["loss"] for step in adapt_stats["trajectory"]]
+ loss_decrease = losses[0] - losses[-1]
+ 
+ if loss_decrease < 0.01: # Not decreasing enough
+ new_lr = min(current_lr * 1.2, 0.1)
+ elif loss_decrease > 1.0: # Too fast (unstable)
+ new_lr = max(current_lr * 0.8, 1e-5)
 ```
 
 ### 12.4 RLHF Integration
@@ -1972,27 +1972,27 @@ def _update_task_learning_rate(self, task_id, adapt_stats):
 ```python
 @dataclass
 class FeedbackData:
-    feedback_id: str
-    timestamp: float
-    feedback_type: str  # "thumbs_up", "thumbs_down", "correction", etc.
-    content: Optional[str]
-    context: Dict[str, Any]
-    agent_response: Optional[str]
-    human_preference: Optional[str]
-    reward_signal: float
-    metadata: Dict[str, Any]
+ feedback_id: str
+ timestamp: float
+ feedback_type: str # "thumbs_up", "thumbs_down", "correction", etc.
+ content: Optional[str]
+ context: Dict[str, Any]
+ agent_response: Optional[str]
+ human_preference: Optional[str]
+ reward_signal: float
+ metadata: Dict[str, Any]
 ```
 
 #### RLHFManager:
 
 ```python
 class RLHFManager:
-    """Manages RLHF feedback processing."""
-    
-    def receive_feedback(self, feedback: FeedbackData)
-    def process_batch()
-    def compute_reward(self, context, response) -> float
-    def update_policy(self, rewards)
+ """Manages RLHF feedback processing."""
+ 
+ def receive_feedback(self, feedback: FeedbackData)
+ def process_batch()
+ def compute_reward(self, context, response) -> float
+ def update_policy(self, rewards)
 ```
 
 #### Auto-Detection of Feedback:
@@ -2000,18 +2000,18 @@ class RLHFManager:
 ```python
 # Patterns detected from user messages:
 CORRECTION_PATTERNS = [
-    r"\b(no|wrong|incorrect|mistake|error)\b",
-    r"\b(actually|correction|should be)\b",
+ r"\b(no|wrong|incorrect|mistake|error)\b",
+ r"\b(actually|correction|should be)\b",
 ]
 
 POSITIVE_PATTERNS = [
-    r"\b(thanks|great|perfect|exactly|correct)\b",
-    r"\b(awesome|excellent|helpful)\b",
+ r"\b(thanks|great|perfect|exactly|correct)\b",
+ r"\b(awesome|excellent|helpful)\b",
 ]
 
 NEGATIVE_PATTERNS = [
-    r"\b(bad|terrible|useless|unhelpful)\b",
-    r"\b(doesn't work|broken|failed)\b",
+ r"\b(bad|terrible|useless|unhelpful)\b",
+ r"\b(doesn't work|broken|failed)\b",
 ]
 ```
 
@@ -2019,10 +2019,10 @@ NEGATIVE_PATTERNS = [
 
 ```python
 class LiveFeedbackProcessor:
-    """Process real-time feedback from user messages."""
-    
-    async def process_live_feedback(self, feedback_data: Dict)
-    def detect_implicit_feedback(self, user_message: str) -> Optional[FeedbackData]
+ """Process real-time feedback from user messages."""
+ 
+ async def process_live_feedback(self, feedback_data: Dict)
+ def detect_implicit_feedback(self, user_message: str) -> Optional[FeedbackData]
 ```
 
 ---
@@ -2041,35 +2041,35 @@ A three-tier memory system for comprehensive context management:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                   HIERARCHICAL CONTEXT MEMORY                        │
+│ HIERARCHICAL CONTEXT MEMORY │
 ├─────────────────────────────────────────────────────────────────────┤
-│                                                                     │
-│  ┌─────────────────────────────────────────────────────────────┐   │
-│  │                    EPISODIC MEMORY                           │   │
-│  │  Recent prompt/response pairs with full reasoning traces     │   │
-│  │  - Access tracking (count, last_accessed)                    │   │
-│  │  - Importance scoring                                        │   │
-│  │  - Consolidation flags                                       │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-│                              │                                      │
-│                              ▼ consolidate                          │
-│  ┌─────────────────────────────────────────────────────────────┐   │
-│  │                    SEMANTIC MEMORY                           │   │
-│  │  Concept index with clustering and relationships             │   │
-│  │  - Term indexing for fast lookup                             │   │
-│  │  - Frequency and importance tracking                         │   │
-│  │  - Related concepts graph                                    │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-│                              │                                      │
-│                              ▼ patterns                             │
-│  ┌─────────────────────────────────────────────────────────────┐   │
-│  │                   PROCEDURAL MEMORY                          │   │
-│  │  Learned patterns, strategies, and procedures                │   │
-│  │  - Strategy signatures                                       │   │
-│  │  - Success rate tracking                                     │   │
-│  │  - Latency metrics                                           │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-│                                                                     │
+│ │
+│ ┌─────────────────────────────────────────────────────────────┐ │
+│ │ EPISODIC MEMORY │ │
+│ │ Recent prompt/response pairs with full reasoning traces │ │
+│ │ - Access tracking (count, last_accessed) │ │
+│ │ - Importance scoring │ │
+│ │ - Consolidation flags │ │
+│ └─────────────────────────────────────────────────────────────┘ │
+│ │ │
+│ ▼ consolidate │
+│ ┌─────────────────────────────────────────────────────────────┐ │
+│ │ SEMANTIC MEMORY │ │
+│ │ Concept index with clustering and relationships │ │
+│ │ - Term indexing for fast lookup │ │
+│ │ - Frequency and importance tracking │ │
+│ │ - Related concepts graph │ │
+│ └─────────────────────────────────────────────────────────────┘ │
+│ │ │
+│ ▼ patterns │
+│ ┌─────────────────────────────────────────────────────────────┐ │
+│ │ PROCEDURAL MEMORY │ │
+│ │ Learned patterns, strategies, and procedures │ │
+│ │ - Strategy signatures │ │
+│ │ - Success rate tracking │ │
+│ │ - Latency metrics │ │
+│ └─────────────────────────────────────────────────────────────┘ │
+│ │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -2078,37 +2078,37 @@ A three-tier memory system for comprehensive context management:
 ```python
 @dataclass
 class EpisodicItem:
-    """Episodic memory with comprehensive metadata."""
-    prompt: Any
-    token: Any
-    trace: Any
-    ts: float = field(default_factory=time.time)
-    importance: float = 1.0
-    access_count: int = 0
-    last_accessed: float = field(default_factory=time.time)
-    consolidated: bool = False
-    meta: Dict[str, Any] = field(default_factory=dict)
+ """Episodic memory with comprehensive metadata."""
+ prompt: Any
+ token: Any
+ trace: Any
+ ts: float = field(default_factory=time.time)
+ importance: float = 1.0
+ access_count: int = 0
+ last_accessed: float = field(default_factory=time.time)
+ consolidated: bool = False
+ meta: Dict[str, Any] = field(default_factory=dict)
 
 @dataclass
 class SemanticEntry:
-    """Semantic memory entry with relationships."""
-    concept: str
-    terms: List[str]
-    freq: int = 1
-    last_seen: float = field(default_factory=time.time)
-    importance: float = 1.0
-    cluster_id: Optional[int] = None
-    related_concepts: List[str] = field(default_factory=list)
-    embedding: Optional[List[float]] = None
+ """Semantic memory entry with relationships."""
+ concept: str
+ terms: List[str]
+ freq: int = 1
+ last_seen: float = field(default_factory=time.time)
+ importance: float = 1.0
+ cluster_id: Optional[int] = None
+ related_concepts: List[str] = field(default_factory=list)
+ embedding: Optional[List[float]] = None
 
 @dataclass
 class ProceduralPattern:
-    """Procedural memory pattern."""
-    name: str
-    signature_terms: List[str]
-    freq: int = 1
-    success_rate: float = 1.0
-    avg_latency_ms: float = 0.0
+ """Procedural memory pattern."""
+ name: str
+ signature_terms: List[str]
+ freq: int = 1
+ success_rate: float = 1.0
+ avg_latency_ms: float = 0.0
 ```
 
 #### Retrieval Strategies:
@@ -2142,26 +2142,26 @@ class ProceduralPattern:
 
 ```python
 class HierarchicalContext:
-    def retrieve(self, query, max_items=10, strategy=RetrievalStrategy.BALANCED):
-        """Retrieve relevant items from all memory tiers."""
-    
-    def retrieve_context_for_generation(self, query_tokens, max_tokens=2048):
-        """Get generation-ready context bundle with flat concatenation."""
-    
-    def store(self, prompt, token, reasoning_trace, importance=1.0):
-        """Store interaction and update all memory tiers."""
-    
-    def consolidate_memory(self, strategy=ConsolidationStrategy.HYBRID):
-        """Move episodic memories to semantic memory."""
-    
-    def prune_memory(self, strategy=PruningStrategy.DECAY, target_reduction=0.2):
-        """Intelligent memory pruning."""
-    
-    def export_memory(self) -> Dict[str, Any]:
-        """Export for persistence."""
-    
-    def import_memory(self, data: Dict[str, Any]):
-        """Import from exported data."""
+ def retrieve(self, query, max_items=10, strategy=RetrievalStrategy.BALANCED):
+ """Retrieve relevant items from all memory tiers."""
+ 
+ def retrieve_context_for_generation(self, query_tokens, max_tokens=2048):
+ """Get generation-ready context bundle with flat concatenation."""
+ 
+ def store(self, prompt, token, reasoning_trace, importance=1.0):
+ """Store interaction and update all memory tiers."""
+ 
+ def consolidate_memory(self, strategy=ConsolidationStrategy.HYBRID):
+ """Move episodic memories to semantic memory."""
+ 
+ def prune_memory(self, strategy=PruningStrategy.DECAY, target_reduction=0.2):
+ """Intelligent memory pruning."""
+ 
+ def export_memory(self) -> Dict[str, Any]:
+ """Export for persistence."""
+ 
+ def import_memory(self, data: Dict[str, Any]):
+ """Import from exported data."""
 ```
 
 ### 13.2 Causal Context Selector
@@ -2185,61 +2185,61 @@ Advanced causal reasoning for context selection:
 
 ```python
 class CausalStrengthType(Enum):
-    CORRELATION = "correlation"        # Simple correlation
-    GRANGER = "granger"               # Granger causality
-    TRANSFER_ENTROPY = "transfer_entropy"  # Information-theoretic
-    INTERVENTION = "intervention"      # Do-calculus based
-    COUNTERFACTUAL = "counterfactual" # Counterfactual queries
+ CORRELATION = "correlation" # Simple correlation
+ GRANGER = "granger" # Granger causality
+ TRANSFER_ENTROPY = "transfer_entropy" # Information-theoretic
+ INTERVENTION = "intervention" # Do-calculus based
+ COUNTERFACTUAL = "counterfactual" # Counterfactual queries
 ```
 
 #### Temporal Decay Functions:
 
 ```python
 class TemporalDecayFunction(Enum):
-    EXPONENTIAL = "exponential"  # 0.5^(t/half_life)
-    HYPERBOLIC = "hyperbolic"    # 1/(1 + t/3600)
-    POWER_LAW = "power_law"      # 1/(1 + t/3600)^alpha
-    LINEAR = "linear"            # max(0, 1 - t/half_life)
+ EXPONENTIAL = "exponential" # 0.5^(t/half_life)
+ HYPERBOLIC = "hyperbolic" # 1/(1 + t/3600)
+ POWER_LAW = "power_law" # 1/(1 + t/3600)^alpha
+ LINEAR = "linear" # max(0, 1 - t/half_life)
 ```
 
 #### Key Methods:
 
 ```python
 class CausalContext:
-    def select(self, world_model, query) -> Dict[str, Any]:
-        """Select causally-relevant context."""
-        # Returns: causal_context, concepts, causal_graph,
-        #          interventions, confounders, mediators
-    
-    def record_intervention(self, variable, value, effect_on=None):
-        """Record a causal intervention."""
-    
-    def compute_counterfactual(self, world_model, variable, original_value,
-                                counterfactual_value, outcome_variable):
-        """Compute counterfactual scenario."""
+ def select(self, world_model, query) -> Dict[str, Any]:
+ """Select causally-relevant context."""
+ # Returns: causal_context, concepts, causal_graph,
+ # interventions, confounders, mediators
+ 
+ def record_intervention(self, variable, value, effect_on=None):
+ """Record a causal intervention."""
+ 
+ def compute_counterfactual(self, world_model, variable, original_value,
+ counterfactual_value, outcome_variable):
+ """Compute counterfactual scenario."""
 ```
 
 #### Output Structure:
 
 ```python
 {
-    "causal_context": [
-        {
-            "source": "episodic|semantic|procedural",
-            "score": float,
-            "item": <original>,
-            "reason": str,
-            "causal_path": List[str],
-            "causal_strength": float,
-            "temporal_relevance": float,
-        }
-    ],
-    "concepts": List[str],
-    "causal_graph": Dict,
-    "interventions": List[Dict],
-    "confounders": List[str],
-    "mediators": List[str],
-    "statistics": CausalStatistics,
+ "causal_context": [
+ {
+ "source": "episodic|semantic|procedural",
+ "score": float,
+ "item": <original>,
+ "reason": str,
+ "causal_path": List[str],
+ "causal_strength": float,
+ "temporal_relevance": float,
+ }
+ ],
+ "concepts": List[str],
+ "causal_graph": Dict,
+ "interventions": List[Dict],
+ "confounders": List[str],
+ "mediators": List[str],
+ "statistics": CausalStatistics,
 }
 ```
 
@@ -2259,11 +2259,11 @@ Multi-layered safety filtering for token generation:
 
 ```python
 class RiskLevel(Enum):
-    SAFE = 0
-    LOW = 1
-    MEDIUM = 2
-    HIGH = 3
-    CRITICAL = 4
+ SAFE = 0
+ LOW = 1
+ MEDIUM = 2
+ HIGH = 3
+ CRITICAL = 4
 ```
 
 #### Validation Categories:
@@ -2288,12 +2288,12 @@ class RiskLevel(Enum):
 ```python
 # Integrates with VULCAN validators when available
 from src.vulcan.safety.llm_validators import (
-    ToxicityValidator,
-    HallucinationValidator,
-    PromptInjectionValidator,
-    PIIValidator,
-    BiasValidator,
-    EnhancedSafetyValidator,
+ ToxicityValidator,
+ HallucinationValidator,
+ PromptInjectionValidator,
+ PIIValidator,
+ BiasValidator,
+ EnhancedSafetyValidator,
 )
 ```
 
@@ -2316,22 +2316,22 @@ Comprehensive AI explainability system:
 
 ```python
 class ExplanationLevel(Enum):
-    MINIMAL = "minimal"           # Just the choice
-    BASIC = "basic"              # Choice + top alternatives
-    STANDARD = "standard"        # Basic + factors + confidence
-    DETAILED = "detailed"        # Standard + attributions + context
-    COMPREHENSIVE = "comprehensive"  # Everything + counterfactuals
+ MINIMAL = "minimal" # Just the choice
+ BASIC = "basic" # Choice + top alternatives
+ STANDARD = "standard" # Basic + factors + confidence
+ DETAILED = "detailed" # Standard + attributions + context
+ COMPREHENSIVE = "comprehensive" # Everything + counterfactuals
 ```
 
 #### Attribution Methods:
 
 ```python
 class AttributionMethod(Enum):
-    GRADIENT = "gradient"                    # Gradient-based
-    ATTENTION = "attention"                  # Attention weights
-    INTEGRATED_GRADIENTS = "integrated_gradients"
-    SHAPLEY = "shapley"                      # SHAP values
-    LIME = "lime"                            # Local interpretable
+ GRADIENT = "gradient" # Gradient-based
+ ATTENTION = "attention" # Attention weights
+ INTEGRATED_GRADIENTS = "integrated_gradients"
+ SHAPLEY = "shapley" # SHAP values
+ LIME = "lime" # Local interpretable
 ```
 
 #### Explanation Components:
@@ -2339,50 +2339,50 @@ class AttributionMethod(Enum):
 ```python
 @dataclass
 class DecisionSummary:
-    token: Token
-    token_str: str
-    position: Optional[int]
-    prob: Optional[float]
-    confidence: Optional[float]
-    entropy: Optional[float]
-    strategy: Optional[str]
-    temperature: Optional[float]
-    perplexity: Optional[float]
-    uncertainty: Optional[float]
+ token: Token
+ token_str: str
+ position: Optional[int]
+ prob: Optional[float]
+ confidence: Optional[float]
+ entropy: Optional[float]
+ strategy: Optional[str]
+ temperature: Optional[float]
+ perplexity: Optional[float]
+ uncertainty: Optional[float]
 
 @dataclass
 class FeatureAttribution:
-    feature_name: str
-    importance: float
-    contribution: float
-    method: AttributionMethod
-    details: Dict[str, Any]
+ feature_name: str
+ importance: float
+ contribution: float
+ method: AttributionMethod
+ details: Dict[str, Any]
 
 @dataclass
 class CounterfactualAnalysis:
-    alternative_token: Token
-    alternative_prob: float
-    scenario_description: str
-    outcome_difference: str
-    plausibility: float
+ alternative_token: Token
+ alternative_prob: float
+ scenario_description: str
+ outcome_difference: str
+ plausibility: float
 ```
 
 #### Key Methods:
 
 ```python
 class ExplainableGeneration:
-    def explain(self, token, chain, hidden_state=None, logits=None,
-                candidates=None, prompt_tokens=None, level=ExplanationLevel.STANDARD):
-        """Generate comprehensive explanation for a token decision."""
-    
-    def explain_sequence(self, tokens, explanations):
-        """Generate explanation for full sequence."""
-    
-    def get_feature_attributions(self, token, hidden_state, method=AttributionMethod.ATTENTION):
-        """Get feature importance attributions."""
-    
-    def generate_counterfactuals(self, token, alternatives, context):
-        """Generate what-if scenarios for alternatives."""
+ def explain(self, token, chain, hidden_state=None, logits=None,
+ candidates=None, prompt_tokens=None, level=ExplanationLevel.STANDARD):
+ """Generate comprehensive explanation for a token decision."""
+ 
+ def explain_sequence(self, tokens, explanations):
+ """Generate explanation for full sequence."""
+ 
+ def get_feature_attributions(self, token, hidden_state, method=AttributionMethod.ATTENTION):
+ """Get feature importance attributions."""
+ 
+ def generate_counterfactuals(self, token, alternatives, context):
+ """Generate what-if scenarios for alternatives."""
 ```
 
 ### 14.3 Unified Generation
@@ -2407,29 +2407,29 @@ The tool selection system determines which reasoning tools to use for a given pr
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    TOOL SELECTION PIPELINE                       │
+│ TOOL SELECTION PIPELINE │
 ├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  1. Admission Control ──► Rate limiting, resource checks        │
-│                         │                                       │
-│  2. Feature Extraction ──► Problem embedding                    │
-│                         │                                       │
-│  3. Cache Lookup ──► Check for cached selection                 │
-│                         │                                       │
-│  4. Memory Prior ──► Similar past problems                      │
-│                         │                                       │
-│  5. Semantic Matching ──► Tool-problem similarity               │
-│                         │                                       │
-│  6. Cost Estimation ──► Predict execution cost                  │
-│                         │                                       │
-│  7. Utility Computation ──► Expected utility per tool           │
-│                         │                                       │
-│  8. Safety Check ──► Validate tool safety                       │
-│                         │                                       │
-│  9. Portfolio Assembly ──► Select complementary tools           │
-│                         │                                       │
-│  10. Warm Pool Priming ──► Pre-initialize selected tools        │
-│                                                                 │
+│ │
+│ 1. Admission Control ──► Rate limiting, resource checks │
+│ │ │
+│ 2. Feature Extraction ──► Problem embedding │
+│ │ │
+│ 3. Cache Lookup ──► Check for cached selection │
+│ │ │
+│ 4. Memory Prior ──► Similar past problems │
+│ │ │
+│ 5. Semantic Matching ──► Tool-problem similarity │
+│ │ │
+│ 6. Cost Estimation ──► Predict execution cost │
+│ │ │
+│ 7. Utility Computation ──► Expected utility per tool │
+│ │ │
+│ 8. Safety Check ──► Validate tool safety │
+│ │ │
+│ 9. Portfolio Assembly ──► Select complementary tools │
+│ │ │
+│ 10. Warm Pool Priming ──► Pre-initialize selected tools │
+│ │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -2455,32 +2455,32 @@ The tool selection system determines which reasoning tools to use for a given pr
 ```python
 @dataclass
 class CostEstimate:
-    latency_ms: float      # Expected execution time
-    energy_mj: float       # Expected energy consumption
-    memory_mb: float       # Expected memory usage
-    confidence: float      # Estimation confidence
-    breakdown: Dict[str, float]  # Per-component costs
+ latency_ms: float # Expected execution time
+ energy_mj: float # Expected energy consumption
+ memory_mb: float # Expected memory usage
+ confidence: float # Estimation confidence
+ breakdown: Dict[str, float] # Per-component costs
 ```
 
 #### Cost Factors:
 
 ```python
 COST_FACTORS = {
-    "symbolic": {
-        "base_latency_ms": 50,
-        "complexity_factor": 1.2,
-        "memory_factor": 0.8,
-    },
-    "probabilistic": {
-        "base_latency_ms": 100,
-        "complexity_factor": 1.5,
-        "memory_factor": 1.2,
-    },
-    "causal": {
-        "base_latency_ms": 150,
-        "complexity_factor": 2.0,
-        "memory_factor": 1.5,
-    },
+ "symbolic": {
+ "base_latency_ms": 50,
+ "complexity_factor": 1.2,
+ "memory_factor": 0.8,
+ },
+ "probabilistic": {
+ "base_latency_ms": 100,
+ "complexity_factor": 1.5,
+ "memory_factor": 1.2,
+ },
+ "causal": {
+ "base_latency_ms": 150,
+ "complexity_factor": 2.0,
+ "memory_factor": 1.5,
+ },
 }
 ```
 
@@ -2491,29 +2491,29 @@ COST_FACTORS = {
 ```python
 @dataclass
 class UtilityEstimate:
-    expected_utility: float   # Overall expected utility
-    quality_score: float      # Expected quality
-    risk_score: float         # Risk estimate
-    confidence: float         # Estimation confidence
-    breakdown: Dict[str, float]
+ expected_utility: float # Overall expected utility
+ quality_score: float # Expected quality
+ risk_score: float # Risk estimate
+ confidence: float # Estimation confidence
+ breakdown: Dict[str, float]
 ```
 
 #### Utility Calculation:
 
 ```python
 def compute_utility(
-    tool: str,
-    problem_features: np.ndarray,
-    context: UtilityContext,
+ tool: str,
+ problem_features: np.ndarray,
+ context: UtilityContext,
 ) -> UtilityEstimate:
-    """
-    Utility = quality * (1 - risk) - cost_penalty
-    
-    Where:
-    - quality: Expected result quality
-    - risk: Probability of failure
-    - cost_penalty: Weighted cost (time, energy)
-    """
+ """
+ Utility = quality * (1 - risk) - cost_penalty
+ 
+ Where:
+ - quality: Expected result quality
+ - risk: Probability of failure
+ - cost_penalty: Weighted cost (time, energy)
+ """
 ```
 
 ### 13.4 Safety Governor
@@ -2522,12 +2522,12 @@ def compute_utility(
 
 ```python
 class SafetyGovernor:
-    """Validates tool safety before execution."""
-    
-    def validate_tool(self, tool: str, context: Dict) -> SafetyResult
-    def check_rate_limits(self, tool: str) -> bool
-    def validate_inputs(self, tool: str, inputs: Dict) -> bool
-    def log_safety_event(self, event: SafetyEvent)
+ """Validates tool safety before execution."""
+ 
+ def validate_tool(self, tool: str, context: Dict) -> SafetyResult
+ def check_rate_limits(self, tool: str) -> bool
+ def validate_inputs(self, tool: str, inputs: Dict) -> bool
+ def log_safety_event(self, event: SafetyEvent)
 ```
 
 #### Safety Checks:
@@ -2572,37 +2572,37 @@ The UnifiedGeneration system combines multiple reasoning strategies into an ense
 ```python
 @dataclass
 class UnifiedGenConfig:
-    max_candidates: int = 10
-    default_module_weights: Dict[str, float] = {
-        "language": 1.0,
-        "symbolic": 1.0,
-        "probabilistic": 1.0,
-        "causal": 1.2,       # Causal reasoning boosted
-        "analogical": 0.8,   # Creative, slightly risky
-        "meta_cognitive": 1.1,
-        "evolutionary": 0.7,
-        "adversarial": 0.6,
-        "hierarchical": 0.9,
-    }
-    fusion_strategy: FusionStrategy = FusionStrategy.WEIGHTED_SUM
-    temperature: float = 1.0
-    diversity_penalty: float = 0.0
-    enable_cross_module_interaction: bool = True
-    enable_dynamic_weights: bool = True
+ max_candidates: int = 10
+ default_module_weights: Dict[str, float] = {
+ "language": 1.0,
+ "symbolic": 1.0,
+ "probabilistic": 1.0,
+ "causal": 1.2, # Causal reasoning boosted
+ "analogical": 0.8, # Creative, slightly risky
+ "meta_cognitive": 1.1,
+ "evolutionary": 0.7,
+ "adversarial": 0.6,
+ "hierarchical": 0.9,
+ }
+ fusion_strategy: FusionStrategy = FusionStrategy.WEIGHTED_SUM
+ temperature: float = 1.0
+ diversity_penalty: float = 0.0
+ enable_cross_module_interaction: bool = True
+ enable_dynamic_weights: bool = True
 ```
 
 ### Cross-Module Interaction:
 
 ```python
 def _model_cross_module_interactions(self, per_module, weights):
-    """Boost candidates with cross-module agreement."""
-    
-    # Find tokens proposed by multiple modules
-    for tok, modules in all_tokens.items():
-        if len(modules) > 1:
-            # Boost based on agreement count
-            boost = 1.0 + 0.1 * (len(modules) - 1)
-            prop["module_prob"] *= boost
+ """Boost candidates with cross-module agreement."""
+ 
+ # Find tokens proposed by multiple modules
+ for tok, modules in all_tokens.items():
+ if len(modules) > 1:
+ # Boost based on agreement count
+ boost = 1.0 + 0.1 * (len(modules) - 1)
+ prop["module_prob"] *= boost
 ```
 
 ### Candidate Metadata:
@@ -2610,16 +2610,16 @@ def _model_cross_module_interactions(self, per_module, weights):
 ```python
 @dataclass
 class CandidateMetadata:
-    token: Any
-    score: float
-    prob: float
-    logit: float
-    rank: int
-    provenance: List[Dict[str, Any]]  # Which modules contributed
-    confidence: float
-    diversity_score: float
-    module_agreement: int             # Number of modules proposing
-    uncertainty: float
+ token: Any
+ score: float
+ prob: float
+ logit: float
+ rank: int
+ provenance: List[Dict[str, Any]] # Which modules contributed
+ confidence: float
+ diversity_score: float
+ module_agreement: int # Number of modules proposing
+ uncertainty: float
 ```
 
 ---
@@ -2638,44 +2638,44 @@ Compiles JSON graph representations to optimized native machine code:
 
 ```python
 class NodeType(Enum):
-    INPUT = "InputNode"
-    OUTPUT = "OutputNode"
-    CONST = "CONST"
-    ADD = "ADD"
-    MUL = "MUL"
-    MATRIX_MUL = "MATRIX_MUL"
-    RELU = "RELU"
-    SOFTMAX = "SOFTMAX"
-    CONV2D = "CONV2D"
-    BATCH_NORM = "BATCH_NORM"
-    EMBEDDING = "EMBEDDING"
-    ATTENTION = "ATTENTION"
-    PHOTONIC_MVM = "PhotonicMVMNode"  # Analog photonic emulation
-    DYNAMIC_CODE = "DynamicCodeNode"
-    GENERATIVE_AI = "GenerativeAINode"
+ INPUT = "InputNode"
+ OUTPUT = "OutputNode"
+ CONST = "CONST"
+ ADD = "ADD"
+ MUL = "MUL"
+ MATRIX_MUL = "MATRIX_MUL"
+ RELU = "RELU"
+ SOFTMAX = "SOFTMAX"
+ CONV2D = "CONV2D"
+ BATCH_NORM = "BATCH_NORM"
+ EMBEDDING = "EMBEDDING"
+ ATTENTION = "ATTENTION"
+ PHOTONIC_MVM = "PhotonicMVMNode" # Analog photonic emulation
+ DYNAMIC_CODE = "DynamicCodeNode"
+ GENERATIVE_AI = "GenerativeAINode"
 ```
 
 #### Graph Optimizer:
 
 ```python
 class GraphOptimizer:
-    """Optimizes graph before compilation."""
-    
-    def optimize(self, graph: nx.DiGraph) -> nx.DiGraph:
-        graph = self._fuse_operations(graph)      # Op fusion
-        graph = self._eliminate_dead_code(graph)  # DCE
-        graph = self._constant_folding(graph)     # Constant evaluation
-        graph = self._common_subexpression_elimination(graph)  # CSE
-        return graph
+ """Optimizes graph before compilation."""
+ 
+ def optimize(self, graph: nx.DiGraph) -> nx.DiGraph:
+ graph = self._fuse_operations(graph) # Op fusion
+ graph = self._eliminate_dead_code(graph) # DCE
+ graph = self._constant_folding(graph) # Constant evaluation
+ graph = self._common_subexpression_elimination(graph) # CSE
+ return graph
 ```
 
 #### Fusable Patterns:
 
 ```python
 patterns = [
-    ["CONV2D", "BATCH_NORM", "RELU"],  # Conv + BN + ReLU
-    ["MATRIX_MUL", "ADD"],              # MatMul + Bias
-    ["ADD", "ADD"],                     # Multiple adds
+ ["CONV2D", "BATCH_NORM", "RELU"], # Conv + BN + ReLU
+ ["MATRIX_MUL", "ADD"], # MatMul + Bias
+ ["ADD", "ADD"], # Multiple adds
 ]
 ```
 
@@ -2687,37 +2687,37 @@ patterns = [
 
 ```python
 class DataType(Enum):
-    FLOAT32 = "float32"
-    FLOAT64 = "float64"
-    INT32 = "int32"
-    INT64 = "int64"
-    BOOL = "bool"
+ FLOAT32 = "float32"
+ FLOAT64 = "float64"
+ INT32 = "int32"
+ INT64 = "int64"
+ BOOL = "bool"
 ```
 
 #### Compilation Pipeline:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    COMPILATION PIPELINE                          │
+│ COMPILATION PIPELINE │
 ├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  JSON Graph ──► Parse ──► NetworkX DiGraph                      │
-│                                │                                │
-│                                ▼                                │
-│  Graph Optimization ──► Fusion, DCE, CSE, Folding               │
-│                                │                                │
-│                                ▼                                │
-│  LLVM IR Generation ──► Create Module, Functions                │
-│                                │                                │
-│                                ▼                                │
-│  LLVM Optimization ──► Passes (O2, vectorization)               │
-│                                │                                │
-│                                ▼                                │
-│  Code Generation ──► Native Machine Code                        │
-│                                │                                │
-│                                ▼                                │
-│  JIT Execution or Binary Output                                 │
-│                                                                 │
+│ │
+│ JSON Graph ──► Parse ──► NetworkX DiGraph │
+│ │ │
+│ ▼ │
+│ Graph Optimization ──► Fusion, DCE, CSE, Folding │
+│ │ │
+│ ▼ │
+│ LLVM IR Generation ──► Create Module, Functions │
+│ │ │
+│ ▼ │
+│ LLVM Optimization ──► Passes (O2, vectorization) │
+│ │ │
+│ ▼ │
+│ Code Generation ──► Native Machine Code │
+│ │ │
+│ ▼ │
+│ JIT Execution or Binary Output │
+│ │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -2729,15 +2729,15 @@ Executes graphs using both compiled code and Python fallback:
 
 ```python
 class HybridExecutor:
-    """
-    Executes compiled graphs with fallback for unsupported ops.
-    
-    Features:
-    - JIT compilation for hot paths
-    - Python fallback for dynamic ops
-    - Caching of compiled functions
-    - Profiling and optimization hints
-    """
+ """
+ Executes compiled graphs with fallback for unsupported ops.
+ 
+ Features:
+ - JIT compilation for hot paths
+ - Python fallback for dynamic ops
+ - Caching of compiled functions
+ - Profiling and optimization hints
+ """
 ```
 
 ---
@@ -2761,23 +2761,23 @@ The autonomous self-improvement system includes:
 
 ```
 1. Context Building ──► 2. Trigger Check ──► 3. Action Generation
-        │                      │                      │
-        ▼                      ▼                      ▼
-   Performance          Self-Improvement         LLM-Driven
-   Metrics              Drive Evaluation         Code Generation
-        │                      │                      │
-        └──────────────────────┴──────────────────────┘
-                               │
-                               ▼
+ │ │ │
+ ▼ ▼ ▼
+ Performance Self-Improvement LLM-Driven
+ Metrics Drive Evaluation Code Generation
+ │ │ │
+ └──────────────────────┴──────────────────────┘
+ │
+ ▼
 4. AST Validation ──► 5. Diff Application ──► 6. Git Commit
-        │                      │                    │
-        ▼                      ▼                    ▼
-   Syntax Check           File System          Version Control
-        │                   Update                  │
-        └──────────────────────┴──────────────────┘
-                               │
-                               ▼
-                    7. Learning/Outcome Recording
+ │ │ │
+ ▼ ▼ ▼
+ Syntax Check File System Version Control
+ │ Update │
+ └──────────────────────┴──────────────────┘
+ │
+ ▼
+ 7. Learning/Outcome Recording
 ```
 
 #### Safety Controls:
@@ -2792,24 +2792,24 @@ The autonomous self-improvement system includes:
 ### Safety Layers:
 
 1. **Input Validation**
-   - Sanitization of user inputs
-   - Pattern-based threat detection
-   - Content filtering
+ - Sanitization of user inputs
+ - Pattern-based threat detection
+ - Content filtering
 
 2. **Reasoning Validation**
-   - SafetyAwareReasoning wrapper
-   - Confidence threshold filtering
-   - Output safety checks
+ - SafetyAwareReasoning wrapper
+ - Confidence threshold filtering
+ - Output safety checks
 
 3. **Causal Safety**
-   - Causal edge validation
-   - Intervention safety checks
-   - Path validation
+ - Causal edge validation
+ - Intervention safety checks
+ - Path validation
 
 4. **Self-Improvement Safety**
-   - AST validation before code application
-   - Git-based rollback capability
-   - Manual approval options
+ - AST validation before code application
+ - Git-based rollback capability
+ - Manual approval options
 
 ### Governance Features:
 
@@ -2830,10 +2830,10 @@ The LLM backend package provides multi-backend LLM integration.
 
 ```
 src/vulcan/llm/
-├── __init__.py          # Package exports
-├── hybrid_executor.py   # Multi-backend executor
-├── mock_llm.py          # Mock implementation for testing
-└── openai_client.py     # OpenAI API client
+├── __init__.py # Package exports
+├── hybrid_executor.py # Multi-backend executor
+├── mock_llm.py # Mock implementation for testing
+└── openai_client.py # OpenAI API client
 ```
 
 ### 18.2 OpenAI Client
@@ -2848,19 +2848,19 @@ Lazy-initialized OpenAI client with error tracking:
 
 # Client Functions
 def get_openai_client() -> Optional[OpenAI]:
-    """Get lazily-initialized OpenAI client."""
+ """Get lazily-initialized OpenAI client."""
 
 def get_openai_init_error() -> Optional[str]:
-    """Get initialization error for diagnostics."""
+ """Get initialization error for diagnostics."""
 
 def initialize_openai_client(api_key: Optional[str] = None) -> bool:
-    """Explicitly initialize with optional key."""
+ """Explicitly initialize with optional key."""
 
 def is_openai_ready() -> bool:
-    """Check if client is ready for use."""
+ """Check if client is ready for use."""
 
 # Availability Check
-OPENAI_AVAILABLE: bool  # True if openai package installed
+OPENAI_AVAILABLE: bool # True if openai package installed
 ```
 
 ### 18.3 Mock LLM
@@ -2871,22 +2871,22 @@ Mock implementation for testing and fallback:
 
 ```python
 class MockGraphixVulcanLLM:
-    """Mock LLM for safe execution when real package unavailable."""
-    
-    def __init__(self, config_path: str):
-        self.bridge = MagicMock()  # Mock bridge for reasoning
-    
-    def generate(self, prompt: str, max_tokens: int = 100) -> str:
-        """Return mock response."""
-    
-    def reason(self, query: str, context: Optional[dict] = None) -> str:
-        """Mock reasoning operation."""
-    
-    def explain(self, concept: str) -> str:
-        """Mock explanation operation."""
-    
-    def get_stats(self) -> dict:
-        """Get generation statistics including is_mock flag."""
+ """Mock LLM for safe execution when real package unavailable."""
+ 
+ def __init__(self, config_path: str):
+ self.bridge = MagicMock() # Mock bridge for reasoning
+ 
+ def generate(self, prompt: str, max_tokens: int = 100) -> str:
+ """Return mock response."""
+ 
+ def reason(self, query: str, context: Optional[dict] = None) -> str:
+ """Mock reasoning operation."""
+ 
+ def explain(self, concept: str) -> str:
+ """Mock explanation operation."""
+ 
+ def get_stats(self) -> dict:
+ """Get generation statistics including is_mock flag."""
 
 # Auto-fallback
 GraphixVulcanLLM = RealGraphixVulcanLLM or MockGraphixVulcanLLM
@@ -2912,48 +2912,48 @@ Multi-backend execution with fallback and ensemble modes:
 
 ```python
 class HybridLLMExecutor:
-    # Constants
-    MIN_MEANINGFUL_LENGTH = 10
-    ENSEMBLE_LOCAL_RESPONSE_MAX_LENGTH = 500
-    
-    DEFAULT_SYSTEM_PROMPT = (
-        "You are VULCAN, an advanced AI assistant. "
-        "You SHOULD remember and reference information shared earlier..."
-    )
-    
-    def __init__(
-        self,
-        local_llm: Optional[Any] = None,
-        openai_client_getter: Optional[Callable] = None,
-        mode: str = "parallel",
-        timeout: float = 30.0,
-        ensemble_min_confidence: float = 0.7,
-        openai_max_tokens: int = 2000,
-    )
-    
-    async def execute(
-        self,
-        prompt: str,
-        max_tokens: int = 1000,
-        temperature: float = 0.7,
-        system_prompt: Optional[str] = None,
-        enable_distillation: bool = True,  # Capture for training
-        conversation_history: Optional[List[Dict]] = None,
-    ) -> Dict[str, Any]:
-        """Execute with configured mode and distillation capture."""
-    
-    def generate(
-        self,
-        prompt: str,
-        context: Optional[Dict[str, Any]] = None,
-        max_tokens: int = 500,
-    ) -> str:
-        """
-        Synchronous generation using local LLM only.
-        
-        Raises RuntimeError if local_llm is None.
-        Does NOT fall back to OpenAI - errors are propagated.
-        """
+ # Constants
+ MIN_MEANINGFUL_LENGTH = 10
+ ENSEMBLE_LOCAL_RESPONSE_MAX_LENGTH = 500
+ 
+ DEFAULT_SYSTEM_PROMPT = (
+ "You are VULCAN, an advanced AI assistant. "
+ "You SHOULD remember and reference information shared earlier..."
+ )
+ 
+ def __init__(
+ self,
+ local_llm: Optional[Any] = None,
+ openai_client_getter: Optional[Callable] = None,
+ mode: str = "parallel",
+ timeout: float = 30.0,
+ ensemble_min_confidence: float = 0.7,
+ openai_max_tokens: int = 2000,
+ )
+ 
+ async def execute(
+ self,
+ prompt: str,
+ max_tokens: int = 1000,
+ temperature: float = 0.7,
+ system_prompt: Optional[str] = None,
+ enable_distillation: bool = True, # Capture for training
+ conversation_history: Optional[List[Dict]] = None,
+ ) -> Dict[str, Any]:
+ """Execute with configured mode and distillation capture."""
+ 
+ def generate(
+ self,
+ prompt: str,
+ context: Optional[Dict[str, Any]] = None,
+ max_tokens: int = 500,
+ ) -> str:
+ """
+ Synchronous generation using local LLM only.
+ 
+ Raises RuntimeError if local_llm is None.
+ Does NOT fall back to OpenAI - errors are propagated.
+ """
 ```
 
 #### Distillation Integration:
@@ -2961,7 +2961,7 @@ class HybridLLMExecutor:
 ```python
 # When enable_distillation=True and source includes OpenAI:
 if enable_distillation and result.get("source") in ("openai", "parallel_both", "ensemble"):
-    self._capture_for_distillation(prompt, result)
+ self._capture_for_distillation(prompt, result)
 ```
 
 ---
@@ -2976,51 +2976,51 @@ Comprehensive knowledge distillation from OpenAI to local LLM.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                KNOWLEDGE DISTILLATION PIPELINE                       │
+│ KNOWLEDGE DISTILLATION PIPELINE │
 ├─────────────────────────────────────────────────────────────────────┤
-│                                                                     │
-│  User Request (with opt-in)                                         │
-│         │                                                           │
-│         ▼                                                           │
-│  ┌─────────────────────────────────────────────────────────────┐   │
-│  │                  CAPTURE LAYER                               │   │
-│  │  OpenAIKnowledgeDistiller.capture_response()                 │   │
-│  │                                                              │   │
-│  │  Stage 1: Opt-In Check ─────► REJECT if not opted in         │   │
-│  │  Stage 2: PII Redaction ────► Mask emails, phones, SSN       │   │
-│  │  Stage 3: Secret Detection ─► REJECT if API keys found       │   │
-│  │  Stage 4: Governance Check ─► REJECT if sensitive content    │   │
-│  │  Stage 5: Quality Validation─► REJECT if low quality         │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-│                              │                                      │
-│                              ▼ (passed all stages)                  │
-│  ┌─────────────────────────────────────────────────────────────┐   │
-│  │                  STORAGE LAYER                               │   │
-│  │  DistillationStorageBackend                                  │   │
-│  │  - JSONL format (appendable)                                 │   │
-│  │  - Optional Fernet encryption                                │   │
-│  │  - Provenance hashes                                         │   │
-│  │  - Retention limits                                          │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-│                              │                                      │
-│                              ▼ (training worker reads)              │
-│  ┌─────────────────────────────────────────────────────────────┐   │
-│  │                  TRAINING LAYER                              │   │
-│  │  GovernedTrainer + ConsensusEngine                           │   │
-│  │  - Proposes weight updates                                   │   │
-│  │  - Consensus approval/rejection                              │   │
-│  │  - Rollback on regression                                    │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-│                              │                                      │
-│                              ▼                                      │
-│  ┌─────────────────────────────────────────────────────────────┐   │
-│  │                  EVALUATION LAYER                            │   │
-│  │  ShadowModelEvaluator + PromotionGate                        │   │
-│  │  - Golden test set evaluation                                │   │
-│  │  - Regression detection                                      │   │
-│  │  - Promotion/rollback decision                               │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-│                                                                     │
+│ │
+│ User Request (with opt-in) │
+│ │ │
+│ ▼ │
+│ ┌─────────────────────────────────────────────────────────────┐ │
+│ │ CAPTURE LAYER │ │
+│ │ OpenAIKnowledgeDistiller.capture_response() │ │
+│ │ │ │
+│ │ Stage 1: Opt-In Check ─────► REJECT if not opted in │ │
+│ │ Stage 2: PII Redaction ────► Mask emails, phones, SSN │ │
+│ │ Stage 3: Secret Detection ─► REJECT if API keys found │ │
+│ │ Stage 4: Governance Check ─► REJECT if sensitive content │ │
+│ │ Stage 5: Quality Validation─► REJECT if low quality │ │
+│ └─────────────────────────────────────────────────────────────┘ │
+│ │ │
+│ ▼ (passed all stages) │
+│ ┌─────────────────────────────────────────────────────────────┐ │
+│ │ STORAGE LAYER │ │
+│ │ DistillationStorageBackend │ │
+│ │ - JSONL format (appendable) │ │
+│ │ - Optional Fernet encryption │ │
+│ │ - Provenance hashes │ │
+│ │ - Retention limits │ │
+│ └─────────────────────────────────────────────────────────────┘ │
+│ │ │
+│ ▼ (training worker reads) │
+│ ┌─────────────────────────────────────────────────────────────┐ │
+│ │ TRAINING LAYER │ │
+│ │ GovernedTrainer + ConsensusEngine │ │
+│ │ - Proposes weight updates │ │
+│ │ - Consensus approval/rejection │ │
+│ │ - Rollback on regression │ │
+│ └─────────────────────────────────────────────────────────────┘ │
+│ │ │
+│ ▼ │
+│ ┌─────────────────────────────────────────────────────────────┐ │
+│ │ EVALUATION LAYER │ │
+│ │ ShadowModelEvaluator + PromotionGate │ │
+│ │ - Golden test set evaluation │ │
+│ │ - Regression detection │ │
+│ │ - Promotion/rollback decision │ │
+│ └─────────────────────────────────────────────────────────────┘ │
+│ │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -3031,28 +3031,28 @@ Comprehensive knowledge distillation from OpenAI to local LLM.
 ```python
 @dataclass
 class DistillationExample:
-    """Training example with full provenance tracking."""
-    
-    # Core content
-    instruction: str          # Sanitized prompt (PII redacted)
-    teacher_answer: str       # OpenAI response
-    context: Dict[str, Any]   # Routing metadata, tools used
-    labels: Dict[str, Any]    # Domain, difficulty, validation
-    
-    # Provenance tracking
-    prompt_hash: str          # SHA256 of original prompt
-    response_hash: str        # SHA256 of response
-    teacher_model: str        # e.g., "gpt-3.5-turbo"
-    timestamp: float
-    
-    # Quality metrics
-    quality_score: float
-    validation_passed: bool
-    rejection_reasons: List[str]
-    
-    # Governance
-    session_opted_in: bool
-    retention_expires: Optional[float]
+ """Training example with full provenance tracking."""
+ 
+ # Core content
+ instruction: str # Sanitized prompt (PII redacted)
+ teacher_answer: str # OpenAI response
+ context: Dict[str, Any] # Routing metadata, tools used
+ labels: Dict[str, Any] # Domain, difficulty, validation
+ 
+ # Provenance tracking
+ prompt_hash: str # SHA256 of original prompt
+ response_hash: str # SHA256 of response
+ teacher_model: str # e.g., "gpt-3.5-turbo"
+ timestamp: float
+ 
+ # Quality metrics
+ quality_score: float
+ validation_passed: bool
+ rejection_reasons: List[str]
+ 
+ # Governance
+ session_opted_in: bool
+ retention_expires: Optional[float]
 ```
 
 ### 19.3 PII Redactor
@@ -3103,12 +3103,12 @@ Checks content against governance rules:
 
 ```python
 DO_NOT_CAPTURE_MARKERS = [
-    "[CONFIDENTIAL]",
-    "[DO NOT LOG]",
-    "[SENSITIVE]",
-    "[PRIVATE]",
-    "[NO_TRAINING]",
-    "[GOVERNANCE_RESTRICTED]",
+ "[CONFIDENTIAL]",
+ "[DO NOT LOG]",
+ "[SENSITIVE]",
+ "[PRIVATE]",
+ "[NO_TRAINING]",
+ "[GOVERNANCE_RESTRICTED]",
 ]
 ```
 
@@ -3131,9 +3131,9 @@ Multi-stage quality filtering:
 
 ```python
 REFUSAL_PATTERNS = [
-    "i cannot", "i can't", "i'm not able to",
-    "as an ai", "as a language model",
-    "i apologize, but", "i'm sorry, but i cannot",
+ "i cannot", "i can't", "i'm not able to",
+ "as an ai", "as a language model",
+ "i apologize, but", "i'm sorry, but i cannot",
 ]
 ```
 
@@ -3141,10 +3141,10 @@ REFUSAL_PATTERNS = [
 
 ```python
 BOILERPLATE_PATTERNS = [
-    "sure, ", "of course, ", "certainly, ",
-    "great question", "good question",
-    "here's", "let me", "i'd be happy to",
-    "i hope this helps", "feel free to ask",
+ "sure, ", "of course, ", "certainly, ",
+ "great question", "good question",
+ "here's", "let me", "i'd be happy to",
+ "i hope this helps", "feel free to ask",
 ]
 ```
 
@@ -3158,14 +3158,14 @@ Evaluates improvements before promotion:
 
 ```python
 GOLDEN_PROMPTS = [
-    {"prompt": "What is 2 + 2?", 
-     "expected_contains": ["4"], "domain": "math"},
-    {"prompt": "Write a Python function that adds two numbers.",
-     "expected_contains": ["def", "return", "+"], "domain": "code"},
-    {"prompt": "Explain machine learning in one sentence.",
-     "expected_contains": ["learn", "data"], "domain": "explanation"},
-    {"prompt": "What is the capital of France?",
-     "expected_contains": ["Paris"], "domain": "factual"},
+ {"prompt": "What is 2 + 2?", 
+ "expected_contains": ["4"], "domain": "math"},
+ {"prompt": "Write a Python function that adds two numbers.",
+ "expected_contains": ["def", "return", "+"], "domain": "code"},
+ {"prompt": "Explain machine learning in one sentence.",
+ "expected_contains": ["learn", "data"], "domain": "explanation"},
+ {"prompt": "What is the capital of France?",
+ "expected_contains": ["Paris"], "domain": "factual"},
 ]
 ```
 
@@ -3193,16 +3193,16 @@ Explicit gate for weight promotion:
 
 ```python
 def evaluate_for_promotion(eval_results, training_metadata):
-    """
-    Returns (approved: bool, decision_details: Dict)
-    
-    Checks:
-    1. eval_score >= MIN_EVAL_SCORE
-    2. regression_count <= MAX_REGRESSION_COUNT
-    3. provenance_valid == True
-    
-    All must pass for approval.
-    """
+ """
+ Returns (approved: bool, decision_details: Dict)
+ 
+ Checks:
+ 1. eval_score >= MIN_EVAL_SCORE
+ 2. regression_count <= MAX_REGRESSION_COUNT
+ 3. provenance_valid == True
+ 
+ All must pass for approval.
+ """
 ```
 
 ### 19.8 Storage Backend
@@ -3213,22 +3213,22 @@ JSONL storage with optional encryption:
 
 ```python
 class DistillationStorageBackend:
-    def __init__(
-        self,
-        storage_path: str = "data/distillation",
-        use_encryption: bool = False,
-        encryption_key: Optional[str] = None,  # Fernet key
-        max_file_size_mb: int = 100,
-    )
-    
-    def append_example(self, example: Dict[str, Any]) -> bool:
-        """Thread-safe append to JSONL."""
-    
-    def read_batch(self, batch_size: int) -> List[Dict[str, Any]]:
-        """Read batch for training."""
-    
-    def get_stats(self) -> Dict[str, Any]:
-        """Get storage statistics."""
+ def __init__(
+ self,
+ storage_path: str = "data/distillation",
+ use_encryption: bool = False,
+ encryption_key: Optional[str] = None, # Fernet key
+ max_file_size_mb: int = 100,
+ )
+ 
+ def append_example(self, example: Dict[str, Any]) -> bool:
+ """Thread-safe append to JSONL."""
+ 
+ def read_batch(self, batch_size: int) -> List[Dict[str, Any]]:
+ """Read batch for training."""
+ 
+ def get_stats(self) -> Dict[str, Any]:
+ """Get storage statistics."""
 ```
 
 ---
@@ -3241,29 +3241,29 @@ class DistillationStorageBackend:
 
 ```python
 def timed_operation(operation_name: str) -> Callable:
-    """Decorator to time operations and log performance."""
-    
-    def decorator(func):
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            start = time.perf_counter()
-            result = func(*args, **kwargs)
-            elapsed_ms = (time.perf_counter() - start) * 1000
-            
-            # Update global stats
-            stats = _PERF_STATS[operation_name]
-            stats["count"] += 1
-            stats["total_ms"] += elapsed_ms
-            stats["min_ms"] = min(stats["min_ms"], elapsed_ms)
-            stats["max_ms"] = max(stats["max_ms"], elapsed_ms)
-            
-            # Log slow operations (>50ms)
-            if elapsed_ms > 50.0:
-                logger.debug("[PERF] %s: %.1fms", operation_name, elapsed_ms)
-            
-            return result
-        return wrapper
-    return decorator
+ """Decorator to time operations and log performance."""
+ 
+ def decorator(func):
+ @functools.wraps(func)
+ def wrapper(*args, **kwargs):
+ start = time.perf_counter()
+ result = func(*args, **kwargs)
+ elapsed_ms = (time.perf_counter() - start) * 1000
+ 
+ # Update global stats
+ stats = _PERF_STATS[operation_name]
+ stats["count"] += 1
+ stats["total_ms"] += elapsed_ms
+ stats["min_ms"] = min(stats["min_ms"], elapsed_ms)
+ stats["max_ms"] = max(stats["max_ms"], elapsed_ms)
+ 
+ # Log slow operations (>50ms)
+ if elapsed_ms > 50.0:
+ logger.debug("[PERF] %s: %.1fms", operation_name, elapsed_ms)
+ 
+ return result
+ return wrapper
+ return decorator
 ```
 
 ### Performance Statistics API:
@@ -3285,18 +3285,18 @@ log_performance_summary()
 ```python
 @dataclass
 class ExecutionMetrics:
-    total_executions: int = 0
-    total_tokens_processed: int = 0
-    total_time_ms: float = 0.0
-    cache_hits: int = 0
-    cache_misses: int = 0
-    memory_peak_mb: float = 0.0
-    flops_total: float = 0.0
-    layer_times: Dict[str, float]
-    
-    def get_avg_time_per_token(self) -> float
-    def get_cache_hit_rate(self) -> float
-    def to_dict(self) -> Dict[str, Any]
+ total_executions: int = 0
+ total_tokens_processed: int = 0
+ total_time_ms: float = 0.0
+ cache_hits: int = 0
+ cache_misses: int = 0
+ memory_peak_mb: float = 0.0
+ flops_total: float = 0.0
+ layer_times: Dict[str, float]
+ 
+ def get_avg_time_per_token(self) -> float
+ def get_cache_hit_rate(self) -> float
+ def to_dict(self) -> Dict[str, Any]
 ```
 
 ### Layer-Level Profiling:
@@ -3304,20 +3304,20 @@ class ExecutionMetrics:
 ```python
 # Fine-grained layer timing (logged when total > 200ms)
 timings = {
-    "ln1_ms": ...,           # Pre-attention layer norm
-    "attention_ms": ...,     # Attention computation
-    "residual1_ms": ...,     # First residual connection
-    "ln2_ms": ...,           # Pre-FFN layer norm
-    "ffn_ms": ...,           # Feed-forward network
-    "residual2_ms": ...,     # Second residual connection
+ "ln1_ms": ..., # Pre-attention layer norm
+ "attention_ms": ..., # Attention computation
+ "residual1_ms": ..., # First residual connection
+ "ln2_ms": ..., # Pre-FFN layer norm
+ "ffn_ms": ..., # Feed-forward network
+ "residual2_ms": ..., # Second residual connection
 }
 
 # FFN sub-operation timing (logged when total > 100ms)
 ffn_timings = {
-    "gate_proj_ms": ...,     # Gate projection
-    "up_proj_ms": ...,       # Up projection
-    "swiglu_ms": ...,        # SwiGLU activation
-    "down_proj_ms": ...,     # Down projection
+ "gate_proj_ms": ..., # Gate projection
+ "up_proj_ms": ..., # Up projection
+ "swiglu_ms": ..., # SwiGLU activation
+ "down_proj_ms": ..., # Down projection
 }
 ```
 
@@ -3325,31 +3325,31 @@ ffn_timings = {
 
 ```python
 class PerformanceProfiler:
-    """Profiles execution performance."""
-    
-    def __init__(self, enabled: bool = False):
-        self.timings: Dict[str, List[float]] = defaultdict(list)
-        self.memory_snapshots: List[Tuple[str, float]] = []
-        
-    def start_timer(self, name: str) -> float
-    def end_timer(self, name: str, start_time: float) -> float
-    def record_memory(self, name: str, bytes_used: float) -> None
-    def get_summary(self) -> Dict[str, Any]
+ """Profiles execution performance."""
+ 
+ def __init__(self, enabled: bool = False):
+ self.timings: Dict[str, List[float]] = defaultdict(list)
+ self.memory_snapshots: List[Tuple[str, float]] = []
+ 
+ def start_timer(self, name: str) -> float
+ def end_timer(self, name: str, start_time: float) -> float
+ def record_memory(self, name: str, bytes_used: float) -> None
+ def get_summary(self) -> Dict[str, Any]
 ```
 
 ### Audit Logging:
 
 ```python
 class AuditLogger:
-    """Logs execution for compliance and debugging."""
-    
-    def log(self, event_type: str, details: Dict[str, Any]):
-        entry = {
-            "timestamp": time.time(),
-            "type": event_type,
-            "details": details
-        }
-        # Append to in-memory list and optionally write to file
+ """Logs execution for compliance and debugging."""
+ 
+ def log(self, event_type: str, details: Dict[str, Any]):
+ entry = {
+ "timestamp": time.time(),
+ "type": event_type,
+ "details": details
+ }
+ # Append to in-memory list and optionally write to file
 ```
 
 ---
@@ -3383,42 +3383,42 @@ class AuditLogger:
 #### For Faster Inference:
 ```python
 config = ExecutorConfig(
-    mode=ExecutionMode.INFERENCE,
-    precision=PrecisionMode.FP16,
-    attention_impl=AttentionImpl.FLASH,
-    use_kv_cache=True,
-    use_kernel_fusion=True,
+ mode=ExecutionMode.INFERENCE,
+ precision=PrecisionMode.FP16,
+ attention_impl=AttentionImpl.FLASH,
+ use_kv_cache=True,
+ use_kernel_fusion=True,
 )
 ```
 
 #### For Better Quality:
 ```python
 config = GraphixTransformerConfig(
-    num_layers=12,
-    hidden_size=768,
-    num_heads=12,
+ num_layers=12,
+ hidden_size=768,
+ num_heads=12,
 )
 
 # Generation settings
 model.generate(
-    prompt,
-    temperature=0.7,
-    top_p=0.9,
-    max_new_tokens=256
+ prompt,
+ temperature=0.7,
+ top_p=0.9,
+ max_new_tokens=256
 )
 ```
 
 #### For Memory Efficiency:
 ```python
 config = GraphixTransformerConfig(
-    gradient_checkpointing=True,
-    lora_rank=8,  # Use LoRA instead of full fine-tuning
+ gradient_checkpointing=True,
+ lora_rank=8, # Use LoRA instead of full fine-tuning
 )
 
 executor_config = ExecutorConfig(
-    use_quantization=True,
-    quantization_bits=8,
-    optimize_memory=True,
+ use_quantization=True,
+ quantization_bits=8,
+ optimize_memory=True,
 )
 ```
 
@@ -3433,19 +3433,19 @@ from src.llm_core.graphix_transformer import GraphixTransformer, GraphixTransfor
 
 # Create model
 config = GraphixTransformerConfig(
-    num_layers=6,
-    hidden_size=256,
-    num_heads=4,
-    vocab_size=4096,
+ num_layers=6,
+ hidden_size=256,
+ num_heads=4,
+ vocab_size=4096,
 )
 model = GraphixTransformer(config)
 
 # Generate text
 text = model.generate(
-    prompt="The future of AI is",
-    max_new_tokens=50,
-    temperature=0.8,
-    top_p=0.9,
+ prompt="The future of AI is",
+ max_new_tokens=50,
+ temperature=0.8,
+ top_p=0.9,
 )
 print(text)
 ```
@@ -3460,18 +3460,18 @@ provider = LocalGPTProvider.from_config_file("provider_config.json")
 
 # Single generation
 text, meta = provider.generate(
-    prompt="Explain quantum computing",
-    max_new_tokens=200,
-    temperature=0.9,
+ prompt="Explain quantum computing",
+ max_new_tokens=200,
+ temperature=0.9,
 )
 
 # Streaming generation
 for partial_text, meta in provider.generate_stream(
-    prompt="Write a story about",
-    max_new_tokens=500,
-    chunk_size=10,
+ prompt="Write a story about",
+ max_new_tokens=500,
+ chunk_size=10,
 ):
-    print(partial_text, end="", flush=True)
+ print(partial_text, end="", flush=True)
 
 # Calculate perplexity
 ppl = provider.perplexity("The quick brown fox jumps over the lazy dog.")
@@ -3486,22 +3486,22 @@ from src.vulcan.reasoning.reasoning_types import ReasoningType
 
 # Initialize reasoner
 reasoner = UnifiedReasoner(
-    enable_learning=True,
-    enable_safety=True,
+ enable_learning=True,
+ enable_safety=True,
 )
 
 # Reason with specific type
 result = reasoner.reason(
-    input_data={"observation": "A causes B"},
-    query={"question": "What happens if A occurs?"},
-    reasoning_type=ReasoningType.CAUSAL,
+ input_data={"observation": "A causes B"},
+ query={"question": "What happens if A occurs?"},
+ reasoning_type=ReasoningType.CAUSAL,
 )
 
 # Reason with ensemble strategy
 result = reasoner.reason(
-    input_data="Is the hypothesis valid?",
-    strategy=ReasoningStrategy.ENSEMBLE,
-    confidence_threshold=0.7,
+ input_data="Is the hypothesis valid?",
+ strategy=ReasoningStrategy.ENSEMBLE,
+ confidence_threshold=0.7,
 )
 
 print(f"Conclusion: {result.conclusion}")
@@ -3521,37 +3521,37 @@ memory = HierarchicalMemory(config)
 
 # Store memory
 mem = memory.store(
-    content="Important fact about machine learning",
-    memory_type=MemoryType.SEMANTIC,
-    importance=0.8,
+ content="Important fact about machine learning",
+ memory_type=MemoryType.SEMANTIC,
+ importance=0.8,
 )
 
 # Retrieve similar memories
 query = MemoryQuery(
-    query_type="semantic_search",
-    content="machine learning facts",
-    limit=10,
+ query_type="semantic_search",
+ content="machine learning facts",
+ limit=10,
 )
 result = memory.retrieve(query)
 
 for mem, score in zip(result.memories, result.scores):
-    print(f"[{score:.2f}] {mem.content}")
+ print(f"[{score:.2f}] {mem.content}")
 
 # Store tool selection
 record = memory.store_tool_selection(
-    problem_features=np.random.randn(128),
-    problem_description="Classification task",
-    selected_tools=["probabilistic", "symbolic"],
-    execution_strategy="ensemble",
-    performance_metrics={"latency_ms": 150, "accuracy": 0.95},
-    success=True,
-    utility_score=0.85,
+ problem_features=np.random.randn(128),
+ problem_description="Classification task",
+ selected_tools=["probabilistic", "symbolic"],
+ execution_strategy="ensemble",
+ performance_metrics={"latency_ms": 150, "accuracy": 0.95},
+ success=True,
+ utility_score=0.85,
 )
 
 # Get tool recommendations
 recommendations = memory.get_recommended_tools(
-    problem_features=np.random.randn(128),
-    max_recommendations=5,
+ problem_features=np.random.randn(128),
+ max_recommendations=5,
 )
 ```
 
@@ -3559,31 +3559,31 @@ recommendations = memory.get_recommended_tools(
 
 ```python
 from src.llm_core.graphix_executor import (
-    GraphixExecutor, ExecutorConfig, ExecutionMode, PrecisionMode
+ GraphixExecutor, ExecutorConfig, ExecutionMode, PrecisionMode
 )
 
 # Configure executor
 config = ExecutorConfig(
-    mode=ExecutionMode.INFERENCE,
-    precision=PrecisionMode.FP16,
-    use_flash_attention=True,
-    use_kv_cache=True,
-    enable_profiling=True,
+ mode=ExecutionMode.INFERENCE,
+ precision=PrecisionMode.FP16,
+ use_flash_attention=True,
+ use_kv_cache=True,
+ enable_profiling=True,
 )
 
 # Create executor
 executor = GraphixExecutor(
-    hidden_size=256,
-    num_layers=6,
-    num_heads=4,
-    vocab_size=4096,
-    config=config,
+ hidden_size=256,
+ num_layers=6,
+ num_heads=4,
+ vocab_size=4096,
+ config=config,
 )
 
 # Execute IR graph
 result = executor.execute(
-    graph_ir={"embedding": {}, "layers": []},
-    inputs={"tokens": [1, 2, 3, 4, 5]},
+ graph_ir={"embedding": {}, "layers": []},
+ inputs={"tokens": [1, 2, 3, 4, 5]},
 )
 
 print(f"Execution time: {result['execution_time_ms']:.2f}ms")
@@ -3603,52 +3603,52 @@ print(f"Total executions: {stats['metrics']['total_executions']}")
 ### Planned Enhancements:
 
 1. **Advanced Attention Patterns**
-   - Multi-scale attention with hierarchical windows
-   - Adaptive sparse patterns based on content
-   - Memory-efficient long context (>100K tokens)
-   - Sliding window with global attention tokens
+ - Multi-scale attention with hierarchical windows
+ - Adaptive sparse patterns based on content
+ - Memory-efficient long context (>100K tokens)
+ - Sliding window with global attention tokens
 
 2. **Enhanced MoE (Mixture of Experts)**
-   - Dynamic expert allocation based on input
-   - Hierarchical expert organization
-   - Expert specialization and routing optimization
-   - Load balancing across experts
+ - Dynamic expert allocation based on input
+ - Hierarchical expert organization
+ - Expert specialization and routing optimization
+ - Load balancing across experts
 
 3. **Improved Generation**
-   - Speculative decoding for faster inference
-   - Beam search with diversity constraints
-   - Constrained generation with grammar rules
-   - Multi-modal generation (text + code + structured)
+ - Speculative decoding for faster inference
+ - Beam search with diversity constraints
+ - Constrained generation with grammar rules
+ - Multi-modal generation (text + code + structured)
 
 4. **Distributed Execution**
-   - Model parallelism across GPUs
-   - Pipeline parallelism for large models
-   - Distributed inference with load balancing
-   - Federated learning support
+ - Model parallelism across GPUs
+ - Pipeline parallelism for large models
+ - Distributed inference with load balancing
+ - Federated learning support
 
 5. **Safety Improvements**
-   - Formal verification integration
-   - Constitutional AI methods
-   - Interpretability and attribution tools
-   - Red team testing automation
+ - Formal verification integration
+ - Constitutional AI methods
+ - Interpretability and attribution tools
+ - Red team testing automation
 
 6. **Learning Enhancements**
-   - Online learning from user feedback
-   - Curriculum learning for complex tasks
-   - Meta-learning for few-shot adaptation
-   - Reinforcement learning from human feedback (RLHF)
+ - Online learning from user feedback
+ - Curriculum learning for complex tasks
+ - Meta-learning for few-shot adaptation
+ - Reinforcement learning from human feedback (RLHF)
 
 7. **Memory System Evolution**
-   - Hierarchical attention over memory
-   - Episodic memory retrieval with temporal reasoning
-   - Semantic memory with knowledge graph integration
-   - Procedural memory for skill acquisition
+ - Hierarchical attention over memory
+ - Episodic memory retrieval with temporal reasoning
+ - Semantic memory with knowledge graph integration
+ - Procedural memory for skill acquisition
 
 8. **Quantization and Efficiency**
-   - INT4 and INT2 quantization
-   - Structured pruning
-   - Knowledge distillation
-   - Neural architecture search (NAS)
+ - INT4 and INT2 quantization
+ - Structured pruning
+ - Knowledge distillation
+ - Neural architecture search (NAS)
 
 ---
 
@@ -3682,6 +3682,6 @@ print(f"Total executions: {stats['metrics']['total_executions']}")
 
 ---
 
-**Document Version:** 3.0.0  
-**Last Updated:** December 30, 2024  
+**Document Version:** 3.0.0 
+**Last Updated:** December 30, 2024 
 **Author:** Vulcan Ultra Deep Dive Analysis

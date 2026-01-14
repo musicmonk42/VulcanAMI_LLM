@@ -1,56 +1,55 @@
 
-VULCAN-AGI: Versatile Universal Learning Architecture for Cognitive Neural Agents
+VULCAN-AMI: Versatile Universal Learning Architecture for Cognitive Neural Agents
 Version: 3.0
 Date: November 10, 2025
-Status: Production-Ready
 Proprietary Software
 
 Overview
-VULCAN-AGI (Versatile Universal Learning Architecture for Cognitive Neural Agents) is a proprietary cognitive architecture developed exclusively by the Novatrax Labs LTD Team. It represents the culmination of advanced research in hybrid symbolic-subsymbolic systems, designed to push the boundaries of Artificial General Intelligence (AGI) with a focus on safety, adaptability, and ethical alignment. VULCAN-AGI is the sole intellectual property of Novatrax Labs LTD and is not open-source. All rights reserved.
+VULCAN-AMI (Versatile Universal Learning Architecture for Cognitive Neural Agents) is a proprietary cognitive architecture developed exclusively by the Novatrax Labs LTD Team. It represents the culmination of advanced research in hybrid symbolic-subsymbolic systems, designed to push the boundaries of Artificial General Intelligence (AGI) with a focus on safety, adaptability, and ethical alignment. VULCAN-AMI is the sole intellectual property of Novatrax Labs LTD and is not open-source. All rights reserved.
 
-Drawing from 2025's AGI milestones—such as OpenAI's GPT-5 achieving expert-level reasoning and DeepMind's Gemini excelling in mathematical olympiads—VULCAN-AGI integrates causal reasoning, multimodal learning, and autonomous self-improvement to create adaptive agents capable of human-like generalization. It is engineered for high-stakes applications in robotics, scientific discovery, and enterprise AI, ensuring robust, explainable decision-making under uncertainty.
+Drawing from 2025's AGI milestones—such as OpenAI's GPT-5 achieving expert-level reasoning and DeepMind's Gemini excelling in mathematical olympiads—VULCAN-AMI integrates causal reasoning, multimodal learning, and autonomous self-improvement to create adaptive agents capable of human-like generalization. It is engineered for high-stakes applications in robotics, scientific discovery, and enterprise AI, ensuring robust, explainable decision-making under uncertainty.
 
-What VULCAN-AGI Does
+What VULCAN-AMI Does
 Causal World Modeling: Constructs directed acyclic graphs (DAGs) for relationship inference, outcome prediction, and intervention planning with calibrated uncertainties.
 Autonomous Learning: Supports continual, curriculum, and meta-learning (e.g., MAML) with RLHF for human alignment.
 Meta-Reasoning: Enables self-reflection on goals, conflict negotiation, preference bandits, and CSIU-driven (Clarity, Simplicity, Information, Uncertainty) optimization.
 Safety & Ethics: Enforces multi-layered validators, ethical boundaries, and graduated responses to prevent harm.
 Multimodal Integration: Processes text/vision/audio/code via embeddings and semantic bridges for cross-domain transfer.
 Distributed Orchestration: Scales agent collectives with fault-tolerant queues and auto-scaling.
-VULCAN-AGI is exclusively available to authorized partners and internal Novatrax Labs LTD projects. For licensing inquiries, contact Novatrax Labs LTD at licensing@novatrax.com.
+VULCAN-AMI is exclusively available to authorized partners and internal Novatrax Labs LTD projects. For licensing inquiries, contact Novatrax Labs LTD at licensing@novatrax.com.
 
 Architecture Overview
-VULCAN-AGI employs a hierarchical, modular design with a unified runtime enforcing the EXAMINE → SELECT → APPLY → REMEMBER cycle. Lazy loading mitigates circular dependencies, and comprehensive fallbacks ensure operational resilience in constrained environments.
+VULCAN-AMI employs a hierarchical, modular design with a unified runtime enforcing the EXAMINE → SELECT → APPLY → REMEMBER cycle. Lazy loading mitigates circular dependencies, and comprehensive fallbacks ensure operational resilience in constrained environments.
 
 text
 ┌─────────────────────────────────────────────────────────────┐
-│                  VULCAN-AGI Core                            │
-│                (Unified Runtime & Orchestrator)             │
+│ VULCAN-AMI Core │
+│ (Unified Runtime & Orchestrator) │
 └────────────────────────┬────────────────────────────────────┘
-                         ↓
+ ↓
 ┌─────────────────────────────────────────────────────────────┐
-│              Cognitive Modules                              │
+│ Cognitive Modules │
 ├─────────────────────────────────────────────────────────────┤
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
-│  │ World Model  │  │   Reasoning  │  │   Learning   │     │
-│  │(CausalDAG,  │  │(Symbolic,    │  │(Continual,   │     │
-│  │ Dynamics)    │  │ Probabilistic│  │ Meta, RLHF)  │     │
-│  └──────────────┘  └──────────────┘  └──────────────┘     │
-│                                                              │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
-│  │Memory System │  │Safety Layer  │  │Curiosity     │     │
-│  │(Hierarchical)│  │(Validators,  │  │Engine        │     │
-│  └──────────────┘  │Ethics)       │  └──────────────┘     │
-│  ┌──────────────┐  └──────────────┘                       │
-│  │Semantic      │                                          │
-│  │Bridge        │  ┌──────────────┐  ┌──────────────┐     │
-│  └──────────────┘  │Meta-Reasoning│  │Problem       │     │
-│                     │(Introspection│  │Decomposer    │     │
-│                     │, Negotiation)│  └──────────────┘     │
+│ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ │
+│ │ World Model │ │ Reasoning │ │ Learning │ │
+│ │(CausalDAG, │ │(Symbolic, │ │(Continual, │ │
+│ │ Dynamics) │ │ Probabilistic│ │ Meta, RLHF) │ │
+│ └──────────────┘ └──────────────┘ └──────────────┘ │
+│ │
+│ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ │
+│ │Memory System │ │Safety Layer │ │Curiosity │ │
+│ │(Hierarchical)│ │(Validators, │ │Engine │ │
+│ └──────────────┘ │Ethics) │ └──────────────┘ │
+│ ┌──────────────┐ └──────────────┘ │
+│ │Semantic │ │
+│ │Bridge │ ┌──────────────┐ ┌──────────────┐ │
+│ └──────────────┘ │Meta-Reasoning│ │Problem │ │
+│ │(Introspection│ │Decomposer │ │
+│ │, Negotiation)│ └──────────────┘ │
 └────────────────────────────────────────────────────────────┘
-                         ↓
+ ↓
 ┌─────────────────────────────────────────────────────────────┐
-│              Deployment & API (FastAPI, Distributed)        │
+│ Deployment & API (FastAPI, Distributed) │
 └────────────────────────────────────────────────────────────┘
 Key Themes
 Hybrid Intelligence: Symbolic (FOL provers, causal graphs) + subsymbolic (embeddings, neural fusion) for explainable reasoning.
@@ -93,9 +92,9 @@ Example (requires API key):
 
 bash
 curl -X POST "https://api.novatrax.com/vulcan/predict" \
-  -H "Authorization: Bearer $NOVATRAX_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"action": "explore", "context": {"domain": "robotics"}}'
+ -H "Authorization: Bearer $NOVATRAX_API_KEY" \
+ -H "Content-Type: application/json" \
+ -d '{"action": "explore", "context": {"domain": "robotics"}}'
 Configuration
 Proprietary layered system: Defaults < Encrypted Files (JSON/YAML) < Env Vars < Runtime Overrides. Contact Novatrax Labs LTD for config templates.
 
@@ -103,18 +102,18 @@ Example snippet (redacted for security):
 
 json
 {
-  "agent_id": "vulcan-001",
-  "learning": {
-    "rate": 0.01,
-    "rlhf_enabled": true
-  },
-  "safety": {
-    "level": "STRICT",
-    "policies": ["ethical_boundaries"]
-  }
+ "agent_id": "vulcan-001",
+ "learning": {
+ "rate": 0.01,
+ "rlhf_enabled": true
+ },
+ "safety": {
+ "level": "STRICT",
+ "policies": ["ethical_boundaries"]
+ }
 }
 Installation & Access
-VULCAN-AGI is proprietary software of Novatrax Labs LTD. Access requires a commercial license.
+VULCAN-AMI is proprietary software of Novatrax Labs LTD. Access requires a commercial license.
 
 Contact Novatrax Labs LTD: Email licensing@novatrax.com for evaluation/demo.
 Secure Deployment: Provided via encrypted Docker images or on-prem binaries.
@@ -131,8 +130,8 @@ CMD ["python", "src/vulcan/main.py", "--mode", "production"]
 Build/Run (with license key):
 
 bash
-docker build --build-arg REJECT_INSECURE_JWT=ack -t vulcan-agi .
-docker run -p 8000:8000 -e NOVATRAX_LICENSE_KEY=$KEY vulcan-agi
+docker build --build-arg REJECT_INSECURE_JWT=ack -t vulcan-ami .
+docker run -p 8000:8000 -e NOVATRAX_LICENSE_KEY=$KEY vulcan-ami
 Enterprise
 Kubernetes: Helm charts for scaling (replicas: 5+), integrated with enterprise monitoring (Prometheus/Grafana).
 On-Prem: Air-gapped deployment with hardware security modules (HSMs) for keys.
@@ -148,17 +147,17 @@ Neurosymbolic Advances: Deeper brain-inspired models.
 Edge Optimization: WebAssembly for low-latency inference.
 Advanced Alignment: Human-in-loop with neurosymbolic ethics.
 Citation & License
-Proprietary License: VULCAN-AGI is the exclusive property of Novatrax Labs LTD. All rights reserved. Unauthorized use, reproduction, or distribution is prohibited. For terms, contact legal@novatrax.com.
+Proprietary License: VULCAN-AMI is the exclusive property of Novatrax Labs LTD. All rights reserved. Unauthorized use, reproduction, or distribution is prohibited. For terms, contact legal@novatrax.com.
 
 Cite as (for licensed publications):
 
 text
 @software{vulcan_agi_2025,
-  title={VULCAN-AGI: Versatile Universal Learning Architecture for Cognitive Neural Agents},
-  author={Novatrax Labs LTD Team},
-  year={2025},
-  version={3.0},
-  publisher={Novatrax Labs LTD}
+ title={VULCAN-AMI: Versatile Universal Learning Architecture for Cognitive Neural Agents},
+ author={Novatrax Labs LTD Team},
+ year={2025},
+ version={3.0},
+ publisher={Novatrax Labs LTD}
 }
 Contact & Support
 Licensing/Partnerships: licensing@novatrax.com

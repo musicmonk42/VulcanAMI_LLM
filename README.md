@@ -1,7 +1,5 @@
 # Graphix Vulcan (Proprietary)
 
-
-
 Proprietary software owned and created by Novatrax Labs LTD. All rights reserved.
 
 Copyright © 2024 Novatrax Labs LTD. All rights reserved.
@@ -38,7 +36,7 @@ Typical use cases
 ## Key Benefits
 
 ### 🧠 **Frontier AGI Technology**
-- **VULCAN-AGI Cognitive Architecture**: Complete reasoning system with causal inference, meta-cognition, and self-awareness (285,000+ lines of code)
+- **VULCAN-AMI Cognitive Architecture**: Complete reasoning system with causal inference, meta-cognition, and self-awareness (285,000+ lines of code)
 - **Hybrid Symbolic-Subsymbolic AI**: Combines explainability of logic with adaptability of neural networks
 - **Autonomous Self-Improvement**: System learns and improves its own reasoning without manual intervention
 - **Multi-Modal Reasoning**: Cross-domain inference across vision, language, and structured data
@@ -62,7 +60,7 @@ Typical use cases
 - **Distributed Execution**: Horizontal scaling with Kubernetes orchestration and auto-scaling
 - **Autonomous Evolution**: Metaprogramming node handlers enable self-improving graphs (8 handlers, 59 tests, 100% passing)
 
-### 🎯 **Enterprise Ready**
+### 🎯 **Features**
 - **Docker & Kubernetes**: Production deployment patterns with Helm charts and multi-environment configs
 - **Reproducible Builds**: 4,007 SHA256-hashed dependencies, 100% pinned versions for supply chain security
 - **Comprehensive Testing**: 43% test coverage with 89 test files, 42+ CI/CD checks, and 29 reproducibility scenarios
@@ -74,32 +72,32 @@ Typical use cases
 ## Key Capabilities
 
 - **Graph IR and validation**
-  - Typed nodes/edges with size limits, unique IDs, and cycle detection.
-  - Policy hooks to extend validation for domain and safety rules.
-  - **NEW**: 8 metaprogramming node handlers (PATTERN_COMPILE, FIND_SUBGRAPH, GRAPH_SPLICE, GRAPH_COMMIT, NSO_MODIFY, ETHICAL_LABEL, EVAL, HALT)
+ - Typed nodes/edges with size limits, unique IDs, and cycle detection.
+ - Policy hooks to extend validation for domain and safety rules.
+ - **NEW**: 8 metaprogramming node handlers (PATTERN_COMPILE, FIND_SUBGRAPH, GRAPH_SPLICE, GRAPH_COMMIT, NSO_MODIFY, ETHICAL_LABEL, EVAL, HALT)
 
 - **Executor**
-  - Concurrent, layerized execution for DAGs with per-node error handling and timeouts.
-  - Extensible node types (input, transform, filter, generative, combine, output).
-  - Observability and audit integrated at node and graph levels.
-  - **NEW**: GraphAwareEvolutionEngine with dual-mode operation (metaprogramming + dict fallback)
+ - Concurrent, layerized execution for DAGs with per-node error handling and timeouts.
+ - Extensible node types (input, transform, filter, generative, combine, output).
+ - Observability and audit integrated at node and graph levels.
+ - **NEW**: GraphAwareEvolutionEngine with dual-mode operation (metaprogramming + dict fallback)
 
 - **Governance and consensus**
-  - Trust-weighted voting (approve/reject/abstain) with quorum thresholds.
-  - Proposal lifecycle (draft/open/approved/rejected/expired/applied/failed).
-  - Optional VULCAN world-model assessment hooks for additional risk/context checks.
-  - Thread-safe operations with periodic cleanup of expired proposals.
-  - **NEW**: NSO authorization and ethical labeling for autonomous graph modifications
+ - Trust-weighted voting (approve/reject/abstain) with quorum thresholds.
+ - Proposal lifecycle (draft/open/approved/rejected/expired/applied/failed).
+ - Optional VULCAN world-model assessment hooks for additional risk/context checks.
+ - Thread-safe operations with periodic cleanup of expired proposals.
+ - **NEW**: NSO authorization and ethical labeling for autonomous graph modifications
 
 - **Observability and dashboards**
-  - Prometheus metrics: latency histograms (p50/p95), errors, explainability gauges, cleanup stats, disk usage, and more.
-  - Auto-generated Grafana dashboard JSON export with example alert thresholds.
+ - Prometheus metrics: latency histograms (p50/p95), errors, explainability gauges, cleanup stats, disk usage, and more.
+ - Auto-generated Grafana dashboard JSON export with example alert thresholds.
 
 - **Security and audit**
-  - SQLite-backed audit trail with WAL, integrity checks, and recovery routines.
-  - Selective alerting to channels (e.g., Slack) with severity filtering and stats.
-  - Rate limiting and JWT/API key layers for service endpoints.
-  - **NEW**: Multi-layer defense for graph self-modification (fail-safe defaults, complete audit trail, version control)
+ - SQLite-backed audit trail with WAL, integrity checks, and recovery routines.
+ - Selective alerting to channels (e.g., Slack) with severity filtering and stats.
+ - Rate limiting and JWT/API key layers for service endpoints.
+ - **NEW**: Multi-layer defense for graph self-modification (fail-safe defaults, complete audit trail, version control)
 
 ---
 
@@ -108,11 +106,11 @@ Typical use cases
 - Operating system: Linux x86_64 (recommended), macOS (development)
 - Python: 3.11+
 - Optional services:
-  - Redis (rate limiting and caching)
-  - Prometheus (metrics scrape) and Grafana (dashboards)
-  - Slack Incoming Webhook (security alerts)
+ - Redis (rate limiting and caching)
+ - Prometheus (metrics scrape) and Grafana (dashboards)
+ - Slack Incoming Webhook (security alerts)
 - Storage:
-  - SQLite by default (embedded); external DB may be supported under enterprise deployment
+ - SQLite by default (embedded); external DB may be supported under enterprise deployment
 
 Note: Platform components and integrations are configurable; enterprise deployment patterns may differ from development defaults.
 
@@ -131,7 +129,7 @@ Important: The steps below are for internal or licensed development environments
 git clone <your-internal-repo-url> graphix_vulcan
 cd graphix_vulcan
 python -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
+source .venv/bin/activate # Windows: .venv\Scripts\activate
 ```
 
 2) Install
@@ -150,12 +148,12 @@ Set required secrets via environment variables or a secure secret manager. At mi
 cp .env.example .env
 # Edit .env and set the following variables:
 # - JWT_SECRET_KEY=<strong-unique-secret>
-# - BOOTSTRAP_KEY=<one-time-bootstrap-secret>  # only needed to create the initial admin/agent
-# - REDIS_URL=redis://<host>:<port>            # optional; falls back to in-memory rate limiting
-# - AUDIT_DB_PATH=./audit.db                   # default shown; secure paths recommended in production
+# - BOOTSTRAP_KEY=<one-time-bootstrap-secret> # only needed to create the initial admin/agent
+# - REDIS_URL=redis://<host>:<port> # optional; falls back to in-memory rate limiting
+# - AUDIT_DB_PATH=./audit.db # default shown; secure paths recommended in production
 # - SLACK_WEBHOOK_URL=<optional-for-alerts>
-# - HOST=127.0.0.1                             # SECURITY: localhost binding (change to 0.0.0.0 for containers)
-# - API_HOST=127.0.0.1                         # SECURITY: localhost binding (change to 0.0.0.0 for containers)
+# - HOST=127.0.0.1 # SECURITY: localhost binding (change to 0.0.0.0 for containers)
+# - API_HOST=127.0.0.1 # SECURITY: localhost binding (change to 0.0.0.0 for containers)
 
 Example (development only):
 ```bash
@@ -163,8 +161,8 @@ export JWT_SECRET_KEY="dev-only-change-me"
 export BOOTSTRAP_KEY="dev-bootstrap"
 export REDIS_URL="redis://localhost:6379"
 export AUDIT_DB_PATH="./audit.db"
-export HOST="127.0.0.1"  # Secure default - localhost only
-export API_HOST="127.0.0.1"  # Secure default - localhost only
+export HOST="127.0.0.1" # Secure default - localhost only
+export API_HOST="127.0.0.1" # Secure default - localhost only
 # export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/..."
 ```
 
@@ -201,16 +199,16 @@ This repository includes comprehensive validation and testing tooling to ensure 
 
 ```bash
 # ⭐ NEW: Simulate all possible reproducibility build scenarios (RECOMMENDED)
-./simulate_all_builds.sh --skip-docker  # Full validation (29 scenarios)
-./simulate_all_builds.sh --quick        # Quick validation before commits
+./simulate_all_builds.sh --skip-docker # Full validation (29 scenarios)
+./simulate_all_builds.sh --quick # Quick validation before commits
 
 # Quick validation (recommended before commits)
 ./quick_test.sh quick
 
 # Quick validation of specific components
-./quick_test.sh docker      # Docker tests only
-./quick_test.sh security    # Security tests only
-./quick_test.sh k8s         # Kubernetes tests only
+./quick_test.sh docker # Docker tests only
+./quick_test.sh security # Security tests only
+./quick_test.sh k8s # Kubernetes tests only
 
 # Full comprehensive test suite (42+ checks)
 ./test_full_cicd.sh
@@ -238,10 +236,10 @@ pytest tests/test_cicd_reproducibility.py -v
 - **Test Functions:** 11,811 test functions (54.9% coverage)
 - **Test Classes:** 2,361 test classes
 - **Test Categories:**
-  - 90 files in tests/ directory (standard suite)
-  - 124 files in src/vulcan/tests/ (VULCAN subsystem tests)
-  - 3 files in stress_tests/ (performance tests)
-  - 28 files embedded in other locations
+ - 90 files in tests/ directory (standard suite)
+ - 124 files in src/vulcan/tests/ (VULCAN subsystem tests)
+ - 3 files in stress_tests/ (performance tests)
+ - 28 files embedded in other locations
 
 **Expected output:**
 ```
@@ -294,78 +292,78 @@ VulcanAMI is structured as a **layered AI operating system** that integrates mul
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                  API Layer (Flask/FastAPI)                   │
-│         Registry API | Arena API | Gateway | Health          │
+│ API Layer (Flask/FastAPI) │
+│ Registry API | Arena API | Gateway | Health │
 ├─────────────────────────────────────────────────────────────┤
-│                    Governance Layer                          │
-│    Trust-Weighted Consensus | Policy Enforcement | Voting   │
+│ Governance Layer │
+│ Trust-Weighted Consensus | Policy Enforcement | Voting │
 ├─────────────────────────────────────────────────────────────┤
-│               VULCAN-AGI Core (285,000+ LOC)                 │
-│  ┌──────────────┬──────────────┬──────────────────────────┐ │
-│  │  Reasoning   │ World Model  │   Meta-Reasoning (Self-  │ │
-│  │   Systems    │   (Causal)   │   Improvement/Awareness) │ │
-│  ├──────────────┼──────────────┼──────────────────────────┤ │
-│  │   Memory     │   Planning   │   Safety & Ethics        │ │
-│  │  Hierarchy   │   Engine     │   Boundaries (CSIU)      │ │
-│  └──────────────┴──────────────┴──────────────────────────┘ │
+│ VULCAN-AMI Core (285,000+ LOC) │
+│ ┌──────────────┬──────────────┬──────────────────────────┐ │
+│ │ Reasoning │ World Model │ Meta-Reasoning (Self- │ │
+│ │ Systems │ (Causal) │ Improvement/Awareness) │ │
+│ ├──────────────┼──────────────┼──────────────────────────┤ │
+│ │ Memory │ Planning │ Safety & Ethics │ │
+│ │ Hierarchy │ Engine │ Boundaries (CSIU) │ │
+│ └──────────────┴──────────────┴──────────────────────────┘ │
 ├─────────────────────────────────────────────────────────────┤
-│         Graph Execution & Compilation Layer                  │
-│  GraphixIR Compiler | Unified Runtime | LLM Core (3.2K LOC) │
+│ Graph Execution & Compilation Layer │
+│ GraphixIR Compiler | Unified Runtime | LLM Core (3.2K LOC) │
 ├─────────────────────────────────────────────────────────────┤
-│      Persistent Memory v46 (5.3K LOC) - Storage Layer       │
-│  Graph RAG | LSM Tree | Unlearning | ZK Proofs | S3/CDN    │
+│ Persistent Memory v46 (5.3K LOC) - Storage Layer │
+│ Graph RAG | LSM Tree | Unlearning | ZK Proofs | S3/CDN │
 ├─────────────────────────────────────────────────────────────┤
-│            Observability & Security Layer                    │
-│  Prometheus | Grafana | Audit Logs | Security Scanning      │
+│ Observability & Security Layer │
+│ Prometheus | Grafana | Audit Logs | Security Scanning │
 ├─────────────────────────────────────────────────────────────┤
-│                Infrastructure & Deployment                   │
-│   Docker/K8s | Helm Charts | Redis | SQLite/PostgreSQL     │
+│ Infrastructure & Deployment │
+│ Docker/K8s | Helm Charts | Redis | SQLite/PostgreSQL │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ### Core Components
 
-- **VULCAN-AGI Cognitive Architecture**
-  - Causal reasoning with interventions and counterfactual simulation
-  - Meta-reasoning with CSIU framework (Curiosity, Safety, Impact, Uncertainty)
-  - Autonomous self-improvement and motivational introspection
-  - Multi-modal reasoning across domains
+- **VULCAN-AMI Cognitive Architecture**
+ - Causal reasoning with interventions and counterfactual simulation
+ - Meta-reasoning with CSIU framework (Curiosity, Safety, Impact, Uncertainty)
+ - Autonomous self-improvement and motivational introspection
+ - Multi-modal reasoning across domains
 
 - **Graph IR and Validation**
-  - JSON schema capturing nodes, edges, metadata, and policy constraints
-  - Structural validation (node/edge shapes, references, cycles, size limits)
-  - Policy and safety hooks (custom domain validators)
-  - LLVM-based compilation for 10-100x performance optimization
+ - JSON schema capturing nodes, edges, metadata, and policy constraints
+ - Structural validation (node/edge shapes, references, cycles, size limits)
+ - Policy and safety hooks (custom domain validators)
+ - LLVM-based compilation for 10-100x performance optimization
 
 - **Execution Engine**
-  - DAG scheduler with layerized concurrency
-  - Per-node handlers (transform/filter/generative/combine/etc.)
-  - Per-node timeouts, error taxonomy, and outcomes
-  - Hardware-agnostic execution (CPU, GPU, future hardware)
+ - DAG scheduler with layerized concurrency
+ - Per-node handlers (transform/filter/generative/combine/etc.)
+ - Per-node timeouts, error taxonomy, and outcomes
+ - Hardware-agnostic execution (CPU, GPU, future hardware)
 
 - **Governance and Consensus**
-  - Proposals (draft → open → approved/rejected → applied/failed)
-  - Trust-weighted votes with quorum and approval thresholds
-  - Application layer applies IR mutations safely with rollback capability
-  - Audit and observability integrated at every stage
+ - Proposals (draft → open → approved/rejected → applied/failed)
+ - Trust-weighted votes with quorum and approval thresholds
+ - Application layer applies IR mutations safely with rollback capability
+ - Audit and observability integrated at every stage
 
 - **Persistent Memory v46**
-  - Graph RAG for intelligent retrieval
-  - Log-Structured Merge (LSM) tree for high-performance storage
-  - Machine unlearning with cryptographic verification (GDPR compliance)
-  - S3-backed with CloudFront CDN for global distribution
+ - Graph RAG for intelligent retrieval
+ - Log-Structured Merge (LSM) tree for high-performance storage
+ - Machine unlearning with cryptographic verification (GDPR compliance)
+ - S3-backed with CloudFront CDN for global distribution
 
 - **Observability**
-  - Prometheus metrics via per-process registry
-  - Dashboard JSON (Grafana) and alert examples
-  - Causal attribution for explainability
-  - Real-time performance monitoring
+ - Prometheus metrics via per-process registry
+ - Dashboard JSON (Grafana) and alert examples
+ - Causal attribution for explainability
+ - Real-time performance monitoring
 
 - **Security and Audit**
-  - Persistent audit DB with WAL mode and integrity checks
-  - Selective alerting to channels with severity/type filters
-  - JWT/API key authentication with rate limiting
-  - Security scanning integrated into CI/CD
+ - Persistent audit DB with WAL mode and integrity checks
+ - Selective alerting to channels with severity/type filters
+ - JWT/API key authentication with rate limiting
+ - Security scanning integrated into CI/CD
 
 **For complete architecture documentation, see:**
 - [docs/ARCHITECTURE_OVERVIEW.md](docs/ARCHITECTURE_OVERVIEW.md) - Full system architecture
@@ -381,9 +379,9 @@ Registry API (Flask)
 - POST /auth/login: returns JWT for authenticated calls
 - POST /registry/onboard: onboard/register agents
 - POST /ir/propose: submit IR proposals for governance
-- GET  /audit/logs: query audit events
-- GET  /health: liveness check
-- GET  /metrics: Prometheus exposition (if enabled)
+- GET /audit/logs: query audit events
+- GET /health: liveness check
+- GET /metrics: Prometheus exposition (if enabled)
 
 Arena API (FastAPI)
 - API key middleware via X-API-Key (if enabled)
@@ -419,8 +417,8 @@ This repository supports multiple deployment options:
 - Kustomize overlays for different environments (development, staging, production)
 - Helm charts for templated deployments
 - Automated deployment scripts for validation and deployment
-  - `./scripts/validate-deployment.sh <environment>` - Pre-deployment validation
-  - `./scripts/deploy.sh <environment> --image-tag <version>` - Automated deployment
+ - `./scripts/validate-deployment.sh <environment>` - Pre-deployment validation
+ - `./scripts/deploy.sh <environment> --image-tag <version>` - Automated deployment
 - See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for detailed instructions
 
 **Azure Kubernetes Service (AKS)**

@@ -2,7 +2,7 @@
 
 ## Overview
 
-The MathematicalComputationTool provides state-of-the-art symbolic mathematical computation for VULCAN-AGI. It generates and executes SymPy code to solve calculus, algebra, and symbolic mathematics problems.
+The MathematicalComputationTool provides state-of-the-art symbolic mathematical computation for VULCAN-AMI. It generates and executes SymPy code to solve calculus, algebra, and symbolic mathematics problems.
 
 **Key Difference from MathematicalVerificationEngine:**
 - `MathematicalComputationTool` **generates** solutions (computes results)
@@ -76,10 +76,10 @@ tool = MathematicalComputationTool(llm=my_llm_provider)
 
 # Solve complex problem
 result = tool.execute(
-    "Find the derivative of sin(x^2) with respect to x"
+ "Find the derivative of sin(x^2) with respect to x"
 )
 
-print(result.result)  # 2*x*cos(x**2)
+print(result.result) # 2*x*cos(x**2)
 ```
 
 ### Via UnifiedReasoner
@@ -91,8 +91,8 @@ from vulcan.reasoning.reasoning_types import ReasoningType
 reasoner = UnifiedReasoner()
 
 result = reasoner.reason(
-    input_data="Integrate x^2",
-    reasoning_type=ReasoningType.MATHEMATICAL
+ input_data="Integrate x^2",
+ reasoning_type=ReasoningType.MATHEMATICAL
 )
 
 print(result.conclusion)
@@ -104,10 +104,10 @@ print(result.conclusion)
 from vulcan.reasoning.mathematical_computation import create_mathematical_computation_tool
 
 tool = create_mathematical_computation_tool(
-    llm=None,              # Optional LLM provider
-    max_tokens=500,        # Max tokens for LLM generation
-    enable_learning=True,  # Learn from successful solutions
-    prefer_templates=False # Prefer LLM over templates
+ llm=None, # Optional LLM provider
+ max_tokens=500, # Max tokens for LLM generation
+ enable_learning=True, # Learn from successful solutions
+ prefer_templates=False # Prefer LLM over templates
 )
 ```
 
@@ -183,10 +183,10 @@ tool.execute("Solve the differential equation dy/dx = y")
 
 ```python
 tool = MathematicalComputationTool(
-    llm=my_llm,              # Optional LLM for code generation
-    max_tokens=500,          # Max tokens for LLM generation
-    enable_learning=True,    # Enable learning from solutions
-    prefer_templates=False   # Prefer templates over LLM
+ llm=my_llm, # Optional LLM for code generation
+ max_tokens=500, # Max tokens for LLM generation
+ enable_learning=True, # Enable learning from solutions
+ prefer_templates=False # Prefer templates over LLM
 )
 ```
 
@@ -198,8 +198,8 @@ You can override the solving strategy per-request:
 from vulcan.reasoning.mathematical_computation import SolutionStrategy
 
 result = tool.execute(
-    "Integrate x^2",
-    strategy=SolutionStrategy.TEMPLATE  # Force template-based
+ "Integrate x^2",
+ strategy=SolutionStrategy.TEMPLATE # Force template-based
 )
 ```
 
@@ -217,16 +217,16 @@ The tool returns a `ComputationResult` dataclass:
 ```python
 @dataclass
 class ComputationResult:
-    success: bool                      # Whether computation succeeded
-    code: str                          # Generated SymPy code
-    result: Optional[str]              # Computed result
-    explanation: str                   # Human-readable explanation
-    error: Optional[str]               # Error message if failed
-    tool: str                          # Tool name
-    problem_type: ProblemType          # Detected problem type
-    strategy: SolutionStrategy         # Strategy used
-    execution_time: float              # Time in seconds
-    metadata: Dict[str, Any]           # Additional metadata
+ success: bool # Whether computation succeeded
+ code: str # Generated SymPy code
+ result: Optional[str] # Computed result
+ explanation: str # Human-readable explanation
+ error: Optional[str] # Error message if failed
+ tool: str # Tool name
+ problem_type: ProblemType # Detected problem type
+ strategy: SolutionStrategy # Strategy used
+ execution_time: float # Time in seconds
+ metadata: Dict[str, Any] # Additional metadata
 ```
 
 ### Formatted Response
@@ -275,8 +275,8 @@ The tool provides graceful degradation:
 ```python
 result = tool.execute("unsolvable problem")
 if not result.success:
-    print(f"Error: {result.error}")
-    print(f"Explanation: {result.explanation}")
+ print(f"Error: {result.error}")
+ print(f"Explanation: {result.explanation}")
 ```
 
 ## Statistics and Monitoring
@@ -307,8 +307,8 @@ The tool uses RestrictedPython to sandbox code execution:
 **Solution:** Ensure you're using `ReasoningType.MATHEMATICAL`:
 ```python
 result = reasoner.reason(
-    input_data="...",
-    reasoning_type=ReasoningType.MATHEMATICAL
+ input_data="...",
+ reasoning_type=ReasoningType.MATHEMATICAL
 )
 ```
 
@@ -333,27 +333,27 @@ tool = MathematicalComputationTool(prefer_templates=True)
 
 ```python
 class MathematicalComputationTool:
-    def __init__(
-        self,
-        llm=None,
-        max_tokens: int = 500,
-        enable_learning: bool = True,
-        prefer_templates: bool = False
-    ): ...
-    
-    def execute(self, query: str, **kwargs) -> ComputationResult: ...
-    def format_response(self, result: ComputationResult) -> str: ...
-    def get_statistics(self) -> Dict[str, Any]: ...
+ def __init__(
+ self,
+ llm=None,
+ max_tokens: int = 500,
+ enable_learning: bool = True,
+ prefer_templates: bool = False
+ ): ...
+ 
+ def execute(self, query: str, **kwargs) -> ComputationResult: ...
+ def format_response(self, result: ComputationResult) -> str: ...
+ def get_statistics(self) -> Dict[str, Any]: ...
 ```
 
 ### Factory Function
 
 ```python
 def create_mathematical_computation_tool(
-    llm=None,
-    max_tokens: int = 500,
-    enable_learning: bool = True,
-    prefer_templates: bool = False
+ llm=None,
+ max_tokens: int = 500,
+ enable_learning: bool = True,
+ prefer_templates: bool = False
 ) -> MathematicalComputationTool: ...
 ```
 

@@ -17,10 +17,10 @@ Add `safety_validator` parameter to `__init__`:
 
 ```python
 def __init__(
-    self,
-    # ... existing params ...
-    safety_config: Optional[Dict[str, Any]] = None,  # Deprecated
-    safety_validator=None,  # NEW: Preferred way to pass shared instance
+ self,
+ # ... existing params ...
+ safety_config: Optional[Dict[str, Any]] = None, # Deprecated
+ safety_validator=None, # NEW: Preferred way to pass shared instance
 ):
 ```
 
@@ -30,32 +30,32 @@ Replace direct instantiation with this pattern:
 ```python
 # Initialize safety validator - prefer shared instance
 if safety_validator is not None:
-    # Use provided shared instance (PREFERRED - prevents duplication)
-    self.safety_validator = safety_validator
-    logger.info(f"{self.__class__.__name__}: Using shared safety validator instance")
+ # Use provided shared instance (PREFERRED - prevents duplication)
+ self.safety_validator = safety_validator
+ logger.info(f"{self.__class__.__name__}: Using shared safety validator instance")
 elif SAFETY_VALIDATOR_AVAILABLE:
-    # Fallback: try to get singleton, or create new instance
-    try:
-        from ..safety.safety_validator import initialize_all_safety_components
-        self.safety_validator = initialize_all_safety_components(
-            config=safety_config, reuse_existing=True
-        )
-        logger.info(f"{self.__class__.__name__}: Using singleton safety validator")
-    except Exception as e:
-        logger.debug(f"Could not get singleton safety validator: {e}")
-        # Last resort: create new instance (causes duplication)
-        if isinstance(safety_config, dict) and safety_config:
-            self.safety_validator = EnhancedSafetyValidator(
-                SafetyConfig.from_dict(safety_config)
-            )
-        else:
-            self.safety_validator = EnhancedSafetyValidator()
-        logger.warning(f"{self.__class__.__name__}: Created new safety validator instance (may cause duplication)")
+ # Fallback: try to get singleton, or create new instance
+ try:
+ from ..safety.safety_validator import initialize_all_safety_components
+ self.safety_validator = initialize_all_safety_components(
+ config=safety_config, reuse_existing=True
+ )
+ logger.info(f"{self.__class__.__name__}: Using singleton safety validator")
+ except Exception as e:
+ logger.debug(f"Could not get singleton safety validator: {e}")
+ # Last resort: create new instance (causes duplication)
+ if isinstance(safety_config, dict) and safety_config:
+ self.safety_validator = EnhancedSafetyValidator(
+ SafetyConfig.from_dict(safety_config)
+ )
+ else:
+ self.safety_validator = EnhancedSafetyValidator()
+ logger.warning(f"{self.__class__.__name__}: Created new safety validator instance (may cause duplication)")
 else:
-    self.safety_validator = None
-    logger.warning(
-        f"{self.__class__.__name__}: Safety validator not available - operating without safety checks"
-    )
+ self.safety_validator = None
+ logger.warning(
+ f"{self.__class__.__name__}: Safety validator not available - operating without safety checks"
+ )
 ```
 
 ### 3. Parent Component Pattern
@@ -65,22 +65,22 @@ Parent components should create ONE validator and pass it to children:
 # In semantic_bridge_core.py:
 # Initialize safety validator ONCE using singleton pattern
 try:
-    from ..safety.safety_validator import initialize_all_safety_components
-    self.safety_validator = initialize_all_safety_components(
-        config=safety_config, reuse_existing=True
-    )
-    logger.info("SemanticBridge: Using singleton safety validator")
+ from ..safety.safety_validator import initialize_all_safety_components
+ self.safety_validator = initialize_all_safety_components(
+ config=safety_config, reuse_existing=True
+ )
+ logger.info("SemanticBridge: Using singleton safety validator")
 except Exception:
-    # ... fallback ...
+ # ... fallback ...
 
 # Pass to all children
 self.concept_mapper = ConceptMapper(
-    world_model=world_model, 
-    safety_validator=self.safety_validator  # Pass instance, not config
+ world_model=world_model, 
+ safety_validator=self.safety_validator # Pass instance, not config
 )
 self.transfer_engine = TransferEngine(
-    world_model=world_model,
-    safety_validator=self.safety_validator  # Pass instance, not config
+ world_model=world_model,
+ safety_validator=self.safety_validator # Pass instance, not config
 )
 # etc.
 ```
@@ -127,42 +127,42 @@ For components that lazy-load the validator (like `dynamics_model.py`), update t
 
 ```python
 def _get_safety_validator(self):
-    if self.safety_validator is not None:
-        return self.safety_validator
-    
-    with self.lock:
-        # Double-check
-        if self.safety_validator is not None:
-            return self.safety_validator
-        
-        try:
-            # Import modules
-            validator_mod = importlib.import_module("..safety.safety_validator", package=__package__)
-            initialize_all_safety_components = getattr(validator_mod, "initialize_all_safety_components", None)
-            
-            # FIXED: Try singleton first
-            if initialize_all_safety_components is not None:
-                try:
-                    self.safety_validator = initialize_all_safety_components(
-                        config=self.safety_config, reuse_existing=True
-                    )
-                    logger.info(f"{self.__class__.__name__}: Using singleton safety validator")
-                    return self.safety_validator
-                except Exception as e:
-                    logger.debug(f"Could not get singleton safety validator: {e}")
-            
-            # Fallback to new instance
-            if isinstance(self.safety_config, dict) and self.safety_config:
-                config_obj = SafetyConfig.from_dict(self.safety_config)
-                self.safety_validator = EnhancedSafetyValidator(config_obj)
-            else:
-                self.safety_validator = EnhancedSafetyValidator()
-            
-            logger.warning(f"{self.__class__.__name__}: Created new safety validator instance (may cause duplication)")
-        except Exception as e:
-            logger.error(f"Safety validator initialization failed: {e}")
-            # Create stub validator
-            # ... existing fallback code ...
+ if self.safety_validator is not None:
+ return self.safety_validator
+ 
+ with self.lock:
+ # Double-check
+ if self.safety_validator is not None:
+ return self.safety_validator
+ 
+ try:
+ # Import modules
+ validator_mod = importlib.import_module("..safety.safety_validator", package=__package__)
+ initialize_all_safety_components = getattr(validator_mod, "initialize_all_safety_components", None)
+ 
+ # FIXED: Try singleton first
+ if initialize_all_safety_components is not None:
+ try:
+ self.safety_validator = initialize_all_safety_components(
+ config=self.safety_config, reuse_existing=True
+ )
+ logger.info(f"{self.__class__.__name__}: Using singleton safety validator")
+ return self.safety_validator
+ except Exception as e:
+ logger.debug(f"Could not get singleton safety validator: {e}")
+ 
+ # Fallback to new instance
+ if isinstance(self.safety_config, dict) and self.safety_config:
+ config_obj = SafetyConfig.from_dict(self.safety_config)
+ self.safety_validator = EnhancedSafetyValidator(config_obj)
+ else:
+ self.safety_validator = EnhancedSafetyValidator()
+ 
+ logger.warning(f"{self.__class__.__name__}: Created new safety validator instance (may cause duplication)")
+ except Exception as e:
+ logger.error(f"Safety validator initialization failed: {e}")
+ # Create stub validator
+ # ... existing fallback code ...
 
 ### Test Mode Configuration
 For components with special test_mode handling (like `problem_decomposer_core.py`), preserve the complex logic but wrap it in the fallback section.

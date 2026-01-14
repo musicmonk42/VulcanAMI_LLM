@@ -4,7 +4,7 @@
 
 This repository includes a comprehensive CI/CD pipeline using GitHub Actions. The pipeline automates testing, building, security scanning, and deployment of the VulcanAMI/Graphix Vulcan platform.
 
-**✅ Validation Status**: All CI/CD configurations have been validated and are production-ready. 
+**✅ Validation Status**: All CI/CD configurations have been validated. 
 
 **✅ Build Status**: 
 - All Dockerfiles validated and working
@@ -205,12 +205,12 @@ kubectl create namespace vulcanami
 
 # Create secrets
 kubectl create secret generic vulcanami-secrets \
-  --from-literal=JWT_SECRET_KEY=$(openssl rand -base64 48) \
-  --from-literal=BOOTSTRAP_KEY=$(openssl rand -base64 32) \
-  --from-literal=POSTGRES_PASSWORD=$(openssl rand -base64 32) \
-  --from-literal=REDIS_PASSWORD=$(openssl rand -base64 32) \
-  --from-literal=MINIO_SECRET_KEY=$(openssl rand -base64 24) \
-  -n vulcanami
+ --from-literal=JWT_SECRET_KEY=$(openssl rand -base64 48) \
+ --from-literal=BOOTSTRAP_KEY=$(openssl rand -base64 32) \
+ --from-literal=POSTGRES_PASSWORD=$(openssl rand -base64 32) \
+ --from-literal=REDIS_PASSWORD=$(openssl rand -base64 32) \
+ --from-literal=MINIO_SECRET_KEY=$(openssl rand -base64 24) \
+ -n vulcanami
 ```
 
 ### 3. Environment-Specific Configuration
@@ -232,43 +232,43 @@ The project includes a comprehensive Makefile for local development:
 
 ```bash
 # Development
-make install          # Install dependencies from requirements.txt
-make install-dev      # Install dev dependencies from requirements-dev.txt
-make setup           # Setup dev environment
+make install # Install dependencies from requirements.txt
+make install-dev # Install dev dependencies from requirements-dev.txt
+make setup # Setup dev environment
 
 # Code Quality
-make format          # Format code
-make lint           # Run linters
-make lint-security  # Security linting
-make type-check     # Type checking
+make format # Format code
+make lint # Run linters
+make lint-security # Security linting
+make type-check # Type checking
 
 # Testing
-make test           # Run all tests
-make test-cov       # Run tests with coverage
-make test-integration  # Integration tests
+make test # Run all tests
+make test-cov # Run tests with coverage
+make test-integration # Integration tests
 
 # Docker
-make docker-build       # Build Docker image
-make docker-run         # Run container
-make docker-build-all   # Build all service images
+make docker-build # Build Docker image
+make docker-run # Run container
+make docker-build-all # Build all service images
 
 # Docker Compose (v2 syntax)
-make up             # Start dev services with 'docker compose'
-make down           # Stop services
-make logs-compose   # View logs
+make up # Start dev services with 'docker compose'
+make down # Stop services
+make logs-compose # View logs
 
 # Kubernetes
-make k8s-apply      # Apply K8s manifests
-make k8s-status     # Check status
+make k8s-apply # Apply K8s manifests
+make k8s-status # Check status
 
 # Helm
-make helm-install   # Install with Helm
-make helm-template  # Show Helm template
+make helm-install # Install with Helm
+make helm-template # Show Helm template
 
 # CI/CD Validation
-make ci-local       # Run CI locally
-make validate-cicd  # Validate all CI/CD configurations
-make generate-secrets  # Generate secrets
+make ci-local # Run CI locally
+make validate-cicd # Validate all CI/CD configurations
+make generate-secrets # Generate secrets
 ```
 
 **New**: Use `make validate-cicd` to run comprehensive validation of Docker, Docker Compose, GitHub Actions, Kubernetes, and Helm configurations.
@@ -352,30 +352,30 @@ Health endpoints:
 1. Check workflow logs in GitHub Actions
 2. Verify required secrets are set
 3. Test Docker build locally:
-   ```bash
-   make docker-build
-   ```
+ ```bash
+ make docker-build
+ ```
 
 ### Deployment Failures
 
 1. Check Kubernetes pod status:
-   ```bash
-   kubectl get pods -n vulcanami
-   kubectl describe pod <pod-name> -n vulcanami
-   kubectl logs <pod-name> -n vulcanami
-   ```
+ ```bash
+ kubectl get pods -n vulcanami
+ kubectl describe pod <pod-name> -n vulcanami
+ kubectl logs <pod-name> -n vulcanami
+ ```
 
 2. Verify secrets exist:
-   ```bash
-   kubectl get secrets -n vulcanami
-   ```
+ ```bash
+ kubectl get secrets -n vulcanami
+ ```
 
 ### Test Failures
 
 1. Run tests locally:
-   ```bash
-   make test-cov
-   ```
+ ```bash
+ make test-cov
+ ```
 
 2. Check test logs in GitHub Actions artifacts
 
@@ -384,9 +384,9 @@ Health endpoints:
 1. Review security scan results in GitHub Security tab
 2. Check workflow artifacts for detailed reports
 3. Update vulnerable dependencies:
-   ```bash
-   pip install --upgrade <package>
-   ```
+ ```bash
+ pip install --upgrade <package>
+ ```
 
 ## Best Practices
 
@@ -429,9 +429,9 @@ The repository includes a comprehensive validation script that checks all aspect
 Validation Summary
 ========================================
 
-Passed:   41
+Passed: 41
 Warnings: 2
-Failed:   0
+Failed: 0
 
 ✓ All critical checks passed!
 ```
@@ -518,12 +518,12 @@ Update the following environment variables in the workflow file to match your Az
 
 ```yaml
 env:
-  AZURE_CONTAINER_REGISTRY: "your-azure-container-registry"
-  CONTAINER_NAME: "your-container-name"
-  RESOURCE_GROUP: "your-resource-group"
-  CLUSTER_NAME: "your-cluster-name"
-  CHART_PATH: "your-chart-path"
-  CHART_OVERRIDE_PATH: "your-chart-override-path"
+ AZURE_CONTAINER_REGISTRY: "your-azure-container-registry"
+ CONTAINER_NAME: "your-container-name"
+ RESOURCE_GROUP: "your-resource-group"
+ CLUSTER_NAME: "your-cluster-name"
+ CHART_PATH: "your-chart-path"
+ CHART_OVERRIDE_PATH: "your-chart-override-path"
 ```
 
 ### Workflow Jobs
@@ -552,8 +552,8 @@ If you're using self-hosted runners instead of GitHub-hosted runners:
 
 ```yaml
 - name: Install Azure CLI
-  run: |
-    curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+ run: |
+ curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
 ```
 
 2. This step appears twice in the workflow (once for each job)

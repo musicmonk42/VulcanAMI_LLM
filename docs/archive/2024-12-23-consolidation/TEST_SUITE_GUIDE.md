@@ -1,6 +1,6 @@
 # ⚠️ DEPRECATED
 
-**This document has been consolidated.**  
+**This document has been consolidated.** 
 **Archived:** December 23, 2024
 
 ## Migration Path
@@ -11,7 +11,7 @@ For TEST_SUITE_GUIDE.md content → See [TESTING_GUIDE.md](../../TESTING_GUIDE.m
 
 # Graphix IR Test Suite Guide
 
-**Version:** 2.2.0  
+**Version:** 2.2.0 
 **Date:** 2024-11-11
 
 This guide explains how to run and interpret test suites validating Graphix IR’s schema, ethics, execution stability, and photonic emulation fidelity.
@@ -81,13 +81,13 @@ Prometheus sample metrics during run:
 name: Graphix Tests
 on: [push]
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - run: python -m venv .venv
-      - run: .venv/bin/pip install -r requirements.txt pytest pytest-asyncio pytest-xdist
-      - run: .venv/bin/pytest src/run_validation_test.py -v
+ test:
+ runs-on: ubuntu-latest
+ steps:
+ - uses: actions/checkout@v3
+ - run: python -m venv .venv
+ - run: .venv/bin/pip install -r requirements.txt pytest pytest-asyncio pytest-xdist
+ - run: .venv/bin/pytest src/run_validation_test.py -v
 ```
 
 Extend for:
