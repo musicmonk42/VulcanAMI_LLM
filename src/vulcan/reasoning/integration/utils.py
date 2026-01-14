@@ -6,6 +6,7 @@ This module contains:
 - Observer integration functions
 - Statistics tracking
 - Singleton management
+- Type safety helpers for reasoning_type enum conversion
 
 Module: vulcan.reasoning.integration.utils
 Author: Vulcan AI Team
@@ -14,12 +15,21 @@ Author: Vulcan AI Team
 import atexit
 import logging
 import threading
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from .types import ReasoningResult
 from .orchestrator import ReasoningIntegration
 
 logger = logging.getLogger(__name__)
+
+# Import ReasoningType enum for type conversion
+try:
+    from vulcan.reasoning.reasoning_types import ReasoningType
+    REASONING_TYPE_AVAILABLE = True
+except ImportError:
+    ReasoningType = None
+    REASONING_TYPE_AVAILABLE = False
+    logger.warning("ReasoningType enum not available - type conversion disabled")
 
 # Global singleton instance
 _reasoning_integration: Optional[ReasoningIntegration] = None
@@ -311,6 +321,8 @@ __all__ = [
     "observe_reasoning_success",
     "observe_reasoning_failure",
     "observe_reasoning_degradation",
+    "convert_reasoning_type_to_enum",
+    "ensure_reasoning_type_enum",
 ]
 
 
@@ -369,3 +381,178 @@ def observe_reasoning_degradation(query: str, reason: str) -> None:
         reason: Reason for degradation
     """
     logger.warning(f"Reasoning degradation: {reason}")
+
+
+# ============================================================
+# TYPE SAFETY HELPERS - Enum Conversion for reasoning_type
+# ============================================================
+
+def convert_reasoning_type_to_enum(
+    reasoning_type: Union[str, 'ReasoningType', None],
+    context: str = "unknown"
+) -> Optional['ReasoningType']:
+    """
+    Convert reasoning_type from string to ReasoningType enum safely.
+    
+    This function addresses the pipeline-dropping bug where philosophical/ethical
+    results from world_model are discarded when reasoning_type is passed as a
+    string instead of as a ReasoningType Enum value.
+    
+    The orchestrator (agent pool, collective, etc) requires Enum values and will
+    crash or discard valid answers on type mismatch. This function provides safe
+    conversion with comprehensive logging.
+    
+    Args:
+        reasoning_type: The reasoning type as string, Enum, or None
+        context: Context string for logging (e.g., "agent_pool", "orchestrator")
+        
+    Returns:
+        ReasoningType enum value if conversion successful, None otherwise
+        
+    Examples:
+        >>> convert_reasoning_type_to_enum("philosophical", "agent_pool")
+        ReasoningType.PHILOSOPHICAL
+        
+        >>> convert_reasoning_type_to_enum("meta_reasoning", "orchestrator")
+        None  # Not in enum, logs warning
+        
+        >>> convert_reasoning_type_to_enum(ReasoningType.CAUSAL, "orchestrator")
+        ReasoningType.CAUSAL  # Already enum, pass through
+    """
+    if not REASONING_TYPE_AVAILABLE or ReasoningType is None:
+        logger.warning(
+            f"[{context}] Cannot convert reasoning_type - ReasoningType enum not available"
+        )
+        return None
+    
+    # Already an enum - pass through
+    if isinstance(reasoning_type, ReasoningType):
+        return reasoning_type
+    
+    # None value - return None
+    if reasoning_type is None:
+        return None
+    
+    # String value - attempt conversion
+    if isinstance(reasoning_type, str):
+        # Try direct attribute access first (e.g., "PHILOSOPHICAL" -> ReasoningType.PHILOSOPHICAL)
+        try:
+            return ReasoningType[reasoning_type.upper()]
+        except KeyError:
+            pass
+        
+        # Try value matching (e.g., "philosophical" -> ReasoningType.PHILOSOPHICAL)
+        reasoning_type_lower = reasoning_type.lower()
+        for member in ReasoningType:
+            if member.value.lower() == reasoning_type_lower:
+                logger.info(
+                    f"[{context}] Converted reasoning_type string '{reasoning_type}' "
+                    f"to enum {member}"
+                )
+                return member
+        
+        # Special case mappings for common aliases
+        alias_map = {
+            "meta_reasoning": ReasoningType.PHILOSOPHICAL,  # Meta-reasoning uses philosophical
+            "philosophical_reasoning": ReasoningType.PHILOSOPHICAL,
+            "ethical_reasoning": ReasoningType.PHILOSOPHICAL,
+            "math": ReasoningType.MATHEMATICAL,
+            "causal_reasoning": ReasoningType.CAUSAL,
+            "world_model": ReasoningType.PHILOSOPHICAL,  # World model uses philosophical
+        }
+        
+        if reasoning_type_lower in alias_map:
+            converted = alias_map[reasoning_type_lower]
+            logger.info(
+                f"[{context}] Converted reasoning_type alias '{reasoning_type}' "
+                f"to enum {converted}"
+            )
+            return converted
+        
+        # Conversion failed - log detailed error
+        logger.error(
+            f"[{context}] CRITICAL: Failed to convert reasoning_type string '{reasoning_type}' "
+            f"to ReasoningType enum. Valid values: {[m.value for m in ReasoningType]}. "
+            f"This may cause result dropping!"
+        )
+        return None
+    
+    # Unknown type
+    logger.error(
+        f"[{context}] CRITICAL: reasoning_type has invalid type {type(reasoning_type).__name__}. "
+        f"Expected str or ReasoningType enum. Value: {reasoning_type}"
+    )
+    return None
+
+
+def ensure_reasoning_type_enum(
+    result: Union[Dict[str, Any], Any],
+    context: str = "unknown"
+) -> Union[Dict[str, Any], Any]:
+    """
+    Ensure reasoning_type field in result is a ReasoningType enum.
+    
+    This function modifies the result in-place if it contains a string reasoning_type,
+    converting it to the proper enum value. If conversion fails, logs full result
+    context for debugging.
+    
+    Args:
+        result: Result dictionary or object with reasoning_type field
+        context: Context string for logging
+        
+    Returns:
+        Modified result with enum reasoning_type (or original if no conversion needed)
+        
+    Example:
+        >>> result = {"reasoning_type": "philosophical", "confidence": 0.9}
+        >>> ensure_reasoning_type_enum(result, "agent_pool")
+        {"reasoning_type": ReasoningType.PHILOSOPHICAL, "confidence": 0.9}
+    """
+    if result is None:
+        return result
+    
+    # Handle dictionary format
+    if isinstance(result, dict):
+        reasoning_type = result.get("reasoning_type")
+        if reasoning_type is not None:
+            converted = convert_reasoning_type_to_enum(reasoning_type, context)
+            if converted is not None:
+                result["reasoning_type"] = converted
+            elif isinstance(reasoning_type, str):
+                # Conversion failed - log full result for debugging
+                logger.error(
+                    f"[{context}] DISCARDED RESULT: reasoning_type conversion failed. "
+                    f"Result will likely be dropped by orchestrator. "
+                    f"reasoning_type='{reasoning_type}', "
+                    f"confidence={result.get('confidence', 'unknown')}, "
+                    f"conclusion_present={('conclusion' in result) or ('response' in result)}, "
+                    f"full_result_keys={list(result.keys())}"
+                )
+        return result
+    
+    # Handle object format (e.g., ReasoningResult)
+    if hasattr(result, "reasoning_type"):
+        reasoning_type = getattr(result, "reasoning_type", None)
+        if reasoning_type is not None:
+            converted = convert_reasoning_type_to_enum(reasoning_type, context)
+            if converted is not None and not isinstance(reasoning_type, ReasoningType):
+                try:
+                    setattr(result, "reasoning_type", converted)
+                except AttributeError:
+                    # Frozen dataclass or read-only attribute
+                    logger.warning(
+                        f"[{context}] Cannot modify reasoning_type attribute "
+                        f"(frozen/read-only). Type: {type(result).__name__}"
+                    )
+            elif isinstance(reasoning_type, str):
+                # Conversion failed - log full result for debugging
+                logger.error(
+                    f"[{context}] DISCARDED RESULT: reasoning_type conversion failed. "
+                    f"Result will likely be dropped by orchestrator. "
+                    f"reasoning_type='{reasoning_type}', "
+                    f"confidence={getattr(result, 'confidence', 'unknown')}, "
+                    f"has_conclusion={hasattr(result, 'conclusion')}, "
+                    f"result_type={type(result).__name__}"
+                )
+    
+    return result
