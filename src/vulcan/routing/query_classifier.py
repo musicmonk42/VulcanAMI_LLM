@@ -683,10 +683,11 @@ PHILOSOPHICAL_PATTERNS: Tuple[re.Pattern, ...] = (
     #
     # Pattern 1: Meta-reasoning about wrong/incorrect answers
     # Queries asking AI to deliberately give wrong answers are philosophical (about knowledge/truth)
-    re.compile(r"\b(?:give|provide)\s+(?:an?\s+)?answer.*\b(?:wrong|incorrect|false)\b", re.IGNORECASE),
+    # FIX: Made more specific - must explicitly ask AI to give wrong answer, not prove something wrong
+    re.compile(r"\b(?:give|provide)\s+(?:an?\s+)?answer\s+(?:that\s+)?(?:you\s+)?(?:believe|think|know)\s+(?:is\s+)?(?:probably\s+)?(?:wrong|incorrect|false)\b", re.IGNORECASE),
     re.compile(r"\byou\s+believe\s+is\s+(?:probably\s+)?(?:wrong|incorrect|false)\b", re.IGNORECASE),
-    re.compile(r"\bintentionally\s+(?:wrong|incorrect|false|mistaken)\b", re.IGNORECASE),
-    re.compile(r"\bdeliberately\s+(?:wrong|incorrect|false|mistaken)\b", re.IGNORECASE),
+    re.compile(r"\bintentionally\s+(?:give|provide)\s+(?:an?\s+)?(?:wrong|incorrect|false|mistaken)\b", re.IGNORECASE),
+    re.compile(r"\bdeliberately\s+(?:give|provide)\s+(?:an?\s+)?(?:wrong|incorrect|false|mistaken)\b", re.IGNORECASE),
     # Pattern 2: External auditing/verification of AI reasoning
     # Queries about auditing/proving AI failures are philosophical (about epistemology/trust)
     re.compile(r"\b(?:external\s+)?auditor\s+(?:prove|verify|demonstrate|show)\b", re.IGNORECASE),
@@ -704,36 +705,30 @@ PHILOSOPHICAL_PATTERNS: Tuple[re.Pattern, ...] = (
     re.compile(r"\bwhere\s+(?:could|might|did)\s+(?:your\s+)?reasoning\s+(?:go\s+wrong|fail)\b", re.IGNORECASE),
     # FIX (Jan 8 2026): Pattern 5: Proof sketch and hidden assumption requests
     # These are meta-reasoning/epistemology questions, not formal logic queries
-    re.compile(r"\bproof\s+sketch\b", re.IGNORECASE),
-    re.compile(r"\bprovide\s+(?:a\s+)?(?:proof|argument|sketch)\b", re.IGNORECASE),
-    re.compile(r"\bhidden\s+assumption\b", re.IGNORECASE),
-    re.compile(r"\b(?:if\s+false,?\s+)?invalidates?\s+(?:the\s+)?(?:proof|argument)\b", re.IGNORECASE),
-    re.compile(r"\bassumption\s+that.*\binvalidate\b", re.IGNORECASE),
+    # FIX: Removed "proof sketch" and "provide proof" - these are mathematical, not philosophical
+    # Only keep patterns about hidden assumptions that would invalidate reasoning
+    re.compile(r"\bhidden\s+assumption.*(?:invalidate|undermine|weaken)\b", re.IGNORECASE),
+    re.compile(r"\bassumption.*(?:if\s+false|when\s+false).*\b(?:invalidate|undermine)\b", re.IGNORECASE),
     # Pattern 6: Queries about step/reasoning analysis
-    re.compile(r"\bone\s+step\s+(?:in\s+)?(?:your\s+)?reasoning\b", re.IGNORECASE),
-    re.compile(r"\bstep\s+(?:that\s+)?could\s+be\s+wrong\b", re.IGNORECASE),
-    re.compile(r"\bprior\s+steps?\s+(?:are\s+)?correct\b", re.IGNORECASE),
+    # FIX: Made more specific - must be about AI's own reasoning, not mathematical steps
+    re.compile(r"\bone\s+step\s+(?:in\s+)?(?:your\s+own\s+)?reasoning\s+(?:process\s+)?(?:that\s+)?(?:could|might)\s+be\s+wrong\b", re.IGNORECASE),
+    re.compile(r"\byour\s+reasoning\s+step\s+(?:that\s+)?could\s+be\s+(?:wrong|flawed|incorrect)\b", re.IGNORECASE),
     # Pattern 7: Queries about causal links and weakness
-    re.compile(r"\bcausal\s+link.*weakest\b", re.IGNORECASE),
-    re.compile(r"\bweakest.*causal\s+link\b", re.IGNORECASE),
-    re.compile(r"\bevidence\s+(?:that\s+)?would\s+break\b", re.IGNORECASE),
+    # FIX: Removed - these are causal reasoning questions, not philosophical
+    # Causal queries should route to causal engine, not philosophical
     # Pattern 8: Queries about AI architecture/capabilities limitations
     re.compile(r"\bclasses?\s+of\s+problems?\s+(?:you\s+)?(?:are\s+)?not\s+(?:well-?)?suited\b", re.IGNORECASE),
     re.compile(r"\byour\s+architecture\s+makes?\s+(?:them\s+)?difficult\b", re.IGNORECASE),
     re.compile(r"\busing\s+(?:one\s+of\s+)?your\s+reasoning\s+tools?\s+would\s+make\b", re.IGNORECASE),
     re.compile(r"\breasoning\s+tools?\s+would\s+make\s+(?:the\s+)?answer\s+worse\b", re.IGNORECASE),
     # FIX (Jan 8 2026): Pattern 9: Causal intervention queries
-    # "If we intervene to remove variable X, what changes?" should be PHILOSOPHICAL/CAUSAL
-    re.compile(r"\bintervene\s+(?:to\s+)?(?:remove|set|fix)\s+(?:variable\s+)?", re.IGNORECASE),
-    re.compile(r"\bwhat\s+(?:provably\s+)?(?:does\s+)?not\s+(?:change)?\b", re.IGNORECASE),
-    re.compile(r"\bprovably\s+(?:does\s+)?not\b", re.IGNORECASE),
-    re.compile(r"\bdo-calculus\b", re.IGNORECASE),
+    # FIX: Removed - these are causal reasoning questions, should go to causal engine
+    # "do-calculus", "intervene to remove variable" are technical causal queries, not philosophical
     # FIX (Jan 8 2026): Pattern 10: Meta-reasoning about uncertainty/confidence
     # "Give a numerical confidence for a claim that depends on missing data" -> PHILOSOPHICAL
-    re.compile(r"\bnumerical\s+confidence\b", re.IGNORECASE),
-    re.compile(r"\bconfidence\s+\(?0[-–]100\)?\s*%?\b", re.IGNORECASE),
-    re.compile(r"\bclaim\s+(?:that\s+)?depends\s+on\s+missing\s+data\b", re.IGNORECASE),
-    re.compile(r"\bwhy\s+(?:that\s+)?(?:number|confidence)\s+is\s+unreliable\b", re.IGNORECASE),
+    # FIX: Made more specific - must be about AI's own uncertainty estimation, not general probability
+    re.compile(r"\b(?:your|the)\s+(?:numerical\s+)?confidence.*(?:unreliable|unjustified|arbitrary)\b", re.IGNORECASE),
+    re.compile(r"\bwhy\s+(?:is\s+)?(?:your|that)\s+confidence\s+(?:level\s+)?(?:unreliable|wrong|unjustified)\b", re.IGNORECASE),
     # FIX (Jan 8 2026): Pattern 11: Meta-reasoning about estimating uncertainty
     # "Describe a situation where you would be unable to estimate uncertainty" -> PHILOSOPHICAL
     re.compile(r"\bunable\s+to\s+estimate\s+uncertainty\b", re.IGNORECASE),
@@ -1847,11 +1842,21 @@ class QueryClassifier:
         # 3. Has clear ethical content (trolley problem indicators)
         if phil_count >= PHIL_KEYWORD_THRESHOLD or has_philosophical_pattern or has_ethical_content:
             # CRITICAL: Check that we don't have explicit mathematical intent
-            if not _has_explicit_mathematical_intent(query_original):
+            # FIX: Also check for domain-specific symbols that indicate technical queries
+            has_logical_symbols = any(sym in query_original for sym in LOGICAL_SYMBOLS)
+            has_math_symbols = MATH_SYMBOL_PATTERN.search(query_original) is not None
+            has_domain_symbols = has_logical_symbols or has_math_symbols or any(sym in query_original for sym in DOMAIN_SYMBOLS)
+            
+            # Only route to philosophical if no explicit mathematical intent AND no domain symbols
+            # OR if ethical content is strong enough to override technical symbols
+            strong_ethical = has_ethical_content and phil_count >= 3
+            
+            if (not _has_explicit_mathematical_intent(query_original) and 
+                not has_domain_symbols) or strong_ethical:
                 logger.info(
                     f"[QueryClassifier] PRIORITY FIX: Detected PHILOSOPHICAL content "
                     f"(keywords={phil_count}, pattern={has_philosophical_pattern}, "
-                    f"ethical={has_ethical_content}) - routing to philosophical (NOT logical)"
+                    f"ethical={has_ethical_content}, domain_symbols={has_domain_symbols}) - routing to philosophical"
                 )
                 return QueryClassification(
                     category=QueryCategory.PHILOSOPHICAL.value,
@@ -1860,6 +1865,11 @@ class QueryClassifier:
                     skip_reasoning=False,
                     confidence=0.9 if has_philosophical_pattern else 0.85,
                     source="keyword",
+                )
+            else:
+                logger.info(
+                    f"[QueryClassifier] FIX: Philosophical keywords present but domain symbols detected "
+                    f"- not routing to philosophical (symbols_present={has_domain_symbols})"
                 )
         
         # =====================================================================
