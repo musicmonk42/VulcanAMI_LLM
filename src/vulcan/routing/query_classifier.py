@@ -684,10 +684,10 @@ PHILOSOPHICAL_PATTERNS: Tuple[re.Pattern, ...] = (
     # Pattern 1: Meta-reasoning about wrong/incorrect answers
     # Queries asking AI to deliberately give wrong answers are philosophical (about knowledge/truth)
     # FIX: Made more specific - must explicitly ask AI to give wrong answer, not prove something wrong
-    re.compile(r"\b(?:give|provide)\s+(?:an?\s+)?answer\s+(?:that\s+)?(?:you\s+)?(?:believe|think|know)\s+(?:is\s+)?(?:probably\s+)?(?:wrong|incorrect|false)\b", re.IGNORECASE),
-    re.compile(r"\byou\s+believe\s+is\s+(?:probably\s+)?(?:wrong|incorrect|false)\b", re.IGNORECASE),
-    re.compile(r"\bintentionally\s+(?:give|provide)\s+(?:an?\s+)?(?:wrong|incorrect|false|mistaken)\b", re.IGNORECASE),
-    re.compile(r"\bdeliberately\s+(?:give|provide)\s+(?:an?\s+)?(?:wrong|incorrect|false|mistaken)\b", re.IGNORECASE),
+    re.compile(r"\b(?:give|provide)\s+(?:an?\s+)?answer\s+(?:that\s+)?(?:you\s+)?(?:believe|think|know)\s+(?:is\s+)?(?:probably\s+)?wrong\b", re.IGNORECASE),
+    re.compile(r"\byou\s+believe\s+is\s+(?:probably\s+)?wrong\b", re.IGNORECASE),
+    re.compile(r"\bintentionally\s+give.*wrong\b", re.IGNORECASE),
+    re.compile(r"\bdeliberately\s+give.*wrong\b", re.IGNORECASE),
     # Pattern 2: External auditing/verification of AI reasoning
     # Queries about auditing/proving AI failures are philosophical (about epistemology/trust)
     re.compile(r"\b(?:external\s+)?auditor\s+(?:prove|verify|demonstrate|show)\b", re.IGNORECASE),
@@ -727,8 +727,8 @@ PHILOSOPHICAL_PATTERNS: Tuple[re.Pattern, ...] = (
     # FIX (Jan 8 2026): Pattern 10: Meta-reasoning about uncertainty/confidence
     # "Give a numerical confidence for a claim that depends on missing data" -> PHILOSOPHICAL
     # FIX: Made more specific - must be about AI's own uncertainty estimation, not general probability
-    re.compile(r"\b(?:your|the)\s+(?:numerical\s+)?confidence.*(?:unreliable|unjustified|arbitrary)\b", re.IGNORECASE),
-    re.compile(r"\bwhy\s+(?:is\s+)?(?:your|that)\s+confidence\s+(?:level\s+)?(?:unreliable|wrong|unjustified)\b", re.IGNORECASE),
+    re.compile(r"\byour.*confidence.*unreliable\b", re.IGNORECASE),
+    re.compile(r"\bwhy.*confidence.*(?:unreliable|wrong|unjustified)\b", re.IGNORECASE),
     # FIX (Jan 8 2026): Pattern 11: Meta-reasoning about estimating uncertainty
     # "Describe a situation where you would be unable to estimate uncertainty" -> PHILOSOPHICAL
     re.compile(r"\bunable\s+to\s+estimate\s+uncertainty\b", re.IGNORECASE),

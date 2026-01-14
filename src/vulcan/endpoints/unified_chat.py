@@ -2004,13 +2004,9 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
                     
                     # Priority boost based on reasoning type
                     reasoning_type = str(c.get('reasoning_type', 'unknown')).lower()
-                    # Extract base type (e.g., "SYMBOLIC" -> "symbolic", "ReasoningType.CAUSAL" -> "causal")
-                    for key in REASONING_TYPE_PRIORITY:
-                        if key in reasoning_type:
-                            reasoning_type = key
-                            break
-                    
-                    priority = REASONING_TYPE_PRIORITY.get(reasoning_type, 3)
+                    # Extract base type using efficient lookup
+                    priority_key = next((k for k in REASONING_TYPE_PRIORITY if k in reasoning_type), 'unknown')
+                    priority = REASONING_TYPE_PRIORITY[priority_key]
                     
                     # Boost domain-specific engines by up to 20% when confidence is similar
                     # This ensures "symbolic 0.75" beats "philosophical 0.80"
@@ -2020,7 +2016,7 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
                     
                     logger.debug(
                         f"[VULCAN] Candidate scoring: source={c['source']}, "
-                        f"type={reasoning_type}, confidence={confidence_score:.2f}, "
+                        f"type={priority_key}, confidence={confidence_score:.2f}, "
                         f"priority={priority}, boost={priority_boost:.2f}, total={total_score:.2f}"
                     )
                     

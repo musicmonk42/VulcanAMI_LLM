@@ -429,6 +429,10 @@ CLEANUP_MISS_INTERVAL = 100  # Trigger cleanup every N cache misses
 # sufficient time headroom under CPU-only execution
 MULTIMODAL_TIME_BUDGET_MULTIPLIER = 3.0  # Allow multimodal more time headroom
 
+# Quality penalty for meta tools when domain-specific tools are available
+# This ensures symbolic/math/probabilistic/causal engines preferred over meta-reasoning
+META_TOOL_QUALITY_PENALTY = 0.85  # 15% reduction in quality estimate
+
 # ==============================================================================
 # Candidate Filtering Configuration
 # ==============================================================================
@@ -5593,12 +5597,11 @@ class ToolSelector:
                 has_domain_tools = any(t in safe_tools for t in ('symbolic', 'mathematical', 'probabilistic', 'causal'))
                 
                 if is_meta_tool and has_domain_tools:
-                    # Reduce quality estimate by 15% when domain tools are available
-                    quality_penalty = 0.85
-                    quality_estimate *= quality_penalty
+                    # Reduce quality estimate when domain tools are available
+                    quality_estimate *= META_TOOL_QUALITY_PENALTY
                     logger.debug(
                         f"[ToolSelector] Meta tool penalty applied to {tool_name}: "
-                        f"quality reduced by {(1-quality_penalty)*100:.0f}% when domain tools available"
+                        f"quality reduced by {(1-META_TOOL_QUALITY_PENALTY)*100:.0f}% when domain tools available"
                     )
                 
                 candidates.append({
