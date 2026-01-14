@@ -247,6 +247,12 @@ LONG_QUERY_REASONING_THRESHOLD = 500  # Chars above which reasoning is forced
 # we skip invoking UnifiedReasoner.reason() to prevent confidence override
 WORLD_MODEL_CONFIDENCE_THRESHOLD = 0.5
 
+# Note: General high-confidence threshold for any reasoning engine result
+# When apply_reasoning() returns ANY tool result with confidence >= this threshold,
+# we use it directly without invoking UnifiedReasoner.reason() to prevent confidence override.
+# This applies to all reasoning engines (symbolic, probabilistic, causal, etc.), not just world_model.
+HIGH_CONFIDENCE_THRESHOLD = 0.5
+
 # FIXED: Add cachetools import for LRU cache with TTL
 try:
     from cachetools import TTLCache
@@ -3064,26 +3070,33 @@ class AgentPoolManager:
                     
                     # =========================================================
                     # =================================================================
-                    # CRITICAL FIX: Simplified World Model Result Detection
+                    # CRITICAL FIX: High-Confidence Result Detection for All Engines
                     # =================================================================
-                    # Industry best practice: Rely on primary indicators (tool selection
-                    # and confidence) rather than requiring secondary metadata flags.
+                    # Industry best practice: When ANY reasoning engine (symbolic, probabilistic,
+                    # causal, world_model, etc.) returns a high-confidence result (>= 0.5), use it
+                    # directly without invoking UnifiedReasoner which may overwrite with lower confidence.
                     # 
-                    # When apply_reasoning() returns a world model result with sufficient
-                    # confidence (>= 0.5), use it directly without invoking other reasoning
-                    # engines. Metadata flags provide additional context but are not
-                    # required for the decision.
+                    # Root Cause: The previous logic only short-circuited for world_model results,
+                    # causing high-confidence results from other engines to be overwritten by
+                    # UnifiedReasoner running with incorrect reasoning types.
                     # 
-                    # This prevents valid world model results from being discarded due to
-                    # missing or inconsistent metadata flags while maintaining confidence
-                    # thresholds for quality assurance.
+                    # Fix: Check confidence threshold for ALL tools, not just world_model.
+                    # This prevents valid reasoning results from being discarded and enables
+                    # proper learning integration by calling observe_engine_result().
                     # =================================================================
+                    
+                    # Check if this is a high-confidence result from ANY reasoning engine
+                    is_high_confidence_result = (
+                        integration_result.confidence >= HIGH_CONFIDENCE_THRESHOLD
+                    )
+                    
+                    # Special handling for world_model results (backward compatibility)
                     is_world_model_result = (
                         integration_result.selected_tools == ["world_model"] and
                         integration_result.confidence >= WORLD_MODEL_CONFIDENCE_THRESHOLD
                     )
                     
-                    # Log metadata flags for debugging but don't require them
+                    # Log metadata flags for world model debugging but don't require them
                     if is_world_model_result:
                         has_metadata_flags = (
                             integration_result.metadata.get("self_referential", False) or
@@ -3096,12 +3109,52 @@ class AgentPoolManager:
                                 f"Using result directly."
                             )
                     
-                    if is_world_model_result:
+                    # Use high-confidence results directly (world_model or any other engine)
+                    if is_high_confidence_result:
+                        # Determine the primary reasoning engine from selected tools
+                        primary_engine = integration_result.selected_tools[0] if integration_result.selected_tools else "general"
+                        
                         logger.info(
-                            f"[AgentPool] World model returned confidence "
-                            f"{integration_result.confidence:.2f}. Using this result directly "
-                            f"without invoking other reasoning engines."
+                            f"[AgentPool] High-confidence result from '{primary_engine}' engine "
+                            f"(confidence={integration_result.confidence:.2f} >= {HIGH_CONFIDENCE_THRESHOLD}). "
+                            f"Using this result directly without invoking UnifiedReasoner."
                         )
+                        
+                        # ============================================================
+                        # LEARNING INTEGRATION: Record successful engine execution
+                        # ============================================================
+                        # Call observe_engine_result() to enable the learning system to
+                        # record this successful high-confidence result for future optimization
+                        try:
+                            from vulcan.reasoning.integration.utils import observe_engine_result
+                            
+                            # Generate query ID for tracking
+                            query_id = context.get("conversation_id", f"query_{task_id}")
+                            
+                            # Prepare result dict for observation
+                            result_dict = {
+                                "confidence": integration_result.confidence,
+                                "selected_tools": integration_result.selected_tools,
+                                "strategy": integration_result.reasoning_strategy,
+                                "conclusion": integration_result.metadata.get("conclusion", ""),
+                            }
+                            
+                            # Record the successful execution (execution time not tracked here, use 0)
+                            observe_engine_result(
+                                query_id=query_id,
+                                engine_name=primary_engine,
+                                result=result_dict,
+                                success=True,
+                                execution_time_ms=0.0  # Timing tracked elsewhere
+                            )
+                            
+                            logger.debug(
+                                f"[AgentPool] Recorded successful execution for engine '{primary_engine}' "
+                                f"to learning system"
+                            )
+                        except Exception as e:
+                            # Don't fail the task if learning observation fails
+                            logger.debug(f"[AgentPool] Learning observation failed: {e}")
                         
                         # ============================================================
                         # FIX (Issue #ROUTING-001): Mark WorldModel responses for content preservation
@@ -3110,7 +3163,7 @@ class AgentPoolManager:
                         # OpenAI from replacing it with generic AI disclaimers. Set metadata
                         # flags to enforce content preservation.
                         is_introspection = integration_result.metadata.get("is_introspection", False)
-                        if is_introspection or 'world_model' in selected_tools:
+                        if is_world_model_result or is_introspection or 'world_model' in selected_tools:
                             integration_result.metadata['preserve_content'] = True
                             integration_result.metadata['no_openai_replacement'] = True
                             logger.info(
@@ -3118,49 +3171,108 @@ class AgentPoolManager:
                                 "OpenAI will not replace with generic disclaimers"
                             )
                         
+                        # ============================================================
+                        # Convert integration_result to reasoning_result format
+                        # ============================================================
                         # Create a reasoning_result from the integration result
-                        # to maintain consistency with downstream code
+                        # to maintain consistency with downstream code.
+                        # For world_model, use HYBRID reasoning type.
+                        # For other engines, map tool name to appropriate ReasoningType.
                         try:
                             # Note: Use different variable name to avoid Python scoping issue
-                            # Previously: from vulcan.reasoning.reasoning_types import ReasoningResult as UR_ReasoningResult, ReasoningType
-                            # This caused "cannot access local variable 'ReasoningType'" error because
-                            # Python treats ALL references to ReasoningType as local when there's a
-                            # local import, even if the import is in a different conditional branch.
                             from vulcan.reasoning.reasoning_types import ReasoningResult as UR_ReasoningResult, ReasoningType as RT_Local
+                            
+                            # Determine the appropriate reasoning type based on the tool
+                            if is_world_model_result:
+                                selected_reasoning_type = RT_Local.HYBRID
+                                source_name = "world_model"
+                            else:
+                                # Map tool to reasoning type
+                                tool_to_rt_map = {
+                                    'symbolic': RT_Local.SYMBOLIC,
+                                    'probabilistic': RT_Local.PROBABILISTIC,
+                                    'causal': RT_Local.CAUSAL,
+                                    'analogical': RT_Local.ANALOGICAL,
+                                    'mathematical': RT_Local.MATHEMATICAL,
+                                    'philosophical': RT_Local.PHILOSOPHICAL,
+                                    'multimodal': RT_Local.MULTIMODAL,
+                                }
+                                selected_reasoning_type = tool_to_rt_map.get(
+                                    primary_engine.lower(),
+                                    RT_Local.HYBRID  # Default fallback
+                                )
+                                source_name = primary_engine
+                            
+                            # Extract conclusion from metadata or rationale
+                            conclusion = integration_result.metadata.get(
+                                "conclusion",
+                                integration_result.metadata.get("world_model_response", integration_result.rationale)
+                            )
+                            
                             reasoning_result = UR_ReasoningResult(
-                                conclusion=integration_result.metadata.get("conclusion", integration_result.metadata.get("world_model_response", "")),
+                                conclusion=conclusion,
                                 confidence=integration_result.confidence,
-                                reasoning_type=RT_Local.HYBRID,  # World model uses hybrid reasoning
+                                reasoning_type=selected_reasoning_type,
                                 explanation=integration_result.metadata.get("explanation", integration_result.rationale),
                                 metadata={
-                                    "source": "world_model",
+                                    "source": source_name,
+                                    "selected_tools": integration_result.selected_tools,
+                                    "strategy": integration_result.reasoning_strategy,
+                                    # Preserve world model metadata if present
                                     "self_referential": integration_result.metadata.get("self_referential", False),
                                     "ethical_query": integration_result.metadata.get("ethical_query", False),
-                                    # FIX: Pass content preservation flags through to final response
                                     "preserve_content": integration_result.metadata.get("preserve_content", False),
                                     "no_openai_replacement": integration_result.metadata.get("no_openai_replacement", False),
                                     "is_introspection": integration_result.metadata.get("is_introspection", False),
+                                    # Add flag to indicate this came from high-confidence path
+                                    "high_confidence_direct_use": True,
                                 }
                             )
                         except ImportError:
                             # Fallback: Create a simple object with required attributes
                             # This is used when vulcan.reasoning.reasoning_types is not available
-                            class WorldModelReasoningResult:
-                                """Fallback result object for world model responses."""
-                                def __init__(self, conclusion, confidence, reasoning_type, explanation):
+                            class HighConfidenceReasoningResult:
+                                """Fallback result object for high-confidence reasoning responses."""
+                                def __init__(self, conclusion, confidence, reasoning_type, explanation, metadata=None):
                                     self.conclusion = conclusion
                                     self.confidence = confidence
                                     self.reasoning_type = reasoning_type
                                     self.explanation = explanation
+                                    self.metadata = metadata or {}
                             
-                            reasoning_result = WorldModelReasoningResult(
-                                conclusion=integration_result.metadata.get("conclusion", integration_result.metadata.get("world_model_response", "")),
+                            # Determine reasoning type string
+                            if is_world_model_result:
+                                rt_string = 'hybrid'
+                            else:
+                                tool_to_rt_string = {
+                                    'symbolic': 'symbolic',
+                                    'probabilistic': 'probabilistic',
+                                    'causal': 'causal',
+                                    'analogical': 'analogical',
+                                    'mathematical': 'mathematical',
+                                    'philosophical': 'philosophical',
+                                    'multimodal': 'multimodal',
+                                }
+                                rt_string = tool_to_rt_string.get(primary_engine.lower(), 'hybrid')
+                            
+                            conclusion = integration_result.metadata.get(
+                                "conclusion",
+                                integration_result.metadata.get("world_model_response", integration_result.rationale)
+                            )
+                            
+                            reasoning_result = HighConfidenceReasoningResult(
+                                conclusion=conclusion,
                                 confidence=integration_result.confidence,
-                                reasoning_type='hybrid',
+                                reasoning_type=rt_string,
                                 explanation=integration_result.metadata.get("explanation", integration_result.rationale),
+                                metadata={
+                                    "source": source_name if is_world_model_result else primary_engine,
+                                    "selected_tools": integration_result.selected_tools,
+                                    "high_confidence_direct_use": True,
+                                }
                             )
                         reasoning_was_invoked = True
-                    # If UnifiedReasoner is available and NOT a world model result, invoke actual reasoning
+                    # If UnifiedReasoner is available and NOT a high-confidence result, invoke actual reasoning
                     elif UnifiedReasoner is not None and create_unified_reasoner is not None:
                         try:
                             # Get or create unified reasoner with learning and safety enabled
