@@ -59,9 +59,9 @@
 
 ## Next Implementation Steps (Short-Term)
 
-1. Hardware metrics ingestion (temperature, utilization, error rate) → RL reward expansion.  
-2. Integrate sustainability panel into Grafana (energy trend + efficiency index).  
-3. Kernel generation caching with fingerprint-based invalidation.  
+1. Hardware metrics ingestion (temperature, utilization, error rate) → RL reward expansion. 
+2. Integrate sustainability panel into Grafana (energy trend + efficiency index). 
+3. Kernel generation caching with fingerprint-based invalidation. 
 4. Improved fused subgraph detection heuristics (pattern miner integration).
 
 ---

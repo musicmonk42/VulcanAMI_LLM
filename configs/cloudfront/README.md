@@ -25,41 +25,41 @@ This comprehensive cache policy configuration provides enterprise-grade caching 
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                         Client Request                       │
+│ Client Request │
 └──────────────────────────┬──────────────────────────────────┘
-                           │
-                           ▼
+ │
+ ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                    Bloom Filter Check                        │
-│  • Fast membership test (0.1% false positive rate)          │
-│  • 10M expected elements, auto-scaling                      │
+│ Bloom Filter Check │
+│ • Fast membership test (0.1% false positive rate) │
+│ • 10M expected elements, auto-scaling │
 └──────────────────────────┬──────────────────────────────────┘
-                           │
-                           ▼
+ │
+ ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                   Multi-Tier Cache Layer                     │
-│  ┌───────────┬──────────┬──────────┬─────────┬───────────┐ │
-│  │   Bloom   │   Hot    │   Warm   │  Cold   │ Manifest  │ │
-│  │   10GB    │   50GB   │  200GB   │  500GB  │    5GB    │ │
-│  │  Priority │ Priority │ Priority │Priority │ Priority  │ │
-│  │     0     │     1    │     2    │    3    │     0     │ │
-│  └───────────┴──────────┴──────────┴─────────┴───────────┘ │
+│ Multi-Tier Cache Layer │
+│ ┌───────────┬──────────┬──────────┬─────────┬───────────┐ │
+│ │ Bloom │ Hot │ Warm │ Cold │ Manifest │ │
+│ │ 10GB │ 50GB │ 200GB │ 500GB │ 5GB │ │
+│ │ Priority │ Priority │ Priority │Priority │ Priority │ │
+│ │ 0 │ 1 │ 2 │ 3 │ 0 │ │
+│ └───────────┴──────────┴──────────┴─────────┴───────────┘ │
 └──────────────────────────┬──────────────────────────────────┘
-                           │
-                           ▼
+ │
+ ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                    Merkle Tree Verification                  │
-│  • SHA-256 hashing with parallel processing                 │
-│  • Cached proofs (24hr TTL)                                 │
-│  • Content integrity validation                             │
+│ Merkle Tree Verification │
+│ • SHA-256 hashing with parallel processing │
+│ • Cached proofs (24hr TTL) │
+│ • Content integrity validation │
 └──────────────────────────┬──────────────────────────────────┘
-                           │
-                           ▼
+ │
+ ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                      Origin Servers                          │
-│  • MinIO S3 backends (3 nodes)                              │
-│  • Least-connection load balancing                          │
-│  • Automatic failover with health checks                    │
+│ Origin Servers │
+│ • MinIO S3 backends (3 nodes) │
+│ • Least-connection load balancing │
+│ • Automatic failover with health checks │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -73,12 +73,12 @@ The cache key includes standard HTTP headers for content negotiation:
 
 ```json
 "standard": [
-  "Range",              // Byte-range requests
-  "If-Range",           // Conditional range requests
-  "If-None-Match",      // ETag validation
-  "If-Modified-Since",  // Time-based validation
-  "Accept-Encoding",    // Compression negotiation
-  "Accept-Language"     // Language preferences
+ "Range", // Byte-range requests
+ "If-Range", // Conditional range requests
+ "If-None-Match", // ETag validation
+ "If-Modified-Since", // Time-based validation
+ "Accept-Encoding", // Compression negotiation
+ "Accept-Language" // Language preferences
 ]
 ```
 
@@ -88,10 +88,10 @@ Specialized headers for Bloom filter operations:
 
 ```json
 "bloom": [
-  "X-Bloom",            // Bloom filter identifier
-  "X-Bloom-Filter",     // Filter data
-  "X-Bloom-Version",    // Filter version
-  "X-Bloom-Hash-Count"  // Number of hash functions
+ "X-Bloom", // Bloom filter identifier
+ "X-Bloom-Filter", // Filter data
+ "X-Bloom-Version", // Filter version
+ "X-Bloom-Hash-Count" // Number of hash functions
 ]
 ```
 
@@ -101,10 +101,10 @@ Headers for Merkle proof verification:
 
 ```json
 "merkle": [
-  "X-Pack-Merkle",      // Merkle pack identifier
-  "X-Merkle-Root",      // Root hash
-  "X-Merkle-Proof",     // Inclusion proof
-  "X-Merkle-Depth"      // Tree depth
+ "X-Pack-Merkle", // Merkle pack identifier
+ "X-Merkle-Root", // Root hash
+ "X-Merkle-Proof", // Inclusion proof
+ "X-Merkle-Depth" // Tree depth
 ]
 ```
 
@@ -114,14 +114,14 @@ Domain-specific headers for ML model delivery:
 
 ```json
 "custom": [
-  "X-Model-Version",        // Model version identifier
-  "X-Embedding-Type",       // Type of embedding (text, image, etc.)
-  "X-Vector-Dimension",     // Dimension of vector embeddings
-  "X-Quantization-Level",   // Model quantization level (FP16, INT8, etc.)
-  "X-Client-Capability",    // Client device capabilities
-  "X-Device-Type",          // Device type (mobile, desktop, server)
-  "X-Resolution",           // Display resolution
-  "X-Bandwidth-Class"       // Network bandwidth class
+ "X-Model-Version", // Model version identifier
+ "X-Embedding-Type", // Type of embedding (text, image, etc.)
+ "X-Vector-Dimension", // Dimension of vector embeddings
+ "X-Quantization-Level", // Model quantization level (FP16, INT8, etc.)
+ "X-Client-Capability", // Client device capabilities
+ "X-Device-Type", // Device type (mobile, desktop, server)
+ "X-Resolution", // Display resolution
+ "X-Bandwidth-Class" // Network bandwidth class
 ]
 ```
 
@@ -142,7 +142,7 @@ Only whitelisted query parameters affect the cache key:
 **Normalization**:
 - Headers converted to lowercase
 - Query strings sorted alphabetically
-- Paths canonicalized (remove ../,  ./, etc.)
+- Paths canonicalized (remove ../, ./, etc.)
 - Default ports removed from URLs
 
 ---
@@ -183,12 +183,12 @@ Content-specific TTL optimization:
 Path-based TTL rules:
 
 ```
-/models/*        → 30 days   (immutable model files)
-/embeddings/*    → 7 days    (vector embeddings)
-/bloom/*         → 24 hours  (bloom filters)
-/manifests/*     → 1 hour    (manifest files)
-*.safetensors    → 30 days   (model format)
-*.bloom          → 24 hours  (bloom filter files)
+/models/* → 30 days (immutable model files)
+/embeddings/* → 7 days (vector embeddings)
+/bloom/* → 24 hours (bloom filters)
+/manifests/* → 1 hour (manifest files)
+*.safetensors → 30 days (model format)
+*.bloom → 24 hours (bloom filter files)
 ```
 
 ### By File Size
@@ -207,7 +207,7 @@ Size-based caching strategy:
 Adaptive TTL based on access patterns:
 
 - **Hot** (>100 req/hour): 30 days TTL
-- **Warm** (10-100 req/hour): 7 days TTL  
+- **Warm** (10-100 req/hour): 7 days TTL 
 - **Cold** (<10 req/hour): 24 hours TTL
 
 ### Advanced TTL Features
@@ -237,10 +237,10 @@ Adaptive TTL based on access patterns:
 - **Eviction**: LRU (Least Recently Used)
 - **Criteria**: >100 requests/hour, >80% hit rate
 - **Content Types**: 
-  - Bloom filters
-  - Merkle proofs
-  - JSON metadata
-  - MessagePack data
+ - Bloom filters
+ - Merkle proofs
+ - JSON metadata
+ - MessagePack data
 
 #### 3. Warm Tier (Priority 2)
 - **Size**: 200 GB
@@ -248,9 +248,9 @@ Adaptive TTL based on access patterns:
 - **Eviction**: LRU
 - **Criteria**: 10-100 requests/hour, >50% hit rate
 - **Content Types**:
-  - Vector embeddings
-  - Binary model chunks
-  - Medium-sized assets
+ - Vector embeddings
+ - Binary model chunks
+ - Medium-sized assets
 
 #### 4. Cold Tier (Priority 3)
 - **Size**: 500 GB
@@ -258,9 +258,9 @@ Adaptive TTL based on access patterns:
 - **Eviction**: LFU (Least Frequently Used)
 - **Criteria**: <10 requests/hour
 - **Content Types**:
-  - Full model files (safetensors)
-  - Large binary objects
-  - Archive data
+ - Full model files (safetensors)
+ - Large binary objects
+ - Archive data
 
 #### 5. Manifest Tier (Priority 0)
 - **Size**: 5 GB
@@ -287,12 +287,12 @@ Warm → Cold: When requests drop below 10/hour
 
 ```json
 {
-  "implementation": "scalable",
-  "falsePositiveRate": 0.001,     // 0.1% FPR
-  "expectedElements": 10000000,   // 10M elements
-  "hashFunctions": 7,              // Optimal for 0.1% FPR
-  "autoScale": true,               // Automatic growth
-  "scaleFactor": 2                 // 2x growth per scale
+ "implementation": "scalable",
+ "falsePositiveRate": 0.001, // 0.1% FPR
+ "expectedElements": 10000000, // 10M elements
+ "hashFunctions": 7, // Optimal for 0.1% FPR
+ "autoScale": true, // Automatic growth
+ "scaleFactor": 2 // 2x growth per scale
 }
 ```
 
@@ -315,10 +315,10 @@ Warm → Cold: When requests drop below 10/hour
 
 ```json
 {
-  "keyPrefix": "bloom:",
-  "ttl": 86400,              // 24 hour persistence
-  "pipeline": true,          // Batch operations
-  "compression": true        // LZ4 compression
+ "keyPrefix": "bloom:",
+ "ttl": 86400, // 24 hour persistence
+ "pipeline": true, // Batch operations
+ "compression": true // LZ4 compression
 }
 ```
 
@@ -330,14 +330,14 @@ Warm → Cold: When requests drop below 10/hour
 
 ```json
 {
-  "hashAlgorithm": "sha256",
-  "leafHashAlgorithm": "sha256",
-  "enableProofCache": true,
-  "proofCacheTTL": 86400,
-  "verifyOnCache": true,
-  "maxTreeDepth": 20,
-  "chunkSize": 1048576,      // 1 MB chunks
-  "parallelHashing": true
+ "hashAlgorithm": "sha256",
+ "leafHashAlgorithm": "sha256",
+ "enableProofCache": true,
+ "proofCacheTTL": 86400,
+ "verifyOnCache": true,
+ "maxTreeDepth": 20,
+ "chunkSize": 1048576, // 1 MB chunks
+ "parallelHashing": true
 }
 ```
 
@@ -355,10 +355,10 @@ Warm → Cold: When requests drop below 10/hour
 2. Server computes Merkle proof for requested content
 3. Check proof cache (24hr TTL)
 4. If not cached:
-   a. Hash content chunks in parallel (1MB chunks)
-   b. Build Merkle tree bottom-up
-   c. Generate inclusion proof
-   d. Cache proof for future requests
+ a. Hash content chunks in parallel (1MB chunks)
+ b. Build Merkle tree bottom-up
+ c. Generate inclusion proof
+ d. Cache proof for future requests
 5. Return content + proof in X-Merkle-Proof header
 6. Client verifies locally using proof + root hash
 ```
@@ -387,16 +387,16 @@ Multi-tier rate limiting with path-specific rules:
 **Path-Specific Limits**:
 ```json
 {
-  "/models/*": {
-    "requests": 100,
-    "window": 60,
-    "burst": 20
-  },
-  "/bloom/*": {
-    "requests": 10000,  // Higher limit for bloom filters
-    "window": 60,
-    "burst": 1000
-  }
+ "/models/*": {
+ "requests": 100,
+ "window": 60,
+ "burst": 20
+ },
+ "/bloom/*": {
+ "requests": 10000, // Higher limit for bloom filters
+ "window": 60,
+ "burst": 1000
+ }
 }
 ```
 
@@ -420,12 +420,12 @@ Referrer-Policy: strict-origin-when-cross-origin
 
 ```json
 {
-  "allowOrigins": ["*"],
-  "allowMethods": ["GET", "HEAD", "OPTIONS"],
-  "allowHeaders": ["Range", "If-Range", "X-Bloom", "X-Pack-Merkle"],
-  "exposeHeaders": ["ETag", "X-Cache-Status", "X-Bloom-Filter"],
-  "maxAge": 86400,
-  "credentials": false
+ "allowOrigins": ["*"],
+ "allowMethods": ["GET", "HEAD", "OPTIONS"],
+ "allowHeaders": ["Range", "If-Range", "X-Bloom", "X-Pack-Merkle"],
+ "exposeHeaders": ["ETag", "X-Cache-Status", "X-Bloom-Filter"],
+ "maxAge": 86400,
+ "credentials": false
 }
 ```
 
@@ -457,13 +457,13 @@ Referrer-Policy: strict-origin-when-cross-origin
 **Configuration**:
 ```json
 {
-  "level": {
-    "br": 6,    // Balance of speed/ratio
-    "gzip": 6,
-    "deflate": 6
-  },
-  "minSize": 1024,      // Don't compress < 1KB
-  "maxSize": 10485760   // Don't compress > 10MB
+ "level": {
+ "br": 6, // Balance of speed/ratio
+ "gzip": 6,
+ "deflate": 6
+ },
+ "minSize": 1024, // Don't compress < 1KB
+ "maxSize": 10485760 // Don't compress > 10MB
 }
 ```
 
@@ -484,10 +484,10 @@ Referrer-Policy: strict-origin-when-cross-origin
 
 ```json
 {
-  "maxRanges": 10,           // Max ranges per request
-  "minChunkSize": 262144,    // 256 KB minimum
-  "sliceSize": 1048576,      // 1 MB cache slices
-  "enableSliceCache": true   // Cache byte ranges
+ "maxRanges": 10, // Max ranges per request
+ "minChunkSize": 262144, // 256 KB minimum
+ "sliceSize": 1048576, // 1 MB cache slices
+ "enableSliceCache": true // Cache byte ranges
 }
 ```
 
@@ -515,8 +515,8 @@ For content that changes incrementally:
 
 ```json
 {
-  "enabled": true,
-  "maxDeltaSize": 10485760  // 10 MB max delta
+ "enabled": true,
+ "maxDeltaSize": 10485760 // 10 MB max delta
 }
 ```
 
@@ -528,9 +528,9 @@ Machine learning-based TTL optimization:
 
 ```json
 {
-  "enabled": true,
-  "algorithm": "ml-based",
-  "adjustmentFactor": 1.5
+ "enabled": true,
+ "algorithm": "ml-based",
+ "adjustmentFactor": 1.5
 }
 ```
 
@@ -544,10 +544,10 @@ Machine learning-based TTL optimization:
 
 ```json
 {
-  "enabled": true,
-  "maxConcurrent": 10,
-  "predictiveAlgorithm": "markov",
-  "minConfidence": 0.7
+ "enabled": true,
+ "maxConcurrent": 10,
+ "predictiveAlgorithm": "markov",
+ "minConfidence": 0.7
 }
 ```
 
@@ -561,10 +561,10 @@ Machine learning-based TTL optimization:
 
 ```json
 {
-  "enabled": true,
-  "schedule": "0 2 * * *",  // Daily at 2 AM
-  "sources": ["/var/log/nginx/popular-urls.txt"],
-  "concurrency": 20
+ "enabled": true,
+ "schedule": "0 2 * * *", // Daily at 2 AM
+ "sources": ["/var/log/nginx/popular-urls.txt"],
+ "concurrency": 20
 }
 ```
 
@@ -582,14 +582,14 @@ Machine learning-based TTL optimization:
 
 ```json
 {
-  "zkUnlearning": {
-    "enabled": true,
-    "circuitPath": "/opt/zk/circuits/unlearning_v1.0",
-    "verifyProofs": true,
-    "propagateToBloom": true,
-    "updateMerkleTree": true,
-    "auditLog": true
-  }
+ "zkUnlearning": {
+ "enabled": true,
+ "circuitPath": "/opt/zk/circuits/unlearning_v1.0",
+ "verifyProofs": true,
+ "propagateToBloom": true,
+ "updateMerkleTree": true,
+ "auditLog": true
+ }
 }
 ```
 
@@ -679,14 +679,14 @@ Endpoint: `/health`
 **Response Format**:
 ```json
 {
-  "status": "healthy|degraded|unhealthy",
-  "timestamp": "2025-11-14T12:00:00Z",
-  "checks": {
-    "cache": {"status": "healthy", "details": {...}},
-    "upstream": {"status": "healthy", "details": {...}},
-    "bloom": {"status": "healthy", "details": {...}},
-    "disk": {"status": "healthy", "details": {...}}
-  }
+ "status": "healthy|degraded|unhealthy",
+ "timestamp": "2025-11-14T12:00:00Z",
+ "checks": {
+ "cache": {"status": "healthy", "details": {...}},
+ "upstream": {"status": "healthy", "details": {...}},
+ "bloom": {"status": "healthy", "details": {...}},
+ "disk": {"status": "healthy", "details": {...}}
+ }
 }
 ```
 
@@ -705,12 +705,12 @@ Webhook endpoint: `https://monitoring.vulcanami.io/webhooks/nginx`
 **Alert Payload**:
 ```json
 {
-  "severity": "warning|critical",
-  "condition": "error_rate_threshold",
-  "value": 7.5,
-  "threshold": 5.0,
-  "timestamp": "2025-11-14T12:00:00Z",
-  "metrics": {...}
+ "severity": "warning|critical",
+ "condition": "error_rate_threshold",
+ "value": 7.5,
+ "threshold": 5.0,
+ "timestamp": "2025-11-14T12:00:00Z",
+ "metrics": {...}
 }
 ```
 
@@ -723,19 +723,19 @@ Webhook endpoint: `https://monitoring.vulcanami.io/webhooks/nginx`
 **PURGE Request**:
 ```bash
 curl -X PURGE https://cdn.vulcanami.io/models/llama-2-7b.safetensors \
-  -H "X-Purge-Token: <secret>"
+ -H "X-Purge-Token: <secret>"
 ```
 
 **Pattern-Based**:
 ```bash
 # Purge all model files
 curl -X PURGE https://cdn.vulcanami.io/models/* \
-  -H "X-Purge-Token: <secret>"
+ -H "X-Purge-Token: <secret>"
 
 # Purge by regex
 curl -X PURGE https://cdn.vulcanami.io/ \
-  -H "X-Purge-Pattern: ^/embeddings/.*\.bin$" \
-  -H "X-Purge-Token: <secret>"
+ -H "X-Purge-Pattern: ^/embeddings/.*\.bin$" \
+ -H "X-Purge-Token: <secret>"
 ```
 
 ### ZK Unlearning Integration
@@ -744,8 +744,8 @@ For GDPR/privacy compliance:
 
 ```bash
 curl -X PURGE https://cdn.vulcanami.io/user-data/12345 \
-  -H "X-ZK-Proof: <base64-encoded-proof>" \
-  -H "X-Purge-Token: <secret>"
+ -H "X-ZK-Proof: <base64-encoded-proof>" \
+ -H "X-Purge-Token: <secret>"
 ```
 
 **Process**:
@@ -768,11 +768,11 @@ curl -X PURGE https://cdn.vulcanami.io/user-data/12345 \
 **Backend Servers**:
 ```json
 {
-  "backends": [
-    {"host": "minio-1", "port": 9000, "weight": 100},
-    {"host": "minio-2", "port": 9000, "weight": 100},
-    {"host": "minio-3", "port": 9000, "weight": 100}
-  ]
+ "backends": [
+ {"host": "minio-1", "port": 9000, "weight": 100},
+ {"host": "minio-2", "port": 9000, "weight": 100},
+ {"host": "minio-3", "port": 9000, "weight": 100}
+ ]
 }
 ```
 
@@ -795,11 +795,11 @@ curl -X PURGE https://cdn.vulcanami.io/user-data/12345 \
 **Configuration**:
 ```json
 {
-  "maxAttempts": 3,
-  "backoff": "exponential",
-  "initialDelay": 100,
-  "maxDelay": 5000,
-  "retryOn": [502, 503, 504]
+ "maxAttempts": 3,
+ "backoff": "exponential",
+ "initialDelay": 100,
+ "maxDelay": 5000,
+ "retryOn": [502, 503, 504]
 }
 ```
 
@@ -883,11 +883,11 @@ Key NGINX directives for implementation:
 ```nginx
 # Proxy cache paths
 proxy_cache_path /var/cache/nginx/hot 
-    levels=1:2 
-    keys_zone=hot:10m 
-    max_size=50g 
-    inactive=30d 
-    use_temp_path=off;
+ levels=1:2 
+ keys_zone=hot:10m 
+ max_size=50g 
+ inactive=30d 
+ use_temp_path=off;
 
 # Cache key
 proxy_cache_key $scheme$proxy_host$request_uri$http_range$http_x_bloom;
@@ -910,11 +910,11 @@ add_header X-Cache-Tier "hot" always;
 
 # Upstream
 upstream minio_backend {
-    least_conn;
-    server minio-1:9000 max_fails=3 fail_timeout=30s;
-    server minio-2:9000 max_fails=3 fail_timeout=30s;
-    server minio-3:9000 max_fails=3 fail_timeout=30s;
-    keepalive 100;
+ least_conn;
+ server minio-1:9000 max_fails=3 fail_timeout=30s;
+ server minio-2:9000 max_fails=3 fail_timeout=30s;
+ server minio-3:9000 max_fails=3 fail_timeout=30s;
+ keepalive 100;
 }
 ```
 
@@ -1067,45 +1067,45 @@ redis-cli GET bloom:stats
 
 ```bash
 curl -X GET https://cdn.vulcanami.io/models/llama-2-7b.safetensors \
-  -H "X-Bloom: llama-2-7b" \
-  -H "Accept-Encoding: br, gzip" \
-  -v
+ -H "X-Bloom: llama-2-7b" \
+ -H "Accept-Encoding: br, gzip" \
+ -v
 ```
 
 ### Range Request with Merkle Proof
 
 ```bash
 curl -X GET https://cdn.vulcanami.io/embeddings/large-corpus.bin \
-  -H "Range: bytes=0-1048575" \
-  -H "X-Merkle-Root: abc123..." \
-  -H "X-Pack-Merkle: package-1" \
-  -v
+ -H "Range: bytes=0-1048575" \
+ -H "X-Merkle-Root: abc123..." \
+ -H "X-Pack-Merkle: package-1" \
+ -v
 ```
 
 ### Conditional Request
 
 ```bash
 curl -X GET https://cdn.vulcanami.io/manifests/model-config.json \
-  -H "If-None-Match: \"abc123\"" \
-  -H "If-Modified-Since: Wed, 14 Nov 2025 12:00:00 GMT" \
-  -v
+ -H "If-None-Match: \"abc123\"" \
+ -H "If-Modified-Since: Wed, 14 Nov 2025 12:00:00 GMT" \
+ -v
 ```
 
 ### Purge Cache
 
 ```bash
 curl -X PURGE https://cdn.vulcanami.io/models/* \
-  -H "X-Purge-Token: secret-token-here" \
-  -v
+ -H "X-Purge-Token: secret-token-here" \
+ -v
 ```
 
 ### ZK Unlearning
 
 ```bash
 curl -X PURGE https://cdn.vulcanami.io/user-data/12345 \
-  -H "X-ZK-Proof: eyJhbGc...base64..." \
-  -H "X-Purge-Token: secret-token-here" \
-  -v
+ -H "X-ZK-Proof: eyJhbGc...base64..." \
+ -H "X-Purge-Token: secret-token-here" \
+ -v
 ```
 
 ---

@@ -2,10 +2,10 @@
 
 ## Overview
 
-This is a production-ready NGINX origin server configuration optimized for serving Vulcan LLM pack files, Bloom filters, manifests, and proofs from MinIO object storage.
+This is a NGINX origin server configuration optimized for serving Vulcan LLM pack files, Bloom filters, manifests, and proofs from MinIO object storage.
 
-**Version**: 4.6.0  
-**Last Updated**: 2025-11-14  
+**Version**: 4.6.0 
+**Last Updated**: 2025-11-14 
 **NGINX Version Required**: 1.24+
 
 ---
@@ -31,16 +31,16 @@ This is a production-ready NGINX origin server configuration optimized for servi
 ### System Design
 
 ```
-┌─────────────┐      ┌──────────────────┐      ┌─────────────────┐
-│   Clients   │─────▶│  NGINX Origin    │─────▶│  MinIO Cluster  │
-│             │      │  (Port 80/443)   │      │  (4 nodes)      │
-└─────────────┘      └──────────────────┘      └─────────────────┘
-                              │
-                              ├─────▶ Hot Cache (10GB)
-                              ├─────▶ Warm Cache (50GB)
-                              ├─────▶ Cold Cache (100GB)
-                              ├─────▶ Bloom Cache (1GB)
-                              └─────▶ Manifest Cache (20GB)
+┌─────────────┐ ┌──────────────────┐ ┌─────────────────┐
+│ Clients │─────▶│ NGINX Origin │─────▶│ MinIO Cluster │
+│ │ │ (Port 80/443) │ │ (4 nodes) │
+└─────────────┘ └──────────────────┘ └─────────────────┘
+ │
+ ├─────▶ Hot Cache (10GB)
+ ├─────▶ Warm Cache (50GB)
+ ├─────▶ Cold Cache (100GB)
+ ├─────▶ Bloom Cache (1GB)
+ └─────▶ Manifest Cache (20GB)
 ```
 
 ### Components
@@ -102,40 +102,40 @@ This is a production-ready NGINX origin server configuration optimized for servi
 ```
 origin.conf
 ├── Upstream Configuration (Lines 10-75)
-│   ├── minio_backend (primary cluster)
-│   ├── minio_backup (disaster recovery)
-│   └── minio_readonly (read replicas)
+│ ├── minio_backend (primary cluster)
+│ ├── minio_backup (disaster recovery)
+│ └── minio_readonly (read replicas)
 │
 ├── Cache Configuration (Lines 80-125)
-│   ├── hot_cache (10GB, 24h)
-│   ├── warm_cache (50GB, 7d)
-│   ├── cold_cache (100GB, 30d)
-│   ├── bloom_cache (1GB, 1h)
-│   └── manifest_cache (20GB, 6h)
+│ ├── hot_cache (10GB, 24h)
+│ ├── warm_cache (50GB, 7d)
+│ ├── cold_cache (100GB, 30d)
+│ ├── bloom_cache (1GB, 1h)
+│ └── manifest_cache (20GB, 6h)
 │
 ├── Rate Limiting (Lines 130-155)
-│   ├── by_ip (100 req/s)
-│   ├── by_user_agent (50 req/s)
-│   ├── api_limit (1000 req/s)
-│   └── Connection limits
+│ ├── by_ip (100 req/s)
+│ ├── by_user_agent (50 req/s)
+│ ├── api_limit (1000 req/s)
+│ └── Connection limits
 │
 ├── Security Configuration (Lines 165-220)
-│   ├── Geo-IP mapping
-│   ├── User agent blocking
-│   ├── Request validation
-│   └── Content type validation
+│ ├── Geo-IP mapping
+│ ├── User agent blocking
+│ ├── Request validation
+│ └── Content type validation
 │
 ├── Logging Configuration (Lines 225-275)
-│   ├── detailed (comprehensive metrics)
-│   ├── performance (timing data)
-│   ├── security (audit trail)
-│   └── cache_analytics (cache stats)
+│ ├── detailed (comprehensive metrics)
+│ ├── performance (timing data)
+│ ├── security (audit trail)
+│ └── cache_analytics (cache stats)
 │
 ├── SSL/TLS Configuration (Lines 280-300)
 │
 └── Server Blocks (Lines 305+)
-    ├── HTTP Server (Port 80)
-    └── HTTPS Server (Port 443)
+ ├── HTTP Server (Port 80)
+ └── HTTPS Server (Port 443)
 ```
 
 ---
@@ -262,10 +262,10 @@ ok
 **Response**:
 ```json
 {
-  "status": "healthy",
-  "version": "4.6.0",
-  "timestamp": "1700000000.123",
-  "upstream": "available"
+ "status": "healthy",
+ "version": "4.6.0",
+ "timestamp": "1700000000.123",
+ "upstream": "available"
 }
 ```
 
@@ -323,7 +323,7 @@ POST /cache/purge
 Content-Type: application/json
 
 {
-  "pattern": "/v1/memory/a1b2c3*"
+ "pattern": "/v1/memory/a1b2c3*"
 }
 ```
 
@@ -336,11 +336,11 @@ Content-Type: application/json
 **Response**:
 ```json
 {
-  "hot_cache": "hot_cache",
-  "warm_cache": "warm_cache",
-  "cold_cache": "cold_cache",
-  "bloom_cache": "bloom_cache",
-  "manifest_cache": "manifest_cache"
+ "hot_cache": "hot_cache",
+ "warm_cache": "warm_cache",
+ "cold_cache": "cold_cache",
+ "bloom_cache": "bloom_cache",
+ "manifest_cache": "manifest_cache"
 }
 ```
 
@@ -521,9 +521,9 @@ proxy_http_version 1.1;
 ### 2. TCP Optimizations
 
 ```nginx
-tcp_nodelay on;      # Disable Nagle's algorithm
-tcp_nopush on;       # Send headers in one packet
-sendfile on;         # Zero-copy file transfer
+tcp_nodelay on; # Disable Nagle's algorithm
+tcp_nopush on; # Send headers in one packet
+sendfile on; # Zero-copy file transfer
 sendfile_max_chunk 512k;
 ```
 
@@ -550,9 +550,9 @@ worker_rlimit_nofile 65535;
 worker_priority -5;
 
 events {
-    worker_connections 10000;
-    use epoll;
-    multi_accept on;
+ worker_connections 10000;
+ use epoll;
+ multi_accept on;
 }
 ```
 
@@ -572,14 +572,14 @@ nginx hard nofile 65535
 
 ```
 /var/log/nginx/
-├── origin-access.log          # Detailed access log
-├── origin-error.log           # Error log
-├── origin-security.log        # Security events
-├── origin-performance.log     # Performance metrics
-├── origin-https-access.log    # HTTPS access log
-├── origin-https-error.log     # HTTPS errors
-├── healthcheck.log            # Health check logs
-└── unmatched.log             # Unmatched requests
+├── origin-access.log # Detailed access log
+├── origin-error.log # Error log
+├── origin-security.log # Security events
+├── origin-performance.log # Performance metrics
+├── origin-https-access.log # HTTPS access log
+├── origin-https-error.log # HTTPS errors
+├── healthcheck.log # Health check logs
+└── unmatched.log # Unmatched requests
 ```
 
 ### Log Format Fields
@@ -610,15 +610,15 @@ nginx hard nofile 65535
 ```bash
 # Cache hit rate
 awk '$11 ~ /HIT/ {hit++} $11 ~ /MISS/ {miss++} END {print hit/(hit+miss)*100"%"}' \
-  /var/log/nginx/origin-access.log
+ /var/log/nginx/origin-access.log
 
 # Average response time
 awk '{sum+=$15; count++} END {print sum/count"s"}' \
-  /var/log/nginx/origin-access.log
+ /var/log/nginx/origin-access.log
 
 # Top requested URLs
 awk '{print $7}' /var/log/nginx/origin-access.log | \
-  sort | uniq -c | sort -rn | head -20
+ sort | uniq -c | sort -rn | head -20
 ```
 
 ### Grafana Dashboards
@@ -724,7 +724,7 @@ sudo cp origin.conf /etc/nginx/sites-available/origin.conf
 
 # Create symlink
 sudo ln -s /etc/nginx/sites-available/origin.conf \
-           /etc/nginx/sites-enabled/origin.conf
+ /etc/nginx/sites-enabled/origin.conf
 
 # Remove default site
 sudo rm -f /etc/nginx/sites-enabled/default
@@ -744,39 +744,39 @@ worker_rlimit_nofile 65535;
 pid /run/nginx.pid;
 
 events {
-    worker_connections 10000;
-    use epoll;
-    multi_accept on;
+ worker_connections 10000;
+ use epoll;
+ multi_accept on;
 }
 
 http {
-    # Basic settings
-    sendfile on;
-    tcp_nopush on;
-    tcp_nodelay on;
-    keepalive_timeout 65;
-    types_hash_max_size 2048;
-    server_tokens off;
-    
-    # MIME types
-    include /etc/nginx/mime.types;
-    default_type application/octet-stream;
-    
-    # Logging
-    access_log /var/log/nginx/access.log;
-    error_log /var/log/nginx/error.log warn;
-    
-    # Gzip
-    gzip on;
-    gzip_vary on;
-    gzip_proxied any;
-    gzip_comp_level 6;
-    gzip_types text/plain text/css text/xml text/javascript
-               application/json application/javascript application/xml+rss;
-    
-    # Include site configs
-    include /etc/nginx/conf.d/*.conf;
-    include /etc/nginx/sites-enabled/*;
+ # Basic settings
+ sendfile on;
+ tcp_nopush on;
+ tcp_nodelay on;
+ keepalive_timeout 65;
+ types_hash_max_size 2048;
+ server_tokens off;
+ 
+ # MIME types
+ include /etc/nginx/mime.types;
+ default_type application/octet-stream;
+ 
+ # Logging
+ access_log /var/log/nginx/access.log;
+ error_log /var/log/nginx/error.log warn;
+ 
+ # Gzip
+ gzip on;
+ gzip_vary on;
+ gzip_proxied any;
+ gzip_comp_level 6;
+ gzip_types text/plain text/css text/xml text/javascript
+ application/json application/javascript application/xml+rss;
+ 
+ # Include site configs
+ include /etc/nginx/conf.d/*.conf;
+ include /etc/nginx/sites-enabled/*;
 }
 ```
 
@@ -785,9 +785,9 @@ http {
 ```bash
 # Self-signed (development)
 sudo openssl req -x509 -nodes -days 365 \
-  -newkey rsa:2048 \
-  -keyout /etc/nginx/ssl/key.pem \
-  -out /etc/nginx/ssl/cert.pem
+ -newkey rsa:2048 \
+ -keyout /etc/nginx/ssl/key.pem \
+ -out /etc/nginx/ssl/cert.pem
 
 # Let's Encrypt (production)
 sudo certbot --nginx -d origin.vulcanami.io
@@ -850,17 +850,17 @@ sudo nano /etc/logrotate.d/nginx
 
 ```
 /var/log/nginx/*.log {
-    daily
-    missingok
-    rotate 30
-    compress
-    delaycompress
-    notifempty
-    create 0640 nginx adm
-    sharedscripts
-    postrotate
-        [ -f /var/run/nginx.pid ] && kill -USR1 `cat /var/run/nginx.pid`
-    endscript
+ daily
+ missingok
+ rotate 30
+ compress
+ delaycompress
+ notifempty
+ create 0640 nginx adm
+ sharedscripts
+ postrotate
+ [ -f /var/run/nginx.pid ] && kill -USR1 `cat /var/run/nginx.pid`
+ endscript
 }
 ```
 
@@ -885,7 +885,7 @@ After=network.target
 Type=simple
 User=nginx
 ExecStart=/usr/local/bin/nginx-prometheus-exporter \
-  -nginx.scrape-uri=http://localhost/nginx_status
+ -nginx.scrape-uri=http://localhost/nginx_status
 Restart=always
 
 [Install]
@@ -952,7 +952,7 @@ sudo sysctl -p
 ```bash
 # Check cache stats
 grep "cache" /var/log/nginx/origin-access.log | \
-  awk '{print $NF}' | sort | uniq -c
+ awk '{print $NF}' | sort | uniq -c
 
 # Check cache size
 du -sh /var/cache/nginx/*
@@ -972,7 +972,7 @@ du -sh /var/cache/nginx/*
 ```bash
 # Average response time
 awk '{sum+=$15; count++} END {print sum/count}' \
-  /var/log/nginx/origin-access.log
+ /var/log/nginx/origin-access.log
 
 # Slow requests
 awk '$15 > 1' /var/log/nginx/origin-access.log
@@ -1019,7 +1019,7 @@ grep " 429 " /var/log/nginx/origin-access.log | wc -l
 
 # Check which IPs are hitting limits
 grep " 429 " /var/log/nginx/origin-access.log | \
-  awk '{print $1}' | sort | uniq -c | sort -rn
+ awk '{print $1}' | sort | uniq -c | sort -rn
 ```
 
 **Solutions**:
@@ -1115,16 +1115,16 @@ grep " 5[0-9][0-9] " /var/log/nginx/origin-access.log | tail -20
 ```bash
 # Analyze cache hit rate
 awk '$11 ~ /HIT/ {hit++} $11 ~ /MISS/ {miss++} END {
-  print "Hit rate:", hit/(hit+miss)*100"%"
+ print "Hit rate:", hit/(hit+miss)*100"%"
 }' /var/log/nginx/origin-access.log.1
 
 # Review top URLs
 awk '{print $7}' /var/log/nginx/origin-access.log.1 | \
-  sort | uniq -c | sort -rn | head -20
+ sort | uniq -c | sort -rn | head -20
 
 # Check slow requests
 awk '$15 > 1 {print $0}' /var/log/nginx/origin-access.log.1 | \
-  wc -l
+ wc -l
 
 # Review security log
 sudo tail -100 /var/log/nginx/origin-security.log
@@ -1156,13 +1156,13 @@ sudo openssl x509 -in /etc/nginx/ssl/cert.pem -noout -dates
 ```bash
 # Backup configuration
 sudo tar czf nginx-config-backup-$(date +%Y%m%d).tar.gz \
-  /etc/nginx/ \
-  /var/log/nginx/ \
-  --exclude=/var/log/nginx/*.log
+ /etc/nginx/ \
+ /var/log/nginx/ \
+ --exclude=/var/log/nginx/*.log
 
 # Backup SSL certificates
 sudo tar czf nginx-ssl-backup-$(date +%Y%m%d).tar.gz \
-  /etc/nginx/ssl/
+ /etc/nginx/ssl/
 ```
 
 #### Restore
@@ -1219,8 +1219,8 @@ hey -n 10000 -c 100 http://localhost/v1/memory/hash
 
 # Custom script
 for i in {1..1000}; do
-  curl -s -w "%{http_code} %{time_total}s\n" \
-    http://localhost/v1/memory/hash > /dev/null
+ curl -s -w "%{http_code} %{time_total}s\n" \
+ http://localhost/v1/memory/hash > /dev/null
 done
 ```
 

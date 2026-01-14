@@ -48,25 +48,25 @@ This document summarizes the comprehensive fix for query routing pipeline overri
 
 ### 2. src/vulcan/reasoning/integration/apply_reasoning_impl.py
 - **Lines ~365-395**: Added category set definitions
-  - `TRULY_SIMPLE_CATEGORIES`: Only GREETING and CHITCHAT
-  - `REASONING_CATEGORIES`: All reasoning types
+ - `TRULY_SIMPLE_CATEGORIES`: Only GREETING and CHITCHAT
+ - `REASONING_CATEGORIES`: All reasoning types
 - **Lines ~470-510**: Updated override logic
-  - Check for reasoning categories before overriding
-  - Only override truly simple queries
-  - Preserve classifier's suggested tools for reasoning
+ - Check for reasoning categories before overriding
+ - Only override truly simple queries
+ - Preserve classifier's suggested tools for reasoning
 
 ### 3. src/vulcan/orchestrator/agent_pool.py
 - **Lines ~3217-3285**: Rewrote override logic
-  - Check `override_router_tools` flag
-  - Detect general fallback vs. authoritative override
-  - Preserve router's specific tools over fallback
-  - Only override when explicitly requested
+ - Check `override_router_tools` flag
+ - Detect general fallback vs. authoritative override
+ - Preserve router's specific tools over fallback
+ - Only override when explicitly requested
 
 ### 4. src/vulcan/reasoning/integration/types.py
 - **Lines ~324-353**: Added `override_router_tools` field to `ReasoningResult`
-  - Default value: `False`
-  - Set to `True` only when integration has high confidence
-  - Used for self-introspection and explicit delegation
+ - Default value: `False`
+ - Set to `True` only when integration has high confidence
+ - Used for self-introspection and explicit delegation
 
 ### 5. tests/test_routing_override_fixes.py (NEW)
 - Comprehensive test suite for all fixes
@@ -91,19 +91,19 @@ All modified files compile successfully without syntax errors.
 ## Expected Behavior After Fix
 
 ### Bayesian/Probabilistic Queries
-**Before**: Classified as MATHEMATICAL → routed to math tool → "No mathematical expression found"  
+**Before**: Classified as MATHEMATICAL → routed to math tool → "No mathematical expression found" 
 **After**: Classified as PROBABILISTIC → routed to probabilistic tool → correct Bayesian computation
 
 ### SAT/Logic Queries
-**Before**: Classified as MATHEMATICAL → routed to math tool → "No mathematical expression found"  
+**Before**: Classified as MATHEMATICAL → routed to math tool → "No mathematical expression found" 
 **After**: Classified as LOGICAL → routed to symbolic tool → correct SAT solving
 
 ### Causal Reasoning Queries
-**Before**: Classified as simple → overridden to ['general'] → wrong execution  
+**Before**: Classified as simple → overridden to ['general'] → wrong execution 
 **After**: Classified as CAUSAL → preserved → routed to causal tool → correct analysis
 
 ### Router Selection Preservation
-**Before**: Router selects ['probabilistic'] → integration returns ['general'] fallback → override to ['general']  
+**Before**: Router selects ['probabilistic'] → integration returns ['general'] fallback → override to ['general'] 
 **After**: Router selects ['probabilistic'] → integration returns ['general'] fallback → preserve ['probabilistic']
 
 ## Files Modified

@@ -42,8 +42,8 @@ python src/setup_agent.py validation_agent executor validator
 Start services:
 
 ```bash
-python app.py        # Registry (http://localhost:5000)
-uvicorn src.graphix_arena:app --reload   # Arena (http://127.0.0.1:8000)
+python app.py # Registry (http://localhost:5000)
+uvicorn src.graphix_arena:app --reload # Arena (http://127.0.0.1:8000)
 ```
 
 ---
@@ -71,27 +71,27 @@ All Arena endpoints require `X-API-Key` header with `GRAPHIX_API_KEY`.
 
 ```bash
 curl -X POST http://127.0.0.1:8000/api/run/generator \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: YOUR_KEY" \
-  -d '{"spec_id":"sentiment_3d_spec","parameters":{"goal":"Photonic sentiment analysis"}}'
+ -H "Content-Type: application/json" \
+ -H "X-API-Key: YOUR_KEY" \
+ -d '{"spec_id":"sentiment_3d_spec","parameters":{"goal":"Photonic sentiment analysis"}}'
 ```
 
 ### Example: Submit Feedback
 
 ```bash
 curl -X POST http://127.0.0.1:8000/api/feedback \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: YOUR_KEY" \
-  -d '{"proposal_id":"initial_graph_v1","score":0.92,"rationale":"Accurate, low latency"}'
+ -H "Content-Type: application/json" \
+ -H "X-API-Key: YOUR_KEY" \
+ -d '{"proposal_id":"initial_graph_v1","score":0.92,"rationale":"Accurate, low latency"}'
 ```
 
 ### Example: Tournament
 
 ```bash
 curl -X POST http://127.0.0.1:8000/api/tournament \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: YOUR_KEY" \
-  -d '{"proposals":[{"id":"p1"},{"id":"p2"}],"fitness":[0.88,0.92]}'
+ -H "Content-Type: application/json" \
+ -H "X-API-Key: YOUR_KEY" \
+ -d '{"proposals":[{"id":"p1"},{"id":"p2"}],"fitness":[0.88,0.92]}'
 ```
 
 ---

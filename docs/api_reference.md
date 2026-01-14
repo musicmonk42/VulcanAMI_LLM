@@ -1,6 +1,6 @@
 # API Reference (Registry & Arena)
 
-**Last Updated:** December 2024  
+**Last Updated:** December 2024 
 **API Version:** v1.0
 
 This document provides comprehensive API reference for both the Registry API (Flask) and Arena API (FastAPI).
@@ -42,11 +42,11 @@ Authorization: Bearer <token>
 **Example JWT Payload:**
 ```json
 {
-  "sub": "agent_alpha_001",
-  "trust_level": 0.85,
-  "scopes": ["read", "write", "propose"],
-  "iat": 1701234567,
-  "exp": 1701236367
+ "sub": "agent_alpha_001",
+ "trust_level": 0.85,
+ "scopes": ["read", "write", "propose"],
+ "iat": 1701234567,
+ "exp": 1701236367
 }
 ```
 
@@ -64,7 +64,7 @@ X-API-Key: <key>
 **Example Request:**
 ```bash
 curl -H "X-API-Key: abc123def456ghi789jkl012" \
-     https://api.example.com/execute/graph
+ https://api.example.com/execute/graph
 ```
 
 ### Bootstrap Authentication
@@ -78,7 +78,7 @@ X-Bootstrap-Key: <bootstrap_secret>
 **Security Notes:**
 - Only works when no agents exist in the system
 - Should be disabled after initial setup
-- HTTPS enforcement recommended for bootstrap endpoint  
+- HTTPS enforcement recommended for bootstrap endpoint 
 
 ## 2. Common JSON Conventions
 
@@ -92,8 +92,8 @@ All timestamps use **RFC3339 format** with timezone:
 Cursor-based pagination (future implementation):
 ```json
 {
-  "limit": 50,
-  "next_cursor": "eyJpZCI6MTIzNDU2fQ=="
+ "limit": 50,
+ "next_cursor": "eyJpZCI6MTIzNDU2fQ=="
 }
 ```
 
@@ -105,14 +105,14 @@ Normalized to the range `[0.0, 1.0]`:
 
 ```json
 {
-  "risk": {
-    "score": 0.11,
-    "factors": {
-      "node_count": 1,
-      "complexity": 0.05,
-      "external_calls": 0
-    }
-  }
+ "risk": {
+ "score": 0.11,
+ "factors": {
+ "node_count": 1,
+ "complexity": 0.05,
+ "external_calls": 0
+ }
+ }
 }
 ```
 
@@ -154,23 +154,23 @@ The Registry API (Flask) handles authentication, agent onboarding, proposal subm
 **Request:**
 ```json
 {
-  "agent_id": "admin_001",
-  "trust_level": 1.0,
-  "scopes": ["admin", "read", "write", "propose"],
-  "metadata": {
-    "description": "System administrator",
-    "created_by": "deployment_script"
-  }
+ "agent_id": "admin_001",
+ "trust_level": 1.0,
+ "scopes": ["admin", "read", "write", "propose"],
+ "metadata": {
+ "description": "System administrator",
+ "created_by": "deployment_script"
+ }
 }
 ```
 
 **Response (201 Created):**
 ```json
 {
-  "agent_id": "admin_001",
-  "trust_level": 1.0,
-  "created_at": "2025-11-11T03:35:00Z",
-  "message": "Bootstrap agent created successfully"
+ "agent_id": "admin_001",
+ "trust_level": 1.0,
+ "created_at": "2025-11-11T03:35:00Z",
+ "message": "Bootstrap agent created successfully"
 }
 ```
 
@@ -188,30 +188,30 @@ The Registry API (Flask) handles authentication, agent onboarding, proposal subm
 **Request:**
 ```json
 {
-  "agent_id": "agent_alpha_001",
-  "password": "secure_password_here",
-  "requested_scopes": ["read", "write"]
+ "agent_id": "agent_alpha_001",
+ "password": "secure_password_here",
+ "requested_scopes": ["read", "write"]
 }
 ```
 
 **Response (200 OK):**
 ```json
 {
-  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "token_type": "Bearer",
-  "expires_in": 1800,
-  "scopes": ["read", "write"]
+ "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+ "token_type": "Bearer",
+ "expires_in": 1800,
+ "scopes": ["read", "write"]
 }
 ```
 
 **Error Response (401 Unauthorized):**
 ```json
 {
-  "error": {
-    "type": "AuthenticationError",
-    "message": "Invalid credentials",
-    "retryable": false
-  }
+ "error": {
+ "type": "AuthenticationError",
+ "message": "Invalid credentials",
+ "retryable": false
+ }
 }
 ```
 
@@ -224,25 +224,25 @@ The Registry API (Flask) handles authentication, agent onboarding, proposal subm
 **Request:**
 ```json
 {
-  "agent_id": "agent_beta_002",
-  "trust_level": 0.75,
-  "scopes": ["read", "write"],
-  "public_key": "-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----",
-  "metadata": {
-    "team": "data_science",
-    "description": "ML experiment runner"
-  }
+ "agent_id": "agent_beta_002",
+ "trust_level": 0.75,
+ "scopes": ["read", "write"],
+ "public_key": "-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----",
+ "metadata": {
+ "team": "data_science",
+ "description": "ML experiment runner"
+ }
 }
 ```
 
 **Response (201 Created):**
 ```json
 {
-  "agent_id": "agent_beta_002",
-  "trust_level": 0.75,
-  "scopes": ["read", "write"],
-  "created_at": "2025-11-11T03:40:00Z",
-  "status": "active"
+ "agent_id": "agent_beta_002",
+ "trust_level": 0.75,
+ "scopes": ["read", "write"],
+ "created_at": "2025-11-11T03:40:00Z",
+ "status": "active"
 }
 ```
 
@@ -255,52 +255,52 @@ The Registry API (Flask) handles authentication, agent onboarding, proposal subm
 **Request:**
 ```json
 {
-  "proposal_type": "graph",
-  "nodes": [
-    {
-      "id": "c1",
-      "type": "CONST",
-      "params": { "value": 10 }
-    },
-    {
-      "id": "add1",
-      "type": "ADD",
-      "params": {}
-    }
-  ],
-  "edges": [
-    {
-      "from": "c1",
-      "to": "add1",
-      "port": "input_a"
-    }
-  ],
-  "metadata": {
-    "authors": ["agent_alpha_001"],
-    "version": "1.0.0",
-    "description": "Basic arithmetic graph",
-    "tags": ["arithmetic", "example"]
-  }
+ "proposal_type": "graph",
+ "nodes": [
+ {
+ "id": "c1",
+ "type": "CONST",
+ "params": { "value": 10 }
+ },
+ {
+ "id": "add1",
+ "type": "ADD",
+ "params": {}
+ }
+ ],
+ "edges": [
+ {
+ "from": "c1",
+ "to": "add1",
+ "port": "input_a"
+ }
+ ],
+ "metadata": {
+ "authors": ["agent_alpha_001"],
+ "version": "1.0.0",
+ "description": "Basic arithmetic graph",
+ "tags": ["arithmetic", "example"]
+ }
 }
 ```
 
 **Response (201 Created):**
 ```json
 {
-  "proposal_id": "prop_2025_00123",
-  "status": "draft",
-  "hash": "sha256:de...ad",
-  "risk": {
-    "score": 0.11,
-    "factors": {
-      "node_count": 2,
-      "complexity": 0.05,
-      "external_calls": 0
-    }
-  },
-  "created_at": "2025-11-11T03:35:00Z",
-  "voting_opens_at": "2025-11-11T04:00:00Z",
-  "expires_at": "2025-11-18T03:35:00Z"
+ "proposal_id": "prop_2025_00123",
+ "status": "draft",
+ "hash": "sha256:de...ad",
+ "risk": {
+ "score": 0.11,
+ "factors": {
+ "node_count": 2,
+ "complexity": 0.05,
+ "external_calls": 0
+ }
+ },
+ "created_at": "2025-11-11T03:35:00Z",
+ "voting_opens_at": "2025-11-11T04:00:00Z",
+ "expires_at": "2025-11-18T03:35:00Z"
 }
 ```
 
@@ -325,21 +325,21 @@ GET /audit/logs?start_time=2025-11-11T00:00:00Z&severity=high&limit=50
 **Response (200 OK):**
 ```json
 {
-  "logs": [
-    {
-      "id": "audit_001",
-      "timestamp": "2025-11-11T03:35:00Z",
-      "agent_id": "agent_alpha_001",
-      "action": "proposal_submitted",
-      "severity": "medium",
-      "details": {
-        "proposal_id": "prop_2025_00123",
-        "risk_score": 0.11
-      }
-    }
-  ],
-  "total_count": 42,
-  "next_cursor": null
+ "logs": [
+ {
+ "id": "audit_001",
+ "timestamp": "2025-11-11T03:35:00Z",
+ "agent_id": "agent_alpha_001",
+ "action": "proposal_submitted",
+ "severity": "medium",
+ "details": {
+ "proposal_id": "prop_2025_00123",
+ "risk_score": 0.11
+ }
+ }
+ ],
+ "total_count": 42,
+ "next_cursor": null
 }
 ```
 
@@ -352,14 +352,14 @@ GET /audit/logs?start_time=2025-11-11T00:00:00Z&severity=high&limit=50
 **Response (200 OK):**
 ```json
 {
-  "status": "healthy",
-  "timestamp": "2025-11-11T03:35:00Z",
-  "version": "1.0.0",
-  "components": {
-    "database": "healthy",
-    "redis": "healthy",
-    "audit_log": "healthy"
-  }
+ "status": "healthy",
+ "timestamp": "2025-11-11T03:35:00Z",
+ "version": "1.0.0",
+ "components": {
+ "database": "healthy",
+ "redis": "healthy",
+ "audit_log": "healthy"
+ }
 }
 ```
 
@@ -407,9 +407,9 @@ The Arena API (FastAPI) handles graph execution, monitoring, and operational tas
 **Response (200 OK):**
 ```json
 {
-  "status": "healthy",
-  "timestamp": "2025-11-11T03:35:00Z",
-  "version": "1.0.0"
+ "status": "healthy",
+ "timestamp": "2025-11-11T03:35:00Z",
+ "version": "1.0.0"
 }
 ```
 
@@ -422,28 +422,28 @@ The Arena API (FastAPI) handles graph execution, monitoring, and operational tas
 **Response (200 OK):**
 ```json
 {
-  "ready": true,
-  "dependencies": {
-    "vulcan_world_model": "ready",
-    "graph_compiler": "ready",
-    "llm_core": "ready",
-    "persistent_memory": "ready"
-  },
-  "timestamp": "2025-11-11T03:35:00Z"
+ "ready": true,
+ "dependencies": {
+ "vulcan_world_model": "ready",
+ "graph_compiler": "ready",
+ "llm_core": "ready",
+ "persistent_memory": "ready"
+ },
+ "timestamp": "2025-11-11T03:35:00Z"
 }
 ```
 
 **Response (503 Service Unavailable):**
 ```json
 {
-  "ready": false,
-  "dependencies": {
-    "vulcan_world_model": "ready",
-    "graph_compiler": "initializing",
-    "llm_core": "error",
-    "persistent_memory": "ready"
-  },
-  "timestamp": "2025-11-11T03:35:00Z"
+ "ready": false,
+ "dependencies": {
+ "vulcan_world_model": "ready",
+ "graph_compiler": "initializing",
+ "llm_core": "error",
+ "persistent_memory": "ready"
+ },
+ "timestamp": "2025-11-11T03:35:00Z"
 }
 ```
 
@@ -456,73 +456,73 @@ The Arena API (FastAPI) handles graph execution, monitoring, and operational tas
 **Request:**
 ```json
 {
-  "graph_id": "graph_abc123",
-  "artifact": {
-    "nodes": [
-      {
-        "id": "input_1",
-        "type": "INPUT",
-        "params": { "value": [1, 2, 3, 4, 5] }
-      },
-      {
-        "id": "transform_1",
-        "type": "TRANSFORM",
-        "params": { "operation": "multiply", "factor": 2 }
-      },
-      {
-        "id": "output_1",
-        "type": "OUTPUT",
-        "params": {}
-      }
-    ],
-    "edges": [
-      { "from": "input_1", "to": "transform_1", "port": "data" },
-      { "from": "transform_1", "to": "output_1", "port": "result" }
-    ],
-    "metadata": {
-      "version": "1.0.2",
-      "description": "Simple transformation pipeline"
-    }
-  },
-  "execution_profile": {
-    "mode": "parallel",
-    "max_concurrency": 8,
-    "timeout_seconds": 120,
-    "retry_policy": {
-      "max_retries": 2,
-      "backoff_factor": 2.0
-    },
-    "resource_limits": {
-      "max_memory_mb": 4096,
-      "max_cpu_cores": 4
-    }
-  }
+ "graph_id": "graph_abc123",
+ "artifact": {
+ "nodes": [
+ {
+ "id": "input_1",
+ "type": "INPUT",
+ "params": { "value": [1, 2, 3, 4, 5] }
+ },
+ {
+ "id": "transform_1",
+ "type": "TRANSFORM",
+ "params": { "operation": "multiply", "factor": 2 }
+ },
+ {
+ "id": "output_1",
+ "type": "OUTPUT",
+ "params": {}
+ }
+ ],
+ "edges": [
+ { "from": "input_1", "to": "transform_1", "port": "data" },
+ { "from": "transform_1", "to": "output_1", "port": "result" }
+ ],
+ "metadata": {
+ "version": "1.0.2",
+ "description": "Simple transformation pipeline"
+ }
+ },
+ "execution_profile": {
+ "mode": "parallel",
+ "max_concurrency": 8,
+ "timeout_seconds": 120,
+ "retry_policy": {
+ "max_retries": 2,
+ "backoff_factor": 2.0
+ },
+ "resource_limits": {
+ "max_memory_mb": 4096,
+ "max_cpu_cores": 4
+ }
+ }
 }
 ```
 
 **Response (202 Accepted):**
 ```json
 {
-  "execution_id": "exec_2025_00456",
-  "status": "queued",
-  "graph_id": "graph_abc123",
-  "estimated_duration_seconds": 45,
-  "created_at": "2025-11-11T03:35:00Z",
-  "status_url": "/execution/exec_2025_00456/status"
+ "execution_id": "exec_2025_00456",
+ "status": "queued",
+ "graph_id": "graph_abc123",
+ "estimated_duration_seconds": 45,
+ "created_at": "2025-11-11T03:35:00Z",
+ "status_url": "/execution/exec_2025_00456/status"
 }
 ```
 
 **Response (400 Bad Request):**
 ```json
 {
-  "error": {
-    "type": "ValidationError",
-    "message": "Graph contains cycle",
-    "details": {
-      "cycle_path": ["node_1", "node_2", "node_3", "node_1"]
-    },
-    "retryable": false
-  }
+ "error": {
+ "type": "ValidationError",
+ "message": "Graph contains cycle",
+ "details": {
+ "cycle_path": ["node_1", "node_2", "node_3", "node_1"]
+ },
+ "retryable": false
+ }
 }
 ```
 
@@ -535,37 +535,37 @@ The Arena API (FastAPI) handles graph execution, monitoring, and operational tas
 **Response (200 OK) - Running:**
 ```json
 {
-  "execution_id": "exec_2025_00456",
-  "status": "running",
-  "progress": {
-    "nodes_completed": 5,
-    "nodes_total": 10,
-    "percentage": 50.0
-  },
-  "started_at": "2025-11-11T03:35:00Z",
-  "estimated_completion": "2025-11-11T03:36:00Z"
+ "execution_id": "exec_2025_00456",
+ "status": "running",
+ "progress": {
+ "nodes_completed": 5,
+ "nodes_total": 10,
+ "percentage": 50.0
+ },
+ "started_at": "2025-11-11T03:35:00Z",
+ "estimated_completion": "2025-11-11T03:36:00Z"
 }
 ```
 
 **Response (200 OK) - Completed:**
 ```json
 {
-  "execution_id": "exec_2025_00456",
-  "status": "completed",
-  "result": {
-    "output_1": [2, 4, 6, 8, 10]
-  },
-  "metrics": {
-    "duration_seconds": 42.5,
-    "nodes_executed": 10,
-    "nodes_cached": 2,
-    "resource_usage": {
-      "peak_memory_mb": 1024,
-      "cpu_time_seconds": 38.2
-    }
-  },
-  "started_at": "2025-11-11T03:35:00Z",
-  "completed_at": "2025-11-11T03:36:42Z"
+ "execution_id": "exec_2025_00456",
+ "status": "completed",
+ "result": {
+ "output_1": [2, 4, 6, 8, 10]
+ },
+ "metrics": {
+ "duration_seconds": 42.5,
+ "nodes_executed": 10,
+ "nodes_cached": 2,
+ "resource_usage": {
+ "peak_memory_mb": 1024,
+ "cpu_time_seconds": 38.2
+ }
+ },
+ "started_at": "2025-11-11T03:35:00Z",
+ "completed_at": "2025-11-11T03:36:42Z"
 }
 ```
 
@@ -578,12 +578,12 @@ The Arena API (FastAPI) handles graph execution, monitoring, and operational tas
 **Response (200 OK):**
 ```json
 {
-  "execution_id": "exec_2025_00456",
-  "status": "cancelled",
-  "cancelled_at": "2025-11-11T03:35:30Z",
-  "partial_results": {
-    "nodes_completed": 3
-  }
+ "execution_id": "exec_2025_00456",
+ "status": "cancelled",
+ "cancelled_at": "2025-11-11T03:35:30Z",
+ "partial_results": {
+ "nodes_completed": 3
+ }
 }
 ```
 
@@ -616,19 +616,19 @@ All error responses follow a consistent schema for easy parsing and handling.
 
 ```json
 {
-  "error": {
-    "type": "ValidationError",
-    "message": "Missing 'nodes' key in graph definition",
-    "details": {
-      "path": "$.artifact",
-      "required_field": "nodes"
-    },
-    "severity": "error",
-    "retryable": false,
-    "request_id": "req_123abc",
-    "timestamp": "2025-11-11T03:40:00Z",
-    "remediation": "Add 'nodes' array to your graph artifact"
-  }
+ "error": {
+ "type": "ValidationError",
+ "message": "Missing 'nodes' key in graph definition",
+ "details": {
+ "path": "$.artifact",
+ "required_field": "nodes"
+ },
+ "severity": "error",
+ "retryable": false,
+ "request_id": "req_123abc",
+ "timestamp": "2025-11-11T03:40:00Z",
+ "remediation": "Add 'nodes' array to your graph artifact"
+ }
 }
 ```
 
@@ -657,21 +657,21 @@ All error responses follow a consistent schema for easy parsing and handling.
 **Example with extended fields:**
 ```json
 {
-  "error": {
-    "type": "RateLimitError",
-    "message": "Rate limit exceeded for API endpoint",
-    "severity": "warning",
-    "retryable": true,
-    "request_id": "req_789xyz",
-    "timestamp": "2025-11-11T03:40:00Z",
-    "details": {
-      "limit": "1000 requests per hour",
-      "current_usage": 1000,
-      "reset_at": "2025-11-11T04:00:00Z"
-    },
-    "remediation": "Wait until rate limit resets or upgrade your plan",
-    "retry_after_seconds": 1200
-  }
+ "error": {
+ "type": "RateLimitError",
+ "message": "Rate limit exceeded for API endpoint",
+ "severity": "warning",
+ "retryable": true,
+ "request_id": "req_789xyz",
+ "timestamp": "2025-11-11T03:40:00Z",
+ "details": {
+ "limit": "1000 requests per hour",
+ "current_usage": 1000,
+ "reset_at": "2025-11-11T04:00:00Z"
+ },
+ "remediation": "Wait until rate limit resets or upgrade your plan",
+ "retry_after_seconds": 1200
+ }
 }
 ```
 
@@ -711,16 +711,16 @@ When rate limit is exceeded, the API returns HTTP 429:
 
 ```json
 {
-  "error": {
-    "type": "RateLimitError",
-    "message": "Rate limit exceeded",
-    "details": {
-      "limit": "1000 requests per hour",
-      "window_reset_at": "2025-11-11T04:00:00Z",
-      "retry_after_seconds": 1200
-    },
-    "retryable": true
-  }
+ "error": {
+ "type": "RateLimitError",
+ "message": "Rate limit exceeded",
+ "details": {
+ "limit": "1000 requests per hour",
+ "window_reset_at": "2025-11-11T04:00:00Z",
+ "retry_after_seconds": 1200
+ },
+ "retryable": true
+ }
 }
 ```
 

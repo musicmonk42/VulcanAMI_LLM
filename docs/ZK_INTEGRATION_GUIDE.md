@@ -10,29 +10,29 @@ The Groth16 zk-SNARK implementation is fully integrated into the VulcanAMI platf
 
 ```
 src/gvulcan/zk/
-├── __init__.py          # Public API exports
-├── field.py             # Finite field arithmetic (BN128)
-├── polynomial.py        # Polynomial operations & Lagrange interpolation
-├── qap.py               # R1CS to QAP conversion
-└── snark.py             # Groth16 prover/verifier implementation
+├── __init__.py # Public API exports
+├── field.py # Finite field arithmetic (BN128)
+├── polynomial.py # Polynomial operations & Lagrange interpolation
+├── qap.py # R1CS to QAP conversion
+└── snark.py # Groth16 prover/verifier implementation
 ```
 
 ### Platform Integration Points
 
 1. **Merkle Trees** (`src/gvulcan/merkle.py`)
-   - Used for creating commitments to model states
-   - Provides verifiable state transitions
-   - Integrates with ZK proofs for privacy-preserving verification
+ - Used for creating commitments to model states
+ - Provides verifiable state transitions
+ - Integrates with ZK proofs for privacy-preserving verification
 
 2. **Unlearning Module** (`src/gvulcan/unlearning/`)
-   - ZK proofs verify unlearning without revealing model weights
-   - Provides compliance evidence for GDPR/CCPA
-   - Enables auditable machine unlearning
+ - ZK proofs verify unlearning without revealing model weights
+ - Provides compliance evidence for GDPR/CCPA
+ - Enables auditable machine unlearning
 
 3. **Storage** (`src/gvulcan/storage/`)
-   - Proof storage and retrieval
-   - Verification key management
-   - Integration with distributed storage backends
+ - Proof storage and retrieval
+ - Verification key management
+ - Integration with distributed storage backends
 
 ## CI/CD Integration
 
@@ -43,12 +43,12 @@ The ZK module is integrated into the CI/CD pipeline with comprehensive test cove
 ```yaml
 # .github/workflows/ci.yml
 - name: Run tests with coverage
-  run: |
-    pytest tests/ \
-      --cov=src \
-      --cov-report=xml \
-      --cov-report=term-missing \
-      -v
+ run: |
+ pytest tests/ \
+ --cov=src \
+ --cov-report=xml \
+ --cov-report=term-missing \
+ -v
 ```
 
 ### Test Coverage
@@ -73,8 +73,8 @@ The ZK module's dependencies are included in the Docker image:
 
 ```dockerfile
 # From requirements.txt
-py-ecc==6.0.0  # Elliptic curve cryptography for pairings (Groth16)
-galois==0.3.8  # Finite field arithmetic for zk-SNARKs
+py-ecc==6.0.0 # Elliptic curve cryptography for pairings (Groth16)
+galois==0.3.8 # Finite field arithmetic for zk-SNARKs
 ```
 
 ### Building
@@ -82,9 +82,9 @@ galois==0.3.8  # Finite field arithmetic for zk-SNARKs
 ```bash
 # Build with dependency hash verification
 docker build \
-  --build-arg REJECT_INSECURE_JWT=ack \
-  -t vulcanami:latest \
-  .
+ --build-arg REJECT_INSECURE_JWT=ack \
+ -t vulcanami:latest \
+ .
 ```
 
 ### Running
@@ -100,31 +100,31 @@ docker run -p 5000:5000 vulcanami:latest
 
 ```python
 from src.gvulcan.zk import (
-    Circuit,
-    R1CSConstraint,
-    Groth16Prover,
+ Circuit,
+ R1CSConstraint,
+ Groth16Prover,
 )
 
 # Define circuit: x² = y
 constraints = [
-    R1CSConstraint(
-        A=[0, 0, 1],  # x
-        B=[0, 0, 1],  # x
-        C=[0, 1, 0]   # y
-    )
+ R1CSConstraint(
+ A=[0, 0, 1], # x
+ B=[0, 0, 1], # x
+ C=[0, 1, 0] # y
+ )
 ]
 
 circuit = Circuit(
-    constraints=constraints,
-    num_variables=3,
-    num_public_inputs=1
+ constraints=constraints,
+ num_variables=3,
+ num_public_inputs=1
 )
 
 # Setup, prove, verify
 prover = Groth16Prover(circuit)
 pk, vk = prover.setup()
 
-witness = [1, 9, 3]  # [constant, y=9, x=3]
+witness = [1, 9, 3] # [constant, y=9, x=3]
 proof = prover.prove(witness)
 
 is_valid = prover.verify(proof, public_inputs=[9], vk=vk)
@@ -139,32 +139,32 @@ import hashlib
 
 # Create commitments to model states
 def commit_model(weights):
-    leaves = [hashlib.sha256(str(w).encode()).digest() for w in weights]
-    tree = MerkleTree(leaves)
-    return tree.root()
+ leaves = [hashlib.sha256(str(w).encode()).digest() for w in weights]
+ tree = MerkleTree(leaves)
+ return tree.root()
 
 weights_before = [0.5, 0.3, 0.8, 0.2]
-weights_after = [0.5, 0.0, 0.8, 0.2]  # Unlearned index 1
+weights_after = [0.5, 0.0, 0.8, 0.2] # Unlearned index 1
 
 root_before = commit_model(weights_before)
 root_after = commit_model(weights_after)
 
 # Generate proof
 proof, vk = generate_proof_for_unlearning(
-    merkle_root_before=int.from_bytes(root_before[:8], 'big'),
-    merkle_root_after=int.from_bytes(root_after[:8], 'big'),
-    pattern_hash=12345,
-    model_weights=[int(w*1000) for w in weights_before],
-    gradient_updates=[0]*len(weights_before),
-    affected_samples=[1]
+ merkle_root_before=int.from_bytes(root_before[:8], 'big'),
+ merkle_root_after=int.from_bytes(root_after[:8], 'big'),
+ pattern_hash=12345,
+ model_weights=[int(w*1000) for w in weights_before],
+ gradient_updates=[0]*len(weights_before),
+ affected_samples=[1]
 )
 
 # Verify proof
 is_valid = verify_unlearning_proof(
-    proof, vk, 
-    int.from_bytes(root_before[:8], 'big'),
-    int.from_bytes(root_after[:8], 'big'),
-    12345, 1, 4
+ proof, vk, 
+ int.from_bytes(root_before[:8], 'big'),
+ int.from_bytes(root_after[:8], 'big'),
+ 12345, 1, 4
 )
 ```
 
@@ -346,6 +346,6 @@ Part of the VulcanAMI project. See top-level LICENSE file.
 
 ---
 
-**Last Updated**: 2024-11-24  
-**Version**: 1.0.0  
-**Status**: Production Ready (with security audit recommendation)
+**Last Updated**: 2024-11-24 
+**Version**: 1.0.0 
+(with security audit recommendation)

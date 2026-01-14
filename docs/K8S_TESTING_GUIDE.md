@@ -41,8 +41,8 @@ echo "✅ Production overlay build successful"
 ```bash
 # Verify all required resources are present
 for resource in Namespace ConfigMap Secret Service PersistentVolumeClaim Deployment StatefulSet NetworkPolicy Job; do
-  count=$(grep "^kind: $resource" /tmp/dev.yaml | wc -l)
-  echo "$resource: $count instances"
+ count=$(grep "^kind: $resource" /tmp/dev.yaml | wc -l)
+ echo "$resource: $count instances"
 done
 
 # Check for critical services
@@ -74,10 +74,10 @@ grep "kind: NetworkPolicy" /tmp/dev.yaml | wc -l
 # Verify no privileged containers
 echo ""
 if grep "privileged: true" /tmp/dev.yaml; then
-  echo "❌ FAILED: Found privileged containers"
-  exit 1
+ echo "❌ FAILED: Found privileged containers"
+ exit 1
 else
-  echo "✅ No privileged containers found"
+ echo "✅ No privileged containers found"
 fi
 ```
 
@@ -129,7 +129,7 @@ kubectl top nodes
 # ✅ Storage classes
 # ✅ Namespace (or permission to create)
 # ✅ Kustomize manifests
-# ⚠️  Warnings for missing optional components (OK)
+# ⚠️ Warnings for missing optional components (OK)
 ```
 
 **Expected Result:** All critical checks pass (warnings are acceptable).
@@ -141,7 +141,7 @@ kubectl top nodes
 kubectl get storageclasses
 
 # Check for 'standard' storage class (used in manifests)
-kubectl get storageclass standard || echo "⚠️  'standard' storage class not found"
+kubectl get storageclass standard || echo "⚠️ 'standard' storage class not found"
 
 # Check default storage class
 kubectl get storageclass -o jsonpath='{.items[?(@.metadata.annotations.storageclass\.kubernetes\.io/is-default-class=="true")].metadata.name}'
@@ -171,20 +171,20 @@ kubectl create namespace vulcanami-development
 
 # Create test secrets
 kubectl create secret generic vulcanami-secrets \
-  --from-literal=JWT_SECRET_KEY=$(openssl rand -base64 48) \
-  --from-literal=BOOTSTRAP_KEY=$(openssl rand -base64 32) \
-  --from-literal=POSTGRES_PASSWORD=$(openssl rand -base64 32) \
-  --from-literal=REDIS_PASSWORD=$(openssl rand -base64 32) \
-  --from-literal=MINIO_ROOT_USER=minioadmin \
-  --from-literal=MINIO_ROOT_PASSWORD=$(openssl rand -base64 32) \
-  --from-literal=MINIO_SECRET_KEY=$(openssl rand -base64 24) \
-  --from-literal=OPENAI_API_KEY=${OPENAI_API_KEY:-} \
-  --from-literal=ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-} \
-  --from-literal=GRAPHIX_API_KEY=${GRAPHIX_API_KEY:-} \
-  --from-literal=VULCAN_LLM_API_KEY=${OPENAI_API_KEY:-} \
-  --from-literal=AWS_ACCESS_KEY_ID=minioadmin \
-  --from-literal=AWS_SECRET_ACCESS_KEY=$(openssl rand -base64 32) \
-  -n vulcanami-development
+ --from-literal=JWT_SECRET_KEY=$(openssl rand -base64 48) \
+ --from-literal=BOOTSTRAP_KEY=$(openssl rand -base64 32) \
+ --from-literal=POSTGRES_PASSWORD=$(openssl rand -base64 32) \
+ --from-literal=REDIS_PASSWORD=$(openssl rand -base64 32) \
+ --from-literal=MINIO_ROOT_USER=minioadmin \
+ --from-literal=MINIO_ROOT_PASSWORD=$(openssl rand -base64 32) \
+ --from-literal=MINIO_SECRET_KEY=$(openssl rand -base64 24) \
+ --from-literal=OPENAI_API_KEY=${OPENAI_API_KEY:-} \
+ --from-literal=ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-} \
+ --from-literal=GRAPHIX_API_KEY=${GRAPHIX_API_KEY:-} \
+ --from-literal=VULCAN_LLM_API_KEY=${OPENAI_API_KEY:-} \
+ --from-literal=AWS_ACCESS_KEY_ID=minioadmin \
+ --from-literal=AWS_SECRET_ACCESS_KEY=$(openssl rand -base64 32) \
+ -n vulcanami-development
 
 # Verify secrets created
 kubectl get secret vulcanami-secrets -n vulcanami-development
@@ -233,19 +233,19 @@ kubectl get pods -n vulcanami-development --field-selector=status.phase!=Running
 ```bash
 # Test PostgreSQL connectivity
 kubectl exec -n vulcanami-development deploy/vulcanami-api -- \
-  sh -c 'timeout 10 nc -zv postgres-service 5432'
+ sh -c 'timeout 10 nc -zv postgres-service 5432'
 
 # Test Redis connectivity
 kubectl exec -n vulcanami-development deploy/vulcanami-api -- \
-  sh -c 'timeout 10 nc -zv redis-service 6379'
+ sh -c 'timeout 10 nc -zv redis-service 6379'
 
 # Test Milvus connectivity
 kubectl exec -n vulcanami-development deploy/vulcanami-api -- \
-  sh -c 'timeout 10 nc -zv milvus-service 19530'
+ sh -c 'timeout 10 nc -zv milvus-service 19530'
 
 # Test MinIO connectivity
 kubectl exec -n vulcanami-development deploy/vulcanami-api -- \
-  sh -c 'timeout 10 curl -f -m 5 http://minio-service:9000/minio/health/live'
+ sh -c 'timeout 10 curl -f -m 5 http://minio-service:9000/minio/health/live'
 ```
 
 **Expected Result:** All connectivity tests pass.
@@ -255,11 +255,11 @@ kubectl exec -n vulcanami-development deploy/vulcanami-api -- \
 ```bash
 # Check API health endpoint
 kubectl exec -n vulcanami-development deploy/vulcanami-api -- \
-  curl -s http://localhost:8000/health/live
+ curl -s http://localhost:8000/health/live
 
 # Check readiness
 kubectl exec -n vulcanami-development deploy/vulcanami-api -- \
-  curl -s http://localhost:8000/health/ready
+ curl -s http://localhost:8000/health/ready
 
 # Port forward and test from local machine
 kubectl port-forward -n vulcanami-development svc/vulcanami-api 8000:8000 &
@@ -296,9 +296,9 @@ kubectl logs -n vulcanami-development job/minio-bucket-setup
 
 # Verify bucket exists via API
 kubectl exec -n vulcanami-development sts/minio -- \
-  mc alias set local http://localhost:9000 minioadmin $(kubectl get secret vulcanami-secrets -n vulcanami-development -o jsonpath='{.data.MINIO_ROOT_PASSWORD}' | base64 -d)
+ mc alias set local http://localhost:9000 minioadmin $(kubectl get secret vulcanami-secrets -n vulcanami-development -o jsonpath='{.data.MINIO_ROOT_PASSWORD}' | base64 -d)
 kubectl exec -n vulcanami-development sts/minio -- \
-  mc ls local/vulcanami-memory
+ mc ls local/vulcanami-memory
 ```
 
 **Expected Result:** Bucket exists and is accessible.
@@ -319,7 +319,7 @@ kubectl get networkpolicies -n vulcanami-development
 # Test that external access to backend services is blocked
 # (This test should fail, which is expected)
 kubectl run test-external --image=curlimages/curl --rm -i --restart=Never -n default -- \
-  curl -m 5 http://postgres-service.vulcanami-development:5432 || echo "✅ External access blocked (as expected)"
+ curl -m 5 http://postgres-service.vulcanami-development:5432 || echo "✅ External access blocked (as expected)"
 ```
 
 **Expected Result:** Network policies exist and block unauthorized access.
@@ -388,7 +388,7 @@ kubectl wait --for=condition=ready pod -n vulcanami-development -l app=vulcanami
 
 # Verify service remains accessible
 kubectl exec -n vulcanami-development deploy/vulcanami-api -- \
-  curl -s http://localhost:8000/health/live
+ curl -s http://localhost:8000/health/live
 ```
 
 **Expected Result:** Pod restarts successfully, service remains available.

@@ -36,7 +36,7 @@ Integrity, confidentiality, safe autonomy, forensic-grade auditability.
 from src.utils.url_validator import validate_url_scheme
 
 # Validate before making request
-validate_url_scheme(url)  # Raises URLValidationError if not http/https
+validate_url_scheme(url) # Raises URLValidationError if not http/https
 response = urllib.request.urlopen(url, timeout=10)
 ```
 
@@ -119,7 +119,7 @@ export VULCAN_TEXT_MODEL_REVISION=86b5e0934494bd15c9632b12f734a8a67f723594
 export VULCAN_AUDIO_MODEL_REVISION=abc123def456...
 export VULCAN_BERT_MODEL_REVISION=def789ghi012...
 export VULCAN_VISION_AUDIO_MODEL_REVISION=ghi345jkl678...
-export ADVERSARIAL_DETECTOR_REVISION=main  # or specific hash
+export ADVERSARIAL_DETECTOR_REVISION=main # or specific hash
 ```
 
 **How to Find Revision Hashes**:
@@ -148,8 +148,8 @@ import tempfile
 
 # Secure temporary file with automatic cleanup
 with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as tmp:
-    file_path = Path(tmp.name)
-    # Use file_path...
+ file_path = Path(tmp.name)
+ # Use file_path...
 # Clean up after use
 file_path.unlink()
 ```

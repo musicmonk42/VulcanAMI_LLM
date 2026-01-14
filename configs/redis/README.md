@@ -2,7 +2,7 @@
 
 ## Overview
 
-This package contains three fully enhanced, production-ready Redis configuration files for the Vulcan LLM system:
+This package contains three fully enhanced Redis configuration files for the Vulcan LLM system:
 
 1. **exporter.env** - Redis Exporter Environment Configuration
 2. **redis.conf** - Redis Server Configuration
@@ -14,9 +14,7 @@ This package contains three fully enhanced, production-ready Redis configuration
 - **Last Updated**: 2025-11-14
 - **Redis Version**: 7.2+
 - **Redis Exporter Version**: Latest
-- **Environment**: Production-ready
-
----
+- **Environment**: ---
 
 ## 📁 File 1: exporter.env
 
@@ -44,13 +42,13 @@ Comprehensive Redis exporter configuration for Prometheus metrics collection and
 #### Vulcan-Specific Configuration
 ```
 Key Pattern Groups:
-- packs=pack:*               (Embedding packs)
-- blooms=pack_bloom:*        (Bloom filters)
-- manifests=manifest:*       (Pack manifests)
-- pins=pin:*                 (Pinned shards)
-- ids=ids:*                  (ID lookups)
-- docs=doc:*                 (Document cache)
-- negative=neg:*             (Negative cache)
+- packs=pack:* (Embedding packs)
+- blooms=pack_bloom:* (Bloom filters)
+- manifests=manifest:* (Pack manifests)
+- pins=pin:* (Pinned shards)
+- ids=ids:* (ID lookups)
+- docs=doc:* (Document cache)
+- negative=neg:* (Negative cache)
 ```
 
 #### Advanced Features
@@ -100,12 +98,12 @@ Production-hardened Redis server configuration with comprehensive security, perf
 
 #### Security Hardening
 - ✅ **Command Renaming**: Dangerous commands disabled or renamed
-  - FLUSHALL → ""
-  - FLUSHDB → ""
-  - CONFIG → ""
-  - KEYS → ""
-  - DEBUG → ""
-  - SAVE → ""
+ - FLUSHALL → ""
+ - FLUSHDB → ""
+ - CONFIG → ""
+ - KEYS → ""
+ - DEBUG → ""
+ - SAVE → ""
 - ✅ **ACL Support**: Fine-grained access control (Redis 6.0+)
 - ✅ **TLS/SSL Encryption**: At-rest and in-transit
 - ✅ **Protected Mode**: Configurable network security
@@ -115,18 +113,18 @@ Production-hardened Redis server configuration with comprehensive security, perf
 #### Performance Optimization
 - ✅ **I/O Threading**: Multi-threaded network I/O (4 threads)
 - ✅ **Memory Management**: 
-  - 2GB maxmemory limit
-  - allkeys-lfu eviction policy
-  - Active defragmentation
-  - Lazy freeing
+ - 2GB maxmemory limit
+ - allkeys-lfu eviction policy
+ - Active defragmentation
+ - Lazy freeing
 - ✅ **Persistence**: Hybrid RDB+AOF
-  - RDB: 900s/1 change, 300s/10 changes, 60s/10000 changes
-  - AOF: everysec fsync
-  - Auto-rewrite optimization
+ - RDB: 900s/1 change, 300s/10 changes, 60s/10000 changes
+ - AOF: everysec fsync
+ - Auto-rewrite optimization
 - ✅ **Data Structure Optimization**: 
-  - Optimized hash, list, set, zset encodings
-  - Memory-efficient representations
-  - Compression enabled
+ - Optimized hash, list, set, zset encodings
+ - Memory-efficient representations
+ - Compression enabled
 
 #### High Availability
 - ✅ **Replication Support**: Master-replica configuration
@@ -159,8 +157,8 @@ Active Defragmentation:
 
 ```
 RDB Snapshots:
-- save 900 1    (15 minutes, 1 change)
-- save 300 10   (5 minutes, 10 changes)
+- save 900 1 (15 minutes, 1 change)
+- save 300 10 (5 minutes, 10 changes)
 - save 60 10000 (1 minute, 10000 changes)
 
 AOF:
@@ -434,12 +432,12 @@ python setup_ttl_monitoring.py /etc/redis/keys_ttl.yml
 ```bash
 # Prometheus configuration
 cat >> /etc/prometheus/prometheus.yml << 'EOF'
-  - job_name: 'redis_vulcan'
-    static_configs:
-      - targets: ['localhost:9121']
-        labels:
-          cluster: 'vulcan-primary'
-          environment: 'production'
+ - job_name: 'redis_vulcan'
+ static_configs:
+ - targets: ['localhost:9121']
+ labels:
+ cluster: 'vulcan-primary'
+ environment: 'production'
 EOF
 
 # Reload Prometheus

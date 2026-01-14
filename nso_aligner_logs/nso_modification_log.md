@@ -5,12 +5,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_0():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os.system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os.system"""
 ```
 
 ### NSO Modification
@@ -20,12 +20,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_20():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os.system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os.system"""
 ```
 
 ### NSO Modification
@@ -35,12 +35,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_40():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os.system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os.system"""
 ```
 
 ### NSO Modification
@@ -50,12 +50,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_60():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os.system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os.system"""
 ```
 
 ### NSO Modification
@@ -65,12 +65,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_80():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os.system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os.system"""
 ```
 
 ### NSO Modification
@@ -80,12 +80,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_0():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os.system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os.system"""
 ```
 
 ### NSO Modification
@@ -95,12 +95,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_20():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os.system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os.system"""
 ```
 
 ### NSO Modification
@@ -110,12 +110,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_40():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os.system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os.system"""
 ```
 
 ### NSO Modification
@@ -125,12 +125,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_60():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os.system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os.system"""
 ```
 
 ### NSO Modification
@@ -140,12 +140,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_80():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os.system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os.system"""
 ```
 
 ### NSO Modification
@@ -155,12 +155,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_0():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os.system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os.system"""
 ```
 
 ### NSO Modification
@@ -170,12 +170,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_20():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os.system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os.system"""
 ```
 
 ### NSO Modification
@@ -185,12 +185,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_40():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os.system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os.system"""
 ```
 
 ### NSO Modification
@@ -200,12 +200,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_60():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os.system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os.system"""
 ```
 
 ### NSO Modification
@@ -215,12 +215,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_80():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os.system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os.system"""
 ```
 
 ### NSO Modification
@@ -230,12 +230,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_0():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os.system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os.system"""
 ```
 
 ### NSO Modification
@@ -245,12 +245,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_20():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os.system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os.system"""
 ```
 
 ### NSO Modification
@@ -260,12 +260,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_40():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os.system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os.system"""
 ```
 
 ### NSO Modification
@@ -275,12 +275,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_60():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os.system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os.system"""
 ```
 
 ### NSO Modification
@@ -290,12 +290,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_80():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os.system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os.system"""
 ```
 
 ### NSO Modification
@@ -305,12 +305,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_0():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os.system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os.system"""
 ```
 
 ### NSO Modification
@@ -320,12 +320,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_20():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os.system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os.system"""
 ```
 
 ### NSO Modification
@@ -335,12 +335,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_40():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os.system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os.system"""
 ```
 
 ### NSO Modification
@@ -350,12 +350,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_60():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os.system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os.system"""
 ```
 
 ### NSO Modification
@@ -365,12 +365,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_80():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os.system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os.system"""
 ```
 
 ### NSO Modification
@@ -380,12 +380,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_0():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os.system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os.system"""
 ```
 
 ### NSO Modification
@@ -395,12 +395,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_20():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os.system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os.system"""
 ```
 
 ### NSO Modification
@@ -410,12 +410,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_40():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os.system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os.system"""
 ```
 
 ### NSO Modification
@@ -425,12 +425,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_60():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os.system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os.system"""
 ```
 
 ### NSO Modification
@@ -440,12 +440,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_80():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os.system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os.system"""
 ```
 
 ### NSO Modification
@@ -455,12 +455,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_0():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os.system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os.system"""
 ```
 
 ### NSO Modification
@@ -470,12 +470,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_20():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os.system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os.system"""
 ```
 
 ### NSO Modification
@@ -485,12 +485,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_40():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os.system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os.system"""
 ```
 
 ### NSO Modification
@@ -500,12 +500,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_60():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os.system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os.system"""
 ```
 
 ### NSO Modification
@@ -515,12 +515,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_80():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os.system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os.system"""
 ```
 
 ### NSO Modification
@@ -530,12 +530,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_0():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os.system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os.system"""
 ```
 
 ### NSO Modification
@@ -545,12 +545,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_20():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os.system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os.system"""
 ```
 
 ### NSO Modification
@@ -560,12 +560,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_40():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os.system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os.system"""
 ```
 
 ### NSO Modification
@@ -575,12 +575,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_60():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os.system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os.system"""
 ```
 
 ### NSO Modification
@@ -590,12 +590,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_80():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os.system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os.system"""
 ```
 
 ### NSO Modification
@@ -605,7 +605,7 @@
 +++ after.py
 @@ -1,4 +1,5 @@
  def main():
-     pass
+ pass
 -import os
 -os.system('ls')
 +
@@ -620,7 +620,7 @@
 +++ after.py
 @@ -1,4 +1,5 @@
  def main():
-     pass
+ pass
 -import sys
 -sys.exit()
 +
@@ -635,7 +635,7 @@
 +++ after.py
 @@ -1,3 +1,5 @@
  def main():
-     pass
+ pass
 -eval('2+2')
 +
 +
@@ -655,18 +655,18 @@
  
 +
  def harmful():
--    os.system('rm -rf /')
--    sys.exit()
--    eval('dangerous')
--    exec('more danger')
-+    """NSO_REDACTED_CALL_TO_os.system"""
-+    """NSO_REDACTED_CALL_TO_sys.exit"""
-+    """NSO_REDACTED_CALL_TO_eval"""
-+    """NSO_REDACTED_CALL_TO_exec"""
+- os.system('rm -rf /')
+- sys.exit()
+- eval('dangerous')
+- exec('more danger')
++ """NSO_REDACTED_CALL_TO_os.system"""
++ """NSO_REDACTED_CALL_TO_sys.exit"""
++ """NSO_REDACTED_CALL_TO_eval"""
++ """NSO_REDACTED_CALL_TO_exec"""
 +
  
  def safe():
-     return math.sqrt(2)
+ return math.sqrt(2)
 ```
 
 ### NSO Modification
@@ -678,7 +678,7 @@
 -def f(): pass
 -os.system('test')
 +def f():
-+    pass
++ pass
 +
 +
 +"""NSO_REDACTED_CALL_TO_os.system"""
@@ -693,7 +693,7 @@
 -def f(): pass
 -os.system('test')
 +def f():
-+    pass
++ pass
 +
 +
 +"""NSO_REDACTED_CALL_TO_os.system"""
@@ -708,7 +708,7 @@
 -def f(): pass
 -os.system('test')
 +def f():
-+    pass
++ pass
 +
 +
 +"""NSO_REDACTED_CALL_TO_os.system"""
@@ -723,7 +723,7 @@
 -def f(): pass
 -os.system('test')
 +def f():
-+    pass
++ pass
 +
 +
 +"""NSO_REDACTED_CALL_TO_os.system"""
@@ -738,7 +738,7 @@
 -def f(): pass
 -os.system('test')
 +def f():
-+    pass
++ pass
 +
 +
 +"""NSO_REDACTED_CALL_TO_os.system"""
@@ -753,7 +753,7 @@
 -def f(): pass
 -os.system('test')
 +def f():
-+    pass
++ pass
 +
 +
 +"""NSO_REDACTED_CALL_TO_os.system"""
@@ -768,7 +768,7 @@
 -def f(): pass
 -os.system('test')
 +def f():
-+    pass
++ pass
 +
 +
 +"""NSO_REDACTED_CALL_TO_os.system"""
@@ -783,7 +783,7 @@
 -def f(): pass
 -os.system('test')
 +def f():
-+    pass
++ pass
 +
 +
 +"""NSO_REDACTED_CALL_TO_os.system"""
@@ -798,7 +798,7 @@
 -def f(): pass
 -os.system('test')
 +def f():
-+    pass
++ pass
 +
 +
 +"""NSO_REDACTED_CALL_TO_os.system"""
@@ -813,7 +813,7 @@
 -def f(): pass
 -os.system('test')
 +def f():
-+    pass
++ pass
 +
 +
 +"""NSO_REDACTED_CALL_TO_os.system"""
@@ -826,12 +826,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_0():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os.system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os.system"""
 ```
 
 ### NSO Modification
@@ -841,12 +841,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_20():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os.system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os.system"""
 ```
 
 ### NSO Modification
@@ -856,12 +856,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_40():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os.system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os.system"""
 ```
 
 ### NSO Modification
@@ -871,12 +871,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_60():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os.system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os.system"""
 ```
 
 ### NSO Modification
@@ -886,12 +886,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_80():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os.system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os.system"""
 ```
 
 ### NSO Modification
@@ -901,7 +901,7 @@
 +++ after.py
 @@ -1,4 +1,5 @@
  def main():
-     pass
+ pass
 -import os
 -os.system('ls')
 +
@@ -916,7 +916,7 @@
 +++ after.py
 @@ -1,4 +1,5 @@
  def main():
-     pass
+ pass
 -import sys
 -sys.exit()
 +
@@ -931,7 +931,7 @@
 +++ after.py
 @@ -1,3 +1,5 @@
  def main():
-     pass
+ pass
 -eval('2+2')
 +
 +
@@ -951,18 +951,18 @@
  
 +
  def harmful():
--    os.system('rm -rf /')
--    sys.exit()
--    eval('dangerous')
--    exec('more danger')
-+    """NSO_REDACTED_CALL_TO_os.system"""
-+    """NSO_REDACTED_CALL_TO_sys.exit"""
-+    """NSO_REDACTED_CALL_TO_eval"""
-+    """NSO_REDACTED_CALL_TO_exec"""
+- os.system('rm -rf /')
+- sys.exit()
+- eval('dangerous')
+- exec('more danger')
++ """NSO_REDACTED_CALL_TO_os.system"""
++ """NSO_REDACTED_CALL_TO_sys.exit"""
++ """NSO_REDACTED_CALL_TO_eval"""
++ """NSO_REDACTED_CALL_TO_exec"""
 +
  
  def safe():
-     return math.sqrt(2)
+ return math.sqrt(2)
 ```
 
 ### NSO Modification
@@ -974,7 +974,7 @@
 -def f(): pass
 -os.system('test')
 +def f():
-+    pass
++ pass
 +
 +
 +"""NSO_REDACTED_CALL_TO_os.system"""
@@ -989,7 +989,7 @@
 -def f(): pass
 -os.system('test')
 +def f():
-+    pass
++ pass
 +
 +
 +"""NSO_REDACTED_CALL_TO_os.system"""
@@ -1004,7 +1004,7 @@
 -def f(): pass
 -os.system('test')
 +def f():
-+    pass
++ pass
 +
 +
 +"""NSO_REDACTED_CALL_TO_os.system"""
@@ -1019,7 +1019,7 @@
 -def f(): pass
 -os.system('test')
 +def f():
-+    pass
++ pass
 +
 +
 +"""NSO_REDACTED_CALL_TO_os.system"""
@@ -1034,7 +1034,7 @@
 -def f(): pass
 -os.system('test')
 +def f():
-+    pass
++ pass
 +
 +
 +"""NSO_REDACTED_CALL_TO_os.system"""
@@ -1049,7 +1049,7 @@
 -def f(): pass
 -os.system('test')
 +def f():
-+    pass
++ pass
 +
 +
 +"""NSO_REDACTED_CALL_TO_os.system"""
@@ -1064,7 +1064,7 @@
 -def f(): pass
 -os.system('test')
 +def f():
-+    pass
++ pass
 +
 +
 +"""NSO_REDACTED_CALL_TO_os.system"""
@@ -1079,7 +1079,7 @@
 -def f(): pass
 -os.system('test')
 +def f():
-+    pass
++ pass
 +
 +
 +"""NSO_REDACTED_CALL_TO_os.system"""
@@ -1094,7 +1094,7 @@
 -def f(): pass
 -os.system('test')
 +def f():
-+    pass
++ pass
 +
 +
 +"""NSO_REDACTED_CALL_TO_os.system"""
@@ -1119,12 +1119,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_0():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os_system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os_system"""
 ```
 
 ### NSO Modification
@@ -1134,12 +1134,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_20():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os_system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os_system"""
 ```
 
 ### NSO Modification
@@ -1149,12 +1149,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_40():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os_system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os_system"""
 ```
 
 ### NSO Modification
@@ -1164,12 +1164,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_60():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os_system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os_system"""
 ```
 
 ### NSO Modification
@@ -1179,12 +1179,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_80():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os_system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os_system"""
 ```
 
 ### NSO Modification
@@ -1194,7 +1194,7 @@
 +++ after.py
 @@ -1,4 +1,5 @@
  def main():
-     pass
+ pass
 -import os
 -os.system('ls')
 +
@@ -1209,7 +1209,7 @@
 +++ after.py
 @@ -1,4 +1,5 @@
  def main():
-     pass
+ pass
 -import sys
 -sys.exit()
 +
@@ -1224,7 +1224,7 @@
 +++ after.py
 @@ -1,3 +1,5 @@
  def main():
-     pass
+ pass
 -eval('2+2')
 +
 +
@@ -1244,18 +1244,18 @@
  
 +
  def harmful():
--    os.system('rm -rf /')
--    sys.exit()
--    eval('dangerous')
--    exec('more danger')
-+    """NSO_REDACTED_CALL_TO_os_system"""
-+    """NSO_REDACTED_CALL_TO_sys_exit"""
-+    """NSO_REDACTED_CALL_TO_eval"""
-+    """NSO_REDACTED_CALL_TO_exec"""
+- os.system('rm -rf /')
+- sys.exit()
+- eval('dangerous')
+- exec('more danger')
++ """NSO_REDACTED_CALL_TO_os_system"""
++ """NSO_REDACTED_CALL_TO_sys_exit"""
++ """NSO_REDACTED_CALL_TO_eval"""
++ """NSO_REDACTED_CALL_TO_exec"""
 +
  
  def safe():
-     return math.sqrt(2)
+ return math.sqrt(2)
 ```
 
 ### NSO Modification
@@ -1267,7 +1267,7 @@
 -def f(): pass
 -os.system('test')
 +def f():
-+    pass
++ pass
 +
 +
 +"""NSO_REDACTED_CALL_TO_os_system"""
@@ -1282,7 +1282,7 @@
 -def f(): pass
 -os.system('test')
 +def f():
-+    pass
++ pass
 +
 +
 +"""NSO_REDACTED_CALL_TO_os_system"""
@@ -1297,7 +1297,7 @@
 -def f(): pass
 -os.system('test')
 +def f():
-+    pass
++ pass
 +
 +
 +"""NSO_REDACTED_CALL_TO_os_system"""
@@ -1312,7 +1312,7 @@
 -def f(): pass
 -os.system('test')
 +def f():
-+    pass
++ pass
 +
 +
 +"""NSO_REDACTED_CALL_TO_os_system"""
@@ -1327,7 +1327,7 @@
 -def f(): pass
 -os.system('test')
 +def f():
-+    pass
++ pass
 +
 +
 +"""NSO_REDACTED_CALL_TO_os_system"""
@@ -1342,7 +1342,7 @@
 -def f(): pass
 -os.system('test')
 +def f():
-+    pass
++ pass
 +
 +
 +"""NSO_REDACTED_CALL_TO_os_system"""
@@ -1357,7 +1357,7 @@
 -def f(): pass
 -os.system('test')
 +def f():
-+    pass
++ pass
 +
 +
 +"""NSO_REDACTED_CALL_TO_os_system"""
@@ -1372,7 +1372,7 @@
 -def f(): pass
 -os.system('test')
 +def f():
-+    pass
++ pass
 +
 +
 +"""NSO_REDACTED_CALL_TO_os_system"""
@@ -1387,7 +1387,7 @@
 -def f(): pass
 -os.system('test')
 +def f():
-+    pass
++ pass
 +
 +
 +"""NSO_REDACTED_CALL_TO_os_system"""
@@ -1402,7 +1402,7 @@
 -def f(): pass
 -os.system('test')
 +def f():
-+    pass
++ pass
 +
 +
 +"""NSO_REDACTED_CALL_TO_os_system"""
@@ -1427,12 +1427,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_0():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os_system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os_system"""
 ```
 
 ### NSO Modification
@@ -1442,12 +1442,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_20():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os_system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os_system"""
 ```
 
 ### NSO Modification
@@ -1457,12 +1457,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_40():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os_system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os_system"""
 ```
 
 ### NSO Modification
@@ -1472,12 +1472,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_60():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os_system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os_system"""
 ```
 
 ### NSO Modification
@@ -1487,12 +1487,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_80():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os_system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os_system"""
 ```
 
 ### NSO Modification
@@ -1502,7 +1502,7 @@
 +++ after.py
 @@ -1,4 +1,5 @@
  def main():
-     pass
+ pass
 -import os
 -os.system('ls')
 +
@@ -1517,7 +1517,7 @@
 +++ after.py
 @@ -1,4 +1,5 @@
  def main():
-     pass
+ pass
 -import sys
 -sys.exit()
 +
@@ -1532,7 +1532,7 @@
 +++ after.py
 @@ -1,3 +1,5 @@
  def main():
-     pass
+ pass
 -eval('2+2')
 +
 +
@@ -1552,18 +1552,18 @@
  
 +
  def harmful():
--    os.system('rm -rf /')
--    sys.exit()
--    eval('dangerous')
--    exec('more danger')
-+    """NSO_REDACTED_CALL_TO_os_system"""
-+    """NSO_REDACTED_CALL_TO_sys_exit"""
-+    """NSO_REDACTED_CALL_TO_eval"""
-+    """NSO_REDACTED_CALL_TO_exec"""
+- os.system('rm -rf /')
+- sys.exit()
+- eval('dangerous')
+- exec('more danger')
++ """NSO_REDACTED_CALL_TO_os_system"""
++ """NSO_REDACTED_CALL_TO_sys_exit"""
++ """NSO_REDACTED_CALL_TO_eval"""
++ """NSO_REDACTED_CALL_TO_exec"""
 +
  
  def safe():
-     return math.sqrt(2)
+ return math.sqrt(2)
 ```
 
 ### NSO Modification
@@ -1575,7 +1575,7 @@
 -def f(): pass
 -os.system('test')
 +def f():
-+    pass
++ pass
 +
 +
 +"""NSO_REDACTED_CALL_TO_os_system"""
@@ -1590,7 +1590,7 @@
 -def f(): pass
 -os.system('test')
 +def f():
-+    pass
++ pass
 +
 +
 +"""NSO_REDACTED_CALL_TO_os_system"""
@@ -1605,7 +1605,7 @@
 -def f(): pass
 -os.system('test')
 +def f():
-+    pass
++ pass
 +
 +
 +"""NSO_REDACTED_CALL_TO_os_system"""
@@ -1620,7 +1620,7 @@
 -def f(): pass
 -os.system('test')
 +def f():
-+    pass
++ pass
 +
 +
 +"""NSO_REDACTED_CALL_TO_os_system"""
@@ -1635,7 +1635,7 @@
 -def f(): pass
 -os.system('test')
 +def f():
-+    pass
++ pass
 +
 +
 +"""NSO_REDACTED_CALL_TO_os_system"""
@@ -1650,7 +1650,7 @@
 -def f(): pass
 -os.system('test')
 +def f():
-+    pass
++ pass
 +
 +
 +"""NSO_REDACTED_CALL_TO_os_system"""
@@ -1665,7 +1665,7 @@
 -def f(): pass
 -os.system('test')
 +def f():
-+    pass
++ pass
 +
 +
 +"""NSO_REDACTED_CALL_TO_os_system"""
@@ -1680,7 +1680,7 @@
 -def f(): pass
 -os.system('test')
 +def f():
-+    pass
++ pass
 +
 +
 +"""NSO_REDACTED_CALL_TO_os_system"""
@@ -1695,7 +1695,7 @@
 -def f(): pass
 -os.system('test')
 +def f():
-+    pass
++ pass
 +
 +
 +"""NSO_REDACTED_CALL_TO_os_system"""
@@ -1710,7 +1710,7 @@
 -def f(): pass
 -os.system('test')
 +def f():
-+    pass
++ pass
 +
 +
 +"""NSO_REDACTED_CALL_TO_os_system"""
@@ -1735,12 +1735,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_0():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os_system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os_system"""
 ```
 
 ### NSO Modification
@@ -1750,12 +1750,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_20():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os_system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os_system"""
 ```
 
 ### NSO Modification
@@ -1765,12 +1765,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_40():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os_system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os_system"""
 ```
 
 ### NSO Modification
@@ -1780,12 +1780,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_60():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os_system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os_system"""
 ```
 
 ### NSO Modification
@@ -1795,12 +1795,12 @@
 +++ after.py
 @@ -1,4 +1,6 @@
  def main():
-     print('start')
+ print('start')
 +
 +
  def dangerous_80():
--    os.system('rm -rf /')
-+    """NSO_REDACTED_CALL_TO_os_system"""
+- os.system('rm -rf /')
++ """NSO_REDACTED_CALL_TO_os_system"""
 ```
 
 ### NSO Modification
@@ -1810,7 +1810,7 @@
 +++ after.py
 @@ -1,4 +1,5 @@
  def main():
-     pass
+ pass
 -import os
 -os.system('ls')
 +
@@ -1825,7 +1825,7 @@
 +++ after.py
 @@ -1,4 +1,5 @@
  def main():
-     pass
+ pass
 -import sys
 -sys.exit()
 +
@@ -1840,7 +1840,7 @@
 +++ after.py
 @@ -1,3 +1,5 @@
  def main():
-     pass
+ pass
 -eval('2+2')
 +
 +
@@ -1860,18 +1860,18 @@
  
 +
  def harmful():
--    os.system('rm -rf /')
--    sys.exit()
--    eval('dangerous')
--    exec('more danger')
-+    """NSO_REDACTED_CALL_TO_os_system"""
-+    """NSO_REDACTED_CALL_TO_sys_exit"""
-+    """NSO_REDACTED_CALL_TO_eval"""
-+    """NSO_REDACTED_CALL_TO_exec"""
+- os.system('rm -rf /')
+- sys.exit()
+- eval('dangerous')
+- exec('more danger')
++ """NSO_REDACTED_CALL_TO_os_system"""
++ """NSO_REDACTED_CALL_TO_sys_exit"""
++ """NSO_REDACTED_CALL_TO_eval"""
++ """NSO_REDACTED_CALL_TO_exec"""
 +
  
  def safe():
-     return math.sqrt(2)
+ return math.sqrt(2)
 ```
 
 ### NSO Modification
@@ -1883,7 +1883,7 @@
 -def f(): pass
 -os.system('test')
 +def f():
-+    pass
++ pass
 +
 +
 +"""NSO_REDACTED_CALL_TO_os_system"""
@@ -1898,7 +1898,7 @@
 -def f(): pass
 -os.system('test')
 +def f():
-+    pass
++ pass
 +
 +
 +"""NSO_REDACTED_CALL_TO_os_system"""
@@ -1913,7 +1913,7 @@
 -def f(): pass
 -os.system('test')
 +def f():
-+    pass
++ pass
 +
 +
 +"""NSO_REDACTED_CALL_TO_os_system"""
@@ -1928,7 +1928,7 @@
 -def f(): pass
 -os.system('test')
 +def f():
-+    pass
++ pass
 +
 +
 +"""NSO_REDACTED_CALL_TO_os_system"""
@@ -1943,7 +1943,7 @@
 -def f(): pass
 -os.system('test')
 +def f():
-+    pass
++ pass
 +
 +
 +"""NSO_REDACTED_CALL_TO_os_system"""
@@ -1958,7 +1958,7 @@
 -def f(): pass
 -os.system('test')
 +def f():
-+    pass
++ pass
 +
 +
 +"""NSO_REDACTED_CALL_TO_os_system"""
@@ -1973,7 +1973,7 @@
 -def f(): pass
 -os.system('test')
 +def f():
-+    pass
++ pass
 +
 +
 +"""NSO_REDACTED_CALL_TO_os_system"""
@@ -1988,7 +1988,7 @@
 -def f(): pass
 -os.system('test')
 +def f():
-+    pass
++ pass
 +
 +
 +"""NSO_REDACTED_CALL_TO_os_system"""
@@ -2003,7 +2003,7 @@
 -def f(): pass
 -os.system('test')
 +def f():
-+    pass
++ pass
 +
 +
 +"""NSO_REDACTED_CALL_TO_os_system"""
@@ -2018,7 +2018,7 @@
 -def f(): pass
 -os.system('test')
 +def f():
-+    pass
++ pass
 +
 +
 +"""NSO_REDACTED_CALL_TO_os_system"""

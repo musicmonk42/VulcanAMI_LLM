@@ -1,7 +1,7 @@
 # Graphix Transparency Report (Auto-Generated Snapshot)
 
-**Reporting Period:** last 30 days  
-**Last Generated:** 2024-11-11 04:06 UTC  
+**Reporting Period:** last 30 days 
+**Last Generated:** 2024-11-11 04:06 UTC 
 **Version:** 2.2.0
 
 ---
@@ -14,8 +14,8 @@
 | Counterfactual Diffs | All positive | ±10% perturbation produced change |
 | Attention Visualization Coverage | 100% | All subgraphs (>3 nodes) plotted |
 
-**Definitions:**  
-- *SHAP Coverage*: Ratio of features with meaningful attribution.  
+**Definitions:** 
+- *SHAP Coverage*: Ratio of features with meaningful attribution. 
 - *Counterfactual Diffs*: Verifies sensitivity to controlled input shifts.
 
 ---

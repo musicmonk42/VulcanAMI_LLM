@@ -84,10 +84,10 @@ The repository includes automated deployment to Azure Kubernetes Service via Git
 ```bash
 # Create Azure Service Principal
 az ad sp create-for-rbac \
-  --name "github-actions-vulcanami" \
-  --role contributor \
-  --scopes /subscriptions/{SUBSCRIPTION_ID} \
-  --sdk-auth
+ --name "github-actions-vulcanami" \
+ --role contributor \
+ --scopes /subscriptions/{SUBSCRIPTION_ID} \
+ --sdk-auth
 
 # Add these secrets to GitHub repository:
 # - AZURE_CLIENT_ID (from Service Principal output)
@@ -130,29 +130,29 @@ Run `make help` to see all available commands.
 Set these in `Settings > Secrets and variables > Actions`:
 
 ```
-JWT_SECRET_KEY          # Generate with: openssl rand -base64 48
-BOOTSTRAP_KEY           # Generate with: openssl rand -base64 32
-POSTGRES_PASSWORD       # Generate with: openssl rand -base64 32
-REDIS_PASSWORD          # Generate with: openssl rand -base64 32
-MINIO_ROOT_PASSWORD     # Generate with: openssl rand -base64 24
-GRAFANA_PASSWORD        # Generate with: openssl rand -base64 16
+JWT_SECRET_KEY # Generate with: openssl rand -base64 48
+BOOTSTRAP_KEY # Generate with: openssl rand -base64 32
+POSTGRES_PASSWORD # Generate with: openssl rand -base64 32
+REDIS_PASSWORD # Generate with: openssl rand -base64 32
+MINIO_ROOT_PASSWORD # Generate with: openssl rand -base64 24
+GRAFANA_PASSWORD # Generate with: openssl rand -base64 16
 ```
 
 Optional:
 ```
-DOCKERHUB_USERNAME      # For Docker Hub registry
-DOCKERHUB_TOKEN         # Docker Hub access token
-PYPI_API_TOKEN         # For PyPI publishing
-SLACK_WEBHOOK_URL      # For notifications
-CODECOV_TOKEN          # For code coverage
-KUBE_CONFIG            # For K8s deployment
+DOCKERHUB_USERNAME # For Docker Hub registry
+DOCKERHUB_TOKEN # Docker Hub access token
+PYPI_API_TOKEN # For PyPI publishing
+SLACK_WEBHOOK_URL # For notifications
+CODECOV_TOKEN # For code coverage
+KUBE_CONFIG # For K8s deployment
 ```
 
 For Azure AKS Deployment:
 ```
-AZURE_CLIENT_ID         # Azure Service Principal Client ID
-AZURE_TENANT_ID         # Azure Active Directory Tenant ID
-AZURE_SUBSCRIPTION_ID   # Azure Subscription ID
+AZURE_CLIENT_ID # Azure Service Principal Client ID
+AZURE_TENANT_ID # Azure Active Directory Tenant ID
+AZURE_SUBSCRIPTION_ID # Azure Subscription ID
 ```
 
 See [DEPLOYMENT.md](./DEPLOYMENT.md#4-azure-aks-deployment) for Azure setup instructions.
@@ -161,12 +161,12 @@ See [DEPLOYMENT.md](./DEPLOYMENT.md#4-azure-aks-deployment) for Azure setup inst
 
 ```bash
 kubectl create secret generic vulcanami-secrets \
-  --from-literal=JWT_SECRET_KEY=$(openssl rand -base64 48) \
-  --from-literal=BOOTSTRAP_KEY=$(openssl rand -base64 32) \
-  --from-literal=POSTGRES_PASSWORD=$(openssl rand -base64 32) \
-  --from-literal=REDIS_PASSWORD=$(openssl rand -base64 32) \
-  --from-literal=MINIO_ROOT_PASSWORD=$(openssl rand -base64 24) \
-  -n vulcanami
+ --from-literal=JWT_SECRET_KEY=$(openssl rand -base64 48) \
+ --from-literal=BOOTSTRAP_KEY=$(openssl rand -base64 32) \
+ --from-literal=POSTGRES_PASSWORD=$(openssl rand -base64 32) \
+ --from-literal=REDIS_PASSWORD=$(openssl rand -base64 32) \
+ --from-literal=MINIO_ROOT_PASSWORD=$(openssl rand -base64 24) \
+ -n vulcanami
 ```
 
 ## 🔄 Workflows

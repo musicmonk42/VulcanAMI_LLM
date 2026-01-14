@@ -38,13 +38,13 @@ record_node_start / record_node_end update ExecutionMetrics with per-node granul
 ## 9. Pseudocode (Condensed)
 ```python
 while remaining:
-  ready = scheduler.get_ready()
-  start_tasks(ready)
-  done = await wait_first_completed(tasks)
-  for task in done:
-     result = process(task)
-     update scheduler & context
-  if critical failure: break
+ ready = scheduler.get_ready()
+ start_tasks(ready)
+ done = await wait_first_completed(tasks)
+ for task in done:
+ result = process(task)
+ update scheduler & context
+ if critical failure: break
 finalize result object
 ```
 

@@ -1,14 +1,12 @@
-VULCAN-AGI Orchestrator Module
+VULCAN-AMI Orchestrator Module
 
 Overview
 
-The Orchestrator Module in VULCAN-AGI serves as the central coordination system for AGI agents, managing lifecycle, task distribution, scaling, metrics, and deployment. It implements a full cognitive cycle (perception → reasoning → validation → execution → learning → reflection → self-improvement) with distributed execution via agent pools and task queues. The module supports variants for parallel, fault-tolerant, and adaptive orchestration, ensuring robustness, scalability, and autonomous improvement through experiment generation.
+The Orchestrator Module in VULCAN-AMI serves as the central coordination system for AGI agents, managing lifecycle, task distribution, scaling, metrics, and deployment. It implements a full cognitive cycle (perception → reasoning → validation → execution → learning → reflection → self-improvement) with distributed execution via agent pools and task queues. The module supports variants for parallel, fault-tolerant, and adaptive orchestration, ensuring robustness, scalability, and autonomous improvement through experiment generation.
 
 Designed for production readiness, it features no circular dependencies, bounded memory usage, thread-safe operations, comprehensive error handling, and Unicode-safe utilities. Self-improvement is integrated via knowledge gap analysis and experiment execution.
 
 Key Features
-
-
 
 Agent Lifecycle Management: Strict state machine for agent states (e.g., IDLE, WORKING) with validation and provenance tracking.
 
@@ -28,13 +26,9 @@ Deployment: Production setup with monitoring, checkpointing, atomic saves (Windo
 
 Self-Improvement: Generates and executes experiments to fill knowledge gaps, integrated into the cognitive cycle.
 
-
-
 Architecture and Components
 
 The module is modular, with each file handling a specific aspect, exported via \_\_init\_\_.py:
-
-
 
 agent\_lifecycle.py: Defines AgentState, AgentCapability, AgentMetadata, JobProvenance, and state transition rules.
 
@@ -54,15 +48,11 @@ variants.py: Specialized classes like ParallelOrchestrator, FaultTolerantOrchest
 
 \_\_init\_\_.py: Exports all components, provides convenience functions (e.g., create\_orchestrator), and module documentation.
 
-
-
 The system uses locks for thread safety, deques for bounded histories, TTL caches for provenance, and fallbacks for optional libraries.
 
 Installation and Dependencies
 
-This module is part of the VULCAN-AGI project. To use it:
-
-
+This module is part of the VULCAN-AMI project. To use it:
 
 Clone the repository (or integrate into your project).
 
@@ -70,25 +60,15 @@ Install required dependencies:
 
 textpip install numpy psutil cachetools
 
-
-
 Core: logging, threading, multiprocessing, time, uuid, json, hashlib, pathlib, collections, dataclasses, psutil, enum, typing, traceback, asyncio, sys, os, pickle, datetime, concurrent.futures.
 
 Optional: ray (distributed), celery (queues), zmq (messaging), numpy (metrics/arrays).
 
 Fallbacks: Custom implementations for missing optionals (e.g., dict-based TTL cache).
 
-
-
-
-
 Import the module:
 
 pythonfrom vulcan.orchestrator import VULCANAGICollective, create\_orchestrator
-
-
-
-
 
 Usage Example
 
@@ -96,13 +76,9 @@ pythonimport logging
 
 from vulcan.orchestrator import create\_orchestrator, create\_agent\_pool, ModalityType
 
-
-
 \# Set up logging
 
 logging.basicConfig(level=logging.INFO)
-
-
 
 \# Create dependencies and config (minimal example)
 
@@ -110,21 +86,15 @@ from vulcan.orchestrator import create\_minimal\_deps
 
 deps = create\_minimal\_deps()
 
-config = type('Config', (), {'enable\_self\_improvement': True})()  # Mock config
-
-
+config = type('Config', (), {'enable\_self\_improvement': True})() # Mock config
 
 \# Create agent pool
 
 pool = create\_agent\_pool(min\_agents=2, max\_agents=10)
 
-
-
 \# Create orchestrator
 
 collective = create\_orchestrator('collective', config, deps=deps, agent\_pool=pool)
-
-
 
 \# Process an input
 
@@ -134,23 +104,17 @@ result = collective.process\_input(input\_data)
 
 print("Result:", result)
 
-
-
 \# Get status
 
 status = collective.get\_status()
 
 print("System Status:", status)
 
-
-
 \# Shutdown
 
 collective.shutdown()
 
 Configuration
-
-
 
 Pool Parameters: Set min\_agents, max\_agents, scale\_threshold in AgentPoolManager.
 
@@ -164,11 +128,7 @@ Self-Improvement: Enable via config.enable\_self\_improvement; adjust experiment
 
 Variants: Select orchestrator type in create\_orchestrator (e.g., "parallel", "adaptive").
 
-
-
 Notes
-
-
 
 Thread Safety: All critical sections locked; supports concurrent operations and async (asyncio).
 
@@ -180,7 +140,5 @@ Extensibility: Extend enums (e.g., AgentCapability), factories, or subclass orch
 
 Limitations: Optionals required for advanced features (e.g., Ray for distributed); Windows file handling for checkpoints.
 
-
-
-For contributions or issues, refer to the VULCAN-AGI project repository.
+For contributions or issues, refer to the VULCAN-AMI project repository.
 

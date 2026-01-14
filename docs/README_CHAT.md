@@ -7,24 +7,24 @@ Simple, beautiful chat interface for VulcanAMI.
 Before running the platform, ensure you have the required setup:
 
 1. **Install dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   ```
+ ```bash
+ pip install -r requirements.txt
+ ```
 
 2. **Create environment file (recommended):**
-   ```bash
-   cp .env.example .env
-   # Edit .env and configure as needed
-   ```
+ ```bash
+ cp .env.example .env
+ # Edit .env and configure as needed
+ ```
 
-   The `.env` file helps configure the platform. See `.env.example` for available options.
+ The `.env` file helps configure the platform. See `.env.example` for available options.
 
 3. **AWS Configuration (optional):**
-   If you have `boto3` installed and want to use AWS Secrets Manager, ensure AWS is configured:
-   ```bash
-   export AWS_DEFAULT_REGION=us-east-1  # or your preferred region
-   ```
-   If you don't need AWS Secrets Manager, the platform will fall back to environment variables.
+ If you have `boto3` installed and want to use AWS Secrets Manager, ensure AWS is configured:
+ ```bash
+ export AWS_DEFAULT_REGION=us-east-1 # or your preferred region
+ ```
+ If you don't need AWS Secrets Manager, the platform will fall back to environment variables.
 
 ## Quick Start
 
@@ -63,9 +63,9 @@ Settings are saved in browser localStorage.
 - ✅ Auto-reconnect
 - ✅ Single HTML file (no dependencies)
 - ✅ **Internal Metrics Tabs** - View system internals directly from the UI:
-  - 📊 **Metrics Tab** - Health status, system status, cognitive systems, LLM status
-  - ⚠️ **Warnings Tab** - Safety status, audit logs, adversarial monitoring
-  - 🔧 **Internals Tab** - World model, memory, hardware, routing, and API endpoints list
+ - 📊 **Metrics Tab** - Health status, system status, cognitive systems, LLM status
+ - ⚠️ **Warnings Tab** - Safety status, audit logs, adversarial monitoring
+ - 🔧 **Internals Tab** - World model, memory, hardware, routing, and API endpoints list
 
 ### Backend (VULCAN Platform)
 - ✅ Full VULCAN platform integration
@@ -90,17 +90,17 @@ The main VULCAN service includes a comprehensive chat endpoint with full platfor
 
 ```json
 {
-  "message": "What would happen if we increased marketing spend by 50%?",
-  "max_tokens": 1024,
-  "enable_reasoning": true,
-  "enable_memory": true,
-  "enable_safety": true,
-  "enable_planning": true,
-  "enable_causal": true,
-  "history": [
-    {"role": "user", "content": "Previous question"},
-    {"role": "assistant", "content": "Previous answer"}
-  ]
+ "message": "What would happen if we increased marketing spend by 50%?",
+ "max_tokens": 1024,
+ "enable_reasoning": true,
+ "enable_memory": true,
+ "enable_safety": true,
+ "enable_planning": true,
+ "enable_causal": true,
+ "history": [
+ {"role": "user", "content": "Previous question"},
+ {"role": "assistant", "content": "Previous answer"}
+ ]
 }
 ```
 
@@ -108,8 +108,8 @@ The main VULCAN service includes a comprehensive chat endpoint with full platfor
 
 ```json
 {
-  "response": "Based on causal analysis of your business model...",
-  "systems_used": ["world_model", "reasoner", "memory", "safety"]
+ "response": "Based on causal analysis of your business model...",
+ "systems_used": ["world_model", "reasoner", "memory", "safety"]
 }
 ```
 
@@ -119,18 +119,18 @@ The main VULCAN service includes a comprehensive chat endpoint with full platfor
 
 ```json
 {
-  "status": "healthy",
-  "service": "vulcan-chat",
-  "active_systems": "7/7",
-  "systems": {
-    "world_model": "active",
-    "reasoner": "active",
-    "memory": "active",
-    "safety": "active",
-    "planner": "active",
-    "llm": "active",
-    "graph_rag": "active"
-  }
+ "status": "healthy",
+ "service": "vulcan-chat",
+ "active_systems": "7/7",
+ "systems": {
+ "world_model": "active",
+ "reasoner": "active",
+ "memory": "active",
+ "safety": "active",
+ "planner": "active",
+ "llm": "active",
+ "graph_rag": "active"
+ }
 }
 ```
 
@@ -172,15 +172,15 @@ Then include the key in your requests:
 
 ```javascript
 fetch('http://localhost:8080/vulcan/v1/chat', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    'X-API-Key': 'your-secret-key'
-  },
-  body: JSON.stringify({
-    message: 'Hello!',
-    enable_reasoning: true
-  })
+ method: 'POST',
+ headers: {
+ 'Content-Type': 'application/json',
+ 'X-API-Key': 'your-secret-key'
+ },
+ body: JSON.stringify({
+ message: 'Hello!',
+ enable_reasoning: true
+ })
 })
 ```
 
@@ -196,14 +196,14 @@ botocore.exceptions.NoRegionError: You must specify a region.
 This happens when `boto3` is installed but AWS is not configured. Solutions:
 
 1. **Set AWS region** (if you want to use AWS Secrets Manager):
-   ```bash
-   export AWS_DEFAULT_REGION=us-east-1
-   ```
+ ```bash
+ export AWS_DEFAULT_REGION=us-east-1
+ ```
 
 2. **Or configure AWS credentials properly**:
-   ```bash
-   aws configure
-   ```
+ ```bash
+ aws configure
+ ```
 
 3. **Or ignore AWS** - the platform will fall back to environment variables for secrets.
 
@@ -226,9 +226,9 @@ The backend has CORS enabled for all origins by default. If you still see issues
 
 1. Check that you're accessing from `http://` not `file://`
 2. Run a local server for your HTML:
-   ```bash
-   python -m http.server 3000
-   ```
+ ```bash
+ python -m http.server 3000
+ ```
 3. Then open `http://localhost:3000/vulcan_chat.html`
 
 ### Components not loading
@@ -239,24 +239,24 @@ Some components may not be available depending on dependencies. Check the `/vulc
 
 ```
 User → vulcan_chat.html → HTTP POST → /vulcan/v1/chat
-                                           ↓
-                               ┌─────────────────────────┐
-                               │     VULCAN Chat Endpoint       │
-                               │  (unified_chat.py)     │
-                               └─────────────────────────┘
-                                           ↓
-                           ┌────────────────┴────────────────┐
-                           ↓                                 ↓
-                    EXAMINE Phase                     SELECT Phase
-                    - Graph RAG Retrieval             - Unified Reasoning
-                    - World Model State               - Safety Validation
-                                                      - Planning (if needed)
-                           ↓                                 ↓
-                    APPLY Phase                      REMEMBER Phase
-                    - LLM Generation                 - Store in Memory
-                    - Safety Filtering               - Update World Model
-                           ↓
-                    Response → JSON → vulcan_chat.html → Display
+ ↓
+ ┌─────────────────────────┐
+ │ VULCAN Chat Endpoint │
+ │ (unified_chat.py) │
+ └─────────────────────────┘
+ ↓
+ ┌────────────────┴────────────────┐
+ ↓ ↓
+ EXAMINE Phase SELECT Phase
+ - Graph RAG Retrieval - Unified Reasoning
+ - World Model State - Safety Validation
+ - Planning (if needed)
+ ↓ ↓
+ APPLY Phase REMEMBER Phase
+ - LLM Generation - Store in Memory
+ - Safety Filtering - Update World Model
+ ↓
+ Response → JSON → vulcan_chat.html → Display
 ```
 
 ## Performance

@@ -1,7 +1,7 @@
 # Metaprogramming Features - Deployment Integration Guide
 
-**Status**: ✅ Deployment Ready  
-**Date**: 2026-01-12  
+**Status**: ✅ Deployment Ready 
+**Date**: 2026-01-12 
 **Features**: Autonomous graph evolution, metaprogramming handlers
 
 ---
@@ -13,19 +13,19 @@ The metaprogramming node handlers and GraphAwareEvolutionEngine are fully integr
 ### New Components
 
 1. **Metaprogramming Handlers** (`src/unified_runtime/metaprogramming_handlers.py`)
-   - 8 node handlers: PATTERN_COMPILE, FIND_SUBGRAPH, GRAPH_SPLICE, GRAPH_COMMIT, NSO_MODIFY, ETHICAL_LABEL, EVAL, HALT
-   - Registered in unified runtime (auto-loaded on startup)
-   - No additional configuration required
+ - 8 node handlers: PATTERN_COMPILE, FIND_SUBGRAPH, GRAPH_SPLICE, GRAPH_COMMIT, NSO_MODIFY, ETHICAL_LABEL, EVAL, HALT
+ - Registered in unified runtime (auto-loaded on startup)
+ - No additional configuration required
 
 2. **GraphAwareEvolutionEngine** (`src/graph_aware_evolution.py`)
-   - Extends base EvolutionEngine with Graph IR operations
-   - Dual-mode: Metaprogramming + dict fallback
-   - Integrates with safety systems (NSO, ethical boundaries)
+ - Extends base EvolutionEngine with Graph IR operations
+ - Dual-mode: Metaprogramming + dict fallback
+ - Integrates with safety systems (NSO, ethical boundaries)
 
 3. **Documentation** (`docs/architecture/`)
-   - ADR-001-metaprogramming.md - Architecture decisions
-   - SECURITY-metaprogramming.md - Security analysis
-   - IMPLEMENTATION-SUMMARY.md - Complete API reference
+ - ADR-001-metaprogramming.md - Architecture decisions
+ - SECURITY-metaprogramming.md - Security analysis
+ - IMPLEMENTATION-SUMMARY.md - Complete API reference
 
 ---
 
@@ -70,11 +70,11 @@ The Makefile already supports building and testing the new features:
 
 **Existing Targets Work**:
 ```bash
-make install          # Installs all dependencies including new code
-make test            # Runs all tests (59/59 metaprogramming tests)
-make docker-build    # Builds image with new features
-make docker-run      # Runs container with new features
-make helm-install    # Deploys to K8s with new features
+make install # Installs all dependencies including new code
+make test # Runs all tests (59/59 metaprogramming tests)
+make docker-build # Builds image with new features
+make docker-run # Runs container with new features
+make helm-install # Deploys to K8s with new features
 ```
 
 **No changes required** - Makefile is feature-complete.
@@ -116,17 +116,17 @@ docker build --build-arg REJECT_INSECURE_JWT=ack -t vulcanami:latest .
 
 # 2. Run with metaprogramming enabled
 docker run -d \
-  -p 8000:8000 \
-  -e JWT_SECRET="$(openssl rand -base64 48)" \
-  -v $(pwd)/graphs:/app/graphs:ro \
-  vulcanami:latest
+ -p 8000:8000 \
+ -e JWT_SECRET="$(openssl rand -base64 48)" \
+ -v $(pwd)/graphs:/app/graphs:ro \
+ vulcanami:latest
 
 # 3. Verify handlers registered
 docker exec <container> python -c "
 from src.unified_runtime.node_handlers import get_node_handlers
 handlers = get_node_handlers()
 metaprog = ['PATTERN_COMPILE', 'FIND_SUBGRAPH', 'GRAPH_SPLICE', 
-            'GRAPH_COMMIT', 'NSO_MODIFY', 'ETHICAL_LABEL', 'EVAL', 'HALT']
+ 'GRAPH_COMMIT', 'NSO_MODIFY', 'ETHICAL_LABEL', 'EVAL', 'HALT']
 print(f'Metaprogramming: {sum(h in handlers for h in metaprog)}/8 registered')
 "
 ```
@@ -158,10 +158,10 @@ helm package helm/vulcanami
 
 # 2. Install with metaprogramming features (auto-enabled)
 helm install vulcanami ./vulcanami-1.0.0.tgz \
-  --set image.tag=latest \
-  --set image.repository=ghcr.io/musicmonk42/vulcanami_llm-api \
-  --namespace vulcanami \
-  --create-namespace
+ --set image.tag=latest \
+ --set image.repository=ghcr.io/musicmonk42/vulcanami_llm-api \
+ --namespace vulcanami \
+ --create-namespace
 
 # 3. Verify deployment
 kubectl get pods -n vulcanami
@@ -185,8 +185,8 @@ kubectl apply -k k8s/overlays/production
 
 # Verify handlers
 kubectl exec -n vulcanami deployment/vulcanami -- \
-  python -c "from src.unified_runtime.node_handlers import get_node_handlers; \
-  print(f'{len(get_node_handlers())} handlers loaded')"
+ python -c "from src.unified_runtime.node_handlers import get_node_handlers; \
+ print(f'{len(get_node_handlers())} handlers loaded')"
 ```
 
 ---
@@ -318,14 +318,14 @@ docker exec <container> python -c "
 from src.unified_runtime.node_handlers import get_node_handlers
 print(f'Total handlers: {len(get_node_handlers())}')
 print('Metaprogramming handlers:', [h for h in get_node_handlers().keys() 
-      if h in ['PATTERN_COMPILE', 'FIND_SUBGRAPH', 'GRAPH_SPLICE', 
-               'GRAPH_COMMIT', 'NSO_MODIFY', 'ETHICAL_LABEL', 'EVAL', 'HALT']])
+ if h in ['PATTERN_COMPILE', 'FIND_SUBGRAPH', 'GRAPH_SPLICE', 
+ 'GRAPH_COMMIT', 'NSO_MODIFY', 'ETHICAL_LABEL', 'EVAL', 'HALT']])
 "
 
 # Kubernetes
 kubectl exec -n vulcanami deployment/vulcanami -- \
-  python -c "from src.unified_runtime.node_handlers import get_node_handlers; \
-  print('Handlers:', len(get_node_handlers()))"
+ python -c "from src.unified_runtime.node_handlers import get_node_handlers; \
+ print('Handlers:', len(get_node_handlers()))"
 ```
 
 Expected output: `Total handlers: 50` (42 existing + 8 metaprogramming)
@@ -378,15 +378,15 @@ import time
 from src.unified_runtime.metaprogramming_handlers import pattern_compile_node
 
 async def bench():
-    ctx = {'audit_log': []}
-    pattern = {'nodes': [{'id': '?n', 'type': 'ADD'}], 'edges': []}
-    
-    start = time.time()
-    for _ in range(1000):
-        await pattern_compile_node({'id': 'p1', 'type': 'PATTERN_COMPILE'}, 
-                                   ctx, {'pattern_in': pattern})
-    duration = time.time() - start
-    print(f'1000 compilations: {duration:.2f}s ({1000/duration:.0f} ops/sec)')
+ ctx = {'audit_log': []}
+ pattern = {'nodes': [{'id': '?n', 'type': 'ADD'}], 'edges': []}
+ 
+ start = time.time()
+ for _ in range(1000):
+ await pattern_compile_node({'id': 'p1', 'type': 'PATTERN_COMPILE'}, 
+ ctx, {'pattern_in': pattern})
+ duration = time.time() - start
+ print(f'1000 compilations: {duration:.2f}s ({1000/duration:.0f} ops/sec)')
 
 asyncio.run(bench())
 "
@@ -431,18 +431,18 @@ For production environments processing high volumes of graph evolution:
 ```yaml
 # helm/vulcanami/values.yaml (optional tuning)
 resources:
-  requests:
-    cpu: 500m      # Sufficient for metaprogramming
-    memory: 1Gi    # Handles pattern caching
-  limits:
-    cpu: 2000m     # Burst capacity for batch operations
-    memory: 4Gi    # Large graph processing
+ requests:
+ cpu: 500m # Sufficient for metaprogramming
+ memory: 1Gi # Handles pattern caching
+ limits:
+ cpu: 2000m # Burst capacity for batch operations
+ memory: 4Gi # Large graph processing
 
 # Optional: Increase for heavy metaprogramming workloads
 autoscaling:
-  minReplicas: 2  # Ensures availability
-  maxReplicas: 10 # Scales for load
-  targetCPUUtilizationPercentage: 70
+ minReplicas: 2 # Ensures availability
+ maxReplicas: 10 # Scales for load
+ targetCPUUtilizationPercentage: 70
 ```
 
 ### Caching (Future Enhancement)
@@ -486,7 +486,7 @@ The metaprogramming features are designed for seamless integration:
 6. **Health**: Existing probes work
 7. **Security**: Inherits all existing protections
 
-**Deploy with confidence** - metaprogramming features are production-ready and fully integrated.
+**Deploy with confidence** - metaprogramming features are and fully integrated.
 
 ---
 

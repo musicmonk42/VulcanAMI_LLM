@@ -6,7 +6,7 @@
 
 This directory contains a custom zero-knowledge proof system that demonstrates ZK principles using real cryptographic primitives. It's designed for:
 - 📚 **Education** - Learning how ZK proofs work
-- 🔬 **Research** - Prototyping ZK integration patterns  
+- 🔬 **Research** - Prototyping ZK integration patterns 
 - 🧪 **Testing** - Internal development and testing
 - ❌ **NOT for production** security-critical systems
 
@@ -15,15 +15,15 @@ This directory contains a custom zero-knowledge proof system that demonstrates Z
 ### Core Files
 
 - **`snark.py`** - Main ZK proof system with custom protocol
-  - `Groth16Prover` class (custom, not standard Groth16)
-  - R1CS constraint system
-  - Proof generation and verification
-  - Circuit creation utilities
+ - `Groth16Prover` class (custom, not standard Groth16)
+ - R1CS constraint system
+ - Proof generation and verification
+ - Circuit creation utilities
 
 - **`verify.py`** - Verification logic
-  - Proof verification functions
-  - Public input validation
-  - Merkle tree verification
+ - Proof verification functions
+ - Public input validation
+ - Merkle tree verification
 
 ## Key Features
 
@@ -61,11 +61,11 @@ prover = Groth16Prover(circuit)
 proving_key, verification_key = prover.setup()
 
 # Generate proof
-witness = [1, 2, 3]  # Private data
+witness = [1, 2, 3] # Private data
 proof = prover.prove(witness, proving_key)
 
 # Verify proof
-public_inputs = [1]  # Public data
+public_inputs = [1] # Public data
 is_valid = prover.verify(proof, public_inputs, verification_key)
 ```
 
@@ -78,20 +78,20 @@ import hashlib
 
 # Create Merkle commitments to model states
 def commit_weights(weights):
-    leaves = [hashlib.sha256(str(w).encode()).digest() for w in weights]
-    tree = MerkleTree(leaves)
-    return tree.get_root()
+ leaves = [hashlib.sha256(str(w).encode()).digest() for w in weights]
+ tree = MerkleTree(leaves)
+ return tree.get_root()
 
 weights_before = [0.5, 0.3, 0.8, 0.2]
-weights_after = [0.5, 0.0, 0.8, 0.2]  # Unlearned
+weights_after = [0.5, 0.0, 0.8, 0.2] # Unlearned
 
 root_before = commit_weights(weights_before)
 root_after = commit_weights(weights_after)
 
 # Generate ZK proof
 circuit = create_unlearning_circuit(
-    num_samples=len(weights_before),
-    model_size=len(weights_before)
+ num_samples=len(weights_before),
+ model_size=len(weights_before)
 )
 prover = Groth16Prover(circuit)
 proving_key, verification_key = prover.setup()
@@ -101,8 +101,8 @@ proof = prover.prove(witness, proving_key)
 
 # Verify (only roots are public, weights stay private)
 public_inputs = [
-    int.from_bytes(root_before[:8], 'big'),
-    int.from_bytes(root_after[:8], 'big')
+ int.from_bytes(root_before[:8], 'big'),
+ int.from_bytes(root_after[:8], 'big')
 ]
 is_valid = prover.verify(proof, public_inputs, verification_key)
 
@@ -115,45 +115,45 @@ print(f"Unlearning verified: {is_valid}")
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│                  User Application                    │
+│ User Application │
 └──────────────────┬──────────────────────────────────┘
-                   │
+ │
 ┌──────────────────▼──────────────────────────────────┐
-│              Groth16Prover (Custom)                  │
-│  ┌──────────────────────────────────────────────┐  │
-│  │  Circuit Definition (R1CS)                   │  │
-│  │  - Constraints                                │  │
-│  │  - Variables                                  │  │
-│  │  - Public inputs                              │  │
-│  └──────────────────────────────────────────────┘  │
-│                                                      │
-│  ┌──────────────────────────────────────────────┐  │
-│  │  Setup Phase                                  │  │
-│  │  - Generate proving key                       │  │
-│  │  - Generate verification key                  │  │
-│  │  - (Simplified trusted setup)                 │  │
-│  └──────────────────────────────────────────────┘  │
-│                                                      │
-│  ┌──────────────────────────────────────────────┐  │
-│  │  Prove Phase                                  │  │
-│  │  - Take private witness                       │  │
-│  │  - Check constraints                          │  │
-│  │  - Generate proof                             │  │
-│  └──────────────────────────────────────────────┘  │
-│                                                      │
-│  ┌──────────────────────────────────────────────┐  │
-│  │  Verify Phase                                 │  │
-│  │  - Take proof + public inputs                 │  │
-│  │  - Verify using verification key              │  │
-│  │  - Return true/false                          │  │
-│  └──────────────────────────────────────────────┘  │
+│ Groth16Prover (Custom) │
+│ ┌──────────────────────────────────────────────┐ │
+│ │ Circuit Definition (R1CS) │ │
+│ │ - Constraints │ │
+│ │ - Variables │ │
+│ │ - Public inputs │ │
+│ └──────────────────────────────────────────────┘ │
+│ │
+│ ┌──────────────────────────────────────────────┐ │
+│ │ Setup Phase │ │
+│ │ - Generate proving key │ │
+│ │ - Generate verification key │ │
+│ │ - (Simplified trusted setup) │ │
+│ └──────────────────────────────────────────────┘ │
+│ │
+│ ┌──────────────────────────────────────────────┐ │
+│ │ Prove Phase │ │
+│ │ - Take private witness │ │
+│ │ - Check constraints │ │
+│ │ - Generate proof │ │
+│ └──────────────────────────────────────────────┘ │
+│ │
+│ ┌──────────────────────────────────────────────┐ │
+│ │ Verify Phase │ │
+│ │ - Take proof + public inputs │ │
+│ │ - Verify using verification key │ │
+│ │ - Return true/false │ │
+│ └──────────────────────────────────────────────┘ │
 └─────────────────┬───────────────────────────────────┘
-                  │
+ │
 ┌─────────────────▼───────────────────────────────────┐
-│        Cryptographic Primitives (py_ecc)            │
-│  - BN128/BN254 elliptic curve                        │
-│  - Finite field arithmetic                           │
-│  - (Partial) Pairing operations                      │
+│ Cryptographic Primitives (py_ecc) │
+│ - BN128/BN254 elliptic curve │
+│ - Finite field arithmetic │
+│ - (Partial) Pairing operations │
 └──────────────────────────────────────────────────────┘
 ```
 
@@ -173,7 +173,7 @@ print(f"Unlearning verified: {is_valid}")
 ### What This Implementation Provides
 
 ✅ **Computational Hiding**: Private data is hidden using cryptographic hashes
-✅ **Binding**: Merkle trees ensure data integrity  
+✅ **Binding**: Merkle trees ensure data integrity 
 ✅ **Real Cryptography**: Uses industry-standard elliptic curves
 
 ### What This Implementation Does NOT Provide
@@ -251,7 +251,7 @@ For most projects, we recommend:
 Real Groth16 is slower (1-10s for proof generation) but provides cryptographic guarantees.
 
 ### Q: Is the code secure?
-**A:** The code uses real cryptographic primitives (py_ecc) but the overall protocol is **not audited** and **not production-ready**. Use at your own risk for non-security-critical applications only.
+**A:** The code uses real cryptographic primitives (py_ecc) but the overall protocol is **not audited** and **not suitable for production**. Use at your own risk for non-security-critical applications only.
 
 ### Q: Can I integrate this with Ethereum?
 **A:** No. The proofs are not compatible with Ethereum's zk-SNARK verification contracts. For Ethereum, use circom + snarkjs.

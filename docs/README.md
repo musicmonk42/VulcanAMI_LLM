@@ -1,9 +1,9 @@
 # Graphix Vulcan Documentation Index
 
-**Version:** 2.2.0  
+**Version:** 2.2.0 
 **Last Updated:** December 23, 2024
 
-Welcome to the root documentation corpus for the Graphix Vulcan Platform (Proprietary & Confidential — Novatrax Labs LTD).  
+Welcome to the root documentation corpus for the Graphix Vulcan Platform (Proprietary & Confidential — Novatrax Labs LTD). 
 This folder aggregates deep technical, governance, safety, execution, optimization, and integration references.
 
 > **📚 Complete documentation index:** See [INDEX.md](INDEX.md) for full navigation
@@ -32,12 +32,12 @@ This folder aggregates deep technical, governance, safety, execution, optimizati
 
 ```
 Governance & Evolution
-    → Validation (Structure/Ontology/Semantic/Safety/Motivational)
-        → Execution Engine (Parallel/Sequential/Streaming/Batch)
-            → AI Runtime / Hardware Dispatch / Node Handlers
-                → Metrics + Audit + Provenance
-                    → Autonomous Optimization / Pattern Learning
-                        → World Model Alignment (VULCAN Bridge)
+ → Validation (Structure/Ontology/Semantic/Safety/Motivational)
+ → Execution Engine (Parallel/Sequential/Streaming/Batch)
+ → AI Runtime / Hardware Dispatch / Node Handlers
+ → Metrics + Audit + Provenance
+ → Autonomous Optimization / Pattern Learning
+ → World Model Alignment (VULCAN Bridge)
 ```
 
 ## Cross-Cutting Invariants
@@ -56,5 +56,5 @@ Refer to each file for exhaustive detail. Update or extend docs only through gov
 
 ---
 
-**Document Version:** 2.2.0  
+**Document Version:** 2.2.0 
 **Last Updated:** December 23, 2024

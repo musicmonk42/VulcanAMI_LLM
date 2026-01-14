@@ -1,7 +1,7 @@
 # Unified Platform Startup Guide
 
-**Version:** 2.1.0  
-**Last Updated:** 2024-12-15  
+**Version:** 2.1.0 
+**Last Updated:** 2024-12-15 
 **Status:** ✅ All 9 Core Services Integrated
 
 ---
@@ -14,24 +14,24 @@ The VulcanAMI platform provides a **unified entry point** (`src/full_platform.py
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ Unified Platform Server (port 8080)                         │
+│ Unified Platform Server (port 8080) │
 │ ┌─────────────────────────────────────────────────────────┐ │
-│ │ FastAPI Main App                                        │ │
-│ │ ┌─────────┐ ┌─────────┐ ┌──────────┐                  │ │
-│ │ │ VULCAN  │ │  Arena  │ │ Registry │ (Mounted)        │ │
-│ │ │ /vulcan │ │ /arena  │ │/registry │                  │ │
-│ │ └─────────┘ └─────────┘ └──────────┘                  │ │
-│ │ ┌──────────┐ ┌──────┐ ┌──────┐                        │ │
-│ │ │API GW    │ │ DQS  │ │ PII  │ (Mounted)              │ │
-│ │ │/api-gw   │ │ /dqs │ │ /pii │                        │ │
-│ │ └──────────┘ └──────┘ └──────┘                        │ │
+│ │ FastAPI Main App │ │
+│ │ ┌─────────┐ ┌─────────┐ ┌──────────┐ │ │
+│ │ │ VULCAN │ │ Arena │ │ Registry │ (Mounted) │ │
+│ │ │ /vulcan │ │ /arena │ │/registry │ │ │
+│ │ └─────────┘ └─────────┘ └──────────┘ │ │
+│ │ ┌──────────┐ ┌──────┐ ┌──────┐ │ │
+│ │ │API GW │ │ DQS │ │ PII │ (Mounted) │ │
+│ │ │/api-gw │ │ /dqs │ │ /pii │ │ │
+│ │ └──────────┘ └──────┘ └──────┘ │ │
 │ └─────────────────────────────────────────────────────────┘ │
-│                                                              │
-│ Background Processes:                                        │
-│ ┌──────────┐ ┌────────────┐ ┌──────────┐                  │
-│ │API Server│ │Registry    │ │Listener  │                  │
-│ │Port 8001 │ │gRPC :50051 │ │Port 8084 │                  │
-│ └──────────┘ └────────────┘ └──────────┘                  │
+│ │
+│ Background Processes: │
+│ ┌──────────┐ ┌────────────┐ ┌──────────┐ │
+│ │API Server│ │Registry │ │Listener │ │
+│ │Port 8001 │ │gRPC :50051 │ │Port 8084 │ │
+│ └──────────┘ └────────────┘ └──────────┘ │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -54,10 +54,10 @@ uvicorn src.full_platform:app --host 0.0.0.0 --port 8080 --reload
 ```bash
 # With multiple workers
 uvicorn src.full_platform:app \
-  --host 0.0.0.0 \
-  --port 8080 \
-  --workers 4 \
-  --log-level info
+ --host 0.0.0.0 \
+ --port 8080 \
+ --workers 4 \
+ --log-level info
 ```
 
 ### Access the Platform
@@ -74,7 +74,7 @@ uvicorn src.full_platform:app \
 
 ### 1. VULCAN (Mounted at `/vulcan`)
 
-**Type:** FastAPI sub-application  
+**Type:** FastAPI sub-application 
 **Purpose:** Core cognitive architecture with AGI capabilities
 
 **Endpoints:**
@@ -86,13 +86,13 @@ uvicorn src.full_platform:app \
 
 **Configuration:**
 ```python
-UNIFIED_VULCAN_MOUNT=/vulcan  # Mount path
-UNIFIED_VULCAN_MODULE=src.vulcan.main  # Import path
+UNIFIED_VULCAN_MOUNT=/vulcan # Mount path
+UNIFIED_VULCAN_MODULE=src.vulcan.main # Import path
 ```
 
 ### 2. Arena (Mounted at `/arena`)
 
-**Type:** FastAPI sub-application  
+**Type:** FastAPI sub-application 
 **Purpose:** Distributed AI agent collaboration and graph evolution
 
 **Endpoints:**
@@ -104,8 +104,8 @@ UNIFIED_VULCAN_MODULE=src.vulcan.main  # Import path
 
 **Configuration:**
 ```python
-UNIFIED_ARENA_MOUNT=/arena  # Mount path
-UNIFIED_ARENA_MODULE=src.graphix_arena  # Import path
+UNIFIED_ARENA_MOUNT=/arena # Mount path
+UNIFIED_ARENA_MODULE=src.graphix_arena # Import path
 ```
 
 **Security:**
@@ -114,7 +114,7 @@ UNIFIED_ARENA_MODULE=src.graphix_arena  # Import path
 
 ### 3. Registry Flask (Mounted at `/registry`)
 
-**Type:** Flask application via WSGI middleware  
+**Type:** Flask application via WSGI middleware 
 **Purpose:** Graph IR registry and proposal management
 
 **Endpoints:**
@@ -125,13 +125,13 @@ UNIFIED_ARENA_MODULE=src.graphix_arena  # Import path
 
 **Configuration:**
 ```python
-UNIFIED_REGISTRY_MOUNT=/registry  # Mount path
-UNIFIED_REGISTRY_MODULE=app  # Import path (Flask app)
+UNIFIED_REGISTRY_MOUNT=/registry # Mount path
+UNIFIED_REGISTRY_MODULE=app # Import path (Flask app)
 ```
 
 ### 4. API Gateway (Mounted at `/api-gateway`)
 
-**Type:** FastAPI sub-application  
+**Type:** FastAPI sub-application 
 **Purpose:** Enterprise API gateway with service discovery
 
 **Endpoints:**
@@ -142,12 +142,12 @@ UNIFIED_REGISTRY_MODULE=app  # Import path (Flask app)
 **Configuration:**
 ```python
 UNIFIED_API_GATEWAY_MOUNT=/api-gateway
-UNIFIED_ENABLE_API_GATEWAY=true  # Enable/disable
+UNIFIED_ENABLE_API_GATEWAY=true # Enable/disable
 ```
 
 ### 5. DQS Service (Mounted at `/dqs`)
 
-**Type:** FastAPI sub-application  
+**Type:** FastAPI sub-application 
 **Purpose:** Real-time data quality monitoring and scoring
 
 **Endpoints:**
@@ -159,12 +159,12 @@ UNIFIED_ENABLE_API_GATEWAY=true  # Enable/disable
 **Configuration:**
 ```python
 UNIFIED_DQS_MOUNT=/dqs
-UNIFIED_ENABLE_DQS_SERVICE=true  # Enable/disable
+UNIFIED_ENABLE_DQS_SERVICE=true # Enable/disable
 ```
 
 ### 6. PII Service (Mounted at `/pii`)
 
-**Type:** FastAPI sub-application  
+**Type:** FastAPI sub-application 
 **Purpose:** PII detection and privacy protection
 
 **Endpoints:**
@@ -176,12 +176,12 @@ UNIFIED_ENABLE_DQS_SERVICE=true  # Enable/disable
 **Configuration:**
 ```python
 UNIFIED_PII_MOUNT=/pii
-UNIFIED_ENABLE_PII_SERVICE=true  # Enable/disable
+UNIFIED_ENABLE_PII_SERVICE=true # Enable/disable
 ```
 
 ### 7. API Server (Standalone - Port 8001)
 
-**Type:** Custom HTTP server (ThreadedHTTPServer)  
+**Type:** Custom HTTP server (ThreadedHTTPServer) 
 **Purpose:** Graphix IR graph submission and execution
 
 **Access:** http://localhost:8001
@@ -189,14 +189,14 @@ UNIFIED_ENABLE_PII_SERVICE=true  # Enable/disable
 **Configuration:**
 ```python
 UNIFIED_API_SERVER_PORT=8001
-UNIFIED_ENABLE_API_SERVER=true  # Enable/disable
+UNIFIED_ENABLE_API_SERVER=true # Enable/disable
 ```
 
 **Note:** Runs as background process, not mounted as sub-app
 
 ### 8. Registry gRPC (Standalone - Port 50051)
 
-**Type:** gRPC server  
+**Type:** gRPC server 
 **Purpose:** Distributed agent communication and governance
 
 **Access:** grpc://localhost:50051
@@ -204,14 +204,14 @@ UNIFIED_ENABLE_API_SERVER=true  # Enable/disable
 **Configuration:**
 ```python
 UNIFIED_REGISTRY_GRPC_PORT=50051
-UNIFIED_ENABLE_REGISTRY_GRPC=true  # Enable/disable
+UNIFIED_ENABLE_REGISTRY_GRPC=true # Enable/disable
 ```
 
 **Note:** Runs as background process with separate gRPC protocol
 
 ### 9. Listener (Standalone - Port 8084)
 
-**Type:** Custom HTTP server  
+**Type:** Custom HTTP server 
 **Purpose:** Secure graph submission listener
 
 **Access:** http://localhost:8084
@@ -219,7 +219,7 @@ UNIFIED_ENABLE_REGISTRY_GRPC=true  # Enable/disable
 **Configuration:**
 ```python
 UNIFIED_LISTENER_PORT=8084
-UNIFIED_ENABLE_LISTENER=true  # Enable/disable
+UNIFIED_ENABLE_LISTENER=true # Enable/disable
 ```
 
 **Note:** Runs as background process with specialized graph validation
@@ -234,12 +234,12 @@ All configuration can be controlled via environment variables with the `UNIFIED_
 
 ```bash
 # Server configuration
-UNIFIED_HOST=0.0.0.0              # Bind address (default: 127.0.0.1)
-UNIFIED_PORT=8080                  # Main server port
-UNIFIED_WORKERS=4                  # Number of workers
+UNIFIED_HOST=0.0.0.0 # Bind address (default: 127.0.0.1)
+UNIFIED_PORT=8080 # Main server port
+UNIFIED_WORKERS=4 # Number of workers
 
 # Authentication
-UNIFIED_AUTH_METHOD=jwt            # none, api_key, jwt, oauth2
+UNIFIED_AUTH_METHOD=jwt # none, api_key, jwt, oauth2
 UNIFIED_API_KEY=your-api-key
 UNIFIED_JWT_SECRET=your-jwt-secret
 
@@ -257,9 +257,9 @@ UNIFIED_REGISTRY_GRPC_PORT=50051
 UNIFIED_LISTENER_PORT=8084
 
 # Feature flags
-UNIFIED_ENABLE_METRICS=true        # Prometheus metrics
-UNIFIED_ENABLE_HEALTH_CHECKS=true  # Health check aggregation
-UNIFIED_CORS_ENABLED=true          # CORS support
+UNIFIED_ENABLE_METRICS=true # Prometheus metrics
+UNIFIED_ENABLE_HEALTH_CHECKS=true # Health check aggregation
+UNIFIED_CORS_ENABLED=true # CORS support
 ```
 
 ### Configuration File
@@ -322,26 +322,26 @@ curl http://localhost:8080/health
 Response:
 ```json
 {
-  "status": "healthy",
-  "timestamp": "2024-12-15T10:30:00Z",
-  "worker_pid": 12345,
-  "services": {
-    "vulcan": {
-      "mounted": true,
-      "health": {
-        "status": "healthy",
-        "latency_ms": 12.3
-      }
-    },
-    "arena": {
-      "mounted": true,
-      "health": {
-        "status": "healthy",
-        "latency_ms": 8.5
-      }
-    }
-    // ... other services
-  }
+ "status": "healthy",
+ "timestamp": "2024-12-15T10:30:00Z",
+ "worker_pid": 12345,
+ "services": {
+ "vulcan": {
+ "mounted": true,
+ "health": {
+ "status": "healthy",
+ "latency_ms": 12.3
+ }
+ },
+ "arena": {
+ "mounted": true,
+ "health": {
+ "status": "healthy",
+ "latency_ms": 8.5
+ }
+ }
+ // ... other services
+ }
 }
 ```
 
@@ -358,34 +358,34 @@ curl http://localhost:8080/api/status
 Response:
 ```json
 {
-  "platform": {
-    "name": "Graphix Vulcan Unified Platform",
-    "version": "2.1.0",
-    "timestamp": "2024-12-15T10:30:00Z",
-    "worker_pid": 12345,
-    "workers": 1
-  },
-  "services": {
-    "vulcan": {
-      "mounted": true,
-      "mount_path": "/vulcan",
-      "health_path": "/vulcan/health",
-      "import_path": "src.vulcan.main.app",
-      "docs_url": "/vulcan/docs"
-    },
-    "api_server": {
-      "mounted": false,
-      "import_success": true,
-      "import_path": "src.api_server (standalone)",
-      "mount_path": "http://localhost:8001"
-    }
-    // ... other services
-  },
-  "configuration": {
-    "auth_method": "api_key",
-    "metrics_enabled": true,
-    "health_checks_enabled": true
-  }
+ "platform": {
+ "name": "Graphix Vulcan Unified Platform",
+ "version": "2.1.0",
+ "timestamp": "2024-12-15T10:30:00Z",
+ "worker_pid": 12345,
+ "workers": 1
+ },
+ "services": {
+ "vulcan": {
+ "mounted": true,
+ "mount_path": "/vulcan",
+ "health_path": "/vulcan/health",
+ "import_path": "src.vulcan.main.app",
+ "docs_url": "/vulcan/docs"
+ },
+ "api_server": {
+ "mounted": false,
+ "import_success": true,
+ "import_path": "src.api_server (standalone)",
+ "mount_path": "http://localhost:8001"
+ }
+ // ... other services
+ },
+ "configuration": {
+ "auth_method": "api_key",
+ "metrics_enabled": true,
+ "health_checks_enabled": true
+ }
 }
 ```
 
@@ -456,21 +456,21 @@ CMD ["python", "-m", "src.full_platform"]
 version: '3.8'
 
 services:
-  platform:
-    build: .
-    ports:
-      - "8080:8080"  # Main platform
-      - "8001:8001"  # API Server
-      - "8084:8084"  # Listener
-      - "50051:50051"  # Registry gRPC
-    environment:
-      - UNIFIED_HOST=0.0.0.0
-      - UNIFIED_WORKERS=4
-      - UNIFIED_AUTH_METHOD=jwt
-      - UNIFIED_JWT_SECRET=${JWT_SECRET}
-    volumes:
-      - ./logs:/app/logs
-      - ./data:/app/data
+ platform:
+ build: .
+ ports:
+ - "8080:8080" # Main platform
+ - "8001:8001" # API Server
+ - "8084:8084" # Listener
+ - "50051:50051" # Registry gRPC
+ environment:
+ - UNIFIED_HOST=0.0.0.0
+ - UNIFIED_WORKERS=4
+ - UNIFIED_AUTH_METHOD=jwt
+ - UNIFIED_JWT_SECRET=${JWT_SECRET}
+ volumes:
+ - ./logs:/app/logs
+ - ./data:/app/data
 ```
 
 ### Kubernetes
@@ -523,10 +523,10 @@ For production, use a reverse proxy (nginx, Traefik) or enable TLS directly:
 ```python
 # In custom deployment
 uvicorn src.full_platform:app \
-  --host 0.0.0.0 \
-  --port 8080 \
-  --ssl-keyfile=/path/to/key.pem \
-  --ssl-certfile=/path/to/cert.pem
+ --host 0.0.0.0 \
+ --port 8080 \
+ --ssl-keyfile=/path/to/key.pem \
+ --ssl-certfile=/path/to/cert.pem
 ```
 
 ### Rate Limiting
@@ -556,6 +556,5 @@ Built-in rate limiting protects all endpoints:
 
 ---
 
-**Last Updated:** 2024-12-15  
-**Version:** 2.1.0  
-**Status:** ✅ Production Ready
+**Last Updated:** 2024-12-15 
+**Version:** 2.1.0 

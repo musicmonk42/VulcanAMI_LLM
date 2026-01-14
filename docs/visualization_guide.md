@@ -1,5 +1,5 @@
-📊 Graphix & VULCAN-AI Visualization Guide  
-Version: 2.1.0  
+📊 Graphix & VULCAN-AI Visualization Guide 
+Version: 2.1.0 
 Date: September 08, 2024
 
 This guide details the setup and interpretation of visual outputs for the Graphix/VULCAN-AI platform. Visualizing the system's operational metrics is crucial for monitoring its health, performance, and ethical alignment during development. The primary tools are Prometheus for metrics collection and Grafana for dashboarding.
@@ -16,10 +16,10 @@ Configure prometheus.yml to scrape the Graphix Arena's metrics endpoint:
 
 ```yaml
 scrape_configs:
-  - job_name: 'graphix_arena'
-    scrape_interval: 15s
-    static_configs:
-      - targets: ['localhost:8000']
+ - job_name: 'graphix_arena'
+ scrape_interval: 15s
+ static_configs:
+ - targets: ['localhost:8000']
 ```
 
 Start the Prometheus server:
@@ -28,7 +28,7 @@ Start the Prometheus server:
 ./prometheus --config.file=prometheus.yml
 ```
 
-Access: http://localhost:9090  
+Access: http://localhost:9090 
 Expected: You should see the graphix_arena target in the "Targets" section with a "UP" state. You can query for metrics like execution_latency_seconds_bucket.
 
 ---
@@ -51,8 +51,8 @@ Configure Grafana:
 
 - Add a Data Source: Connect Grafana to your running Prometheus server (URL: http://localhost:9090).
 - Import the Dashboard: 
-  - **Mission Control Dashboard (Recommended)**: Go to Dashboards -> Import and upload `dashboards/grafana/graphix_mission_control.json` for a comprehensive pre-built dashboard with panels for latency, errors, safety, energy, cache, and health metrics.
-  - **Auto-generated Dashboard**: Alternatively, the ObservabilityManager creates a dashboard file at `observability_logs/graphix_dashboard.json`.
+ - **Mission Control Dashboard (Recommended)**: Go to Dashboards -> Import and upload `dashboards/grafana/graphix_mission_control.json` for a comprehensive pre-built dashboard with panels for latency, errors, safety, energy, cache, and health metrics.
+ - **Auto-generated Dashboard**: Alternatively, the ObservabilityManager creates a dashboard file at `observability_logs/graphix_dashboard.json`.
 
 ### Mission Control Dashboard
 
@@ -83,7 +83,7 @@ Install Graphviz:
 pip install graphviz
 ```
 
-Generate a Plot:  
+Generate a Plot: 
 Run the following Python script to create a sample plot.
 
 ```python
@@ -99,7 +99,7 @@ attention_tensor = np.random.rand(5, 5)
 image_path = obs.plot_semantic_map(attention_tensor, labels=['Feat1', 'Feat2', 'Feat3', 'Feat4', 'Feat5'])
 
 if image_path:
-    print(f"Semantic map plot saved to: {image_path}")
+ print(f"Semantic map plot saved to: {image_path}")
 ```
 
 Expected Output: A PNG file will be saved in the observability_logs/ directory showing a directed graph where edge thickness represents the attention weight between features.
@@ -114,13 +114,13 @@ Your monitoring setup will provide insights into the platform's operation.
 
 The auto-generated dashboard includes the following key panels:
 
-| Panel Title                      | Metric Type    | What it Shows                                                                              |
+| Panel Title | Metric Type | What it Shows |
 |----------------------------------|---------------|--------------------------------------------------------------------------------------------|
-| 95th Percentile Execution Latency| Histogram     | The latency (in seconds) that 95% of requests are faster than. Key SLO metric for performance.|
-| Execution Error Rate             | Counter (Rate)| Number of errors per second, broken down by component. Dashboard includes an alert if rate exceeds 0.1/sec.|
-| Total Audit Events               | Stat          | Count of total audit events logged, categorized by type (e.g., test_event, validation_pass).|
-| Total Bias Detections            | Stat          | Counter tracking how many times the NSOAligner has detected a biased or risky proposal.     |
-| Tensor Semantics                 | Table         | Shows the latest explainability scores for processed tensors.                               |
+| 95th Percentile Execution Latency| Histogram | The latency (in seconds) that 95% of requests are faster than. Key SLO metric for performance.|
+| Execution Error Rate | Counter (Rate)| Number of errors per second, broken down by component. Dashboard includes an alert if rate exceeds 0.1/sec.|
+| Total Audit Events | Stat | Count of total audit events logged, categorized by type (e.g., test_event, validation_pass).|
+| Total Bias Detections | Stat | Counter tracking how many times the NSOAligner has detected a biased or risky proposal. |
+| Tensor Semantics | Table | Shows the latest explainability scores for processed tensors. |
 
 ---
 

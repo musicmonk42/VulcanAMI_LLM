@@ -1,7 +1,6 @@
 # VulcanAMI Data Quality System (DQS)
 
-**Version**: 2.0.0  
-**Status**: Production Ready  
+**Version**: 2.0.0 
 **License**: Proprietary
 
 ## Overview
@@ -49,9 +48,9 @@ classifier = DataQualityClassifier()
 
 # Score data
 data = {
-    "title": "Machine Learning Research",
-    "content": "High-quality research document",
-    "created_at": "2025-11-14T00:00:00Z"
+ "title": "Machine Learning Research",
+ "content": "High-quality research document",
+ "created_at": "2025-11-14T00:00:00Z"
 }
 
 score = classifier.classify(data, "json", {"source": "arxiv.org"})
@@ -66,31 +65,31 @@ print(f"Action: {score.action}")
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                    Data Ingestion                        │
+│ Data Ingestion │
 └────────────────────┬────────────────────────────────────┘
-                     │
-                     ▼
+ │
+ ▼
 ┌─────────────────────────────────────────────────────────┐
-│            Data Quality Classifier (8 Dimensions)        │
-│  PII Detection • Graph Analysis • Syntactic Validation   │
-│  Semantic Validity • Data Freshness • Source Credibility│
-│  Consistency • Completeness                             │
+│ Data Quality Classifier (8 Dimensions) │
+│ PII Detection • Graph Analysis • Syntactic Validation │
+│ Semantic Validity • Data Freshness • Source Credibility│
+│ Consistency • Completeness │
 └────────────────────┬────────────────────────────────────┘
-                     │
-                     ▼
+ │
+ ▼
 ┌─────────────────────────────────────────────────────────┐
-│                  Score Aggregation                       │
-│  Weighted Average • Multi-label Classification           │
+│ Score Aggregation │
+│ Weighted Average • Multi-label Classification │
 └────────────────────┬────────────────────────────────────┘
-                     │
-          ┌──────────┴──────────┐
-          ▼                     ▼
-     Accept/Warn          Quarantine/Reject
-          │                     │
-          ▼                     ▼
-    Production            Automated Remediation
-                               ↓
-                          Manual Review
+ │
+ ┌──────────┴──────────┐
+ ▼ ▼
+ Accept/Warn Quarantine/Reject
+ │ │
+ ▼ ▼
+ Production Automated Remediation
+ ↓
+ Manual Review
 ```
 
 ## Quality Dimensions
@@ -274,8 +273,8 @@ FROM python:3.11-slim
 
 # Install dependencies
 RUN apt-get update && apt-get install -y \
-    postgresql-client \
-    redis-tools
+ postgresql-client \
+ redis-tools
 
 # Copy files
 COPY . /app
@@ -340,8 +339,8 @@ sudo journalctl -u dqs-classifier -f
 ```sql
 -- Check dimension breakdown
 SELECT 
-    AVG((dimension_scores->>'pii_confidence')::float) as avg_pii,
-    AVG((dimension_scores->>'graph_completeness')::float) as avg_graph
+ AVG((dimension_scores->>'pii_confidence')::float) as avg_pii,
+ AVG((dimension_scores->>'graph_completeness')::float) as avg_graph
 FROM dqs.quality_scores
 WHERE last_scored_at > NOW() - INTERVAL '1 day';
 ```
@@ -351,8 +350,8 @@ WHERE last_scored_at > NOW() - INTERVAL '1 day';
 ```sql
 -- Identify PII sources
 SELECT 
-    metadata->>'source' as source,
-    COUNT(*) as pii_count
+ metadata->>'source' as source,
+ COUNT(*) as pii_count
 FROM dqs.quality_scores
 WHERE 'contains_pii' = ANY(labels)
 GROUP BY source

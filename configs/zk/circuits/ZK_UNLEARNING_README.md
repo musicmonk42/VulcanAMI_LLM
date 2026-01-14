@@ -2,9 +2,9 @@
 
 ## Zero-Knowledge Proof System for Verifiable Data Unlearning
 
-**Version**: 1.0.0  
-**Last Updated**: 2025-11-14  
-**Circuit Type**: Groth16 zkSNARK  
+**Version**: 1.0.0 
+**Last Updated**: 2025-11-14 
+**Circuit Type**: Groth16 zkSNARK 
 **Security Level**: 128-bit
 
 ---
@@ -28,7 +28,7 @@
 
 ## 🎯 Overview
 
-The Vulcan LLM Unlearning Verification Circuit is a production-ready zero-knowledge proof system that enables **verifiable data unlearning** in machine learning systems. It allows proving that specific data has been properly removed from an AI model without revealing sensitive information about the data or model parameters.
+The Vulcan LLM Unlearning Verification Circuit is a zero-knowledge proof system that enables **verifiable data unlearning** in machine learning systems. It allows proving that specific data has been properly removed from an AI model without revealing sensitive information about the data or model parameters.
 
 ### What Problem Does It Solve?
 
@@ -84,30 +84,30 @@ This circuit enables **cryptographic proof** that:
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│             Unlearning Request                      │
-│  (Document IDs, Timestamps, Privacy Requirements)  │
+│ Unlearning Request │
+│ (Document IDs, Timestamps, Privacy Requirements) │
 └───────────────────┬─────────────────────────────────┘
-                    │
-                    ▼
+ │
+ ▼
 ┌─────────────────────────────────────────────────────┐
-│           Witness Generator                         │
-│  (Computes private inputs from system state)        │
+│ Witness Generator │
+│ (Computes private inputs from system state) │
 └───────────────────┬─────────────────────────────────┘
-                    │
-                    ▼
+ │
+ ▼
 ┌─────────────────────────────────────────────────────┐
-│              ZK Prover                              │
-│  (Generates cryptographic proof)                    │
-│  • Input: Public + Private Signals                  │
-│  • Output: Proof (256 bytes)                        │
+│ ZK Prover │
+│ (Generates cryptographic proof) │
+│ • Input: Public + Private Signals │
+│ • Output: Proof (256 bytes) │
 └───────────────────┬─────────────────────────────────┘
-                    │
-                    ▼
+ │
+ ▼
 ┌─────────────────────────────────────────────────────┐
-│             ZK Verifier                             │
-│  (Verifies proof in ~5ms)                           │
-│  • Input: Proof + Public Inputs                     │
-│  • Output: Accept/Reject                            │
+│ ZK Verifier │
+│ (Verifies proof in ~5ms) │
+│ • Input: Proof + Public Inputs │
+│ • Output: Accept/Reject │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -301,38 +301,38 @@ Create `test/input.json`:
 
 ```json
 {
-  "requestId": "123456789",
-  "timestamp": "1700000000",
-  "versionBefore": "1",
-  "versionAfter": "2",
-  "unlearningSetRoot": "0x1234...",
-  "embeddingTreeRootBefore": "0x5678...",
-  "embeddingTreeRootAfter": "0x9abc...",
-  "modelStateRootBefore": "0xdef0...",
-  "modelStateRootAfter": "0x1234...",
-  "privacyBudget": "100",
-  "sensitivityParameter": "10",
-  "embeddingCommitmentBefore": "0x5678...",
-  "embeddingCommitmentAfter": "0x9abc...",
-  "modelCommitmentBefore": "0xdef0...",
-  "modelCommitmentAfter": "0x1234...",
-  "requireStrictZeroing": "1",
-  "requirePrivacyGuarantee": "1",
-  "documentIds": ["1", "2", "3", ...],
-  "documentMerkleProofs": [...],
-  "documentMerkleIndices": [...],
-  "embeddingsBefore": [...],
-  "embeddingsAfter": [...],
-  "embeddingBlindingBefore": [...],
-  "embeddingBlindingAfter": [...],
-  "modelParamsBefore": [...],
-  "modelParamsAfter": [...],
-  "modelBlindingBefore": "...",
-  "modelBlindingAfter": "...",
-  "unlearningMask": [...],
-  "updateThreshold": "...",
-  "queriesCountBefore": "...",
-  "queriesCountAfter": "..."
+ "requestId": "123456789",
+ "timestamp": "1700000000",
+ "versionBefore": "1",
+ "versionAfter": "2",
+ "unlearningSetRoot": "0x1234...",
+ "embeddingTreeRootBefore": "0x5678...",
+ "embeddingTreeRootAfter": "0x9abc...",
+ "modelStateRootBefore": "0xdef0...",
+ "modelStateRootAfter": "0x1234...",
+ "privacyBudget": "100",
+ "sensitivityParameter": "10",
+ "embeddingCommitmentBefore": "0x5678...",
+ "embeddingCommitmentAfter": "0x9abc...",
+ "modelCommitmentBefore": "0xdef0...",
+ "modelCommitmentAfter": "0x1234...",
+ "requireStrictZeroing": "1",
+ "requirePrivacyGuarantee": "1",
+ "documentIds": ["1", "2", "3", ...],
+ "documentMerkleProofs": [...],
+ "documentMerkleIndices": [...],
+ "embeddingsBefore": [...],
+ "embeddingsAfter": [...],
+ "embeddingBlindingBefore": [...],
+ "embeddingBlindingAfter": [...],
+ "modelParamsBefore": [...],
+ "modelParamsAfter": [...],
+ "modelBlindingBefore": "...",
+ "modelBlindingAfter": "...",
+ "unlearningMask": [...],
+ "updateThreshold": "...",
+ "queriesCountBefore": "...",
+ "queriesCountAfter": "..."
 }
 ```
 
@@ -340,9 +340,9 @@ Then run:
 
 ```bash
 node build/unlearning_v1.0_js/generate_witness.js \
-  build/unlearning_v1.0_js/unlearning_v1.0.wasm \
-  test/input.json \
-  build/witness.wtns
+ build/unlearning_v1.0_js/unlearning_v1.0.wasm \
+ test/input.json \
+ build/witness.wtns
 ```
 
 #### Proof Generation with rapidsnark
@@ -350,9 +350,9 @@ node build/unlearning_v1.0_js/generate_witness.js \
 ```bash
 # Faster proof generation (requires rapidsnark)
 rapidsnark keys/unlearning_v1.0_final.zkey \
-  build/witness.wtns \
-  build/proof.json \
-  build/public.json
+ build/witness.wtns \
+ build/proof.json \
+ build/public.json
 ```
 
 #### Batch Verification
@@ -360,10 +360,10 @@ rapidsnark keys/unlearning_v1.0_final.zkey \
 ```bash
 # Verify multiple proofs
 for proof in proofs/*.json; do
-  snarkjs groth16 verify \
-    keys/verification_key.json \
-    ${proof%.json}_public.json \
-    $proof
+ snarkjs groth16 verify \
+ keys/verification_key.json \
+ ${proof%.json}_public.json \
+ $proof
 done
 ```
 
@@ -477,28 +477,28 @@ The circuit verifies the following in order:
 ### Security Best Practices
 
 1. **Multi-Party Trusted Setup**
-   - Use at least 50 participants
-   - Include diverse stakeholders
-   - Public randomness from blockchain
-   - Verify entire transcript
+ - Use at least 50 participants
+ - Include diverse stakeholders
+ - Public randomness from blockchain
+ - Verify entire transcript
 
 2. **Key Management**
-   - Store proving keys securely
-   - Rotate verification keys periodically
-   - Use HSM for critical keys
-   - Backup with encryption
+ - Store proving keys securely
+ - Rotate verification keys periodically
+ - Use HSM for critical keys
+ - Backup with encryption
 
 3. **Proof Storage**
-   - Store proofs on blockchain for auditability
-   - Include timestamp and request ID
-   - Maintain proof history
-   - Regular integrity checks
+ - Store proofs on blockchain for auditability
+ - Include timestamp and request ID
+ - Maintain proof history
+ - Regular integrity checks
 
 4. **Integration Security**
-   - Validate all public inputs
-   - Rate limit proof generation
-   - Monitor for unusual patterns
-   - Log all operations
+ - Validate all public inputs
+ - Rate limit proof generation
+ - Monitor for unusual patterns
+ - Log all operations
 
 ---
 
@@ -536,28 +536,28 @@ GPU: NVIDIA A100 (optional)
 #### Optimization Tips
 
 1. **Use GPU Acceleration**
-   ```bash
-   # Install rapidsnark with CUDA support
-   npm run task buildPoverWithCUDA
-   ```
+ ```bash
+ # Install rapidsnark with CUDA support
+ npm run task buildPoverWithCUDA
+ ```
 
 2. **Parallel Witness Generation**
-   ```bash
-   # Process multiple witnesses in parallel
-   parallel -j 16 ./generate_witness.sh ::: inputs/*.json
-   ```
+ ```bash
+ # Process multiple witnesses in parallel
+ parallel -j 16 ./generate_witness.sh ::: inputs/*.json
+ ```
 
 3. **Optimize Memory**
-   ```bash
-   # Use memory-mapped files for large witnesses
-   export NODE_OPTIONS="--max-old-space-size=65536"
-   ```
+ ```bash
+ # Use memory-mapped files for large witnesses
+ export NODE_OPTIONS="--max-old-space-size=65536"
+ ```
 
 4. **Cache Powers of Tau**
-   ```bash
-   # Reuse across multiple circuits
-   ln -s /shared/ptau/powersOfTau28_hez_final_24.ptau
-   ```
+ ```bash
+ # Reuse across multiple circuits
+ ln -s /shared/ptau/powersOfTau28_hez_final_24.ptau
+ ```
 
 ---
 
@@ -572,19 +572,19 @@ POST /api/v1/proof/generate
 Content-Type: application/json
 
 {
-  "requestId": "unlearn-123",
-  "documentIds": ["doc1", "doc2"],
-  "timestamp": 1700000000,
-  "embeddings": {...},
-  "modelState": {...}
+ "requestId": "unlearn-123",
+ "documentIds": ["doc1", "doc2"],
+ "timestamp": 1700000000,
+ "embeddings": {...},
+ "modelState": {...}
 }
 
 Response:
 {
-  "proof": "0x...",
-  "publicInputs": [...],
-  "generationTime": 28.3,
-  "verified": true
+ "proof": "0x...",
+ "publicInputs": [...],
+ "generationTime": 28.3,
+ "verified": true
 }
 ```
 
@@ -595,15 +595,15 @@ POST /api/v1/proof/verify
 Content-Type: application/json
 
 {
-  "proof": "0x...",
-  "publicInputs": [...]
+ "proof": "0x...",
+ "publicInputs": [...]
 }
 
 Response:
 {
-  "valid": true,
-  "verificationTime": 0.005,
-  "timestamp": 1700000100
+ "valid": true,
+ "verificationTime": 0.005,
+ "timestamp": 1700000100
 }
 ```
 
@@ -614,27 +614,27 @@ from vulcan_zk import UnlearningProver, UnlearningVerifier
 
 # Initialize prover
 prover = UnlearningProver(
-    circuit_path="circuits/unlearning_v1.0.circom",
-    proving_key="keys/proving_key.zkey"
+ circuit_path="circuits/unlearning_v1.0.circom",
+ proving_key="keys/proving_key.zkey"
 )
 
 # Generate proof
 proof = prover.generate_proof(
-    request_id="unlearn-123",
-    document_ids=["doc1", "doc2"],
-    embeddings_before=embeddings_before,
-    embeddings_after=embeddings_after,
-    # ... other inputs
+ request_id="unlearn-123",
+ document_ids=["doc1", "doc2"],
+ embeddings_before=embeddings_before,
+ embeddings_after=embeddings_after,
+ # ... other inputs
 )
 
 # Verify proof
 verifier = UnlearningVerifier(
-    verification_key="keys/verification_key.json"
+ verification_key="keys/verification_key.json"
 )
 
 is_valid = verifier.verify(
-    proof=proof.proof,
-    public_inputs=proof.public_inputs
+ proof=proof.proof,
+ public_inputs=proof.public_inputs
 )
 
 print(f"Proof valid: {is_valid}")
@@ -647,26 +647,26 @@ import { UnlearningProver, UnlearningVerifier } from '@vulcan/zk-unlearning';
 
 // Generate proof
 const prover = new UnlearningProver({
-  circuitWasm: 'build/unlearning_v1.0.wasm',
-  provingKey: 'keys/proving_key.zkey'
+ circuitWasm: 'build/unlearning_v1.0.wasm',
+ provingKey: 'keys/proving_key.zkey'
 });
 
 const proof = await prover.generateProof({
-  requestId: 'unlearn-123',
-  documentIds: ['doc1', 'doc2'],
-  embeddingsBefore: embeddingsBefore,
-  embeddingsAfter: embeddingsAfter,
-  // ... other inputs
+ requestId: 'unlearn-123',
+ documentIds: ['doc1', 'doc2'],
+ embeddingsBefore: embeddingsBefore,
+ embeddingsAfter: embeddingsAfter,
+ // ... other inputs
 });
 
 // Verify proof
 const verifier = new UnlearningVerifier({
-  verificationKey: 'keys/verification_key.json'
+ verificationKey: 'keys/verification_key.json'
 });
 
 const isValid = await verifier.verify({
-  proof: proof.proof,
-  publicInputs: proof.publicInputs
+ proof: proof.proof,
+ publicInputs: proof.publicInputs
 });
 
 console.log(`Proof valid: ${isValid}`);
@@ -677,44 +677,44 @@ console.log(`Proof valid: ${isValid}`);
 ```solidity
 // Deploy verifier contract
 contract UnlearningVerifier {
-    // Auto-generated from circuit
-    function verifyProof(
-        uint[2] memory a,
-        uint[2][2] memory b,
-        uint[2] memory c,
-        uint[17] memory input
-    ) public view returns (bool) {
-        // Groth16 verification
-        return verify(a, b, c, input);
-    }
+ // Auto-generated from circuit
+ function verifyProof(
+ uint[2] memory a,
+ uint[2][2] memory b,
+ uint[2] memory c,
+ uint[17] memory input
+ ) public view returns (bool) {
+ // Groth16 verification
+ return verify(a, b, c, input);
+ }
 }
 
 // Use in your contract
 contract UnlearningRegistry {
-    UnlearningVerifier public verifier;
-    
-    mapping(bytes32 => bool) public unlearningProofs;
-    
-    function registerUnlearning(
-        bytes32 requestId,
-        uint[2] memory a,
-        uint[2][2] memory b,
-        uint[2] memory c,
-        uint[17] memory input
-    ) public {
-        require(
-            verifier.verifyProof(a, b, c, input),
-            "Invalid proof"
-        );
-        
-        require(
-            uint256(input[0]) == uint256(requestId),
-            "Request ID mismatch"
-        );
-        
-        unlearningProofs[requestId] = true;
-        emit UnlearningVerified(requestId, block.timestamp);
-    }
+ UnlearningVerifier public verifier;
+ 
+ mapping(bytes32 => bool) public unlearningProofs;
+ 
+ function registerUnlearning(
+ bytes32 requestId,
+ uint[2] memory a,
+ uint[2][2] memory b,
+ uint[2] memory c,
+ uint[17] memory input
+ ) public {
+ require(
+ verifier.verifyProof(a, b, c, input),
+ "Invalid proof"
+ );
+ 
+ require(
+ uint256(input[0]) == uint256(requestId),
+ "Request ID mismatch"
+ );
+ 
+ unlearningProofs[requestId] = true;
+ emit UnlearningVerified(requestId, block.timestamp);
+ }
 }
 ```
 
@@ -752,7 +752,7 @@ Error: Signal not found: embeddingsBefore[0][0]
 **Solution:**
 ```bash
 # Verify input JSON matches circuit interface
-./build_circuit.sh info  # Check expected inputs
+./build_circuit.sh info # Check expected inputs
 
 # Validate JSON syntax
 jq . test/input.json
@@ -811,9 +811,9 @@ snarkjs r1cs print build/unlearning_v1.0.r1cs build/unlearning_v1.0.sym
 
 # Verify setup
 snarkjs zkey verify \
-  build/unlearning_v1.0.r1cs \
-  ptau/powersOfTau28_hez_final_24.ptau \
-  keys/unlearning_v1.0_final.zkey
+ build/unlearning_v1.0.r1cs \
+ ptau/powersOfTau28_hez_final_24.ptau \
+ keys/unlearning_v1.0_final.zkey
 
 # Test with minimal input
 ./build_circuit.sh test-input
@@ -824,25 +824,25 @@ snarkjs zkey verify \
 
 ## ❓ FAQ
 
-**Q: How long does proof generation take?**  
+**Q: How long does proof generation take?** 
 A: ~30 seconds on a 32-core CPU, ~10 seconds with GPU acceleration.
 
-**Q: Can I batch multiple unlearning requests?**  
+**Q: Can I batch multiple unlearning requests?** 
 A: Yes, up to 256 embeddings per proof. For more, generate multiple proofs in parallel.
 
-**Q: Is the proof size constant?**  
+**Q: Is the proof size constant?** 
 A: Yes, Groth16 proofs are always 256 bytes regardless of circuit size.
 
-**Q: How do I verify proofs on-chain?**  
+**Q: How do I verify proofs on-chain?** 
 A: Deploy the generated Solidity verifier contract and call `verifyProof()`.
 
-**Q: What happens if the trusted setup is compromised?**  
+**Q: What happens if the trusted setup is compromised?** 
 A: Attackers could forge proofs. Use multi-party computation with 50+ participants.
 
-**Q: Can quantum computers break this?**  
+**Q: Can quantum computers break this?** 
 A: Yes, Groth16 is not quantum-resistant. Future versions will use post-quantum SNARKs.
 
-**Q: How much does it cost to verify on Ethereum?**  
+**Q: How much does it cost to verify on Ethereum?** 
 A: ~250,000 gas (~$10 at 50 gwei, $2000/ETH). Use L2s for lower costs.
 
 ---

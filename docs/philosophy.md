@@ -6,11 +6,11 @@
 
 **Graphix IR** is envisioned as a revolutionary AI-native language, prioritizing machine agents over human programmers to create, optimize, and explain computational workflows as graph-structured data.
 
-> **Aspirational goal:**  
+> **Aspirational goal:** 
 > Fully autonomous, self-improving systems—declarative, extensible, auditable, and optimized for AI-driven evolution.
 
-**Caveat:**  
-This vision is *potentially unachievable* in its entirety due to practical constraints (computational complexity, ethical requirements like ITU F.748.47, hardware limitations, and AI reasoning limits).  
+**Caveat:** 
+This vision is *potentially unachievable* in its entirety due to practical constraints (computational complexity, ethical requirements like ITU F.748.47, hardware limitations, and AI reasoning limits). 
 While infinite recursive self-improvement or full transparency may be impossible, these ideals guide transformative development.
 
 ---
@@ -53,46 +53,46 @@ While infinite recursive self-improvement or full transparency may be impossible
 
 ### 🕵️ Auditability & Explainability
 - Every node, edge, and contract is a point for audit and explanation.
-- Enables closed loop:  
-  **AI as Author → AI as Optimizer → AI as Auditor → AI as Explainer**
+- Enables closed loop: 
+ **AI as Author → AI as Optimizer → AI as Auditor → AI as Explainer**
 
 ---
 
 ## 5️⃣ Example: Self-Improving System Lifecycle
 
-**Step 1: AI Author**  
-LLM receives NL prompt (“Classify MNIST with <10ms latency, >99% accuracy”)  
+**Step 1: AI Author** 
+LLM receives NL prompt (“Classify MNIST with <10ms latency, >99% accuracy”) 
 → Emits program graph: `Input → Dense → Activation → Output + ContractNode`
 
-**Step 2: AI Optimizer**  
-Consumes graph + contracts  
+**Step 2: AI Optimizer** 
+Consumes graph + contracts 
 → Applies transformations, offloads subgraphs to hardware nodes, partitions for distributed execution (`ScatterGatherNode`).
 
-**Step 3: AI Auditor**  
-Simulates or runs graph with test data  
+**Step 3: AI Auditor** 
+Simulates or runs graph with test data 
 → Validates contracts, updates audit metadata, analyzes distributed/meta-learning performance.
 
-**Step 4: AI Explainer**  
-Consumes graph + contract history  
-→ Outputs machine/human-readable report:  
+**Step 4: AI Explainer** 
+Consumes graph + contract history 
+→ Outputs machine/human-readable report: 
 > “This program classifies digits using a 2-layer network, meeting <10ms latency and >99% accuracy, as verified in test run #2301. Latency contract was satisfied after distributed optimization.”
 
 ---
 
 ## 6️⃣ Roadmap for Next-Level Extensions
 
-- **Modular Subgraphs:**  
-  `CompositeNode` for reusable, parameterized modules.
-- **Async/Event/Reactive:**  
-  `SchedulerNode`, event/trigger edges for time-based/streaming workflows.
-- **Probabilistic/AutoML:**  
-  `RandomNode`, `HyperParamNode`, `SearchNode` for AutoML/Bayesian flows.
-- **Explainability Nodes:**  
-  Intermediate explanation/justification, runtime introspection.
-- **Security/Compliance:**  
-  `EncryptNode`, `PolicyNode`, richer contract types (privacy, residency).
-- **Distributed/Meta-learning:**  
-  `ScatterGatherNode`, `MetaLearnerNode`, advanced agentic/distributed computation.
+- **Modular Subgraphs:** 
+ `CompositeNode` for reusable, parameterized modules.
+- **Async/Event/Reactive:** 
+ `SchedulerNode`, event/trigger edges for time-based/streaming workflows.
+- **Probabilistic/AutoML:** 
+ `RandomNode`, `HyperParamNode`, `SearchNode` for AutoML/Bayesian flows.
+- **Explainability Nodes:** 
+ Intermediate explanation/justification, runtime introspection.
+- **Security/Compliance:** 
+ `EncryptNode`, `PolicyNode`, richer contract types (privacy, residency).
+- **Distributed/Meta-learning:** 
+ `ScatterGatherNode`, `MetaLearnerNode`, advanced agentic/distributed computation.
 
 ---
 
@@ -100,8 +100,8 @@ Consumes graph + contract history
 
 - All documentation/specification is versioned and machine-readable.
 - AIs propose extensions, validate compatibility, generate migration scripts.
-- **Specification as code:**  
-  Every grammar change is itself a graph (meta-programming).
+- **Specification as code:** 
+ Every grammar change is itself a graph (meta-programming).
 
 ---
 
@@ -109,7 +109,7 @@ Consumes graph + contract history
 
 This spec is a template for the next era of AI-native, self-improving systems—where AIs build, secure, optimize, and explain everything themselves.
 
-> **Human readability is not a goal; AI evolvability and auditability are.**  
+> **Human readability is not a goal; AI evolvability and auditability are.** 
 > While aspirational and limited by reality, this vision steers Graphix IR toward autonomous, efficient, and transparent AI evolution.
 
 ---

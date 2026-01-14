@@ -1,14 +1,12 @@
-VULCAN-AGI Semantic Bridge Module
+VULCAN-AMI Semantic Bridge Module
 
 Overview
 
-The Semantic Bridge Module in the VULCAN-AGI system provides a production-grade framework for cross-domain knowledge transfer, concept mapping, and conflict resolution. It enables seamless adaptation of concepts and patterns across domains by mapping patterns to grounded concepts, resolving conflicts with evidence-based weighting, registering domain profiles for risk assessment, and orchestrating safe transfers with mitigations and constraints. The core orchestrator, SemanticBridge, integrates these components with safety validation, world model reasoning, and unified caching for efficient, robust operations.
+The Semantic Bridge Module in the VULCAN-AMI system provides a production-grade framework for cross-domain knowledge transfer, concept mapping, and conflict resolution. It enables seamless adaptation of concepts and patterns across domains by mapping patterns to grounded concepts, resolving conflicts with evidence-based weighting, registering domain profiles for risk assessment, and orchestrating safe transfers with mitigations and constraints. The core orchestrator, SemanticBridge, integrates these components with safety validation, world model reasoning, and unified caching for efficient, robust operations.
 
 Designed for scalability, it features thread-safe operations, bounded data structures (e.g., max-limited deques, priority-based eviction), retry logic for failures, and fallbacks for optional libraries (NetworkX, scikit-learn) to ensure reliability in varied environments. It supports domain-adaptive thresholds, concept decay, transfer rollbacks, and mitigation learning for adaptive safety.
 
 Key Features
-
-
 
 Concept Mapping: Maps patterns to concepts with measurable effects, grounding validation, and outcome tracking.
 
@@ -28,13 +26,9 @@ Persistence \& History: Tracks operation history with bounded storage and versio
 
 Retry \& Robustness: Decorator for retrying failed operations with exponential backoff.
 
-
-
 Architecture and Components
 
 The module is structured around interconnected classes, exported via \_\_init\_\_.py:
-
-
 
 semantic\_bridge\_core.py: Core SemanticBridge orchestrates mapping, resolution, registration, and transfer; includes ConceptType, TransferStatus, PatternSignature, ConceptVersion, TransferCompatibility, ConceptConflict, retry\_on\_failure.
 
@@ -50,15 +44,11 @@ cache\_manager.py: Implements CacheManager for unified caching with memory enfor
 
 \_\_init\_\_.py: Exports all components; provides factory create\_semantic\_bridge and get\_version\_info.
 
-
-
 The system uses locks for concurrency, deques for bounded histories, and optional libs with fallbacks.
 
 Installation and Dependencies
 
-This module is part of the VULCAN-AGI project. To use it:
-
-
+This module is part of the VULCAN-AMI project. To use it:
 
 Clone the repository (or integrate into your project).
 
@@ -66,25 +56,15 @@ Install required dependencies:
 
 textpip install numpy networkx scikit-learn
 
-
-
 Core: numpy, logging, typing, dataclasses, collections, time, json, hashlib, enum, pathlib, pickle, threading, functools.
 
 Optional: networkx (graphs), sklearn (similarity/clustering).
 
 Fallbacks: Custom implementations (e.g., simple dicts for graphs, manual cosine for similarity).
 
-
-
-
-
 Import the module:
 
 pythonfrom vulcan.semantic\_bridge import create\_semantic\_bridge
-
-
-
-
 
 Usage Example
 
@@ -92,39 +72,31 @@ pythonimport logging
 
 from vulcan.semantic\_bridge import create\_semantic\_bridge, ConceptType
 
-
-
 \# Set up logging
 
 logging.basicConfig(level=logging.INFO)
-
-
 
 \# Initialize bridge with optional world\_model and safety\_config
 
 bridge = create\_semantic\_bridge(
 
-&nbsp;   world\_model=None,  # Replace with actual world model
+&nbsp; world\_model=None, # Replace with actual world model
 
-&nbsp;   vulcan\_memory=None,  # Replace with memory system
+&nbsp; vulcan\_memory=None, # Replace with memory system
 
-&nbsp;   config={'safety': {'max\_risk\_score': 0.8}}
+&nbsp; config={'safety': {'max\_risk\_score': 0.8}}
 
 )
-
-
 
 \# Register a domain
 
 bridge.register\_domain(
 
-&nbsp;   'optimization',
+&nbsp; 'optimization',
 
-&nbsp;   characteristics={'adaptability': 'medium', 'complexity': 'high'}
+&nbsp; characteristics={'adaptability': 'medium', 'complexity': 'high'}
 
 )
-
-
 
 \# Map a pattern to concept
 
@@ -134,33 +106,27 @@ concept = bridge.map\_pattern\_to\_concept(pattern)
 
 print(f"Mapped Concept: {concept.concept\_id}, Grounding: {concept.grounding\_status}")
 
-
-
 \# Resolve conflicts
 
-conflicting\_concepts = \[concept, bridge.map\_pattern\_to\_concept(pattern)]  # Simulate conflict
+conflicting\_concepts = \[concept, bridge.map\_pattern\_to\_concept(pattern)] # Simulate conflict
 
 resolution = bridge.resolve\_conflicts(conflicting\_concepts)
 
 print(f"Resolution Action: {resolution.action}")
 
-
-
 \# Transfer concept
 
 transfer\_decision = bridge.transfer\_concept(
 
-&nbsp;   concept.concept\_id,
+&nbsp; concept.concept\_id,
 
-&nbsp;   source\_domain='optimization',
+&nbsp; source\_domain='optimization',
 
-&nbsp;   target\_domain='planning'
+&nbsp; target\_domain='planning'
 
 )
 
 print(f"Transfer Type: {transfer\_decision.transfer\_type}")
-
-
 
 \# Get statistics
 
@@ -169,8 +135,6 @@ stats = bridge.get\_statistics()
 print(f"Total Concepts: {stats\['total\_concepts']}")
 
 Configuration
-
-
 
 SemanticBridge: Set max\_versioned\_concepts=1000, max\_pattern\_cache\_size=5000, max\_domain\_cache\_size=2000 for bounded storage.
 
@@ -184,11 +148,7 @@ CacheManager: Set max\_memory\_mb=1000, priorities (1-10) for caches.
 
 Retry Logic: Configure max\_retries=3, backoff\_factor=2 in retry\_on\_failure.
 
-
-
 Notes
-
-
 
 Thread Safety: Reentrant locks and thread-safe deques ensure concurrent access.
 
@@ -200,7 +160,5 @@ Extensibility: Add custom resolvers via EvidenceWeightedResolver, domains to Dom
 
 Limitations: Full graph features require NetworkX; similarity needs scikit-learn. Safety requires external validator.
 
-
-
-For contributions or issues, refer to the VULCAN-AGI project repository.
+For contributions or issues, refer to the VULCAN-AMI project repository.
 

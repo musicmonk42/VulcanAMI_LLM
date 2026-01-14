@@ -1,6 +1,6 @@
 # Vulcan Persistent Memory v46
 
-A sophisticated, production-ready persistent memory system combining advanced retrieval, storage, and privacy-preserving machine unlearning capabilities.
+A sophisticated persistent memory system combining advanced retrieval, storage, and privacy-preserving machine unlearning capabilities.
 
 ## 🚀 Features
 
@@ -67,9 +67,9 @@ from persistant_memory_v46 import quick_start
 
 # Initialize the complete system
 system = quick_start(
-    s3_bucket="my-memory-bucket",
-    compression="zstd",
-    encryption="AES256"
+ s3_bucket="my-memory-bucket",
+ compression="zstd",
+ encryption="AES256"
 )
 
 # Access components
@@ -90,38 +90,38 @@ import numpy as np
 
 # Initialize GraphRAG
 rag = GraphRAG(
-    embedding_model="all-MiniLM-L6-v2",
-    index_type="disk_based_tier_c",
-    prefetch=True
+ embedding_model="all-MiniLM-L6-v2",
+ index_type="disk_based_tier_c",
+ prefetch=True
 )
 
 # Add documents
 rag.add_document(
-    doc_id="doc1",
-    content="The capital of France is Paris.",
-    embedding=np.random.randn(768),
-    chunks=[
-        ("chunk1", "The capital of France", np.random.randn(768)),
-        ("chunk2", "Paris is the capital", np.random.randn(768))
-    ]
+ doc_id="doc1",
+ content="The capital of France is Paris.",
+ embedding=np.random.randn(768),
+ chunks=[
+ ("chunk1", "The capital of France", np.random.randn(768)),
+ ("chunk2", "Paris is the capital", np.random.randn(768))
+ ]
 )
 
 # Retrieve with advanced options
 results = rag.retrieve(
-    query_or_embedding="What is the capital of France?",
-    k=10,
-    rerank=True,
-    parent_child_context=True,
-    graph_expansion=True,
-    diversity_penalty=0.5
+ query_or_embedding="What is the capital of France?",
+ k=10,
+ rerank=True,
+ parent_child_context=True,
+ graph_expansion=True,
+ diversity_penalty=0.5
 )
 
 # Access results
 for result in results:
-    print(f"Score: {result.score:.3f}")
-    print(f"Content: {result.content}")
-    print(f"Metadata: {result.metadata}")
-    
+ print(f"Score: {result.score:.3f}")
+ print(f"Content: {result.content}")
+ print(f"Metadata: {result.metadata}")
+ 
 # Get statistics
 stats = rag.get_statistics()
 print(f"Total nodes: {stats['total_nodes']}")
@@ -135,10 +135,10 @@ from persistant_memory_v46 import MerkleLSM
 
 # Initialize LSM tree
 lsm = MerkleLSM(
-    packfile_size_mb=32,
-    compaction_strategy="adaptive",
-    bloom_filter=True,
-    background_compaction=True
+ packfile_size_mb=32,
+ compaction_strategy="adaptive",
+ bloom_filter=True,
+ background_compaction=True
 )
 
 # Write data
@@ -156,7 +156,7 @@ print(f"All user keys: {matching_keys}")
 # Range query
 users = lsm.range_query("user:1000", "user:9999")
 for key, value in users:
-    print(f"{key}: {value}")
+ print(f"{key}: {value}")
 
 # Create snapshot
 lsm.create_snapshot("backup_2024_01_15")
@@ -178,19 +178,19 @@ from persistant_memory_v46 import PackfileStore
 
 # Initialize store
 store = PackfileStore(
-    s3_bucket="my-bucket",
-    cloudfront_url="https://d1234.cloudfront.net",
-    compression="zstd",
-    encryption="AES256",
-    storage_class="INTELLIGENT_TIERING"
+ s3_bucket="my-bucket",
+ cloudfront_url="https://d1234.cloudfront.net",
+ compression="zstd",
+ encryption="AES256",
+ storage_class="INTELLIGENT_TIERING"
 )
 
 # Upload packfile
 pack_data = b"This is my packfile data..." * 1000
 path = store.upload(
-    pack_data,
-    pack_id="pack-001",
-    metadata={"type": "embeddings", "version": "1.0"}
+ pack_data,
+ pack_id="pack-001",
+ metadata={"type": "embeddings", "version": "1.0"}
 )
 print(f"Uploaded to: {path}")
 
@@ -201,7 +201,7 @@ print(f"Downloaded {len(downloaded)} bytes")
 # List packfiles
 packfiles = store.list_packfiles(prefix="2024/01/")
 for pack in packfiles:
-    print(f"{pack['key']}: {pack['size']} bytes")
+ print(f"{pack['key']}: {pack['size']} bytes")
 
 # Prefetch multiple files
 store.prefetch([path1, path2, path3])
@@ -219,17 +219,17 @@ from persistant_memory_v46 import UnlearningEngine
 
 # Initialize engine
 engine = UnlearningEngine(
-    merkle_graph=lsm.dag,
-    method="gradient_surgery",
-    enable_verification=True
+ merkle_graph=lsm.dag,
+ method="gradient_surgery",
+ enable_verification=True
 )
 
 # Unlearn specific data
 result = engine.unlearn(
-    data_to_forget=["sensitive_doc_1", "sensitive_doc_2"],
-    data_to_retain=["public_doc_1", "public_doc_2"],
-    fast_lane=False,
-    verify=True
+ data_to_forget=["sensitive_doc_1", "sensitive_doc_2"],
+ data_to_retain=["public_doc_1", "public_doc_2"],
+ fast_lane=False,
+ verify=True
 )
 
 print(f"Method: {result['method']}")
@@ -238,9 +238,9 @@ print(f"Forget score: {result['verification']['avg_forget_score']:.3f}")
 
 # Gradient surgery on packfile
 result = engine.gradient_surgery(
-    packfile="pack-123",
-    pattern="user_data_*",
-    fast_lane=False
+ packfile="pack-123",
+ pattern="user_data_*",
+ fast_lane=False
 )
 
 print(f"Iterations: {result['iterations']}")
@@ -259,16 +259,16 @@ from persistant_memory_v46 import ZKProver
 
 # Initialize prover
 prover = ZKProver(
-    circuit_hash="sha256:unlearning_v1.0",
-    proof_system="groth16",
-    security_level=128
+ circuit_hash="sha256:unlearning_v1.0",
+ proof_system="groth16",
+ security_level=128
 )
 
 # Generate unlearning proof
 proof = prover.generate_unlearning_proof(
-    pattern="sensitive_*",
-    affected_packs=["pack-001", "pack-002", "pack-003"],
-    metadata={"reason": "GDPR deletion request"}
+ pattern="sensitive_*",
+ affected_packs=["pack-001", "pack-002", "pack-003"],
+ metadata={"reason": "GDPR deletion request"}
 )
 
 print(f"Proof ID: {proof['proof_id']}")
@@ -282,12 +282,12 @@ print(f"Proof valid: {is_valid}")
 
 # Generate batch proof
 batch_proof = prover.generate_batch_unlearning_proof(
-    patterns=["user1_*", "user2_*", "user3_*"],
-    affected_packs_per_pattern=[
-        ["pack-001", "pack-002"],
-        ["pack-003"],
-        ["pack-004", "pack-005"]
-    ]
+ patterns=["user1_*", "user2_*", "user3_*"],
+ affected_packs_per_pattern=[
+ ["pack-001", "pack-002"],
+ ["pack-003"],
+ ["pack-004", "pack-005"]
+ ]
 )
 
 print(f"Batch proof for {len(batch_proof['patterns'])} patterns")
@@ -301,28 +301,28 @@ proof_hex = prover.export_proof(proof['proof_id'], format="hex")
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                     Application Layer                    │
+│ Application Layer │
 ├─────────────────────────────────────────────────────────┤
-│                                                           │
-│  ┌────────────┐  ┌────────────┐  ┌──────────────────┐  │
-│  │ Graph RAG  │  │ Unlearning │  │   ZK Prover      │  │
-│  │ (Retrieval)│  │  Engine    │  │ (Verification)   │  │
-│  └─────┬──────┘  └──────┬─────┘  └────────┬─────────┘  │
-│        │                │                  │             │
+│ │
+│ ┌────────────┐ ┌────────────┐ ┌──────────────────┐ │
+│ │ Graph RAG │ │ Unlearning │ │ ZK Prover │ │
+│ │ (Retrieval)│ │ Engine │ │ (Verification) │ │
+│ └─────┬──────┘ └──────┬─────┘ └────────┬─────────┘ │
+│ │ │ │ │
 ├────────┼────────────────┼──────────────────┼─────────────┤
-│        │                │                  │             │
-│  ┌─────▼──────────┐  ┌─▼──────────────┐  │             │
-│  │  Merkle LSM    │  │  Merkle DAG    │  │             │
-│  │  (Index/KV)    │◄─┤  (Versioning)  │  │             │
-│  └─────┬──────────┘  └────────────────┘  │             │
-│        │                                  │             │
+│ │ │ │ │
+│ ┌─────▼──────────┐ ┌─▼──────────────┐ │ │
+│ │ Merkle LSM │ │ Merkle DAG │ │ │
+│ │ (Index/KV) │◄─┤ (Versioning) │ │ │
+│ └─────┬──────────┘ └────────────────┘ │ │
+│ │ │ │
 ├────────┼──────────────────────────────────┼─────────────┤
-│        │                                  │             │
-│  ┌─────▼────────────────────────────┐    │             │
-│  │      Packfile Store               │    │             │
-│  │  (S3 + CloudFront + Encryption)   │◄───┘             │
-│  └───────────────────────────────────┘                  │
-│                                                           │
+│ │ │ │
+│ ┌─────▼────────────────────────────┐ │ │
+│ │ Packfile Store │ │ │
+│ │ (S3 + CloudFront + Encryption) │◄───┘ │
+│ └───────────────────────────────────┘ │
+│ │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -332,18 +332,18 @@ proof_hex = prover.export_proof(proof['proof_id'], format="hex")
 
 ```python
 rag = GraphRAG(
-    embedding_model="all-MiniLM-L6-v2",      # Embedding model
-    index_type="disk_based_tier_c",        # Index type
-    cache_size=10000,                      # Cache size
-    rerank_model="cross_encoder",          # Reranking model
-    graph_hop_limit=2,                     # Graph traversal depth
-    fusion_weights={                       # Fusion weights
-        "dense": 0.7,
-        "sparse": 0.2,
-        "graph": 0.1
-    },
-    enable_query_decomposition=True,       # Decompose queries
-    enable_hypothetical_docs=True          # Generate hypothetical docs
+ embedding_model="all-MiniLM-L6-v2", # Embedding model
+ index_type="disk_based_tier_c", # Index type
+ cache_size=10000, # Cache size
+ rerank_model="cross_encoder", # Reranking model
+ graph_hop_limit=2, # Graph traversal depth
+ fusion_weights={ # Fusion weights
+ "dense": 0.7,
+ "sparse": 0.2,
+ "graph": 0.1
+ },
+ enable_query_decomposition=True, # Decompose queries
+ enable_hypothetical_docs=True # Generate hypothetical docs
 )
 ```
 
@@ -351,16 +351,16 @@ rag = GraphRAG(
 
 ```python
 lsm = MerkleLSM(
-    packfile_size_mb=32,                   # Target packfile size
-    compaction_strategy="adaptive",        # Compaction strategy
-    bloom_filter=True,                     # Enable bloom filters
-    bloom_size=100000,                     # Bloom filter size
-    bloom_hashes=3,                        # Hash functions
-    max_levels=7,                          # Max LSM levels
-    level_multiplier=10,                   # Level size multiplier
-    compaction_trigger_ratio=4.0,          # Compaction trigger
-    background_compaction=True,            # Background compaction
-    compression="zlib"                     # Compression algorithm
+ packfile_size_mb=32, # Target packfile size
+ compaction_strategy="adaptive", # Compaction strategy
+ bloom_filter=True, # Enable bloom filters
+ bloom_size=100000, # Bloom filter size
+ bloom_hashes=3, # Hash functions
+ max_levels=7, # Max LSM levels
+ level_multiplier=10, # Level size multiplier
+ compaction_trigger_ratio=4.0, # Compaction trigger
+ background_compaction=True, # Background compaction
+ compression="zlib" # Compression algorithm
 )
 ```
 
@@ -368,16 +368,16 @@ lsm = MerkleLSM(
 
 ```python
 store = PackfileStore(
-    s3_bucket="my-bucket",                 # S3 bucket
-    cloudfront_url="https://cdn.example.com", # CloudFront URL
-    compression="zstd",                    # Compression (zstd/zlib/lz4)
-    encryption="AES256",                   # Encryption (AES256/aws:kms)
-    storage_class="INTELLIGENT_TIERING",   # Storage class
-    enable_versioning=True,                # Enable versioning
-    cache_control="public, max-age=31536000", # Cache control
-    enable_adaptive_range=True,            # Adaptive range requests
-    prefetch_enabled=True,                 # Enable prefetching
-    region="us-east-1"                     # AWS region
+ s3_bucket="my-bucket", # S3 bucket
+ cloudfront_url="https://cdn.example.com", # CloudFront URL
+ compression="zstd", # Compression (zstd/zlib/lz4)
+ encryption="AES256", # Encryption (AES256/aws:kms)
+ storage_class="INTELLIGENT_TIERING", # Storage class
+ enable_versioning=True, # Enable versioning
+ cache_control="public, max-age=31536000", # Cache control
+ enable_adaptive_range=True, # Adaptive range requests
+ prefetch_enabled=True, # Enable prefetching
+ region="us-east-1" # AWS region
 )
 ```
 
@@ -484,4 +484,4 @@ For issues or questions:
 
 ---
 
-**Vulcan Persistent Memory v46** - Production-ready persistent memory with privacy-preserving unlearning
+**Vulcan Persistent Memory v46** - Persistent memory with privacy-preserving unlearning

@@ -79,11 +79,11 @@ kubectl create namespace vulcanami
 ### Create Secrets
 ```bash
 kubectl create secret generic vulcanami-secrets \
-  --from-literal=jwt-secret-key=$(openssl rand -base64 48) \
-  --from-literal=bootstrap-key=$(openssl rand -base64 32) \
-  --from-literal=postgres-password=$(openssl rand -base64 32) \
-  --from-literal=redis-password=$(openssl rand -base64 32) \
-  -n vulcanami
+ --from-literal=jwt-secret-key=$(openssl rand -base64 48) \
+ --from-literal=bootstrap-key=$(openssl rand -base64 32) \
+ --from-literal=postgres-password=$(openssl rand -base64 32) \
+ --from-literal=redis-password=$(openssl rand -base64 32) \
+ -n vulcanami
 ```
 
 ### Deploy Development
@@ -129,11 +129,11 @@ helm lint helm/vulcanami
 ### Template (Test Rendering)
 ```bash
 helm template vulcanami ./helm/vulcanami \
-  --set image.tag=v1.0.0 \
-  --set secrets.jwtSecretKey=YOUR_SECRET \
-  --set secrets.bootstrapKey=YOUR_SECRET \
-  --set secrets.postgresPassword=YOUR_SECRET \
-  --set secrets.redisPassword=YOUR_SECRET
+ --set image.tag=v1.0.0 \
+ --set secrets.jwtSecretKey=YOUR_SECRET \
+ --set secrets.bootstrapKey=YOUR_SECRET \
+ --set secrets.postgresPassword=YOUR_SECRET \
+ --set secrets.redisPassword=YOUR_SECRET
 ```
 
 ### Install
@@ -143,12 +143,12 @@ kubectl create namespace vulcanami
 
 # Install with secrets
 helm install vulcanami ./helm/vulcanami \
-  --namespace vulcanami \
-  --set image.tag=v1.0.0 \
-  --set secrets.jwtSecretKey=$(openssl rand -base64 48 | tr -d '\n') \
-  --set secrets.bootstrapKey=$(openssl rand -base64 32 | tr -d '\n') \
-  --set secrets.postgresPassword=$(openssl rand -base64 32 | tr -d '\n') \
-  --set secrets.redisPassword=$(openssl rand -base64 32 | tr -d '\n')
+ --namespace vulcanami \
+ --set image.tag=v1.0.0 \
+ --set secrets.jwtSecretKey=$(openssl rand -base64 48 | tr -d '\n') \
+ --set secrets.bootstrapKey=$(openssl rand -base64 32 | tr -d '\n') \
+ --set secrets.postgresPassword=$(openssl rand -base64 32 | tr -d '\n') \
+ --set secrets.redisPassword=$(openssl rand -base64 32 | tr -d '\n')
 ```
 
 ### Status
@@ -185,23 +185,23 @@ docker build --build-arg REJECT_INSECURE_JWT=ack -t vulcanami:latest .
 ```bash
 # API Gateway
 docker build --build-arg REJECT_INSECURE_JWT=ack \
-  -t vulcanami-api:latest -f docker/api/Dockerfile .
+ -t vulcanami-api:latest -f docker/api/Dockerfile .
 
 # DQS Service
 docker build --build-arg REJECT_INSECURE_JWT=ack \
-  -t vulcanami-dqs:latest -f docker/dqs/Dockerfile .
+ -t vulcanami-dqs:latest -f docker/dqs/Dockerfile .
 
 # PII Service
 docker build --build-arg REJECT_INSECURE_JWT=ack \
-  -t vulcanami-pii:latest -f docker/pii/Dockerfile .
+ -t vulcanami-pii:latest -f docker/pii/Dockerfile .
 ```
 
 ### Run Image
 ```bash
 docker run -d \
-  -e JWT_SECRET_KEY=$(openssl rand -base64 48) \
-  -p 5000:5000 \
-  vulcanami:latest
+ -e JWT_SECRET_KEY=$(openssl rand -base64 48) \
+ -p 5000:5000 \
+ vulcanami:latest
 ```
 
 ---
@@ -275,8 +275,8 @@ helm template vulcanami ./helm/vulcanami --debug
 4. **Rotate secrets regularly**
 5. **Use secret management** - AWS Secrets Manager, HashiCorp Vault
 6. **Network binding:**
-   - Development: `127.0.0.1` (localhost only)
-   - Docker/Kubernetes: `0.0.0.0` (container networking)
+ - Development: `127.0.0.1` (localhost only)
+ - Docker/Kubernetes: `0.0.0.0` (container networking)
 7. **Pin model versions** - set HuggingFace revision hashes
 
 ---
@@ -294,28 +294,28 @@ helm template vulcanami ./helm/vulcanami --debug
 
 ```bash
 # Validation
-./scripts/validate-all.sh          # Validate all configurations
-./scripts/check-prerequisites.sh   # Check installed tools
-./scripts/generate-secrets.sh      # Generate secrets
+./scripts/validate-all.sh # Validate all configurations
+./scripts/check-prerequisites.sh # Check installed tools
+./scripts/generate-secrets.sh # Generate secrets
 
 # Docker
-docker ps                          # List running containers
-docker logs CONTAINER_NAME         # View logs
-docker exec -it CONTAINER bash     # Shell access
+docker ps # List running containers
+docker logs CONTAINER_NAME # View logs
+docker exec -it CONTAINER bash # Shell access
 
 # Docker Compose
-docker compose ps                  # List services
-docker compose logs -f             # Follow logs
-docker compose restart SERVICE     # Restart service
+docker compose ps # List services
+docker compose logs -f # Follow logs
+docker compose restart SERVICE # Restart service
 
 # Kubernetes
-kubectl get pods -n vulcanami      # List pods
-kubectl describe pod POD -n vulcanami  # Pod details
-kubectl logs -f POD -n vulcanami   # Follow logs
-kubectl exec -it POD -- bash       # Shell access
+kubectl get pods -n vulcanami # List pods
+kubectl describe pod POD -n vulcanami # Pod details
+kubectl logs -f POD -n vulcanami # Follow logs
+kubectl exec -it POD -- bash # Shell access
 
 # Helm
-helm list -n vulcanami             # List releases
+helm list -n vulcanami # List releases
 helm history vulcanami -n vulcanami # Release history
 helm get manifest vulcanami -n vulcanami # View manifests
 ```

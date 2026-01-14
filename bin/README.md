@@ -1,7 +1,6 @@
 # VulcanAMI Command-Line Tools
 
-**Version**: 4.6.0  
-**Status**: Production Ready  
+**Version**: 4.6.0 
 **License**: Proprietary
 
 ## Overview
@@ -447,15 +446,15 @@ vulcan-prefetch-vectors query-456 --tier hot --top-k 100
 
 # Repack old packs
 for pack in /data/packs/*.pack; do
-    age=$(find "$pack" -mtime +7)
-    if [ -n "$age" ]; then
-        vulcan-repack "$pack" --strategy adaptive
-    fi
+ age=$(find "$pack" -mtime +7)
+ if [ -n "$age" ]; then
+ vulcan-repack "$pack" --strategy adaptive
+ fi
 done
 
 # Verify all packs
 for pack in /data/packs/*.pack; do
-    vulcan-pack-verify "$pack" || echo "FAILED: $pack"
+ vulcan-pack-verify "$pack" || echo "FAILED: $pack"
 done
 ```
 
@@ -494,42 +493,42 @@ vulcan-unlearn "pattern" --no-proof
 ## Performance Tips
 
 1. **Pack Building**
-   - Use `--no-dqs` for trusted data (10x faster)
-   - Lower compression for speed: `--compression 1`
-   - Use parallel workers: `--parallel 4`
+ - Use `--no-dqs` for trusted data (10x faster)
+ - Lower compression for speed: `--compression 1`
+ - Use parallel workers: `--parallel 4`
 
 2. **Verification**
-   - Skip full verification for routine checks
-   - Use bloom filters for membership tests
+ - Skip full verification for routine checks
+ - Use bloom filters for membership tests
 
 3. **Unlearning**
-   - Use `--fast-lane` when confidence is high
-   - Batch multiple patterns together
-   - Skip proof generation for internal operations
+ - Use `--fast-lane` when confidence is high
+ - Batch multiple patterns together
+ - Skip proof generation for internal operations
 
 4. **Vector Operations**
-   - Prefetch during off-peak hours
-   - Use appropriate tier for access patterns
-   - Monitor cache hit rates
+ - Prefetch during off-peak hours
+ - Use appropriate tier for access patterns
+ - Monitor cache hit rates
 
 ## Security
 
 ### Best Practices
 
 1. **Credentials**
-   - Never pass passwords as arguments
-   - Use environment variables or secret managers
-   - Rotate keys regularly
+ - Never pass passwords as arguments
+ - Use environment variables or secret managers
+ - Rotate keys regularly
 
 2. **Data Protection**
-   - Always enable DQS for untrusted data
-   - Use encryption for sensitive packs
-   - Audit all unlearning operations
+ - Always enable DQS for untrusted data
+ - Use encryption for sensitive packs
+ - Audit all unlearning operations
 
 3. **Access Control**
-   - Restrict tool access to authorized users
-   - Log all operations
-   - Review audit trails regularly
+ - Restrict tool access to authorized users
+ - Log all operations
+ - Review audit trails regularly
 
 ## Support
 

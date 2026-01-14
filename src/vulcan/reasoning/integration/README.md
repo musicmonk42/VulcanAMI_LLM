@@ -6,7 +6,7 @@ Refactored from monolithic `reasoning_integration.py` (4,283 lines) into modular
 
 ### ✅ Completed Modules (931 lines / 22%)
 - `types.py` (469 lines) - Core dataclasses, enums, constants
-- `safety_checker.py` (252 lines) - Safety validation & false positive detection  
+- `safety_checker.py` (252 lines) - Safety validation & false positive detection 
 - `query_router.py` (68 lines) - Query type routing
 - `__init__.py` (142 lines) - Public API exports
 

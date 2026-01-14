@@ -1,7 +1,6 @@
 # VulcanAMI OPA Write Barrier Policy
 
-**Version**: p2025.11 (Policy 2.0.0)  
-**Status**: Production Ready  
+**Version**: p2025.11 (Policy 2.0.0) 
 **License**: Proprietary
 
 ## Overview
@@ -10,16 +9,16 @@ Enterprise-grade Open Policy Agent (OPA) policy for controlling write access to 
 
 ### Key Features
 
-✅ **8-Dimension Data Quality Integration** - Complete DQS integration  
-✅ **Advanced PII Protection** - 35+ PII types with ML-powered detection  
-✅ **Multi-Region Compliance** - GDPR, HIPAA, SOX, PCI-DSS  
-✅ **Comprehensive Access Control** - RBAC + ABAC with API key validation  
-✅ **Rate Limiting** - Per-user, per-source, and global limits  
-✅ **Geographic Restrictions** - Region blocking and data residency  
-✅ **Temporal Constraints** - Time-based access windows  
-✅ **Auto-Remediation** - 8 remediation strategies  
-✅ **Batch Decisions** - Process 1000+ items efficiently  
-✅ **Full Audit Trail** - Complete decision logging  
+✅ **8-Dimension Data Quality Integration** - Complete DQS integration 
+✅ **Advanced PII Protection** - 35+ PII types with ML-powered detection 
+✅ **Multi-Region Compliance** - GDPR, HIPAA, SOX, PCI-DSS 
+✅ **Comprehensive Access Control** - RBAC + ABAC with API key validation 
+✅ **Rate Limiting** - Per-user, per-source, and global limits 
+✅ **Geographic Restrictions** - Region blocking and data residency 
+✅ **Temporal Constraints** - Time-based access windows 
+✅ **Auto-Remediation** - 8 remediation strategies 
+✅ **Batch Decisions** - Process 1000+ items efficiently 
+✅ **Full Audit Trail** - Complete decision logging 
 
 ## Quick Start
 
@@ -39,40 +38,40 @@ opa run --server --addr=0.0.0.0:8181 policy.rego data.json
 ```bash
 # Allow example (high quality)
 curl -X POST http://localhost:8181/v1/data/graphix/vulcan/writebarrier/decision \
-  -H "Content-Type: application/json" \
-  -d '{
-    "input": {
-      "dqs": 0.95,
-      "pii": {
-        "detected_types": [],
-        "stage2_reviewed": true
-      },
-      "user": {
-        "id": "user123",
-        "authenticated": true,
-        "roles": ["data_engineer"]
-      },
-      "api_key": "valid_key",
-      "api_key_expires_at": 9999999999000000000,
-      "source": {
-        "id": "internal_etl",
-        "credibility": 0.95
-      }
-    }
-  }'
+ -H "Content-Type: application/json" \
+ -d '{
+ "input": {
+ "dqs": 0.95,
+ "pii": {
+ "detected_types": [],
+ "stage2_reviewed": true
+ },
+ "user": {
+ "id": "user123",
+ "authenticated": true,
+ "roles": ["data_engineer"]
+ },
+ "api_key": "valid_key",
+ "api_key_expires_at": 9999999999000000000,
+ "source": {
+ "id": "internal_etl",
+ "credibility": 0.95
+ }
+ }
+ }'
 
 # Response
 {
-  "result": {
-    "allow": true,
-    "quarantine": false,
-    "reject": false,
-    "metadata": {
-      "audit_required": false,
-      "encryption_required": false,
-      "redaction_required": false
-    }
-  }
+ "result": {
+ "allow": true,
+ "quarantine": false,
+ "reject": false,
+ "metadata": {
+ "audit_required": false,
+ "encryption_required": false,
+ "redaction_required": false
+ }
+ }
 }
 ```
 
@@ -98,7 +97,7 @@ curl -X POST http://localhost:8181/v1/data/graphix/vulcan/writebarrier/decision 
 
 ```
 Input → Quality Check → PII Check → Authorization → Compliance → Rate Limit → Decision
-         (DQS 8D)      (35+ types)   (RBAC+ABAC)    (GDPR/etc)   (3-tier)    (A/Q/R)
+ (DQS 8D) (35+ types) (RBAC+ABAC) (GDPR/etc) (3-tier) (A/Q/R)
 ```
 
 ### Decision Flow
@@ -116,10 +115,10 @@ Input → Quality Check → PII Check → Authorization → Compliance → Rate 
 
 ```json
 {
-  "accept": 0.75,      // High quality - allow
-  "warning": 0.60,     // Acceptable - allow with warning
-  "quarantine": 0.40,  // Needs remediation
-  "reject": 0.30       // Unacceptable - reject
+ "accept": 0.75, // High quality - allow
+ "warning": 0.60, // Acceptable - allow with warning
+ "quarantine": 0.40, // Needs remediation
+ "reject": 0.30 // Unacceptable - reject
 }
 ```
 
@@ -135,9 +134,9 @@ SSN, Passport, Biometric, Medical Records, Genetic Data, etc.
 
 ```json
 {
-  "per_user": 10000,     // Requests per hour per user
-  "per_source": 50000,   // Requests per hour per source
-  "global": 1000000      // Total requests per hour
+ "per_user": 10000, // Requests per hour per user
+ "per_source": 50000, // Requests per hour per source
+ "global": 1000000 // Total requests per hour
 }
 ```
 
@@ -148,11 +147,11 @@ SSN, Passport, Biometric, Medical Records, Genetic Data, etc.
 **Input**:
 ```json
 {
-  "dqs": 0.95,
-  "pii": {"detected_types": [], "stage2_reviewed": true},
-  "user": {"id": "user123", "authenticated": true, "roles": ["data_engineer"]},
-  "api_key": "valid_key",
-  "source": {"id": "internal_etl", "credibility": 0.95}
+ "dqs": 0.95,
+ "pii": {"detected_types": [], "stage2_reviewed": true},
+ "user": {"id": "user123", "authenticated": true, "roles": ["data_engineer"]},
+ "api_key": "valid_key",
+ "source": {"id": "internal_etl", "credibility": 0.95}
 }
 ```
 
@@ -163,14 +162,14 @@ SSN, Passport, Biometric, Medical Records, Genetic Data, etc.
 **Input**:
 ```json
 {
-  "dqs": 0.85,
-  "pii": {
-    "detected_types": ["email_address", "phone_number"],
-    "stage2_reviewed": false
-  },
-  "user": {"id": "user123", "authenticated": true, "roles": ["data_engineer"]},
-  "api_key": "valid_key",
-  "source": {"id": "external_api", "credibility": 0.70}
+ "dqs": 0.85,
+ "pii": {
+ "detected_types": ["email_address", "phone_number"],
+ "stage2_reviewed": false
+ },
+ "user": {"id": "user123", "authenticated": true, "roles": ["data_engineer"]},
+ "api_key": "valid_key",
+ "source": {"id": "external_api", "credibility": 0.70}
 }
 ```
 
@@ -181,11 +180,11 @@ SSN, Passport, Biometric, Medical Records, Genetic Data, etc.
 **Input**:
 ```json
 {
-  "dqs": 0.25,
-  "pii": {"detected_types": [], "stage2_reviewed": true},
-  "user": {"id": "user123", "authenticated": true, "roles": ["data_engineer"]},
-  "api_key": "valid_key",
-  "source": {"id": "external_api", "credibility": 0.50}
+ "dqs": 0.25,
+ "pii": {"detected_types": [], "stage2_reviewed": true},
+ "user": {"id": "user123", "authenticated": true, "roles": ["data_engineer"]},
+ "api_key": "valid_key",
+ "source": {"id": "external_api", "credibility": 0.50}
 }
 ```
 
@@ -196,17 +195,17 @@ SSN, Passport, Biometric, Medical Records, Genetic Data, etc.
 **Input**:
 ```json
 {
-  "dqs": 0.85,
-  "pii": {"detected_types": ["email_address"], "stage2_reviewed": true},
-  "user": {"id": "user123", "authenticated": true, "roles": ["data_engineer"]},
-  "api_key": "valid_key",
-  "source": {"id": "internal_etl", "credibility": 0.90},
-  "compliance": {
-    "gdpr_consent_obtained": true,
-    "gdpr_consent_timestamp": "2025-01-15T10:00:00Z"
-  },
-  "data_subject": {"region": "DE"},
-  "storage_region": "eu-central-1"
+ "dqs": 0.85,
+ "pii": {"detected_types": ["email_address"], "stage2_reviewed": true},
+ "user": {"id": "user123", "authenticated": true, "roles": ["data_engineer"]},
+ "api_key": "valid_key",
+ "source": {"id": "internal_etl", "credibility": 0.90},
+ "compliance": {
+ "gdpr_consent_obtained": true,
+ "gdpr_consent_timestamp": "2025-01-15T10:00:00Z"
+ },
+ "data_subject": {"region": "DE"},
+ "storage_region": "eu-central-1"
 }
 ```
 
@@ -218,12 +217,12 @@ SSN, Passport, Biometric, Medical Records, Genetic Data, etc.
 
 ```bash
 docker run -d \
-  --name opa-writebarrier \
-  -p 8181:8181 \
-  -v $(pwd)/policy.rego:/policies/policy.rego \
-  -v $(pwd)/data.json:/policies/data.json \
-  openpolicyagent/opa:0.65.0 \
-  run --server --addr=0.0.0.0:8181 /policies
+ --name opa-writebarrier \
+ -p 8181:8181 \
+ -v $(pwd)/policy.rego:/policies/policy.rego \
+ -v $(pwd)/data.json:/policies/data.json \
+ openpolicyagent/opa:0.65.0 \
+ run --server --addr=0.0.0.0:8181 /policies
 ```
 
 ### Kubernetes
@@ -232,34 +231,34 @@ docker run -d \
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: opa-writebarrier
+ name: opa-writebarrier
 spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: opa-writebarrier
-  template:
-    metadata:
-      labels:
-        app: opa-writebarrier
-    spec:
-      containers:
-      - name: opa
-        image: openpolicyagent/opa:0.65.0
-        args:
-          - "run"
-          - "--server"
-          - "--addr=0.0.0.0:8181"
-          - "/policies"
-        ports:
-        - containerPort: 8181
-        volumeMounts:
-        - name: policies
-          mountPath: /policies
-      volumes:
-      - name: policies
-        configMap:
-          name: opa-policies
+ replicas: 3
+ selector:
+ matchLabels:
+ app: opa-writebarrier
+ template:
+ metadata:
+ labels:
+ app: opa-writebarrier
+ spec:
+ containers:
+ - name: opa
+ image: openpolicyagent/opa:0.65.0
+ args:
+ - "run"
+ - "--server"
+ - "--addr=0.0.0.0:8181"
+ - "/policies"
+ ports:
+ - containerPort: 8181
+ volumeMounts:
+ - name: policies
+ mountPath: /policies
+ volumes:
+ - name: policies
+ configMap:
+ name: opa-policies
 ```
 
 ### API Gateway (Kong)
@@ -267,9 +266,9 @@ spec:
 ```yaml
 plugins:
 - name: opa
-  config:
-    opa_url: http://opa-writebarrier:8181/v1/data/graphix/vulcan/writebarrier/decision
-    include_body_in_opa_input: true
+ config:
+ opa_url: http://opa-writebarrier:8181/v1/data/graphix/vulcan/writebarrier/decision
+ include_body_in_opa_input: true
 ```
 
 ## Testing
@@ -357,11 +356,11 @@ Supports OAuth2/OIDC for user authentication and RBAC.
 
 ### Supported Regulations
 
-✅ **GDPR** - General Data Protection Regulation  
-✅ **HIPAA** - Health Insurance Portability and Accountability Act  
-✅ **SOX** - Sarbanes-Oxley Act  
-✅ **PCI-DSS** - Payment Card Industry Data Security Standard  
-✅ **CCPA** - California Consumer Privacy Act  
+✅ **GDPR** - General Data Protection Regulation 
+✅ **HIPAA** - Health Insurance Portability and Accountability Act 
+✅ **SOX** - Sarbanes-Oxley Act 
+✅ **PCI-DSS** - Payment Card Industry Data Security Standard 
+✅ **CCPA** - California Consumer Privacy Act 
 
 ### Audit Requirements
 
@@ -381,7 +380,7 @@ Supports OAuth2/OIDC for user authentication and RBAC.
 ```bash
 # Validate input
 opa eval --data policy.rego --input input.json \
-  'data.graphix.vulcan.writebarrier.decision'
+ 'data.graphix.vulcan.writebarrier.decision'
 ```
 
 **Issue**: Slow decisions
@@ -391,7 +390,7 @@ opa eval --data policy.rego --input input.json \
 ```bash
 # Profile policy
 opa eval --profile --data policy.rego --input input.json \
-  'data.graphix.vulcan.writebarrier.decision'
+ 'data.graphix.vulcan.writebarrier.decision'
 ```
 
 **Issue**: Rate limits not enforced
@@ -445,11 +444,11 @@ opa eval --profile --data policy.rego --input input.json \
 
 ### Security Features
 
-✅ Input validation and sanitization  
-✅ Injection attack prevention  
-✅ Resource exhaustion protection  
-✅ Secure defaults (deny-by-default)  
-✅ Regular security audits  
+✅ Input validation and sanitization 
+✅ Injection attack prevention 
+✅ Resource exhaustion protection 
+✅ Secure defaults (deny-by-default) 
+✅ Regular security audits 
 
 ## Changelog
 

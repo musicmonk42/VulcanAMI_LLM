@@ -9,25 +9,25 @@
 ## 2. Proposal Structure
 ```json
 {
-  "proposal_id": "prop_2025_0042",
-  "type": "ontology_update",
-  "changeset": {
-    "add_nodes": [{ "type_uri": "https://graphix.ai/ontology/AuditNode", "lifecycle": "active" }],
-    "deprecate_nodes": ["https://graphix.ai/ontology/LegacyNode"]
-  },
-  "metadata": {
-    "risk_estimate": 0.19,
-    "description": "Add structured audit node",
-    "tags": ["observability"]
-  },
-  "status": "open",
-  "signatures": { "author_sig": "sig_abcd1234" },
-  "critical": false
+ "proposal_id": "prop_2025_0042",
+ "type": "ontology_update",
+ "changeset": {
+ "add_nodes": [{ "type_uri": "https://graphix.ai/ontology/AuditNode", "lifecycle": "active" }],
+ "deprecate_nodes": ["https://graphix.ai/ontology/LegacyNode"]
+ },
+ "metadata": {
+ "risk_estimate": 0.19,
+ "description": "Add structured audit node",
+ "tags": ["observability"]
+ },
+ "status": "open",
+ "signatures": { "author_sig": "sig_abcd1234" },
+ "critical": false
 }
 ```
 
 ## 3. Voting & Trust Weight
-approval_ratio = approve_weight / (approve_weight + reject_weight)  
+approval_ratio = approve_weight / (approve_weight + reject_weight) 
 Abstain excluded. Trust concentration warnings if > percentile threshold.
 
 ## 4. Thresholds & Quorum

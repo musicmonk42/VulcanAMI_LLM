@@ -84,12 +84,12 @@ The following components are planned for future implementation:
 ```python
 # Must be implemented in ShardedMessageBus class:
 async def pause_publishes(self, shard_id: str) -> None:
-    """Pause publishing to specified shard."""
-    pass
+ """Pause publishing to specified shard."""
+ pass
 
 async def resume_publishes(self, shard_id: str) -> None:
-    """Resume publishing to specified shard."""
-    pass
+ """Resume publishing to specified shard."""
+ pass
 ```
 
 **Location**: These methods should be called from backpressure manager when handling backpressure events.
@@ -105,9 +105,9 @@ async def resume_publishes(self, shard_id: str) -> None:
 ```python
 # Encryption
 processed_payload = self.security_utils.encrypt_data(
-    json.dumps(payload),
-    context=f"msgbus:{topic}"
-)  # Returns bytes
+ json.dumps(payload),
+ context=f"msgbus:{topic}"
+) # Returns bytes
 
 # Decryption - do NOT encode bytes again
 decrypted_json = self.encryption.decrypt(message.payload).decode('utf-8')
@@ -139,14 +139,14 @@ self._http_session: Optional[aiohttp.ClientSession] = None
 
 # In publish or other methods
 if not self._http_session:
-    self._http_session = aiohttp.ClientSession()
+ self._http_session = aiohttp.ClientSession()
 await self._http_session.post(...)
 
 # In shutdown
 async def shutdown(self):
-    if self._http_session:
-        await self._http_session.close()
-    # ... other cleanup
+ if self._http_session:
+ await self._http_session.close()
+ # ... other cleanup
 ```
 
 ### 5. sharded_message_bus.py - Untracked Async Tasks
@@ -157,10 +157,10 @@ async def shutdown(self):
 ```python
 # Add error handler to tasks
 def _task_error_handler(task: asyncio.Task) -> None:
-    if not task.cancelled():
-        exc = task.exception()
-        if exc:
-            logger.error(f"Background task failed: {exc}", exc_info=exc)
+ if not task.cancelled():
+ exc = task.exception()
+ if exc:
+ logger.error(f"Background task failed: {exc}", exc_info=exc)
 
 # When creating tasks
 task = asyncio.create_task(_run_workflow())
@@ -181,18 +181,18 @@ task.add_done_callback(lambda t: self._background_tasks.discard(t))
 ```python
 # Option 1: Always use bytes
 if self.encryption_enabled:
-    processed_payload = self.security_utils.encrypt_data(
-        json.dumps(payload), context=f"msgbus:{topic}"
-    )  # bytes
+ processed_payload = self.security_utils.encrypt_data(
+ json.dumps(payload), context=f"msgbus:{topic}"
+ ) # bytes
 else:
-    processed_payload = json.dumps(payload).encode('utf-8')  # bytes
+ processed_payload = json.dumps(payload).encode('utf-8') # bytes
 
 # Option 2: Always use strings (base64 encode encrypted)
 if self.encryption_enabled:
-    encrypted_bytes = self.security_utils.encrypt_data(...)
-    processed_payload = base64.b64encode(encrypted_bytes).decode('ascii')
+ encrypted_bytes = self.security_utils.encrypt_data(...)
+ processed_payload = base64.b64encode(encrypted_bytes).decode('ascii')
 else:
-    processed_payload = json.dumps(payload)
+ processed_payload = json.dumps(payload)
 ```
 
 ### 7. sharded_message_bus.py - Race Condition in Rebalancing
@@ -204,10 +204,10 @@ else:
 # Use try/finally to guarantee event is set
 self.rebalancing_in_progress.clear()
 try:
-    # ... rebalancing work ...
-    await self._rebalance_shards()
+ # ... rebalancing work ...
+ await self._rebalance_shards()
 finally:
-    self.rebalancing_in_progress.set()
+ self.rebalancing_in_progress.set()
 ```
 
 ### 8. sharded_message_bus.py - Security Utils Consistency
@@ -237,18 +237,18 @@ import random
 ```python
 # WRONG:
 internal_message = Message(
-    topic=topic,
-    payload=payload,
-    trace_id=internal_message.get('trace_id', str(uuid.uuid4())),  # ERROR!
-    timestamp=time.time()
+ topic=topic,
+ payload=payload,
+ trace_id=internal_message.get('trace_id', str(uuid.uuid4())), # ERROR!
+ timestamp=time.time()
 )
 
 # CORRECT:
 internal_message = Message(
-    topic=topic,
-    payload=payload,
-    trace_id=payload.get('trace_id', str(uuid.uuid4())),  # Use payload
-    timestamp=time.time()
+ topic=topic,
+ payload=payload,
+ trace_id=payload.get('trace_id', str(uuid.uuid4())), # Use payload
+ timestamp=time.time()
 )
 ```
 
@@ -259,18 +259,18 @@ internal_message = Message(
 **Fix Required**:
 ```python
 async def publish_dlq(self, message: Message, original_error: str) -> bool:
-    """Publish message to Dead Letter Queue."""
-    original_topic = message.topic
-    dlq_channel = f"{original_topic}{self.cfg.DLQ_CHANNEL_SUFFIX}"
-    
-    # Create NEW message with DLQ topic
-    dlq_message = Message(
-        topic=dlq_channel,  # Use the DLQ topic, not original
-        payload={**message.payload, "dlq_original_error": original_error},
-        trace_id=message.trace_id,
-        timestamp=time.time()
-    )
-    return await self.publish(dlq_message)
+ """Publish message to Dead Letter Queue."""
+ original_topic = message.topic
+ dlq_channel = f"{original_topic}{self.cfg.DLQ_CHANNEL_SUFFIX}"
+ 
+ # Create NEW message with DLQ topic
+ dlq_message = Message(
+ topic=dlq_channel, # Use the DLQ topic, not original
+ payload={**message.payload, "dlq_original_error": original_error},
+ trace_id=message.trace_id,
+ timestamp=time.time()
+ )
+ return await self.publish(dlq_message)
 ```
 
 ### 12. redis_bridge.py - Type Annotation Issues
@@ -282,12 +282,12 @@ async def publish_dlq(self, message: Message, original_error: str) -> bool:
 from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
-    from redis.asyncio import Redis, PubSub
+ from redis.asyncio import Redis, PubSub
 
 class RedisBridge:
-    def __init__(self):
-        self.redis_client: Optional["Redis"] = None
-        self.pubsub_client: Optional["PubSub"] = None
+ def __init__(self):
+ self.redis_client: Optional["Redis"] = None
+ self.pubsub_client: Optional["PubSub"] = None
 ```
 
 ### 13. redis_bridge.py - Inconsistent Error Handling
@@ -297,15 +297,15 @@ class RedisBridge:
 **Fix Required**:
 ```python
 try:
-    # ... setup code ...
-    self.circuit.record_success()
+ # ... setup code ...
+ self.circuit.record_success()
 except (ConnectionError, TimeoutError) as e:
-    self.circuit.record_failure()
-    raise
+ self.circuit.record_failure()
+ raise
 except Exception as e:
-    self.circuit.record_failure()  # ADD THIS
-    logger.error(f"Unexpected error: {e}")
-    raise
+ self.circuit.record_failure() # ADD THIS
+ logger.error(f"Unexpected error: {e}")
+ raise
 ```
 
 ### 14. resilience.py - Unused Import

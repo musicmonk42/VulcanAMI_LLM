@@ -12,7 +12,7 @@ This document describes the critical security fixes applied to the VulcanAMI inf
 - **CI/CD Validation**: `infrastructure-validation.yml` workflow checks for `latest` tag
 ```yaml
 image:
-  tag: ""  # REQUIRED: Must be set to specific version like "v1.0.0"
+ tag: "" # REQUIRED: Must be set to specific version like "v1.0.0"
 ```
 
 #### 2. **Removed Hardcoded MinIO Credentials** ✅
@@ -21,10 +21,10 @@ image:
 - **CI/CD Validation**: Workflow checks for hardcoded credentials
 ```yaml
 minio:
-  accessKeySecretName: ""  # REQUIRED: Reference to external secret
-  accessKeySecretKey: "accessKey"
-  secretKeySecretName: ""  # REQUIRED: Reference to external secret
-  secretKeySecretKey: "secretKey"
+ accessKeySecretName: "" # REQUIRED: Reference to external secret
+ accessKeySecretKey: "accessKey"
+ secretKeySecretName: "" # REQUIRED: Reference to external secret
+ secretKeySecretKey: "secretKey"
 ```
 
 #### 3. **Enabled Read-Only Root Filesystem** ✅
@@ -33,7 +33,7 @@ minio:
 - **CI/CD Validation**: Workflow checks this setting
 ```yaml
 securityContext:
-  readOnlyRootFilesystem: true
+ readOnlyRootFilesystem: true
 ```
 
 #### 4. **Required Secrets Validation** ✅
@@ -41,10 +41,10 @@ securityContext:
 - **Fix**: Added REQUIRED comments and documented need for validation
 ```yaml
 secrets:
-  jwtSecretKey: ""  # REQUIRED
-  bootstrapKey: ""  # REQUIRED
-  postgresPassword: ""  # REQUIRED
-  redisPassword: ""  # REQUIRED
+ jwtSecretKey: "" # REQUIRED
+ bootstrapKey: "" # REQUIRED
+ postgresPassword: "" # REQUIRED
+ redisPassword: "" # REQUIRED
 ```
 
 #### 5. **Added Health Probes** ✅
@@ -53,18 +53,18 @@ secrets:
 - **CI/CD Validation**: Workflow checks for presence of probes
 ```yaml
 livenessProbe:
-  httpGet:
-    path: /health
-    port: 8000
-  initialDelaySeconds: 30
-  periodSeconds: 10
+ httpGet:
+ path: /health
+ port: 8000
+ initialDelaySeconds: 30
+ periodSeconds: 10
 
 readinessProbe:
-  httpGet:
-    path: /ready
-    port: 8000
-  initialDelaySeconds: 10
-  periodSeconds: 5
+ httpGet:
+ path: /ready
+ port: 8000
+ initialDelaySeconds: 10
+ periodSeconds: 5
 ```
 
 #### 6. **Added Pod Disruption Budget** ✅
@@ -72,8 +72,8 @@ readinessProbe:
 - **Fix**: Configured PDB to ensure availability
 ```yaml
 podDisruptionBudget:
-  enabled: true
-  minAvailable: 1
+ enabled: true
+ minAvailable: 1
 ```
 
 #### 7. **Added Pod Anti-Affinity** ✅
@@ -81,11 +81,11 @@ podDisruptionBudget:
 - **Fix**: Configured pod anti-affinity rules
 ```yaml
 affinity:
-  podAntiAffinity:
-    preferredDuringSchedulingIgnoredDuringExecution:
-      - weight: 100
-        podAffinityTerm:
-          topologyKey: kubernetes.io/hostname
+ podAntiAffinity:
+ preferredDuringSchedulingIgnoredDuringExecution:
+ - weight: 100
+ podAffinityTerm:
+ topologyKey: kubernetes.io/hostname
 ```
 
 #### 8. **Reduced Rate Limit** ✅
@@ -117,8 +117,8 @@ final_snapshot_identifier = "${local.name_prefix}-db-final-snapshot"
 - **CI/CD Validation**: Workflow checks Lambda@Edge configurations
 ```hcl
 resource "aws_lambda_function" "edge_auth" {
-  # NOTE: Lambda@Edge does not support reserved_concurrent_executions
-  # ... other configuration
+ # NOTE: Lambda@Edge does not support reserved_concurrent_executions
+ # ... other configuration
 }
 ```
 
@@ -129,8 +129,8 @@ resource "aws_lambda_function" "edge_auth" {
 ```hcl
 # Added:
 resource "aws_s3_bucket" "logs_secondary" {
-  provider = aws.secondary
-  bucket   = local.bucket_logs_secondary
+ provider = aws.secondary
+ bucket = local.bucket_logs_secondary
 }
 ```
 
@@ -139,9 +139,9 @@ resource "aws_s3_bucket" "logs_secondary" {
 - **Fix**: Created Lambda function source and used `data.archive_file`
 ```hcl
 data "archive_file" "edge_auth" {
-  type        = "zip"
-  source_file = "${path.module}/lambda/edge-auth.js"
-  output_path = "${path.module}/lambda/edge-auth.zip"
+ type = "zip"
+ source_file = "${path.module}/lambda/edge-auth.js"
+ output_path = "${path.module}/lambda/edge-auth.zip"
 }
 ```
 
@@ -150,11 +150,11 @@ data "archive_file" "edge_auth" {
 - **Fix**: Created separate variables for each
 ```hcl
 variable "acm_certificate_arn" {
-  description = "ACM certificate ARN for CloudFront (must be in us-east-1)"
+ description = "ACM certificate ARN for CloudFront (must be in us-east-1)"
 }
 
 variable "alb_certificate_arn" {
-  description = "ACM certificate ARN for ALB (must be in the same region as the ALB)"
+ description = "ACM certificate ARN for ALB (must be in the same region as the ALB)"
 }
 ```
 
@@ -164,7 +164,7 @@ variable "alb_certificate_arn" {
 - **CI/CD Validation**: Workflow checks for `0.0.0.0/0` in defaults
 ```hcl
 variable "allowed_ip_ranges" {
-  default = []  # Empty default requires explicit IP range specification
+ default = [] # Empty default requires explicit IP range specification
 }
 ```
 
@@ -173,14 +173,14 @@ variable "allowed_ip_ranges" {
 - **Fix**: Added bucket policy with CloudFront service principal
 ```hcl
 data "aws_iam_policy_document" "cloudfront_logs_bucket" {
-  statement {
-    principals {
-      type        = "Service"
-      identifiers = ["cloudfront.amazonaws.com"]
-    }
-    actions   = ["s3:PutObject"]
-    resources = ["${aws_s3_bucket.cloudfront_logs[0].arn}/*"]
-  }
+ statement {
+ principals {
+ type = "Service"
+ identifiers = ["cloudfront.amazonaws.com"]
+ }
+ actions = ["s3:PutObject"]
+ resources = ["${aws_s3_bucket.cloudfront_logs[0].arn}/*"]
+ }
 }
 ```
 
@@ -189,7 +189,7 @@ data "aws_iam_policy_document" "cloudfront_logs_bucket" {
 - **Fix**: Enabled special characters
 ```hcl
 resource "random_password" "redis_auth_token" {
-  special = true  # Redis supports special characters in auth tokens
+ special = true # Redis supports special characters in auth tokens
 }
 ```
 
@@ -199,7 +199,7 @@ resource "random_password" "redis_auth_token" {
 ```hcl
 # NOTE: Health check requires curl to be installed in the container image
 healthCheck = {
-  command = ["CMD-SHELL", "curl -f http://localhost:${var.port}/health || exit 1"]
+ command = ["CMD-SHELL", "curl -f http://localhost:${var.port}/health || exit 1"]
 }
 ```
 
@@ -208,10 +208,10 @@ healthCheck = {
 - **Fix**: Added lifecycle precondition
 ```hcl
 lifecycle {
-  precondition {
-    condition     = var.auto_scaling_min_capacity <= var.auto_scaling_max_capacity
-    error_message = "Auto-scaling minimum capacity must be less than or equal to maximum capacity."
-  }
+ precondition {
+ condition = var.auto_scaling_min_capacity <= var.auto_scaling_max_capacity
+ error_message = "Auto-scaling minimum capacity must be less than or equal to maximum capacity."
+ }
 }
 ```
 
@@ -220,8 +220,8 @@ lifecycle {
 - **Fix**: Updated default to 365 days and improved documentation
 ```hcl
 variable "cloudwatch_retention_days" {
-  description = "CloudWatch Logs retention in days. Note: Production deployments enforce minimum 365 days regardless of this value."
-  default     = 365
+ description = "CloudWatch Logs retention in days. Note: Production deployments enforce minimum 365 days regardless of this value."
+ default = 365
 }
 ```
 
@@ -284,7 +284,7 @@ terraform validate
 #### Required Environment Variables for Deployment:
 ```bash
 # Helm deployment requires:
-export IMAGE_TAG="v1.0.0"  # Never use 'latest'
+export IMAGE_TAG="v1.0.0" # Never use 'latest'
 export JWT_SECRET_KEY="$(openssl rand -base64 48)"
 export BOOTSTRAP_KEY="$(openssl rand -base64 32)"
 export POSTGRES_PASSWORD="$(openssl rand -base64 32)"
@@ -294,13 +294,13 @@ export MINIO_SECRET_KEY="$(openssl rand -base64 48)"
 
 # Deploy with Helm
 helm upgrade --install vulcanami ./helm/vulcanami \
-  --set image.tag=$IMAGE_TAG \
-  --set secrets.jwtSecretKey=$JWT_SECRET_KEY \
-  --set secrets.bootstrapKey=$BOOTSTRAP_KEY \
-  --set secrets.postgresPassword=$POSTGRES_PASSWORD \
-  --set secrets.redisPassword=$REDIS_PASSWORD \
-  --set minio.accessKeySecretName=minio-credentials \
-  --set minio.secretKeySecretName=minio-credentials
+ --set image.tag=$IMAGE_TAG \
+ --set secrets.jwtSecretKey=$JWT_SECRET_KEY \
+ --set secrets.bootstrapKey=$BOOTSTRAP_KEY \
+ --set secrets.postgresPassword=$POSTGRES_PASSWORD \
+ --set secrets.redisPassword=$REDIS_PASSWORD \
+ --set minio.accessKeySecretName=minio-credentials \
+ --set minio.secretKeySecretName=minio-credentials
 ```
 
 ### For CI/CD
@@ -401,6 +401,6 @@ When adding new infrastructure:
 
 ---
 
-**Last Updated**: 2025-11-23  
-**Maintainer**: Infrastructure Team  
+**Last Updated**: 2025-11-23 
+**Maintainer**: Infrastructure Team 
 **CI/CD Workflow Version**: v1.0.0

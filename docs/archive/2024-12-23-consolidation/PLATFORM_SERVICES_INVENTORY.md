@@ -1,6 +1,6 @@
 # ⚠️ DEPRECATED
 
-**This document has been consolidated.**  
+**This document has been consolidated.** 
 **Archived:** December 23, 2024
 
 ## Migration Path
@@ -11,7 +11,7 @@ For PLATFORM_SERVICES_INVENTORY.md content → See [COMPLETE_SERVICE_CATALOG.md]
 
 # VulcanAMI Platform Services Inventory & Startup Analysis
 
-**Generated:** 2024-12-15  
+**Generated:** 2024-12-15 
 **Purpose:** Complete inventory of all platform services and their startup mechanisms
 
 ---
@@ -37,19 +37,19 @@ The VulcanAMI platform consists of **multiple service layers** that need to be c
 
 **Mounted Sub-Applications**:
 1. **VULCAN** - Mounted at `/vulcan`
-   - Source: `src/vulcan/main.py`
-   - Type: FastAPI app
-   - Initialization: Manual deployment setup in lifespan
-   
+ - Source: `src/vulcan/main.py`
+ - Type: FastAPI app
+ - Initialization: Manual deployment setup in lifespan
+ 
 2. **Arena** - Mounted at `/arena`
-   - Source: `src/graphix_arena.py`
-   - Type: FastAPI app
-   - Initialization: Routes registered at import time
-   
+ - Source: `src/graphix_arena.py`
+ - Type: FastAPI app
+ - Initialization: Routes registered at import time
+ 
 3. **Registry** - Mounted at `/registry`
-   - Source: `app.py`
-   - Type: Flask app (via WSGI middleware)
-   - Port: Runs under unified platform (not standalone)
+ - Source: `app.py`
+ - Type: Flask app (via WSGI middleware)
+ - Port: Runs under unified platform (not standalone)
 
 ### 1.2 Service Manager
 
@@ -65,10 +65,10 @@ The `AsyncServiceManager` class handles:
 
 ### 2.1 API Gateway Service
 
-**File**: `src/api_gateway.py`  
-**Type**: FastAPI  
-**Default Port**: 8000 (ENV: `API_PORT`)  
-**Purpose**: Enterprise API gateway with VULCAN AGI integration
+**File**: `src/api_gateway.py` 
+**Type**: FastAPI 
+**Default Port**: 8000 (ENV: `API_PORT`) 
+**Purpose**: Enterprise API gateway with VULCAN AMI integration
 
 **Features**:
 - Service discovery and routing
@@ -81,9 +81,9 @@ The `AsyncServiceManager` class handles:
 
 ### 2.2 API Server (Graphix)
 
-**File**: `src/api_server.py`  
-**Type**: HTTP server (custom ThreadedHTTPServer)  
-**Default Port**: Variable (configurable)  
+**File**: `src/api_server.py` 
+**Type**: HTTP server (custom ThreadedHTTPServer) 
+**Default Port**: Variable (configurable) 
 **Purpose**: Graphix IR graph submission and execution
 
 **Features**:
@@ -97,9 +97,9 @@ The `AsyncServiceManager` class handles:
 
 ### 2.3 Data Quality Service (DQS)
 
-**File**: `src/dqs_service.py`  
-**Type**: FastAPI  
-**Default Port**: 8080 (ENV: `DQS_PORT`) ⚠️ **CONFLICTS with full_platform.py**  
+**File**: `src/dqs_service.py` 
+**Type**: FastAPI 
+**Default Port**: 8080 (ENV: `DQS_PORT`) ⚠️ **CONFLICTS with full_platform.py** 
 **Purpose**: Real-time data quality monitoring and scoring
 
 **Features**:
@@ -108,14 +108,14 @@ The `AsyncServiceManager` class handles:
 - Prometheus metrics
 - Rate limiting
 
-**Current Status**: ❌ NOT STARTED by full_platform.py  
+**Current Status**: ❌ NOT STARTED by full_platform.py 
 **Issue**: Port 8080 conflicts with full_platform.py default
 
 ### 2.4 PII Service
 
-**File**: `src/pii_service.py`  
-**Type**: FastAPI  
-**Default Port**: 8082 (ENV: `PII_PORT`)  
+**File**: `src/pii_service.py` 
+**Type**: FastAPI 
+**Default Port**: 8082 (ENV: `PII_PORT`) 
 **Purpose**: PII detection and privacy protection
 
 **Features**:
@@ -128,9 +128,9 @@ The `AsyncServiceManager` class handles:
 
 ### 2.5 Registry API Server (gRPC)
 
-**File**: `src/governance/registry_api_server.py`  
-**Type**: gRPC server  
-**Default Port**: 50051 (ENV: `REGISTRY_PORT`)  
+**File**: `src/governance/registry_api_server.py` 
+**Type**: gRPC server 
+**Default Port**: 50051 (ENV: `REGISTRY_PORT`) 
 **Purpose**: Graphix IR Registry for distributed agent communication
 
 **Features**:
@@ -143,9 +143,9 @@ The `AsyncServiceManager` class handles:
 
 ### 2.6 Listener Service
 
-**File**: `src/listener.py`  
-**Type**: HTTP server (custom)  
-**Default Port**: 8181 (`--port` arg) ⚠️ **CONFLICTS with Arena**  
+**File**: `src/listener.py` 
+**Type**: HTTP server (custom) 
+**Default Port**: 8181 (`--port` arg) ⚠️ **CONFLICTS with Arena** 
 **Purpose**: Secure HTTP listener for Graphix IR graph submission
 
 **Features**:
@@ -154,7 +154,7 @@ The `AsyncServiceManager` class handles:
 - Rate limiting
 - Graceful shutdown
 
-**Current Status**: ❌ NOT STARTED by full_platform.py  
+**Current Status**: ❌ NOT STARTED by full_platform.py 
 **Issue**: Port 8181 conflicts with Arena default
 
 ---
@@ -262,7 +262,7 @@ The platform includes 71 functional service modules with 557 files:
 19. **persistant_context.py** - Context management
 
 ### VULCAN Services (256 files, 13,304 functions)
-20-75. Complete VULCAN-AGI cognitive architecture
+20-75. Complete VULCAN-AMI cognitive architecture
 
 ### Additional Services (200+ files)
 76-100+. Supporting infrastructure, utilities, and specialized services
@@ -276,17 +276,17 @@ The platform includes 71 functional service modules with 557 files:
 ### 7.1 Immediate Actions
 
 1. **Fix Port Conflicts**:
-   - Change DQS default port from 8080 to 8083
-   - Change Listener default port from 8181 to 8084
+ - Change DQS default port from 8080 to 8083
+ - Change Listener default port from 8181 to 8084
 
 2. **Document Service Architecture**:
-   - ✅ This document provides the inventory
-   - Create service dependency diagram
-   - Document inter-service communication
+ - ✅ This document provides the inventory
+ - Create service dependency diagram
+ - Document inter-service communication
 
 3. **Choose Deployment Strategy**:
-   - **Development**: Use full_platform.py only (current 3 services)
-   - **Production**: Use Docker Compose for all 9 services
+ - **Development**: Use full_platform.py only (current 3 services)
+ - **Production**: Use Docker Compose for all 9 services
 
 ### 7.2 For Full Platform Startup
 
@@ -334,6 +334,6 @@ The documentation clearly lists "everything the platform does" across 557 files 
 1. Decide on deployment strategy (dev vs prod)
 2. Fix port conflicts in default configurations
 3. Update full_platform.py to either:
-   - Mount additional services as sub-apps, OR
-   - Document that standalone services must be started separately
+ - Mount additional services as sub-apps, OR
+ - Document that standalone services must be started separately
 4. Create comprehensive docker-compose.yml for full platform

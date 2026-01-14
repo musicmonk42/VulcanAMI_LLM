@@ -54,20 +54,20 @@ query routing degradation (469ms → 152,048ms) by caching ML model instances.
 **Reasoning System Fix Notes:**
 
 - **VULCAN_USE_REASONING_DIRECTLY**: When true, high-confidence results from specialized
-  reasoning engines (probabilistic, causal, symbolic, etc.) are returned directly to the
-  user without being overridden by OpenAI. This fixes the "OpenAI always wins" problem
-  where correct reasoning results were discarded because OpenAI finished first.
+ reasoning engines (probabilistic, causal, symbolic, etc.) are returned directly to the
+ user without being overridden by OpenAI. This fixes the "OpenAI always wins" problem
+ where correct reasoning results were discarded because OpenAI finished first.
 
 - **VULCAN_MIN_REASONING_CONFIDENCE**: The minimum confidence threshold (0.0-1.0) for
-  using reasoning results directly. Results with confidence >= this threshold bypass
-  LLM synthesis. Default 0.5 balances accuracy with direct response usage.
+ using reasoning results directly. Results with confidence >= this threshold bypass
+ LLM synthesis. Default 0.5 balances accuracy with direct response usage.
 
 - **VULCAN_SELF_INTROSPECTION_ENABLED**: Enables the world model for self-awareness
-  questions like "would you become self-aware?". These queries are routed to VULCAN's
-  world model introspection system instead of general reasoning.
+ questions like "would you become self-aware?". These queries are routed to VULCAN's
+ world model introspection system instead of general reasoning.
 
 - **VULCAN_SELF_INTROSPECTION_SAFETY_BYPASS**: Bypasses safety checks for self-introspection
-  queries. This allows authentic self-reflection responses without content filtering.
+ queries. This allows authentic self-reflection responses without content filtering.
 
 ### 2.2 CuriosityDriver Configuration (Active Learning)
 
@@ -106,40 +106,40 @@ query routing delays, cascade timeouts, and learning system issues.
 **Performance Tuning Notes:**
 
 - **GRAPHIX_VULCAN_TIMEOUT**: Controls the timeout for local transformer generation.
-  At ~500ms per token on CPU, a 120s timeout allows ~240 tokens. Increase this value
-  if you see "Generation timed out" errors. The previous default of 60s was insufficient
-  for CPU-intensive inference. Set higher (180s or 240s) for very slow environments.
+ At ~500ms per token on CPU, a 120s timeout allows ~240 tokens. Increase this value
+ if you see "Generation timed out" errors. The previous default of 60s was insufficient
+ for CPU-intensive inference. Set higher (180s or 240s) for very slow environments.
 
 - **VULCAN_EMBEDDING_TIMEOUT**: Reduced from 30s to 5s to prevent cascade delays when
-  decomposition calls multiple embeddings. Increase for slower CPU environments.
+ decomposition calls multiple embeddings. Increase for slower CPU environments.
 
 - **VULCAN_DECOMPOSITION_THRESHOLD**: Raised from 0.40 to 0.70 so fewer queries trigger
-  the slow hierarchical decomposition path.
+ the slow hierarchical decomposition path.
 
 - **ARENA_COMPLEXITY_THRESHOLD**: Lowered from 0.30 to 0.10 so more queries go through
-  Arena. Set to 0.0 to disable fast-path skip entirely.
+ Arena. Set to 0.0 to disable fast-path skip entirely.
 
 - **VULCAN_SELF_IMPROVEMENT_AUTO_COMMIT**: Disabled by default to prevent
-  "Cannot commit: /app is not a Git repository" errors in container environments.
+ "Cannot commit: /app is not a Git repository" errors in container environments.
 
 - **VULCAN_GAP_GIVEUP_THRESHOLD**: Increased from 3 to 10 to prevent premature give-up
-  on complex learning gaps.
+ on complex learning gaps.
 
 - **VULCAN_LLM_HARD_TIMEOUT**: Hard timeout (300s) for VULCAN LLM operations.
-  This prevents indefinite hangs during CPU-intensive language generation. The internal LLM
-  can take 500ms+ per token on CPU. Increased from 120s to 300s to allow ~600 tokens on
-  CPU-only cloud instances. Note: The internal LLM is for language
-  generation, not reasoning. Reasoning is done by VULCAN's reasoning systems.
+ This prevents indefinite hangs during CPU-intensive language generation. The internal LLM
+ can take 500ms+ per token on CPU. Increased from 120s to 300s to allow ~600 tokens on
+ CPU-only cloud instances. Note: The internal LLM is for language
+ generation, not reasoning. Reasoning is done by VULCAN's reasoning systems.
 
 - **VULCAN_LLM_PER_TOKEN_TIMEOUT**: Per-token timeout (30s) for CPU execution.
-  Allows for slower token generation on CPU-bound systems.
+ Allows for slower token generation on CPU-bound systems.
 
 - **VULCAN_CPU_MAX_TOKENS**: Maximum tokens (50) for local LLM generation on CPU.
-  At ~500ms per token, 50 tokens takes ~25 seconds, ensuring completion within timeout.
-  Override via environment variable for GPU environments (e.g., VULCAN_CPU_MAX_TOKENS=500).
+ At ~500ms per token, 50 tokens takes ~25 seconds, ensuring completion within timeout.
+ Override via environment variable for GPU environments (e.g., VULCAN_CPU_MAX_TOKENS=500).
 
 - **MIN_AGENTS**: Minimum agents (2) in the agent pool. Reduced from 5 to reduce
-  context-switching overhead on CPU-only cloud instances.
+ context-switching overhead on CPU-only cloud instances.
 
 **OpenAI Language-Only Architecture:**
 
@@ -148,20 +148,20 @@ VULCAN handles ALL reasoning internally using its specialized reasoning systems
 generation - converting VULCAN's reasoning results into natural language prose.
 
 - **OPENAI_LANGUAGE_ONLY**: When "true" (default), restricts OpenAI to language-only
-  operations. Operations like embeddings, image generation (DALL-E), and audio
-  transcription (Whisper) are blocked and must use local models or alternatives.
-  OpenAI is NEVER permitted to perform reasoning - only language generation.
+ operations. Operations like embeddings, image generation (DALL-E), and audio
+ transcription (Whisper) are blocked and must use local models or alternatives.
+ OpenAI is NEVER permitted to perform reasoning - only language generation.
 
 - **OPENAI_LANGUAGE_FORMATTING**: When "true" (default), routes ALL natural language
-  output formatting to OpenAI (gpt-4o-mini). This provides fast response times
-  (~2-5 seconds vs 60+ seconds with internal LLM on CPU). VULCAN's reasoning
-  systems still do ALL thinking - OpenAI only formats the output as prose.
-  Every (input, output) pair is captured for distillation training.
+ output formatting to OpenAI (gpt-4o-mini). This provides fast response times
+ (~2-5 seconds vs 60+ seconds with internal LLM on CPU). VULCAN's reasoning
+ systems still do ALL thinking - OpenAI only formats the output as prose.
+ Every (input, output) pair is captured for distillation training.
 
 - **OPENAI_LANGUAGE_POLISH**: Legacy option. When "true", enables OpenAI to polish
-  the internal LLM's language output. Both serve the same conceptual role -
-  language generation from VULCAN's reasoning results. OPENAI_LANGUAGE_FORMATTING
-  is the preferred option (replaces this).
+ the internal LLM's language output. Both serve the same conceptual role -
+ language generation from VULCAN's reasoning results. OPENAI_LANGUAGE_FORMATTING
+ is the preferred option (replaces this).
 
 **LLM-First Query Classification:**
 
@@ -169,23 +169,23 @@ VULCAN now supports LLM-first query classification for improved semantic underst
 of user queries. This feature addresses the "brittleness" of keyword-based classification.
 
 - **LLM_FIRST_CLASSIFICATION**: When "true" (default), uses LLM for query classification
-  BEFORE falling back to keyword matching. Classification order:
-  * Cache lookup (instant)
-  * Security fast-path (deterministic, blocks malicious queries)
-  * Greeting fast-path (exact match, 24 patterns, 0ms latency)
-  * **LLM classification (PRIMARY - semantic understanding)**
-  * Keyword fallback (when LLM unavailable/times out)
-  * Default UNKNOWN
-  
-  When "false", uses traditional keyword-first approach with LLM as fallback.
+ BEFORE falling back to keyword matching. Classification order:
+ * Cache lookup (instant)
+ * Security fast-path (deterministic, blocks malicious queries)
+ * Greeting fast-path (exact match, 24 patterns, 0ms latency)
+ * **LLM classification (PRIMARY - semantic understanding)**
+ * Keyword fallback (when LLM unavailable/times out)
+ * Default UNKNOWN
+ 
+ When "false", uses traditional keyword-first approach with LLM as fallback.
 
 - **CLASSIFICATION_LLM_TIMEOUT**: Maximum time (3.0 seconds) for LLM classification
-  requests. Short timeout prevents classification from blocking query processing.
-  LLM calls that exceed this timeout gracefully fall back to keyword matching.
+ requests. Short timeout prevents classification from blocking query processing.
+ LLM calls that exceed this timeout gracefully fall back to keyword matching.
 
 - **CLASSIFICATION_LLM_MODEL**: Model to use for classification. Default is "gpt-4o-mini"
-  which provides fast, cost-effective classification with good accuracy. Alternative
-  models: "gpt-4o", "claude-3-haiku-20240307".
+ which provides fast, cost-effective classification with good accuracy. Alternative
+ models: "gpt-4o", "claude-3-haiku-20240307".
 
 **Key Benefits:**
 - Better semantic understanding of complex queries
@@ -201,31 +201,31 @@ decision-maker for what reasoning runs. These feature flags control the refactor
 execution paths to eliminate redundant parallel reasoning execution.
 
 - **TRUST_ROUTER_TOOL_SELECTION**: When "true" (default), chat endpoints trust the
-  QueryRouter's selected_tools instead of second-guessing with endpoint-level heuristics.
-  
-  **ARCHITECTURE**: Router decides → Endpoint executes (single source of truth)
-  
-  When "false" (legacy behavior), endpoints use local heuristics that can conflict
-  with router decisions, causing unpredictable behavior.
-  
-  **Industry Standard**: Separation of concerns - router makes decisions, executor
-  executes them without modification.
+ QueryRouter's selected_tools instead of second-guessing with endpoint-level heuristics.
+ 
+ **ARCHITECTURE**: Router decides → Endpoint executes (single source of truth)
+ 
+ When "false" (legacy behavior), endpoints use local heuristics that can conflict
+ with router decisions, causing unpredictable behavior.
+ 
+ **Industry Standard**: Separation of concerns - router makes decisions, executor
+ executes them without modification.
 
 - **SINGLE_REASONING_PATH**: When "true" (default), use EITHER agent pool OR parallel
-  reasoning execution, not both. This prevents redundant reasoning that was causing
-  2-3x duplicate work.
-  
-  **ARCHITECTURE**: DRY principle - reasoning runs once, not multiple times
-  
-  When "false" (legacy behavior), both agent pool reasoning tasks AND parallel
-  reasoning execution run simultaneously, wasting compute resources and causing
-  race conditions in result merging.
-  
-  **Expected Impact**: 
-  * Queries that ran reasoning 2-3 times now run once
-  * Faster response times (no redundant work)
-  * More predictable execution paths
-  * Better resource utilization
+ reasoning execution, not both. This prevents redundant reasoning that was causing
+ 2-3x duplicate work.
+ 
+ **ARCHITECTURE**: DRY principle - reasoning runs once, not multiple times
+ 
+ When "false" (legacy behavior), both agent pool reasoning tasks AND parallel
+ reasoning execution run simultaneously, wasting compute resources and causing
+ race conditions in result merging.
+ 
+ **Expected Impact**: 
+ * Queries that ran reasoning 2-3 times now run once
+ * Faster response times (no redundant work)
+ * More predictable execution paths
+ * Better resource utilization
 
 **Migration Note**: These flags default to "true" for new deployments. Existing
 deployments can set to "false" for gradual rollout if needed.
@@ -272,24 +272,24 @@ Signed config proposal → validation pipeline → hot reload for non-critical; 
 ## 8. Composite Example
 ```json
 {
-  "runtime": {
-    "profile": "development",
-    "max_graph_nodes": 6000,
-    "node_timeout_ms": 7000,
-    "layer_timeout_factor": 2.1
-  },
-  "governance": {
-    "risk_threshold": 0.28,
-    "replay_window_seconds": 60
-  },
-  "observability": {
-    "metrics_enabled": true,
-    "tracing": "verbose"
-  },
-  "intrinsic_drives": {
-    "enabled": true,
-    "max_sessions_per_day": 3
-  }
+ "runtime": {
+ "profile": "development",
+ "max_graph_nodes": 6000,
+ "node_timeout_ms": 7000,
+ "layer_timeout_factor": 2.1
+ },
+ "governance": {
+ "risk_threshold": 0.28,
+ "replay_window_seconds": 60
+ },
+ "observability": {
+ "metrics_enabled": true,
+ "tracing": "verbose"
+ },
+ "intrinsic_drives": {
+ "enabled": true,
+ "max_sessions_per_day": 3
+ }
 }
 ```
 
@@ -311,8 +311,8 @@ The system uses FAISS for high-performance vector similarity search with automat
 
 **Installation** (if not present):
 ```bash
-pip install faiss-cpu  # For CPU-only systems
-pip install faiss-gpu  # For GPU acceleration
+pip install faiss-cpu # For CPU-only systems
+pip install faiss-gpu # For GPU acceleration
 ```
 
 ### LLVM Compiler Backend

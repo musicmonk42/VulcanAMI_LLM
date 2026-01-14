@@ -40,8 +40,8 @@ export REDIS_PASSWORD=$(openssl rand -base64 32 | tr -d '+/')
 # Security: Set network binding
 # - Development (local): Use 127.0.0.1 (localhost only - secure default)
 # - Docker/Container: Use 0.0.0.0 (container networking)
-export HOST=0.0.0.0  # For Docker
-export API_HOST=0.0.0.0  # For Docker
+export HOST=0.0.0.0 # For Docker
+export API_HOST=0.0.0.0 # For Docker
 
 # Optional: Pin HuggingFace models to specific versions (production recommended)
 # export VULCAN_TEXT_MODEL_REVISION=86b5e0934494bd15c9632b12f734a8a67f723594
@@ -100,11 +100,11 @@ docker compose -f docker-compose.prod.yml up -d
 - **User**: graphix (UID 1001)
 - **Ports**: 8000
 - **Features**:
-  - Multi-stage build (builder + runtime)
-  - Hash-verified dependencies
-  - JWT validation on startup
-  - Healthcheck enabled
-  - Non-root execution
+ - Multi-stage build (builder + runtime)
+ - Hash-verified dependencies
+ - JWT validation on startup
+ - Healthcheck enabled
+ - Non-root execution
 - **Includes**: `src/`, `configs/` directories
 
 ### API Gateway (`docker/api/Dockerfile`)
@@ -218,30 +218,30 @@ docker build --build-arg REJECT_INSECURE_JWT=ack -t vulcanami:latest .
 
 ### Required (Production)
 ```bash
-JWT_SECRET_KEY        # API authentication (>=32 chars)
-BOOTSTRAP_KEY         # Initial setup key
-POSTGRES_PASSWORD     # Database password
-REDIS_PASSWORD        # Cache password
-MINIO_ROOT_USER       # Object storage user
-MINIO_ROOT_PASSWORD   # Object storage password
-GRAFANA_PASSWORD      # Dashboard password
+JWT_SECRET_KEY # API authentication (>=32 chars)
+BOOTSTRAP_KEY # Initial setup key
+POSTGRES_PASSWORD # Database password
+REDIS_PASSWORD # Cache password
+MINIO_ROOT_USER # Object storage user
+MINIO_ROOT_PASSWORD # Object storage password
+GRAFANA_PASSWORD # Dashboard password
 ```
 
 ### Optional
 ```bash
-ENVIRONMENT           # development|production
-LOG_LEVEL             # DEBUG|INFO|WARNING|ERROR
-API_PORT              # Default: 8000
-DATABASE_URL          # Override default connection
+ENVIRONMENT # development|production
+LOG_LEVEL # DEBUG|INFO|WARNING|ERROR
+API_PORT # Default: 8000
+DATABASE_URL # Override default connection
 ```
 
 ### Ray Configuration (Optional)
 When Ray is enabled for distributed computing, the following environment variables help optimize container behavior:
 
 ```bash
-RAY_DISABLE_DOCKER_CPU_WARNING=1  # Suppress CPU detection warning in containers
-RAY_ENABLED=true                   # Enable Ray workers (default: false)
-RAY_ADDRESS=auto                   # Ray cluster address or "auto" for local
+RAY_DISABLE_DOCKER_CPU_WARNING=1 # Suppress CPU detection warning in containers
+RAY_ENABLED=true # Enable Ray workers (default: false)
+RAY_ADDRESS=auto # Ray cluster address or "auto" for local
 ```
 
 **Important**: For optimal Ray performance, containers need adequate shared memory. This is configured in Docker Compose files with `shm_size: '10gb'` (recommended: at least 30% of available RAM). Without sufficient shared memory, Ray's object store will fall back to `/tmp`, which harms performance.
@@ -303,11 +303,11 @@ Or for Cloud Run source-based deployments, the `cloudbuild.yaml` is automaticall
 For docker-compose:
 ```yaml
 services:
-  your-service:
-    build:
-      context: .
-      args:
-        REJECT_INSECURE_JWT: ack
+ your-service:
+ build:
+ context: .
+ args:
+ REJECT_INSECURE_JWT: ack
 ```
 
 ### Entrypoint fails with JWT error
@@ -393,9 +393,9 @@ Railway deployment is configured via `railway.toml`. However, Railway does NOT s
 1. Connect your Railway service to this repository
 2. Go to your service's "Variables" tab in Railway dashboard
 3. Add the following environment variable:
-   ```
-   REJECT_INSECURE_JWT=ack
-   ```
+ ```
+ REJECT_INSECURE_JWT=ack
+ ```
 4. Railway will automatically pass this to the Docker build process
 
 **Required Runtime Environment Variables** (also set in Railway's Variables tab):
@@ -420,6 +420,6 @@ For issues or questions:
 
 ---
 
-**Last Updated**: December 4, 2025  
-**Docker Version**: 28.0.4  
+**Last Updated**: December 4, 2025 
+**Docker Version**: 28.0.4 
 **Compose Version**: v2.38.2

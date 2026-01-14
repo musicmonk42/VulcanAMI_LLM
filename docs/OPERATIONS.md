@@ -1,6 +1,6 @@
 # VulcanAMI Platform Operations Guide
 
-**Version:** 2.2.0  
+**Version:** 2.2.0 
 **Last Updated:** December 23, 2024
 
 This comprehensive operations guide covers day-to-day operations, monitoring, observability, and troubleshooting for the VulcanAMI/GraphixVulcan platform.
@@ -306,22 +306,22 @@ export MAX_AGENTS=5
 ### 7.3 Recovery Procedures
 
 1. **Service Failure**: 
-   - Check health endpoints
-   - Restart affected service
-   - Validate audit chain integrity
+ - Check health endpoints
+ - Restart affected service
+ - Validate audit chain integrity
 
 2. **Data Corruption**:
-   - Stop affected services
-   - Restore from last known good snapshot
-   - Replay audit log from checkpoint
-   - Validate data integrity
+ - Stop affected services
+ - Restore from last known good snapshot
+ - Replay audit log from checkpoint
+ - Validate data integrity
 
 3. **Complete Failure**:
-   - Provision new infrastructure
-   - Restore database from backup
-   - Restore application state from S3
-   - Replay audit log
-   - Validate full system
+ - Provision new infrastructure
+ - Restore database from backup
+ - Restore application state from S3
+ - Replay audit log
+ - Validate full system
 
 ### 7.4 Failover Procedures
 
@@ -342,11 +342,11 @@ helm rollback vulcanami -n vulcanami
 
 ### 8.1 Governance / Evolution Flow
 
-1. Proposal submission (`ProposalNode` or API)  
-2. Validator pipeline (structure → ontology → semantics → security → alignment → safety)  
-3. Consensus threshold check (trust-weighted)  
-4. Apply & hash chain update  
-5. Post-run observation & pattern mining  
+1. Proposal submission (`ProposalNode` or API) 
+2. Validator pipeline (structure → ontology → semantics → security → alignment → safety) 
+3. Consensus threshold check (trust-weighted) 
+4. Apply & hash chain update 
+5. Post-run observation & pattern mining 
 6. Autonomous optimizer may propose refinement if fitness < threshold
 
 Ensure all proposals log fingerprint + risk vector; assert uniqueness inside replay window (configurable TTL).
@@ -375,5 +375,5 @@ Ensure all proposals log fingerprint + risk vector; assert uniqueness inside rep
 
 ---
 
-**Document Version:** 2.2.0  
+**Document Version:** 2.2.0 
 **Last Updated:** December 23, 2024

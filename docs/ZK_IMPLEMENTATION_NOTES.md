@@ -5,7 +5,7 @@
 This implementation provides **real cryptographic zero-knowledge proofs** using:
 - **Custom ZK circuit design** (not standard Groth16 or PLONK)
 - **py_ecc library** for elliptic curve operations (BN128/BN254 curve)
-- **Merkle trees** for data integrity verification  
+- **Merkle trees** for data integrity verification 
 - **Hash-based commitments** for zero-knowledge properties
 - **Educational and research-focused** implementation
 
@@ -56,10 +56,10 @@ prover = Groth16Prover(circuit)
 proving_key, verification_key = prover.setup()
 
 # Generate proof (custom ZK proof, not standard Groth16)
-proof = prover.prove(witness)  # ✓ Real cryptography, custom protocol
+proof = prover.prove(witness) # ✓ Real cryptography, custom protocol
 
 # Verify proof (custom verification logic)
-is_valid = prover.verify(proof, public_inputs, verification_key)  # ✓ Hash-based verification
+is_valid = prover.verify(proof, public_inputs, verification_key) # ✓ Hash-based verification
 ```
 
 ## Understanding the Implementation
@@ -96,7 +96,7 @@ is_valid = prover.verify(proof, public_inputs, verification_key)  # ✓ Hash-bas
 | QAP Polynomials | ⚠️ Simplified | ✅ Full | ✅ Different approach |
 | Trusted Setup | ⚠️ Basic | ✅ MPC-based | ✅ Universal |
 | Pairing-Based | ⚠️ Partial | ✅ Yes | ✅ Yes |
-| Production Ready | ❌ No | ✅ Yes | ✅ Yes |
+| ✅ | ❌ No | ✅ Yes | ✅ Yes |
 | Audit Status | ❌ Not audited | ✅ Well-audited | ✅ Well-audited |
 
 ### When to Use This Implementation
@@ -111,7 +111,7 @@ is_valid = prover.verify(proof, public_inputs, verification_key)  # ✓ Hash-bas
 **❌ Not Suitable For:**
 - Production systems requiring security audits
 - Integration with Ethereum or other blockchains
-- High-value financial applications  
+- High-value financial applications 
 - Systems requiring standards compliance
 - Deployment without additional security review
 
@@ -122,28 +122,28 @@ is_valid = prover.verify(proof, public_inputs, verification_key)  # ✓ Hash-bas
 To upgrade this to production-grade Groth16 zk-SNARKs (4-6 weeks of effort):
 
 1. **Full QAP Implementation** (1-2 weeks)
-   - Complete polynomial interpolation from R1CS
-   - Proper QAP polynomial generation
-   - Lagrange interpolation for witness polynomials
+ - Complete polynomial interpolation from R1CS
+ - Proper QAP polynomial generation
+ - Lagrange interpolation for witness polynomials
 
 2. **Complete Pairing-Based Cryptography** (2-3 weeks)
-   - Full implementation of pairing operations
-   - Proper proof generation using pairings
-   - Standard Groth16 verification equation
+ - Full implementation of pairing operations
+ - Proper proof generation using pairings
+ - Standard Groth16 verification equation
 
 3. **Multi-Party Computation Setup** (1 week)
-   - Distributed trusted setup ceremony
-   - Powers of tau generation
-   - Secure parameter generation
+ - Distributed trusted setup ceremony
+ - Powers of tau generation
+ - Secure parameter generation
 
 4. **Security Audit** (ongoing)
-   - Professional cryptographic audit
-   - Formal verification of circuits
-   - Penetration testing
+ - Professional cryptographic audit
+ - Formal verification of circuits
+ - Penetration testing
 
 ### Recommended Production Alternatives
 
-If you need production-ready ZK-SNARKs now, consider these audited implementations:
+If you need ZK-SNARKs now, consider these audited implementations:
 
 #### Option A: Circom + SnarkJS (JavaScript/TypeScript)
 ```bash
@@ -202,21 +202,21 @@ cargo add ark-bn254
 pragma circom 2.0.0;
 
 template UnlearningProof() {
-    // Public inputs
-    signal input merkle_root_before;
-    signal input merkle_root_after;
-    signal input pattern_hash;
-    
-    // Private inputs (witness)
-    signal input model_weights[1000];
-    signal input gradient_updates[1000];
-    
-    // Constraints
-    // Verify that unlearning was performed correctly
-    // without revealing model weights or gradients
-    
-    component constraint_check = ConstraintChecker();
-    // ... circuit logic
+ // Public inputs
+ signal input merkle_root_before;
+ signal input merkle_root_after;
+ signal input pattern_hash;
+ 
+ // Private inputs (witness)
+ signal input model_weights[1000];
+ signal input gradient_updates[1000];
+ 
+ // Constraints
+ // Verify that unlearning was performed correctly
+ // without revealing model weights or gradients
+ 
+ component constraint_check = ConstraintChecker();
+ // ... circuit logic
 }
 ```
 
@@ -318,7 +318,7 @@ Design a proper arithmetic circuit that verifies unlearning:
 ```
 Public Inputs:
 - merkle_root_before: Root of Merkle tree before unlearning
-- merkle_root_after: Root of Merkle tree after unlearning  
+- merkle_root_after: Root of Merkle tree after unlearning 
 - pattern_hash: Hash of pattern being unlearned
 - forget_loss_delta: Change in loss on forget set (should increase)
 - retain_loss_delta: Change in loss on retain set (should be minimal)
@@ -332,21 +332,21 @@ Private Inputs (Witness):
 
 Constraints:
 1. Merkle tree validity:
-   - Verify merkle_proofs against merkle_root_before
-   - Verify updated tree matches merkle_root_after
+ - Verify merkle_proofs against merkle_root_before
+ - Verify updated tree matches merkle_root_after
 
 2. Gradient surgery correctness:
-   - gradient_updates orthogonal to retain gradients
-   - gradient_updates aligned with forget gradients
-   - Updates applied correctly: weights_after = weights_before + lr * gradient_updates
+ - gradient_updates orthogonal to retain gradients
+ - gradient_updates aligned with forget gradients
+ - Updates applied correctly: weights_after = weights_before + lr * gradient_updates
 
 3. Loss constraints:
-   - forget_loss_delta > threshold (unlearning worked)
-   - retain_loss_delta < threshold (didn't harm other knowledge)
+ - forget_loss_delta > threshold (unlearning worked)
+ - retain_loss_delta < threshold (didn't harm other knowledge)
 
 4. Completeness:
-   - All affected samples match pattern_hash
-   - No other samples were modified
+ - All affected samples match pattern_hash
+ - No other samples were modified
 ```
 
 ### 4. Trusted Setup or Transparent Setup
@@ -394,55 +394,55 @@ Currently, gradient surgery is simulated. For production:
 ```python
 # Current (Simulated)
 def _gradient_surgery(self, request):
-    # Simulated - returns fake metrics
-    return {
-        'records_affected': 42,
-        'gradient_norm': 0.0123
-    }
+ # Simulated - returns fake metrics
+ return {
+ 'records_affected': 42,
+ 'gradient_norm': 0.0123
+ }
 
 # Production (Real Integration)
 def _gradient_surgery(self, request):
-    # 1. Load actual model
-    model = torch.load(request.model_path)
-    
-    # 2. Identify forget and retain sets
-    forget_data = self._load_data_matching_pattern(request.pattern)
-    retain_data = self._load_data_not_matching_pattern(request.pattern)
-    
-    # 3. Compute gradients
-    forget_grads = compute_gradients(model, forget_data)
-    retain_grads = compute_gradients(model, retain_data)
-    
-    # 4. Perform gradient surgery
-    surgical_grads = project_gradient(
-        forget_grads, 
-        retain_grads,
-        method='orthogonal'
-    )
-    
-    # 5. Update model
-    optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
-    apply_gradients(model, surgical_grads)
-    
-    # 6. Generate witness for ZK proof
-    witness = {
-        'model_weights_before': serialize_weights(model_before),
-        'model_weights_after': serialize_weights(model),
-        'gradient_updates': serialize_gradients(surgical_grads),
-        'forget_loss_before': loss_before,
-        'forget_loss_after': loss_after
-    }
-    
-    # 7. Generate ZK proof
-    proof = generate_groth16_proof(witness, circuit_path)
-    
-    return {
-        'records_affected': len(forget_data),
-        'gradient_norm': torch.norm(surgical_grads).item(),
-        'zk_proof': proof,
-        'merkle_root_before': compute_merkle_root(model_before),
-        'merkle_root_after': compute_merkle_root(model)
-    }
+ # 1. Load actual model
+ model = torch.load(request.model_path)
+ 
+ # 2. Identify forget and retain sets
+ forget_data = self._load_data_matching_pattern(request.pattern)
+ retain_data = self._load_data_not_matching_pattern(request.pattern)
+ 
+ # 3. Compute gradients
+ forget_grads = compute_gradients(model, forget_data)
+ retain_grads = compute_gradients(model, retain_data)
+ 
+ # 4. Perform gradient surgery
+ surgical_grads = project_gradient(
+ forget_grads, 
+ retain_grads,
+ method='orthogonal'
+ )
+ 
+ # 5. Update model
+ optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
+ apply_gradients(model, surgical_grads)
+ 
+ # 6. Generate witness for ZK proof
+ witness = {
+ 'model_weights_before': serialize_weights(model_before),
+ 'model_weights_after': serialize_weights(model),
+ 'gradient_updates': serialize_gradients(surgical_grads),
+ 'forget_loss_before': loss_before,
+ 'forget_loss_after': loss_after
+ }
+ 
+ # 7. Generate ZK proof
+ proof = generate_groth16_proof(witness, circuit_path)
+ 
+ return {
+ 'records_affected': len(forget_data),
+ 'gradient_norm': torch.norm(surgical_grads).item(),
+ 'zk_proof': proof,
+ 'merkle_root_before': compute_merkle_root(model_before),
+ 'merkle_root_after': compute_merkle_root(model)
+ }
 ```
 
 ### 6. Verification Implementation
@@ -452,38 +452,38 @@ Replace simplified verification with real pairing checks:
 ```python
 # Current (Simplified)
 def verify_proof(self, proof: str, public_inputs: Dict) -> bool:
-    # Just checks hash - NOT cryptographic
-    proof_hash = hashlib.sha256(proof.encode()).hexdigest()
-    return True  # Always passes
+ # Just checks hash - NOT cryptographic
+ proof_hash = hashlib.sha256(proof.encode()).hexdigest()
+ return True # Always passes
 
 # Production (Real Groth16 Verification)
 def verify_groth16_proof(
-    proof: GrothProof,
-    vk: VerificationKey,
-    public_inputs: List[int]
+ proof: GrothProof,
+ vk: VerificationKey,
+ public_inputs: List[int]
 ) -> bool:
-    """
-    Verify Groth16 proof using pairing checks.
-    
-    Verifies: e(A, B) = e(α, β) * e(IC, γ) * e(C, δ)
-    where IC = vk.IC0 + Σ(public_input[i] * vk.IC[i])
-    """
-    from py_ecc.bn128 import pairing, add, multiply, G1, G2, FQ12
-    
-    # Compute IC = IC0 + Σ(input[i] * IC[i])
-    IC = vk.IC[0]
-    for i, inp in enumerate(public_inputs):
-        IC = add(IC, multiply(vk.IC[i + 1], inp))
-    
-    # Verify pairing equation
-    left = pairing(G2, proof.a)
-    right = (
-        pairing(vk.beta, vk.alpha) *
-        pairing(IC, vk.gamma) *
-        pairing(proof.c, vk.delta)
-    )
-    
-    return left == right
+ """
+ Verify Groth16 proof using pairing checks.
+ 
+ Verifies: e(A, B) = e(α, β) * e(IC, γ) * e(C, δ)
+ where IC = vk.IC0 + Σ(public_input[i] * vk.IC[i])
+ """
+ from py_ecc.bn128 import pairing, add, multiply, G1, G2, FQ12
+ 
+ # Compute IC = IC0 + Σ(input[i] * IC[i])
+ IC = vk.IC[0]
+ for i, inp in enumerate(public_inputs):
+ IC = add(IC, multiply(vk.IC[i + 1], inp))
+ 
+ # Verify pairing equation
+ left = pairing(G2, proof.a)
+ right = (
+ pairing(vk.beta, vk.alpha) *
+ pairing(IC, vk.gamma) *
+ pairing(proof.c, vk.delta)
+ )
+ 
+ return left == right
 ```
 
 ## Migration Path
@@ -567,13 +567,13 @@ prover = Groth16Prover(circuit)
 proving_key, verification_key = prover.setup()
 
 # Create witness (private data)
-witness = [1, 5, 6]  # Example: [1, x, y] where x*y = x+y (5*6 = 5+6 is false, but demo)
+witness = [1, 5, 6] # Example: [1, x, y] where x*y = x+y (5*6 = 5+6 is false, but demo)
 
 # Generate proof
 proof = prover.prove(witness, proving_key)
 
 # Verify proof (only public inputs needed)
-public_inputs = [1]  # Only the constant "1"
+public_inputs = [1] # Only the constant "1"
 is_valid = prover.verify(proof, public_inputs, verification_key)
 
 print(f"Proof valid: {is_valid}")
@@ -589,11 +589,11 @@ import hashlib
 # Scenario: Prove model was updated without revealing weights
 
 # Step 1: Create Merkle trees for model states
-weights_before = [0.5, 0.3, 0.8, 0.2]  # Original weights
-weights_after = [0.5, 0.0, 0.8, 0.2]   # After unlearning (zeroed one weight)
+weights_before = [0.5, 0.3, 0.8, 0.2] # Original weights
+weights_after = [0.5, 0.0, 0.8, 0.2] # After unlearning (zeroed one weight)
 
 def hash_leaf(data):
-    return hashlib.sha256(str(data).encode()).digest()
+ return hashlib.sha256(str(data).encode()).digest()
 
 tree_before = MerkleTree([hash_leaf(w) for w in weights_before])
 tree_after = MerkleTree([hash_leaf(w) for w in weights_after])
@@ -604,8 +604,8 @@ root_after = tree_after.get_root()
 
 # Step 3: Create circuit for unlearning proof
 circuit = create_unlearning_circuit(
-    num_samples=len(weights_before),
-    model_size=len(weights_before)
+ num_samples=len(weights_before),
+ model_size=len(weights_before)
 )
 
 # Step 4: Generate proof (weights stay private)
@@ -619,7 +619,7 @@ proof = prover.prove(witness, proving_key)
 
 # Step 5: Verify (only roots are public)
 public_inputs = [int.from_bytes(root_before[:8], 'big'), 
-                 int.from_bytes(root_after[:8], 'big')]
+ int.from_bytes(root_after[:8], 'big')]
 
 is_valid = prover.verify(proof, public_inputs, verification_key)
 
@@ -636,69 +636,69 @@ from src.gvulcan.zk.snark import Groth16Prover, create_unlearning_circuit
 from src.gvulcan.merkle import MerkleTree
 
 class ZKUnlearningVerifier:
-    """Verifies model unlearning with zero-knowledge proofs."""
-    
-    def __init__(self, model_size: int):
-        self.circuit = create_unlearning_circuit(
-            num_samples=100,
-            model_size=model_size
-        )
-        self.prover = Groth16Prover(self.circuit)
-        self.proving_key, self.verification_key = self.prover.setup()
-    
-    def commit_model(self, model: torch.nn.Module) -> bytes:
-        """Create Merkle commitment to model weights."""
-        weights = []
-        for param in model.parameters():
-            weights.extend(param.detach().cpu().flatten().tolist())
-        
-        # Create Merkle tree
-        import hashlib
-        leaves = [hashlib.sha256(str(w).encode()).digest() for w in weights]
-        tree = MerkleTree(leaves)
-        return tree.get_root()
-    
-    def prove_unlearning(self, model_before: torch.nn.Module, 
-                         model_after: torch.nn.Module) -> dict:
-        """Generate ZK proof of unlearning."""
-        
-        # Get commitments
-        commitment_before = self.commit_model(model_before)
-        commitment_after = self.commit_model(model_after)
-        
-        # Extract weights for witness
-        weights_before = []
-        for param in model_before.parameters():
-            weights_before.extend(param.detach().cpu().flatten().tolist()[:100])
-        
-        weights_after = []
-        for param in model_after.parameters():
-            weights_after.extend(param.detach().cpu().flatten().tolist()[:100])
-        
-        # Create witness
-        witness = [1] + weights_before + weights_after
-        
-        # Generate proof
-        proof = self.prover.prove(witness, self.proving_key)
-        
-        return {
-            'proof': proof,
-            'commitment_before': commitment_before,
-            'commitment_after': commitment_after
-        }
-    
-    def verify_unlearning(self, proof_data: dict) -> bool:
-        """Verify ZK proof of unlearning."""
-        public_inputs = [
-            int.from_bytes(proof_data['commitment_before'][:8], 'big'),
-            int.from_bytes(proof_data['commitment_after'][:8], 'big')
-        ]
-        
-        return self.prover.verify(
-            proof_data['proof'],
-            public_inputs,
-            self.verification_key
-        )
+ """Verifies model unlearning with zero-knowledge proofs."""
+ 
+ def __init__(self, model_size: int):
+ self.circuit = create_unlearning_circuit(
+ num_samples=100,
+ model_size=model_size
+ )
+ self.prover = Groth16Prover(self.circuit)
+ self.proving_key, self.verification_key = self.prover.setup()
+ 
+ def commit_model(self, model: torch.nn.Module) -> bytes:
+ """Create Merkle commitment to model weights."""
+ weights = []
+ for param in model.parameters():
+ weights.extend(param.detach().cpu().flatten().tolist())
+ 
+ # Create Merkle tree
+ import hashlib
+ leaves = [hashlib.sha256(str(w).encode()).digest() for w in weights]
+ tree = MerkleTree(leaves)
+ return tree.get_root()
+ 
+ def prove_unlearning(self, model_before: torch.nn.Module, 
+ model_after: torch.nn.Module) -> dict:
+ """Generate ZK proof of unlearning."""
+ 
+ # Get commitments
+ commitment_before = self.commit_model(model_before)
+ commitment_after = self.commit_model(model_after)
+ 
+ # Extract weights for witness
+ weights_before = []
+ for param in model_before.parameters():
+ weights_before.extend(param.detach().cpu().flatten().tolist()[:100])
+ 
+ weights_after = []
+ for param in model_after.parameters():
+ weights_after.extend(param.detach().cpu().flatten().tolist()[:100])
+ 
+ # Create witness
+ witness = [1] + weights_before + weights_after
+ 
+ # Generate proof
+ proof = self.prover.prove(witness, self.proving_key)
+ 
+ return {
+ 'proof': proof,
+ 'commitment_before': commitment_before,
+ 'commitment_after': commitment_after
+ }
+ 
+ def verify_unlearning(self, proof_data: dict) -> bool:
+ """Verify ZK proof of unlearning."""
+ public_inputs = [
+ int.from_bytes(proof_data['commitment_before'][:8], 'big'),
+ int.from_bytes(proof_data['commitment_after'][:8], 'big')
+ ]
+ 
+ return self.prover.verify(
+ proof_data['proof'],
+ public_inputs,
+ self.verification_key
+ )
 
 # Usage
 model = torch.nn.Linear(10, 10)
@@ -720,7 +720,7 @@ These examples demonstrate the **current custom implementation**. They show:
 - ✅ How to use the ZK API
 - ✅ Integration patterns with ML models
 - ✅ Merkle tree commitments
-- ⚠️ **Not** production-ready cryptography
+- ⚠️ **Not** cryptography
 - ⚠️ For demonstration and development only
 
 For production use, replace with standard Groth16/PLONK implementation.
@@ -753,7 +753,7 @@ For most applications, start with Groth16 using an existing trusted setup ceremo
 
 ## Conclusion
 
-The current ZK implementation is a **simplified placeholder** suitable for development but **not for production**. To deploy a production-ready system:
+The current ZK implementation is a **simplified placeholder** suitable for development but **not for production**. To deploy a system:
 
 1. **Choose a real SNARK library** (circom + snarkjs recommended)
 2. **Design proper circuits** for your unlearning verification

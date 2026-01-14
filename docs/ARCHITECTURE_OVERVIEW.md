@@ -1,6 +1,6 @@
 # VulcanAMI Platform Architecture Overview
 
-**Version:** 2.2.0  
+**Version:** 2.2.0 
 **Last Updated:** December 23, 2024
 
 This document provides a comprehensive architectural deep dive into the VulcanAMI/GraphixVulcan platform, covering all layers from conceptual stratification to implementation details.
@@ -44,19 +44,19 @@ Each layer publishes discrete metrics, exposes standardized error/value envelope
 ## 2. Graph IR Canonical Shape
 ```json
 {
-  "nodes": [
-    { "id": "string", "type": "string", "params": {}, "critical": false }
-  ],
-  "edges": [
-    { "from": "nodeOrObj", "to": "nodeOrObj", "metadata": {} }
-  ],
-  "metadata": {
-    "version": "semver",
-    "authors": ["agent_id"],
-    "risk_profile": {},
-    "lineage": [],
-    "_semantic_transfers": []
-  }
+ "nodes": [
+ { "id": "string", "type": "string", "params": {}, "critical": false }
+ ],
+ "edges": [
+ { "from": "nodeOrObj", "to": "nodeOrObj", "metadata": {} }
+ ],
+ "metadata": {
+ "version": "semver",
+ "authors": ["agent_id"],
+ "risk_profile": {},
+ "lineage": [],
+ "_semantic_transfers": []
+ }
 }
 ```
 
@@ -175,7 +175,7 @@ The VulcanAMI platform integrates multiple sophisticated components:
 
 ### 16.1 GraphixIR Compiler Layer
 
-**Location:** `src/compiler/graph_compiler.py`  
+**Location:** `src/compiler/graph_compiler.py` 
 **Purpose:** Compiles JSON graph representations to optimized native machine code via LLVM
 
 **Key Features:**
@@ -191,7 +191,7 @@ The VulcanAMI platform integrates multiple sophisticated components:
 
 ### 16.2 LLM Core
 
-**Location:** `src/llm_core/`  
+**Location:** `src/llm_core/` 
 **Purpose:** Custom transformer with graph execution integration
 
 **Components:**
@@ -207,7 +207,7 @@ The VulcanAMI platform integrates multiple sophisticated components:
 
 ### 16.3 Persistent Memory v46
 
-**Location:** `src/persistant_memory_v46/`  
+**Location:** `src/persistant_memory_v46/` 
 **Purpose:** Advanced storage with privacy-preserving unlearning
 
 **Components:**
@@ -216,16 +216,16 @@ The VulcanAMI platform integrates multiple sophisticated components:
 - **Machine Unlearning**: 4 methods (Gradient Surgery, SISA, Influence Functions, Amnesiac)
 - **Zero-Knowledge Proofs**: Groth16 zk-SNARKs for unlearning verification
 
-### 16.4 VULCAN-AGI Cognitive Architecture
+### 16.4 VULCAN-AMI Cognitive Architecture
 
-**Location:** `src/vulcan/`  
+**Location:** `src/vulcan/` 
 **Scale:** 256 files, 13,304 functions, 285,000+ LOC
 
 **Subsystems:**
 - **World Model**: Causal reasoning, state prediction, intervention management
-  - **SystemObserver**: Converts system events (queries, engine results, validation failures) into observations that feed the causal learning system
-  - **Routing Recommendations**: Provides learned routing suggestions based on historical patterns
-  - **Performance Introspection**: Self-awareness of system capabilities and known issues
+ - **SystemObserver**: Converts system events (queries, engine results, validation failures) into observations that feed the causal learning system
+ - **Routing Recommendations**: Provides learned routing suggestions based on historical patterns
+ - **Performance Introspection**: Self-awareness of system capabilities and known issues
 - **Meta-Reasoning**: Self-improvement, motivational introspection, CSIU framework
 - **Reasoning Systems**: Symbolic, causal, analogical, multimodal, probabilistic
 - **Memory Systems**: Hierarchical, distributed, episodic, semantic, working
@@ -238,38 +238,38 @@ The VulcanAMI platform integrates multiple sophisticated components:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ 1. GRAPHIX-VULCAN BRIDGE (Orchestration)                    │
+│ 1. GRAPHIX-VULCAN BRIDGE (Orchestration) │
 └───┬─────────────────────────────────────────────────────────┘
-    ↓
+ ↓
 ┌───▼─────────────────────────────────────────────────────────┐
-│ 2. EXAMINE PHASE                                             │
-│    - Graph RAG retrieves relevant context                    │
-│    - World Model updates with observations                   │
-│    - Confidence and uncertainty quantification               │
+│ 2. EXAMINE PHASE │
+│ - Graph RAG retrieves relevant context │
+│ - World Model updates with observations │
+│ - Confidence and uncertainty quantification │
 └───┬─────────────────────────────────────────────────────────┘
-    ↓
+ ↓
 ┌───▼─────────────────────────────────────────────────────────┐
-│ 3. SELECT PHASE                                              │
-│    - VULCAN generates candidate actions                      │
-│    - Predict outcomes (causal prediction engine)             │
-│    - Meta-reasoning filters (CSIU, safety)                   │
-│    - Select optimal action                                   │
+│ 3. SELECT PHASE │
+│ - VULCAN generates candidate actions │
+│ - Predict outcomes (causal prediction engine) │
+│ - Meta-reasoning filters (CSIU, safety) │
+│ - Select optimal action │
 └───┬─────────────────────────────────────────────────────────┘
-    ↓
+ ↓
 ┌───▼─────────────────────────────────────────────────────────┐
-│ 4. APPLY PHASE                                               │
-│    - Safety validation                                       │
-│    - Graph compilation (if needed)                           │
-│    - LLM generation or graph execution                       │
-│    - Monitor with rollback capability                        │
+│ 4. APPLY PHASE │
+│ - Safety validation │
+│ - Graph compilation (if needed) │
+│ - LLM generation or graph execution │
+│ - Monitor with rollback capability │
 └───┬─────────────────────────────────────────────────────────┘
-    ↓
+ ↓
 ┌───▼─────────────────────────────────────────────────────────┐
-│ 5. REMEMBER PHASE                                            │
-│    - Update World Model                                      │
-│    - Store in Persistent Memory with unlearning metadata     │
-│    - Extract principles via Knowledge Crystallizer           │
-│    - Trigger self-improvement if needed                      │
+│ 5. REMEMBER PHASE │
+│ - Update World Model │
+│ - Store in Persistent Memory with unlearning metadata │
+│ - Extract principles via Knowledge Crystallizer │
+│ - Trigger self-improvement if needed │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -294,26 +294,26 @@ The **SystemObserver** (located in `vulcan/world_model/system_observer.py`) crea
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    Query Processing Pipeline                 │
-│  QueryRouter → ReasoningIntegration → Engines → Response    │
+│ Query Processing Pipeline │
+│ QueryRouter → ReasoningIntegration → Engines → Response │
 └───┬─────────────────────────────────────────────────────────┘
-    │ Events: query_start, engine_result, validation_failure,
-    │         outcome, error
-    ↓
+ │ Events: query_start, engine_result, validation_failure,
+ │ outcome, error
+ ↓
 ┌───▼─────────────────────────────────────────────────────────┐
-│                      SystemObserver                          │
-│  - Converts system events to Observation objects            │
-│  - Tracks query, engine, and outcome history                │
-│  - Detects patterns (formal logic, probability, etc.)       │
+│ SystemObserver │
+│ - Converts system events to Observation objects │
+│ - Tracks query, engine, and outcome history │
+│ - Detects patterns (formal logic, probability, etc.) │
 └───┬─────────────────────────────────────────────────────────┘
-    │ Observations
-    ↓
+ │ Observations
+ ↓
 ┌───▼─────────────────────────────────────────────────────────┐
-│                      World Model                             │
-│  - Updates causal graph with observations                   │
-│  - Learns which engines succeed on which query types        │
-│  - Provides routing recommendations                         │
-│  - Enables performance introspection                        │
+│ World Model │
+│ - Updates causal graph with observations │
+│ - Learns which engines succeed on which query types │
+│ - Provides routing recommendations │
+│ - Enables performance introspection │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -321,32 +321,32 @@ The **SystemObserver** (located in `vulcan/world_model/system_observer.py`) crea
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                  API Layer (Flask/FastAPI)                   │
-│         Registry API | Arena API | Gateway | Health          │
+│ API Layer (Flask/FastAPI) │
+│ Registry API | Arena API | Gateway | Health │
 ├─────────────────────────────────────────────────────────────┤
-│                    Governance Layer                          │
-│    Trust-Weighted Consensus | Policy Enforcement | Voting   │
+│ Governance Layer │
+│ Trust-Weighted Consensus | Policy Enforcement | Voting │
 ├─────────────────────────────────────────────────────────────┤
-│               VULCAN-AGI Core (285,000+ LOC)                 │
-│  ┌──────────────┬──────────────┬──────────────────────────┐ │
-│  │  Reasoning   │ World Model  │   Meta-Reasoning (Self-  │ │
-│  │   Systems    │   (Causal)   │   Improvement/Awareness) │ │
-│  ├──────────────┼──────────────┼──────────────────────────┤ │
-│  │   Memory     │   Planning   │   Safety & Ethics        │ │
-│  │  Hierarchy   │   Engine     │   Boundaries (CSIU)      │ │
-│  └──────────────┴──────────────┴──────────────────────────┘ │
+│ VULCAN-AMI Core (285,000+ LOC) │
+│ ┌──────────────┬──────────────┬──────────────────────────┐ │
+│ │ Reasoning │ World Model │ Meta-Reasoning (Self- │ │
+│ │ Systems │ (Causal) │ Improvement/Awareness) │ │
+│ ├──────────────┼──────────────┼──────────────────────────┤ │
+│ │ Memory │ Planning │ Safety & Ethics │ │
+│ │ Hierarchy │ Engine │ Boundaries (CSIU) │ │
+│ └──────────────┴──────────────┴──────────────────────────┘ │
 ├─────────────────────────────────────────────────────────────┤
-│         Graph Execution & Compilation Layer                  │
-│  GraphixIR Compiler | Unified Runtime | LLM Core (3.2K LOC) │
+│ Graph Execution & Compilation Layer │
+│ GraphixIR Compiler | Unified Runtime | LLM Core (3.2K LOC) │
 ├─────────────────────────────────────────────────────────────┤
-│      Persistent Memory v46 (5.3K LOC) - Storage Layer       │
-│  Graph RAG | LSM Tree | Unlearning | ZK Proofs | S3/CDN    │
+│ Persistent Memory v46 (5.3K LOC) - Storage Layer │
+│ Graph RAG | LSM Tree | Unlearning | ZK Proofs | S3/CDN │
 ├─────────────────────────────────────────────────────────────┤
-│            Observability & Security Layer                    │
-│  Prometheus | Grafana | Audit Logs | Security Scanning      │
+│ Observability & Security Layer │
+│ Prometheus | Grafana | Audit Logs | Security Scanning │
 ├─────────────────────────────────────────────────────────────┤
-│                Infrastructure & Deployment                   │
-│   Docker/K8s | Helm Charts | Redis | SQLite/PostgreSQL     │
+│ Infrastructure & Deployment │
+│ Docker/K8s | Helm Charts | Redis | SQLite/PostgreSQL │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -361,5 +361,5 @@ The **SystemObserver** (located in `vulcan/world_model/system_observer.py`) crea
 
 ---
 
-**Document Version:** 2.2.0  
+**Document Version:** 2.2.0 
 **Last Updated:** December 23, 2024
