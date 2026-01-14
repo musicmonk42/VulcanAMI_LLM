@@ -16,6 +16,7 @@ from .types import (
     LOG_PREFIX,
     FAST_PATH_COMPLEXITY_THRESHOLD,
     DECOMPOSITION_COMPLEXITY_THRESHOLD,
+    DEFENSE_COMPLEXITY_OVERRIDE,
 )
 from .query_router import get_reasoning_type_from_route
 from .selection_strategies import (
@@ -108,16 +109,17 @@ def apply_reasoning(
 
         try:
             # =================================================================
-            # Note: Check for self-referential queries FIRST
-            # Note: Also check for ethical queries that need world model
+            # DEFENSE-IN-DEPTH: Early detection for all checkpoints
             # =================================================================
-            # World model handles queries about VULCAN's self directly.
-            # For ALL queries that are about VULCAN itself (capabilities,
-            # preferences, self-awareness, etc.), consult world model first.
-            # Ethical queries also benefit from world model's ethical framework.
+            # Check ONCE at method entry to avoid redundant calls. This cached
+            # result is reused in:
+            # 1. World model introspection check (below)
+            # 2. Classifier skip defense checkpoint
+            # 3. Pattern fallback defense checkpoint
+            # 4. Fast path defense checkpoint
             # =================================================================
-            is_self_ref = self._is_self_referential(query)
-            is_ethical = self._is_ethical_query(query)
+            is_self_ref = is_self_referential(query)
+            is_ethical = is_ethical_query(query)
             
             # Initialize wm_result to None - will be populated if world_model is consulted
             wm_result = None
@@ -316,29 +318,72 @@ def apply_reasoning(
                         )
                         # Don't skip - fall through to World Model invocation below
                     else:
-                        # Only skip for truly trivial queries (GREETING, CHITCHAT)
-                        logger.info(
-                            f"{LOG_PREFIX} CLASSIFIER SKIP: '{query[:30]}' classified as "
-                            f"{classification.category} - skipping reasoning entirely"
-                        )
-                        with self._stats_lock:
-                            self._stats.fast_path_count += 1
-                        
-                        return ReasoningResult(
-                            selected_tools=classification.suggested_tools or ["general"],
-                            reasoning_strategy=ReasoningStrategyType.DIRECT.value,
-                            confidence=classification.confidence,
-                            rationale=f"Query classified as {classification.category} - no reasoning needed",
-                            metadata={
-                                "fast_path": True,
-                                "classifier_category": classification.category,
-                                "classifier_source": classification.source,
-                                "complexity": classification.complexity,
-                                "query_type": classification.category.lower(),
-                                "selection_time_ms": (time.perf_counter() - selection_start) * 1000,
-                                "needs_reasoning": False,
-                            },
-                        )
+                        # =================================================================
+                        # DEFENSE-IN-DEPTH: Last-chance check before classifier skip
+                        # =================================================================
+                        # Critical safeguard: Even if classifier says skip_reasoning,
+                        # check for self-referential/ethical content that must escalate.
+                        # Classifier may misclassify due to short length or simple phrasing.
+                        # Uses cached detection results from method entry.
+                        # =================================================================
+                        if is_self_ref or is_ethical:
+                            query_nature = 'self-referential' if is_self_ref else 'ethical'
+                            logger.warning(
+                                f"{LOG_PREFIX} DEFENSE-IN-DEPTH: Classifier skip attempted "
+                                f"(category={classification.category}) but {query_nature} query detected. "
+                                f"Escalating to world_model/meta_reasoning. Query: '{query[:60]}...'"
+                            )
+                            
+                            # Force category mutation to ensure proper routing
+                            original_query_type = query_type
+                            query_type = 'self_introspection' if is_self_ref else 'ethical'
+                            
+                            # Set context to guarantee world_model routing
+                            if context is None:
+                                context = {}
+                            context['defense_in_depth_escalation'] = True
+                            context['escalation_reason'] = f"{query_nature} content misclassified as {classification.category}"
+                            context['original_query_type'] = original_query_type
+                            context['original_category'] = classification.category
+                            context['classifier_suggested_tools'] = ['world_model']
+                            context['prevent_router_tool_override'] = True
+                            context['classifier_is_authoritative'] = True
+                            
+                            # Override complexity and classification to ensure reasoning is triggered
+                            # Use a value above FAST_PATH_COMPLEXITY_THRESHOLD
+                            complexity = max(complexity, FAST_PATH_COMPLEXITY_THRESHOLD + DEFENSE_COMPLEXITY_OVERRIDE)
+                            classification.skip_reasoning = False
+                            
+                            logger.info(
+                                f"{LOG_PREFIX} DEFENSE-IN-DEPTH: Query type updated {original_query_type} -> {query_type}, "
+                                f"skip_reasoning overridden to False, forcing world_model reasoning"
+                            )
+                            
+                            # Fall through to normal reasoning path (don't return here)
+                        else:
+                            # Only skip for truly trivial queries (GREETING, CHITCHAT)
+                            logger.info(
+                                f"{LOG_PREFIX} CLASSIFIER SKIP: '{query[:30]}' classified as "
+                                f"{classification.category} - skipping reasoning entirely"
+                            )
+                            with self._stats_lock:
+                                self._stats.fast_path_count += 1
+                            
+                            return ReasoningResult(
+                                selected_tools=classification.suggested_tools or ["general"],
+                                reasoning_strategy=ReasoningStrategyType.DIRECT.value,
+                                confidence=classification.confidence,
+                                rationale=f"Query classified as {classification.category} - no reasoning needed",
+                                metadata={
+                                    "fast_path": True,
+                                    "classifier_category": classification.category,
+                                    "classifier_source": classification.source,
+                                    "complexity": classification.complexity,
+                                    "query_type": classification.category.lower(),
+                                    "selection_time_ms": (time.perf_counter() - selection_start) * 1000,
+                                    "needs_reasoning": False,
+                                },
+                            )
                 
                 # Classifier identified this needs reasoning - use its suggestions
                 # Override the heuristic complexity with LLM-derived complexity
@@ -586,44 +631,123 @@ def apply_reasoning(
             )
             
             if is_simple_greeting:
-                logger.info(
-                    f"{LOG_PREFIX} PATTERN FALLBACK: '{query[:20]}' (len={len(query)}) - "
-                    f"skipping reasoning entirely"
-                )
-                with self._stats_lock:
-                    self._stats.fast_path_count += 1
-                
-                return ReasoningResult(
-                    selected_tools=["general"],
-                    reasoning_strategy=ReasoningStrategyType.DIRECT.value,
-                    confidence=0.95,
-                    rationale="Simple greeting/conversational - bypassing reasoning",
-                    metadata={
-                        "fast_path": True,
-                        "simple_query_bypass": True,
-                        "complexity": 0.0,  # Override upstream complexity
-                        "query_type": "conversational",
-                        "selection_time_ms": 0.0,
-                    },
-                )
+                # =================================================================
+                # DEFENSE-IN-DEPTH: Last-chance check before pattern fallback
+                # =================================================================
+                # Even if pattern matching identifies a simple greeting, check for
+                # self-referential/ethical content that must route to world_model.
+                # Uses cached detection results from method entry.
+                # =================================================================
+                if is_self_ref or is_ethical:
+                    query_nature = 'self-referential' if is_self_ref else 'ethical'
+                    logger.warning(
+                        f"{LOG_PREFIX} DEFENSE-IN-DEPTH: Pattern fallback attempted but "
+                        f"{query_nature} query detected. Escalating to world_model/meta_reasoning. "
+                        f"Query: '{query[:60]}...'"
+                    )
+                    
+                    # Force category mutation to ensure proper routing
+                    query_type = 'self_introspection' if is_self_ref else 'ethical'
+                    
+                    # Set context to guarantee world_model routing
+                    if context is None:
+                        context = {}
+                    context['defense_in_depth_escalation'] = True
+                    context['escalation_reason'] = f"{query_nature} content detected in apparent greeting"
+                    context['classifier_suggested_tools'] = ['world_model']
+                    context['prevent_router_tool_override'] = True
+                    context['classifier_is_authoritative'] = True
+                    
+                    # Fall through to normal reasoning path (don't return here)
+                    logger.info(
+                        f"{LOG_PREFIX} DEFENSE-IN-DEPTH: Routing to world_model for "
+                        f"{query_nature} analysis despite simple appearance"
+                    )
+                else:
+                    # Truly simple greeting - safe to bypass
+                    logger.info(
+                        f"{LOG_PREFIX} PATTERN FALLBACK: '{query[:20]}' (len={len(query)}) - "
+                        f"skipping reasoning entirely"
+                    )
+                    with self._stats_lock:
+                        self._stats.fast_path_count += 1
+                    
+                    return ReasoningResult(
+                        selected_tools=["general"],
+                        reasoning_strategy=ReasoningStrategyType.DIRECT.value,
+                        confidence=0.95,
+                        rationale="Simple greeting/conversational - bypassing reasoning",
+                        metadata={
+                            "fast_path": True,
+                            "simple_query_bypass": True,
+                            "complexity": 0.0,  # Override upstream complexity
+                            "query_type": "conversational",
+                            "selection_time_ms": 0.0,
+                        },
+                    )
             
             # Fast path for simple queries - skip heavy tool selection
             if complexity < FAST_PATH_COMPLEXITY_THRESHOLD:
-                with self._stats_lock:
-                    self._stats.fast_path_count += 1
+                # =================================================================
+                # DEFENSE-IN-DEPTH: Last-chance check before fast path
+                # =================================================================
+                # Critical safeguard: Even if complexity is low, check for queries
+                # that MUST route to world_model/meta_reasoning regardless of
+                # apparent simplicity. This prevents:
+                # - "Are you conscious?" (low complexity but self-referential)
+                # - "Should I lie?" (simple but ethical)
+                # - "What are you?" (short but introspective)
+                # Uses cached detection results from method entry.
+                # =================================================================
+                if is_self_ref or is_ethical:
+                    query_nature = 'self-referential' if is_self_ref else 'ethical'
+                    logger.warning(
+                        f"{LOG_PREFIX} DEFENSE-IN-DEPTH: Fast path attempted (complexity={complexity:.2f}) "
+                        f"but {query_nature} query detected. Escalating to world_model/meta_reasoning. "
+                        f"Query: '{query[:60]}...'"
+                    )
+                    
+                    # Force category mutation to ensure proper routing
+                    original_query_type = query_type
+                    query_type = 'self_introspection' if is_self_ref else 'ethical'
+                    
+                    # Set context to guarantee world_model routing
+                    if context is None:
+                        context = {}
+                    context['defense_in_depth_escalation'] = True
+                    context['escalation_reason'] = f"{query_nature} content with low complexity={complexity:.2f}"
+                    context['original_query_type'] = original_query_type
+                    context['classifier_suggested_tools'] = ['world_model']
+                    context['prevent_router_tool_override'] = True
+                    context['classifier_is_authoritative'] = True
+                    
+                    # Override complexity to ensure reasoning is triggered
+                    # Use a value above FAST_PATH_COMPLEXITY_THRESHOLD
+                    complexity = max(complexity, FAST_PATH_COMPLEXITY_THRESHOLD + DEFENSE_COMPLEXITY_OVERRIDE)
+                    
+                    logger.info(
+                        f"{LOG_PREFIX} DEFENSE-IN-DEPTH: Query type updated {original_query_type} -> {query_type}, "
+                        f"complexity overridden to {complexity:.2f} to force world_model reasoning"
+                    )
+                    
+                    # Fall through to normal reasoning path (don't return here)
+                else:
+                    # Truly simple query - safe to use fast path
+                    with self._stats_lock:
+                        self._stats.fast_path_count += 1
 
-                return ReasoningResult(
-                    selected_tools=["general"],
-                    reasoning_strategy=ReasoningStrategyType.DIRECT.value,
-                    confidence=0.9,
-                    rationale="Simple query - using fast path direct response",
-                    metadata={
-                        "fast_path": True,
-                        "complexity": complexity,
-                        "query_type": query_type,
-                        "selection_time_ms": 0.0,
-                    },
-                )
+                    return ReasoningResult(
+                        selected_tools=["general"],
+                        reasoning_strategy=ReasoningStrategyType.DIRECT.value,
+                        confidence=0.9,
+                        rationale="Simple query - using fast path direct response",
+                        metadata={
+                            "fast_path": True,
+                            "complexity": complexity,
+                            "query_type": query_type,
+                            "selection_time_ms": 0.0,
+                        },
+                    )
 
             # ================================================================
             # FIX #1: QUERY PREPROCESSING - REMOVED (architectural band-aid)
