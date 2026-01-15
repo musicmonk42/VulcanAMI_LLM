@@ -449,7 +449,36 @@ class TestWhitelistValidation:
 
 
 # ============================================================================
-# Performance Tests
+# Pytest Fixtures (if needed)
+# ============================================================================
+
+@pytest.fixture
+def mock_benchmark():
+    """
+    Provide mock benchmark fixture when pytest-benchmark is not installed.
+    
+    Industry Standard: Graceful degradation for optional test dependencies.
+    This allows performance tests to run in a degraded mode when the
+    benchmark library isn't available.
+    """
+    try:
+        # If pytest-benchmark is installed, this import will succeed
+        import pytest_benchmark
+        # Return None to indicate real benchmark should be used
+        return None
+    except ImportError:
+        # pytest-benchmark not available, return a mock
+        class MockBenchmark:
+            """Mock benchmark that just calls the function once."""
+            def __call__(self, func, *args, **kwargs):
+                """Execute function once and return result."""
+                return func(*args, **kwargs)
+        
+        return MockBenchmark()
+
+
+# ============================================================================
+# Performance Tests (require pytest-benchmark)
 # ============================================================================
 
 class TestPerformance:
@@ -458,8 +487,17 @@ class TestPerformance:
     
     Industry Standard: Validate that security/safety checks don't
     significantly impact performance.
+    
+    Note: These tests require pytest-benchmark. Install with:
+        pip install pytest-benchmark
+    
+    If pytest-benchmark is not available, tests will be skipped.
     """
     
+    @pytest.mark.skipif(
+        not _is_pytest_benchmark_available(),
+        reason="pytest-benchmark not installed"
+    )
     def test_whitelist_check_is_fast(self, benchmark):
         """
         Test that whitelist checking is fast enough for production.
@@ -479,6 +517,10 @@ class TestPerformance:
         # benchmark.stats will contain timing statistics
         # This test will fail if the function is too slow
     
+    @pytest.mark.skipif(
+        not _is_pytest_benchmark_available(),
+        reason="pytest-benchmark not installed"
+    )
     def test_reasoning_check_is_fast(self, benchmark):
         """
         Test that reasoning detection is fast enough for production.
@@ -495,19 +537,20 @@ class TestPerformance:
 
 
 # ============================================================================
-# Pytest Fixtures (if needed)
+# Helper Functions
 # ============================================================================
 
-@pytest.fixture
-def benchmark_if_available():
+def _is_pytest_benchmark_available() -> bool:
     """
-    Provide benchmark fixture if pytest-benchmark is installed.
+    Check if pytest-benchmark is available.
     
-    Industry Standard: Graceful degradation when optional dependencies
-    are not available.
+    Industry Standard: Graceful feature detection for optional dependencies.
+    
+    Returns:
+        True if pytest-benchmark is installed, False otherwise
     """
     try:
         import pytest_benchmark
-        return pytest.mark.benchmark
+        return True
     except ImportError:
-        return pytest.mark.skip(reason="pytest-benchmark not installed")
+        return False

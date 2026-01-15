@@ -147,15 +147,16 @@ REASONING_TASK_INDICATORS = [
 # documentation of each category's purpose.
 ALLOWED_LLM_TASKS = [
     # Classification and categorization (pattern recognition)
+    # Note: Single-word keywords for efficient word-boundary matching
     'classify', 'classification', 'categorize', 'categorization',
-    'identify category', 'determine type', 'assign category',
+    'categorizing', 'categorized',
     
     # Summarization and condensation (language compression)
     'summarize', 'summary', 'summarization',
     'condense', 'brief', 'overview',
     
     # Formatting and presentation (language generation)
-    'format', 'formatting', 'reformat',
+    'format', 'formatting', 'reformat', 'reformatting',
     'present', 'display', 'render',
     
     # Extraction and parsing (pattern extraction)
