@@ -166,6 +166,15 @@ llm:
     timeout: 3.0
     # Model to use for classification (fast and cost-effective)
     model: "gpt-4o-mini"
+  # P2 FIX: OpenAI Retry Configuration (Resilience)
+  # Exponential backoff with jitter for transient API failures
+  retry:
+    # Maximum number of retry attempts for API calls
+    maxRetries: 3
+    # Base delay in seconds for exponential backoff
+    baseDelay: 1.0
+    # Maximum delay cap in seconds to prevent excessive waits
+    maxDelay: 60.0
   # Tool Selector LLM Classification Integration (NEW FEATURE)
   # Configuration for integrating QueryClassifier into ToolSelector
   toolSelector:

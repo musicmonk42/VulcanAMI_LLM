@@ -18,14 +18,87 @@
 # ============================================================
 
 import logging
-from typing import Optional
+from typing import Optional, Any
 from unittest.mock import MagicMock
 
 # Module metadata
-__version__ = "1.0.0"
+__version__ = "1.1.0"  # P1 FIX: Transparent mock mode with echo/logging
 __author__ = "VULCAN-AGI Team"
 
 logger = logging.getLogger(__name__)
+
+
+# ============================================================
+# MOCK DETECTION UTILITIES
+# ============================================================
+
+def is_mock_llm(llm: Any) -> bool:
+    """
+    Check if the given LLM instance is a mock.
+    
+    P1 FIX: This utility function allows callers to detect mock mode
+    and handle it appropriately (e.g., use rule-based formatting instead
+    of expecting real language generation).
+    
+    Args:
+        llm: The LLM instance to check
+        
+    Returns:
+        True if the LLM is a mock instance, False otherwise
+        
+    Example:
+        >>> from vulcan.llm.mock_llm import is_mock_llm
+        >>> if is_mock_llm(executor.local_llm):
+        ...     logger.warning("Using mock LLM - responses will be template-based")
+    """
+    if llm is None:
+        return False
+    
+    # Check by class name (works across module boundaries)
+    class_name = type(llm).__name__
+    if class_name == "MockGraphixVulcanLLM":
+        return True
+    
+    # Check for mock marker attribute
+    if hasattr(llm, '_is_mock') and llm._is_mock:
+        return True
+    
+    # Check get_stats for mock indicator
+    if hasattr(llm, 'get_stats'):
+        try:
+            stats = llm.get_stats()
+            if isinstance(stats, dict) and stats.get('is_mock', False):
+                return True
+        except Exception:
+            pass
+    
+    return False
+
+
+# ============================================================
+# MOCK RESPONSE DETECTION
+# ============================================================
+
+MOCK_RESPONSE_PREFIX = "MOCK_LLM:"
+
+
+def is_mock_response(response: str) -> bool:
+    """
+    Check if a response string is from the mock LLM.
+    
+    P1 FIX: Allows callers to detect mock responses and handle them
+    appropriately in the output pipeline.
+    
+    Args:
+        response: The response string to check
+        
+    Returns:
+        True if the response is from mock LLM, False otherwise
+    """
+    if not response:
+        return False
+    return response.strip().startswith(MOCK_RESPONSE_PREFIX)
+
 
 # ============================================================
 # MOCK LLM IMPLEMENTATION
@@ -93,37 +166,114 @@ class MockGraphixVulcanLLM:
         """
         Simulate text generation for language output formatting.
         
+        P1 FIX: Mock LLM is now TRANSPARENT and NON-BLOCKING.
+        
+        The mock implementation now:
+        1. Clearly indicates it's a mock response with "MOCK_LLM:" prefix
+        2. Echoes back the input prompt for debugging/testing visibility
+        3. Returns structured JSON-like output for easier testing
+        4. Logs a WARNING whenever used (for production alerting)
+        
         NOTE: The internal LLM is for LANGUAGE GENERATION only, not reasoning.
         VULCAN's reasoning systems (symbolic, probabilistic, causal, mathematical)
-        do ALL the thinking BEFORE this LLM is called. This LLM converts
-        structured reasoning outputs to natural language prose.
-        
-        The mock implementation provides a template-based response that:
-        1. Acknowledges the user's query
-        2. Provides a reasonable response structure
-        3. Does NOT contain "Mock response" marker (which would be filtered)
+        do ALL the thinking BEFORE this LLM is called.
         
         Args:
             prompt: The input prompt to respond to (may include reasoning context)
             max_tokens: Maximum number of tokens to generate (used for compatibility)
             
         Returns:
-            A formatted response string suitable for user display
+            A mock response string clearly marked as mock output
         """
         self._generation_count += 1
         self._total_tokens_requested += max_tokens
         
+        # P1 FIX: Log WARNING whenever mock is used for total transparency
+        # This ensures developers/operators know when mock is being used in production
+        prompt_preview = prompt[:100] + "..." if len(prompt) > 100 else prompt
+        self.logger.warning(
+            f"[MOCK_LLM] ⚠️ Mock LLM generating response - real GraphixVulcanLLM not available. "
+            f"Prompt: '{prompt_preview}' (max_tokens: {max_tokens})"
+        )
+        
+        # P1 FIX: Return transparent mock response that:
+        # 1. Is clearly marked as mock (MOCK_LLM prefix)
+        # 2. Echoes the input for debugging
+        # 3. Provides structured output for testing
+        response = self._generate_transparent_mock_response(prompt, max_tokens)
+        
+        return response
+    
+    def _generate_transparent_mock_response(self, prompt: str, max_tokens: int) -> str:
+        """
+        Generate a transparent mock response that clearly indicates mock status.
+        
+        P1 FIX: This response is designed to:
+        1. Be instantly recognizable as mock output (not mistaken for real LLM)
+        2. Echo back input for debugging/testing
+        3. Provide structured data for test assertions
+        4. Never mislead users or developers
+        
+        Args:
+            prompt: The input prompt
+            max_tokens: Token limit (included in response for visibility)
+            
+        Returns:
+            Transparent mock response string
+        """
+        import json
+        
+        # Create structured mock response
+        mock_data = {
+            "mock_llm": True,
+            "warning": "This is a mock response - real GraphixVulcanLLM not available",
+            "input_echo": {
+                "prompt_preview": prompt[:200] + "..." if len(prompt) > 200 else prompt,
+                "prompt_length": len(prompt),
+                "max_tokens_requested": max_tokens,
+            },
+            "generation_stats": {
+                "generation_count": self._generation_count,
+                "total_tokens_requested": self._total_tokens_requested,
+            },
+            "message": (
+                "VULCAN's reasoning systems completed their work. "
+                "This mock LLM formatted the output. "
+                "Install the real GraphixVulcanLLM for production use."
+            ),
+        }
+        
+        # Return clearly-marked mock response
+        return f"MOCK_LLM: {json.dumps(mock_data, indent=2)}"
+    
+    def generate_legacy(self, prompt: str, max_tokens: int = 100) -> str:
+        """
+        Legacy generation method that produces template-based responses.
+        
+        DEPRECATED: This method is kept for backwards compatibility but should
+        not be used. Use generate() instead which provides transparent mock output.
+        
+        Args:
+            prompt: The input prompt to respond to
+            max_tokens: Maximum number of tokens to generate
+            
+        Returns:
+            A template-based response string
+        """
+        import warnings
+        warnings.warn(
+            "generate_legacy() is deprecated. Use generate() for transparent mock output.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        
         # Log with truncated prompt for privacy
         prompt_preview = prompt[:30] + "..." if len(prompt) > 30 else prompt
         self.logger.info(
-            f"Generating response for prompt: '{prompt_preview}' (max_tokens: {max_tokens})"
+            f"[LEGACY] Generating response for prompt: '{prompt_preview}' (max_tokens: {max_tokens})"
         )
         
         # Generate a meaningful response based on the prompt content
-        # NOTE: This is a fallback when the real GraphixVulcanLLM is not available
-        # The response should be helpful and not contain "Mock response" marker
-        
-        # Extract key information from prompt for template-based response
         prompt_lower = prompt.lower().strip()
         
         # Handle common query types with appropriate template responses
@@ -330,6 +480,10 @@ __all__ = [
     "MockGraphixVulcanLLM",
     "GraphixVulcanLLM",
     "GRAPHIX_LLM_AVAILABLE",
+    # P1 FIX: Mock detection utilities
+    "is_mock_llm",
+    "is_mock_response",
+    "MOCK_RESPONSE_PREFIX",
 ]
 
 
@@ -337,4 +491,7 @@ __all__ = [
 if GRAPHIX_LLM_AVAILABLE:
     logger.debug(f"Mock LLM module v{__version__} loaded (real GraphixVulcanLLM available)")
 else:
-    logger.debug(f"Mock LLM module v{__version__} loaded (using mock implementation)")
+    logger.warning(
+        f"Mock LLM module v{__version__} loaded - USING MOCK IMPLEMENTATION. "
+        f"Install graphix_vulcan_llm package for production use."
+    )
