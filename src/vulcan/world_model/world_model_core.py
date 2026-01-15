@@ -4930,7 +4930,7 @@ class WorldModel:
     # REASONING ENGINE ROUTING (CRITICAL FIX)
     # =========================================================================
     
-    def _should_route_to_reasoning_engine(self, query_lower: str) -> bool:
+    def _should_route_to_reasoning_engine(self, query: str) -> bool:
         """
         Detect queries needing specialized technical reasoning engines.
         
@@ -4945,23 +4945,23 @@ class WorldModel:
         - Performance optimized with early returns
         
         Args:
-            query_lower: The query string (pre-lowercased for efficiency)
+            query: The query string to analyze
         
         Returns:
             bool: True if query should route to specialized engine, False otherwise
         """
         # Input validation
-        if not query_lower or not isinstance(query_lower, str):
+        if not query or not isinstance(query, str):
             logger.warning("[WorldModel] Invalid query for routing detection")
             return False
         
         # Security: Validate query length to prevent resource exhaustion
         MAX_QUERY_LENGTH = 10000
-        if len(query_lower) > MAX_QUERY_LENGTH:
-            logger.warning(f"[WorldModel] Query exceeds max length ({len(query_lower)} > {MAX_QUERY_LENGTH})")
+        if len(query) > MAX_QUERY_LENGTH:
+            logger.warning(f"[WorldModel] Query exceeds max length ({len(query)} > {MAX_QUERY_LENGTH})")
             return False
         
-        query_lower = query_lower.lower()
+        query_lower = query.lower()
         
         # CAUSAL REASONING INDICATORS
         causal_indicators = [
@@ -5017,7 +5017,7 @@ class WorldModel:
             'satisfiable', 'satisfiability',
             'sat', 'unsat',
             '→', '∧', '∨', '¬', '⊕', '↔',
-            'implies', 'and', 'or', 'not',
+            'logical implies', 'logical and', 'logical or', 'logical not',
             'fol', 'first-order', 'first order logic',
             'predicate logic', 'propositional logic',
             'cnf', 'dnf', 'conjunctive normal form',
@@ -5080,6 +5080,8 @@ class WorldModel:
                 try:
                     from vulcan.reasoning.causal_reasoning import CausalReasoner
                     reasoner = CausalReasoner()
+                    # Note: Each engine has its own interface method name (analyze/reason/verify/query)
+                    # This is intentional as each engine was designed independently
                     result = reasoner.analyze(query)
                     logger.info("[WorldModel] CausalReasoner completed successfully")
                 except ImportError as e:
