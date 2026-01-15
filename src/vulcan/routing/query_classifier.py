@@ -948,6 +948,14 @@ VALUE_CONFLICT_PATTERNS: Tuple[re.Pattern, ...] = (
 )
 
 # =============================================================================
+# FIX #4: SAT word-boundary pattern for robust SAT detection
+# =============================================================================
+# Word-boundary check for "sat" to avoid false positives like "I sat down"
+# Matches: "SAT problem", "sat solver", "Is it sat?"
+# Does NOT match: "satisfiable", "I sat down", "The cat sat"
+SAT_WORD_BOUNDARY_PATTERN: re.Pattern = re.compile(r'\bsat\b', re.IGNORECASE)
+
+# =============================================================================
 # SPECULATION patterns - Counterfactual/hypothetical reasoning queries
 # =============================================================================
 # These queries are semantically complex but syntactically simple.
@@ -1404,11 +1412,8 @@ class QueryClassifier:
                 return "symbolic"
         
         # Word-boundary check for "sat" to avoid false positives
-        # Pattern: word boundary + "sat" + word boundary
-        # Matches: "SAT problem", "sat solver", "Is it sat?"
-        # Does NOT match: "satisfiable", "I sat down", "The cat sat"
-        sat_word_pattern = re.compile(r'\bsat\b', re.IGNORECASE)
-        has_sat_word = sat_word_pattern.search(query) is not None
+        # Uses module-level SAT_WORD_BOUNDARY_PATTERN for efficiency
+        has_sat_word = SAT_WORD_BOUNDARY_PATTERN.search(query) is not None
         
         # Logical connective symbols
         logical_symbols = ['→', '∧', '∨', '¬', '↔', '⊢', '⊨', '->', '/\\', '\\/', '~']
