@@ -64,10 +64,82 @@ from .task_queues import TaskQueueInterface, create_task_queue, PriorityJobQueue
 from .metrics import ResponseTimeTracker, SystemMetrics
 
 
-# Import memory systems for provenance tracking
-from src.vulcan.memory.specialized import WorkingMemory
-from src.vulcan.memory.hierarchical import HierarchicalMemory
-from src.vulcan.memory.base import MemoryConfig
+# ============================================================
+# CIRCULAR IMPORT FIX: Memory imports are now lazy-loaded
+# ============================================================
+# Import memory systems lazily to avoid circular import with hierarchical.py
+# The circular import occurs because:
+#   1. src/vulcan/__init__.py imports from .memory (HierarchicalMemory)
+#   2. src/vulcan/memory/__init__.py imports from .hierarchical
+#   3. hierarchical.py starts loading but HierarchicalMemory class not defined yet
+#   4. src/vulcan/__init__.py then imports from .orchestrator
+#   5. orchestrator/__init__.py imports from .agent_pool
+#   6. agent_pool.py (here) tries to import HierarchicalMemory - but it's not ready!
+#
+# Solution: Use lazy imports that defer loading until first use.
+# ============================================================
+WorkingMemory = None  # Lazy-loaded
+HierarchicalMemory = None  # Lazy-loaded
+MemoryConfig = None  # Lazy-loaded
+_memory_import_attempted = False  # Track if we've tried to import
+
+
+def _lazy_import_memory():
+    """
+    Lazily import memory components to avoid circular import issues.
+    
+    CIRCULAR IMPORT FIX: This function is called when memory components are
+    actually needed, not at module load time. This prevents the circular import
+    that occurs when agent_pool.py imports from src.vulcan.memory.hierarchical
+    which in turn depends on modules that import from agent_pool.py.
+    
+    Returns:
+        bool: True if imports succeeded, False otherwise
+    """
+    global WorkingMemory, HierarchicalMemory, MemoryConfig, _memory_import_attempted
+    
+    # Only attempt import once
+    if _memory_import_attempted:
+        return WorkingMemory is not None and HierarchicalMemory is not None and MemoryConfig is not None
+    
+    _memory_import_attempted = True
+    
+    # Try multiple import paths for robustness
+    import_paths = [
+        ('vulcan.memory.specialized', 'vulcan.memory.hierarchical', 'vulcan.memory.base'),
+        ('src.vulcan.memory.specialized', 'src.vulcan.memory.hierarchical', 'src.vulcan.memory.base'),
+    ]
+    
+    for specialized_path, hierarchical_path, base_path in import_paths:
+        try:
+            # Dynamic import using __import__
+            specialized_module = __import__(specialized_path, fromlist=['WorkingMemory'])
+            hierarchical_module = __import__(hierarchical_path, fromlist=['HierarchicalMemory'])
+            base_module = __import__(base_path, fromlist=['MemoryConfig'])
+            
+            # Update global references
+            WorkingMemory = getattr(specialized_module, 'WorkingMemory', None)
+            HierarchicalMemory = getattr(hierarchical_module, 'HierarchicalMemory', None)
+            MemoryConfig = getattr(base_module, 'MemoryConfig', None)
+            
+            if WorkingMemory and HierarchicalMemory and MemoryConfig:
+                logging.getLogger(__name__).debug(
+                    f"Memory components loaded successfully via {specialized_path} (lazy import)"
+                )
+                return True
+            
+        except ImportError as e:
+            logging.getLogger(__name__).debug(
+                f"Import path {specialized_path} failed: {e}. Trying next path..."
+            )
+            continue
+    
+    # All paths failed
+    logging.getLogger(__name__).warning(
+        "Memory components not available (all import paths failed). "
+        "Provenance tracking will use fallback implementations."
+    )
+    return False
 
 # Import TournamentManager for multi-agent selection
 try:
@@ -607,22 +679,40 @@ class AgentPoolManager:
 
         # MEMORY LEAK FIX: Use specialized memory systems instead of unbounded list
         # PERF FIX Issue #2: Use singleton HierarchicalMemory to avoid re-initialization
-        memory_config = MemoryConfig(max_working_memory=50)
-        self.working_memory = WorkingMemory(memory_config)
+        # CIRCULAR IMPORT FIX: Lazy-load memory components to avoid import cycle
+        _lazy_import_memory()
+        
+        # Initialize memory systems (with fallback if lazy import failed)
+        if MemoryConfig is not None:
+            memory_config = MemoryConfig(max_working_memory=50)
+        else:
+            # Fallback: use a simple object with the required attribute
+            memory_config = type('MemoryConfig', (), {'max_working_memory': 50})()
+            logger.warning("[AgentPool] Using fallback MemoryConfig - memory components not available")
+        
+        if WorkingMemory is not None:
+            self.working_memory = WorkingMemory(memory_config)
+        else:
+            # Fallback: use None and handle gracefully elsewhere
+            self.working_memory = None
+            logger.warning("[AgentPool] WorkingMemory not available - using fallback")
         
         # Try to use singleton HierarchicalMemory first
+        self.long_term_memory = None
         try:
             from vulcan.reasoning.singletons import get_hierarchical_memory
             self.long_term_memory = get_hierarchical_memory(memory_config)
             if self.long_term_memory:
                 logger.info("[AgentPool] Using singleton HierarchicalMemory")
         except ImportError:
-            self.long_term_memory = None
+            pass
         
         # Fallback to direct instantiation if singleton not available
-        if self.long_term_memory is None:
+        if self.long_term_memory is None and HierarchicalMemory is not None:
             self.long_term_memory = HierarchicalMemory(memory_config)
             logger.info("[AgentPool] HierarchicalMemory initialized (direct)")
+        elif self.long_term_memory is None:
+            logger.warning("[AgentPool] HierarchicalMemory not available - using fallback")
         
         # Keep legacy provenance tracking for backward compatibility
         max_provenance = self.config.get("max_provenance_records", SIMPLE_MODE_MAX_PROVENANCE)
@@ -920,18 +1010,20 @@ class AgentPoolManager:
                 # Clean up lookup for items that have been rotated out of the deque
                 self._cleanup_provenance_lookup()
             
-            # Store in working_memory for short-term access
-            self.working_memory.store(record, relevance=0.8)
+            # Store in working_memory for short-term access (if available)
+            if self.working_memory is not None:
+                self.working_memory.store(record, relevance=0.8)
             
-            # Store in long_term_memory asynchronously for persistence
-            try:
-                self.long_term_memory.store(
-                    content=record,
-                    importance=0.7,
-                    metadata={"type": "provenance", "job_id": job_id}
-                )
-            except Exception as e:
-                logger.warning(f"Failed to store provenance in long-term memory: {e}")
+            # Store in long_term_memory asynchronously for persistence (if available)
+            if self.long_term_memory is not None:
+                try:
+                    self.long_term_memory.store(
+                        content=record,
+                        importance=0.7,
+                        metadata={"type": "provenance", "job_id": job_id}
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to store provenance in long-term memory: {e}")
     
     async def flush_history(self) -> None:
         """
