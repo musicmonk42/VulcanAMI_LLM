@@ -379,7 +379,8 @@ class CreativeHandler:
         )
         
         return {
-            'is_verified': is_verified,
+            'passed': is_verified,  # Match key expected by calling code
+            'is_verified': is_verified,  # Keep for backward compatibility
             'issues': issues,
             'conflicts': conflicts,
             'warnings': warnings,

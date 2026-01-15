@@ -3051,7 +3051,6 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
 
 # Feature flag: Enable World Model orchestration endpoint
 # Set VULCAN_ENABLE_WM_ORCHESTRATION=true to enable
-import os
 ENABLE_WM_ORCHESTRATION = os.environ.get(
     "VULCAN_ENABLE_WM_ORCHESTRATION", "false"
 ).lower() in ("true", "1", "yes")
