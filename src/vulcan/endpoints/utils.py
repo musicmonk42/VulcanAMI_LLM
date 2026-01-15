@@ -8,7 +8,7 @@ access helpers that handle both standalone and mounted sub-app scenarios.
 import importlib
 import logging
 import os
-from typing import Optional, TYPE_CHECKING
+from typing import Optional, Union, TYPE_CHECKING
 
 from fastapi import Request, HTTPException
 
@@ -18,7 +18,46 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def get_deployment(request: Request) -> Optional["ProductionDeployment"]:
+def get_deployment_from_module() -> Optional["ProductionDeployment"]:
+    """
+    Get ProductionDeployment instance from module-level app state.
+    
+    This function provides a fallback for getting deployment when a Request
+    object is not available (e.g., when called from proxy functions in
+    full_platform.py that bypass FastAPI's request injection).
+    
+    Returns:
+        ProductionDeployment instance or None if not found
+        
+    Note:
+        This should only be used when a Request object is unavailable.
+        Prefer get_deployment(request) when possible as it can propagate
+        the deployment to the request's app state for faster subsequent access.
+    """
+    for module_path in ["vulcan.main", "src.vulcan.main"]:
+        try:
+            vulcan_module = importlib.import_module(module_path)
+            if (
+                hasattr(vulcan_module, "app") 
+                and hasattr(vulcan_module.app, "state")
+                and hasattr(vulcan_module.app.state, "deployment")
+                and vulcan_module.app.state.deployment is not None
+            ):
+                deployment = vulcan_module.app.state.deployment
+                logger.debug(f"Deployment found via module {module_path}")
+                return deployment
+        except ImportError as e:
+            logger.debug(f"Could not import {module_path}: {e}")
+            continue
+        except AttributeError as e:
+            logger.debug(f"Module {module_path} exists but deployment not accessible: {e}")
+            continue
+    
+    logger.warning("Deployment not found via module fallback")
+    return None
+
+
+def get_deployment(request: Optional[Request] = None) -> Optional["ProductionDeployment"]:
     """
     Get the ProductionDeployment instance from any valid location.
     
@@ -35,11 +74,16 @@ def get_deployment(request: Request) -> Optional["ProductionDeployment"]:
     subsequent requests from the same app instance.
     
     Args:
-        request: FastAPI request object
+        request: Optional FastAPI request object. If None, falls back to
+                 module-level lookup only.
         
     Returns:
         ProductionDeployment instance or None if not found
     """
+    # If no request provided, use module fallback only
+    if request is None:
+        return get_deployment_from_module()
+    
     # Try 1: Direct app.state (standalone mode or properly propagated)
     if hasattr(request.app.state, "deployment") and request.app.state.deployment is not None:
         logger.debug("Deployment found in request.app.state")
@@ -104,7 +148,7 @@ def get_deployment(request: Request) -> Optional["ProductionDeployment"]:
     return None
 
 
-def require_deployment(request: Request) -> "ProductionDeployment":
+def require_deployment(request: Optional[Request] = None) -> "ProductionDeployment":
     """
     Get deployment or raise HTTPException if not available.
     
@@ -112,7 +156,8 @@ def require_deployment(request: Request) -> "ProductionDeployment":
     deployment is available before processing requests.
     
     Args:
-        request: FastAPI request object
+        request: Optional FastAPI request object. If None, falls back to
+                 module-level lookup only.
         
     Returns:
         ProductionDeployment instance
@@ -124,7 +169,7 @@ def require_deployment(request: Request) -> "ProductionDeployment":
     if deployment is None:
         # Get process ID for multi-worker debugging
         pid = os.getpid()
-        app_title = getattr(request.app, "title", "unknown")
+        app_title = getattr(request.app, "title", "unknown") if request else "no_request"
         
         logger.error(
             f"CRITICAL: deployment not found (pid={pid}, app.title={app_title}). "
