@@ -11,6 +11,7 @@ import logging
 import os
 import secrets
 import time
+import uuid
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Request
@@ -3041,4 +3042,164 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
 # ============================================================
 # STANDARD API ENDPOINTS (continued)
 # ============================================================
+
+
+# ============================================================
+# NEW: World Model Orchestration Endpoint
+# Industry Standard: Feature flag for gradual rollout
+# ============================================================
+
+# Feature flag: Enable World Model orchestration endpoint
+# Set VULCAN_ENABLE_WM_ORCHESTRATION=true to enable
+import os
+ENABLE_WM_ORCHESTRATION = os.environ.get(
+    "VULCAN_ENABLE_WM_ORCHESTRATION", "false"
+).lower() in ("true", "1", "yes")
+
+
+@router.post("/v1/chat/orchestrated", response_model=None)
+async def orchestrated_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, Any]:
+    """
+    World Model Orchestrated Chat Endpoint.
+    
+    NEW ARCHITECTURE: This endpoint uses the World Model's process_request()
+    method to orchestrate all user requests, ensuring:
+    - LLMs never generate unverified knowledge (only format verified content)
+    - Reasoning engines solve reasoning problems (not LLMs)
+    - Creative content is knowledge-grounded (poems about physics are accurate)
+    - Factual requests retrieve and verify first (papers use real knowledge)
+    
+    Industry Standard: Feature-flagged rollout, comprehensive error handling,
+    backward-compatible response format.
+    
+    Args:
+        request: FastAPI request object
+        body: UnifiedChatRequest with message, history, and configuration
+    
+    Returns:
+        VulcanResponse with orchestrated response and metadata
+    """
+    start_time = time.time()
+    query_id = str(uuid.uuid4())
+    
+    # Check if feature is enabled
+    if not ENABLE_WM_ORCHESTRATION:
+        return {
+            "response": "World Model orchestration is not enabled. Please use /v1/chat instead.",
+            "confidence": 0.0,
+            "systems_used": [],
+            "metadata": {
+                "error": "Feature not enabled",
+                "feature_flag": "VULCAN_ENABLE_WM_ORCHESTRATION=false",
+            },
+            "query_id": query_id,
+            "latency_ms": int((time.time() - start_time) * 1000),
+        }
+    
+    try:
+        # Get deployment context
+        deps = request.app.state.deployment
+        
+        # Validate request
+        user_message = body.message.strip()
+        if not user_message or len(user_message) > MAX_MESSAGE_LENGTH:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Message must be between 1 and {MAX_MESSAGE_LENGTH} characters"
+            )
+        
+        # Get World Model instance
+        world_model = deps.world_model
+        if not world_model:
+            raise HTTPException(
+                status_code=503,
+                detail="World Model not available"
+            )
+        
+        logger.info(
+            f"[Orchestrated Chat] Processing request: query_id={query_id}, "
+            f"message_length={len(user_message)}"
+        )
+        
+        # Prepare context from conversation history
+        context = {
+            'conversation_history': body.history or [],
+            'conversation_id': body.conversation_id,
+            'preferences': {},
+        }
+        
+        # Call World Model's process_request method
+        result = world_model.process_request(
+            query=user_message,
+            context=context,
+        )
+        
+        # Extract response and metadata
+        response_text = result.get('response', '')
+        confidence = result.get('confidence', 0.0)
+        source = result.get('source', 'unknown')
+        metadata = result.get('metadata', {})
+        
+        # Build systems_used list
+        systems_used = ['world_model_orchestration', source]
+        if result.get('engine'):
+            systems_used.append(result['engine'])
+        
+        # Calculate latency
+        latency_ms = int((time.time() - start_time) * 1000)
+        
+        logger.info(
+            f"[Orchestrated Chat] Response generated: query_id={query_id}, "
+            f"source={source}, confidence={confidence:.2f}, latency={latency_ms}ms"
+        )
+        
+        # Return response in VulcanResponse format
+        return {
+            "response": response_text,
+            "confidence": confidence,
+            "systems_used": systems_used,
+            "metadata": {
+                **metadata,
+                "orchestration": {
+                    "classification": metadata.get('classification', {}),
+                    "source": source,
+                    "orchestrated": True,
+                },
+                "transparency": {
+                    "source": "world_model_orchestration",
+                    "confidence": confidence,
+                    "orchestrated": True,
+                },
+            },
+            "query_id": query_id,
+            "response_id": str(uuid.uuid4()),
+            "latency_ms": latency_ms,
+            "routing": {
+                "query_id": query_id,
+                "orchestrated": True,
+            },
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"[Orchestrated Chat] Error processing request: {e}",
+            exc_info=True
+        )
+        latency_ms = int((time.time() - start_time) * 1000)
+        
+        return {
+            "response": f"I encountered an error processing your request: {str(e)}",
+            "confidence": 0.0,
+            "systems_used": ["error"],
+            "metadata": {
+                "error": str(e),
+                "error_type": type(e).__name__,
+            },
+            "query_id": query_id,
+            "response_id": str(uuid.uuid4()),
+            "latency_ms": latency_ms,
+        }
+
 
