@@ -401,7 +401,7 @@ class StartupManager:
         try:
             # Import required modules
             from vulcan.utils_main.components import initialize_component
-            from vulcan.orchestrator.variants import ProductionDeployment
+            from vulcan.orchestrator.deployment import ProductionDeployment
             from vulcan.llm import GraphixVulcanLLM
             
             # Setup thread pool executor
