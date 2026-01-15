@@ -95,6 +95,14 @@ class StartupManager:
         If startup fails after executor creation, the executor is properly
         cleaned up to prevent thread leaks.
         
+        IMPORTANT - Zombie Thread Warning:
+            Python cannot forcibly terminate OS threads. When a phase times out,
+            the underlying thread may continue running as a "zombie" - consuming
+            resources but no longer responding to the application. This is logged
+            with CRITICAL severity to enable container orchestration systems
+            (Kubernetes, Docker Swarm, etc.) to detect and reclaim these resources
+            by restarting the pod/container.
+        
         Raises:
             RuntimeError: If critical phase fails
             asyncio.TimeoutError: If phase exceeds timeout limit
@@ -106,45 +114,39 @@ class StartupManager:
         
         try:
             # Phase 1: Configuration (P1 Fix: Issue #6 - timeout enforcement)
-            meta = get_phase_metadata(StartupPhase.CONFIGURATION)
-            await asyncio.wait_for(
-                self._phase_configuration(), 
-                timeout=meta.timeout_seconds
+            await self._run_phase_with_timeout(
+                StartupPhase.CONFIGURATION,
+                self._phase_configuration
             )
             
             # Phase 2: Core Services (P1 Fix: Issue #6 - timeout enforcement)
-            meta = get_phase_metadata(StartupPhase.CORE_SERVICES)
-            await asyncio.wait_for(
-                self._phase_core_services(), 
-                timeout=meta.timeout_seconds
+            await self._run_phase_with_timeout(
+                StartupPhase.CORE_SERVICES,
+                self._phase_core_services
             )
             
             # Phase 3: Reasoning Systems (P1 Fix: Issue #6 - timeout enforcement)
-            meta = get_phase_metadata(StartupPhase.REASONING_SYSTEMS)
-            await asyncio.wait_for(
-                self._phase_reasoning_systems(), 
-                timeout=meta.timeout_seconds
+            await self._run_phase_with_timeout(
+                StartupPhase.REASONING_SYSTEMS,
+                self._phase_reasoning_systems
             )
             
             # Phase 4: Memory Systems (P1 Fix: Issue #6 - timeout enforcement)
-            meta = get_phase_metadata(StartupPhase.MEMORY_SYSTEMS)
-            await asyncio.wait_for(
-                self._phase_memory_systems(), 
-                timeout=meta.timeout_seconds
+            await self._run_phase_with_timeout(
+                StartupPhase.MEMORY_SYSTEMS,
+                self._phase_memory_systems
             )
             
             # Phase 5: Preloading (P1 Fix: Issue #6 - timeout enforcement)
-            meta = get_phase_metadata(StartupPhase.PRELOADING)
-            await asyncio.wait_for(
-                self._phase_preloading(), 
-                timeout=meta.timeout_seconds
+            await self._run_phase_with_timeout(
+                StartupPhase.PRELOADING,
+                self._phase_preloading
             )
             
             # Phase 6: Monitoring (P1 Fix: Issue #6 - timeout enforcement)
-            meta = get_phase_metadata(StartupPhase.MONITORING)
-            await asyncio.wait_for(
-                self._phase_monitoring(), 
-                timeout=meta.timeout_seconds
+            await self._run_phase_with_timeout(
+                StartupPhase.MONITORING,
+                self._phase_monitoring
             )
             
             # Health validation
@@ -158,25 +160,124 @@ class StartupManager:
             logger.info(f"✅ VULCAN-AGI worker {self.worker_id} started in {elapsed:.2f}s")
             
         except asyncio.TimeoutError as e:
-            logger.error(f"Startup phase timed out", exc_info=True)
+            # Zombie thread logging already done in _run_phase_with_timeout
             # Clean up executor on failure (P0 Fix: Issue #3)
-            if self.executor:
-                try:
-                    self.executor.shutdown(wait=False, cancel_futures=True)
-                    logger.debug("Executor cleaned up after timeout")
-                except Exception as cleanup_error:
-                    logger.warning(f"Error cleaning up executor: {cleanup_error}")
+            self._cleanup_executor_on_failure("timeout")
             raise RuntimeError("Startup phase timed out") from e
         except Exception as e:
             logger.error(f"Startup failed: {e}", exc_info=True)
             # Clean up executor on failure (P0 Fix: Issue #3)
-            if self.executor:
-                try:
-                    self.executor.shutdown(wait=False, cancel_futures=True)
-                    logger.debug("Executor cleaned up after startup failure")
-                except Exception as cleanup_error:
-                    logger.warning(f"Error cleaning up executor: {cleanup_error}")
+            self._cleanup_executor_on_failure("startup failure")
             raise
+    
+    async def _run_phase_with_timeout(
+        self,
+        phase: StartupPhase,
+        phase_func: Callable,
+    ) -> None:
+        """
+        Run a startup phase with timeout enforcement and zombie thread logging.
+        
+        This method wraps phase execution with:
+        1. Timeout enforcement via asyncio.wait_for
+        2. Comprehensive zombie thread logging on timeout
+        3. Thread state inspection for diagnostics
+        
+        Args:
+            phase: The startup phase being executed
+            phase_func: The async function to execute
+            
+        Raises:
+            asyncio.TimeoutError: If phase exceeds its configured timeout
+            RuntimeError: If critical phase fails
+        """
+        meta = get_phase_metadata(phase)
+        
+        try:
+            await asyncio.wait_for(
+                phase_func(),
+                timeout=meta.timeout_seconds
+            )
+        except asyncio.TimeoutError:
+            # Log zombie thread warning with detailed diagnostics
+            self._log_zombie_thread_warning(phase, meta)
+            raise
+    
+    def _log_zombie_thread_warning(
+        self,
+        phase: StartupPhase,
+        meta: Any,
+    ) -> None:
+        """
+        Log comprehensive zombie thread warning for container orchestration.
+        
+        CRITICAL: Python cannot forcibly kill OS threads. When a phase times out,
+        the underlying thread(s) may continue running indefinitely, consuming
+        resources but no longer responding to the application.
+        
+        This method logs with CRITICAL severity to:
+        1. Alert operators to potential resource leaks
+        2. Enable container orchestration to detect and restart pods
+        3. Provide diagnostic information for debugging
+        
+        Args:
+            phase: The phase that timed out
+            meta: Phase metadata including timeout configuration
+        """
+        import threading
+        
+        # Gather active thread information
+        active_threads = threading.enumerate()
+        vulcan_threads = [t for t in active_threads if t.name.startswith("vulcan_")]
+        
+        # Log critical zombie warning
+        logger.critical(
+            f"🧟 ZOMBIE THREAD WARNING: Phase '{meta.name}' timed out after "
+            f"{meta.timeout_seconds}s. "
+            f"IMPORTANT: Python cannot forcibly terminate OS threads. "
+            f"The timed-out operation may continue running as a zombie thread, "
+            f"consuming CPU/memory resources indefinitely. "
+            f"Container orchestration (Kubernetes/Docker) should restart this pod "
+            f"to reclaim resources. "
+            f"Active threads: {len(active_threads)} total, {len(vulcan_threads)} vulcan threads."
+        )
+        
+        # Log thread details for debugging
+        if vulcan_threads:
+            thread_info = ", ".join(
+                f"{t.name}(alive={t.is_alive()}, daemon={t.daemon})"
+                for t in vulcan_threads[:5]  # Limit to first 5 to avoid log spam
+            )
+            logger.critical(
+                f"🧟 Vulcan threads that may be zombies: {thread_info}"
+                + (f" ... and {len(vulcan_threads) - 5} more" if len(vulcan_threads) > 5 else "")
+            )
+        
+        # Log recommendations
+        logger.critical(
+            f"🧟 RECOMMENDED ACTIONS:\n"
+            f"  1. Check container/pod health metrics for resource leaks\n"
+            f"  2. Consider restarting the container/pod to reclaim resources\n"
+            f"  3. Investigate why phase '{meta.name}' exceeded {meta.timeout_seconds}s timeout\n"
+            f"  4. Review thread pool configuration if using ThreadPoolExecutor"
+        )
+        
+        # Track zombie in phase results
+        self.phase_results[phase] = False
+    
+    def _cleanup_executor_on_failure(self, failure_reason: str) -> None:
+        """
+        Clean up ThreadPoolExecutor after a failure with proper logging.
+        
+        Args:
+            failure_reason: Description of why cleanup is being performed
+        """
+        if self.executor:
+            try:
+                self.executor.shutdown(wait=False, cancel_futures=True)
+                logger.debug(f"Executor cleaned up after {failure_reason}")
+            except Exception as cleanup_error:
+                logger.warning(f"Error cleaning up executor: {cleanup_error}")
     
     async def _phase_configuration(self) -> None:
         """
