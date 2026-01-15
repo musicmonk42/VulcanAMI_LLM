@@ -373,8 +373,19 @@ class VersionedDataLogger:
 
             self.version_counter += 1
 
+            # FIX Issue #7: Size-based rotation in addition to time-based
+            # Rotate when file exceeds 100MB to prevent disk filling
+            should_rotate = False
+            if self.log_file.exists():
+                file_size_mb = self.log_file.stat().st_size / (1024 * 1024)
+                if file_size_mb > 100:  # 100MB limit
+                    should_rotate = True
+                    logger.warning(
+                        f"Log file size ({file_size_mb:.1f}MB) exceeds 100MB limit, rotating"
+                    )
+
             # FIXED: Time-based rotation instead of count-based only
-            if timestamp - self._last_rotation > 3600:  # Rotate every hour
+            if should_rotate or timestamp - self._last_rotation > 3600:  # Rotate every hour or on size
                 self._rotate_logs()
                 self._last_rotation = timestamp
 

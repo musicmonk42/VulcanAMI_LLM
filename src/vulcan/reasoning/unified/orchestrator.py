@@ -5129,3 +5129,76 @@ class UnifiedReasoner:
 
         elapsed = time.time() - start_time
         logger.info(f"Shutdown complete in {elapsed:.2f}s")
+
+    # =========================================================================
+    # FIX Issue #3: Nested Executor Deadlock on Windows
+    # When UnifiedReasoner is serialized (pickled) for use in a ProcessPoolExecutor,
+    # the ThreadPoolExecutor cannot be pickled and must be re-initialized in the
+    # child process. These methods handle proper serialization and deserialization.
+    # =========================================================================
+
+    def __getstate__(self) -> Dict[str, Any]:
+        """
+        Prepare state for pickling (multiprocessing).
+        
+        ThreadPoolExecutor and other non-serializable objects are excluded.
+        They will be re-initialized in __setstate__ after unpickling.
+        
+        Returns:
+            Dictionary of picklable state
+        """
+        state = self.__dict__.copy()
+        
+        # Remove non-picklable objects
+        non_picklable = [
+            'executor',           # ThreadPoolExecutor
+            '_cache_lock',        # threading.RLock
+            '_stats_lock',        # threading.RLock
+            '_shutdown_lock',     # threading.Lock
+            'tool_selector',      # May contain non-picklable state
+            'portfolio_executor', # Contains ThreadPoolExecutor
+            'warm_pool',          # Contains threads
+            'cache',              # May contain locks
+            'tool_monitor',       # May contain threads
+            'safety_governor',    # May contain locks
+        ]
+        
+        for attr in non_picklable:
+            if attr in state:
+                state[attr] = None
+                
+        # Store config for re-initialization
+        state['_reinit_max_workers'] = getattr(self, 'max_workers', 4)
+        
+        return state
+
+    def __setstate__(self, state: Dict[str, Any]):
+        """
+        Restore state after unpickling (in child process).
+        
+        Re-initializes ThreadPoolExecutor and other non-picklable objects.
+        This is called when the object is deserialized in a child process.
+        
+        Args:
+            state: Dictionary of pickled state
+        """
+        self.__dict__.update(state)
+        
+        # Re-initialize ThreadPoolExecutor for the child process
+        max_workers = state.get('_reinit_max_workers', 4)
+        self.executor = ThreadPoolExecutor(max_workers=max_workers)
+        
+        # Re-initialize locks
+        import threading
+        self._cache_lock = threading.RLock()
+        self._stats_lock = threading.RLock()
+        self._shutdown_lock = threading.Lock()
+        
+        # Reset shutdown state for child process
+        self._is_shutdown = False
+        
+        # Note: Other components (tool_selector, portfolio_executor, etc.) 
+        # will be None and should be re-initialized if needed. This is safer
+        # than trying to re-create complex components with potentially stale state.
+        
+        logger.debug("UnifiedReasoner re-initialized after unpickling")
