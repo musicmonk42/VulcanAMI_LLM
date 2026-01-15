@@ -4647,9 +4647,9 @@ Output the complete modified file content.
                 # Notify if weight changed significantly
                 if boost_amount >= 0.2:
                     self._send_alert(
-                        "INFO",
+                        "info",
+                        f"Objective '{objective.type}' priority boosted significantly",
                         {
-                            "message": f"Objective '{objective.type}' priority boosted significantly",
                             "old_weight": old_weight,
                             "new_weight": objective.weight,
                             "reason": "CuriosityEngine detected relevant knowledge gaps"
@@ -4670,11 +4670,3 @@ Output the complete modified file content.
             )
         
         return boosted_objectives
-    
-    def _send_alert(self, severity: str, details: Dict[str, Any]) -> None:
-        """Send alert using callback if configured."""
-        if self.alert_callback:
-            try:
-                self.alert_callback(severity, details)
-            except Exception as e:
-                logger.warning(f"Alert callback failed: {e}")
