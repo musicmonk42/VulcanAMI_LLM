@@ -552,15 +552,33 @@ class ValidationTracker:
         self.lock = threading.RLock()
         self._np = np if NUMPY_AVAILABLE else FakeNumpy
         
-        # Set placeholder for dependencies (must be re-injected)
+        # Set None for dependencies - they must be re-injected via set_dependencies()
+        # Using None instead of MagicMock aligns with fail-fast anti-zombie architecture
         self.world_model = None
-        self.self_improvement_drive = MagicMock(_csiu_enabled=False)
-        self.transparency_interface = MagicMock()
+        self.self_improvement_drive = None
+        self.transparency_interface = None
+        
+        # Flag to track if dependencies have been injected
+        self._dependencies_injected = False
         
         logger.info(
             f"ValidationTracker restored from serialization. "
             f"IMPORTANT: Call set_dependencies() to restore: {required_deps}"
         )
+
+    def _check_dependencies(self, operation: str = "operation") -> None:
+        """
+        Check if required dependencies have been injected.
+        
+        Raises:
+            RuntimeError: If set_dependencies() has not been called after deserialization
+        """
+        if not getattr(self, '_dependencies_injected', True):
+            raise RuntimeError(
+                f"ValidationTracker.{operation} called before dependencies were injected. "
+                f"After deserializing, you MUST call set_dependencies() to restore "
+                f"world_model, self_improvement_drive, and transparency_interface."
+            )
 
     def set_dependencies(
         self,
@@ -607,6 +625,9 @@ class ValidationTracker:
             if transparency_interface is not None:
                 self.transparency_interface = transparency_interface
                 logger.debug("ValidationTracker: transparency_interface dependency injected")
+            
+            # Mark dependencies as injected
+            self._dependencies_injected = True
 
     def record_validation(
         self,

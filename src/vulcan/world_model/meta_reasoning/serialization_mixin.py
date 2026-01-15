@@ -239,22 +239,41 @@ class SerializationMixin(ABC):
             state: State dictionary to process
             
         Returns:
-            State with defaultdicts converted to regular dicts
+            State with defaultdicts converted to regular dicts, with
+            factory type information preserved for restoration
         """
         result = {}
+        defaultdict_info = {}  # Store factory type info
+        
         for key, value in state.items():
             if isinstance(value, defaultdict):
                 result[key] = dict(value)
-                # Store the fact that this was a defaultdict
-                if not hasattr(self, '_defaultdict_attrs'):
-                    self._defaultdict_attrs = set()
-                self._defaultdict_attrs.add(key)
+                # Store factory type for proper restoration
+                factory = value.default_factory
+                if factory is list:
+                    defaultdict_info[key] = 'list'
+                elif factory is dict:
+                    defaultdict_info[key] = 'dict'
+                elif factory is set:
+                    defaultdict_info[key] = 'set'
+                elif factory is int:
+                    defaultdict_info[key] = 'int'
+                elif factory is float:
+                    defaultdict_info[key] = 'float'
+                elif factory is str:
+                    defaultdict_info[key] = 'str'
+                else:
+                    # Default to list for unknown factories
+                    defaultdict_info[key] = 'list'
+                    logger.debug(
+                        f"Unknown defaultdict factory for {key}, defaulting to list"
+                    )
             else:
                 result[key] = value
         
-        # Include the tracking set in state if we found any
-        if hasattr(self, '_defaultdict_attrs') and self._defaultdict_attrs:
-            result['_defaultdict_attrs'] = self._defaultdict_attrs
+        # Include factory info in state if we found any defaultdicts
+        if defaultdict_info:
+            result['_defaultdict_factories'] = defaultdict_info
             
         return result
     
@@ -262,20 +281,28 @@ class SerializationMixin(ABC):
         """
         Restore defaultdict instances after deserialization.
         
-        This method restores regular dicts back to defaultdicts
-        based on the _defaultdict_attrs tracking set.
-        
-        Note: The default_factory is set to list by default.
-        Subclasses may override this for different factories.
+        This method restores regular dicts back to defaultdicts using
+        the factory type information stored during serialization.
         """
-        defaultdict_attrs = getattr(self, '_defaultdict_attrs', set())
-        for attr in defaultdict_attrs:
+        # Factory type mapping
+        factory_map = {
+            'list': list,
+            'dict': dict,
+            'set': set,
+            'int': int,
+            'float': float,
+            'str': str,
+        }
+        
+        defaultdict_factories = getattr(self, '_defaultdict_factories', {})
+        for attr, factory_name in defaultdict_factories.items():
             if hasattr(self, attr) and isinstance(getattr(self, attr), dict):
-                setattr(self, attr, defaultdict(list, getattr(self, attr)))
+                factory = factory_map.get(factory_name, list)
+                setattr(self, attr, defaultdict(factory, getattr(self, attr)))
         
         # Clean up tracking attribute
-        if hasattr(self, '_defaultdict_attrs'):
-            delattr(self, '_defaultdict_attrs')
+        if hasattr(self, '_defaultdict_factories'):
+            delattr(self, '_defaultdict_factories)
 
 
 class ThreadSafeSerializationMixin(SerializationMixin):
@@ -340,12 +367,27 @@ def make_pickleable(
     state = {}
     for key, value in obj.__dict__.items():
         if key not in unpickleable_attrs:
+            # Type-based check first (more efficient than pickle test)
+            value_type = type(value)
+            
+            # Known unpickleable types - skip immediately
+            if value_type.__module__ == 'builtins' and value_type.__name__ == 'module':
+                logger.debug(f"Skipping module reference: {key}")
+                continue
+            if hasattr(value_type, '__self__'):  # Bound method
+                logger.debug(f"Skipping bound method: {key}")
+                continue
+            if value_type.__name__ in ('RLock', 'Lock', 'Semaphore'):
+                logger.debug(f"Skipping threading primitive: {key}")
+                continue
+            
+            # For remaining types, try pickle test only if uncertain
             try:
                 import pickle
                 pickle.dumps(value)
                 state[key] = value
-            except (TypeError, pickle.PicklingError):
-                logger.debug(f"Skipping unpickleable attribute: {key}")
+            except (TypeError, pickle.PicklingError) as e:
+                logger.debug(f"Skipping unpickleable attribute {key}: {e}")
                 continue
     
     return state

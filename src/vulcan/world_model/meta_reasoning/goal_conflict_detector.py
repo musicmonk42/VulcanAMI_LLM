@@ -304,7 +304,7 @@ class GoalConflictDetector:
                 # This prevents the "zombie" architecture anti-pattern
                 raise RuntimeError(
                     "GoalConflictDetector CRITICAL INITIALIZATION FAILURE\n"
-                    "═══════════════════════════════════════════════════════════\n"
+                    "============================================================\n"
                     "The ObjectiveHierarchy module failed to import, and no\n"
                     "explicit mock was provided.\n\n"
                     "This is a SECURITY and CORRECTNESS safeguard:\n"
