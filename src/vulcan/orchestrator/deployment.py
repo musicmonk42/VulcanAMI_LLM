@@ -491,8 +491,9 @@ class ProductionDeployment:
             )
 
         try:
-            # FIX: Simplified check - no MagicMock comparison needed since we don't use mocks
-            if CausalWorldModel is not None:
+            # FIX: Check both that CausalWorldModel is not None AND that it's callable
+            # This ensures the import succeeded with a valid class, not just any truthy value
+            if CausalWorldModel is not None and callable(CausalWorldModel):
                 # Build configuration for CausalWorldModel from AgentConfig
                 enable_si = bool(getattr(self.config, "enable_self_improvement", False))
                 cfg_file = getattr(

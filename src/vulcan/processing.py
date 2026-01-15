@@ -306,12 +306,14 @@ class VersionedDataLogger:
         max_entries: int = 1000,
         enable_versioning: bool = True,
         max_age_days: int = 30,
+        max_log_size_mb: int = 100,  # FIX Issue #7: Configurable log size limit
     ):
         self.log_dir = Path(log_dir)
         self.log_dir.mkdir(parents=True, exist_ok=True)
         self.max_entries = max_entries
         self.enable_versioning = enable_versioning
         self.max_age_days = max_age_days
+        self.max_log_size_mb = max_log_size_mb  # FIX Issue #7: Configurable limit
         self.current_log = deque(maxlen=max_entries)
         self.log_lock = threading.Lock()
         self.version_counter = 0
@@ -374,14 +376,14 @@ class VersionedDataLogger:
             self.version_counter += 1
 
             # FIX Issue #7: Size-based rotation in addition to time-based
-            # Rotate when file exceeds 100MB to prevent disk filling
+            # Rotate when file exceeds configured size limit to prevent disk filling
             should_rotate = False
             if self.log_file.exists():
                 file_size_mb = self.log_file.stat().st_size / (1024 * 1024)
-                if file_size_mb > 100:  # 100MB limit
+                if file_size_mb > self.max_log_size_mb:
                     should_rotate = True
                     logger.warning(
-                        f"Log file size ({file_size_mb:.1f}MB) exceeds 100MB limit, rotating"
+                        f"Log file size ({file_size_mb:.1f}MB) exceeds {self.max_log_size_mb}MB limit, rotating"
                     )
 
             # FIXED: Time-based rotation instead of count-based only

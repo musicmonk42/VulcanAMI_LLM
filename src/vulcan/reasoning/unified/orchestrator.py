@@ -5185,11 +5185,11 @@ class UnifiedReasoner:
         self.__dict__.update(state)
         
         # Re-initialize ThreadPoolExecutor for the child process
+        # The executor is stored with explicit max_workers for proper re-initialization
         max_workers = state.get('_reinit_max_workers', 4)
         self.executor = ThreadPoolExecutor(max_workers=max_workers)
         
-        # Re-initialize locks
-        import threading
+        # Re-initialize locks (threading is imported at module level)
         self._cache_lock = threading.RLock()
         self._stats_lock = threading.RLock()
         self._shutdown_lock = threading.Lock()
