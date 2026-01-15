@@ -259,7 +259,10 @@ class GoalConflictDetector:
     # --- START FIX: Modify __init__ for optional hierarchy ---
     def __init__(self, objective_hierarchy: Optional[ObjectiveHierarchy] = None):
         """
-        Initialize conflict detector
+        Initialize the Goal Conflict Detector.
+        
+        This class detects and analyzes conflicts between system objectives,
+        providing resolution strategies when conflicts are found.
 
         Args:
             objective_hierarchy: ObjectiveHierarchy instance (required in production, 
@@ -267,41 +270,73 @@ class GoalConflictDetector:
                                  
         Raises:
             RuntimeError: If ObjectiveHierarchy import failed and no mock is provided.
-                         This prevents "zombie" operation with fake objects.
+                         This prevents "zombie" operation with fake objects that would
+                         silently return meaningless results.
+            TypeError: If objective_hierarchy is not a valid type.
+                         
+        Design Decision - Fail Fast (Anti-Zombie Architecture):
+            This class explicitly REFUSES to create instances with fake/mock
+            hierarchies unless they are explicitly passed by the caller.
+            This prevents the dangerous "zombie" pattern where:
+            - Import fails silently
+            - System creates MagicMock automatically
+            - All conflict detection returns fake results
+            - System appears to work but makes garbage decisions
+            
+            By failing fast with a clear error, we ensure that:
+            - Deployment issues are caught immediately
+            - Test code must explicitly opt-in to mocking
+            - Production systems never run with fake components
+            
+        Example (Production):
+            >>> hierarchy = ObjectiveHierarchy(design_spec)
+            >>> detector = GoalConflictDetector(hierarchy)
+            
+        Example (Testing):
+            >>> from unittest.mock import MagicMock
+            >>> mock_hierarchy = MagicMock()
+            >>> detector = GoalConflictDetector(mock_hierarchy)  # Explicit mock OK
         """
 
         if objective_hierarchy is None:
             if not OBJECTIVE_HIERARCHY_AVAILABLE:
-                # FIXED: Fail fast instead of using MagicMock fallback
-                # This prevents the "zombie" architecture where the system runs
-                # with fake objects that silently return garbage
+                # CRITICAL: Fail fast instead of using MagicMock fallback
+                # This prevents the "zombie" architecture anti-pattern
                 raise RuntimeError(
-                    "GoalConflictDetector requires ObjectiveHierarchy, but import failed. "
-                    "Cannot create detector without a valid hierarchy - this would cause "
-                    "the system to run with fake objects that return meaningless results. "
-                    "Please ensure objective_hierarchy module is properly installed and importable. "
-                    "For testing, pass a Mock or MagicMock explicitly."
+                    "GoalConflictDetector CRITICAL INITIALIZATION FAILURE\n"
+                    "═══════════════════════════════════════════════════════════\n"
+                    "The ObjectiveHierarchy module failed to import, and no\n"
+                    "explicit mock was provided.\n\n"
+                    "This is a SECURITY and CORRECTNESS safeguard:\n"
+                    "  - Without a valid hierarchy, conflict detection is meaningless\n"
+                    "  - The system would return fake/garbage results\n"
+                    "  - This 'zombie' operation is dangerous and forbidden\n\n"
+                    "SOLUTIONS:\n"
+                    "  1. Fix the import error for objective_hierarchy module\n"
+                    "  2. For testing, explicitly pass a Mock: GoalConflictDetector(MagicMock())\n\n"
+                    "Import error details should be in logs above."
                 )
             else:
-                # Import succeeded, but none provided. Create a default instance.
+                # Import succeeded, but none provided - create default instance
                 logger.info(
-                    "No ObjectiveHierarchy provided. Creating default ObjectiveHierarchy instance."
+                    "No ObjectiveHierarchy provided. Creating default instance."
                 )
-                self.objective_hierarchy = ObjectiveHierarchy()  # Create default instance
+                self.objective_hierarchy = ObjectiveHierarchy()
 
-        # Allow Mock/MagicMock types for testing - but they must be explicitly passed
+        # Allow Mock/MagicMock for testing - but MUST be explicitly passed
         elif isinstance(objective_hierarchy, (Mock, MagicMock)):
             logger.warning(
-                "GoalConflictDetector initialized with Mock hierarchy - "
-                "this should only be used for testing purposes."
+                "GoalConflictDetector initialized with MOCK hierarchy. "
+                "This should ONLY be used for testing purposes. "
+                "Production usage with mocks will produce invalid results."
             )
             self.objective_hierarchy = objective_hierarchy
         elif OBJECTIVE_HIERARCHY_AVAILABLE and not isinstance(
             objective_hierarchy, RealObjectiveHierarchy
         ):
             raise TypeError(
-                f"objective_hierarchy must be an instance of ObjectiveHierarchy or a Mock, "
-                f"got {type(objective_hierarchy)}"
+                f"objective_hierarchy must be an instance of ObjectiveHierarchy or "
+                f"an explicit Mock for testing. Got: {type(objective_hierarchy).__name__}"
             )
         else:
             self.objective_hierarchy = objective_hierarchy
@@ -325,29 +360,85 @@ class GoalConflictDetector:
         # Use fake numpy if needed
         self._np = np if NUMPY_AVAILABLE else FakeNumpy
 
-        logger.info("GoalConflictDetector initialized")
+        logger.info("GoalConflictDetector initialized successfully")
 
     def __getstate__(self) -> Dict[str, Any]:
         """
-        Prepare state for pickling by removing unpickleable objects.
+        Prepare instance state for pickle serialization.
         
-        This fixes the persistence firewall issue where threading locks,
-        module references, and related objects cannot be pickled.
+        Implements industry-standard serialization with:
+        - Thread-safe state capture (acquires lock)
+        - Explicit removal of unpickleable objects
+        - Serialization metadata for debugging/versioning
+        
+        Returns:
+            Dictionary containing all pickleable state
+            
+        Thread Safety:
+            Acquires self.lock before capturing state
+            
+        Removed Attributes:
+            - lock: threading.RLock (re-created on restore)
+            - _np: numpy module reference (re-created on restore)
+            
+        Note:
+            objective_hierarchy IS pickled. If it contains unpickleable
+            items (like locks), it must implement its own __getstate__.
         """
-        state = self.__dict__.copy()
-        # Remove unpickleable items - they will be re-created on unpickle
-        state.pop('lock', None)  # threading.RLock
-        state.pop('_np', None)  # numpy module reference
-        return state
+        self.lock.acquire()
+        try:
+            state = self.__dict__.copy()
+            
+            # Remove unpickleable items
+            state.pop('lock', None)
+            state.pop('_np', None)
+            
+            # Add serialization metadata
+            state['_serialization_metadata'] = {
+                'version': '1.0.0',
+                'serialized_at': time.time(),
+                'class': f"{self.__class__.__module__}.{self.__class__.__name__}",
+            }
+            
+            logger.debug(
+                f"GoalConflictDetector serialized: {len(state)} keys"
+            )
+            return state
+        finally:
+            self.lock.release()
 
     def __setstate__(self, state: Dict[str, Any]) -> None:
         """
-        Restore state after unpickling, re-creating unpickleable objects.
+        Restore instance state after pickle deserialization.
+        
+        Implements industry-standard deserialization with:
+        - Metadata extraction and version checking
+        - Re-creation of threading locks
+        - Re-establishment of numpy module reference
+        
+        Args:
+            state: Dictionary from __getstate__
+            
+        Post-Conditions:
+            - self.lock is a new RLock instance
+            - self._np references numpy or FakeNumpy
+            - All other state is restored from pickle
         """
+        metadata = state.pop('_serialization_metadata', {})
+        version = metadata.get('version', 'unknown')
+        
+        if version != '1.0.0':
+            logger.warning(
+                f"GoalConflictDetector deserialized from version {version}"
+            )
+        
         self.__dict__.update(state)
+        
         # Re-create unpickleable objects
         self.lock = threading.RLock()
         self._np = np if NUMPY_AVAILABLE else FakeNumpy
+        
+        logger.debug("GoalConflictDetector restored from serialization")
 
     def _initialize_conflict_rules(self) -> List[Dict[str, Any]]:
         """Initialize conflict detection rules"""

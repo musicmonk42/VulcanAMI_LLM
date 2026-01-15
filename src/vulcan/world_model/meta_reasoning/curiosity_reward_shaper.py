@@ -475,18 +475,32 @@ class CuriosityRewardShaper:
 
     def __getstate__(self) -> Dict[str, Any]:
         """
-        Prepare state for pickling by removing unpickleable lock objects.
+        Prepare state for pickling by removing unpickleable objects.
         """
         state = self.__dict__.copy()
-        state.pop('lock', None)
+        state.pop('lock', None)  # threading.RLock
+        state.pop('_np', None)  # numpy module reference
+        state.pop('world_model', None)  # may be MagicMock
+        # Convert defaultdict to regular dict for pickling
+        if 'state_feature_distributions' in state:
+            state['state_feature_distributions'] = dict(state['state_feature_distributions'])
         return state
 
     def __setstate__(self, state: Dict[str, Any]) -> None:
         """
-        Restore state after unpickling, re-creating the lock.
+        Restore state after unpickling, re-creating unpickleable objects.
         """
         self.__dict__.update(state)
         self.lock = threading.RLock()
+        self._np = np if NUMPY_AVAILABLE else FakeNumpy
+        self.world_model = None  # Must be re-injected
+        # Restore defaultdict
+        if 'state_feature_distributions' in self.__dict__ and isinstance(self.state_feature_distributions, dict):
+            self.state_feature_distributions = defaultdict(list, self.state_feature_distributions)
+
+    def set_world_model(self, world_model) -> None:
+        """Re-inject world_model after unpickling."""
+        self.world_model = world_model
 
     def compute_curiosity_bonus(
         self, state: Dict[str, Any], context: Optional[Dict[str, Any]] = None
