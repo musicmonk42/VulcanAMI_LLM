@@ -72,9 +72,11 @@ def get_deployment(request: Request) -> Optional["ProductionDeployment"]:
                         f"Propagated deployment to request.app.state "
                         f"(app.title={app_title}) for faster subsequent access"
                     )
-                except Exception as prop_err:
+                except (AttributeError, TypeError) as prop_err:
                     # Non-fatal: propagation failure just means slower subsequent lookups
-                    logger.debug(f"Could not propagate deployment to request.app: {prop_err}")
+                    # AttributeError: state doesn't exist or is read-only
+                    # TypeError: state object doesn't support attribute assignment
+                    logger.debug(f"Could not propagate deployment to request.app: {type(prop_err).__name__}: {prop_err}")
                 
                 return deployment
         except ImportError as e:
@@ -85,10 +87,18 @@ def get_deployment(request: Request) -> Optional["ProductionDeployment"]:
             continue
     
     # Log detailed diagnostic information when deployment is not found
+    # Use getattr with default to safely get state attributes
+    try:
+        state_attrs = list(dir(request.app.state)) if hasattr(request.app, 'state') else []
+        # Filter to only show deployment-related or custom attributes (not dunder methods)
+        state_attrs = [a for a in state_attrs if not a.startswith('_')]
+    except (TypeError, AttributeError):
+        state_attrs = ['<unable to inspect>']
+    
     logger.warning(
         f"Deployment not found. Diagnostics: "
         f"request.app.title={app_title}, "
-        f"request.app.state attrs={list(vars(request.app.state).keys()) if hasattr(request.app, 'state') else 'no state'}"
+        f"request.app.state attrs={state_attrs}"
     )
     
     return None
