@@ -16,6 +16,8 @@ from typing import Any, Dict
 
 from fastapi import APIRouter, HTTPException, Request
 
+from vulcan.endpoints.utils import get_deployment
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["health"])
@@ -47,14 +49,15 @@ async def health_check(request: Request) -> Dict[str, Any]:
     try:
         app = request.app
         
-        if not hasattr(app.state, "deployment"):
+        # Use get_deployment for consistent fallback behavior with sub-app mounting
+        deployment = get_deployment(request)
+        if deployment is None:
             return {
                 "status": "unhealthy",
                 "error": "Deployment not initialized",
                 "timestamp": time.time(),
             }
 
-        deployment = app.state.deployment
         status = deployment.get_status()
         
         # Get settings from app state or use defaults
@@ -155,7 +158,9 @@ async def readiness_check(request: Request) -> Dict[str, Any]:
     """
     try:
         app = request.app
-        has_deployment = hasattr(app.state, "deployment")
+        # Use get_deployment for consistent fallback behavior with sub-app mounting
+        deployment = get_deployment(request)
+        has_deployment = deployment is not None
         has_llm = hasattr(app.state, "llm")
         
         ready = has_deployment and has_llm
