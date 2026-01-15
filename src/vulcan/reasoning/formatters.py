@@ -11,10 +11,13 @@ The formatters handle:
 - Formal proofs and symbolic reasoning
 - Pareto dominance analysis
 - Debug wrapper unwrapping
+- ReasoningType Enum to string conversion
 
 Functions:
     get_reasoning_attr          - Safe attribute extraction from ReasoningResult
     reasoning_result_to_dict    - Convert ReasoningResult to dictionary
+    reasoning_type_to_string    - Convert ReasoningType Enum/str to string safely
+    format_reasoning_type_display - Format reasoning type for human display
     format_direct_reasoning_response - Format complete reasoning response
     format_conclusion_for_user  - Format conclusion value for human output
     format_moral_uncertainty_result - Format MEC analysis
@@ -25,7 +28,7 @@ Functions:
 
 import ast
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, Union
 
 logger = logging.getLogger(__name__)
 
@@ -104,10 +107,89 @@ def reasoning_result_to_dict(result: Any) -> Dict[str, Any]:
     return result_dict if result_dict else {"value": str(result)}
 
 
+def reasoning_type_to_string(reasoning_type: Any) -> str:
+    """
+    Convert a reasoning_type to its string representation safely.
+    
+    Industry Standard: Type-safe conversion handling both Enum and string types.
+    This prevents AttributeError when calling .replace() on Enum objects.
+    
+    Handles:
+    1. ReasoningType Enum instances - extracts .value (the string representation)
+    2. String values - returns as-is
+    3. None - returns empty string
+    4. Other objects - converts via str()
+    
+    Args:
+        reasoning_type: The reasoning type (ReasoningType Enum, str, or other)
+        
+    Returns:
+        String representation suitable for display formatting.
+        
+    Example:
+        >>> from vulcan.reasoning.reasoning_types import ReasoningType
+        >>> reasoning_type_to_string(ReasoningType.PROBABILISTIC)
+        'probabilistic'
+        >>> reasoning_type_to_string("causal_reasoning")
+        'causal_reasoning'
+        >>> reasoning_type_to_string(None)
+        ''
+        
+    Note:
+        This resolves "'ReasoningType' object has no attribute 'replace'" errors
+        that occur when Enum objects are passed to string formatting code.
+    """
+    if reasoning_type is None:
+        return ""
+    
+    # Handle Enum instances (ReasoningType, etc.)
+    # Industry Standard: Check for .value first (standard Enum attribute)
+    if hasattr(reasoning_type, 'value'):
+        return str(reasoning_type.value)
+    
+    # Handle objects with .name attribute (Enum alternative)
+    if hasattr(reasoning_type, 'name') and not isinstance(reasoning_type, str):
+        return str(reasoning_type.name)
+    
+    # String or other - convert to string
+    return str(reasoning_type)
+
+
+def format_reasoning_type_display(reasoning_type: Any, default: str = "Hybrid") -> str:
+    """
+    Format a reasoning_type for human-readable display.
+    
+    Industry Standard: Single responsibility function for consistent display formatting.
+    Converts underscores to spaces and applies title case.
+    
+    Args:
+        reasoning_type: The reasoning type (ReasoningType Enum, str, or other)
+        default: Default display value if reasoning_type is None/empty
+        
+    Returns:
+        Human-readable formatted string (e.g., "Probabilistic", "Causal Reasoning")
+        
+    Example:
+        >>> format_reasoning_type_display(ReasoningType.PROBABILISTIC)
+        'Probabilistic'
+        >>> format_reasoning_type_display("causal_reasoning")
+        'Causal Reasoning'
+        >>> format_reasoning_type_display(None)
+        'Hybrid'
+    """
+    type_str = reasoning_type_to_string(reasoning_type)
+    
+    if not type_str:
+        return default
+    
+    # Format: replace underscores with spaces and apply title case
+    return type_str.replace("_", " ").title()
+
+
 def format_direct_reasoning_response(
     conclusion: Any,
     confidence: float,
-    reasoning_type: str,
+    reasoning_type: Union[str, Any],  # Accepts str or ReasoningType Enum
     explanation: str,
     reasoning_results: Dict[str, Any] = None,
 ) -> str:
@@ -225,7 +307,8 @@ def format_direct_reasoning_response(
     
     # Add transparency footer with reasoning type and confidence
     confidence_pct = int(confidence * 100)
-    reasoning_type_display = reasoning_type.replace("_", " ").title() if reasoning_type else "Hybrid"
+    # Industry Standard: Use helper function for type-safe enum/string conversion
+    reasoning_type_display = format_reasoning_type_display(reasoning_type, default="Hybrid")
     response_parts.append(
         f"\nReasoning type: {reasoning_type_display} | Confidence: {confidence_pct}%"
     )
