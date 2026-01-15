@@ -35,6 +35,14 @@ from .query_analysis import (
 from .cross_domain import apply_cross_domain_transfer
 from .learning import learn_from_outcome, learn_from_reasoning_outcome
 
+# Import ReasoningType enum for proper type conversion
+try:
+    from vulcan.reasoning.reasoning_types import ReasoningType
+    REASONING_TYPE_ENUM_AVAILABLE = True
+except ImportError:
+    ReasoningType = None
+    REASONING_TYPE_ENUM_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 # Optional answer validator import
@@ -282,9 +290,36 @@ def apply_reasoning(
                         f"without other engines."
                     )
                     
-                    # Determine reasoning type: self-referential takes priority
-                    reasoning_type = "meta_reasoning" if is_self_ref else "philosophical_reasoning"
+                    # ═══════════════════════════════════════════════════════════════════
+                    # BUG FIX: Use proper ReasoningType enum instead of string
+                    # ═══════════════════════════════════════════════════════════════════
+                    # PROBLEM: Previous code assigned string values:
+                    #   reasoning_type = "meta_reasoning" if is_self_ref else "philosophical_reasoning"
+                    # This caused TypeError in ReasoningResult.__post_init__ which validates:
+                    #   if not isinstance(self.reasoning_type, ReasoningType):
+                    #       raise TypeError(...)
+                    #
+                    # SOLUTION: Use ReasoningType.PHILOSOPHICAL enum for all meta/philosophical queries.
+                    # The "meta_reasoning" string is not a valid enum member, and philosophical
+                    # reasoning is the appropriate type for both self-referential and ethical queries.
+                    # ═══════════════════════════════════════════════════════════════════
+                    if REASONING_TYPE_ENUM_AVAILABLE:
+                        reasoning_type_enum = ReasoningType.PHILOSOPHICAL
+                    else:
+                        # Fallback if enum not available - this will be caught by validation
+                        reasoning_type_enum = "philosophical"
+                        logger.warning(
+                            f"{LOG_PREFIX} ReasoningType enum not available - using string fallback "
+                            f"(may cause validation errors)"
+                        )
+                    
                     strategy_type = ReasoningStrategyType.META_REASONING.value if is_self_ref else ReasoningStrategyType.PHILOSOPHICAL_REASONING.value
+                    
+                    # ═══════════════════════════════════════════════════════════════════
+                    # Note: Store reasoning_type_enum in metadata for downstream conversion
+                    # The integration ReasoningResult doesn't have reasoning_type field,
+                    # but we need to pass this through for orchestrator/agent_pool
+                    # ═══════════════════════════════════════════════════════════════════
                     
                     return ReasoningResult(
                         selected_tools=["world_model"],
@@ -302,7 +337,10 @@ def apply_reasoning(
                             # Note: Add conclusion field so main.py can extract it
                             "conclusion": world_model_response,
                             "explanation": wm_result.get("reasoning", ""),
-                            "reasoning_type": reasoning_type,
+                            # BUG FIX: Store ReasoningType enum (not string) in metadata
+                            "reasoning_type": reasoning_type_enum,
+                            # Note: Store string version for backward compatibility
+                            "reasoning_type_str": "meta_reasoning" if is_self_ref else "philosophical_reasoning",
                             "aspect": wm_result.get("aspect", "general"),
                             "selection_time_ms": selection_time,
                             "classifier_is_authoritative": True,
