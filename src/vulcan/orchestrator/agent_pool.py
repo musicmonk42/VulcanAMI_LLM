@@ -360,10 +360,19 @@ def _is_privileged_result(reasoning_result) -> bool:
     """
     Detect if a ReasoningResult is privileged and must not be overridden.
     
+    INDUSTRY STANDARD IMPLEMENTATION (Fix #3):
+    A result is privileged if it's from a meta-reasoning/introspection component
+    AND contains substantive content (not just a template).
+    
     A result is privileged if:
-    1. selected_tools includes "world_model", OR
+    1. selected_tools includes "world_model" AND response is not a template, OR
     2. metadata includes 'is_self_introspection' or 'self_referential', OR  
     3. reasoning_strategy is 'meta_reasoning' or 'philosophical_reasoning'
+    
+    TEMPLATE DETECTION:
+    If world_model returns a boilerplate response like "This is a philosophical
+    question requiring reasoned analysis...", it should NOT be privileged.
+    This allows fallback to specialized reasoning engines.
     
     Privileged results bypass ALL fallback, consensus, voting, and blending logic.
     
@@ -371,7 +380,7 @@ def _is_privileged_result(reasoning_result) -> bool:
         reasoning_result: ReasoningResult object (or dict) from apply_reasoning
         
     Returns:
-        True if result is privileged, False otherwise
+        True if result is privileged and substantive, False if template/boilerplate
     """
     if reasoning_result is None:
         return False
@@ -381,23 +390,70 @@ def _is_privileged_result(reasoning_result) -> bool:
         selected_tools = reasoning_result.get('selected_tools', [])
         metadata = reasoning_result.get('metadata', {})
         strategy = reasoning_result.get('reasoning_strategy', '')
+        # Extract response for template detection
+        response = str(reasoning_result.get('response', ''))
+        if not response:
+            # Try alternative keys
+            response = str(
+                reasoning_result.get('conclusion', '') or
+                reasoning_result.get('output', '') or
+                reasoning_result.get('result', '')
+            )
     else:
         # Object with attributes
         selected_tools = getattr(reasoning_result, 'selected_tools', [])
         metadata = getattr(reasoning_result, 'metadata', {})
         strategy = getattr(reasoning_result, 'reasoning_strategy', '')
+        # Extract response from object
+        response = str(getattr(reasoning_result, 'response', ''))
+        if not response:
+            response = str(
+                getattr(reasoning_result, 'conclusion', '') or
+                getattr(reasoning_result, 'output', '') or
+                getattr(reasoning_result, 'result', '')
+            )
+    
+    # TEMPLATE DETECTION: Check if response is boilerplate
+    # Industry standard: Use multiple indicators to avoid false positives
+    template_indicators = [
+        "This is a philosophical question requiring reasoned analysis",
+        "I'll analyze this using multiple ethical frameworks",
+        "Consequentialist: What outcomes matter?",
+        "Deontological: What duties or rules apply?",
+        "Virtue ethics: What would a person of good character do?",
+        # Additional templates from world_model_core.py
+        "This presents an ethical dilemma requiring careful consideration",
+        "Relevant ethical frameworks:",
+        "This philosophical question requires multi-framework analysis",
+    ]
+    
+    is_template = any(indicator in response for indicator in template_indicators)
     
     # Check condition 1: world_model tool selected
     if 'world_model' in selected_tools:
+        if is_template:
+            logger.warning(
+                "[AgentPool] Detected boilerplate response from world_model, "
+                "NOT marking as privileged to allow fallback"
+            )
+            return False  # Not privileged - let other engines try
         return True
     
     # Check condition 2: self-introspection metadata flags
+    # These are always privileged regardless of content
     if metadata:
         if metadata.get('is_self_introspection') or metadata.get('self_referential'):
             return True
     
     # Check condition 3: meta or philosophical reasoning strategy
+    # Only privileged if not a template
     if strategy in ('meta_reasoning', 'philosophical_reasoning'):
+        if is_template:
+            logger.warning(
+                f"[AgentPool] Detected boilerplate {strategy} response, "
+                f"NOT marking as privileged"
+            )
+            return False
         return True
     
     return False
