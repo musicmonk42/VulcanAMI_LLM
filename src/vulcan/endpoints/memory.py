@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["memory"])
 
 
-@router.post("/v1/memory/search")
+@router.post("/v1/memory/search", response_model=None)
 async def search_memory(request: Request) -> dict:
     """
     Search memory with filters.

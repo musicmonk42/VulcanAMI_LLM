@@ -101,7 +101,7 @@ def _calculate_aggregate_confidence_chat(reasoning_insights: Dict[str, Any]) -> 
         return sum(confidence_scores) / len(confidence_scores)
 
 
-@router.post("/llm/chat")
+@router.post("/llm/chat", response_model=None)
 async def chat(request: Request) -> Dict[str, Any]:
     """Conversational interface via VULCAN's cognitive architecture.
 

@@ -275,7 +275,7 @@ async def _execute_with_enhanced_prompt(
     )
 
 
-@router.post("/v1/chat")
+@router.post("/v1/chat", response_model=None)
 async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, Any]:
     """
     Unified chat endpoint that integrates the ENTIRE VulcanAMI platform.

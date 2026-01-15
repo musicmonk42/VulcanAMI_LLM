@@ -80,7 +80,7 @@ async def get_world_model_status():
         )
 
 
-@router.post("/intervene")
+@router.post("/intervene", response_model=None)
 async def execute_causal_intervention(request: InterventionRequest):
     """
     Execute causal interventions on world model.
@@ -135,7 +135,7 @@ async def execute_causal_intervention(request: InterventionRequest):
         )
 
 
-@router.post("/predict")
+@router.post("/predict", response_model=None)
 async def generate_counterfactual_prediction(request: PredictionRequest):
     """
     Generate counterfactual predictions.

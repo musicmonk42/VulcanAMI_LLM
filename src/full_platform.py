@@ -3146,7 +3146,7 @@ async def status_page(request: Request):
     return HTMLResponse(content=html_content)
 
 
-@app.get("/health/live")
+@app.get("/health/live", response_model=None)
 async def health_live():
     """
     Kubernetes/Docker liveness probe endpoint.
@@ -3160,7 +3160,7 @@ async def health_live():
     return {"status": "alive", "timestamp": datetime.utcnow().isoformat()}
 
 
-@app.get("/health/ready")
+@app.get("/health/ready", response_model=None)
 async def health_ready():
     """
     Kubernetes readiness probe endpoint.
@@ -3231,7 +3231,7 @@ async def health_ready():
         )
 
 
-@app.get("/health")
+@app.get("/health", response_model=None)
 async def health_check(request: Request):
     """Comprehensive health check for all services."""
     base_url = f"http://{request.url.hostname}:{request.url.port or settings.port}"
@@ -3262,7 +3262,7 @@ async def health_check(request: Request):
     }
 
 
-@app.get("/health/components")
+@app.get("/health/components", response_model=None)
 async def component_health():
     """
     Return detailed status of all 71 documented platform components.
@@ -3358,7 +3358,7 @@ async def component_health():
     }
 
 
-@app.get("/api/status")
+@app.get("/api/status", response_model=None)
 async def api_status():
     """JSON API for service status."""
     return {
@@ -3379,7 +3379,7 @@ async def api_status():
     }
 
 
-@app.post("/auth/token")
+@app.post("/auth/token", response_model=None)
 async def get_token(request: Request, sub: Optional[str] = None):
     """
     Secure token issuance endpoint.
@@ -3416,7 +3416,7 @@ async def get_token(request: Request, sub: Optional[str] = None):
     }
 
 
-@app.get("/api/protected")
+@app.get("/api/protected", response_model=None)
 async def protected_endpoint(auth: Dict = Depends(verify_authentication)):
     """Example protected endpoint."""
     return {"message": "Access granted!", "auth": auth}
@@ -3438,7 +3438,7 @@ if PROMETHEUS_AVAILABLE:
 # even if the mount has issues, and provides a consistent API surface.
 # =============================================================================
 
-@app.get("/vulcan/health")
+@app.get("/vulcan/health", response_model=None)
 async def vulcan_health_proxy():
     """
     Proxy endpoint for VULCAN health check.
@@ -3528,7 +3528,7 @@ async def vulcan_health_proxy():
         )
 
 
-@app.get("/debug/deployment")
+@app.get("/debug/deployment", response_model=None)
 async def debug_parent_deployment(request: Request):
     """
     Debug endpoint to verify deployment state on the PARENT app.
@@ -3562,7 +3562,7 @@ async def debug_parent_deployment(request: Request):
     }
 
 
-@app.post("/vulcan/v1/chat")
+@app.post("/vulcan/v1/chat", response_model=None)
 async def vulcan_chat_proxy(request: Request):
     """
     Proxy endpoint for VULCAN chat API.
@@ -3647,7 +3647,7 @@ async def vulcan_chat_proxy(request: Request):
         )
 
 
-@app.post("/v1/chat")
+@app.post("/v1/chat", response_model=None)
 async def v1_chat_proxy(request: Request):
     """
     Alternative proxy endpoint for chat API at /v1/chat.
@@ -3719,7 +3719,7 @@ def _check_vulcan_deployment(vulcan_module):
     return None
 
 
-@app.post("/v1/feedback/thumbs")
+@app.post("/v1/feedback/thumbs", response_model=None)
 async def v1_feedback_thumbs_proxy(request: Request):
     """
     Proxy endpoint for VULCAN feedback thumbs API.
@@ -3778,7 +3778,7 @@ async def v1_feedback_thumbs_proxy(request: Request):
         )
 
 
-@app.post("/v1/feedback")
+@app.post("/v1/feedback", response_model=None)
 async def v1_feedback_proxy(request: Request):
     """
     Proxy endpoint for VULCAN feedback API.
@@ -3836,7 +3836,7 @@ async def v1_feedback_proxy(request: Request):
         )
 
 
-@app.get("/v1/feedback/stats")
+@app.get("/v1/feedback/stats", response_model=None)
 async def v1_feedback_stats_proxy():
     """
     Proxy endpoint for VULCAN feedback stats API.
@@ -3939,7 +3939,7 @@ async def _proxy_vulcan_status_endpoint(
         )
 
 
-@app.get("/v1/status")
+@app.get("/v1/status", response_model=None)
 async def v1_status_proxy():
     """
     Proxy endpoint for VULCAN system status.
@@ -3951,7 +3951,7 @@ async def v1_status_proxy():
     )
 
 
-@app.get("/v1/cognitive/status")
+@app.get("/v1/cognitive/status", response_model=None)
 async def v1_cognitive_status_proxy():
     """
     Proxy endpoint for VULCAN cognitive status.
@@ -3963,7 +3963,7 @@ async def v1_cognitive_status_proxy():
     )
 
 
-@app.get("/v1/llm/status")
+@app.get("/v1/llm/status", response_model=None)
 async def v1_llm_status_proxy():
     """
     Proxy endpoint for VULCAN LLM status.
@@ -3975,7 +3975,7 @@ async def v1_llm_status_proxy():
     )
 
 
-@app.get("/v1/routing/status")
+@app.get("/v1/routing/status", response_model=None)
 async def v1_routing_status_proxy():
     """
     Proxy endpoint for VULCAN routing status.
@@ -3987,7 +3987,7 @@ async def v1_routing_status_proxy():
     )
 
 
-@app.get("/safety/status")
+@app.get("/safety/status", response_model=None)
 async def safety_status_proxy():
     """
     Proxy endpoint for VULCAN safety status.
@@ -3999,7 +3999,7 @@ async def safety_status_proxy():
     )
 
 
-@app.get("/safety/audit/recent")
+@app.get("/safety/audit/recent", response_model=None)
 async def safety_audit_recent_proxy(limit: int = 10):
     """
     Proxy endpoint for VULCAN safety audit recent logs.
@@ -4013,7 +4013,7 @@ async def safety_audit_recent_proxy(limit: int = 10):
     )
 
 
-@app.get("/world-model/status")
+@app.get("/world-model/status", response_model=None)
 async def world_model_status_proxy():
     """
     Proxy endpoint for VULCAN world model status.
@@ -4025,7 +4025,7 @@ async def world_model_status_proxy():
     )
 
 
-@app.get("/memory/status")
+@app.get("/memory/status", response_model=None)
 async def memory_status_proxy():
     """
     Proxy endpoint for VULCAN memory status.
@@ -4037,7 +4037,7 @@ async def memory_status_proxy():
     )
 
 
-@app.get("/hardware/status")
+@app.get("/hardware/status", response_model=None)
 async def hardware_status_proxy():
     """
     Proxy endpoint for VULCAN hardware status.
@@ -4100,7 +4100,7 @@ def get_arena_instance():
         return None
 
 
-@app.post("/api/arena/run/{agent_id}")
+@app.post("/api/arena/run/{agent_id}", response_model=None)
 async def arena_run_agent(
     agent_id: str, request: Request, auth: Dict = Depends(verify_authentication)
 ):
@@ -4117,7 +4117,7 @@ async def arena_run_agent(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/api/arena/feedback")
+@app.post("/api/arena/feedback", response_model=None)
 async def arena_feedback(request: Request, auth: Dict = Depends(verify_authentication)):
     """Submit feedback via Arena API."""
     arena = get_arena_instance()
@@ -4132,7 +4132,7 @@ async def arena_feedback(request: Request, auth: Dict = Depends(verify_authentic
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/api/arena/tournament")
+@app.post("/api/arena/tournament", response_model=None)
 async def arena_tournament(
     request: Request, auth: Dict = Depends(verify_authentication)
 ):
@@ -4149,7 +4149,7 @@ async def arena_tournament(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/api/arena/feedback_dispatch")
+@app.post("/api/arena/feedback_dispatch", response_model=None)
 async def arena_feedback_dispatch(
     request: Request, auth: Dict = Depends(verify_authentication)
 ):
@@ -4183,7 +4183,7 @@ async def arena_feedback_dispatch(
 # =============================================================================
 
 
-@app.post("/api/omega/phase1/survival")
+@app.post("/api/omega/phase1/survival", response_model=None)
 async def omega_phase1_survival(
     request: Request, auth: Dict = Depends(verify_authentication)
 ):
@@ -4257,7 +4257,7 @@ async def omega_phase1_survival(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/api/omega/phase2/teleportation")
+@app.post("/api/omega/phase2/teleportation", response_model=None)
 async def omega_phase2_teleportation(
     request: Request, auth: Dict = Depends(verify_authentication)
 ):
@@ -4349,7 +4349,7 @@ async def omega_phase2_teleportation(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/api/omega/phase3/immunization")
+@app.post("/api/omega/phase3/immunization", response_model=None)
 async def omega_phase3_immunization(
     request: Request, auth: Dict = Depends(verify_authentication)
 ):
@@ -4427,7 +4427,7 @@ async def omega_phase3_immunization(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/api/adversarial/status")
+@app.get("/api/adversarial/status", response_model=None)
 async def adversarial_status():
     """
     Get current adversarial testing system status.
@@ -4456,7 +4456,7 @@ async def adversarial_status():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/api/adversarial/run-test")
+@app.post("/api/adversarial/run-test", response_model=None)
 async def run_adversarial_test(auth: Dict = Depends(verify_authentication)):
     """
     Manually trigger a single adversarial test suite run.
@@ -4483,7 +4483,7 @@ async def run_adversarial_test(auth: Dict = Depends(verify_authentication)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/api/adversarial/check-query")
+@app.post("/api/adversarial/check-query", response_model=None)
 async def check_query_adversarial(
     request: Request, auth: Dict = Depends(verify_authentication)
 ):
@@ -4530,7 +4530,7 @@ async def check_query_adversarial(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/api/omega/phase4/csiu")
+@app.post("/api/omega/phase4/csiu", response_model=None)
 async def omega_phase4_csiu(
     request: Request, auth: Dict = Depends(verify_authentication)
 ):
@@ -4608,7 +4608,7 @@ async def omega_phase4_csiu(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/api/omega/phase5/unlearning")
+@app.post("/api/omega/phase5/unlearning", response_model=None)
 async def omega_phase5_unlearning(
     request: Request, auth: Dict = Depends(verify_authentication)
 ):

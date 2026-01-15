@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.get("/status")
+@router.get("/status", response_model=None)
 async def get_safety_status() -> Dict[str, Any]:
     """
     Get comprehensive safety system status.
@@ -74,7 +74,7 @@ async def get_safety_status() -> Dict[str, Any]:
         )
 
 
-@router.post("/initialize")
+@router.post("/initialize", response_model=None)
 async def initialize_safety() -> Dict[str, Any]:
     """
     Manually trigger safety system initialization.

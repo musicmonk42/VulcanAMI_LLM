@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["status"])
 
 
-@router.get("/v1/status")
+@router.get("/v1/status", response_model=None)
 async def system_status(request: Request) -> Dict[str, Any]:
     """
     Get detailed system status.
@@ -103,7 +103,7 @@ async def system_status(request: Request) -> Dict[str, Any]:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/v1/cognitive/status")
+@router.get("/v1/cognitive/status", response_model=None)
 async def cognitive_status(request: Request) -> Dict[str, Any]:
     """
     Get detailed status of VULCAN's cognitive subsystems.
@@ -251,7 +251,7 @@ async def cognitive_status(request: Request) -> Dict[str, Any]:
     }
 
 
-@router.get("/v1/llm/status")
+@router.get("/v1/llm/status", response_model=None)
 async def llm_status(request: Request) -> Dict[str, Any]:
     """
     Diagnostic endpoint to check LLM availability and configuration.
@@ -319,7 +319,7 @@ async def llm_status(request: Request) -> Dict[str, Any]:
     }
 
 
-@router.get("/v1/routing/status")
+@router.get("/v1/routing/status", response_model=None)
 async def routing_status() -> Dict[str, Any]:
     """
     Get detailed status of VULCAN's Query Routing and Dual-Mode Learning Integration.
@@ -461,7 +461,7 @@ async def routing_status() -> Dict[str, Any]:
     return status
 
 
-@router.post("/v1/checkpoint")
+@router.post("/v1/checkpoint", response_model=None)
 async def save_checkpoint(request: Request) -> Dict[str, str]:
     """
     Manually trigger checkpoint save.
@@ -506,7 +506,7 @@ async def save_checkpoint(request: Request) -> Dict[str, str]:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/debug/deployment")
+@router.get("/debug/deployment", response_model=None)
 async def debug_deployment(request: Request) -> Dict[str, Any]:
     """
     Debug endpoint to verify deployment state on the serving app.

@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.post("/v1/feedback")
+@router.post("/v1/feedback", response_model=None)
 async def submit_feedback(request: Union[Request, Any] = None) -> Dict[str, Any]:
     """
     Submit human feedback for RLHF learning.
@@ -150,7 +150,7 @@ async def submit_feedback(request: Union[Request, Any] = None) -> Dict[str, Any]
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/v1/feedback/thumbs")
+@router.post("/v1/feedback/thumbs", response_model=None)
 async def submit_thumbs_feedback(request: Union[Request, Any] = None) -> Dict[str, Any]:
     """
     Submit thumbs up/down feedback (simplified endpoint for UI buttons).
@@ -244,7 +244,7 @@ async def submit_thumbs_feedback(request: Union[Request, Any] = None) -> Dict[st
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/v1/feedback/stats")
+@router.get("/v1/feedback/stats", response_model=None)
 async def get_feedback_stats(request: Optional[Request] = None) -> Dict[str, Any]:
     """
     Get RLHF feedback statistics.

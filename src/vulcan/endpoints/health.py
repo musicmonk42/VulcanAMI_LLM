@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["health"])
 
 
-@router.get("/health")
+@router.get("/health", response_model=None)
 async def health_check(request: Request) -> Dict[str, Any]:
     """
     Comprehensive health check endpoint.
@@ -106,7 +106,7 @@ async def health_check(request: Request) -> Dict[str, Any]:
         }
 
 
-@router.get("/health/live")
+@router.get("/health/live", response_model=None)
 async def liveness_check() -> Dict[str, Any]:
     """
     Lightweight liveness check endpoint.
@@ -130,7 +130,7 @@ async def liveness_check() -> Dict[str, Any]:
     }
 
 
-@router.get("/health/ready")
+@router.get("/health/ready", response_model=None)
 async def readiness_check(request: Request) -> Dict[str, Any]:
     """
     Fast readiness check endpoint.

@@ -81,7 +81,7 @@ async def get_distillation_status():
         )
 
 
-@router.post("/flush")
+@router.post("/flush", response_model=None)
 async def trigger_distillation_flush(request: DistillationFlushRequest):
     """
     Trigger knowledge distillation flush.
@@ -124,7 +124,7 @@ async def trigger_distillation_flush(request: DistillationFlushRequest):
         )
 
 
-@router.post("/clear")
+@router.post("/clear", response_model=None)
 async def clear_distillation_buffer():
     """
     Clear the distillation buffer without training.
@@ -160,7 +160,7 @@ async def clear_distillation_buffer():
         )
 
 
-@router.post("/config")
+@router.post("/config", response_model=None)
 async def update_distillation_config(request: DistillationConfigUpdateRequest):
     """
     Update distillation configuration.
