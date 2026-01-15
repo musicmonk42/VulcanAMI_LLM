@@ -188,6 +188,27 @@ class IREdgeType(Enum):
     PRIORITY = "priority"  # Priority ordering
 
 
+class RequestType(Enum):
+    """
+    Types of user requests for World Model orchestration.
+    
+    This enum determines how the World Model handles a request:
+    - REASONING: Route to reasoning engines (symbolic, probabilistic, causal, etc.)
+    - KNOWLEDGE_SYNTHESIS: Retrieve and verify facts, then synthesize into requested format
+    - CREATIVE: Generate creative content grounded in verified knowledge
+    - ETHICAL: Route to meta-reasoning for ethical/philosophical analysis
+    - CONVERSATIONAL: Simple conversational requests (greetings, meta-questions)
+    
+    Industry Standard: Comprehensive enum with clear documentation per value
+    """
+
+    REASONING = "reasoning"  # Logical, mathematical, probabilistic, causal reasoning
+    KNOWLEDGE_SYNTHESIS = "knowledge_synthesis"  # Papers, explanations, factual content
+    CREATIVE = "creative"  # Poems, stories, songs with knowledge grounding
+    ETHICAL = "ethical"  # Ethical dilemmas, moral questions, philosophical reasoning
+    CONVERSATIONAL = "conversational"  # Greetings, chitchat, meta-questions
+
+
 @dataclass
 class IRNode:
     """Base IR node with full validation."""
