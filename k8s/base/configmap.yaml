@@ -7,6 +7,15 @@ data:
   ENVIRONMENT: "production"
   LOG_LEVEL: "INFO"
   PYTHONUNBUFFERED: "1"
+  # Thread Thrashing Prevention (Forensic Audit Issue #2)
+  # These variables prevent PyTorch/NumPy/OpenBLAS from spawning excessive threads
+  OMP_NUM_THREADS: "4"
+  MKL_NUM_THREADS: "4"
+  TORCH_NUM_THREADS: "4"
+  OPENBLAS_NUM_THREADS: "4"
+  VECLIB_MAXIMUM_THREADS: "4"
+  NUMEXPR_NUM_THREADS: "4"
+  TOKENIZERS_PARALLELISM: "false"
   # Database
   POSTGRES_HOST: "postgres-service"
   POSTGRES_PORT: "5432"

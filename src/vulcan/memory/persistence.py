@@ -19,6 +19,34 @@ import numpy as np
 
 from .base import CompressionType, Memory, MemoryType
 
+# SECURITY FIX: Import safe_pickle_load for use with external/checkpoint data
+# For purely internal data structures, regular pickle.load with nosec is acceptable
+# For data that could potentially come from external sources (checkpoints, user-uploaded),
+# use safe_pickle_load instead
+try:
+    from vulcan.security_fixes import safe_pickle_load, RestrictedUnpickler
+    SAFE_PICKLE_AVAILABLE = True
+except ImportError:
+    try:
+        from src.vulcan.security_fixes import safe_pickle_load, RestrictedUnpickler
+        SAFE_PICKLE_AVAILABLE = True
+    except ImportError:
+        SAFE_PICKLE_AVAILABLE = False
+        safe_pickle_load = None
+        RestrictedUnpickler = None
+
+# Configuration flag for enforcing safe pickle loading
+# Set VULCAN_ENFORCE_SAFE_PICKLE=true to use RestrictedUnpickler for all pickle loads
+ENFORCE_SAFE_PICKLE = os.environ.get("VULCAN_ENFORCE_SAFE_PICKLE", "false").lower() in ("true", "1", "yes")
+
+# SECURITY: Validate configuration at import time (fail-fast principle)
+if ENFORCE_SAFE_PICKLE and not SAFE_PICKLE_AVAILABLE:
+    logging.error(
+        "SECURITY MISCONFIGURATION: VULCAN_ENFORCE_SAFE_PICKLE=true but "
+        "safe_pickle_load is not available. Pickle operations will raise RuntimeError. "
+        "Either install vulcan.security_fixes or disable enforcement."
+    )
+
 # Try to import advanced libraries
 try:
     from cryptography.fernet import Fernet

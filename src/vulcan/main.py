@@ -14,15 +14,30 @@ Original 11,316-line monolith archived → 222-line entry point + 24 focused mod
 # Prevents PyTorch/NumPy/OpenBLAS from spawning 40+ threads causing
 # "Thread Thrashing" which locks the CPU for 60-100+ seconds.
 # These environment variables MUST be set before ANY torch/numpy imports.
+#
+# FORENSIC AUDIT FIX (Issue #2):
+# These variables are ALSO set in:
+# - entrypoint.sh (for Docker/container deployments)
+# - Dockerfile (as ENV defaults)
+# This ensures they are set BEFORE Python even starts, which is the only
+# guaranteed way to control thread counts for compiled libraries.
+#
+# Setting them here in Python provides defense-in-depth for:
+# - Direct Python execution (python main.py)
+# - Development environments without Docker
+# - Cases where entrypoint.sh is bypassed
+#
+# The pattern ${VAR:-default} in shell and setdefault here means
+# user overrides via environment are respected.
 # ====================================================================
 import os
-os.environ["OMP_NUM_THREADS"] = "4"
-os.environ["MKL_NUM_THREADS"] = "4"
-os.environ["TORCH_NUM_THREADS"] = "4"
-os.environ["OPENBLAS_NUM_THREADS"] = "4"
-os.environ["VECLIB_MAXIMUM_THREADS"] = "4"
-os.environ["NUMEXPR_NUM_THREADS"] = "4"
-os.environ["TOKENIZERS_PARALLELISM"] = "false"  # Prevent tokenizer deadlocks
+os.environ.setdefault("OMP_NUM_THREADS", "4")
+os.environ.setdefault("MKL_NUM_THREADS", "4")
+os.environ.setdefault("TORCH_NUM_THREADS", "4")
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "4")
+os.environ.setdefault("VECLIB_MAXIMUM_THREADS", "4")
+os.environ.setdefault("NUMEXPR_NUM_THREADS", "4")
+os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")  # Prevent tokenizer deadlocks
 
 # Disable TQDM progress bars (can enable with VULCAN_DEBUG=1)
 if not os.environ.get("VULCAN_DEBUG"):

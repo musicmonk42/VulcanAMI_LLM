@@ -302,7 +302,7 @@ class SerializationMixin(ABC):
         
         # Clean up tracking attribute
         if hasattr(self, '_defaultdict_factories'):
-            delattr(self, '_defaultdict_factories)
+            delattr(self, '_defaultdict_factories')
 
 
 class ThreadSafeSerializationMixin(SerializationMixin):

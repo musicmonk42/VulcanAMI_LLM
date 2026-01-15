@@ -2670,6 +2670,18 @@ class APIGateway:
         Args:
             host: Host to bind to (default: 127.0.0.1 for localhost only)
             port: Port to bind to
+            
+        Note:
+            SIGNAL HANDLING FIX (Forensic Audit Issue #1):
+            We rely on aiohttp's web.run_app() built-in signal handling rather than
+            registering our own handlers. This prevents the "Signal War" where
+            multiple signal handlers compete for SIGINT/SIGTERM:
+            
+            - web.run_app() registers its own signal handlers for graceful shutdown
+            - Our app.on_shutdown handler (set up in _setup_shutdown_handlers) is called
+            - Manual signal handlers would interfere with aiohttp's shutdown sequence
+            
+            The app.on_shutdown hook already handles cleanup() for us.
         """
         logger.info(f"Starting VULCAN-AGI API Gateway on {host}:{port}")
         if host == "0.0.0.0":  # nosec B104 - This is a security check, not a binding
@@ -2677,19 +2689,18 @@ class APIGateway:
                 "⚠️ Binding to 0.0.0.0 (all interfaces) - ensure firewall is configured!"
             )
 
-        loop = asyncio.get_event_loop()
-
-        def signal_handler():
-            logger.info("Received shutdown signal")
-            loop.create_task(self.cleanup())
-            loop.stop()
-
-        for sig in (signal.SIGTERM, signal.SIGINT):
-            try:
-                loop.add_signal_handler(sig, signal_handler)
-            except NotImplementedError:
-                # Signal handlers not supported on this platform (e.g., Windows)
-                logger.debug(f"Signal handler not supported for {sig}")
+        # SIGNAL HANDLING FIX: Removed manual signal handler registration
+        # aiohttp's web.run_app() handles SIGTERM/SIGINT automatically and triggers
+        # our app.on_shutdown handlers. Manual handlers here would create a "Signal War"
+        # where Python can only have one active handler per signal, and the last one wins,
+        # potentially leaving components without proper shutdown.
+        #
+        # The shutdown flow is now:
+        # 1. SIGTERM/SIGINT received
+        # 2. aiohttp catches signal and initiates graceful shutdown
+        # 3. app.on_shutdown handlers are called (including our cleanup())
+        # 4. All background tasks are cancelled and awaited
+        # 5. Resources are properly released
 
         web.run_app(self.app, host=host, port=port)
 

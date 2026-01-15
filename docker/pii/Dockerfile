@@ -59,12 +59,23 @@ RUN python -m compileall -q src
 
 FROM python:3.11-slim AS runtime
 
+# Runtime environment settings
+# THREAD THRASHING FIX (Forensic Audit Issue #2):
+# These variables MUST be set before Python imports numpy/torch/scipy
+# to prevent CPU oversubscription.
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     LANG=C.UTF-8 \
     TZ=UTC \
     PYTHONOPTIMIZE=1 \
-    PYTHONPATH=/app
+    PYTHONPATH=/app \
+    OMP_NUM_THREADS=4 \
+    MKL_NUM_THREADS=4 \
+    TORCH_NUM_THREADS=4 \
+    OPENBLAS_NUM_THREADS=4 \
+    VECLIB_MAXIMUM_THREADS=4 \
+    NUMEXPR_NUM_THREADS=4 \
+    TOKENIZERS_PARALLELISM=false
 
 WORKDIR /app
 

@@ -1,13 +1,59 @@
 #!/bin/sh
 # Hardened runtime entrypoint for Graphix / Vulcan platform
 # Validates presence & strength of JWT secrets before starting.
+#
+# SECURITY FEATURES:
+# - Strict error handling (set -eu)
+# - Graceful shutdown signal handling (trap)
+# - Thread limit enforcement before Python starts
+# - JWT secret validation with strength checks
+# - Defense-in-depth with user-overridable defaults
 
 # Use POSIX-compliant shell options only
 # -e: exit on error, -u: treat unset variables as error
 set -eu
 
+# ============================================================================
+# GRACEFUL SHUTDOWN HANDLING (Industry Best Practice)
+# ============================================================================
+# Trap signals to ensure clean shutdown propagation to child processes
+# This prevents zombie processes and ensures proper resource cleanup
+cleanup() {
+  exit_code=$?
+  echo "Entrypoint received shutdown signal (exit code: $exit_code)" >&2
+  # The exec below replaces this shell, so children will receive signals directly
+  # This trap ensures logging if the shell itself receives a signal before exec
+  exit $exit_code
+}
+trap cleanup EXIT INT TERM
+
 echo "Container startup at: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
+# ============================================================================
+# THREAD THRASHING FIX (Forensic Audit Issue #2)
+# ============================================================================
+# Set thread limits BEFORE Python starts to prevent CPU oversubscription.
+# These environment variables MUST be set here (in the shell) because:
+# 1. PyTorch/NumPy/OpenBLAS read these at import time
+# 2. Setting them inside Python AFTER imports doesn't work
+# 3. Setting them before ANY Python import ensures they take effect
+#
+# Default to 4 threads if not already set by the user/orchestrator
+# User can override via environment variables for fine-tuning
+# ============================================================================
+export OMP_NUM_THREADS="${OMP_NUM_THREADS:-4}"
+export MKL_NUM_THREADS="${MKL_NUM_THREADS:-4}"
+export TORCH_NUM_THREADS="${TORCH_NUM_THREADS:-4}"
+export OPENBLAS_NUM_THREADS="${OPENBLAS_NUM_THREADS:-4}"
+export VECLIB_MAXIMUM_THREADS="${VECLIB_MAXIMUM_THREADS:-4}"
+export NUMEXPR_NUM_THREADS="${NUMEXPR_NUM_THREADS:-4}"
+export TOKENIZERS_PARALLELISM="${TOKENIZERS_PARALLELISM:-false}"
+
+echo "Thread limits set: OMP=$OMP_NUM_THREADS, MKL=$MKL_NUM_THREADS, TORCH=$TORCH_NUM_THREADS"
+
+# ============================================================================
+# JWT SECRET VALIDATION (Security Best Practice)
+# ============================================================================
 INSECURE_DEFAULTS="super-secret-key insecure-dev-secret default-super-secret-key-change-me changeme password secret admin"
 MIN_LENGTH=32
 

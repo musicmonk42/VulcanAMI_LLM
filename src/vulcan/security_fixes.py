@@ -108,14 +108,16 @@ class RestrictedUnpickler(pickle.Unpickler):
                     import numpy._core.multiarray as nm
 
                     return getattr(nm, name)
-                except (ImportError, AttributeError):
+                except (ImportError, AttributeError) as e:
                     # Fall back to numpy.core for older versions
                     try:
                         import numpy.core.multiarray as nm
 
                         return getattr(nm, name)
-                    except (ImportError, AttributeError):
-                        logger.warning(f"Operation failed: {e}")
+                    except (ImportError, AttributeError) as fallback_e:
+                        logger.warning(
+                            f"NumPy multiarray import failed: primary={e}, fallback={fallback_e}"
+                        )
 
         # Allow PyTorch tensor reconstruction functions (critical for model loading)
         if module == "torch._utils":
