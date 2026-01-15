@@ -313,6 +313,15 @@ services:
       - ENVIRONMENT=development
       - VERSION=4.6.0
       - PORT=8000
+      # Thread Thrashing Prevention (Forensic Audit Issue #2)
+      # These variables prevent PyTorch/NumPy/OpenBLAS from spawning excessive threads
+      - OMP_NUM_THREADS=${OMP_NUM_THREADS:-4}
+      - MKL_NUM_THREADS=${MKL_NUM_THREADS:-4}
+      - TORCH_NUM_THREADS=${TORCH_NUM_THREADS:-4}
+      - OPENBLAS_NUM_THREADS=${OPENBLAS_NUM_THREADS:-4}
+      - VECLIB_MAXIMUM_THREADS=${VECLIB_MAXIMUM_THREADS:-4}
+      - NUMEXPR_NUM_THREADS=${NUMEXPR_NUM_THREADS:-4}
+      - TOKENIZERS_PARALLELISM=${TOKENIZERS_PARALLELISM:-false}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-dev-jwt-secret-key-change-in-production-minimum-32-chars}
       - JWT_SECRET=${JWT_SECRET:-dev-jwt-secret-key-change-in-production-minimum-32-chars}
       - GRAPHIX_JWT_SECRET=${GRAPHIX_JWT_SECRET:-dev-jwt-secret-key-change-in-production-minimum-32-chars}

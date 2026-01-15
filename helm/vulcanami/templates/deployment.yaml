@@ -139,6 +139,22 @@ spec:
         - name: PYTHON_UNBUFFERED
           value: {{ .pythonUnbuffered | quote }}
         {{- end }}
+        {{- /* Thread Thrashing Prevention (Forensic Audit Issue #2) */}}
+        {{- /* These variables prevent PyTorch/NumPy/OpenBLAS from spawning excessive threads */}}
+        - name: OMP_NUM_THREADS
+          value: "4"
+        - name: MKL_NUM_THREADS
+          value: "4"
+        - name: TORCH_NUM_THREADS
+          value: "4"
+        - name: OPENBLAS_NUM_THREADS
+          value: "4"
+        - name: VECLIB_MAXIMUM_THREADS
+          value: "4"
+        - name: NUMEXPR_NUM_THREADS
+          value: "4"
+        - name: TOKENIZERS_PARALLELISM
+          value: "false"
         {{- /* LLM API Keys (CRITICAL for chat features) */}}
         {{- if .Values.secrets.openaiApiKey }}
         - name: OPENAI_API_KEY
