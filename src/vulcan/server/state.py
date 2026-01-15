@@ -32,6 +32,7 @@ Module Attributes:
         Process-level lock for split-brain prevention when Redis is unavailable.
         Ensures only one orchestrator instance runs to prevent conflicting state
         modifications. Set during lifespan startup if Redis is not available.
+        Now supports heartbeat mechanism for self-healing in distributed systems.
         
     rate_limit_cleanup_thread (Optional[Thread]): 
         Background daemon thread for rate limit cleanup. Periodically removes
@@ -71,24 +72,30 @@ Usage Example:
             thread = Thread(target=cleanup_rate_limits, daemon=True)
             thread.start()
             state.rate_limit_cleanup_thread = thread
+    
+    # Check process lock heartbeat status
+    if state.process_lock is not None:
+        heartbeat_status = state.process_lock.get_heartbeat_status()
+        if not heartbeat_status["thread_alive"]:
+            logger.warning("Process lock heartbeat thread not running!")
     ```
 
 See Also:
     - vulcan.server.app: Main application lifespan management
     - vulcan.server.startup.manager: Startup phase orchestration
-    - vulcan.utils_main.process_lock: ProcessLock implementation
+    - vulcan.utils_main.process_lock: ProcessLock implementation with heartbeat
 
 Notes:
     - This module must remain dependency-free except for standard library
     - Do not add business logic to this module
     - Keep module size minimal to avoid import overhead
     
-Version: 2.0.0
+Version: 2.1.0
 Author: VULCAN-AGI Team
 License: MIT
 """
 
-from typing import Optional, Any
+from typing import Optional, Any, Dict
 from threading import Thread, Lock
 
 __all__ = [
@@ -96,6 +103,7 @@ __all__ = [
     "rate_limit_cleanup_thread", 
     "rate_limit_thread_lock",
     "redis_client",
+    "get_lock_status",
 ]
 
 # ============================================================
@@ -108,6 +116,13 @@ Process lock for split-brain prevention when Redis is unavailable.
 
 When Redis is not configured, only one orchestrator instance should run
 to prevent conflicting state modifications. This lock ensures mutual exclusion.
+
+Heartbeat Support (v2.1.0):
+    The process lock now includes a heartbeat mechanism that periodically
+    updates the lock file with a timestamp. This enables:
+    - Detection of crashed processes by other instances
+    - Self-healing: stale locks can be safely acquired
+    - Visibility into lock health via get_heartbeat_status()
 
 Type: Optional[ProcessLock] (using Any to avoid import cycles)
 """
@@ -158,3 +173,54 @@ May be None if:
 Type: Optional[redis.Redis] (using Any to avoid import dependency)
 Thread-Safety: Redis client itself is thread-safe for operations
 """
+
+
+# ============================================================
+# Status Functions
+# ============================================================
+
+def get_lock_status() -> Dict[str, Any]:
+    """
+    Get comprehensive status of the process lock for monitoring/diagnostics.
+    
+    This function provides observability into the process lock state,
+    including heartbeat information for distributed system health checks.
+    
+    Returns:
+        Dictionary with lock status information:
+        - locked: Whether the lock is currently held
+        - heartbeat: Heartbeat status dict (if lock supports it)
+        - error: Error message if status check failed
+        
+    Example:
+        >>> status = get_lock_status()
+        >>> if status.get("heartbeat", {}).get("thread_alive") is False:
+        ...     logger.warning("Lock heartbeat not running!")
+    """
+    if process_lock is None:
+        return {
+            "locked": False,
+            "heartbeat": None,
+            "message": "Process lock not initialized (Redis may be available)"
+        }
+    
+    try:
+        result = {
+            "locked": process_lock.is_locked() if hasattr(process_lock, "is_locked") else False,
+        }
+        
+        # Get heartbeat status if available
+        if hasattr(process_lock, "get_heartbeat_status"):
+            result["heartbeat"] = process_lock.get_heartbeat_status()
+        else:
+            result["heartbeat"] = None
+            result["message"] = "Lock does not support heartbeat"
+        
+        return result
+        
+    except Exception as e:
+        return {
+            "locked": False,
+            "heartbeat": None,
+            "error": f"Failed to get lock status: {str(e)}"
+        }

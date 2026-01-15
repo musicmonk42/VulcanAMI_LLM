@@ -153,6 +153,35 @@ graceful shutdown.
 
 
 # ============================================================
+# Process Lock Heartbeat Configuration
+# ============================================================
+
+PROCESS_LOCK_HEARTBEAT_INTERVAL_SECONDS = 30
+"""
+Heartbeat interval for process lock in seconds.
+
+The process lock (used when Redis is unavailable) periodically updates
+a timestamp in the lock file to indicate the process is alive.
+
+Rationale: 30 seconds provides a good balance between:
+- Responsiveness (detecting dead processes quickly)
+- I/O overhead (avoiding excessive file writes)
+"""
+
+PROCESS_LOCK_TTL_SECONDS = 90
+"""
+TTL for process lock heartbeat in seconds.
+
+If the lock file's timestamp is older than this value, the lock is
+considered stale and can be safely acquired by another process.
+
+Rationale: 3x the heartbeat interval allows for timing variance and
+brief I/O delays while still detecting crashed processes within a
+reasonable timeframe (under 2 minutes).
+"""
+
+
+# ============================================================
 # Self-Optimization Configuration
 # ============================================================
 

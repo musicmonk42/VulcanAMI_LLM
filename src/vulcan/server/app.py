@@ -96,13 +96,24 @@ async def lifespan(app: FastAPI):
     # ============================================================
     # Acquire process lock when Redis is unavailable to ensure only
     # one orchestrator instance runs, preventing split-brain conditions.
+    # The lock now includes a heartbeat mechanism for self-healing in
+    # distributed systems - stale locks from crashed processes can be
+    # detected and safely acquired.
     if state.redis_client is None:
         logger.warning(
             "Redis unavailable - acquiring process lock to prevent split-brain"
         )
         from vulcan.utils_main.process_lock import ProcessLock
+        from vulcan.server.startup.constants import (
+            PROCESS_LOCK_HEARTBEAT_INTERVAL_SECONDS,
+            PROCESS_LOCK_TTL_SECONDS,
+        )
         
-        state.process_lock = ProcessLock()
+        state.process_lock = ProcessLock(
+            heartbeat_interval=PROCESS_LOCK_HEARTBEAT_INTERVAL_SECONDS,
+            lock_ttl=PROCESS_LOCK_TTL_SECONDS,
+            enable_heartbeat=True,  # Enable heartbeat for self-healing
+        )
         if not state.process_lock.acquire():
             logger.critical(
                 "FATAL: Cannot acquire process lock. Another vulcan.orchestrator "
@@ -114,7 +125,11 @@ async def lifespan(app: FastAPI):
                 "Split-brain prevention: Another orchestrator instance is running. "
                 "Start Redis for multi-instance support or stop the other process."
             )
-        logger.info("Process lock acquired - singleton mode active")
+        logger.info(
+            f"Process lock acquired - singleton mode active "
+            f"(heartbeat interval: {PROCESS_LOCK_HEARTBEAT_INTERVAL_SECONDS}s, "
+            f"TTL: {PROCESS_LOCK_TTL_SECONDS}s)"
+        )
     else:
         logger.info("Redis available - multi-instance mode supported")
     
