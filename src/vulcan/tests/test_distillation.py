@@ -615,5 +615,356 @@ class TestEdgeCases:
             assert True
 
 
+# ============================================================
+# SECURITY TESTS - Fail-Safe Behavior (P0: PII Leak Prevention)
+# ============================================================
+
+
+class TestPIIRedactorFailSafe:
+    """
+    Test fail-safe behavior in PII redactor.
+    
+    SECURITY CRITICAL: On any exception during redaction, the redactor MUST
+    return a safe placeholder string instead of the original text. This prevents
+    accidental PII/secret leakage if regex engine crashes, bad input is provided,
+    or any other error occurs.
+    
+    This addresses the "PII Leak" security issue from the Forensic Audit:
+    - Never return original text on redaction error
+    - Return "[CONTENT REDACTED DUE TO SYSTEM ERROR]" on failure
+    - Fail safe in contains_secrets() by assuming secrets present on error
+    """
+    
+    def test_redact_returns_safe_placeholder_on_exception(self):
+        """Test that redact() returns safe placeholder on internal error."""
+        redactor = PIIRedactor()
+        
+        # Verify the REDACTION_ERROR_PLACEHOLDER constant exists
+        assert hasattr(redactor, 'REDACTION_ERROR_PLACEHOLDER')
+        assert redactor.REDACTION_ERROR_PLACEHOLDER == "[CONTENT REDACTED DUE TO SYSTEM ERROR]"
+    
+    def test_redact_does_not_leak_on_regex_error(self):
+        """Test that regex errors don't cause PII leakage."""
+        redactor = PIIRedactor()
+        
+        # Create a mock pattern that will raise an exception
+        original_patterns = redactor.pii_patterns.copy()
+        
+        class BrokenPattern:
+            def findall(self, text):
+                raise RuntimeError("Simulated regex engine crash")
+            def sub(self, replacement, text):
+                raise RuntimeError("Simulated regex engine crash")
+        
+        # Inject broken pattern
+        redactor.pii_patterns["test_broken"] = BrokenPattern()
+        
+        # Text with sensitive data
+        sensitive_text = "My email is secret@private.com"
+        
+        try:
+            redacted, stats = redactor.redact(sensitive_text)
+            
+            # CRITICAL: Original text should NOT be returned
+            assert redacted != sensitive_text, "Original text was returned on error - PII LEAK!"
+            
+            # Should return the fail-safe placeholder or an error indicator
+            assert (
+                redacted == redactor.REDACTION_ERROR_PLACEHOLDER or 
+                "error" in stats
+            ), "Redaction should fail safely"
+        finally:
+            # Restore original patterns
+            redactor.pii_patterns = original_patterns
+    
+    def test_contains_secrets_fails_safe_on_error(self):
+        """Test that contains_secrets() assumes secrets present on error."""
+        redactor = PIIRedactor()
+        
+        # Save original patterns
+        original_secret_patterns = redactor.secret_patterns.copy()
+        
+        class BrokenPattern:
+            def search(self, text):
+                raise RuntimeError("Simulated crash during secret detection")
+        
+        # Inject broken pattern
+        redactor.secret_patterns["test_broken"] = BrokenPattern()
+        
+        try:
+            # This should fail safe by returning True (assume secrets present)
+            result = redactor.contains_secrets("some text with potential secrets")
+            
+            # SECURITY: On error, should assume secrets ARE present (fail safe)
+            assert result is True, "contains_secrets() should return True on error (fail safe)"
+        finally:
+            # Restore original patterns
+            redactor.secret_patterns = original_secret_patterns
+    
+    def test_redact_returns_error_stats_on_failure(self):
+        """Test that redact() returns error indicator in stats on failure."""
+        redactor = PIIRedactor()
+        
+        # Inject a pattern that always raises as the FIRST pattern to be checked
+        class AlwaysFailPattern:
+            def findall(self, text):
+                raise ValueError("Intentional test failure")
+            def sub(self, replacement, text):
+                raise ValueError("Intentional test failure")
+        
+        # Clear existing patterns and add only our broken one to ensure it's hit first
+        original_patterns = redactor.secret_patterns.copy()
+        redactor.secret_patterns = {"always_fail": AlwaysFailPattern()}
+        
+        try:
+            # The redact should fail and return error stats
+            redacted, stats = redactor.redact("test text")
+            
+            # SECURITY: On failure, MUST return placeholder, not original text
+            assert redacted == redactor.REDACTION_ERROR_PLACEHOLDER, \
+                f"Expected placeholder but got: {redacted}"
+            assert stats.get("error") == 1, \
+                f"Expected error=1 in stats but got: {stats}"
+        finally:
+            # Restore original patterns
+            redactor.secret_patterns = original_patterns
+    
+    def test_placeholder_constant_is_not_empty(self):
+        """Verify fail-safe placeholder is meaningful and non-empty."""
+        redactor = PIIRedactor()
+        
+        assert redactor.REDACTION_ERROR_PLACEHOLDER
+        assert len(redactor.REDACTION_ERROR_PLACEHOLDER) > 10
+        assert "REDACTED" in redactor.REDACTION_ERROR_PLACEHOLDER
+        assert "ERROR" in redactor.REDACTION_ERROR_PLACEHOLDER
+
+
+# ============================================================
+# STORAGE TESTS - Log Rotation (P1: Infinite Storage Prevention)
+# ============================================================
+
+
+class TestStorageRotation:
+    """
+    Test storage log rotation functionality.
+    
+    This addresses the "Infinite Storage Bomb" issue from the Forensic Audit:
+    - Size-based file rotation when file exceeds max_file_size_mb
+    - Cleanup of old rotated files to prevent disk fill
+    - Disk space warning when below threshold
+    """
+    
+    def test_storage_has_rotation_settings(self):
+        """Test that storage has rotation configuration options."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            storage = DistillationStorageBackend(
+                storage_path=tmpdir,
+                max_file_size_mb=100,
+                max_rotated_files=10,
+                min_free_disk_mb=500
+            )
+            
+            assert storage.max_file_size_bytes == 100 * 1024 * 1024
+            assert storage.max_rotated_files == 10
+            assert storage.min_free_disk_bytes == 500 * 1024 * 1024
+    
+    def test_file_rotation_on_size_limit(self):
+        """Test that files are rotated when they exceed size limit."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Use very small size limit for testing (1KB)
+            storage = DistillationStorageBackend(
+                storage_path=tmpdir,
+                max_file_size_mb=0.001,  # ~1KB
+                max_rotated_files=5,
+                enable_async_writes=False  # Use sync for predictable testing
+            )
+            
+            # Write enough data to trigger rotation
+            for i in range(100):
+                storage.append_example({
+                    "prompt": f"Question {i}" * 10,  # Make it larger
+                    "response": f"Answer {i}" * 10,
+                    "timestamp": time.time()
+                })
+            
+            # Check that rotated files exist
+            storage_path = Path(tmpdir)
+            rotated_files = list(storage_path.glob("examples.*.jsonl"))
+            
+            # Should have some rotated files
+            assert len(rotated_files) >= 1, "No rotation occurred"
+    
+    def test_old_rotated_files_cleanup(self):
+        """Test that old rotated files are cleaned up."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create a storage with small rotation limits
+            storage = DistillationStorageBackend(
+                storage_path=tmpdir,
+                max_file_size_mb=0.001,  # Very small - triggers rotation quickly
+                max_rotated_files=2,  # Only keep 2 rotated files
+                enable_async_writes=False
+            )
+            
+            # Write enough to trigger multiple rotations
+            for i in range(200):
+                storage.append_example({
+                    "prompt": f"Question {i}" * 20,
+                    "response": f"Answer {i}" * 20,
+                    "timestamp": time.time()
+                })
+            
+            # Check rotated files
+            storage_path = Path(tmpdir)
+            rotated_files = list(storage_path.glob("examples.*.jsonl"))
+            
+            # Should have at most max_rotated_files rotated files
+            # Note: The +1 accounts for the current active file which may also
+            # match the glob pattern temporarily during rotation
+            max_expected = storage.max_rotated_files
+            assert len(rotated_files) <= max_expected, \
+                f"Found {len(rotated_files)} rotated files, expected at most {max_expected}"
+    
+    def test_disk_space_check_exists(self):
+        """Test that disk space checking functionality exists."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            storage = DistillationStorageBackend(storage_path=tmpdir)
+            
+            # Method should exist
+            assert hasattr(storage, '_check_disk_space')
+            
+            # Should not raise when called
+            storage._check_disk_space()
+
+
+# ============================================================
+# TRAINING TRIGGER TESTS (P2: Close the Learning Loop)
+# ============================================================
+
+
+class TestTrainingTrigger:
+    """
+    Test training trigger functionality.
+    
+    This addresses the "Training Dead End" issue from the Forensic Audit:
+    - trigger_training() method exists and works
+    - Threshold-based automatic triggering
+    - Callback and webhook support
+    """
+    
+    def test_distiller_has_trigger_training_method(self):
+        """Test that OpenAIKnowledgeDistiller has trigger_training method."""
+        from vulcan.distillation.distiller import OpenAIKnowledgeDistiller
+        
+        with tempfile.TemporaryDirectory() as tmpdir:
+            distiller = OpenAIKnowledgeDistiller(
+                storage_path=f"{tmpdir}/distillation.json",
+                training_trigger_threshold=10
+            )
+            
+            assert hasattr(distiller, 'trigger_training')
+            assert callable(distiller.trigger_training)
+    
+    def test_trigger_training_returns_result_dict(self):
+        """Test that trigger_training returns proper result dictionary."""
+        from vulcan.distillation.distiller import OpenAIKnowledgeDistiller
+        
+        with tempfile.TemporaryDirectory() as tmpdir:
+            distiller = OpenAIKnowledgeDistiller(
+                storage_path=f"{tmpdir}/distillation.json",
+                training_trigger_threshold=1000  # High threshold to not auto-trigger
+            )
+            
+            # Manual trigger (forced)
+            result = distiller.trigger_training(reason="test", force=True)
+            
+            assert isinstance(result, dict)
+            assert "triggered" in result
+            assert "reason" in result
+            assert "timestamp" in result or "total_examples" in result
+    
+    def test_trigger_respects_threshold(self):
+        """Test that trigger respects threshold when not forced."""
+        from vulcan.distillation.distiller import OpenAIKnowledgeDistiller
+        
+        with tempfile.TemporaryDirectory() as tmpdir:
+            distiller = OpenAIKnowledgeDistiller(
+                storage_path=f"{tmpdir}/distillation.json",
+                training_trigger_threshold=1000  # High threshold
+            )
+            
+            # Without force=True and without enough examples, should not trigger
+            result = distiller.trigger_training(reason="test", force=False)
+            
+            assert result["triggered"] is False or result.get("reason") == "below_threshold"
+    
+    def test_trigger_training_with_callback(self):
+        """Test that training callback is invoked."""
+        from vulcan.distillation.distiller import OpenAIKnowledgeDistiller
+        
+        callback_invoked = {"called": False, "args": None}
+        
+        def test_callback(**kwargs):
+            callback_invoked["called"] = True
+            callback_invoked["args"] = kwargs
+            return {"status": "success"}
+        
+        with tempfile.TemporaryDirectory() as tmpdir:
+            distiller = OpenAIKnowledgeDistiller(
+                storage_path=f"{tmpdir}/distillation.json",
+                training_trigger_threshold=1,
+                training_trigger_callback=test_callback
+            )
+            
+            # Force trigger to test callback
+            result = distiller.trigger_training(reason="test_callback", force=True)
+            
+            assert result["triggered"] is True
+            assert result["callback_invoked"] is True
+            assert callback_invoked["called"] is True
+            assert "storage_path" in callback_invoked["args"]
+    
+    def test_trigger_training_logs_audit_entry(self):
+        """Test that trigger_training creates audit log entry."""
+        from vulcan.distillation.distiller import OpenAIKnowledgeDistiller
+        
+        with tempfile.TemporaryDirectory() as tmpdir:
+            distiller = OpenAIKnowledgeDistiller(
+                storage_path=f"{tmpdir}/distillation.json",
+                training_trigger_threshold=1
+            )
+            
+            # Trigger training
+            distiller.trigger_training(reason="test_audit", force=True)
+            
+            # Check audit log
+            audit_log = distiller.get_audit_log()
+            
+            # Should have an entry for training_trigger
+            trigger_entries = [
+                entry for entry in audit_log 
+                if entry.get("action") == "training_trigger"
+            ]
+            assert len(trigger_entries) >= 1
+    
+    def test_trigger_updates_stats(self):
+        """Test that trigger_training updates statistics."""
+        from vulcan.distillation.distiller import OpenAIKnowledgeDistiller
+        
+        with tempfile.TemporaryDirectory() as tmpdir:
+            distiller = OpenAIKnowledgeDistiller(
+                storage_path=f"{tmpdir}/distillation.json",
+                training_trigger_threshold=1
+            )
+            
+            initial_triggers = distiller.stats.get("training_triggers", 0)
+            
+            # Trigger training
+            distiller.trigger_training(reason="test_stats", force=True)
+            
+            # Stats should be updated
+            assert distiller.stats["training_triggers"] == initial_triggers + 1
+            assert distiller.stats["last_training_trigger_time"] is not None
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "--tb=short"])

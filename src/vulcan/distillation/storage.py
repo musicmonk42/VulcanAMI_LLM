@@ -56,6 +56,8 @@ class DistillationStorageBackend:
         use_encryption: bool = False,
         encryption_key: Optional[str] = None,
         max_file_size_mb: int = 100,
+        max_rotated_files: int = 10,
+        min_free_disk_mb: int = 500,
         enable_async_writes: bool = True,
         async_buffer_size: int = 100,
         async_flush_interval_seconds: float = 5.0,
@@ -68,6 +70,8 @@ class DistillationStorageBackend:
             use_encryption: Enable encryption at rest
             encryption_key: Fernet key for encryption (auto-generated if not provided)
             max_file_size_mb: Max size per JSONL file before rotation
+            max_rotated_files: Maximum number of rotated files to keep (default: 10)
+            min_free_disk_mb: Minimum free disk space before warning (default: 500MB)
             enable_async_writes: Enable async buffered writes (default: True)
             async_buffer_size: Max buffer size before auto-flush (default: 100)
             async_flush_interval_seconds: Time between auto-flushes (default: 5.0)
@@ -75,6 +79,8 @@ class DistillationStorageBackend:
         self.storage_path = Path(storage_path)
         self.use_encryption = use_encryption
         self.max_file_size_bytes = max_file_size_mb * 1024 * 1024
+        self.max_rotated_files = max_rotated_files
+        self.min_free_disk_bytes = min_free_disk_mb * 1024 * 1024
         self.logger = logging.getLogger("DistillationStorage")
         
         # Thread safety lock for concurrent access
@@ -580,11 +586,69 @@ class DistillationStorageBackend:
         }
     
     def _rotate_file(self, file_path: Path):
-        """Rotate file when it exceeds max size."""
+        """
+        Rotate file when it exceeds max size and clean up old rotated files.
+        
+        Also checks disk space and warns if below threshold.
+        """
         timestamp = int(time.time())
         rotated_path = file_path.with_suffix(f".{timestamp}.jsonl")
         file_path.rename(rotated_path)
         self.logger.info(f"Rotated {file_path} to {rotated_path}")
+        
+        # Clean up old rotated files to prevent disk fill
+        self._cleanup_old_rotated_files(file_path)
+        
+        # Check disk space and warn if low
+        self._check_disk_space()
+    
+    def _cleanup_old_rotated_files(self, base_file_path: Path):
+        """
+        Remove oldest rotated files when exceeding max_rotated_files limit.
+        
+        This prevents unbounded disk usage from accumulated rotated files.
+        """
+        try:
+            # Find all rotated files matching pattern: examples.{timestamp}.jsonl
+            pattern = base_file_path.stem + ".*.jsonl"
+            rotated_files = sorted(
+                self.storage_path.glob(pattern),
+                key=lambda f: f.stat().st_mtime
+            )
+            
+            # Remove oldest files if exceeding limit
+            files_to_remove = len(rotated_files) - self.max_rotated_files
+            if files_to_remove > 0:
+                for old_file in rotated_files[:files_to_remove]:
+                    old_file.unlink()
+                    self.logger.info(f"Removed old rotated file: {old_file}")
+                
+                self.logger.info(
+                    f"Cleaned up {files_to_remove} old rotated files "
+                    f"(keeping {self.max_rotated_files} most recent)"
+                )
+        except Exception as e:
+            self.logger.error(f"Failed to cleanup old rotated files: {e}")
+    
+    def _check_disk_space(self):
+        """
+        Check available disk space and log warning if below threshold.
+        
+        This provides early warning before disk fills up completely.
+        """
+        try:
+            import shutil
+            disk_usage = shutil.disk_usage(self.storage_path)
+            free_bytes = disk_usage.free
+            
+            if free_bytes < self.min_free_disk_bytes:
+                self.logger.warning(
+                    f"LOW DISK SPACE WARNING: Only {free_bytes / (1024*1024):.1f}MB free. "
+                    f"Distillation storage may fail. "
+                    f"Consider running cleanup_expired() or increasing disk space."
+                )
+        except Exception as e:
+            self.logger.debug(f"Could not check disk space: {e}")
     
     def get_stats(self) -> Dict[str, Any]:
         """Get storage statistics including async write stats."""
