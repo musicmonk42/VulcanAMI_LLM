@@ -2249,6 +2249,84 @@ class WorldModel:
             self.bootstrap_mode,
         )
         logger.info("=" * 60)
+        
+        # ============================================================
+        # NEW: World Model Orchestration Architecture (Phase 2)
+        # Lazy-loaded handlers for request processing
+        # ============================================================
+        self._request_classifier = None
+        self._knowledge_handler = None
+        self._creative_handler = None
+        self._llm_guidance_builder = None
+        logger.info("✓ World Model Orchestration handlers initialized (lazy-load)")
+
+    @property
+    def request_classifier(self):
+        """
+        Lazy-load RequestClassifier.
+        
+        Industry Standard: Lazy property pattern to avoid circular imports
+        and reduce initialization overhead.
+        """
+        if self._request_classifier is None:
+            try:
+                from vulcan.world_model.request_classifier import RequestClassifier
+                self._request_classifier = RequestClassifier(self)
+                logger.info("[WorldModel] RequestClassifier initialized")
+            except Exception as e:
+                logger.error(f"[WorldModel] RequestClassifier initialization failed: {e}")
+        return self._request_classifier
+    
+    @property
+    def knowledge_handler(self):
+        """
+        Lazy-load KnowledgeHandler.
+        
+        Industry Standard: Lazy property pattern to avoid circular imports
+        and reduce initialization overhead.
+        """
+        if self._knowledge_handler is None:
+            try:
+                from vulcan.world_model.knowledge_handler import KnowledgeHandler
+                self._knowledge_handler = KnowledgeHandler(self)
+                logger.info("[WorldModel] KnowledgeHandler initialized")
+            except Exception as e:
+                logger.error(f"[WorldModel] KnowledgeHandler initialization failed: {e}")
+        return self._knowledge_handler
+    
+    @property
+    def creative_handler(self):
+        """
+        Lazy-load CreativeHandler.
+        
+        Industry Standard: Lazy property pattern to avoid circular imports
+        and reduce initialization overhead.
+        """
+        if self._creative_handler is None:
+            try:
+                from vulcan.world_model.creative_handler import CreativeHandler
+                self._creative_handler = CreativeHandler(self, self.knowledge_handler)
+                logger.info("[WorldModel] CreativeHandler initialized")
+            except Exception as e:
+                logger.error(f"[WorldModel] CreativeHandler initialization failed: {e}")
+        return self._creative_handler
+    
+    @property
+    def llm_guidance_builder(self):
+        """
+        Lazy-load LLMGuidanceBuilder.
+        
+        Industry Standard: Lazy property pattern to avoid circular imports
+        and reduce initialization overhead.
+        """
+        if self._llm_guidance_builder is None:
+            try:
+                from vulcan.world_model.llm_guidance import LLMGuidanceBuilder
+                self._llm_guidance_builder = LLMGuidanceBuilder()
+                logger.info("[WorldModel] LLMGuidanceBuilder initialized")
+            except Exception as e:
+                logger.error(f"[WorldModel] LLMGuidanceBuilder initialization failed: {e}")
+        return self._llm_guidance_builder
 
     def load_manifest(self):
         manifest_path = "D:\\Graphix\\configs\\type_system_manifest.json"
@@ -2520,6 +2598,505 @@ class WorldModel:
                 return None
         
         return metrics_provider
+
+    # ============================================================
+    # NEW: World Model Orchestration - Request Processing
+    # Central coordinator for ALL user requests
+    # ============================================================
+    
+    def process_request(self, query: str, **kwargs) -> Dict[str, Any]:
+        """
+        Main entry point - World Model coordinates ALL requests.
+        
+        Industry Standard: Central orchestration with clear request routing,
+        comprehensive error handling, and transparent result reporting.
+        
+        This method implements the core orchestration architecture:
+        1. Classify request type (reasoning, knowledge, creative, ethical, conversational)
+        2. Route to appropriate handler
+        3. Retrieve/verify knowledge if needed
+        4. Build LLM guidance for formatting
+        5. Return structured response with metadata
+        
+        Args:
+            query: User's natural language query
+            **kwargs: Additional context (conversation history, preferences, etc.)
+        
+        Returns:
+            Dictionary with:
+                - response: Final natural language response
+                - confidence: Overall confidence (0.0-1.0)
+                - source: Processing source (reasoning_engine, knowledge_retrieval, etc.)
+                - metadata: Classification, retrieval, verification details
+        """
+        try:
+            # Step 1: Classify the request
+            classification = self.request_classifier.classify(query, context=kwargs.get('context'))
+            
+            logger.info(
+                f"[WorldModel.process_request] Request classified: "
+                f"type={classification.request_type.value}, domain={classification.domain}, "
+                f"confidence={classification.confidence:.2f}"
+            )
+            
+            # Step 2: Route to appropriate handler based on request type
+            from vulcan.vulcan_types import RequestType
+            
+            if classification.request_type == RequestType.REASONING:
+                return self._handle_reasoning_request(query, classification, **kwargs)
+            
+            elif classification.request_type == RequestType.KNOWLEDGE_SYNTHESIS:
+                return self._handle_knowledge_request(query, classification, **kwargs)
+            
+            elif classification.request_type == RequestType.CREATIVE:
+                return self._handle_creative_request(query, classification, **kwargs)
+            
+            elif classification.request_type == RequestType.ETHICAL:
+                return self._handle_ethical_request(query, classification, **kwargs)
+            
+            else:  # CONVERSATIONAL
+                return self._handle_conversational_request(query, classification, **kwargs)
+                
+        except Exception as e:
+            logger.error(f"[WorldModel.process_request] Error processing request: {e}", exc_info=True)
+            return {
+                'response': f"I encountered an error processing your request: {str(e)}",
+                'confidence': 0.0,
+                'source': 'error',
+                'metadata': {'error': str(e), 'error_type': type(e).__name__},
+            }
+    
+    def _handle_reasoning_request(
+        self,
+        query: str,
+        classification,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Handle requests that require reasoning.
+        
+        Routes to appropriate reasoning engine, then formats result using LLM guidance.
+        
+        Industry Standard: Separation of reasoning (VULCAN engines) from formatting (LLM).
+        """
+        try:
+            # Get reasoning engine based on classification
+            engine = classification.reasoning_engine
+            
+            logger.info(f"[WorldModel] Routing to reasoning engine: {engine}")
+            
+            # Invoke reasoning engine - this is where actual computation happens
+            reasoning_result = self._invoke_reasoning_engine(query, engine)
+            
+            # Build LLM guidance for formatting the result
+            guidance = self.llm_guidance_builder.build_for_reasoning(
+                reasoning_result, query
+            )
+            
+            # Format with LLM (converts structured output to natural language)
+            formatted_response = self._format_with_llm(guidance)
+            
+            return {
+                'response': formatted_response,
+                'confidence': reasoning_result.get('confidence', 0.0),
+                'source': 'reasoning_engine',
+                'engine': engine,
+                'reasoning_result': reasoning_result,  # Include raw result for debugging
+                'metadata': {
+                    'classification': classification.to_dict(),
+                    'reasoning_type': engine,
+                },
+            }
+        except Exception as e:
+            logger.error(f"[WorldModel] Reasoning request failed: {e}", exc_info=True)
+            return {
+                'response': f"Reasoning failed: {str(e)}",
+                'confidence': 0.0,
+                'source': 'error',
+                'metadata': {'error': str(e)},
+            }
+    
+    def _handle_knowledge_request(
+        self,
+        query: str,
+        classification,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Handle requests that require knowledge retrieval and synthesis.
+        
+        Industry Standard: Knowledge retrieval → Verification → Structuring → Formatting.
+        """
+        try:
+            # Retrieve knowledge
+            knowledge = self.knowledge_handler.retrieve_knowledge(
+                domain=classification.domain,
+                topic=classification.subdomain or classification.domain,
+                query=query,
+            )
+            
+            # Verify knowledge
+            verified = self.knowledge_handler.verify_knowledge(knowledge)
+            
+            logger.info(
+                f"[WorldModel] Knowledge retrieved: {len(verified.verified_facts)} facts, "
+                f"confidence={verified.confidence:.2f}"
+            )
+            
+            # Determine format (paper, explanation, summary)
+            format_type = self._determine_synthesis_format(query)
+            
+            # Build LLM guidance
+            guidance = self.llm_guidance_builder.build_for_knowledge_synthesis(
+                verified, classification.subdomain or classification.domain, format_type
+            )
+            
+            # Format with LLM
+            formatted_response = self._format_with_llm(guidance)
+            
+            return {
+                'response': formatted_response,
+                'confidence': verified.confidence,
+                'source': 'knowledge_retrieval',
+                'verified_facts': len(verified.verified_facts),
+                'sources': knowledge.sources,
+                'metadata': {
+                    'classification': classification.to_dict(),
+                    'retrieval': knowledge.metadata,
+                    'verification': verified.metadata,
+                },
+            }
+        except Exception as e:
+            logger.error(f"[WorldModel] Knowledge request failed: {e}", exc_info=True)
+            return {
+                'response': f"Knowledge retrieval failed: {str(e)}",
+                'confidence': 0.0,
+                'source': 'error',
+                'metadata': {'error': str(e)},
+            }
+    
+    def _handle_creative_request(
+        self,
+        query: str,
+        classification,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Handle creative requests with knowledge grounding.
+        
+        Industry Standard: Knowledge retrieval → Constraint building → 
+        Creative generation → Verification.
+        """
+        try:
+            # Prepare creative guidance
+            creative_guidance = self.creative_handler.prepare_creative_guidance(
+                format_type=classification.creative_format,
+                subject=classification.subdomain,
+                domain=classification.domain,
+                query=query,
+            )
+            
+            logger.info(
+                f"[WorldModel] Creative guidance prepared: format={creative_guidance.format}, "
+                f"subject={creative_guidance.subject_knowledge.topic}"
+            )
+            
+            # Build LLM guidance
+            guidance = self.llm_guidance_builder.build_for_creative(
+                creative_guidance, query
+            )
+            
+            # Generate with LLM
+            creative_output = self._format_with_llm(guidance)
+            
+            # Verify the output - pass full guidance, not just constraints
+            verification = self.creative_handler.verify_creative_output(
+                creative_output, creative_guidance
+            )
+            
+            if not verification['passed']:
+                logger.warning(
+                    f"[WorldModel] Creative output failed verification: "
+                    f"{verification['violations']}"
+                )
+            
+            return {
+                'response': creative_output,
+                'confidence': 0.85 if verification['passed'] else 0.60,
+                'source': 'creative_handler',
+                'format': classification.creative_format,
+                'grounded_in': creative_guidance.subject_knowledge.facts[:3],
+                'verification': verification,
+                'metadata': {
+                    'classification': classification.to_dict(),
+                    'knowledge': creative_guidance.subject_knowledge.metadata,
+                },
+            }
+        except Exception as e:
+            logger.error(f"[WorldModel] Creative request failed: {e}", exc_info=True)
+            return {
+                'response': f"Creative generation failed: {str(e)}",
+                'confidence': 0.0,
+                'source': 'error',
+                'metadata': {'error': str(e)},
+            }
+    
+    def _handle_ethical_request(
+        self,
+        query: str,
+        classification,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Handle ethical/philosophical requests using meta-reasoning.
+        
+        Industry Standard: Meta-reasoning analysis → Structuring → Formatting.
+        """
+        try:
+            # Use meta-reasoning components
+            ethical_analysis = self._run_ethical_analysis(query)
+            
+            # Build LLM guidance
+            guidance = self.llm_guidance_builder.build_for_ethical(
+                ethical_analysis, query
+            )
+            
+            # Format with LLM
+            formatted_response = self._format_with_llm(guidance)
+            
+            return {
+                'response': formatted_response,
+                'confidence': ethical_analysis.get('confidence', 0.70),
+                'source': 'meta_reasoning',
+                'analysis': ethical_analysis,
+                'metadata': {
+                    'classification': classification.to_dict(),
+                },
+            }
+        except Exception as e:
+            logger.error(f"[WorldModel] Ethical request failed: {e}", exc_info=True)
+            return {
+                'response': f"Ethical analysis failed: {str(e)}",
+                'confidence': 0.0,
+                'source': 'error',
+                'metadata': {'error': str(e)},
+            }
+    
+    def _handle_conversational_request(
+        self,
+        query: str,
+        classification,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Handle simple conversational requests.
+        
+        Industry Standard: Minimal processing for simple exchanges.
+        """
+        try:
+            # Build simple guidance
+            from vulcan.world_model.llm_guidance import LLMGuidance
+            
+            guidance = LLMGuidance(
+                task="Respond conversationally to the user",
+                verified_content={'query': query},
+                structure={'format': 'conversational'},
+                constraints=[
+                    "Keep response brief and friendly",
+                    "Do not make factual claims you cannot verify",
+                ],
+                permissions=[
+                    "You may be conversational and friendly",
+                    "You may ask clarifying questions",
+                ],
+                tone="friendly and helpful",
+                format="conversation",
+                max_length=200,
+                metadata={'source': 'conversational'},
+            )
+            
+            response = self._format_with_llm(guidance)
+            
+            return {
+                'response': response,
+                'confidence': 0.90,  # Conversational doesn't need high confidence
+                'source': 'conversational',
+                'metadata': {
+                    'classification': classification.to_dict(),
+                },
+            }
+        except Exception as e:
+            logger.error(f"[WorldModel] Conversational request failed: {e}", exc_info=True)
+            return {
+                'response': "Hello! How can I help you today?",
+                'confidence': 0.50,
+                'source': 'fallback',
+                'metadata': {'error': str(e)},
+            }
+    
+    def _invoke_reasoning_engine(self, query: str, engine: str) -> Dict[str, Any]:
+        """
+        Invoke appropriate reasoning engine.
+        
+        Industry Standard: Lazy loading with graceful fallback.
+        """
+        try:
+            if engine == 'symbolic':
+                from vulcan.reasoning.symbolic.reasoner import SymbolicReasoner
+                reasoner = SymbolicReasoner()
+                result = reasoner.query(query, timeout=10)
+                return result
+            
+            elif engine == 'probabilistic':
+                from vulcan.reasoning.probabilistic_reasoning import ProbabilisticReasoner
+                reasoner = ProbabilisticReasoner()
+                result = reasoner.predict_with_uncertainty(query)
+                return result
+            
+            elif engine == 'causal':
+                from vulcan.reasoning.causal_reasoning import CausalReasoner
+                reasoner = CausalReasoner()
+                result = reasoner.analyze(query)
+                return result
+            
+            elif engine == 'mathematical':
+                from vulcan.reasoning.mathematical_computation import MathematicalReasoner
+                reasoner = MathematicalReasoner()
+                result = reasoner.compute(query)
+                return result
+            
+            else:
+                # Fallback to unified reasoner
+                logger.warning(f"[WorldModel] Unknown engine '{engine}', using unified reasoner")
+                from vulcan.reasoning.unified import UnifiedReasoner
+                reasoner = UnifiedReasoner()
+                result = reasoner.reason(query)
+                return result
+                
+        except Exception as e:
+            logger.error(f"[WorldModel] Reasoning engine '{engine}' failed: {e}")
+            return {
+                'conclusion': f"Reasoning failed: {str(e)}",
+                'confidence': 0.0,
+                'status': 'error',
+                'error': str(e),
+            }
+    
+    def _run_ethical_analysis(self, query: str) -> Dict[str, Any]:
+        """
+        Run ethical analysis using meta-reasoning components.
+        
+        Industry Standard: Leverage existing meta-reasoning infrastructure.
+        """
+        try:
+            # Use ethical boundary monitor if available
+            if hasattr(self, 'ethical_boundary_monitor') and self.ethical_boundary_monitor:
+                analysis = self.ethical_boundary_monitor.analyze_query(query)
+                return analysis
+            
+            # Fallback to motivational introspection
+            if hasattr(self, 'motivational_introspection') and self.motivational_introspection:
+                analysis = self.motivational_introspection.analyze_query(query)
+                return analysis
+            
+            # Basic fallback
+            return {
+                'analysis': 'Ethical analysis not available',
+                'confidence': 0.50,
+            }
+        except Exception as e:
+            logger.error(f"[WorldModel] Ethical analysis failed: {e}")
+            return {
+                'analysis': f"Analysis failed: {str(e)}",
+                'confidence': 0.0,
+            }
+    
+    def _format_with_llm(self, guidance) -> str:
+        """
+        Use LLM to format content according to guidance.
+        
+        Industry Standard: LLM as formatting layer, not reasoning layer.
+        """
+        try:
+            # Build formatting prompt
+            prompt = self._build_formatting_prompt(guidance)
+            
+            # Use HybridLLMExecutor with FORMAT mode
+            from vulcan.llm.hybrid_executor import get_hybrid_executor
+            
+            executor = get_hybrid_executor()
+            if executor:
+                result = executor.execute_sync(
+                    prompt=prompt,
+                    max_tokens=guidance.max_length or 1024,
+                )
+                return result.get('text', '')
+        except Exception as e:
+            logger.error(f"[WorldModel] LLM formatting failed: {e}")
+        
+        # Fallback: return structured content directly
+        return self._fallback_format(guidance)
+    
+    def _build_formatting_prompt(self, guidance) -> str:
+        """
+        Build the prompt for LLM formatting.
+        
+        Industry Standard: Structured prompt with clear instructions.
+        """
+        prompt_parts = [
+            f"TASK: {guidance.task}",
+            "",
+            "CONTENT TO FORMAT:",
+            json.dumps(guidance.verified_content, indent=2, default=str),
+            "",
+            "STRUCTURE:",
+            json.dumps(guidance.structure, indent=2),
+            "",
+            "CONSTRAINTS (you MUST follow these):",
+        ]
+        for constraint in guidance.constraints:
+            prompt_parts.append(f"- {constraint}")
+        
+        prompt_parts.append("")
+        prompt_parts.append("PERMISSIONS (you MAY do these):")
+        for permission in guidance.permissions:
+            prompt_parts.append(f"- {permission}")
+        
+        prompt_parts.append("")
+        prompt_parts.append(f"TONE: {guidance.tone}")
+        prompt_parts.append(f"FORMAT: {guidance.format}")
+        
+        return "\n".join(prompt_parts)
+    
+    def _fallback_format(self, guidance) -> str:
+        """
+        Fallback formatting when LLM is unavailable.
+        
+        Industry Standard: Graceful degradation with structured output.
+        """
+        content = guidance.verified_content
+        
+        if 'conclusion' in content:
+            return f"Result: {content['conclusion']}"
+        elif 'facts' in content:
+            return "\n".join([f"• {fact}" for fact in content['facts'][:10]])
+        else:
+            return str(content)
+    
+    def _determine_synthesis_format(self, query: str) -> str:
+        """
+        Determine synthesis format from query.
+        
+        Industry Standard: Pattern matching with default fallback.
+        """
+        query_lower = query.lower()
+        
+        if 'paper' in query_lower or 'essay' in query_lower:
+            return 'paper'
+        elif 'summary' in query_lower or 'summarize' in query_lower:
+            return 'summary'
+        else:
+            return 'explanation'
 
     def start_autonomous_improvement(self):
         """Start the autonomous self-improvement background thread"""

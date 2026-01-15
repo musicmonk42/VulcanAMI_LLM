@@ -38,11 +38,12 @@ Welcome to the VulcanAMI/GraphixVulcan documentation. This index organizes all d
 | [QUICK_START_WINDOWS.md](QUICK_START_WINDOWS.md) | Windows-specific setup |
 | [UNIFIED_STARTUP_GUIDE.md](UNIFIED_STARTUP_GUIDE.md) | All-in-one startup |
 
-### Architecture & Design (10 docs)
+### Architecture & Design (11 docs)
 
 | Document | Description |
 |----------|-------------|
 | [ARCHITECTURE_OVERVIEW.md](ARCHITECTURE_OVERVIEW.md) ⭐ | Platform architecture deep dive |
+| [WORLD_MODEL_ORCHESTRATION.md](WORLD_MODEL_ORCHESTRATION.md) ⭐ **NEW** | World Model orchestration architecture |
 | [VULCAN_INTERNAL_LLM_DEEP_DIVE.md](VULCAN_INTERNAL_LLM_DEEP_DIVE.md) ⭐ | Ultra deep dive into internal LLM |
 | [INTEGRATION_GUIDE.md](INTEGRATION_GUIDE.md) ⭐ | Distillation system integration guide |
 | [COMPREHENSIVE_REPO_OVERVIEW.md](COMPREHENSIVE_REPO_OVERVIEW.md) | Repository structure |

@@ -1739,10 +1739,18 @@ class LLMMode(str, Enum):
     ARCHITECTURE: QueryRouter determines LLM mode based on query type.
     This ensures consistent behavior and prevents runtime mode selection.
     
+    WORLD MODEL ORCHESTRATION INTEGRATION:
+        The World Model now uses FORMAT mode extensively to ensure LLMs only
+        format verified content from reasoning engines and knowledge systems,
+        never generating unverified knowledge or performing reasoning themselves.
+    
     Modes:
         FORMAT_ONLY: LLM only formats VULCAN's reasoning output into natural language.
                      Used when reasoning engines provide the answer (most queries).
                      Examples: mathematical, logical, symbolic queries
+        
+        FORMAT: Alias for FORMAT_ONLY - used by World Model orchestration.
+                Explicitly indicates formatting of verified content only.
         
         GENERATE: LLM generates creative/conversational content.
                   Used when no reasoning engines are needed.
@@ -1756,6 +1764,7 @@ class LLMMode(str, Enum):
     """
     
     FORMAT_ONLY = "format_only"  # Default: LLM formats reasoning output
+    FORMAT = "format_only"        # Alias: World Model orchestration formatting
     GENERATE = "generate"         # LLM generates content (creative queries)
     ENHANCE = "enhance"          # LLM enhances simple responses (chitchat)
 

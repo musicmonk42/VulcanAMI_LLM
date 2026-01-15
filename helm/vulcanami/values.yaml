@@ -193,6 +193,35 @@ llm:
     checkIntervalSeconds: 120
     maxCostPerSession: 2.0
     maxCostPerDay: 10.0
+  # World Model Orchestration (NEW FEATURE - v1.0)
+  # Ensures LLMs only format verified content, not generate unverified knowledge
+  worldModelOrchestration:
+    # Enable World Model orchestration endpoint (/v1/chat/orchestrated)
+    # When true: Uses world_model.process_request() for all orchestrated requests
+    # When false: Only /v1/chat endpoint available (backward compatible)
+    enabled: false
+    # Classification confidence thresholds
+    classification:
+      # Minimum confidence for reasoning classification (0.0-1.0)
+      minReasoningConfidence: 0.85
+      # Minimum confidence for creative classification (0.0-1.0)
+      minCreativeConfidence: 0.80
+      # Minimum confidence for knowledge synthesis (0.0-1.0)
+      minKnowledgeConfidence: 0.75
+    # Knowledge retrieval configuration
+    knowledgeRetrieval:
+      # Maximum results from GraphRAG per query
+      maxGraphRagResults: 20
+      # Verification level: basic, standard, or thorough
+      verificationLevel: "standard"
+      # Timeout for knowledge retrieval (seconds)
+      timeout: 30.0
+    # Creative content constraints
+    creative:
+      # Enable post-generation verification
+      verifyOutput: true
+      # Maximum creative output length (characters)
+      maxOutputLength: 5000
   # GraphixVulcanLLM Configuration (Internal LLM - v2.0.3)
   # CRITICAL FIX: Timeout wrapper prevents silent failures during generation
   graphixVulcan:

@@ -37,6 +37,7 @@ Typical use cases
 
 ### 🧠 **Frontier AGI Technology**
 - **VULCAN-AMI Cognitive Architecture**: Complete reasoning system with causal inference, meta-cognition, and self-awareness (285,000+ lines of code)
+- **World Model Orchestration (NEW)**: LLMs only format verified content - reasoning engines compute, knowledge systems verify, LLMs present
 - **Hybrid Symbolic-Subsymbolic AI**: Combines explainability of logic with adaptability of neural networks
 - **Autonomous Self-Improvement**: System learns and improves its own reasoning without manual intervention
 - **Multi-Modal Reasoning**: Cross-domain inference across vision, language, and structured data
