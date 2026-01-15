@@ -37,13 +37,15 @@ def get_deployment_from_module() -> Optional["ProductionDeployment"]:
     for module_path in ["vulcan.main", "src.vulcan.main"]:
         try:
             vulcan_module = importlib.import_module(module_path)
-            if (
-                hasattr(vulcan_module, "app") 
-                and hasattr(vulcan_module.app, "state")
-                and hasattr(vulcan_module.app.state, "deployment")
-                and vulcan_module.app.state.deployment is not None
-            ):
-                deployment = vulcan_module.app.state.deployment
+            # Use getattr chain with None defaults for cleaner access
+            app = getattr(vulcan_module, "app", None)
+            if app is None:
+                continue
+            state = getattr(app, "state", None)
+            if state is None:
+                continue
+            deployment = getattr(state, "deployment", None)
+            if deployment is not None:
                 logger.debug(f"Deployment found via module {module_path}")
                 return deployment
         except ImportError as e:
@@ -98,13 +100,15 @@ def get_deployment(request: Optional[Request] = None) -> Optional["ProductionDep
     for module_path in ["vulcan.main", "src.vulcan.main"]:
         try:
             vulcan_module = importlib.import_module(module_path)
-            if (
-                hasattr(vulcan_module, "app") 
-                and hasattr(vulcan_module.app, "state")
-                and hasattr(vulcan_module.app.state, "deployment")
-                and vulcan_module.app.state.deployment is not None
-            ):
-                deployment = vulcan_module.app.state.deployment
+            # Use getattr chain with None defaults for cleaner access
+            app = getattr(vulcan_module, "app", None)
+            if app is None:
+                continue
+            state = getattr(app, "state", None)
+            if state is None:
+                continue
+            deployment = getattr(state, "deployment", None)
+            if deployment is not None:
                 logger.info(f"Deployment found via module {module_path}")
                 
                 # FIX: Propagate deployment to request.app.state for faster

@@ -34,15 +34,20 @@ router = APIRouter()
 
 
 @router.post("/v1/feedback")
-async def submit_feedback(request: Request) -> Dict[str, Any]:
+async def submit_feedback(request: Union[Request, Any] = None) -> Dict[str, Any]:
     """
     Submit human feedback for RLHF learning.
     
     This endpoint accepts feedback on AI responses to improve future performance
     through Reinforcement Learning from Human Feedback (RLHF).
     
+    Supports two calling patterns:
+    1. Via FastAPI router: Request object is injected automatically
+    2. Direct call from proxy: FeedbackRequest model is passed directly
+    
     Args:
-        request: FastAPI request object containing FeedbackRequest body with:
+        request: Either a FastAPI Request object (when called via router) or
+                 a FeedbackRequest model object (when called from proxy) with:
             - query_id: ID of the original query
             - response_id: ID of the AI response being rated
             - feedback_type: Type of feedback (e.g., "rating", "preference")
@@ -57,6 +62,7 @@ async def submit_feedback(request: Request) -> Dict[str, Any]:
             - message: Human-readable status message
         
     Raises:
+        HTTPException: 400 if request body is invalid
         HTTPException: 503 if deployment or learning system not initialized
         HTTPException: 500 if feedback submission fails
     """
@@ -73,9 +79,19 @@ async def submit_feedback(request: Request) -> Dict[str, Any]:
             feedback_data = FeedbackRequest(**body)
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Invalid request body: {e}")
-    else:
+    elif request is not None:
         # Direct call with model object (from proxy functions)
+        # Validate expected attributes exist
+        required_attrs = ['query_id', 'response_id', 'feedback_type', 'content', 'reward_signal']
+        missing = [attr for attr in required_attrs if not hasattr(request, attr)]
+        if missing:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Invalid feedback request: missing required attributes {missing}"
+            )
         feedback_data = request
+    else:
+        raise HTTPException(status_code=400, detail="No request data provided")
     
     deployment = require_deployment(actual_request)
 
@@ -143,8 +159,13 @@ async def submit_thumbs_feedback(request: Union[Request, Any] = None) -> Dict[st
     on AI responses, typically triggered by UI buttons. It provides a quick way
     for users to indicate satisfaction without detailed feedback.
     
+    Supports two calling patterns:
+    1. Via FastAPI router: Request object is injected automatically
+    2. Direct call from proxy: ThumbsFeedbackRequest model is passed directly
+    
     Args:
-        request: FastAPI request object or ThumbsFeedbackRequest model with:
+        request: Either a FastAPI Request object (when called via router) or
+                 a ThumbsFeedbackRequest model object (when called from proxy) with:
             - query_id: ID of the original query
             - response_id: ID of the AI response being rated
             - is_positive: Boolean indicating thumbs up (True) or down (False)
@@ -156,6 +177,7 @@ async def submit_thumbs_feedback(request: Union[Request, Any] = None) -> Dict[st
             - message: Human-readable confirmation message
         
     Raises:
+        HTTPException: 400 if request body is invalid
         HTTPException: 503 if deployment or learning system not initialized
         HTTPException: 500 if feedback submission fails
     """
@@ -172,9 +194,19 @@ async def submit_thumbs_feedback(request: Union[Request, Any] = None) -> Dict[st
             thumbs_data = ThumbsFeedbackRequest(**body)
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Invalid request body: {e}")
-    else:
+    elif request is not None:
         # Direct call with model object (from proxy functions)
+        # Validate expected attributes exist
+        required_attrs = ['query_id', 'response_id', 'is_positive']
+        missing = [attr for attr in required_attrs if not hasattr(request, attr)]
+        if missing:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Invalid thumbs feedback request: missing required attributes {missing}"
+            )
         thumbs_data = request
+    else:
+        raise HTTPException(status_code=400, detail="No request data provided")
     
     # Use require_deployment for consistent fallback behavior with sub-app mounting
     deployment = require_deployment(actual_request)
