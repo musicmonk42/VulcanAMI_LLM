@@ -33,6 +33,7 @@ from datetime import datetime
 from pathlib import Path
 from threading import RLock
 from typing import Any, Dict, List, Optional
+from unittest.mock import MagicMock
 
 from .agent_lifecycle import AgentState
 from .collective import VULCANAGICollective
