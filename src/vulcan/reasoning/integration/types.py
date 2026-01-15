@@ -24,6 +24,10 @@ logger = logging.getLogger(__name__)
 
 # =============================================================================
 # Configuration Constants
+# FIX Issue #10: Config Drift - Aligned DEFAULT_TIME_BUDGET_MS with
+# orchestrator/variants.py to prevent inconsistent timeouts (was 5000ms here
+# vs 300000ms there). Using the higher value to accommodate slow local LLM
+# inference (~1s per token on CPU).
 # =============================================================================
 
 # Logging prefix for consistent output
@@ -31,7 +35,9 @@ LOG_PREFIX = "[ReasoningIntegration]"
 
 # Default execution budgets
 DEFAULT_MAX_WORKERS = 4  # Maximum parallel workers for PortfolioExecutor
-DEFAULT_TIME_BUDGET_MS = 5000  # Default time budget in milliseconds
+# FIX Issue #10: Increased from 5000 to 30000 (30s) to prevent premature timeouts
+# Note: For very slow systems, orchestrator/variants.py uses 300000ms (5min)
+DEFAULT_TIME_BUDGET_MS = 30000  # Default time budget in milliseconds
 DEFAULT_ENERGY_BUDGET_MJ = 1000  # Default energy budget in millijoules
 DEFAULT_MIN_CONFIDENCE = 0.5  # Minimum confidence threshold for results
 

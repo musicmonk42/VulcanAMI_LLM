@@ -253,6 +253,51 @@ TOOL_DESCRIPTIONS = {
         ambiguity, entailment, sentiment, entity, dependency, constituent,
         first-order logic, FOL, every, some, most, few, disambiguate
     """,
+    # FIX: Added world_model tool description to prevent semantic blindness
+    # Issue #5: Semantic similarity for world_model was always 0.0 because
+    # the tool was not present in TOOL_DESCRIPTIONS
+    "world_model": """
+        Meta-reasoning, self-awareness, introspection, and counterfactual analysis.
+        
+        USE THIS TOOL FOR:
+        - Self-referential queries about the AI system itself
+        - Questions about the AI's capabilities, limitations, or design
+        - Meta-cognition and reasoning about reasoning
+        - Introspection about internal states and processes
+        - Self-improvement and learning optimization
+        - Counterfactual reasoning about alternative scenarios
+        - Hypothetical reasoning about "what if" scenarios
+        - Goal conflict detection and resolution
+        - Value alignment and ethical boundary monitoring
+        - System health and performance introspection
+        - Answering "how do you work?" or "what can you do?"
+        - Questions about consciousness, awareness, or sentience
+        
+        TRIGGER KEYWORDS: you, your, yourself, self, introspect, introspection,
+        self-aware, self-awareness, conscious, consciousness, sentient, sentience,
+        meta, meta-cognition, meta-reasoning, capabilities, limitations,
+        how do you, what can you, what are you, who are you, about yourself,
+        internal state, self-model, self-improvement, counterfactual, hypothetical,
+        alternative scenario, what if you, would you, could you
+    """,
+    # FIX: Added cryptographic tool description to prevent semantic blindness
+    "cryptographic": """
+        Deterministic cryptographic computations and hash operations.
+        
+        USE THIS TOOL FOR:
+        - Hash function computations (SHA-256, SHA-512, MD5, etc.)
+        - Base64 encoding and decoding
+        - Hex encoding and decoding
+        - HMAC calculations
+        - Digital signature verification concepts
+        - Checksum calculations
+        - Key derivation concepts
+        - Encryption/decryption algorithm explanations
+        
+        TRIGGER KEYWORDS: hash, sha256, sha512, md5, blake2, checksum, hmac,
+        base64, hex, encode, decode, encrypt, decrypt, digest, signature,
+        cryptographic, crypto, key derivation, pbkdf2, bcrypt, argon2
+    """,
 }
 
 
@@ -879,6 +924,99 @@ TOOL_KEYWORDS = {
         "entailment",
         "linguistic",
         "natural language",
+    ],
+    # FIX: Issue #5 - Added world_model keywords to prevent semantic blindness
+    # Without these, WorldModel engine was never selected for self-referential queries
+    "world_model": [
+        # Self-referential pronouns
+        "you",
+        "your",
+        "yourself",
+        # Self-awareness terms
+        "self",
+        "self-aware",
+        "self-awareness",
+        "conscious",
+        "consciousness",
+        "sentient",
+        "sentience",
+        "aware",
+        "awareness",
+        # Meta-cognition
+        "meta",
+        "meta-cognition",
+        "meta-reasoning",
+        "introspect",
+        "introspection",
+        # System capability questions
+        "capabilities",
+        "capability",
+        "limitations",
+        "limitation",
+        "how do you",
+        "what can you",
+        "what are you",
+        "who are you",
+        "about yourself",
+        "your design",
+        "your system",
+        "your model",
+        "your architecture",
+        # Self-improvement and goals
+        "self-improvement",
+        "self-model",
+        "internal state",
+        "goal conflict",
+        "value alignment",
+        # Counterfactual
+        "counterfactual",
+        "hypothetical",
+        "what if you",
+        "would you",
+        "could you",
+        "alternative scenario",
+    ],
+    # FIX: Added cryptographic keywords to prevent semantic blindness
+    "cryptographic": [
+        # Hash functions
+        "hash",
+        "sha256",
+        "sha-256",
+        "sha512",
+        "sha-512",
+        "md5",
+        "blake2",
+        "blake2b",
+        "checksum",
+        "digest",
+        "hmac",
+        # Encoding
+        "base64",
+        "hex",
+        "hexadecimal",
+        "encode",
+        "decode",
+        "encoding",
+        "decoding",
+        # Cryptographic operations
+        "encrypt",
+        "decrypt",
+        "encryption",
+        "decryption",
+        "cryptographic",
+        "crypto",
+        "cipher",
+        # Key derivation
+        "key derivation",
+        "pbkdf2",
+        "bcrypt",
+        "argon2",
+        "scrypt",
+        # Signatures
+        "signature",
+        "digital signature",
+        "sign",
+        "verify",
     ],
 }
 
