@@ -705,24 +705,29 @@ class TestPIIRedactorFailSafe:
         """Test that redact() returns error indicator in stats on failure."""
         redactor = PIIRedactor()
         
-        # Inject a pattern that always raises
+        # Inject a pattern that always raises as the FIRST pattern to be checked
         class AlwaysFailPattern:
             def findall(self, text):
                 raise ValueError("Intentional test failure")
             def sub(self, replacement, text):
                 raise ValueError("Intentional test failure")
         
-        redactor.secret_patterns["always_fail"] = AlwaysFailPattern()
+        # Clear existing patterns and add only our broken one to ensure it's hit first
+        original_patterns = redactor.secret_patterns.copy()
+        redactor.secret_patterns = {"always_fail": AlwaysFailPattern()}
         
-        # The redact should fail and return error stats
-        redacted, stats = redactor.redact("test text")
-        
-        # Either returns placeholder with error stat, or handles gracefully
-        assert (
-            redacted == redactor.REDACTION_ERROR_PLACEHOLDER or
-            stats.get("error") == 1 or
-            "error" in stats
-        ) or redacted == "test text"  # If pattern iteration order doesn't hit broken one first
+        try:
+            # The redact should fail and return error stats
+            redacted, stats = redactor.redact("test text")
+            
+            # SECURITY: On failure, MUST return placeholder, not original text
+            assert redacted == redactor.REDACTION_ERROR_PLACEHOLDER, \
+                f"Expected placeholder but got: {redacted}"
+            assert stats.get("error") == 1, \
+                f"Expected error=1 in stats but got: {stats}"
+        finally:
+            # Restore original patterns
+            redactor.secret_patterns = original_patterns
     
     def test_placeholder_constant_is_not_empty(self):
         """Verify fail-safe placeholder is meaningful and non-empty."""
@@ -813,8 +818,11 @@ class TestStorageRotation:
             rotated_files = list(storage_path.glob("examples.*.jsonl"))
             
             # Should have at most max_rotated_files rotated files
-            assert len(rotated_files) <= storage.max_rotated_files + 1, \
-                f"Too many rotated files: {len(rotated_files)} (max: {storage.max_rotated_files})"
+            # Note: The +1 accounts for the current active file which may also
+            # match the glob pattern temporarily during rotation
+            max_expected = storage.max_rotated_files
+            assert len(rotated_files) <= max_expected, \
+                f"Found {len(rotated_files)} rotated files, expected at most {max_expected}"
     
     def test_disk_space_check_exists(self):
         """Test that disk space checking functionality exists."""
