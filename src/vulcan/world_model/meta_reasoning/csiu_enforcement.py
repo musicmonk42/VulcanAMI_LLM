@@ -110,6 +110,26 @@ class CSIUEnforcement:
             "[INTERNAL] CSIU Enforcement initialized with 5% single cap, 10% cumulative cap"
         )
 
+    def __getstate__(self) -> Dict[str, Any]:
+        """
+        Prepare state for pickling by removing unpickleable lock objects.
+        
+        This fixes the persistence firewall issue where threading locks cannot
+        be pickled, causing state serialization to fail.
+        """
+        state = self.__dict__.copy()
+        # Remove the lock - it will be re-created on unpickle
+        state.pop('_lock', None)
+        return state
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        """
+        Restore state after unpickling, re-creating the lock.
+        """
+        self.__dict__.update(state)
+        # Re-create the lock after unpickling
+        self._lock = threading.RLock()
+
     def is_enabled(self) -> bool:
         """Check if CSIU is enabled"""
         return self.config.global_enabled

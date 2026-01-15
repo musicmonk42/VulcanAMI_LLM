@@ -234,6 +234,21 @@ class ObjectiveHierarchy:
             "ObjectiveHierarchy initialized with %d objectives", len(self.objectives)
         )
 
+    def __getstate__(self) -> Dict[str, Any]:
+        """
+        Prepare state for pickling by removing unpickleable lock objects.
+        """
+        state = self.__dict__.copy()
+        state.pop('lock', None)
+        return state
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        """
+        Restore state after unpickling, re-creating the lock.
+        """
+        self.__dict__.update(state)
+        self.lock = threading.RLock()
+
     def _initialize_from_design_spec(self):
         """Initialize objectives from design specification"""
 

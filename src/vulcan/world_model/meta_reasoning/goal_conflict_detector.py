@@ -41,7 +41,11 @@ try:
     NUMPY_AVAILABLE = True
 except ImportError:
     NUMPY_AVAILABLE = False
-    logger.warning("NumPy not available, using list-based math")
+    logger.warning(
+        "NumPy not available. Using limited FakeNumpy fallback. "
+        "Some advanced features may not work correctly. "
+        "For full functionality, install numpy: pip install numpy"
+    )
 
     class FakeNumpy:
         # Define necessary numpy functions used in this file
@@ -121,16 +125,22 @@ try:
     OBJECTIVE_HIERARCHY_AVAILABLE = True
     logger.info("Successfully imported objective_hierarchy.")
 except ImportError as e:
-    logger.error(f"Failed to import objective_hierarchy: {e}. Using fallback mock.")
+    # FIXED: Log error and set flag for detection - do not use MagicMock in production
+    # The system should fail fast if ObjectiveHierarchy is not available, rather than
+    # running with a mock that silently returns garbage ("zombie" architecture).
+    logger.error(
+        f"CRITICAL: Failed to import objective_hierarchy: {e}. "
+        "This module is required for proper goal conflict detection. "
+        "GoalConflictDetector will raise an error if instantiated without a valid hierarchy."
+    )
     OBJECTIVE_HIERARCHY_AVAILABLE = False
-    # Use MagicMock for a more flexible fallback
-    # FIXED: Use MagicMock class, not an instance
-    ObjectiveHierarchy = MagicMock
-    RealObjectiveHierarchy = None  # Set Real reference to None
+    RealObjectiveHierarchy = None
 
-    # Define fallback Enums
+    # Define minimal fallback types for type hints only
+    # These should NOT be used in production - only for testing with explicit mocks
     class Objective:
-        pass  # Simple placeholder class
+        """Placeholder class - use only for testing."""
+        pass
 
     class ObjectiveType(Enum):
         PRIMARY = "primary"
@@ -141,7 +151,7 @@ except ImportError as e:
         DIRECT = "direct"
         INDIRECT = "indirect"
         CONSTRAINT = "constraint"
-        TRADEOFF = "tradeoff"  # Added TRADEOFF
+        TRADEOFF = "tradeoff"
 
 
 # --- END FIX ---
@@ -252,15 +262,26 @@ class GoalConflictDetector:
         Initialize conflict detector
 
         Args:
-            objective_hierarchy: ObjectiveHierarchy instance (optional, defaults to fallback)
+            objective_hierarchy: ObjectiveHierarchy instance (required in production, 
+                                 or a Mock/MagicMock for testing)
+                                 
+        Raises:
+            RuntimeError: If ObjectiveHierarchy import failed and no mock is provided.
+                         This prevents "zombie" operation with fake objects.
         """
 
         if objective_hierarchy is None:
             if not OBJECTIVE_HIERARCHY_AVAILABLE:
-                logger.warning(
-                    "No ObjectiveHierarchy provided and import failed. Using MagicMock fallback."
+                # FIXED: Fail fast instead of using MagicMock fallback
+                # This prevents the "zombie" architecture where the system runs
+                # with fake objects that silently return garbage
+                raise RuntimeError(
+                    "GoalConflictDetector requires ObjectiveHierarchy, but import failed. "
+                    "Cannot create detector without a valid hierarchy - this would cause "
+                    "the system to run with fake objects that return meaningless results. "
+                    "Please ensure objective_hierarchy module is properly installed and importable. "
+                    "For testing, pass a Mock or MagicMock explicitly."
                 )
-                self.objective_hierarchy = ObjectiveHierarchy()  # Instantiates the mock
             else:
                 # Import succeeded, but none provided. Create a default instance.
                 logger.info(
@@ -268,20 +289,20 @@ class GoalConflictDetector:
                 )
                 self.objective_hierarchy = ObjectiveHierarchy()  # Create default instance
 
-        # FIXED: Allow Mock/MagicMock types for testing
+        # Allow Mock/MagicMock types for testing - but they must be explicitly passed
+        elif isinstance(objective_hierarchy, (Mock, MagicMock)):
+            logger.warning(
+                "GoalConflictDetector initialized with Mock hierarchy - "
+                "this should only be used for testing purposes."
+            )
+            self.objective_hierarchy = objective_hierarchy
         elif OBJECTIVE_HIERARCHY_AVAILABLE and not isinstance(
-            objective_hierarchy, (RealObjectiveHierarchy, Mock, MagicMock)
+            objective_hierarchy, RealObjectiveHierarchy
         ):
             raise TypeError(
-                f"objective_hierarchy must be an instance of RealObjectiveHierarchy or a Mock, got {type(objective_hierarchy)}"
+                f"objective_hierarchy must be an instance of ObjectiveHierarchy or a Mock, "
+                f"got {type(objective_hierarchy)}"
             )
-        elif not OBJECTIVE_HIERARCHY_AVAILABLE and not isinstance(
-            objective_hierarchy, (Mock, MagicMock)
-        ):
-            raise TypeError(
-                f"objective_hierarchy must be an instance of a Mock (RealObjectiveHierarchy failed to import), got {type(objective_hierarchy)}"
-            )
-
         else:
             self.objective_hierarchy = objective_hierarchy
         # --- END FIX ---
@@ -305,6 +326,28 @@ class GoalConflictDetector:
         self._np = np if NUMPY_AVAILABLE else FakeNumpy
 
         logger.info("GoalConflictDetector initialized")
+
+    def __getstate__(self) -> Dict[str, Any]:
+        """
+        Prepare state for pickling by removing unpickleable objects.
+        
+        This fixes the persistence firewall issue where threading locks,
+        module references, and related objects cannot be pickled.
+        """
+        state = self.__dict__.copy()
+        # Remove unpickleable items - they will be re-created on unpickle
+        state.pop('lock', None)  # threading.RLock
+        state.pop('_np', None)  # numpy module reference
+        return state
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        """
+        Restore state after unpickling, re-creating unpickleable objects.
+        """
+        self.__dict__.update(state)
+        # Re-create unpickleable objects
+        self.lock = threading.RLock()
+        self._np = np if NUMPY_AVAILABLE else FakeNumpy
 
     def _initialize_conflict_rules(self) -> List[Dict[str, Any]]:
         """Initialize conflict detection rules"""

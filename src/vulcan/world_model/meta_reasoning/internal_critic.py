@@ -423,6 +423,32 @@ class InternalCritic:
             f"  Perspective weights: {{p.value: w for p, w in self.perspective_weights.items()}}"
         )
 
+    def __getstate__(self) -> Dict[str, Any]:
+        """
+        Prepare state for pickling by removing unpickleable objects.
+        
+        This fixes the persistence firewall issue where threading locks,
+        module references, and bound methods cannot be pickled.
+        """
+        state = self.__dict__.copy()
+        # Remove unpickleable items - they will be re-created on unpickle
+        state.pop('lock', None)  # threading.RLock
+        state.pop('_np', None)  # numpy module reference
+        state.pop('evaluation_criteria', None)  # dict with bound methods
+        return state
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        """
+        Restore state after unpickling, re-creating unpickleable objects.
+        """
+        self.__dict__.update(state)
+        # Re-create unpickleable objects
+        self.lock = threading.RLock()
+        self._np = np if NUMPY_AVAILABLE else FakeNumpy
+        # Re-initialize evaluation criteria (bound method references)
+        self.evaluation_criteria = {}
+        self._initialize_default_criteria()
+
     def evaluate_proposal(
         self, proposal: Dict[str, Any], context: Optional[Dict[str, Any]] = None
     ) -> Evaluation:

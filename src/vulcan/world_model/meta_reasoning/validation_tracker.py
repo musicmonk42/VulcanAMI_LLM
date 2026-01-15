@@ -430,6 +430,59 @@ class ValidationTracker:
 
         logger.info("ValidationTracker initialized")
 
+    def __getstate__(self) -> Dict[str, Any]:
+        """
+        Prepare state for pickling by removing unpickleable objects.
+        
+        This fixes the persistence firewall issue where threading locks,
+        module references, and mock objects cannot be pickled.
+        """
+        state = self.__dict__.copy()
+        # Remove unpickleable items - they will be re-created on unpickle
+        state.pop('lock', None)  # threading.RLock
+        state.pop('_np', None)  # numpy module reference
+        # Note: world_model, self_improvement_drive, transparency_interface 
+        # should be re-injected after unpickling if needed
+        state.pop('world_model', None)
+        state.pop('self_improvement_drive', None)
+        state.pop('transparency_interface', None)
+        return state
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        """
+        Restore state after unpickling, re-creating unpickleable objects.
+        
+        Note: world_model, self_improvement_drive, and transparency_interface
+        must be re-injected after unpickling by calling set_dependencies().
+        """
+        self.__dict__.update(state)
+        # Re-create unpickleable objects
+        self.lock = threading.RLock()
+        self._np = np if NUMPY_AVAILABLE else FakeNumpy
+        # Set placeholder for dependencies that must be re-injected
+        self.world_model = None
+        self.self_improvement_drive = MagicMock(_csiu_enabled=False)
+        self.transparency_interface = MagicMock()
+
+    def set_dependencies(
+        self,
+        world_model=None,
+        self_improvement_drive=None,
+        transparency_interface=None
+    ) -> None:
+        """
+        Re-inject dependencies after unpickling.
+        
+        Call this method after restoring from pickle to reconnect
+        the tracker to other system components.
+        """
+        if world_model is not None:
+            self.world_model = world_model
+        if self_improvement_drive is not None:
+            self.self_improvement_drive = self_improvement_drive
+        if transparency_interface is not None:
+            self.transparency_interface = transparency_interface
+
     def record_validation(
         self,
         proposal: Dict[str, Any],

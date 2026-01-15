@@ -1121,6 +1121,21 @@ class SelfImprovementDrive:
         if self._csiu_enabled:
             logger.info("CSIU (latent drive) enabled with granular controls")
 
+    def __getstate__(self) -> Dict[str, Any]:
+        """
+        Prepare state for pickling by removing unpickleable lock objects.
+        """
+        state = self.__dict__.copy()
+        state.pop('_lock', None)
+        return state
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        """
+        Restore state after unpickling, re-creating the lock.
+        """
+        self.__dict__.update(state)
+        self._lock = threading.RLock()
+
     # ---------- Helper Methods ----------
 
     def _determine_llm_provider_id(self) -> Optional[str]:

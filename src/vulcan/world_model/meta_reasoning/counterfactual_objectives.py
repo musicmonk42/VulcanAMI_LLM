@@ -122,6 +122,21 @@ class CounterfactualObjectiveReasoner:
 
         logger.info("CounterfactualObjectiveReasoner initialized")
 
+    def __getstate__(self) -> Dict[str, Any]:
+        """
+        Prepare state for pickling by removing unpickleable lock objects.
+        """
+        state = self.__dict__.copy()
+        state.pop('lock', None)
+        return state
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        """
+        Restore state after unpickling, re-creating the lock.
+        """
+        self.__dict__.update(state)
+        self.lock = threading.RLock()
+
     # --- END FIX ---
 
     def predict_under_objective(

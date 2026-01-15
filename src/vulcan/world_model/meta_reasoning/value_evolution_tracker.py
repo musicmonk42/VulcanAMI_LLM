@@ -603,6 +603,21 @@ class ValueEvolutionTracker:
             f"  CUSUM slack param (relative): {self.cusum_slack}, Anomaly Z-threshold: {self.anomaly_z_threshold}"
         )
 
+    def __getstate__(self) -> Dict[str, Any]:
+        """
+        Prepare state for pickling by removing unpickleable lock objects.
+        """
+        state = self.__dict__.copy()
+        state.pop('lock', None)
+        return state
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        """
+        Restore state after unpickling, re-creating the lock.
+        """
+        self.__dict__.update(state)
+        self.lock = threading.RLock()
+
     def record_value_state(
         self, values: Dict[str, float], metadata: Optional[Dict[str, Any]] = None
     ) -> ValueState:
