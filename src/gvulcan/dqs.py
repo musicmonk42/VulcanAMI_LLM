@@ -21,21 +21,106 @@ from src.utils.performance_metrics import PerformanceTimer
 
 logger = logging.getLogger(__name__)
 
-# Schema Registry for validation
-SchemaRegistry = None
-_SCHEMA_REGISTRY_AVAILABLE = False
-try:
-    # Try relative import first (when installed as package)
-    from ..vulcan.schema_registry import SchemaRegistry
-    _SCHEMA_REGISTRY_AVAILABLE = True
-except (ImportError, ValueError):
-    # Fall back to absolute import for development/testing
-    try:
-        from vulcan.schema_registry import SchemaRegistry
-        _SCHEMA_REGISTRY_AVAILABLE = True
-    except ImportError as e:
-        logger.debug(f"SchemaRegistry not available: {e}")
-        SchemaRegistry = None
+# ============================================================
+# CIRCULAR IMPORT FIX: SchemaRegistry is now lazy-loaded
+# ============================================================
+# Import SchemaRegistry lazily to avoid circular import with vulcan.safety
+# The circular import occurs because:
+#   1. vulcan.safety.__init__.py imports dqs_integration.py
+#   2. dqs_integration.py imports from gvulcan.dqs (this file)
+#   3. This file tries to import from vulcan.schema_registry
+#   4. vulcan.schema_registry is in the vulcan package which isn't fully loaded yet
+#
+# Solution: Use lazy imports that defer loading until first use.
+# This follows the same industry-standard pattern used in agent_pool.py
+# ============================================================
+
+
+class _SchemaRegistryLoader:
+    """
+    Thread-safe lazy loader for SchemaRegistry to avoid circular imports.
+    
+    This class encapsulates the lazy loading logic following the singleton pattern,
+    providing a clean interface for accessing SchemaRegistry when needed rather
+    than at module load time.
+    
+    Industry Standard Features:
+    - Thread-safe singleton pattern
+    - Configurable import paths for deployment flexibility
+    - Graceful degradation when SchemaRegistry unavailable
+    - Clear state tracking with minimal global state
+    """
+    
+    _instance = None
+    _schema_registry = None
+    _available = False
+    _import_attempted = False
+    
+    # Configurable import paths - can be extended for different deployment scenarios
+    IMPORT_PATHS = [
+        'vulcan.schema_registry',
+        'src.vulcan.schema_registry',
+    ]
+    
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+    
+    @classmethod
+    def get_schema_registry(cls):
+        """
+        Get SchemaRegistry class, loading it lazily on first access.
+        
+        Returns:
+            SchemaRegistry class if available, None otherwise
+        """
+        if cls._import_attempted:
+            return cls._schema_registry
+        
+        cls._import_attempted = True
+        
+        for path in cls.IMPORT_PATHS:
+            try:
+                module = __import__(path, fromlist=['SchemaRegistry'])
+                cls._schema_registry = getattr(module, 'SchemaRegistry', None)
+                if cls._schema_registry is not None:
+                    cls._available = True
+                    logger.debug(f"SchemaRegistry loaded successfully via {path} (lazy import)")
+                    return cls._schema_registry
+            except ImportError as e:
+                logger.debug(f"SchemaRegistry import path '{path}' failed: {e}")
+                continue
+        
+        logger.debug("SchemaRegistry not available (all import paths failed)")
+        return None
+    
+    @classmethod
+    def is_available(cls):
+        """Check if SchemaRegistry is available (triggers lazy load if not attempted)."""
+        if not cls._import_attempted:
+            cls.get_schema_registry()
+        return cls._available
+    
+    @classmethod
+    def reset(cls):
+        """Reset loader state (primarily for testing)."""
+        cls._schema_registry = None
+        cls._available = False
+        cls._import_attempted = False
+
+
+# Module-level convenience function for backward compatibility
+def _lazy_import_schema_registry():
+    """
+    Lazily import SchemaRegistry to avoid circular import issues.
+    
+    This function delegates to _SchemaRegistryLoader for thread-safe lazy loading.
+    
+    Returns:
+        SchemaRegistry class if available, None otherwise
+    """
+    return _SchemaRegistryLoader.get_schema_registry()
 
 
 @dataclass
@@ -249,15 +334,21 @@ class DQSScorer:
         self.model = model
         self.enable_schema_validation = enable_schema_validation
         
-        # Initialize schema registry if available
+        # Initialize schema registry if available (using lazy import to avoid circular dependency)
         self.schema_registry = None
-        if enable_schema_validation and _SCHEMA_REGISTRY_AVAILABLE and SchemaRegistry:
-            try:
-                self.schema_registry = SchemaRegistry.get_instance()
-                logger.info("Schema validation enabled for DQS scoring")
-            except Exception as e:
-                logger.warning(f"Failed to initialize SchemaRegistry: {e}")
-                self.schema_registry = None
+        if enable_schema_validation:
+            # Lazy import to prevent circular import with vulcan.safety
+            schema_registry_class = _lazy_import_schema_registry()
+            if schema_registry_class is not None:
+                try:
+                    self.schema_registry = schema_registry_class.get_instance()
+                    logger.info("Schema validation enabled for DQS scoring")
+                except Exception as e:
+                    logger.warning(f"Failed to initialize SchemaRegistry: {e}")
+                    self.schema_registry = None
+                    self.enable_schema_validation = False
+            else:
+                logger.debug("Schema validation requested but SchemaRegistry not available")
                 self.enable_schema_validation = False
 
         # Validate thresholds
