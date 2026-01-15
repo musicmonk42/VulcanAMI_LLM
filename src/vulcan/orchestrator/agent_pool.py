@@ -124,13 +124,15 @@ def _lazy_import_memory():
             
             if WorkingMemory and HierarchicalMemory and MemoryConfig:
                 logging.getLogger(__name__).debug(
-                    f"Memory components loaded successfully via {specialized_path} (lazy import)"
+                    f"Memory components (WorkingMemory, HierarchicalMemory, MemoryConfig) "
+                    f"loaded successfully via {specialized_path.rsplit('.', 1)[0]} (lazy import)"
                 )
                 return True
             
         except ImportError as e:
             logging.getLogger(__name__).debug(
-                f"Import path {specialized_path} failed: {e}. Trying next path..."
+                f"Memory component import failed for path prefix "
+                f"'{specialized_path.rsplit('.', 1)[0]}': {e}. Trying next path..."
             )
             continue
     
