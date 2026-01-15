@@ -367,6 +367,8 @@ services:
       - MEMORY_GUARD_ENABLED=${MEMORY_GUARD_ENABLED:-true}
       - MEMORY_GUARD_THRESHOLD_PERCENT=${MEMORY_GUARD_THRESHOLD_PERCENT:-85.0}
       - MEMORY_GUARD_CHECK_INTERVAL=${MEMORY_GUARD_CHECK_INTERVAL:-5.0}
+      # Death spiral prevention: Max backoff multiplier for sleep interval
+      - MEMORY_GUARD_MAX_BACKOFF_MULTIPLIER=${MEMORY_GUARD_MAX_BACKOFF_MULTIPLIER:-5}
       # GC Rate Limiting (every N requests instead of every request)
       - GC_REQUEST_INTERVAL=${GC_REQUEST_INTERVAL:-10}
       # Problem Decomposer Configuration

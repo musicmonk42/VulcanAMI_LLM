@@ -40,6 +40,7 @@ query routing degradation (469ms → 152,048ms) by caching ML model instances.
 | MEMORY_GUARD_ENABLED | No | Enable memory pressure monitoring | "true" |
 | MEMORY_GUARD_THRESHOLD_PERCENT | No | Memory % to trigger GC | "85.0" |
 | MEMORY_GUARD_CHECK_INTERVAL | No | Seconds between memory checks | "5.0" |
+| MEMORY_GUARD_MAX_BACKOFF_MULTIPLIER | No | Max backoff multiplier for death spiral prevention | "5" |
 | GC_REQUEST_INTERVAL | No | GC every N requests (rate limiting) | "10" |
 | PROBLEM_DECOMPOSER_ENABLED | No | Enable hierarchical problem decomposition | "true" |
 | VULCAN_DECOMPOSITION_THRESHOLD | No | Complexity threshold for decomposition | "0.70" |

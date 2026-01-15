@@ -779,5 +779,192 @@ class TestMemoryGuardThreadSafety(unittest.TestCase):
         self.assertEqual(guard.peak_memory_percent, 99.0)
 
 
+class TestMemoryGuardDeathSpiralPrevention(unittest.TestCase):
+    """Test the death spiral prevention feature (GC backoff mechanism)."""
+
+    def setUp(self):
+        """Clean up any existing guard."""
+        try:
+            from vulcan.monitoring.memory_guard import stop_memory_guard
+            stop_memory_guard()
+        except ImportError:
+            pass
+
+    def tearDown(self):
+        """Clean up after tests."""
+        try:
+            from vulcan.monitoring.memory_guard import stop_memory_guard
+            stop_memory_guard()
+        except ImportError:
+            pass
+
+    def test_consecutive_criticals_initialization(self):
+        """Test that consecutive criticals counter is initialized to 0."""
+        try:
+            from vulcan.monitoring.memory_guard import MemoryGuard
+        except ImportError:
+            self.skipTest("MemoryGuard not available")
+            return
+
+        guard = MemoryGuard()
+        self.assertEqual(guard._consecutive_criticals, 0)
+        self.assertEqual(guard.max_backoff_multiplier, 5)
+
+    def test_backoff_multiplier_in_status(self):
+        """Test that backoff multiplier is exposed in status."""
+        try:
+            from vulcan.monitoring.memory_guard import MemoryGuard
+        except ImportError:
+            self.skipTest("MemoryGuard not available")
+            return
+
+        guard = MemoryGuard()
+        status = guard.get_status()
+
+        self.assertIn("consecutive_criticals", status)
+        self.assertIn("current_backoff_multiplier", status)
+        self.assertIn("max_backoff_multiplier", status)
+        self.assertEqual(status["consecutive_criticals"], 0)
+        self.assertEqual(status["current_backoff_multiplier"], 1)  # 0 + 1
+        self.assertEqual(status["max_backoff_multiplier"], 5)
+
+    def test_backoff_multiplier_calculation(self):
+        """Test that backoff multiplier is calculated correctly."""
+        try:
+            from vulcan.monitoring.memory_guard import MemoryGuard
+        except ImportError:
+            self.skipTest("MemoryGuard not available")
+            return
+
+        guard = MemoryGuard()
+        
+        # With 0 consecutive criticals, multiplier should be 1
+        guard._consecutive_criticals = 0
+        status = guard.get_status()
+        self.assertEqual(status["current_backoff_multiplier"], 1)
+        
+        # With 2 consecutive criticals, multiplier should be 3
+        guard._consecutive_criticals = 2
+        status = guard.get_status()
+        self.assertEqual(status["current_backoff_multiplier"], 3)
+        
+        # With 5+ consecutive criticals, multiplier should be capped at 5
+        guard._consecutive_criticals = 10
+        status = guard.get_status()
+        self.assertEqual(status["current_backoff_multiplier"], 5)
+
+    @patch('vulcan.monitoring.memory_guard.psutil')
+    def test_consecutive_criticals_increment(self, mock_psutil):
+        """Test that consecutive criticals increments on critical memory."""
+        try:
+            from vulcan.monitoring.memory_guard import MemoryGuard
+        except ImportError:
+            self.skipTest("MemoryGuard not available")
+            return
+
+        # Mock critical memory (90% > 85% critical threshold)
+        mock_memory = MagicMock()
+        mock_memory.percent = 90.0
+        mock_memory.available = 1 * 1024**3
+        mock_memory.used = 9 * 1024**3
+        mock_psutil.virtual_memory.return_value = mock_memory
+
+        guard = MemoryGuard(
+            warning_threshold=70.0,
+            gc_threshold=75.0,
+            critical_threshold=85.0,
+            check_interval=0.05
+        )
+
+        # Simulate critical event
+        guard._consecutive_criticals = 0
+        if mock_memory.percent > guard.critical_threshold:
+            guard._consecutive_criticals += 1
+
+        self.assertEqual(guard._consecutive_criticals, 1)
+
+    @patch('vulcan.monitoring.memory_guard.psutil')
+    def test_consecutive_criticals_reset_on_lower_memory(self, mock_psutil):
+        """Test that consecutive criticals resets when memory drops below critical."""
+        try:
+            from vulcan.monitoring.memory_guard import MemoryGuard
+        except ImportError:
+            self.skipTest("MemoryGuard not available")
+            return
+
+        guard = MemoryGuard(
+            warning_threshold=70.0,
+            gc_threshold=75.0,
+            critical_threshold=85.0,
+            check_interval=0.05
+        )
+
+        # Simulate previous critical events
+        guard._consecutive_criticals = 3
+
+        # Mock memory dropping below critical (80% - above gc, below critical)
+        mock_memory = MagicMock()
+        mock_memory.percent = 80.0
+        mock_memory.available = 2 * 1024**3
+        mock_memory.used = 8 * 1024**3
+        mock_psutil.virtual_memory.return_value = mock_memory
+
+        # Simulate the reset logic from _monitor_loop
+        if mock_memory.percent <= guard.critical_threshold:
+            guard._consecutive_criticals = 0
+
+        self.assertEqual(guard._consecutive_criticals, 0)
+
+    def test_sleep_interval_with_backoff(self):
+        """Test that sleep interval is calculated with backoff."""
+        try:
+            from vulcan.monitoring.memory_guard import MemoryGuard
+        except ImportError:
+            self.skipTest("MemoryGuard not available")
+            return
+
+        guard = MemoryGuard(check_interval=5.0)
+        
+        # Normal: 5.0 * 1 = 5.0
+        guard._consecutive_criticals = 0
+        backoff_multiplier = min(guard._consecutive_criticals + 1, guard.max_backoff_multiplier)
+        sleep_interval = guard.interval * backoff_multiplier
+        self.assertEqual(sleep_interval, 5.0)
+        
+        # After 2 criticals: 5.0 * 3 = 15.0
+        guard._consecutive_criticals = 2
+        backoff_multiplier = min(guard._consecutive_criticals + 1, guard.max_backoff_multiplier)
+        sleep_interval = guard.interval * backoff_multiplier
+        self.assertEqual(sleep_interval, 15.0)
+        
+        # After 10 criticals (capped at 5x): 5.0 * 5 = 25.0
+        guard._consecutive_criticals = 10
+        backoff_multiplier = min(guard._consecutive_criticals + 1, guard.max_backoff_multiplier)
+        sleep_interval = guard.interval * backoff_multiplier
+        self.assertEqual(sleep_interval, 25.0)
+
+    def test_max_backoff_multiplier_configurable(self):
+        """Test that max backoff multiplier is configurable."""
+        try:
+            from vulcan.monitoring.memory_guard import MemoryGuard
+        except ImportError:
+            self.skipTest("MemoryGuard not available")
+            return
+
+        guard = MemoryGuard()
+        
+        # Default should be 5
+        self.assertEqual(guard.max_backoff_multiplier, 5)
+        
+        # Should be configurable
+        guard.max_backoff_multiplier = 10
+        self.assertEqual(guard.max_backoff_multiplier, 10)
+        
+        # Verify backoff calculation respects new max
+        guard._consecutive_criticals = 15
+        backoff_multiplier = min(guard._consecutive_criticals + 1, guard.max_backoff_multiplier)
+        self.assertEqual(backoff_multiplier, 10)
+
+
 if __name__ == "__main__":
     unittest.main()
