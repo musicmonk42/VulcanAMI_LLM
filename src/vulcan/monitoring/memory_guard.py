@@ -113,6 +113,10 @@ class MemoryGuard:
         self._consecutive_criticals = 0
         self.max_backoff_multiplier = 5  # Cap backoff at 5x normal interval
     
+    def _calculate_backoff_multiplier(self) -> int:
+        """Calculate current backoff multiplier based on consecutive criticals."""
+        return min(self._consecutive_criticals + 1, self.max_backoff_multiplier)
+    
     def _increment_gc_trigger(self):
         """Thread-safe GC trigger increment."""
         with self._stats_lock:
@@ -196,7 +200,7 @@ class MemoryGuard:
         """Background monitoring loop with graduated response and death spiral prevention."""
         while self._running and not self._shutdown_event.is_set():
             # Calculate sleep interval with backoff for consecutive critical events
-            backoff_multiplier = min(self._consecutive_criticals + 1, self.max_backoff_multiplier)
+            backoff_multiplier = self._calculate_backoff_multiplier()
             sleep_interval = self.interval * backoff_multiplier
             
             try:
@@ -269,9 +273,6 @@ class MemoryGuard:
     
     def get_status(self) -> dict:
         """Get current memory guard status."""
-        # Calculate current backoff multiplier
-        backoff_multiplier = min(self._consecutive_criticals + 1, self.max_backoff_multiplier)
-        
         status = {
             "running": self._running,
             "warning_threshold": self.warning_threshold,
@@ -283,7 +284,7 @@ class MemoryGuard:
             "peak_memory_percent": self.peak_memory_percent,
             "has_aggressive_callback": self.aggressive_gc_callback is not None,
             "consecutive_criticals": self._consecutive_criticals,
-            "current_backoff_multiplier": backoff_multiplier,
+            "current_backoff_multiplier": self._calculate_backoff_multiplier(),
             "max_backoff_multiplier": self.max_backoff_multiplier,
         }
         

@@ -916,7 +916,7 @@ class TestMemoryGuardDeathSpiralPrevention(unittest.TestCase):
         self.assertEqual(guard._consecutive_criticals, 0)
 
     def test_sleep_interval_with_backoff(self):
-        """Test that sleep interval is calculated with backoff."""
+        """Test that sleep interval is calculated with backoff via public API."""
         try:
             from vulcan.monitoring.memory_guard import MemoryGuard
         except ImportError:
@@ -925,23 +925,23 @@ class TestMemoryGuardDeathSpiralPrevention(unittest.TestCase):
 
         guard = MemoryGuard(check_interval=5.0)
         
-        # Normal: 5.0 * 1 = 5.0
+        # Normal: multiplier=1, sleep=5.0
         guard._consecutive_criticals = 0
-        backoff_multiplier = min(guard._consecutive_criticals + 1, guard.max_backoff_multiplier)
-        sleep_interval = guard.interval * backoff_multiplier
-        self.assertEqual(sleep_interval, 5.0)
+        status = guard.get_status()
+        self.assertEqual(status["current_backoff_multiplier"], 1)
+        self.assertEqual(guard.interval * status["current_backoff_multiplier"], 5.0)
         
-        # After 2 criticals: 5.0 * 3 = 15.0
+        # After 2 criticals: multiplier=3, sleep=15.0
         guard._consecutive_criticals = 2
-        backoff_multiplier = min(guard._consecutive_criticals + 1, guard.max_backoff_multiplier)
-        sleep_interval = guard.interval * backoff_multiplier
-        self.assertEqual(sleep_interval, 15.0)
+        status = guard.get_status()
+        self.assertEqual(status["current_backoff_multiplier"], 3)
+        self.assertEqual(guard.interval * status["current_backoff_multiplier"], 15.0)
         
-        # After 10 criticals (capped at 5x): 5.0 * 5 = 25.0
+        # After 10 criticals (capped at 5x): multiplier=5, sleep=25.0
         guard._consecutive_criticals = 10
-        backoff_multiplier = min(guard._consecutive_criticals + 1, guard.max_backoff_multiplier)
-        sleep_interval = guard.interval * backoff_multiplier
-        self.assertEqual(sleep_interval, 25.0)
+        status = guard.get_status()
+        self.assertEqual(status["current_backoff_multiplier"], 5)
+        self.assertEqual(guard.interval * status["current_backoff_multiplier"], 25.0)
 
     def test_max_backoff_multiplier_configurable(self):
         """Test that max backoff multiplier is configurable."""
@@ -960,10 +960,11 @@ class TestMemoryGuardDeathSpiralPrevention(unittest.TestCase):
         guard.max_backoff_multiplier = 10
         self.assertEqual(guard.max_backoff_multiplier, 10)
         
-        # Verify backoff calculation respects new max
+        # Verify backoff calculation respects new max via public API
         guard._consecutive_criticals = 15
-        backoff_multiplier = min(guard._consecutive_criticals + 1, guard.max_backoff_multiplier)
-        self.assertEqual(backoff_multiplier, 10)
+        status = guard.get_status()
+        self.assertEqual(status["current_backoff_multiplier"], 10)
+        self.assertEqual(status["max_backoff_multiplier"], 10)
 
 
 if __name__ == "__main__":
