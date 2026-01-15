@@ -60,6 +60,16 @@ logger = logging.getLogger(__name__)
 
 
 # ============================================================================
+# Pre-compiled regex patterns (Issue #8 Fix: Avoid re-compilation in loops)
+# ============================================================================
+
+# Pattern for cryptographic/multi-char function notation: SHA256(x), MD5(y), etc.
+# Must have at least 2 characters and be ALL-CAPS or CAPS with numbers
+# Used by Lexer.preprocess_natural_language to replace function calls with placeholders
+_CRYPTO_FUNC_PATTERN = re.compile(r'[A-Z]{2,}[A-Z0-9]*\([^)]*\)')
+
+
+# ============================================================================
 # TOKEN-BASED LEXER
 # ============================================================================
 
@@ -208,11 +218,11 @@ class Lexer:
         # breaking single-letter predicates like P(x), Q(y), H(x).
         # Pattern matches: SHA256(x), MD5(y), BLAKE2(z), etc.
         # Must have at least 2 characters and be ALL-CAPS or CAPS with numbers
-        func_pattern = re.compile(r'[A-Z]{2,}[A-Z0-9]*\([^)]*\)')
-        func_matches = func_pattern.findall(result)
+        # FIX Issue #8: Use pre-compiled pattern to avoid re-compilation in loops
+        func_matches = _CRYPTO_FUNC_PATTERN.findall(result)
         if func_matches:
             logger.debug(f"Lexer: Found function notation, replacing: {func_matches[:3]}")
-            result = func_pattern.sub('FUNC', result)
+            result = _CRYPTO_FUNC_PATTERN.sub('FUNC', result)
         
         # Step 3: Handle concatenation operator ||
         # Replace || with a placeholder since it's not a standard FOL operator
@@ -316,6 +326,7 @@ class Lexer:
             "->": TokenType.IMPLIES,
             "↔": TokenType.IFF,
             "<=>": TokenType.IFF,
+            "<->": TokenType.IFF,  # FIX Issue #4: Added ASCII <-> for biconditional
             "iff": TokenType.IFF,
             "∀": TokenType.FORALL,
             "forall": TokenType.FORALL,
@@ -334,10 +345,12 @@ class Lexer:
         }
 
         # Regex to find tokens, including multi-character operators
+        # FIX Issue #4: Added <-> pattern to handle both ASCII biconditional representations
+        # Previously only <=> was in IFF_OP, causing <-> to be tokenized incorrectly
         token_regex_parts = [
             r"(?P<ARROW_OP>\-\>)",
             r"(?P<IMPLIES_OP>\=\>|→)",
-            r"(?P<IFF_OP><=>|↔)",
+            r"(?P<IFF_OP><\->|<=>|↔)",  # FIX: Added <-> for ASCII biconditional
             r"(?P<IDENTIFIER>[a-zA-Z_][a-zA-Z0-9_]*)",
             r"(?P<SYMBOL>["
             + "".join(re.escape(k) for k in self.token_map.keys() if len(k) == 1)

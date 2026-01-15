@@ -35,10 +35,19 @@ class ContextMode(Enum):
 
 @dataclass
 class UtilityWeights:
-    """Weights for utility components"""
+    """Weights for utility components
+    
+    Note: The default time_penalty was reduced from 1.0 to 0.1 to prevent
+    slow-but-high-quality reasoning engines (like Analogical at 25s startup)
+    from being penalized so heavily that they're never selected.
+    
+    Issue #6 Fix: With time_penalty=1.0 and 25s execution time, the utility
+    cost was -25, making the AI ignore optimal engines during warmup.
+    """
 
     quality: float = 1.0
-    time_penalty: float = 1.0
+    # FIX Issue #6: Reduced from 1.0 to 0.1 to prevent penalizing slow engines
+    time_penalty: float = 0.1
     energy_penalty: float = 1.0
     risk_penalty: float = 1.0
 
@@ -243,24 +252,28 @@ class UtilityModel:
         config = config or {}
 
         # Default weights for different modes
+        # FIX Issue #6: Reduced time_penalty values across all modes to prevent
+        # slow-but-high-quality engines from being penalized excessively.
+        # Previous values (e.g., 2.0 for RUSH) caused 50+ point utility penalties
+        # for engines with 25s startup time.
         self.mode_weights = {
             ContextMode.RUSH: UtilityWeights(
-                quality=0.7, time_penalty=2.0, energy_penalty=0.5, risk_penalty=1.0
+                quality=0.7, time_penalty=0.3, energy_penalty=0.5, risk_penalty=1.0
             ),
             ContextMode.ACCURATE: UtilityWeights(
-                quality=2.0, time_penalty=0.3, energy_penalty=0.5, risk_penalty=1.5
+                quality=2.0, time_penalty=0.05, energy_penalty=0.5, risk_penalty=1.5
             ),
             ContextMode.EFFICIENT: UtilityWeights(
-                quality=0.8, time_penalty=1.0, energy_penalty=2.0, risk_penalty=1.0
+                quality=0.8, time_penalty=0.15, energy_penalty=2.0, risk_penalty=1.0
             ),
             ContextMode.BALANCED: UtilityWeights(
-                quality=1.0, time_penalty=1.0, energy_penalty=1.0, risk_penalty=1.0
+                quality=1.0, time_penalty=0.1, energy_penalty=1.0, risk_penalty=1.0
             ),
             ContextMode.EXPLORATORY: UtilityWeights(
-                quality=0.5, time_penalty=0.5, energy_penalty=0.5, risk_penalty=0.5
+                quality=0.5, time_penalty=0.05, energy_penalty=0.5, risk_penalty=0.5
             ),
             ContextMode.CONSERVATIVE: UtilityWeights(
-                quality=1.5, time_penalty=1.0, energy_penalty=1.0, risk_penalty=2.0
+                quality=1.5, time_penalty=0.1, energy_penalty=1.0, risk_penalty=2.0
             ),
         }
 

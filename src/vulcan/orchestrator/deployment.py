@@ -33,7 +33,6 @@ from datetime import datetime
 from pathlib import Path
 from threading import RLock
 from typing import Any, Dict, List, Optional
-from unittest.mock import MagicMock
 
 from .agent_lifecycle import AgentState
 from .collective import VULCANAGICollective
@@ -477,18 +476,24 @@ class ProductionDeployment:
 
         # PREFER: Causal WorldModel (meta-reasoning + self-improvement)
         # Guard with try/except and fall back to learning.UnifiedWorldModel if needed
+        # FIX: Mock Object Poisoning - Use None instead of MagicMock to prevent
+        # downstream systems from receiving truthy mock objects that produce gibberish
+        # output (e.g., "<MagicMock id='...'>") when serialized.
         components["world_model"] = None
         CausalWorldModel = None  # Define first
         try:
             from vulcan.world_model import WorldModel as CausalWorldModel
         except ImportError:
-            CausalWorldModel = MagicMock()
+            # FIX: Set to None instead of MagicMock to prevent mock object poisoning
+            CausalWorldModel = None
             logger.warning(
-                "Using MagicMock for WorldModel (aliased as CausalWorldModel)"
+                "WorldModel not available - skipping initialization (no mock fallback)"
             )
 
         try:
-            if CausalWorldModel and not isinstance(CausalWorldModel, MagicMock):
+            # FIX: Check both that CausalWorldModel is not None AND that it's callable
+            # This ensures the import succeeded with a valid class, not just any truthy value
+            if CausalWorldModel is not None and callable(CausalWorldModel):
                 # Build configuration for CausalWorldModel from AgentConfig
                 enable_si = bool(getattr(self.config, "enable_self_improvement", False))
                 cfg_file = getattr(
@@ -533,15 +538,10 @@ class ProductionDeployment:
                         True,
                         enable_si,
                     )
-            elif CausalWorldModel and isinstance(CausalWorldModel, MagicMock):
-                logger.warning(
-                    "CausalWorldModel is a MagicMock, skipping initialization."
-                )
-                components["world_model"] = None
             else:
-                # This else is redundant with the except ImportError, but good for clarity
+                # CausalWorldModel import failed, components["world_model"] stays None
                 logger.warning(
-                    "CausalWorldModel not imported, skipping initialization."
+                    "CausalWorldModel not available, skipping initialization."
                 )
                 components["world_model"] = None
 
