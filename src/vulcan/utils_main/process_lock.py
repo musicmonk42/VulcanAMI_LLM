@@ -423,7 +423,11 @@ class ProcessLock:
             if lock_dir and not os.path.exists(lock_dir):
                 os.makedirs(lock_dir, exist_ok=True)
             
-            # Open file in read/write mode, creating if needed
+            # Open file for reading and writing
+            # Use 'a+' to create if not exists, then seek to beginning
+            # This is safer than 'w+' which would truncate before we can read
+            # existing lock info, and handles the race condition better than
+            # checking existence first.
             self._lock_file = open(self.lock_path, "a+")
             self._lock_file.seek(0)
             
@@ -465,8 +469,10 @@ class ProcessLock:
                 # Remove stale lock file
                 try:
                     os.remove(self.lock_path)
-                except OSError:
-                    pass  # File may have already been removed
+                except OSError as remove_error:
+                    self._logger.debug(
+                        f"Lock file already removed or inaccessible: {remove_error}"
+                    )
                 
                 # Retry lock acquisition once
                 try:
@@ -533,6 +539,11 @@ class ProcessLock:
         if not self._locked:
             return
         
+        # Mark as unlocked first to prevent re-entry issues
+        # This is safe because we check _locked at entry
+        was_locked = self._locked
+        self._locked = False
+        
         # Stop heartbeat thread first
         self._stop_heartbeat()
         
@@ -543,18 +554,18 @@ class ProcessLock:
                 self._lock_file.close()
                 self._lock_file = None
             
-            self._locked = False
-            
             # Remove lock file
             try:
                 os.remove(self.lock_path)
-            except OSError:
-                pass  # File may have already been removed
+            except OSError as remove_error:
+                self._logger.debug(
+                    f"Lock file already removed or inaccessible during release: {remove_error}"
+                )
                 
             self._logger.info("Process lock released")
         except Exception as e:
             self._logger.warning(f"Error releasing process lock: {e}")
-            self._locked = False
+            # _locked is already False, so no need to set it again
     
     def is_locked(self) -> bool:
         """
