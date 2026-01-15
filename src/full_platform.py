@@ -1503,6 +1503,14 @@ async def _background_services_initialization(app: FastAPI, worker_id: int, logg
                 vulcan_module.app.state.deployment = vulcan_deployment
                 vulcan_module.app.state.startup_time = __import__("time").time()
                 vulcan_module.app.state.worker_id = worker_id
+                
+                # FIX: Also attach deployment to the PARENT app's state
+                # When VULCAN is mounted as a sub-app, requests to /vulcan/* endpoints
+                # have request.app pointing to the parent app, not vulcan_module.app.
+                # By setting deployment on both, we ensure require_deployment() works
+                # regardless of which app the request comes through.
+                app.state.deployment = vulcan_deployment
+                logger.info("✓ Deployment attached to both vulcan_module.app and parent app")
 
                 await asyncio.sleep(0.05)  # Brief yield for health checks
 
