@@ -91,14 +91,28 @@ DEFAULT_LOG_QUERY_LIMIT = 100
 # Request truncation limit
 MAX_REQUEST_LENGTH = 2000
 
-# PERFORMANCE FIX: Thread pool for async I/O operations
-# This allows governance logging to run without blocking the asyncio event loop
-# Configurable via environment variable GOVERNANCE_IO_WORKERS (default: min(4, cpu_count+1))
+# THREAD EXPLOSION FIX (Issue #2): Thread pool for async I/O operations
+# This allows governance logging to run without blocking the asyncio event loop.
+#
+# IMPORTANT: For fire-and-forget logging, we use max_workers=1 by default to:
+#   1. Prevent thread thrashing under high load
+#   2. Ensure sequential log writes (maintains order)
+#   3. Reduce context switching overhead
+#   4. Minimize resource contention on SQLite database
+#
+# The previous default of min(4, cpu_count+1) caused thread explosion under load
+# because each fire-and-forget call could spawn work across multiple threads,
+# leading to contention on the shared SQLite connection.
+#
+# Override via environment variable GOVERNANCE_IO_WORKERS if parallelism is needed.
 _GOVERNANCE_IO_EXECUTOR: Optional[ThreadPoolExecutor] = None
 _GOVERNANCE_EXECUTOR_LOCK = threading.Lock()
 
-# Calculate default worker count based on CPU count
-_DEFAULT_GOVERNANCE_WORKERS = min(4, (os.cpu_count() or 1) + 1)
+# THREAD EXPLOSION FIX: Default to 1 worker for fire-and-forget logging
+# This prevents thread thrashing while still providing non-blocking I/O.
+# Multiple workers are only beneficial if writes are independent and don't
+# contend on shared resources (like SQLite), which is not the case here.
+_DEFAULT_GOVERNANCE_WORKERS = 1
 
 # ============================================================
 # BUFFERED LOGGING CONFIGURATION
@@ -116,7 +130,19 @@ DEFAULT_LOG_PATH = Path("governance_logs")  # Default directory for JSONL log fi
 
 
 def _get_governance_executor() -> ThreadPoolExecutor:
-    """Get or create the thread pool for async governance I/O operations."""
+    """
+    Get or create the singleton thread pool for async governance I/O operations.
+    
+    THREAD EXPLOSION FIX (Issue #2): This uses max_workers=1 by default to prevent
+    thread thrashing. Fire-and-forget logging doesn't benefit from parallelism
+    because writes contend on the shared SQLite database.
+    
+    Thread Safety:
+        Uses double-checked locking pattern for thread-safe singleton initialization.
+    
+    Returns:
+        ThreadPoolExecutor: Singleton executor for governance I/O operations.
+    """
     global _GOVERNANCE_IO_EXECUTOR
     if _GOVERNANCE_IO_EXECUTOR is None:
         with _GOVERNANCE_EXECUTOR_LOCK:
@@ -124,11 +150,20 @@ def _get_governance_executor() -> ThreadPoolExecutor:
                 max_workers = int(
                     os.getenv("GOVERNANCE_IO_WORKERS", str(_DEFAULT_GOVERNANCE_WORKERS))
                 )
+                # Log configuration for observability
+                if max_workers != _DEFAULT_GOVERNANCE_WORKERS:
+                    logger.info(
+                        f"[GovernanceLogger] Using custom worker count: {max_workers} "
+                        f"(default: {_DEFAULT_GOVERNANCE_WORKERS})"
+                    )
                 _GOVERNANCE_IO_EXECUTOR = ThreadPoolExecutor(
                     max_workers=max_workers, thread_name_prefix="governance_io"
                 )
                 # Register cleanup on application exit
                 atexit.register(_cleanup_governance_executor)
+                logger.debug(
+                    f"[GovernanceLogger] Executor initialized with {max_workers} worker(s)"
+                )
     return _GOVERNANCE_IO_EXECUTOR
 
 

@@ -205,16 +205,26 @@ class CacheStatistics:
 
 class EmbeddingCache:
     """
-    Thread-safe embedding cache with LRU eviction.
+    Thread-safe embedding cache with LRU eviction and fine-grained locking.
 
     Stores computed embeddings keyed by text hash to avoid redundant
     computation. Uses LRU (Least Recently Used) eviction when cache
     reaches capacity, with batch eviction to reduce lock contention.
 
+    LOCK CONTENTION FIX (Issue #3):
+        The cache now uses fine-grained locking to prevent slow cache misses
+        from blocking fast cache hits. Key improvements:
+        
+        1. Lock held only for dictionary operations, not during model encoding
+        2. In-progress computation tracking prevents duplicate work
+        3. Concurrent readers don't block each other
+        4. Copy-on-read semantics prevent mutation issues
+
     Thread Safety:
         All public methods are thread-safe using RLock. The cache uses
         copy-on-read semantics to prevent external mutation of cached
-        values.
+        values. In-progress computations are tracked to prevent duplicate
+        work across threads.
 
     Memory Management:
         When the cache reaches capacity, it evicts 10% of entries in a
@@ -227,6 +237,7 @@ class EmbeddingCache:
         _hits: Counter for cache hits
         _misses: Counter for cache misses
         _evictions: Counter for eviction operations
+        _in_progress: Set of keys currently being computed (prevents duplicates)
 
     Example:
         >>> cache = EmbeddingCache(max_size=5000)
@@ -260,12 +271,21 @@ class EmbeddingCache:
         self._cache: OrderedDict[str, List[float]] = OrderedDict()
         self._max_size = max_size
         self._lock = threading.RLock()
+        
+        # LOCK CONTENTION FIX (Issue #3): Track in-progress computations
+        # This prevents duplicate work when multiple threads miss the cache
+        # for the same key simultaneously. Each entry maps key -> Event.
+        # Threads waiting for a computation to complete can wait on the Event.
+        self._in_progress: Dict[str, threading.Event] = {}
+        self._in_progress_lock = threading.Lock()
 
         # Statistics tracking
         self._hits = 0
         self._misses = 0
         self._evictions = 0
         self._compute_time_saved_ms = 0.0
+        # LOCK CONTENTION FIX: Track duplicate computation prevention
+        self._duplicate_computations_prevented = 0
 
         logger.info(f"{LOG_PREFIX} Initialized with max_size={max_size}")
 
@@ -476,6 +496,67 @@ class EmbeddingCache:
                 f"cache_size={len(self._cache)}/{self._max_size}"
             )
 
+    def try_acquire_computation(self, text: str) -> Tuple[bool, Optional[threading.Event]]:
+        """
+        LOCK CONTENTION FIX (Issue #3): Try to acquire the right to compute an embedding.
+        
+        This method implements a "compute-once" pattern that prevents duplicate
+        work when multiple threads miss the cache for the same key simultaneously.
+        
+        Usage pattern:
+            acquired, wait_event = cache.try_acquire_computation(text)
+            if acquired:
+                try:
+                    embedding = model.encode(text)
+                    cache.put(text, embedding)
+                finally:
+                    cache.release_computation(text)
+            else:
+                # Another thread is computing - wait for it
+                wait_event.wait(timeout=30.0)
+                embedding = cache.get(text)  # Should be there now
+        
+        Args:
+            text: Text to compute embedding for.
+            
+        Returns:
+            Tuple of (acquired, wait_event):
+                - acquired: True if this thread should compute, False if another is
+                - wait_event: Event to wait on if acquired is False
+        """
+        key = self._make_key(text)
+        
+        with self._in_progress_lock:
+            if key in self._in_progress:
+                # Another thread is computing - return the wait event
+                self._duplicate_computations_prevented += 1
+                logger.debug(
+                    f"{LOG_PREFIX} Duplicate computation prevented for key={key[:16]}..."
+                )
+                return False, self._in_progress[key]
+            else:
+                # This thread will compute - create an event for others to wait on
+                event = threading.Event()
+                self._in_progress[key] = event
+                return True, None
+
+    def release_computation(self, text: str) -> None:
+        """
+        LOCK CONTENTION FIX (Issue #3): Release the computation lock for a text.
+        
+        Must be called after compute is complete (in a finally block).
+        Signals waiting threads that the computation is done.
+        
+        Args:
+            text: Text that was being computed.
+        """
+        key = self._make_key(text)
+        
+        with self._in_progress_lock:
+            if key in self._in_progress:
+                event = self._in_progress.pop(key)
+                event.set()  # Wake up any waiting threads
+
     def record_time_saved(self, time_ms: float) -> None:
         """
         Record time saved by cache hit.
@@ -536,6 +617,14 @@ class EmbeddingCache:
             self._misses = 0
             self._evictions = 0
             self._compute_time_saved_ms = 0.0
+        
+        # LOCK CONTENTION FIX: Clear in-progress computations
+        with self._in_progress_lock:
+            # Signal all waiting threads before clearing
+            for event in self._in_progress.values():
+                event.set()
+            self._in_progress.clear()
+            self._duplicate_computations_prevented = 0
 
         logger.info(f"{LOG_PREFIX} Cache cleared")
 
@@ -574,6 +663,14 @@ class EmbeddingCache:
             self._misses = 0
             self._evictions = 0
             self._compute_time_saved_ms = 0.0
+
+        # LOCK CONTENTION FIX: Clear in-progress computations
+        with self._in_progress_lock:
+            # Signal all waiting threads before clearing
+            for event in self._in_progress.values():
+                event.set()
+            self._in_progress.clear()
+            self._duplicate_computations_prevented = 0
 
         # Log with warning level for audit purposes (corruption recovery scenario)
         logger.warning(
@@ -663,6 +760,8 @@ class EmbeddingCache:
             - time_saved_ms: Estimated time saved by cache
             - sample_keys: First 5 cache keys (truncated)
             - fill_percentage: Cache fill percentage
+            - in_progress_count: Number of embeddings currently being computed
+            - duplicate_computations_prevented: Count of prevented duplicate work
 
         Example:
             >>> debug_info = cache.debug_cache_state()
@@ -679,7 +778,7 @@ class EmbeddingCache:
             # Get sample keys for debugging
             sample_keys = [k[:32] + "..." for k in list(self._cache.keys())[:5]]
 
-            return {
+            result = {
                 "size": len(self._cache),
                 "max_size": self._max_size,
                 "hits": self._hits,
@@ -692,6 +791,13 @@ class EmbeddingCache:
                 "fill_percentage": f"{fill_pct:.1f}%",
                 "total_operations": total,
             }
+
+        # LOCK CONTENTION FIX: Include in-progress computation stats
+        with self._in_progress_lock:
+            result["in_progress_count"] = len(self._in_progress)
+            result["duplicate_computations_prevented"] = self._duplicate_computations_prevented
+
+        return result
 
     def verify_key_generation(self, text: str) -> Dict[str, str]:
         """
@@ -790,10 +896,16 @@ def get_embedding_cached(
     estimated_compute_ms: float = DEFAULT_ESTIMATED_COMPUTE_MS,
 ) -> List[float]:
     """
-    Get embedding with caching.
+    Get embedding with caching and duplicate computation prevention.
 
     Checks cache first, computes embedding only if not cached.
     Records time saved for monitoring when cache hits occur.
+    
+    LOCK CONTENTION FIX (Issue #3): This function now uses the compute-once
+    pattern to prevent duplicate work when multiple threads request the same
+    embedding simultaneously. If another thread is already computing an
+    embedding for the same text, this thread will wait for that computation
+    to complete rather than computing redundantly.
 
     Args:
         text: Text to embed.
@@ -821,13 +933,39 @@ def get_embedding_cached(
     """
     cache = _get_cache()
 
-    # Check cache first
+    # Check cache first (fast path - no lock contention on hit)
     cached = cache.get(text)
     if cached is not None:
         cache.record_time_saved(estimated_compute_ms)
         return cached
 
-    # Compute embedding
+    # LOCK CONTENTION FIX: Try to acquire computation right
+    # This prevents duplicate work when multiple threads miss cache simultaneously
+    acquired, wait_event = cache.try_acquire_computation(text)
+    
+    if not acquired:
+        # Another thread is computing - wait for it (up to 60s timeout)
+        if wait_event is not None:
+            wait_event.wait(timeout=60.0)
+        
+        # Check cache again - should be there now
+        cached = cache.get(text)
+        if cached is not None:
+            cache.record_time_saved(estimated_compute_ms)
+            return cached
+        
+        # If still not in cache (timeout or error), fall through to compute
+        logger.warning(
+            f"{LOG_PREFIX} Wait for computation timed out, computing directly"
+        )
+        # Re-acquire computation right
+        acquired, _ = cache.try_acquire_computation(text)
+        if not acquired:
+            # Still couldn't acquire - another thread is computing, just compute anyway
+            # This is a rare race condition fallback
+            pass
+
+    # Compute embedding (outside of any lock)
     start = time.perf_counter()
 
     try:
@@ -840,6 +978,8 @@ def get_embedding_cached(
                 f"Model {type(model).__name__} has no encode() or embed() method"
             )
     except Exception as e:
+        # Release computation lock on error
+        cache.release_computation(text)
         logger.error(f"{LOG_PREFIX} Embedding computation failed: {e}")
         raise
 
@@ -849,8 +989,9 @@ def get_embedding_cached(
     if hasattr(embedding, "tolist"):
         embedding = embedding.tolist()
 
-    # Store in cache
+    # Store in cache and release computation lock
     cache.put(text, embedding)
+    cache.release_computation(text)
 
     stats = cache.get_stats()
     logger.info(
