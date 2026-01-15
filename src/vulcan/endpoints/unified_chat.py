@@ -25,6 +25,7 @@ from vulcan.endpoints.chat_helpers import (
     build_context,
     extract_tools_from_routing,  # FIX Issue 7: Import tools extraction helper
     format_reasoning_results,  # Fix: Import reasoning formatter for LLM context
+    safe_reasoning_type_to_string,  # Industry Standard: Type-safe enum-to-string conversion
     MAX_HISTORY_MESSAGES,
     MAX_HISTORY_TOKENS,
     MAX_MESSAGE_LENGTH,
@@ -1494,10 +1495,13 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
             extracted_type = _get_reasoning_attr(agent_reasoning_output, "reasoning_type")
             extracted_explanation = _get_reasoning_attr(agent_reasoning_output, "explanation")
             
+            # Industry Standard: Convert reasoning_type to string for JSON serialization
+            extracted_type_str = safe_reasoning_type_to_string(extracted_type, default="unknown")
+            
             reasoning_results["agent_reasoning"] = {
                 "conclusion": extracted_conclusion,
                 "confidence": extracted_confidence,
-                "reasoning_type": extracted_type,
+                "reasoning_type": extracted_type_str,
                 "explanation": extracted_explanation,
             }
             
@@ -1505,7 +1509,7 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
             conclusion_preview = str(extracted_conclusion)[:100] if extracted_conclusion else "None"
             logger.info(
                 f"[VULCAN/v1/chat] Agent reasoning injected into context: "
-                f"type={extracted_type}, confidence={extracted_confidence}, "
+                f"type={extracted_type_str}, confidence={extracted_confidence}, "
                 f"has_conclusion={extracted_conclusion is not None}, "
                 f"conclusion_preview='{conclusion_preview}'"
             )
@@ -1667,10 +1671,14 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
                         )
                         
                         # Build a privileged no-answer response
+                        # Industry Standard: Convert reasoning_type to string for JSON serialization
+                        privileged_reasoning_type = integration_result.metadata.get("reasoning_type", "meta_reasoning")
+                        privileged_reasoning_type_str = safe_reasoning_type_to_string(privileged_reasoning_type, default="meta_reasoning")
+                        
                         direct_reasoning_output = {
                             "conclusion": f"I cannot provide a complete answer to this question at this time. {rationale}",
                             "confidence": 0.0,  # Explicit 0.0 to signal no answer
-                            "reasoning_type": integration_result.metadata.get("reasoning_type", "meta_reasoning"),
+                            "reasoning_type": privileged_reasoning_type_str,
                             "explanation": rationale,
                             "privileged_no_answer": True,
                             "override_router_tools": True,
@@ -1689,10 +1697,13 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
                         wm_explanation = integration_result.metadata.get("explanation", "")
                         wm_reasoning_type = integration_result.metadata.get("reasoning_type", "meta_reasoning")
                         
+                        # Industry Standard: Convert reasoning_type to string for JSON serialization
+                        wm_reasoning_type_str = safe_reasoning_type_to_string(wm_reasoning_type, default="meta_reasoning")
+                        
                         direct_reasoning_output = {
                             "conclusion": wm_conclusion,
                             "confidence": integration_result.confidence,
-                            "reasoning_type": wm_reasoning_type,
+                            "reasoning_type": wm_reasoning_type_str,
                             "explanation": wm_explanation,
                         }
                         
@@ -1703,7 +1714,7 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
                         conclusion_preview = str(wm_conclusion)[:100] if wm_conclusion else "None"
                         logger.info(
                             f"[VULCAN/v1/chat] Using world_model result directly: "
-                            f"type={wm_reasoning_type}, confidence={integration_result.confidence:.2f}, "
+                            f"type={wm_reasoning_type_str}, confidence={integration_result.confidence:.2f}, "
                             f"has_conclusion={wm_conclusion is not None}, "
                             f"conclusion_preview='{conclusion_preview}'"
                         )
@@ -1724,11 +1735,14 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
                         tool_reasoning_type = integration_result.metadata.get("reasoning_type")
                         tool_name = integration_result.metadata.get("selected_tool", "unknown")
                         
+                        # Industry Standard: Convert reasoning_type to string for JSON serialization
+                        tool_reasoning_type_str = safe_reasoning_type_to_string(tool_reasoning_type, default=tool_name)
+                        
                         # Build reasoning output from tool execution result
                         direct_reasoning_output = {
                             "conclusion": tool_conclusion,
                             "confidence": integration_result.confidence,
-                            "reasoning_type": str(tool_reasoning_type) if tool_reasoning_type else tool_name,
+                            "reasoning_type": tool_reasoning_type_str,
                             "explanation": tool_explanation or integration_result.rationale,
                         }
                         
@@ -2106,20 +2120,24 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
             # Add reasoning-specific systems to systems_used
             systems_used.append("direct_reasoning_output")
             
+            # Industry Standard: Convert reasoning_type to string for JSON serialization
+            # This prevents "'ReasoningType' object has no attribute 'replace'" errors
+            reasoning_type_str = safe_reasoning_type_to_string(best_reasoning_type, default="unknown")
+            
             final_response = VulcanResponse(
                 response=direct_reasoning_response,
                 systems_used=list(set(systems_used)),
                 confidence=best_confidence,
                 metadata={
                     "reasoning_direct": True,
-                    "reasoning_type": best_reasoning_type,
+                    "reasoning_type": reasoning_type_str,
                     "reasoning_confidence": best_confidence,
                     "skip_llm_synthesis": True,
                     "conversation_id": body.conversation_id,
                     "routing": routing_stats,
                     # FIX: Add transparency fields for provenance
                     "engine": best_source,  # Which engine produced this result
-                    "tool": best_reasoning_type,  # Which reasoning tool was used
+                    "tool": reasoning_type_str,  # Which reasoning tool was used
                     "reasoning_source": best_source,  # unified/agent/direct
                     **metadata,
                 },

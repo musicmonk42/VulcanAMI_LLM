@@ -15,6 +15,7 @@ from fastapi import APIRouter, HTTPException, Request
 
 from vulcan.endpoints.chat_helpers import (
     format_reasoning_results,  # Fix: Import reasoning formatter for LLM context
+    safe_reasoning_type_to_string,  # Industry Standard: Type-safe enum-to-string conversion
     CONTEXT_TRUNCATION_LIMITS,
     MIN_MEANINGFUL_RESPONSE_LENGTH,
     MOCK_RESPONSE_MARKER,
@@ -1602,12 +1603,16 @@ async def chat(request: Request) -> Dict[str, Any]:
                                 
                                 # FIX: Collect all results for tournament selection
                                 if reasoning_out or reasoning_invoked:
+                                    # Industry Standard: Convert reasoning_type to string for JSON serialization
+                                    raw_reasoning_type = reasoning_out.get("reasoning_type", "unknown") if reasoning_out else "unknown"
+                                    reasoning_type_str = safe_reasoning_type_to_string(raw_reasoning_type, default="unknown")
+                                    
                                     agent_result = {
                                         "job_id": job_id,
                                         "reasoning_output": reasoning_out,
                                         "reasoning_invoked": reasoning_invoked,
                                         "confidence": reasoning_out.get("confidence", 0.5) if reasoning_out else 0.5,
-                                        "reasoning_type": reasoning_out.get("reasoning_type", "unknown") if reasoning_out else "unknown",
+                                        "reasoning_type": reasoning_type_str,
                                     }
                                     all_agent_results.append(agent_result)
                                     logger.info(
@@ -1711,15 +1716,19 @@ async def chat(request: Request) -> Dict[str, Any]:
     if agent_reasoning_output:
         # Add agent-based reasoning as a distinct category (merges with existing insights)
         # Note: Use helper to handle both dict and ReasoningResult objects
+        # Industry Standard: Convert reasoning_type to string for JSON serialization
+        extracted_reasoning_type = _get_reasoning_attr(agent_reasoning_output, "reasoning_type")
+        reasoning_type_str = safe_reasoning_type_to_string(extracted_reasoning_type, default="unknown")
+        
         reasoning_insights["agent_reasoning"] = {
             "conclusion": _get_reasoning_attr(agent_reasoning_output, "conclusion"),
             "confidence": _get_reasoning_attr(agent_reasoning_output, "confidence"),
-            "reasoning_type": _get_reasoning_attr(agent_reasoning_output, "reasoning_type"),
+            "reasoning_type": reasoning_type_str,
             "explanation": _get_reasoning_attr(agent_reasoning_output, "explanation"),
         }
         logger.info(
             f"[VULCAN] Agent reasoning injected into context: "
-            f"type={_get_reasoning_attr(agent_reasoning_output, 'reasoning_type')}"
+            f"type={reasoning_type_str}"
         )
 
     # ================================================================
