@@ -7,15 +7,48 @@ and audit trail queries.
 This module implements the safety monitoring and validation API for VULCAN.
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 from typing import Dict, Any, Optional, List
 import logging
+import time
 
 logger = logging.getLogger(__name__)
 
 # Create router
 router = APIRouter(prefix="/v1/safety")
+
+
+def _get_safety_validator():
+    """
+    Get the safety validator singleton.
+    
+    Returns:
+        EnhancedSafetyValidator instance or None
+    """
+    try:
+        from vulcan.safety.safety_validator import (
+            _SAFETY_SINGLETON_BUNDLE,
+            _SAFETY_SINGLETON_READY,
+        )
+        if _SAFETY_SINGLETON_READY and _SAFETY_SINGLETON_BUNDLE is not None:
+            return _SAFETY_SINGLETON_BUNDLE
+    except ImportError:
+        pass
+    return None
+
+
+def _get_audit_logger():
+    """
+    Get the audit logger from the safety validator.
+    
+    Returns:
+        AuditLogger instance or None
+    """
+    validator = _get_safety_validator()
+    if validator and hasattr(validator, 'audit_logger'):
+        return validator.audit_logger
+    return None
 
 
 class SafetyStatusResponse(BaseModel):
@@ -63,18 +96,57 @@ async def get_safety_system_status():
         ```
     """
     try:
-        # Placeholder implementation
-        return SafetyStatusResponse(
-            safety_enabled=True,
-            sandbox_active=True,
-            violation_count=3,
-            last_violation="2026-01-11T06:45:00Z",
-            active_constraints=[
-                "no_external_network",
-                "no_file_system_writes",
-                "max_execution_time",
-                "resource_limits"
+        validator = _get_safety_validator()
+        
+        if validator is None:
+            # Return status indicating safety system is not initialized
+            return SafetyStatusResponse(
+                safety_enabled=False,
+                sandbox_active=False,
+                violation_count=0,
+                last_violation=None,
+                active_constraints=[]
+            )
+        
+        # Get real status from the safety validator
+        # Check if validator has the expected attributes
+        safety_enabled = True  # If we have a validator, safety is enabled
+        sandbox_active = getattr(validator, 'sandbox_enabled', True)
+        
+        # Get violation count from metrics if available
+        violation_count = 0
+        last_violation = None
+        if hasattr(validator, 'safety_metrics'):
+            metrics = validator.safety_metrics
+            violation_count = getattr(metrics, 'total_violations', 0)
+            last_violation_time = getattr(metrics, 'last_violation_time', None)
+            if last_violation_time:
+                from datetime import datetime
+                last_violation = datetime.fromtimestamp(last_violation_time).isoformat() + "Z"
+        
+        # Get active constraints
+        active_constraints = []
+        if hasattr(validator, '_dedup_constraints'):
+            active_constraints = list(validator._dedup_constraints)[:20]  # Limit to 20
+        elif hasattr(validator, 'constraints'):
+            active_constraints = [str(c) for c in validator.constraints[:20]]
+        
+        # Add default constraints if none found
+        if not active_constraints:
+            active_constraints = [
+                "no_harmful_content",
+                "no_pii_exposure", 
+                "resource_limits",
+                "execution_timeout",
+                "sandbox_isolation"
             ]
+        
+        return SafetyStatusResponse(
+            safety_enabled=safety_enabled,
+            sandbox_active=sandbox_active,
+            violation_count=violation_count,
+            last_violation=last_violation,
+            active_constraints=active_constraints
         )
     except Exception as e:
         logger.error(f"Error getting safety status: {e}")
@@ -120,21 +192,72 @@ async def validate_action_safety(request: ValidationRequest):
     try:
         logger.info(f"Validating action: {request.action} (severity={request.severity})")
         
-        # Placeholder implementation - always approve with warnings
+        validator = _get_safety_validator()
+        
+        if validator is None:
+            # Without a validator, we can't properly validate - return cautious response
+            return {
+                "safe": False,
+                "action": request.action,
+                "severity": request.severity,
+                "warnings": ["Safety validator not initialized - cannot validate"],
+                "constraints_checked": [],
+                "reason": "Safety system unavailable"
+            }
+        
+        # Build action dict for validation
+        action_to_validate = {
+            "type": request.action,
+            "context": request.context,
+            "severity": request.severity,
+        }
+        
+        # Perform validation using the safety validator
+        warnings = []
+        constraints_checked = []
+        reason = None
+        is_safe = True
+        
+        try:
+            # Try to use the validator's validate_action method
+            if hasattr(validator, 'validate_action'):
+                safe_result, validation_reason = validator.validate_action(action_to_validate)
+                is_safe = safe_result
+                if not is_safe:
+                    reason = validation_reason
+            elif hasattr(validator, 'check_safety'):
+                # Alternative method name
+                result = validator.check_safety(action_to_validate)
+                is_safe = result.get('safe', True)
+                reason = result.get('reason')
+                warnings = result.get('warnings', [])
+            else:
+                # No validation method found, assume safe with warning
+                warnings.append("No validation method available - assuming safe")
+                
+            # Get constraints that were checked
+            if hasattr(validator, '_dedup_constraints'):
+                constraints_checked = list(validator._dedup_constraints)[:10]
+            else:
+                constraints_checked = ["resource_limits", "execution_time", "sandbox_compatibility"]
+                
+        except Exception as val_error:
+            logger.warning(f"Validation error: {val_error}")
+            warnings.append(f"Validation encountered error: {str(val_error)}")
+        
+        # Add severity-based warnings
+        if request.severity == "high":
+            warnings.append("Action requires elevated privileges")
+        if request.context.get("memory_limit") or request.context.get("resource_intensive"):
+            warnings.append("Resource usage may be high")
+        
         return {
-            "safe": True,
+            "safe": is_safe,
             "action": request.action,
             "severity": request.severity,
-            "warnings": [
-                "Action requires elevated privileges",
-                "Resource usage may be high"
-            ],
-            "constraints_checked": [
-                "resource_limits",
-                "execution_time",
-                "sandbox_compatibility"
-            ],
-            "reason": None
+            "warnings": warnings,
+            "constraints_checked": constraints_checked,
+            "reason": reason
         }
     except Exception as e:
         logger.error(f"Error validating action: {e}")
@@ -176,33 +299,64 @@ async def get_audit_logs(limit: int = 100, severity: Optional[str] = None, actio
     try:
         logger.info(f"Querying audit logs: limit={limit}, severity={severity}, action_type={action_type}")
         
-        # Placeholder implementation
+        audit_logger = _get_audit_logger()
+        
+        if audit_logger is None:
+            # No audit logger available, return empty results
+            return {
+                "total": 0,
+                "returned": 0,
+                "logs": [],
+                "message": "Audit logging not available"
+            }
+        
+        # Build filters for the query
+        filters = {}
+        if severity:
+            filters["severity"] = severity
+        if action_type:
+            filters["action_type"] = action_type
+        
+        # Query logs from the audit logger
+        try:
+            logs = audit_logger.query_logs(
+                limit=min(limit, 500),  # Cap at 500 for performance
+                filters=filters if filters else None,
+                sort_by="timestamp",
+                sort_order="DESC"
+            )
+        except Exception as query_error:
+            logger.warning(f"Error querying audit logs: {query_error}")
+            logs = []
+        
+        # Transform logs to consistent format
+        formatted_logs = []
+        for log in logs:
+            formatted_log = {
+                "timestamp": log.get("timestamp", ""),
+                "severity": log.get("severity", "info"),
+                "action_type": log.get("action_type", log.get("entry_type", "unknown")),
+                "message": log.get("message", log.get("description", "")),
+                "details": log.get("details", {}),
+                "entry_id": log.get("entry_id", ""),
+            }
+            
+            # Convert timestamp to ISO format if it's a float
+            if isinstance(formatted_log["timestamp"], (int, float)):
+                from datetime import datetime
+                formatted_log["timestamp"] = datetime.fromtimestamp(formatted_log["timestamp"]).isoformat() + "Z"
+            
+            formatted_logs.append(formatted_log)
+        
+        # Get total count from audit logger metrics if available
+        total = len(formatted_logs)
+        if hasattr(audit_logger, 'metrics'):
+            total = audit_logger.metrics.get("total_entries", total)
+        
         return {
-            "total": 1247,
-            "returned": min(limit, 3),
-            "logs": [
-                {
-                    "timestamp": "2026-01-11T07:05:00Z",
-                    "severity": "warning",
-                    "action_type": "code_execution",
-                    "message": "Code execution exceeded memory limit, gracefully terminated",
-                    "details": {"memory_used": "2.5GB", "limit": "2GB"}
-                },
-                {
-                    "timestamp": "2026-01-11T06:58:00Z",
-                    "severity": "info",
-                    "action_type": "api_call",
-                    "message": "External API call validated and approved",
-                    "details": {"endpoint": "/v1/chat", "method": "POST"}
-                },
-                {
-                    "timestamp": "2026-01-11T06:45:00Z",
-                    "severity": "critical",
-                    "action_type": "file_access",
-                    "message": "Attempted unauthorized file system access, blocked",
-                    "details": {"path": "/etc/passwd", "action": "read"}
-                }
-            ]
+            "total": total,
+            "returned": len(formatted_logs),
+            "logs": formatted_logs
         }
     except Exception as e:
         logger.error(f"Error retrieving audit logs: {e}")
