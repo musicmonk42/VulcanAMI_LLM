@@ -15,6 +15,7 @@ import gc
 import hashlib
 import json
 import logging
+import os
 import pickle
 import queue
 import shutil
@@ -29,17 +30,37 @@ from pathlib import Path
 from typing import Any, AsyncGenerator, Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
-import os
 import PIL.Image
 import psutil
 import torch
+
+# SECURITY FIX: Import safe_pickle_load for use with external/checkpoint data
+try:
+    from vulcan.security_fixes import safe_pickle_load
+    SAFE_PICKLE_AVAILABLE = True
+except ImportError:
+    try:
+        from src.vulcan.security_fixes import safe_pickle_load
+        SAFE_PICKLE_AVAILABLE = True
+    except ImportError:
+        SAFE_PICKLE_AVAILABLE = False
+        safe_pickle_load = None
+
+# Configuration flag for enforcing safe pickle loading
+ENFORCE_SAFE_PICKLE = os.environ.get("VULCAN_ENFORCE_SAFE_PICKLE", "false").lower() in ("true", "1", "yes")
 import torch.nn as nn
 
 # REMOVED: sentence_transformers import - will use internal LLM-based encoder
 from transformers import AutoImageProcessor, AutoModel, AutoTokenizer
 
-# FIXED: Import from src.vulcan.config instead of config
-from src.vulcan.config import EMBEDDING_DIM, HIDDEN_DIM, LATENT_DIM, ModalityType
+# FIXED: Use vulcan.config import (works with src in path or installed package)
+# Changed from src.vulcan.config to vulcan.config to prevent circular dependency
+# and match standard package import patterns used elsewhere in the codebase
+try:
+    from vulcan.config import EMBEDDING_DIM, HIDDEN_DIM, LATENT_DIM, ModalityType
+except ImportError:
+    # Fallback for direct execution or non-standard path setups
+    from src.vulcan.config import EMBEDDING_DIM, HIDDEN_DIM, LATENT_DIM, ModalityType
 
 # HuggingFace Model Configuration (CWE-494 mitigation)
 # To pin models to specific revisions for security, set these environment variables:
@@ -64,12 +85,15 @@ except ImportError:
 
 # --- Simple Mode Import ---
 try:
-    from src.vulcan.simple_mode import should_skip_bert, SKIP_BERT_EMBEDDINGS
+    from vulcan.simple_mode import should_skip_bert, SKIP_BERT_EMBEDDINGS
 except ImportError:
-    # Fallback if simple_mode not available
-    SKIP_BERT_EMBEDDINGS = os.getenv("SKIP_BERT_EMBEDDINGS", "false").lower() in ("true", "1", "yes", "on")
-    def should_skip_bert():
-        return SKIP_BERT_EMBEDDINGS
+    try:
+        from src.vulcan.simple_mode import should_skip_bert, SKIP_BERT_EMBEDDINGS
+    except ImportError:
+        # Fallback if simple_mode not available
+        SKIP_BERT_EMBEDDINGS = os.getenv("SKIP_BERT_EMBEDDINGS", "false").lower() in ("true", "1", "yes", "on")
+        def should_skip_bert():
+            return SKIP_BERT_EMBEDDINGS
 
 
 # --- Custom LLM Dependency ---
@@ -506,11 +530,19 @@ class VersionedDataLogger:
         return None
 
     def _load_data(self, data_hash: str) -> Any:
-        """Load data from versioned store."""
+        """Load data from versioned store.
+        
+        SECURITY: Uses safe_pickle_load when VULCAN_ENFORCE_SAFE_PICKLE=true
+        to prevent arbitrary code execution from malicious pickle files.
+        """
         # Find file with hash prefix
         for file in self.data_store.glob(f"*_{data_hash[:8]}.pkl"):
             with open(file, "rb") as f:
-                return pickle.load(f)  # nosec B301 - Internal data structure
+                # SECURITY FIX: Use safe_pickle_load when available and enforced
+                if ENFORCE_SAFE_PICKLE and SAFE_PICKLE_AVAILABLE:
+                    return safe_pickle_load(f)
+                else:
+                    return pickle.load(f)  # nosec B301 - Internal data structure
         return None
 
     def _cleanup_loop(self):

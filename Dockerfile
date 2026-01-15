@@ -195,12 +195,24 @@ RUN python -m compileall -q src
 FROM python:3.11-slim AS runtime
 
 # Runtime environment settings
+# THREAD THRASHING FIX (Forensic Audit Issue #2):
+# These variables MUST be set before Python imports numpy/torch/scipy
+# to prevent CPU oversubscription. Setting them in the Docker ENV ensures
+# they are available from the very start of any Python process.
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     LANG=C.UTF-8 \
     TZ=UTC \
     # Optionally run with Python optimization (-O) by setting below:
-    PYTHONOPTIMIZE=1
+    PYTHONOPTIMIZE=1 \
+    # Thread limits to prevent CPU oversubscription
+    OMP_NUM_THREADS=4 \
+    MKL_NUM_THREADS=4 \
+    TORCH_NUM_THREADS=4 \
+    OPENBLAS_NUM_THREADS=4 \
+    VECLIB_MAXIMUM_THREADS=4 \
+    NUMEXPR_NUM_THREADS=4 \
+    TOKENIZERS_PARALLELISM=false
 
 WORKDIR /app
 

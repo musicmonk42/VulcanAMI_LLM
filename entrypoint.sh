@@ -8,6 +8,27 @@ set -eu
 
 echo "Container startup at: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
+# ============================================================================
+# THREAD THRASHING FIX (Forensic Audit Issue #2)
+# ============================================================================
+# Set thread limits BEFORE Python starts to prevent CPU oversubscription.
+# These environment variables MUST be set here (in the shell) because:
+# 1. PyTorch/NumPy/OpenBLAS read these at import time
+# 2. Setting them inside Python AFTER imports doesn't work
+# 3. Setting them before ANY Python import ensures they take effect
+#
+# Default to 4 threads if not already set by the user/orchestrator
+# ============================================================================
+export OMP_NUM_THREADS="${OMP_NUM_THREADS:-4}"
+export MKL_NUM_THREADS="${MKL_NUM_THREADS:-4}"
+export TORCH_NUM_THREADS="${TORCH_NUM_THREADS:-4}"
+export OPENBLAS_NUM_THREADS="${OPENBLAS_NUM_THREADS:-4}"
+export VECLIB_MAXIMUM_THREADS="${VECLIB_MAXIMUM_THREADS:-4}"
+export NUMEXPR_NUM_THREADS="${NUMEXPR_NUM_THREADS:-4}"
+export TOKENIZERS_PARALLELISM="${TOKENIZERS_PARALLELISM:-false}"
+
+echo "Thread limits set: OMP=$OMP_NUM_THREADS, MKL=$MKL_NUM_THREADS, TORCH=$TORCH_NUM_THREADS"
+
 INSECURE_DEFAULTS="super-secret-key insecure-dev-secret default-super-secret-key-change-me changeme password secret admin"
 MIN_LENGTH=32
 
