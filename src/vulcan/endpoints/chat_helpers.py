@@ -3,12 +3,118 @@ Chat Helper Functions and Constants
 
 Shared utilities for chat endpoints including context management,
 history truncation, and formatting functions.
+
+Industry Standard: This module follows defensive programming patterns with
+type-safe enum handling to prevent AttributeError when serializing
+ReasoningType enums to strings.
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from enum import Enum
+from typing import Any, Dict, List, Optional, Union
 
 logger = logging.getLogger(__name__)
+
+
+def safe_reasoning_type_to_string(
+    reasoning_type: Optional[Union[str, Enum, Any]],
+    default: str = "unknown"
+) -> str:
+    """
+    Convert a reasoning_type to its string representation safely.
+    
+    Industry Standard: Type-safe conversion that handles Enum, string, and
+    other types without raising AttributeError. This prevents the common
+    "'ReasoningType' object has no attribute 'replace'" error.
+    
+    Args:
+        reasoning_type: The reasoning type value which may be:
+            - A ReasoningType Enum instance
+            - A string value
+            - None
+            - Any other object
+        default: Default string to return if reasoning_type is None or empty
+        
+    Returns:
+        str: The string representation suitable for display or serialization
+        
+    Examples:
+        >>> from vulcan.reasoning.reasoning_types import ReasoningType
+        >>> safe_reasoning_type_to_string(ReasoningType.PROBABILISTIC)
+        'probabilistic'
+        >>> safe_reasoning_type_to_string("causal_reasoning")
+        'causal_reasoning'
+        >>> safe_reasoning_type_to_string(None)
+        'unknown'
+        >>> safe_reasoning_type_to_string(None, default="hybrid")
+        'hybrid'
+        
+    Note:
+        This resolves the serialization bug where Enum objects are passed
+        to code expecting strings, causing AttributeError on string methods.
+    """
+    if reasoning_type is None:
+        return default
+    
+    # Handle Enum instances - extract .value (the string representation)
+    # Industry Standard: Check for Enum base class, not just hasattr
+    if isinstance(reasoning_type, Enum):
+        return str(reasoning_type.value)
+    
+    # Handle objects that might be enum-like (have .value attribute)
+    # This provides backward compatibility with custom enum implementations
+    if hasattr(reasoning_type, 'value') and not isinstance(reasoning_type, str):
+        try:
+            return str(reasoning_type.value)
+        except (AttributeError, TypeError):
+            pass
+    
+    # Handle objects with .name attribute (alternative enum representation)
+    if hasattr(reasoning_type, 'name') and not isinstance(reasoning_type, str):
+        try:
+            return str(reasoning_type.name)
+        except (AttributeError, TypeError):
+            pass
+    
+    # Already a string or convert to string
+    result = str(reasoning_type)
+    return result if result else default
+
+
+def format_reasoning_type_for_display(
+    reasoning_type: Optional[Union[str, Enum, Any]],
+    default: str = "Hybrid"
+) -> str:
+    """
+    Format a reasoning_type for human-readable display.
+    
+    Industry Standard: Single responsibility function for consistent display
+    formatting across all endpoints. Converts enums safely, replaces
+    underscores with spaces, and applies title case.
+    
+    Args:
+        reasoning_type: The reasoning type (Enum, string, or other)
+        default: Default display value if reasoning_type is None/empty
+        
+    Returns:
+        str: Human-readable formatted string (e.g., "Probabilistic", "Causal Reasoning")
+        
+    Examples:
+        >>> format_reasoning_type_for_display(ReasoningType.PROBABILISTIC)
+        'Probabilistic'
+        >>> format_reasoning_type_for_display("causal_reasoning")
+        'Causal Reasoning'
+        >>> format_reasoning_type_for_display(None)
+        'Hybrid'
+    """
+    type_str = safe_reasoning_type_to_string(reasoning_type, default="")
+    
+    if not type_str:
+        return default
+    
+    # Format: replace underscores with spaces and apply title case
+    # Safe to call .replace() because type_str is guaranteed to be a string
+    return type_str.replace("_", " ").title()
 
 # CONTEXT ACCUMULATION FIX: Constants for context window management
 MAX_HISTORY_MESSAGES = 20
@@ -460,9 +566,11 @@ def _format_engine_result_dict(engine_name: str, result: Dict[str, Any]) -> str:
         except (ValueError, TypeError) as e:
             logger.debug(f"[_format_engine_result_dict] Invalid confidence value: {e}")
     
-    # Format reasoning type
+    # Format reasoning type - use type-safe conversion to handle Enum objects
+    # Industry Standard: Prevent "'ReasoningType' object has no attribute 'replace'" error
     if reasoning_type is not None:
-        section_parts.append(f"\n- Type: {reasoning_type}")
+        reasoning_type_str = safe_reasoning_type_to_string(reasoning_type, default="unknown")
+        section_parts.append(f"\n- Type: {reasoning_type_str}")
         has_content = True
     
     # Format explanation
