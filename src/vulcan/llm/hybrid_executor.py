@@ -129,14 +129,71 @@ REASONING_TASK_INDICATORS = [
     "how many", "how much", "how long", "how far",
 ]
 
+# ============================================================
+# ALLOWED LLM TASKS - Language Understanding (Not Reasoning)
+# ============================================================
+# These tasks are legitimate uses of LLMs that do NOT constitute "reasoning."
+# LLMs excel at language understanding and pattern recognition tasks such as
+# classification, summarization, and extraction.
+#
+# ARCHITECTURE PRINCIPLE:
+#   - Reasoning tasks (calculation, logical inference, causal analysis) → VULCAN engines
+#   - Language tasks (classification, formatting, summarization) → LLM allowed
+#
+# This whitelist ensures QueryClassifier and similar components can use LLMs
+# for their intended purpose without triggering the reasoning task blocker.
+#
+# Industry Standard: Comprehensive whitelist with clear categorization and
+# documentation of each category's purpose.
+ALLOWED_LLM_TASKS = [
+    # Classification and categorization (pattern recognition)
+    'classify', 'classification', 'categorize', 'categorization',
+    'identify category', 'determine type', 'assign category',
+    
+    # Summarization and condensation (language compression)
+    'summarize', 'summary', 'summarization',
+    'condense', 'brief', 'overview',
+    
+    # Formatting and presentation (language generation)
+    'format', 'formatting', 'reformat',
+    'present', 'display', 'render',
+    
+    # Extraction and parsing (pattern extraction)
+    'extract', 'extraction', 'parse', 'parsing',
+    'identify', 'find', 'locate',
+    
+    # Translation and transformation (language mapping)
+    'translate', 'translation', 'transform',
+    'convert', 'rephrase', 'paraphrase', 'reword',
+    
+    # Tagging and labeling (metadata assignment)
+    'tag', 'tagging', 'label', 'labeling',
+    'annotate', 'annotation', 'mark',
+]
+
 
 def _is_reasoning_task(prompt: str) -> bool:
     """
-    Detect if a prompt is asking for reasoning rather than formatting.
+    Detect if a prompt is asking for reasoning rather than language understanding.
     
     This function identifies prompts that are requesting the LLM to think,
     reason, or solve problems - which is NOT the role of the LLM in VULCAN's
-    architecture. LLMs should only format/paraphrase reasoning results.
+    architecture. LLMs should only be used for language understanding tasks
+    (classification, formatting, summarization) or paraphrasing reasoning results.
+    
+    ARCHITECTURE PRINCIPLE:
+        - Reasoning tasks (calculation, logical inference) → BLOCKED, use VULCAN engines
+        - Language tasks (classification, formatting) → ALLOWED, legitimate LLM use
+    
+    FIX: Query Classification Bypass
+    ================================
+    This fix addresses the issue where QueryClassifier's classification prompts
+    were being blocked as "reasoning tasks" because they contain words like
+    "classify" and "analyze". Classification is a language understanding task,
+    not reasoning, so it should be allowed.
+    
+    The fix checks ALLOWED_LLM_TASKS first - if the prompt matches any allowed
+    task pattern, it's immediately classified as NOT a reasoning task.
     
     CODE REVIEW FIX: Improved regex to reduce false positives by requiring
     word boundaries and mathematical context.
@@ -146,10 +203,45 @@ def _is_reasoning_task(prompt: str) -> bool:
         
     Returns:
         True if the prompt appears to be a reasoning task, False otherwise
+        
+    Examples:
+        >>> _is_reasoning_task("Classify this query into categories")
+        False  # Classification is allowed
+        
+        >>> _is_reasoning_task("Calculate 2+2")
+        True  # Mathematical computation is reasoning
+        
+        >>> _is_reasoning_task("Summarize the following text")
+        False  # Summarization is allowed
+        
+        >>> _is_reasoning_task("Solve this equation: x^2 + 2x + 1 = 0")
+        True  # Problem-solving is reasoning
     """
     import re
     
     prompt_lower = prompt.lower().strip()
+    
+    # ============================================================
+    # FIX: Check ALLOWED_LLM_TASKS first (whitelist approach)
+    # ============================================================
+    # If the prompt contains any allowed language task keywords, it's NOT
+    # a reasoning task. This allows QueryClassifier and similar components
+    # to use LLMs for legitimate language understanding tasks.
+    #
+    # Industry Standard: Whitelist-first security model - explicitly allow
+    # known-safe operations before applying restrictive checks.
+    for allowed_task in ALLOWED_LLM_TASKS:
+        # Use word boundary matching to prevent false positives
+        # e.g., "classify" should match but not trigger in "misclassify"
+        pattern = r'\b' + re.escape(allowed_task) + r'\b'
+        if re.search(pattern, prompt_lower):
+            return False  # Allowed language task, NOT reasoning
+    
+    # ============================================================
+    # Check for reasoning task indicators (existing logic)
+    # ============================================================
+    # This section remains unchanged - it detects actual reasoning tasks
+    # that should be blocked and routed to VULCAN's reasoning engines.
     
     # Check for reasoning task indicator patterns with word boundaries
     # This prevents false positives like "room 5-3" or "version 5-3"
@@ -3784,6 +3876,7 @@ __all__ = [
     # P0 FIX: LLM-as-Reasoner bypass prevention
     "NotReasoningEngineError",
     "REASONING_TASK_INDICATORS",
+    "ALLOWED_LLM_TASKS",  # FIX: Export whitelist for external validation
 ]
 
 
