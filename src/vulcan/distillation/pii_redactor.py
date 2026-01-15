@@ -90,47 +90,63 @@ class PIIRedactor:
         self.redaction_count = 0
         self.secrets_detected = 0
     
+    # Fail-safe placeholder returned when redaction encounters an error
+    # SECURITY: Never return original text on error - could leak PII/secrets
+    REDACTION_ERROR_PLACEHOLDER = "[CONTENT REDACTED DUE TO SYSTEM ERROR]"
+    
     def redact(self, text: str) -> Tuple[str, Dict[str, int]]:
         """
-        Redact PII and secrets from text.
+        Redact PII and secrets from text with fail-safe error handling.
+        
+        SECURITY NOTE: On any exception during redaction, this method returns
+        a safe placeholder string instead of the original text. This prevents
+        accidental PII/secret leakage if regex engine crashes, bad input is
+        provided, or any other error occurs.
         
         Args:
             text: The text to redact
             
         Returns:
             Tuple of (redacted_text, redaction_stats)
+            On error: Returns (REDACTION_ERROR_PLACEHOLDER, {"error": 1})
         """
-        redacted = text
-        stats = {}
-        
-        # CRITICAL: Redact secrets FIRST (highest priority)
-        for name, pattern in self.secret_patterns.items():
-            matches = pattern.findall(redacted)
-            if matches:
-                stats[f"SECRET_{name}"] = len(matches)
-                redacted = pattern.sub(f"[REDACTED_SECRET_{name.upper()}]", redacted)
-                self.secrets_detected += len(matches)
-        
-        # Then redact PII
-        for name, pattern in self.pii_patterns.items():
-            matches = pattern.findall(redacted)
-            if matches:
-                stats[name] = len(matches)
-                redacted = pattern.sub(f"[REDACTED_{name.upper()}]", redacted)
-                self.redaction_count += len(matches)
-        
-        # Basic name detection (after markers)
-        for marker in self.NAME_MARKERS:
-            if marker in redacted.lower():
-                pattern = re.compile(
-                    f"({re.escape(marker)})\\s+(\\w+)",
-                    re.IGNORECASE
-                )
-                if pattern.search(redacted):
-                    stats["potential_name"] = stats.get("potential_name", 0) + 1
-                    redacted = pattern.sub(r"\1 [REDACTED_NAME]", redacted)
-        
-        return redacted, stats
+        try:
+            redacted = text
+            stats = {}
+            
+            # CRITICAL: Redact secrets FIRST (highest priority)
+            for name, pattern in self.secret_patterns.items():
+                matches = pattern.findall(redacted)
+                if matches:
+                    stats[f"SECRET_{name}"] = len(matches)
+                    redacted = pattern.sub(f"[REDACTED_SECRET_{name.upper()}]", redacted)
+                    self.secrets_detected += len(matches)
+            
+            # Then redact PII
+            for name, pattern in self.pii_patterns.items():
+                matches = pattern.findall(redacted)
+                if matches:
+                    stats[name] = len(matches)
+                    redacted = pattern.sub(f"[REDACTED_{name.upper()}]", redacted)
+                    self.redaction_count += len(matches)
+            
+            # Basic name detection (after markers)
+            for marker in self.NAME_MARKERS:
+                if marker in redacted.lower():
+                    pattern = re.compile(
+                        f"({re.escape(marker)})\\s+(\\w+)",
+                        re.IGNORECASE
+                    )
+                    if pattern.search(redacted):
+                        stats["potential_name"] = stats.get("potential_name", 0) + 1
+                        redacted = pattern.sub(r"\1 [REDACTED_NAME]", redacted)
+            
+            return redacted, stats
+            
+        except Exception as e:
+            # FAIL SAFE: Never return original text on error - could leak PII/secrets
+            logger.error(f"Redaction CRITICAL FAILURE: {e}")
+            return self.REDACTION_ERROR_PLACEHOLDER, {"error": 1}
     
     def _check_patterns(self, text: str) -> bool:
         """
@@ -158,55 +174,65 @@ class PIIRedactor:
         
         This prevents bypass attacks where secrets are encoded before submission.
         
+        SECURITY NOTE: On any unexpected exception, this method returns True
+        (assumes secrets present) to fail safely and prevent potential leaks.
+        
         Args:
             text: The text to check
             
         Returns:
             True if text contains secrets (plain or encoded), False otherwise
+            On error: Returns True (fail safe - assume secrets present)
         """
-        # Check original text
-        if self._check_patterns(text):
-            return True
-        
-        # Check base64 decoded content
-        # Look for potential base64 strings (20+ chars of base64 alphabet)
-        base64_pattern = re.compile(r'[A-Za-z0-9+/=]{20,}')
-        for match in base64_pattern.finditer(text):
-            try:
-                # Attempt to decode as base64
-                decoded = base64.b64decode(match.group()).decode('utf-8', errors='ignore')
-                if self._check_patterns(decoded):
-                    logger.warning("Encoded secret detected (base64)")
-                    return True
-            except Exception:
-                # Not valid base64 or decoding failed
-                pass
-        
-        # Check hex decoded content
-        # Look for potential hex strings (40+ hex chars)
-        hex_pattern = re.compile(r'[0-9a-fA-F]{40,}')
-        for match in hex_pattern.finditer(text):
-            try:
-                # Attempt to decode as hex
-                decoded = bytes.fromhex(match.group()).decode('utf-8', errors='ignore')
-                if self._check_patterns(decoded):
-                    logger.warning("Encoded secret detected (hex)")
-                    return True
-            except Exception:
-                # Not valid hex or decoding failed
-                pass
-        
-        # Check URL decoded content
         try:
-            decoded_url = urllib.parse.unquote(text)
-            if decoded_url != text and self._check_patterns(decoded_url):
-                logger.warning("Encoded secret detected (URL encoding)")
+            # Check original text
+            if self._check_patterns(text):
                 return True
-        except Exception:
-            # URL decoding failed
-            pass
-        
-        return False
+            
+            # Check base64 decoded content
+            # Look for potential base64 strings (20+ chars of base64 alphabet)
+            base64_pattern = re.compile(r'[A-Za-z0-9+/=]{20,}')
+            for match in base64_pattern.finditer(text):
+                try:
+                    # Attempt to decode as base64
+                    decoded = base64.b64decode(match.group()).decode('utf-8', errors='ignore')
+                    if self._check_patterns(decoded):
+                        logger.warning("Encoded secret detected (base64)")
+                        return True
+                except Exception:
+                    # Not valid base64 or decoding failed
+                    pass
+            
+            # Check hex decoded content
+            # Look for potential hex strings (40+ hex chars)
+            hex_pattern = re.compile(r'[0-9a-fA-F]{40,}')
+            for match in hex_pattern.finditer(text):
+                try:
+                    # Attempt to decode as hex
+                    decoded = bytes.fromhex(match.group()).decode('utf-8', errors='ignore')
+                    if self._check_patterns(decoded):
+                        logger.warning("Encoded secret detected (hex)")
+                        return True
+                except Exception:
+                    # Not valid hex or decoding failed
+                    pass
+            
+            # Check URL decoded content
+            try:
+                decoded_url = urllib.parse.unquote(text)
+                if decoded_url != text and self._check_patterns(decoded_url):
+                    logger.warning("Encoded secret detected (URL encoding)")
+                    return True
+            except Exception:
+                # URL decoding failed
+                pass
+            
+            return False
+            
+        except Exception as e:
+            # FAIL SAFE: On any error, assume secrets present to prevent leaks
+            logger.error(f"Secret detection CRITICAL FAILURE: {e}")
+            return True
     
     def get_stats(self) -> Dict[str, int]:
         """Get redaction statistics."""

@@ -93,6 +93,7 @@ class OpenAIKnowledgeDistiller:
     # Configuration defaults
     DEFAULT_MAX_BUFFER_SIZE = 1000
     DEFAULT_RETENTION_DAYS = 30
+    DEFAULT_TRAINING_TRIGGER_THRESHOLD = 500  # Trigger training after N examples
     
     def __init__(
         self,
@@ -103,6 +104,9 @@ class OpenAIKnowledgeDistiller:
         require_opt_in: bool = True,  # Privacy-first default
         enable_pii_redaction: bool = True,
         enable_governance_check: bool = True,
+        training_trigger_threshold: int = DEFAULT_TRAINING_TRIGGER_THRESHOLD,
+        training_trigger_callback: Optional[callable] = None,
+        training_webhook_url: Optional[str] = None,
     ):
         """
         Initialize the capture layer for knowledge distillation.
@@ -118,6 +122,9 @@ class OpenAIKnowledgeDistiller:
             require_opt_in: Require explicit opt-in for capture (default: True)
             enable_pii_redaction: Enable PII redaction (default: True)
             enable_governance_check: Check governance/CSIU before capture
+            training_trigger_threshold: Number of examples to trigger training (default: 500)
+            training_trigger_callback: Optional callback function to invoke for training
+            training_webhook_url: Optional webhook URL to notify for training
         """
         self.local_llm = local_llm
         self.storage_path = Path(storage_path)
@@ -126,6 +133,12 @@ class OpenAIKnowledgeDistiller:
         self.require_opt_in = require_opt_in
         self.enable_pii_redaction = enable_pii_redaction
         self.enable_governance_check = enable_governance_check
+        
+        # Training trigger configuration
+        self.training_trigger_threshold = training_trigger_threshold
+        self.training_trigger_callback = training_trigger_callback
+        self.training_webhook_url = training_webhook_url
+        self._last_training_trigger_count = 0
         
         self.logger = logging.getLogger("OpenAIKnowledgeDistiller")
         
@@ -158,6 +171,8 @@ class OpenAIKnowledgeDistiller:
             "average_quality_score": 0.0,
             "opt_in_required_skips": 0,
             "buffer_flushes": 0,
+            "training_triggers": 0,
+            "last_training_trigger_time": None,
         }
         
         # Audit log for governance
@@ -247,6 +262,7 @@ class OpenAIKnowledgeDistiller:
         Two-phase commit prevents data loss on partial failures:
         1. Phase 1: Write examples to storage
         2. Phase 2: Only clear buffer entries that were successfully written
+        3. Phase 3: Check if training should be triggered
         
         The stored examples are consumed by:
         - GovernedTrainer: For consensus-based weight updates
@@ -285,6 +301,9 @@ class OpenAIKnowledgeDistiller:
             f"Flushed {flushed} examples to distillation store "
             f"(available for GovernedTrainer). Buffer has {len(self._capture_buffer)} remaining."
         )
+        
+        # Phase 3: Check if training should be triggered
+        self._check_training_trigger()
         
         return flushed
     
@@ -529,6 +548,168 @@ class OpenAIKnowledgeDistiller:
             "session_id": session_id[:16] if session_id else "unknown",
             "opted_in": opted_in,
         })
+    
+    def _check_training_trigger(self):
+        """
+        Check if training should be triggered based on example count threshold.
+        
+        This method is called after each flush to storage and checks if the
+        total captured examples since last trigger exceeds the threshold.
+        """
+        current_count = self.stats["examples_captured"]
+        examples_since_trigger = current_count - self._last_training_trigger_count
+        
+        if examples_since_trigger >= self.training_trigger_threshold:
+            self.trigger_training(reason="threshold_reached")
+    
+    def trigger_training(
+        self,
+        reason: str = "manual",
+        force: bool = False,
+    ) -> Dict[str, Any]:
+        """
+        Trigger training pipeline for accumulated distillation examples.
+        
+        This method closes the loop between data capture and model training by:
+        1. Logging a training trigger event for observability
+        2. Invoking an optional callback function (e.g., to call GovernedTrainer)
+        3. Sending a webhook notification (e.g., to external training orchestrator)
+        4. Recording the trigger in audit log for governance
+        
+        The actual training is performed by external systems:
+        - GovernedTrainer: Consensus-based weight updates
+        - SelfImprovingTraining: Meta-learning orchestrator
+        - External training pipelines via webhook
+        
+        Args:
+            reason: Reason for triggering (e.g., "threshold_reached", "manual", "scheduled")
+            force: Force trigger even if below threshold
+            
+        Returns:
+            Dict containing trigger status and metadata
+            
+        Example usage:
+            # Manual trigger
+            distiller.trigger_training(reason="manual")
+            
+            # With callback to GovernedTrainer
+            distiller = OpenAIKnowledgeDistiller(
+                training_trigger_callback=governed_trainer.train_from_distillation,
+                training_trigger_threshold=500,
+            )
+            
+            # With webhook to external system
+            distiller = OpenAIKnowledgeDistiller(
+                training_webhook_url="https://training.example.com/trigger",
+                training_trigger_threshold=1000,
+            )
+        """
+        storage_stats = self.storage_backend.get_stats()
+        total_examples = storage_stats.get("total_examples", 0)
+        
+        # Check if we have enough examples (unless forced)
+        if not force and total_examples < self.training_trigger_threshold:
+            self.logger.debug(
+                f"Training trigger skipped: {total_examples} examples "
+                f"< {self.training_trigger_threshold} threshold"
+            )
+            return {
+                "triggered": False,
+                "reason": "below_threshold",
+                "total_examples": total_examples,
+                "threshold": self.training_trigger_threshold,
+            }
+        
+        trigger_time = time.time()
+        trigger_result = {
+            "triggered": True,
+            "reason": reason,
+            "timestamp": trigger_time,
+            "total_examples": total_examples,
+            "examples_since_last_trigger": self.stats["examples_captured"] - self._last_training_trigger_count,
+            "callback_invoked": False,
+            "webhook_sent": False,
+            "errors": [],
+        }
+        
+        # Update tracking state
+        self._last_training_trigger_count = self.stats["examples_captured"]
+        self.stats["training_triggers"] += 1
+        self.stats["last_training_trigger_time"] = trigger_time
+        
+        # Log the trigger event
+        self.logger.info(
+            f"TRAINING TRIGGER: reason={reason}, examples={total_examples}, "
+            f"trigger_count={self.stats['training_triggers']}"
+        )
+        
+        # Invoke callback if configured
+        if self.training_trigger_callback:
+            try:
+                callback_result = self.training_trigger_callback(
+                    storage_path=str(self.storage_backend.storage_path),
+                    total_examples=total_examples,
+                    trigger_reason=reason,
+                )
+                trigger_result["callback_invoked"] = True
+                trigger_result["callback_result"] = callback_result
+                self.logger.info(f"Training callback invoked successfully: {callback_result}")
+            except Exception as e:
+                error_msg = f"Training callback failed: {e}"
+                trigger_result["errors"].append(error_msg)
+                self.logger.error(error_msg)
+        
+        # Send webhook notification if configured
+        if self.training_webhook_url:
+            try:
+                import urllib.request
+                import json as json_module
+                
+                webhook_payload = json_module.dumps({
+                    "event": "training_trigger",
+                    "reason": reason,
+                    "timestamp": trigger_time,
+                    "total_examples": total_examples,
+                    "storage_path": str(self.storage_backend.storage_path),
+                    "stats": {
+                        "captured": self.stats["examples_captured"],
+                        "rejected": self.stats["examples_rejected"],
+                        "avg_quality": self.stats["average_quality_score"],
+                    },
+                }).encode("utf-8")
+                
+                req = urllib.request.Request(
+                    self.training_webhook_url,
+                    data=webhook_payload,
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+                
+                with urllib.request.urlopen(req, timeout=10) as response:
+                    trigger_result["webhook_sent"] = True
+                    trigger_result["webhook_status"] = response.status
+                    self.logger.info(
+                        f"Training webhook sent to {self.training_webhook_url}: "
+                        f"status={response.status}"
+                    )
+            except Exception as e:
+                error_msg = f"Training webhook failed: {e}"
+                trigger_result["errors"].append(error_msg)
+                self.logger.error(error_msg)
+        
+        # Log audit entry
+        self._log_audit("training_trigger", {
+            "reason": reason,
+            "total_examples": total_examples,
+            "callback_invoked": trigger_result["callback_invoked"],
+            "webhook_sent": trigger_result["webhook_sent"],
+            "errors": trigger_result["errors"],
+        })
+        
+        # Save state
+        self._save_state()
+        
+        return trigger_result
 
 
 __all__ = ["OpenAIKnowledgeDistiller"]
