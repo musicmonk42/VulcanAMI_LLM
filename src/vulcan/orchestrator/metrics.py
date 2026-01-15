@@ -977,6 +977,322 @@ def compute_rate(
 # MODULE EXPORTS
 # ============================================================
 
+# ============================================================
+# RESPONSE TIME TRACKER - Performance Monitoring
+# ============================================================
+
+
+class ResponseTimeTracker:
+    """Tracks response times for performance monitoring and adaptive scaling.
+    
+    Maintains a sliding window of response times to compute percentiles
+    and detect performance degradation for auto-scaling decisions.
+    """
+    
+    def __init__(self, window_size: int = 1000, alert_threshold_ms: float = 5000.0):
+        """
+        Initialize response time tracker.
+        
+        Args:
+            window_size: Number of samples to keep in sliding window
+            alert_threshold_ms: Response time threshold for alerts (milliseconds)
+        """
+        self.window_size = window_size
+        self.alert_threshold_ms = alert_threshold_ms
+        self._samples: deque = deque(maxlen=window_size)
+        self._lock = threading.RLock()
+        self._degradation_callbacks: List[callable] = []
+    
+    def record(self, duration_ms: float, job_id: str = None, agent_id: str = None) -> None:
+        """Record a response time sample."""
+        timestamp = time.time()
+        with self._lock:
+            self._samples.append({
+                "timestamp": timestamp,
+                "duration_ms": duration_ms,
+                "job_id": job_id,
+                "agent_id": agent_id,
+            })
+        
+        # Check for degradation
+        if duration_ms > self.alert_threshold_ms:
+            self._notify_degradation(duration_ms, job_id, agent_id)
+    
+    def get_percentile(self, percentile: float) -> float:
+        """Get the specified percentile of response times."""
+        with self._lock:
+            if not self._samples:
+                return 0.0
+            durations = sorted([s["duration_ms"] for s in self._samples])
+            idx = int(len(durations) * percentile / 100.0)
+            return durations[min(idx, len(durations) - 1)]
+    
+    def get_stats(self) -> Dict[str, Any]:
+        """Get comprehensive response time statistics."""
+        with self._lock:
+            if not self._samples:
+                return {
+                    "count": 0,
+                    "avg_ms": 0.0,
+                    "p50_ms": 0.0,
+                    "p95_ms": 0.0,
+                    "p99_ms": 0.0,
+                    "max_ms": 0.0,
+                    "min_ms": 0.0,
+                }
+            
+            durations = [s["duration_ms"] for s in self._samples]
+            sorted_durations = sorted(durations)
+            
+            return {
+                "count": len(durations),
+                "avg_ms": sum(durations) / len(durations),
+                "p50_ms": sorted_durations[len(sorted_durations) // 2],
+                "p95_ms": sorted_durations[int(len(sorted_durations) * 0.95)],
+                "p99_ms": sorted_durations[int(len(sorted_durations) * 0.99)],
+                "max_ms": max(durations),
+                "min_ms": min(durations),
+            }
+    
+    def register_degradation_callback(self, callback: callable) -> None:
+        """Register a callback for performance degradation alerts."""
+        self._degradation_callbacks.append(callback)
+    
+    def _notify_degradation(self, duration_ms: float, job_id: str, agent_id: str) -> None:
+        """Notify registered callbacks of performance degradation."""
+        for callback in self._degradation_callbacks:
+            try:
+                callback(duration_ms, job_id, agent_id)
+            except Exception as e:
+                logger.error(f"Error in degradation callback: {e}")
+    
+    def get_recent_trend(self, window_seconds: float = 60.0) -> float:
+        """Get trend of response times in the recent window.
+        
+        Returns:
+            Positive value indicates degradation, negative indicates improvement.
+        """
+        now = time.time()
+        with self._lock:
+            recent = [s for s in self._samples if now - s["timestamp"] <= window_seconds]
+            
+            if len(recent) < 2:
+                return 0.0
+            
+            # Compare first half vs second half
+            mid = len(recent) // 2
+            first_half_avg = sum(s["duration_ms"] for s in recent[:mid]) / mid
+            second_half_avg = sum(s["duration_ms"] for s in recent[mid:]) / (len(recent) - mid)
+            
+            return second_half_avg - first_half_avg
+    
+    def trim_to_window_size(self) -> None:
+        """Trim samples to window size to prevent memory growth.
+        
+        PERFORMANCE FIX: Called periodically to ensure the samples deque
+        doesn't exceed the configured window size.
+        """
+        with self._lock:
+            # The deque has maxlen, but we explicitly trim for safety
+            if len(self._samples) > self.window_size:
+                # Keep only the most recent samples
+                recent = list(self._samples)[-self.window_size:]
+                self._samples.clear()
+                self._samples.extend(recent)
+
+
+# ============================================================
+# SYSTEM METRICS - Monitoring and Instrumentation
+# ============================================================
+
+
+class SystemMetrics:
+    """
+    System metrics for monitoring CuriosityEngine and AgentPool performance.
+    
+    Tracks:
+    - Curiosity engine useful/empty cycles
+    - Agent job latency percentiles (p50, p99)
+    - Stuck job recoveries
+    - Dead letter queue jobs
+    """
+    
+    # Alert threshold for job latency p99 in milliseconds (10 seconds)
+    ALERT_LATENCY_THRESHOLD_MS = 10000.0
+    
+    def __init__(self, alert_threshold_dormancy: float = 0.95):
+        """
+        Initialize system metrics.
+        
+        Args:
+            alert_threshold_dormancy: Threshold for alerting on curiosity dormancy (0.0-1.0)
+        """
+        self._lock = threading.RLock()
+        self.metrics: Dict[str, Any] = {
+            # Curiosity Engine metrics
+            "curiosity_useful_cycles": 0,
+            "curiosity_empty_cycles": 0,
+            "curiosity_total_experiments": 0,
+            "curiosity_successful_experiments": 0,
+            
+            # Agent Pool metrics
+            "agent_job_latencies_ms": deque(maxlen=1000),  # Rolling window
+            "agent_job_latency_p50": 0.0,
+            "agent_job_latency_p99": 0.0,
+            "stuck_job_recoveries": 0,
+            "dead_letter_jobs": 0,
+            
+            # Health metrics
+            "last_healthy_cycle_timestamp": time.time(),
+            "consecutive_alerts": 0,
+        }
+        self.alert_threshold_dormancy = alert_threshold_dormancy
+        
+        logger.info("SystemMetrics initialized for monitoring")
+    
+    def record_curiosity_cycle(self, experiments_run: int, successful: int) -> None:
+        """
+        Record a curiosity engine learning cycle result.
+        
+        Args:
+            experiments_run: Number of experiments run in this cycle
+            successful: Number of successful experiments
+        """
+        with self._lock:
+            if experiments_run > 0:
+                self.metrics["curiosity_useful_cycles"] += 1
+                self.metrics["last_healthy_cycle_timestamp"] = time.time()
+            else:
+                self.metrics["curiosity_empty_cycles"] += 1
+            
+            self.metrics["curiosity_total_experiments"] += experiments_run
+            self.metrics["curiosity_successful_experiments"] += successful
+    
+    def record_job_latency(self, latency_ms: float) -> None:
+        """
+        Record a job latency measurement.
+        
+        Args:
+            latency_ms: Job latency in milliseconds
+        """
+        with self._lock:
+            self.metrics["agent_job_latencies_ms"].append(latency_ms)
+            self._update_latency_percentiles()
+    
+    def _update_latency_percentiles(self) -> None:
+        """Update p50 and p99 latency metrics. Must be called with lock held."""
+        latencies = list(self.metrics["agent_job_latencies_ms"])
+        if not latencies:
+            return
+        
+        sorted_latencies = sorted(latencies)
+        n = len(sorted_latencies)
+        
+        # Calculate p50 (median) - proper handling for even-length arrays
+        if n % 2 == 0:
+            # For even-length arrays, median is average of two middle values
+            mid = n // 2
+            self.metrics["agent_job_latency_p50"] = (
+                sorted_latencies[mid - 1] + sorted_latencies[mid]
+            ) / 2.0
+        else:
+            # For odd-length arrays, median is the middle value
+            self.metrics["agent_job_latency_p50"] = sorted_latencies[n // 2]
+        
+        # Calculate p99
+        p99_idx = min(int(n * 0.99), n - 1)
+        self.metrics["agent_job_latency_p99"] = sorted_latencies[p99_idx]
+    
+    def record_stuck_job_recovery(self) -> None:
+        """Record a stuck job recovery event."""
+        with self._lock:
+            self.metrics["stuck_job_recoveries"] += 1
+    
+    def record_dead_letter_job(self) -> None:
+        """Record a job moved to dead letter queue."""
+        with self._lock:
+            self.metrics["dead_letter_jobs"] += 1
+    
+    def get_dormancy_ratio(self) -> float:
+        """
+        Get the ratio of empty cycles to total cycles.
+        
+        Returns:
+            Dormancy ratio (0.0-1.0), higher means more dormant
+        """
+        with self._lock:
+            total = (
+                self.metrics["curiosity_useful_cycles"] + 
+                self.metrics["curiosity_empty_cycles"]
+            )
+            if total == 0:
+                return 0.0
+            return self.metrics["curiosity_empty_cycles"] / total
+    
+    def should_alert(self) -> Optional[str]:
+        """
+        Check if any metric warrants an alert.
+        
+        Returns:
+            Alert message string if alerting, None otherwise
+        """
+        with self._lock:
+            # Alert if curiosity engine is too dormant
+            dormancy = self.get_dormancy_ratio()
+            if dormancy > self.alert_threshold_dormancy:
+                self.metrics["consecutive_alerts"] += 1
+                return f"Curiosity engine stuck in dormancy (ratio={dormancy:.2f})"
+            
+            # Alert if job latencies spike
+            if self.metrics["agent_job_latency_p99"] > self.ALERT_LATENCY_THRESHOLD_MS:
+                self.metrics["consecutive_alerts"] += 1
+                return (
+                    f"Job processing latency spike "
+                    f"(p99={self.metrics['agent_job_latency_p99']:.0f}ms)"
+                )
+            
+            # Reset consecutive alerts if healthy
+            self.metrics["consecutive_alerts"] = 0
+            return None
+    
+    def get_all_metrics(self) -> Dict[str, Any]:
+        """
+        Get all metrics as a dictionary.
+        
+        Returns:
+            Dictionary of all metrics (excludes the raw latencies deque)
+        """
+        with self._lock:
+            return {
+                "curiosity_useful_cycles": self.metrics["curiosity_useful_cycles"],
+                "curiosity_empty_cycles": self.metrics["curiosity_empty_cycles"],
+                "curiosity_total_experiments": self.metrics["curiosity_total_experiments"],
+                "curiosity_successful_experiments": self.metrics["curiosity_successful_experiments"],
+                "curiosity_dormancy_ratio": self.get_dormancy_ratio(),
+                "agent_job_latency_p50": self.metrics["agent_job_latency_p50"],
+                "agent_job_latency_p99": self.metrics["agent_job_latency_p99"],
+                "stuck_job_recoveries": self.metrics["stuck_job_recoveries"],
+                "dead_letter_jobs": self.metrics["dead_letter_jobs"],
+                "last_healthy_cycle_timestamp": self.metrics["last_healthy_cycle_timestamp"],
+                "consecutive_alerts": self.metrics["consecutive_alerts"],
+            }
+    
+    def reset(self) -> None:
+        """Reset all metrics."""
+        with self._lock:
+            self.metrics["curiosity_useful_cycles"] = 0
+            self.metrics["curiosity_empty_cycles"] = 0
+            self.metrics["curiosity_total_experiments"] = 0
+            self.metrics["curiosity_successful_experiments"] = 0
+            self.metrics["agent_job_latencies_ms"].clear()
+            self.metrics["agent_job_latency_p50"] = 0.0
+            self.metrics["agent_job_latency_p99"] = 0.0
+            self.metrics["stuck_job_recoveries"] = 0
+            self.metrics["dead_letter_jobs"] = 0
+            self.metrics["last_healthy_cycle_timestamp"] = time.time()
+            self.metrics["consecutive_alerts"] = 0
+
+
 __all__ = [
     "EnhancedMetricsCollector",
     "MetricType",
@@ -985,4 +1301,6 @@ __all__ = [
     "compute_percentile",
     "compute_moving_average",
     "compute_rate",
+    "ResponseTimeTracker",
+    "SystemMetrics",
 ]

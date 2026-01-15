@@ -22,10 +22,12 @@
 # ============================================================
 
 import asyncio
+import atexit
 import json
 import logging
 import os
 import pickle
+import sys
 import time
 from datetime import datetime
 from pathlib import Path
@@ -202,6 +204,11 @@ class ProductionDeployment:
         self.orchestrator_type = orchestrator_type
         self.redis_client = redis_client
         self._shutdown_requested = False
+        
+        # SAFETY FIX: Register cleanup with atexit instead of __del__
+        # This ensures deterministic cleanup before interpreter shutdown,
+        # avoiding NameError/ImportError when global variables are destroyed.
+        atexit.register(self._atexit_cleanup)
 
         # FIXED: Add checkpoint locking and step tracking to prevent race conditions
         self._checkpoint_lock = RLock()
@@ -1768,22 +1775,297 @@ class ProductionDeployment:
 
         logger.info("Shutdown complete")
 
-    def __del__(self):
-        """Destructor to ensure cleanup"""
+    def _atexit_cleanup(self):
+        """
+        Cleanup method registered with atexit for deterministic shutdown.
+        
+        SAFETY FIX: Replaces __del__ to avoid NameError/ImportError when
+        Python destroys global variables during interpreter shutdown.
+        This ensures logging and other globals are still available.
+        """
         try:
             if not self._shutdown_requested:
+                logger.info("ProductionDeployment atexit cleanup triggered")
                 self.shutdown()
         except Exception as e:
+            # Use print as fallback since logging might be unavailable
             try:
-                logger.error(f"Error during shutdown in destructor: {e}", exc_info=True)
-            except (
-                Exception
-            ):  # nosec B110 - Logger may be unavailable during interpreter shutdown
-                pass
+                logger.error(f"Error during atexit cleanup: {e}", exc_info=True)
+            except:
+                print(f"ProductionDeployment: Error in atexit cleanup: {e}", file=sys.stderr)
+
+    def __enter__(self):
+        """Context manager entry - returns self for use in 'with' statements."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit - ensures cleanup on context exit."""
+        self.shutdown()
+        return False  # Don't suppress exceptions
+
+
+# ============================================================
+# AUTO-SCALER - Adaptive Resource Management
+# ============================================================
+
+
+class AutoScaler:
+    """Automatically scale agent pool based on load with proper locking"""
+
+    def __init__(self, pool_manager):
+        """
+        Initialize auto-scaler
+
+        Args:
+            pool_manager: Agent pool manager instance
+        """
+        import threading
+        
+        self.pool = pool_manager
+        self._shutdown_event = threading.Event()
+
+        # Start scaling thread
+        self.scaling_thread = threading.Thread(
+            target=self._scaling_loop, daemon=True, name="AutoScaler"
+        )
+        self.scaling_thread.start()
+
+        logger.info("Auto-scaler initialized")
+
+    def _scaling_loop(self):
+        """
+        Scaling loop that monitors load and adjusts pool size
+        FIXED: Uses interruptible wait instead of time.sleep
+        """
+        logger.info("Auto-scaler loop started")
+        
+        # Import SIMPLE_MODE constants if available
+        try:
+            from .agent_pool import SIMPLE_MODE, SIMPLE_MODE_CHECK_INTERVAL
+        except ImportError:
+            SIMPLE_MODE = False
+            SIMPLE_MODE_CHECK_INTERVAL = 300
+        
+        # PERFORMANCE: Use simple_mode check interval for less frequent scaling
+        check_interval = SIMPLE_MODE_CHECK_INTERVAL if SIMPLE_MODE else 30
+
+        while not self._shutdown_event.is_set():
+            # FIXED: Use interruptible wait
+            if self._shutdown_event.wait(timeout=check_interval):
+                break
+
+            try:
+                self._evaluate_and_scale()
+            except Exception as e:
+                logger.error(f"Auto-scaler error: {e}", exc_info=True)
+
+        logger.info("Auto-scaler loop stopped")
+
+    def _evaluate_and_scale(self):
+        """Evaluate current load and scale accordingly with enhanced metrics"""
+        status = self.pool.get_pool_status()
+
+        total_agents = status["total_agents"]
+        idle_agents = status.get("state_distribution", {}).get("idle", 0)
+        working_agents = status.get("state_distribution", {}).get(
+            "working", 0
+        )
+        # FIXED: Use .get() with default to avoid KeyError during shutdown
+        pending_tasks = status.get("pending_tasks", 0)
+
+        # Calculate utilization
+        if total_agents > 0:
+            utilization = working_agents / total_agents
+        else:
+            utilization = 0.0
+        
+        # Get response time metrics for adaptive scaling
+        response_stats = self.pool.response_time_tracker.get_stats()
+        p95_ms = response_stats.get("p95_ms", 0.0)
+        p99_ms = response_stats.get("p99_ms", 0.0)
+        trend = self.pool.response_time_tracker.get_recent_trend()
+        
+        # Get priority queue depth
+        queue_depth = self.pool.priority_queue.size()
+        
+        # Performance thresholds
+        p95_target = self.pool.perf_thresholds["p95_target_ms"]
+        p99_target = self.pool.perf_thresholds["p99_target_ms"]
+        max_queue = self.pool.perf_thresholds["max_queue_depth"]
+
+        logger.debug(
+            f"Auto-scaler evaluation: "
+            f"utilization={utilization:.2f}, "
+            f"total={total_agents}, "
+            f"idle={idle_agents}, "
+            f"working={working_agents}, "
+            f"pending={pending_tasks}, "
+            f"p95={p95_ms:.1f}ms, p99={p99_ms:.1f}ms, "
+            f"queue_depth={queue_depth}, trend={trend:.1f}"
+        )
+        
+        # Determine scaling action
+        scale_up_reasons = []
+        scale_down_ok = True
+        
+        # Scale up conditions:
+        # 1. High utilization (>80%)
+        if utilization > 0.8:
+            scale_up_reasons.append("high_utilization")
+        
+        # 2. Pending tasks exceed idle agents
+        if pending_tasks > idle_agents:
+            scale_up_reasons.append("pending_tasks")
+        
+        # 3. Response times exceeding SLA targets
+        if p95_ms > p95_target:
+            scale_up_reasons.append("p95_exceeded")
+            scale_down_ok = False
+        
+        if p99_ms > p99_target:
+            scale_up_reasons.append("p99_exceeded")
+            scale_down_ok = False
+        
+        # 4. Queue depth too high
+        if queue_depth > max_queue:
+            scale_up_reasons.append("queue_depth")
+        
+        # 5. Degrading performance trend
+        if trend > 50:  # 50ms degradation trend
+            scale_up_reasons.append("degrading_trend")
+            scale_down_ok = False
+
+        # Scale up if any reason applies
+        if scale_up_reasons:
+            agents_to_spawn = min(
+                max(1, pending_tasks - idle_agents, len(scale_up_reasons)),
+                self.pool.max_agents - total_agents,
+            )
+
+            if agents_to_spawn > 0:
+                logger.info(f"Scaling up by {agents_to_spawn} agents, reasons: {scale_up_reasons}")
+                for _ in range(agents_to_spawn):
+                    self.pool.spawn_agent()
+
+        # Scale down only if low utilization AND performance is good
+        elif scale_down_ok and utilization < 0.2 and total_agents > self.pool.min_agents:
+            agents_to_retire = min(
+                idle_agents // 2, total_agents - self.pool.min_agents
+            )
+
+            if agents_to_retire > 0:
+                idle_agent_ids = [
+                    agent_id
+                    for agent_id, metadata in self.pool.agents.items()
+                    if metadata.state == AgentState.IDLE
+                ][:agents_to_retire]
+
+                logger.info(f"Scaling down by {agents_to_retire} agents (performance OK)")
+                for agent_id in idle_agent_ids:
+                    self.pool.retire_agent(agent_id)
+
+    def shutdown(self):
+        """Shutdown auto-scaler"""
+        logger.info("Shutting down auto-scaler")
+        self._shutdown_event.set()
+        if self.scaling_thread.is_alive():
+            self.scaling_thread.join(timeout=5)
+        logger.info("Auto-scaler shutdown complete")
+
+
+# ============================================================
+# RECOVERY MANAGER - Fault Tolerance
+# ============================================================
+
+
+class RecoveryManager:
+    """Manages agent recovery and fault tolerance"""
+
+    def __init__(self, pool_manager):
+        """
+        Initialize recovery manager
+
+        Args:
+            pool_manager: Agent pool manager instance
+        """
+        self.pool = pool_manager
+        self.recovery_strategies = {
+            AgentState.ERROR: self._recover_error_agent,
+            AgentState.TERMINATED: self._recover_terminated_agent,
+            AgentState.SUSPENDED: self._recover_suspended_agent,
+        }
+        logger.info("Recovery manager initialized")
+
+    def recover_agent(self, agent_id: str) -> bool:
+        """
+        Attempt to recover an agent
+
+        Args:
+            agent_id: Agent identifier
+
+        Returns:
+            True if recovery successful, False otherwise
+        """
+        if agent_id not in self.pool.agents:
+            logger.warning(f"Cannot recover agent {agent_id}: not found")
+            return False
+
+        metadata = self.pool.agents[agent_id]
+
+        if metadata.state in self.recovery_strategies:
+            strategy = self.recovery_strategies[metadata.state]
+            return strategy(agent_id, metadata)
+
+        logger.warning(
+            f"No recovery strategy for agent {agent_id} in state {metadata.state}"
+        )
+        return False
+
+    def _recover_error_agent(self, agent_id: str, metadata) -> bool:
+        """Recover agent in error state"""
+        error_count = len(metadata.error_history)
+        consecutive_errors = metadata.consecutive_errors
+
+        logger.info(
+            f"Attempting to recover error agent {agent_id}: "
+            f"errors={error_count}, consecutive={consecutive_errors}"
+        )
+
+        if consecutive_errors < 3:
+            # Try recovery
+            return self.pool.recover_agent(agent_id)
+        elif consecutive_errors < 5:
+            # Reset error history and try recovery
+            logger.info(f"Resetting error history for agent {agent_id}")
+            metadata.error_history = []
+            metadata.consecutive_errors = 0
+            return self.pool.recover_agent(agent_id)
+        else:
+            # Too many errors, retire agent
+            logger.warning(f"Agent {agent_id} has too many errors, retiring")
+            self.pool.retire_agent(agent_id, force=True)
+            return False
+
+    def _recover_terminated_agent(self, agent_id: str, metadata) -> bool:
+        """Recover terminated agent by spawning replacement"""
+        if self.pool.get_pool_status()["total_agents"] < self.pool.min_agents:
+            logger.info(
+                f"Pool below minimum, spawning replacement for terminated agent {agent_id}"
+            )
+            new_agent_id = self.pool.spawn_agent(
+                capability=metadata.capability, location=metadata.location
+            )
+            return new_agent_id is not None
+        return False
+
+    def _recover_suspended_agent(self, agent_id: str, metadata) -> bool:
+        """Recover suspended agent"""
+        logger.info(f"Recovering suspended agent {agent_id}")
+        return metadata.transition_state(AgentState.IDLE, "Recovered from suspension")
 
 
 # ============================================================
 # MODULE EXPORTS
 # ============================================================
 
-__all__ = ["ProductionDeployment", "atomic_write_with_retry"]
+__all__ = ["ProductionDeployment", "atomic_write_with_retry", "AutoScaler", "RecoveryManager"]
