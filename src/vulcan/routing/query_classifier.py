@@ -305,6 +305,13 @@ STRONG_LOGICAL_INDICATORS: FrozenSet[str] = frozenset([
 # Logical symbols for quick detection of formal logic queries
 LOGICAL_SYMBOLS: Tuple[str, ...] = ('→', '∧', '∨', '¬', '↔', '⊢', '⊨', '∀', '∃')
 
+# Logical connective symbols (Unicode + ASCII representations) for SAT detection
+# Used in _classify_symbolic_logic() to detect logical formulas
+LOGICAL_CONNECTIVE_SYMBOLS: Tuple[str, ...] = (
+    '→', '∧', '∨', '¬', '↔', '⊢', '⊨',  # Unicode symbols
+    '->', '/\\', '\\/', '~',              # ASCII representations
+)
+
 # Domain-specific symbols used in pre-check before self-introspection
 DOMAIN_SYMBOLS: Tuple[str, ...] = ('→', '∧', '∨', '¬', '↔', 'P(', 'do(')
 
@@ -1415,9 +1422,8 @@ class QueryClassifier:
         # Uses module-level SAT_WORD_BOUNDARY_PATTERN for efficiency
         has_sat_word = SAT_WORD_BOUNDARY_PATTERN.search(query) is not None
         
-        # Logical connective symbols
-        logical_symbols = ['→', '∧', '∨', '¬', '↔', '⊢', '⊨', '->', '/\\', '\\/', '~']
-        has_logical_symbols = any(sym in query for sym in logical_symbols)
+        # Logical connective symbols - uses module-level constant for efficiency
+        has_logical_symbols = any(sym in query for sym in LOGICAL_CONNECTIVE_SYMBOLS)
         
         # If we have the word "sat" (not "satisfiable"), check for logic context
         if has_sat_word:
