@@ -57,22 +57,19 @@ def safe_reasoning_type_to_string(
         return default
     
     # Handle Enum instances - extract .value (the string representation)
-    # Industry Standard: Check for Enum base class, not just hasattr
+    # Industry Standard: Check for Enum base class for type safety
     if isinstance(reasoning_type, Enum):
         return str(reasoning_type.value)
     
-    # Handle objects that might be enum-like (have .value attribute)
-    # This provides backward compatibility with custom enum implementations
+    # Handle objects that might be enum-like but not derived from Enum
+    # This provides backward compatibility with:
+    # - Third-party enum implementations (e.g., IntEnum, StrEnum)
+    # - Dynamically generated enum-like classes
+    # - Mock objects in tests
+    # We prefer .value over .name because .value contains the user-facing string
     if hasattr(reasoning_type, 'value') and not isinstance(reasoning_type, str):
         try:
             return str(reasoning_type.value)
-        except (AttributeError, TypeError):
-            pass
-    
-    # Handle objects with .name attribute (alternative enum representation)
-    if hasattr(reasoning_type, 'name') and not isinstance(reasoning_type, str):
-        try:
-            return str(reasoning_type.name)
         except (AttributeError, TypeError):
             pass
     
