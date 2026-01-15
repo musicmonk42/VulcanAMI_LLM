@@ -847,47 +847,247 @@ class SymbolicReasoner:
 
     def _handle_fol_formalization(self, query: str) -> Dict[str, Any]:
         """
-        BUG #10 FIX: Handle queries asking for FOL formalization.
+        CRITICAL FIX #2: Handle FOL formalization with quantifier scope ambiguity detection.
         
-        Instead of returning generic "Proven: True", this generates actual
-        FOL translations of the statements in the query.
+        Detects and resolves quantifier scope ambiguity patterns like:
+        - "Every X verbed a Y" (e.g., "Every engineer reviewed a document")
+        - "Each X verbed some Y"
+        - "All X verbed a Y"
+        
+        Provides BOTH readings:
+        - Reading A: Narrow scope existential (∃ scoped wider) - one shared object
+        - Reading B: Wide scope universal (∀ scoped wider) - possibly different objects
+        
+        Args:
+            query: The query asking for FOL formalization, may contain quoted sentence
+            
+        Returns:
+            Dict with FOL formalizations, ambiguity analysis, and confidence score
+            
+        Example:
+            Input: "Every engineer reviewed a document."
+            Output: {
+                "fol_formalization": {
+                    "reading_a": {"fol": "∃d.(∀e.Reviewed(e,d))", ...},
+                    "reading_b": {"fol": "∀e.(∃d.Reviewed(e,d))", ...},
+                    "ambiguity_type": "quantifier_scope"
+                }
+            }
+        """
+        logger.info("[SymbolicReasoner] CRITICAL FIX #2: Processing FOL formalization request")
+        
+        try:
+            # Step 1: Extract sentence from query (handle quoted text)
+            sentence = self._extract_sentence_from_query(query)
+            
+            if not sentence:
+                logger.warning("[SymbolicReasoner] No sentence found in query, using fallback")
+                return self._fallback_fol_formalization(query)
+            
+            # Sanitize sentence for logging (prevent log injection)
+            safe_sentence = sentence.replace('\n', ' ').replace('\r', ' ')[:200]
+            logger.info(f"[SymbolicReasoner] Extracted sentence: '{safe_sentence}'")
+            
+            # Step 2: Detect quantifier scope ambiguity pattern
+            ambiguity_result = self._detect_quantifier_scope_ambiguity(sentence)
+            
+            if ambiguity_result:
+                logger.info(f"[SymbolicReasoner] Quantifier scope ambiguity detected: {ambiguity_result['ambiguity_type']}")
+                return {
+                    "proven": True,
+                    "confidence": 0.90,
+                    "fol_formalization": ambiguity_result,
+                    "applicable": True,
+                    "method": "fol_formalization",
+                }
+            
+            # Step 3: No ambiguity detected, use fallback
+            logger.info("[SymbolicReasoner] No quantifier scope ambiguity detected, using fallback")
+            return self._fallback_fol_formalization(query)
+            
+        except Exception as e:
+            logger.error(f"[SymbolicReasoner] FOL formalization failed with error: {e}", exc_info=True)
+            return {
+                "proven": False,
+                "confidence": 0.30,
+                "error": str(e),
+                "applicable": True,
+                "method": "fol_formalization",
+            }
+    
+    def _extract_sentence_from_query(self, query: str) -> Optional[str]:
+        """
+        Extract the target sentence from the query.
+        
+        Handles multiple formats:
+        - Quoted sentence: 'Sentence: "Every engineer reviewed a document."'
+        - Direct sentence after colon: 'Sentence: Every engineer reviewed a document.'
+        - Bare sentence in query
+        
+        Args:
+            query: The input query string
+            
+        Returns:
+            The extracted sentence or None if not found
+        """
+        # Try to extract quoted sentence first
+        quoted_match = re.search(r'"([^"]+)"', query)
+        if quoted_match:
+            return quoted_match.group(1).strip()
+        
+        # Try to extract sentence after "Sentence:" marker
+        sentence_match = re.search(r'Sentence:\s*(.+?)(?:\n|$)', query, re.IGNORECASE)
+        if sentence_match:
+            return sentence_match.group(1).strip().rstrip('."\'')
+        
+        # Look for sentence-like patterns (capitalized word followed by words and ending with period)
+        sentence_pattern = re.search(r'([A-Z][^.!?]*[.!?])', query)
+        if sentence_pattern:
+            return sentence_pattern.group(1).strip()
+        
+        return None
+    
+    def _detect_quantifier_scope_ambiguity(self, sentence: str) -> Optional[Dict[str, Any]]:
+        """
+        Detect quantifier scope ambiguity patterns in the sentence.
+        
+        Patterns detected:
+        - "Every/Each/All X verb(ed) a/some Y"
+        - Examples: "Every engineer reviewed a document", "Each student read some book"
+        
+        Args:
+            sentence: The natural language sentence to analyze
+            
+        Returns:
+            Dict with ambiguity analysis including both readings, or None if no ambiguity
+        """
+        # Pattern: "Every/Each/All <subject> <verb> a/some <object>"
+        # Handles verbs with or without 'ed' suffix
+        # Case-insensitive matching
+        pattern = r'\b(every|each|all)\s+(\w+)\s+(\w+?(?:ed)?)\s+(a|some)\s+(\w+)'
+        match = re.search(pattern, sentence, re.IGNORECASE)
+        
+        if not match:
+            # Sanitize for logging (prevent log injection)
+            safe_sentence = sentence.replace('\n', ' ').replace('\r', ' ')[:100]
+            logger.debug(f"[SymbolicReasoner] No quantifier scope pattern matched in: {safe_sentence}")
+            return None
+        
+        quantifier1 = match.group(1).lower()  # every/each/all
+        subject_noun = match.group(2).lower()  # engineer
+        verb = match.group(3).lower()  # review
+        quantifier2 = match.group(4).lower()  # a/some
+        object_noun = match.group(5).lower()  # document
+        
+        logger.info(f"[SymbolicReasoner] Pattern match: {quantifier1} {subject_noun} {verb} {quantifier2} {object_noun}")
+        
+        # Generate variable names (first letter of each noun)
+        subject_var = subject_noun[0].lower()
+        object_var = object_noun[0].lower()
+        
+        # Handle case where variables would be the same
+        if subject_var == object_var:
+            subject_var = subject_noun[0].lower()
+            object_var = object_noun[:2].lower() if len(object_noun) > 1 else object_noun[0].upper()
+        
+        # Generate predicate name (base form, capitalized)
+        predicate = verb.capitalize()
+        # Remove 'ed' suffix if present to get base form
+        if predicate.endswith('ed'):
+            # Handle cases like 'reviewed' -> 'Review', 'tested' -> 'Test', 'assigned' -> 'Assign'
+            predicate = predicate[:-2]  # Remove 'ed'
+            if predicate.endswith('i'):  # Handle 'tried' -> 'Try'
+                predicate = predicate[:-1] + 'y'
+        
+        # Generate past tense for English rewrite
+        # If the verb already ends in 'ed', use it as-is
+        # Otherwise add 'ed'
+        if verb.endswith('ed'):
+            past_tense = verb
+        elif verb.endswith('e'):
+            past_tense = verb + 'd'
+        elif verb.endswith('y') and len(verb) > 1 and verb[-2] not in 'aeiou':
+            past_tense = verb[:-1] + 'ied'
+        else:
+            # Check for irregular verbs
+            irregular_verbs = {
+                'read': 'read',
+                'write': 'wrote',
+                'speak': 'spoke',
+                'take': 'took',
+                'make': 'made',
+                'see': 'saw',
+                'do': 'did',
+                'go': 'went',
+            }
+            past_tense = irregular_verbs.get(verb, verb + 'ed')
+        
+        # Reading A: Narrow scope existential (∃ scoped wider)
+        # "There exists one Y such that all X verb Y"
+        reading_a_fol = f"∃{object_var}.(∀{subject_var}.{predicate}({subject_var},{object_var}))"
+        reading_a_interpretation = f"Narrow scope existential (one shared {object_noun})"
+        reading_a_english = f"There is a specific {object_noun} that {quantifier1} {subject_noun} {past_tense}."
+        
+        # Reading B: Wide scope universal (∀ scoped wider)
+        # "For all X, there exists a Y such that X verb Y"
+        reading_b_fol = f"∀{subject_var}.(∃{object_var}.{predicate}({subject_var},{object_var}))"
+        reading_b_interpretation = f"Wide scope existential (possibly different {object_noun}s)"
+        reading_b_english = f"{quantifier1.capitalize()} {subject_noun} {past_tense} some {object_noun} (possibly different ones)."
+        
+        return {
+            "original_sentence": sentence.strip().rstrip('.') + '.',
+            "reading_a": {
+                "fol": reading_a_fol,
+                "interpretation": reading_a_interpretation,
+                "english_rewrite": reading_a_english,
+            },
+            "reading_b": {
+                "fol": reading_b_fol,
+                "interpretation": reading_b_interpretation,
+                "english_rewrite": reading_b_english,
+            },
+            "ambiguity_type": "quantifier_scope",
+        }
+    
+    def _fallback_fol_formalization(self, query: str) -> Dict[str, Any]:
+        """
+        Fallback FOL formalization for queries without quantifier scope ambiguity.
+        
+        Uses the existing NL converter or generates basic formalizations.
         
         Args:
             query: The query asking for formalization
             
         Returns:
-            Dict with FOL formalizations and high confidence
+            Dict with FOL formalizations and moderate confidence
         """
-        logger.info(f"[SymbolicReasoner] BUG #10 FIX: Detected FOL formalization request")
-        
         try:
-            # Use NL converter to generate FOL formalization
-            # BUG #2 FIX: convert() returns a string (the formula), not a dict
+            # Try NL converter first
             fol_result = self.nl_converter.convert(query)
             
-            # Handle string return type (successful conversion)
             if isinstance(fol_result, str) and fol_result:
                 return {
                     "proven": True,
-                    "confidence": 0.85,
+                    "confidence": 0.70,
                     "fol_formalization": fol_result,
                     "explanation": f"FOL formalization: {fol_result}",
                     "applicable": True,
                     "method": "fol_formalization",
                 }
-            else:
-                # Fallback: Try to extract statements and formalize them manually
-                formalizations = self._generate_fol_translations(query)
-                return {
-                    "proven": True,
-                    "confidence": 0.70,
-                    "fol_formalizations": formalizations,
-                    "explanation": f"Generated {len(formalizations)} FOL formalizations",
-                    "applicable": True,
-                    "method": "fol_formalization",
-                }
+            
+            # Use basic translation generator
+            formalizations = self._generate_fol_translations(query)
+            return {
+                "proven": True,
+                "confidence": 0.70,
+                "fol_formalizations": formalizations,
+                "explanation": f"Generated {len(formalizations)} FOL formalizations",
+                "applicable": True,
+                "method": "fol_formalization",
+            }
+            
         except Exception as e:
-            logger.error(f"[SymbolicReasoner] FOL formalization failed: {e}")
+            logger.error(f"[SymbolicReasoner] Fallback formalization failed: {e}")
             return {
                 "proven": False,
                 "confidence": 0.30,
