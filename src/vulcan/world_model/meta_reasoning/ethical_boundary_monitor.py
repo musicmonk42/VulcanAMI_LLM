@@ -438,6 +438,45 @@ class EthicalBoundaryMonitor:
         logger.info("EthicalBoundaryMonitor initialized (FULL IMPLEMENTATION)")
         logger.info(f"  Strict mode: {strict_mode}, Boundaries: {len(self.boundaries)}")
 
+    def __getstate__(self) -> Dict[str, Any]:
+        """
+        Prepare state for pickling by removing unpickleable objects.
+        
+        Note: Boundaries with lambda validators cannot be pickled.
+        Only the boundary metadata (names, categories, etc.) is preserved.
+        Validators will be re-initialized from defaults on unpickle.
+        """
+        state = self.__dict__.copy()
+        # Remove unpickleable items
+        state.pop('lock', None)  # threading.RLock
+        # Save only boundary names for later reconstruction
+        state['_boundary_names_to_restore'] = list(state.get('boundaries', {}).keys())
+        state.pop('boundaries', None)  # Contains lambdas
+        return state
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        """
+        Restore state after unpickling, re-creating unpickleable objects.
+        
+        Boundaries are re-initialized from defaults as validators (lambdas)
+        cannot be pickled. Custom boundaries must be re-added after unpickling.
+        """
+        # Get boundary names to restore
+        boundary_names = state.pop('_boundary_names_to_restore', [])
+        
+        self.__dict__.update(state)
+        # Re-create unpickleable objects
+        self.lock = threading.RLock()
+        self.boundaries = {}
+        
+        # Re-initialize default boundaries
+        self._initialize_default_boundaries()
+        
+        logger.info(
+            f"EthicalBoundaryMonitor restored from pickle. "
+            f"Default boundaries re-initialized. Custom boundaries need to be re-added."
+        )
+
     def add_boundary(
         self,
         name: str,

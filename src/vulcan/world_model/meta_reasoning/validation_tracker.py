@@ -430,6 +430,205 @@ class ValidationTracker:
 
         logger.info("ValidationTracker initialized")
 
+    def __getstate__(self) -> Dict[str, Any]:
+        """
+        Prepare instance state for pickle serialization.
+        
+        This method implements industry-standard serialization by:
+        1. Acquiring the lock for thread-safe state capture
+        2. Removing unpickleable objects (lock, module refs, external deps)
+        3. Adding serialization metadata for debugging and versioning
+        
+        Returns:
+            Dictionary containing all pickleable state with metadata
+            
+        Thread Safety:
+            Acquires self.lock before capturing state to ensure consistency
+            
+        Removed Attributes:
+            - lock: threading.RLock (re-created on restore)
+            - _np: numpy module reference (re-created on restore)
+            - world_model: External dependency (must be re-injected)
+            - self_improvement_drive: External dependency (must be re-injected)
+            - transparency_interface: External dependency (must be re-injected)
+            
+        Important:
+            After restoring from pickle, call set_dependencies() to
+            re-inject external dependencies for full functionality.
+            
+        See Also:
+            __setstate__: Restores state and re-creates unpickleable objects
+            set_dependencies: Re-injects external dependencies
+        """
+        # Acquire lock for thread-safe state capture
+        self.lock.acquire()
+        try:
+            state = self.__dict__.copy()
+            
+            # Remove unpickleable items
+            state.pop('lock', None)  # threading.RLock
+            state.pop('_np', None)  # numpy module reference
+            
+            # Remove external dependencies (must be re-injected via set_dependencies)
+            state.pop('world_model', None)
+            state.pop('self_improvement_drive', None)
+            state.pop('transparency_interface', None)
+            
+            # Add serialization metadata
+            state['_serialization_metadata'] = {
+                'version': '1.0.0',
+                'serialized_at': time.time(),
+                'class': f"{self.__class__.__module__}.{self.__class__.__name__}",
+                'requires_dependency_injection': [
+                    'world_model',
+                    'self_improvement_drive', 
+                    'transparency_interface'
+                ],
+            }
+            
+            logger.debug(
+                f"ValidationTracker serialized: {len(state)} keys, "
+                f"dependencies must be re-injected via set_dependencies()"
+            )
+            
+            return state
+        finally:
+            self.lock.release()
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        """
+        Restore instance state after pickle deserialization.
+        
+        This method implements industry-standard deserialization by:
+        1. Extracting and logging serialization metadata
+        2. Restoring all pickleable state
+        3. Re-creating the threading lock
+        4. Re-establishing numpy module reference
+        5. Setting placeholder values for external dependencies
+        
+        Args:
+            state: Dictionary from __getstate__
+            
+        Post-Conditions:
+            - self.lock is a new RLock instance
+            - self._np references numpy or FakeNumpy
+            - External dependencies are set to placeholders
+            - Object is partially functional (call set_dependencies for full)
+            
+        Important:
+            After calling this method, you MUST call set_dependencies() to
+            restore full functionality. Without this, operations requiring
+            world_model, self_improvement_drive, or transparency_interface
+            will fail or produce degraded results.
+            
+        Example:
+            >>> tracker = pickle.loads(pickled_state)
+            >>> tracker.set_dependencies(
+            ...     world_model=my_world_model,
+            ...     self_improvement_drive=my_drive,
+            ...     transparency_interface=my_interface
+            ... )
+            
+        See Also:
+            __getstate__: Captures state for serialization
+            set_dependencies: Re-injects required dependencies
+        """
+        # Extract metadata for logging
+        metadata = state.pop('_serialization_metadata', {})
+        serialized_at = metadata.get('serialized_at')
+        version = metadata.get('version', 'unknown')
+        required_deps = metadata.get('requires_dependency_injection', [])
+        
+        if version != '1.0.0':
+            logger.warning(
+                f"ValidationTracker deserialized from version {version}. "
+                f"Some state may not restore correctly."
+            )
+        
+        # Restore pickleable state
+        self.__dict__.update(state)
+        
+        # Re-create unpickleable objects
+        self.lock = threading.RLock()
+        self._np = np if NUMPY_AVAILABLE else FakeNumpy
+        
+        # Set None for dependencies - they must be re-injected via set_dependencies()
+        # Using None instead of MagicMock aligns with fail-fast anti-zombie architecture
+        self.world_model = None
+        self.self_improvement_drive = None
+        self.transparency_interface = None
+        
+        # Flag to track if dependencies have been injected
+        self._dependencies_injected = False
+        
+        logger.info(
+            f"ValidationTracker restored from serialization. "
+            f"IMPORTANT: Call set_dependencies() to restore: {required_deps}"
+        )
+
+    def _check_dependencies(self, operation: str = "operation") -> None:
+        """
+        Check if required dependencies have been injected.
+        
+        Raises:
+            RuntimeError: If set_dependencies() has not been called after deserialization
+        """
+        if not getattr(self, '_dependencies_injected', True):
+            raise RuntimeError(
+                f"ValidationTracker.{operation} called before dependencies were injected. "
+                f"After deserializing, you MUST call set_dependencies() to restore "
+                f"world_model, self_improvement_drive, and transparency_interface."
+            )
+
+    def set_dependencies(
+        self,
+        world_model: Any = None,
+        self_improvement_drive: Any = None,
+        transparency_interface: Any = None
+    ) -> None:
+        """
+        Re-inject external dependencies after deserialization.
+        
+        This method MUST be called after restoring from pickle to
+        reconnect the ValidationTracker to other system components.
+        Without calling this method, the tracker will operate in
+        a degraded mode with placeholder dependencies.
+        
+        Args:
+            world_model: The WorldModel instance for predictions
+            self_improvement_drive: SelfImprovementDrive for CSIU tracking
+            transparency_interface: TransparencyInterface for audit logging
+            
+        Thread Safety:
+            Acquires self.lock before modifying dependencies
+            
+        Example:
+            >>> tracker = pickle.loads(pickled_state)
+            >>> tracker.set_dependencies(
+            ...     world_model=WorldModel(...),
+            ...     self_improvement_drive=SelfImprovementDrive(...),
+            ...     transparency_interface=TransparencyInterface(...)
+            ... )
+            
+        Warning:
+            Failing to call this method after deserialization will result
+            in degraded functionality. CSIU tracking will be disabled
+            and transparency auditing will use mock implementations.
+        """
+        with self.lock:
+            if world_model is not None:
+                self.world_model = world_model
+                logger.debug("ValidationTracker: world_model dependency injected")
+            if self_improvement_drive is not None:
+                self.self_improvement_drive = self_improvement_drive
+                logger.debug("ValidationTracker: self_improvement_drive dependency injected")
+            if transparency_interface is not None:
+                self.transparency_interface = transparency_interface
+                logger.debug("ValidationTracker: transparency_interface dependency injected")
+            
+            # Mark dependencies as injected
+            self._dependencies_injected = True
+
     def record_validation(
         self,
         proposal: Dict[str, Any],

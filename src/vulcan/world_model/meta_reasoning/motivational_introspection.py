@@ -410,6 +410,21 @@ class MotivationalIntrospection:
             len(self.active_objectives),
         )
 
+    def __getstate__(self) -> Dict[str, Any]:
+        """
+        Prepare state for pickling by removing unpickleable lock objects.
+        """
+        state = self.__dict__.copy()
+        state.pop('lock', None)
+        return state
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        """
+        Restore state after unpickling, re-creating the lock.
+        """
+        self.__dict__.update(state)
+        self.lock = threading.RLock()
+
     def _initialize_components(self):
         """Placeholder for initializing other components if needed."""
         # This method was added in the user's replacement __init__

@@ -473,6 +473,63 @@ class CuriosityRewardShaper:
         logger.info(f"  Decay rate: {decay_rate}, Max bonus: {max_bonus}")
         logger.info(f"  Episodic memory size: {episodic_memory_size}")
 
+    def __getstate__(self) -> Dict[str, Any]:
+        """
+        Prepare state for pickling by removing unpickleable objects.
+        """
+        state = self.__dict__.copy()
+        state.pop('lock', None)  # threading.RLock
+        state.pop('_np', None)  # numpy module reference
+        state.pop('world_model', None)  # may be MagicMock
+        # Convert defaultdict to regular dict for pickling
+        if 'state_feature_distributions' in state:
+            state['state_feature_distributions'] = dict(state['state_feature_distributions'])
+        return state
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        """
+        Restore state after unpickling, re-creating unpickleable objects.
+        """
+        self.__dict__.update(state)
+        self.lock = threading.RLock()
+        self._np = np if NUMPY_AVAILABLE else FakeNumpy
+        self.world_model = None  # Must be re-injected via set_world_model()
+        self._world_model_injected = False  # Track injection state
+        # Restore defaultdict
+        if 'state_feature_distributions' in self.__dict__ and isinstance(self.state_feature_distributions, dict):
+            self.state_feature_distributions = defaultdict(list, self.state_feature_distributions)
+
+    def set_world_model(self, world_model: Any) -> None:
+        """
+        Re-inject world_model after unpickling.
+        
+        Args:
+            world_model: The WorldModel instance to use for predictions
+            
+        Raises:
+            ValueError: If world_model is None
+        """
+        if world_model is None:
+            raise ValueError(
+                "world_model cannot be None. Provide a valid WorldModel instance."
+            )
+        with self.lock:
+            self.world_model = world_model
+            self._world_model_injected = True
+            logger.debug("CuriosityRewardShaper: world_model dependency injected")
+
+    def _validate_world_model(self, operation: str = "operation") -> None:
+        """
+        Validate that world_model is available for operations that require it.
+        
+        This method should be called at the start of methods that need world_model.
+        """
+        if self.world_model is None and not getattr(self, '_world_model_injected', True):
+            logger.warning(
+                f"CuriosityRewardShaper.{operation} called without world_model. "
+                f"After deserializing, call set_world_model() to restore full functionality."
+            )
+
     def compute_curiosity_bonus(
         self, state: Dict[str, Any], context: Optional[Dict[str, Any]] = None
     ) -> float:

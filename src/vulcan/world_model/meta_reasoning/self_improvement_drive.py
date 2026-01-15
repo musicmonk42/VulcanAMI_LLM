@@ -1121,6 +1121,21 @@ class SelfImprovementDrive:
         if self._csiu_enabled:
             logger.info("CSIU (latent drive) enabled with granular controls")
 
+    def __getstate__(self) -> Dict[str, Any]:
+        """
+        Prepare state for pickling by removing unpickleable lock objects.
+        """
+        state = self.__dict__.copy()
+        state.pop('_lock', None)
+        return state
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        """
+        Restore state after unpickling, re-creating the lock.
+        """
+        self.__dict__.update(state)
+        self._lock = threading.RLock()
+
     # ---------- Helper Methods ----------
 
     def _determine_llm_provider_id(self) -> Optional[str]:
@@ -4632,9 +4647,9 @@ Output the complete modified file content.
                 # Notify if weight changed significantly
                 if boost_amount >= 0.2:
                     self._send_alert(
-                        "INFO",
+                        "info",
+                        f"Objective '{objective.type}' priority boosted significantly",
                         {
-                            "message": f"Objective '{objective.type}' priority boosted significantly",
                             "old_weight": old_weight,
                             "new_weight": objective.weight,
                             "reason": "CuriosityEngine detected relevant knowledge gaps"
@@ -4655,11 +4670,3 @@ Output the complete modified file content.
             )
         
         return boosted_objectives
-    
-    def _send_alert(self, severity: str, details: Dict[str, Any]) -> None:
-        """Send alert using callback if configured."""
-        if self.alert_callback:
-            try:
-                self.alert_callback(severity, details)
-            except Exception as e:
-                logger.warning(f"Alert callback failed: {e}")

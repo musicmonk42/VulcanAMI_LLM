@@ -234,6 +234,23 @@ class ObjectiveHierarchy:
             "ObjectiveHierarchy initialized with %d objectives", len(self.objectives)
         )
 
+    def __getstate__(self) -> Dict[str, Any]:
+        """
+        Prepare state for pickling by removing unpickleable objects.
+        """
+        state = self.__dict__.copy()
+        state.pop('lock', None)  # threading.RLock
+        state.pop('_np', None)  # numpy module reference
+        return state
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        """
+        Restore state after unpickling, re-creating unpickleable objects.
+        """
+        self.__dict__.update(state)
+        self.lock = threading.RLock()
+        self._np = np if NUMPY_AVAILABLE else FakeNumpy
+
     def _initialize_from_design_spec(self):
         """Initialize objectives from design specification"""
 
