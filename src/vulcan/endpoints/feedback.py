@@ -12,7 +12,7 @@ from typing import Any, Dict
 
 from fastapi import APIRouter, HTTPException, Request
 
-from vulcan.endpoints.utils import require_deployment
+from vulcan.endpoints.utils import require_deployment, get_deployment
 
 logger = logging.getLogger(__name__)
 
@@ -99,7 +99,7 @@ async def submit_feedback(request: Request, app):
 
 
 @router.post("/v1/feedback/thumbs")
-async def submit_thumbs_feedback(request, app):
+async def submit_thumbs_feedback(request: Request, app):
     """
     Submit thumbs up/down feedback (simplified endpoint for UI buttons).
     
@@ -120,11 +120,10 @@ async def submit_thumbs_feedback(request, app):
         >>> response = await submit_thumbs_feedback(thumbs_request, app)
         >>> print(response["feedback_type"])  # "thumbs_up" or "thumbs_down"
     """
-    if not hasattr(app.state, "deployment"):
-        raise HTTPException(status_code=503, detail="System not initialized")
+    # Use require_deployment for consistent fallback behavior with sub-app mounting
+    deployment = require_deployment(request)
 
     try:
-        deployment = app.state.deployment
         
         # FIX MAJOR-4: Use deps.continual instead of deps.learning
         learning_system = None
@@ -158,7 +157,7 @@ async def submit_thumbs_feedback(request, app):
 
 
 @router.get("/v1/feedback/stats")
-async def get_feedback_stats(app):
+async def get_feedback_stats(request: Request, app):
     """
     Get RLHF feedback statistics.
     
@@ -166,6 +165,7 @@ async def get_feedback_stats(app):
     positive/negative counts, and RLHF learning status.
     
     Args:
+        request: FastAPI request object for accessing deployment
         app: FastAPI app instance for accessing state
         
     Returns:
@@ -178,11 +178,19 @@ async def get_feedback_stats(app):
         >>> stats = await get_feedback_stats(app)
         >>> print(stats["total_feedback"])
     """
-    if not hasattr(app.state, "deployment"):
-        raise HTTPException(status_code=503, detail="System not initialized")
+    # Use get_deployment for consistent fallback behavior with sub-app mounting
+    deployment = get_deployment(request)
+    
+    if deployment is None:
+        return {
+            "status": "unavailable",
+            "message": "Deployment not initialized",
+            "total_feedback": 0,
+            "positive_feedback": 0,
+            "negative_feedback": 0,
+        }
 
     try:
-        deployment = app.state.deployment
         
         # FIX MAJOR-4: Use deps.continual instead of deps.learning
         learning_system = None
