@@ -68,11 +68,12 @@ import json
 import logging
 import threading
 import time
+from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, TYPE_CHECKING
+from typing import Any, Deque, Dict, List, Literal, Optional, TYPE_CHECKING
 
 # Initialize logger immediately after imports
 logger = logging.getLogger(__name__)
@@ -383,9 +384,14 @@ class TelemetryRecorder:
         self._buffer: List[TelemetryEntry] = []
         self._ai_interaction_buffer: List[AIInteractionEntry] = []
         
-        # PERFORMANCE FIX: Buffer for memory updates
-        # Memory updates are now buffered instead of written on every request
-        self._memory_update_buffer: List[MemoryUpdateEntry] = []
+        # MEMORY LEAK FIX (Issue #1): Bounded buffer for memory updates
+        # Previously used unbounded list that could grow without limit if I/O lags.
+        # Now uses deque with maxlen to enforce MEMORY_UPDATE_BUFFER_SIZE.
+        # When buffer is full, oldest entries are automatically dropped (backpressure).
+        # This prevents memory exhaustion under high load while maintaining throughput.
+        self._memory_update_buffer: Deque[MemoryUpdateEntry] = deque(
+            maxlen=memory_update_buffer_size
+        )
         self._memory_update_lock = threading.RLock()
 
         # Thread safety
@@ -455,6 +461,8 @@ class TelemetryRecorder:
             # PERFORMANCE FIX: Memory update stats
             "memory_updates_queued": 0,
             "memory_updates_flushed": 0,
+            # MEMORY LEAK FIX (Issue #1): Track dropped entries for observability
+            "memory_updates_dropped": 0,
             # I/O stats
             "async_flushes_started": 0,
             "async_flushes_completed": 0,
@@ -725,12 +733,19 @@ class TelemetryRecorder:
         interaction_type: Optional[str] = None,
     ) -> None:
         """
-        PERFORMANCE FIX: Queue a memory update for batch processing.
+        Queue a memory update for batch processing with bounded backpressure.
         
-        Instead of writing to disk on every request (which caused progressive
-        slowdown), memory updates are now buffered and flushed periodically.
+        MEMORY LEAK FIX (Issue #1): This method now uses a bounded deque that
+        automatically drops oldest entries when at capacity. This prevents
+        unbounded memory growth if I/O lags behind incoming requests.
         
-        This method is non-blocking.
+        Backpressure Strategy:
+            - Buffer has fixed maxlen (MEMORY_UPDATE_BUFFER_SIZE)
+            - When full, oldest entries are automatically dropped (deque behavior)
+            - Dropped entries are logged and counted for observability
+            - This ensures O(1) memory usage regardless of I/O performance
+        
+        This method is non-blocking and safe to call from any thread.
         
         Args:
             source: Interaction source (user/agent/arena)
@@ -751,11 +766,39 @@ class TelemetryRecorder:
         )
         
         with self._memory_update_lock:
+            # MEMORY LEAK FIX: Check if buffer is at capacity before append
+            # deque with maxlen automatically drops oldest, but we track for observability
+            # Use maxlen property directly for accurate comparison
+            buffer_was_full = (
+                self._memory_update_buffer.maxlen is not None
+                and len(self._memory_update_buffer) == self._memory_update_buffer.maxlen
+            )
+            
+            # Append to bounded deque (oldest auto-dropped if full)
             self._memory_update_buffer.append(entry)
             self._stats["memory_updates_queued"] += 1
             
-            # Trigger async flush if buffer is full
-            if len(self._memory_update_buffer) >= self._memory_update_buffer_size:
+            # Track dropped entries for monitoring and alerting
+            if buffer_was_full:
+                self._stats["memory_updates_dropped"] += 1
+                # Log at warning level on first drop, then debug to avoid log flooding
+                if self._stats["memory_updates_dropped"] == 1:
+                    logger.warning(
+                        "[TelemetryRecorder] Memory update buffer full - applying backpressure. "
+                        "Oldest entries will be dropped. Consider increasing flush frequency "
+                        "or investigating I/O performance."
+                    )
+                elif self._stats["memory_updates_dropped"] % 100 == 0:
+                    # Periodic warning every 100 drops
+                    logger.warning(
+                        f"[TelemetryRecorder] Memory update backpressure: "
+                        f"{self._stats['memory_updates_dropped']} entries dropped total"
+                    )
+            
+            # Trigger async flush if buffer is at flush threshold
+            # Use 80% of capacity as trigger to avoid constant flush-on-full
+            flush_threshold = int(self._memory_update_buffer_size * 0.8)
+            if len(self._memory_update_buffer) >= flush_threshold:
                 self._schedule_memory_flush_locked()
 
     def _submit_flush_to_executor(self) -> None:
@@ -1260,9 +1303,17 @@ class TelemetryRecorder:
             else:
                 stats["avg_latency_ms"] = 0.0
 
-        # PERFORMANCE FIX: Include memory update buffer stats
+        # MEMORY LEAK FIX: Include memory update buffer stats with backpressure info
         with self._memory_update_lock:
             stats["memory_update_buffer_size"] = len(self._memory_update_buffer)
+            stats["memory_update_buffer_capacity"] = self._memory_update_buffer_size
+            # Calculate buffer utilization for monitoring
+            if self._memory_update_buffer_size > 0:
+                stats["memory_update_buffer_utilization"] = (
+                    len(self._memory_update_buffer) / self._memory_update_buffer_size
+                )
+            else:
+                stats["memory_update_buffer_utilization"] = 0.0
 
         stats["flush_in_progress"] = self._flush_in_progress.is_set()
         

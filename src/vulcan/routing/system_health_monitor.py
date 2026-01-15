@@ -87,8 +87,17 @@ ARENA_TIMEOUT_WARNING_THRESHOLD_PCT = 10.0
 ARENA_TIMEOUT_SKIP_THRESHOLD_PCT = 30.0
 
 # CPU usage thresholds (percentage)
+# HEALTH MONITOR FIX (Issue #4): CPU thresholds are now advisory only
+# CPU alone does NOT trigger degradation - high CPU is expected during inference
 CPU_WARNING_THRESHOLD_PCT = 80.0
 CPU_CRITICAL_THRESHOLD_PCT = 90.0
+
+# HEALTH MONITOR FIX (Issue #4): New latency-based thresholds
+# These distinguish "busy but working" (high CPU, low latency) from "stalled" (high CPU, high latency)
+# Only trigger degradation when BOTH CPU is high AND latency is degraded
+REQUEST_LATENCY_WARNING_THRESHOLD_MS = 5000.0    # 5 seconds - warning if requests take this long
+REQUEST_LATENCY_CRITICAL_THRESHOLD_MS = 15000.0  # 15 seconds - critical if requests take this long
+REQUEST_LATENCY_WINDOW_SIZE = 20  # Number of request latency samples to track
 
 # Safety block rate thresholds (percentage)
 SAFETY_BLOCK_WARNING_THRESHOLD_PCT = 30.0
@@ -103,6 +112,7 @@ SAFETY_WINDOW_SIZE = 50
 EMBEDDING_RECOVERY_THRESHOLD_MS = 500.0
 ARENA_RECOVERY_THRESHOLD_PCT = 5.0
 CPU_RECOVERY_THRESHOLD_PCT = 70.0
+REQUEST_LATENCY_RECOVERY_THRESHOLD_MS = 2000.0  # 2 seconds - recovered when latency drops
 
 # Minimum samples before making decisions
 MIN_SAMPLES_FOR_DECISION = 5
@@ -131,6 +141,10 @@ class HealthMetrics:
     cpu_usage_pct: float = 0.0
     safety_block_rate_pct: float = 0.0
     safety_sample_count: int = 0
+    # HEALTH MONITOR FIX (Issue #4): Request latency tracking
+    # This distinguishes "busy but working" from "stalled"
+    request_latency_p95_ms: float = 0.0
+    request_latency_sample_count: int = 0
     timestamp: float = field(default_factory=time.time)
 
 
@@ -156,6 +170,14 @@ class SystemHealthMonitor:
 
     This class tracks key performance metrics and automatically enables
     degradation strategies when thresholds are exceeded.
+    
+    HEALTH MONITOR FIX (Issue #4):
+        The monitor now distinguishes between "high load" and "system stall":
+        
+        - High CPU alone does NOT trigger degradation (expected during inference)
+        - Degradation only triggers when high CPU is combined with high latency
+        - This prevents false degradation during normal LLM compute bursts
+        - Request latency tracking provides the "stall detection" signal
     """
 
     def __init__(self, config: Optional[Dict[str, Any]] = None):
@@ -175,6 +197,10 @@ class SystemHealthMonitor:
         self._safety_results: Deque[bool] = deque(
             maxlen=SAFETY_WINDOW_SIZE
         )  # True = blocked
+        
+        # HEALTH MONITOR FIX (Issue #4): Request latency tracking
+        # This provides the "stall detection" signal to distinguish busy from stalled
+        self._request_latencies: Deque[float] = deque(maxlen=REQUEST_LATENCY_WINDOW_SIZE)
 
         # State tracking
         self._fast_path_enabled = False
@@ -239,6 +265,23 @@ class SystemHealthMonitor:
                 logger.debug("[HealthMonitor] Safety block recorded: %s", reason[:50])
             self._check_thresholds()
 
+    def record_request_latency(self, latency_ms: float) -> None:
+        """
+        HEALTH MONITOR FIX (Issue #4): Record overall request latency.
+        
+        This is the key metric for distinguishing "busy but working" from "stalled".
+        High CPU with low request latency = normal inference (don't degrade)
+        High CPU with high request latency = system stall (degrade)
+        
+        Call this method at the end of each request with the total request duration.
+        
+        Args:
+            latency_ms: Total request latency in milliseconds
+        """
+        with self._lock:
+            self._request_latencies.append(latency_ms)
+            self._check_thresholds()
+
     # ========================================================
     # METRIC CALCULATION
     # ========================================================
@@ -297,6 +340,9 @@ class SystemHealthMonitor:
             cpu_usage_pct=self._get_cpu_usage(),
             safety_block_rate_pct=self._calculate_rate(self._safety_results),
             safety_sample_count=len(self._safety_results),
+            # HEALTH MONITOR FIX (Issue #4): Request latency tracking
+            request_latency_p95_ms=self._calculate_p95(self._request_latencies),
+            request_latency_sample_count=len(self._request_latencies),
         )
 
     # ========================================================
@@ -304,7 +350,18 @@ class SystemHealthMonitor:
     # ========================================================
 
     def _check_thresholds(self) -> None:
-        """Check all thresholds and update degradation state."""
+        """
+        Check all thresholds and update degradation state.
+        
+        HEALTH MONITOR FIX (Issue #4): CPU alone no longer triggers degradation.
+        The system now distinguishes between "high load" and "system stall":
+        
+        - High CPU alone = normal inference (no degradation)
+        - High CPU + high request latency = system stall (trigger degradation)
+        - High request latency alone = system stall (trigger degradation)
+        
+        This prevents false degradation during normal LLM compute bursts.
+        """
         metrics = self._get_metrics()
         issues = []
         recommendations = []
@@ -344,17 +401,60 @@ class SystemHealthMonitor:
                 if DegradationLevel.WARNING.value > new_level.value:
                     new_level = DegradationLevel.WARNING
 
-        # Check CPU usage
+        # HEALTH MONITOR FIX (Issue #4): Request latency-based degradation
+        # This is the primary signal for "system stall" vs "busy but working"
+        # Request latency alone can trigger degradation (indicates system is stalled)
+        if metrics.request_latency_sample_count >= MIN_SAMPLES_FOR_DECISION:
+            if metrics.request_latency_p95_ms >= REQUEST_LATENCY_CRITICAL_THRESHOLD_MS:
+                issues.append(
+                    f"Request latency critical: {metrics.request_latency_p95_ms:.0f}ms (p95)"
+                )
+                recommendations.append("System stalled - enable fast path")
+                self._reduce_batch_size = True
+                if DegradationLevel.CRITICAL.value > new_level.value:
+                    new_level = DegradationLevel.CRITICAL
+            elif metrics.request_latency_p95_ms >= REQUEST_LATENCY_WARNING_THRESHOLD_MS:
+                issues.append(
+                    f"Request latency high: {metrics.request_latency_p95_ms:.0f}ms (p95)"
+                )
+                if DegradationLevel.DEGRADED.value > new_level.value:
+                    new_level = DegradationLevel.DEGRADED
+
+        # HEALTH MONITOR FIX (Issue #4): CPU check is now advisory only
+        # High CPU alone does NOT trigger degradation - it's expected during inference
+        # Only log a warning if CPU is high; actual degradation requires high latency
         if metrics.cpu_usage_pct >= CPU_CRITICAL_THRESHOLD_PCT:
-            issues.append(f"CPU usage critical: {metrics.cpu_usage_pct:.1f}%")
-            recommendations.append("Reduce batch sizes")
-            self._reduce_batch_size = True
-            if DegradationLevel.DEGRADED.value > new_level.value:
-                new_level = DegradationLevel.DEGRADED
+            # Only add to issues list for visibility, but DON'T trigger degradation
+            # unless request latency is also high (checked above)
+            if metrics.request_latency_sample_count >= MIN_SAMPLES_FOR_DECISION:
+                if metrics.request_latency_p95_ms >= REQUEST_LATENCY_WARNING_THRESHOLD_MS:
+                    # High CPU + high latency = true system stall
+                    issues.append(
+                        f"CPU usage critical with high latency: {metrics.cpu_usage_pct:.1f}%"
+                    )
+                    recommendations.append("Reduce batch sizes due to system stall")
+                    self._reduce_batch_size = True
+                else:
+                    # High CPU but low latency = normal inference, just log
+                    logger.debug(
+                        "[HealthMonitor] High CPU (%.1f%%) but low latency (%.0fms) - "
+                        "normal inference load, not degrading",
+                        metrics.cpu_usage_pct,
+                        metrics.request_latency_p95_ms,
+                    )
+            else:
+                # Not enough latency samples yet - be conservative and just log
+                logger.debug(
+                    "[HealthMonitor] High CPU (%.1f%%) but insufficient latency data - "
+                    "waiting for more samples before deciding",
+                    metrics.cpu_usage_pct,
+                )
         elif metrics.cpu_usage_pct >= CPU_WARNING_THRESHOLD_PCT:
-            issues.append(f"CPU usage high: {metrics.cpu_usage_pct:.1f}%")
-            if DegradationLevel.WARNING.value > new_level.value:
-                new_level = DegradationLevel.WARNING
+            # Advisory warning only - don't change degradation level
+            logger.debug(
+                "[HealthMonitor] CPU usage elevated: %.1f%% (advisory)",
+                metrics.cpu_usage_pct,
+            )
 
         # Check safety block rate
         if metrics.safety_sample_count >= MIN_SAMPLES_FOR_DECISION:
@@ -419,10 +519,13 @@ class SystemHealthMonitor:
             if metrics.arena_timeout_rate_pct > ARENA_RECOVERY_THRESHOLD_PCT:
                 can_recover = False
 
-        # Check CPU recovery
+        # HEALTH MONITOR FIX (Issue #4): Check request latency for recovery
+        # Recovery requires request latency to be below the recovery threshold
         if self._reduce_batch_size:
-            if metrics.cpu_usage_pct > CPU_RECOVERY_THRESHOLD_PCT:
-                can_recover = False
+            if metrics.request_latency_sample_count >= MIN_SAMPLES_FOR_DECISION:
+                if metrics.request_latency_p95_ms > REQUEST_LATENCY_RECOVERY_THRESHOLD_MS:
+                    can_recover = False
+            # Don't require CPU to recover - latency is the key signal
 
         if can_recover:
             logger.info("[HealthMonitor] System recovered - disabling fast path mode")
@@ -448,7 +551,7 @@ class SystemHealthMonitor:
             return self._skip_arena
 
     def should_reduce_batch_size(self) -> bool:
-        """Check if batch sizes should be reduced due to high CPU."""
+        """Check if batch sizes should be reduced due to high latency (not just CPU)."""
         with self._lock:
             return self._reduce_batch_size
 
@@ -504,6 +607,9 @@ class SystemHealthMonitor:
                 "cpu_usage_pct": metrics.cpu_usage_pct,
                 "safety_block_rate_pct": metrics.safety_block_rate_pct,
                 "safety_samples": metrics.safety_sample_count,
+                # HEALTH MONITOR FIX (Issue #4): Include request latency metrics
+                "request_latency_p95_ms": metrics.request_latency_p95_ms,
+                "request_latency_samples": metrics.request_latency_sample_count,
             }
 
     # ========================================================
@@ -544,6 +650,8 @@ class SystemHealthMonitor:
             self._embedding_latencies.clear()
             self._arena_results.clear()
             self._safety_results.clear()
+            # HEALTH MONITOR FIX (Issue #4): Clear request latency data
+            self._request_latencies.clear()
             self._fast_path_enabled = False
             self._skip_arena = False
             self._reduce_batch_size = False
@@ -606,4 +714,8 @@ __all__ = [
     "ARENA_TIMEOUT_SKIP_THRESHOLD_PCT",
     "CPU_CRITICAL_THRESHOLD_PCT",
     "SAFETY_BLOCK_CRITICAL_THRESHOLD_PCT",
+    # HEALTH MONITOR FIX (Issue #4): New latency-based thresholds
+    "REQUEST_LATENCY_WARNING_THRESHOLD_MS",
+    "REQUEST_LATENCY_CRITICAL_THRESHOLD_MS",
+    "REQUEST_LATENCY_RECOVERY_THRESHOLD_MS",
 ]
