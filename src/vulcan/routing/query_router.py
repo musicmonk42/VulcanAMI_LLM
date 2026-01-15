@@ -4841,9 +4841,23 @@ class QueryAnalyzer:
             plan.telemetry_data["reasoning_confidence"] = reasoning_result.confidence
 
         except ImportError:
-            logger.debug("[QueryRouter] Reasoning integration not available")
+            logger.debug("[QueryRouter] Reasoning integration not available - using fallback tool selection")
+            # MEDIUM Priority Fix #5: Fallback to _select_reasoning_tools when integration unavailable
+            selected_tools = self._select_reasoning_tools(plan)
+            plan.telemetry_data["selected_tools"] = selected_tools
+            plan.telemetry_data["reasoning_strategy"] = "pattern_based"
+            logger.info(
+                f"[QueryRouter] Tool selection fallback: tools={selected_tools}, strategy=pattern_based"
+            )
         except Exception as e:
-            logger.warning(f"[QueryRouter] Reasoning integration failed: {e}")
+            logger.warning(f"[QueryRouter] Reasoning integration failed: {e} - using fallback")
+            # MEDIUM Priority Fix #5: Fallback to _select_reasoning_tools on error
+            selected_tools = self._select_reasoning_tools(plan)
+            plan.telemetry_data["selected_tools"] = selected_tools
+            plan.telemetry_data["reasoning_strategy"] = "pattern_based"
+            logger.info(
+                f"[QueryRouter] Tool selection fallback (after error): tools={selected_tools}"
+            )
 
         # Decompose into agent tasks (only if safety passed)
         plan.agent_tasks = self._decompose_to_tasks(query, query_type, source, plan)
@@ -5336,6 +5350,180 @@ class QueryAnalyzer:
                 return query_type
 
         return QueryType.GENERAL
+
+    def _select_reasoning_tools(self, plan: ProcessingPlan) -> List[str]:
+        """
+        Select appropriate reasoning tools based on query classification.
+        
+        INDUSTRY STANDARD: Maps query characteristics to specialized engines
+        with proper priority ordering to prevent misrouting.
+        
+        This method ensures that technical queries (causal, analogical, mathematical, SAT)
+        are routed to the correct reasoning engines based on their detected patterns,
+        query type, and complexity scores.
+        
+        Priority Ordering:
+            1. SAT/symbolic queries → ['symbolic'] (HIGHEST PRIORITY)
+            2. Causal queries → ['causal']
+            3. Analogical queries → ['analogical']
+            4. Mathematical queries → ['mathematical', 'symbolic']
+            5. Philosophical queries → ['philosophical', 'world_model']
+            6. Probabilistic queries → ['probabilistic']
+        
+        Args:
+            plan: ProcessingPlan with query_type, detected_patterns, complexity_score
+            
+        Returns:
+            List of tool names (e.g., ['symbolic'], ['causal', 'world_model'])
+            
+        Example:
+            >>> plan = ProcessingPlan(...)
+            >>> plan.detected_patterns = ['sat_problem', 'logic_symbols']
+            >>> router._select_reasoning_tools(plan)
+            ['symbolic']
+        """
+        # Defensive programming: validate plan parameter
+        if not plan or not isinstance(plan, ProcessingPlan):
+            logger.warning("[QueryRouter._select_reasoning_tools] Invalid plan parameter")
+            return ['general']
+        
+        query_lower = plan.original_query.lower() if plan.original_query else ""
+        detected_patterns = plan.detected_patterns or []
+        query_type = plan.query_type
+        complexity = plan.complexity_score
+        uncertainty = plan.uncertainty_score
+        
+        # ============================================================
+        # PRIORITY 1: SAT/Symbolic Queries (HIGHEST PRIORITY)
+        # ============================================================
+        # SAT queries must route to symbolic engine for satisfiability checking
+        sat_patterns = ['sat_', 'satisfiable', 'unsatisfiable', 'cnf', 'dnf']
+        if any(p.startswith('sat_') for p in detected_patterns):
+            logger.info(
+                f"[QueryRouter._select_reasoning_tools] SAT pattern detected → ['symbolic']"
+            )
+            return ['symbolic']
+        
+        # Check for SAT keywords in query
+        sat_keywords = ['satisfiable', 'unsatisfiable', 'sat', 'unsat', 'cnf', 'dnf']
+        if any(kw in query_lower for kw in sat_keywords):
+            # Additional check: ensure it's actually a SAT query, not just mentioning the word
+            logic_symbols = ['→', '∧', '∨', '¬', '∀', '∃', '->', '/\\', '\\/', '~']
+            has_logic = any(sym in plan.original_query or sym in query_lower for sym in logic_symbols)
+            if has_logic:
+                logger.info(
+                    f"[QueryRouter._select_reasoning_tools] SAT keywords + logic symbols → ['symbolic']"
+                )
+                return ['symbolic']
+        
+        # ============================================================
+        # PRIORITY 2: Causal Queries
+        # ============================================================
+        # Causal queries need causal inference engine
+        causal_indicators = ['confound', 'intervention', 'do(', 'causal effect', 'counterfactual']
+        has_causal_pattern = any('causal' in p for p in detected_patterns)
+        has_causal_keyword = any(ind in query_lower for ind in causal_indicators)
+        is_causal_type = query_type == QueryType.REASONING and 'causal' in query_lower
+        
+        if has_causal_pattern or has_causal_keyword or is_causal_type:
+            logger.info(
+                f"[QueryRouter._select_reasoning_tools] Causal indicators detected → ['causal']"
+            )
+            return ['causal']
+        
+        # ============================================================
+        # PRIORITY 3: Analogical Queries
+        # ============================================================
+        # Analogical queries need structure mapping engine
+        analogical_indicators = [
+            'analogical', 'analogy', 'structure mapping', 'domain s', 'domain t',
+            'similar to', 'like a', 'parallels', 'corresponds to', 'mapping'
+        ]
+        has_analogical_pattern = any('analogical' in p or 'analog' in p for p in detected_patterns)
+        has_analogical_keyword = any(ind in query_lower for ind in analogical_indicators)
+        
+        if has_analogical_pattern or has_analogical_keyword:
+            logger.info(
+                f"[QueryRouter._select_reasoning_tools] Analogical indicators detected → ['analogical']"
+            )
+            return ['analogical']
+        
+        # ============================================================
+        # PRIORITY 4: Mathematical Queries
+        # ============================================================
+        # Mathematical queries may need both mathematical and symbolic engines
+        math_patterns = ['math_', 'probability', 'calculation', 'equation']
+        has_math_pattern = any(any(mp in p for mp in math_patterns) for p in detected_patterns)
+        
+        # Check for mathematical keywords
+        math_indicators = [
+            'calculate', 'compute', 'solve', 'integral', 'derivative', 'equation',
+            'probability', 'bayesian', 'likelihood', 'lagrangian', 'hamiltonian'
+        ]
+        has_math_keyword = any(ind in query_lower for ind in math_indicators)
+        
+        if has_math_pattern or has_math_keyword:
+            # Complex math problems may need symbolic reasoning too
+            if complexity >= 0.7 or 'prove' in query_lower or 'theorem' in query_lower:
+                logger.info(
+                    f"[QueryRouter._select_reasoning_tools] Complex math → ['mathematical', 'symbolic']"
+                )
+                return ['mathematical', 'symbolic']
+            else:
+                logger.info(
+                    f"[QueryRouter._select_reasoning_tools] Mathematical indicators → ['mathematical']"
+                )
+                return ['mathematical']
+        
+        # ============================================================
+        # PRIORITY 5: Philosophical Queries
+        # ============================================================
+        # Philosophical queries use world_model for introspection
+        philosophical_indicators = [
+            'philosophical', 'ethics', 'moral', 'consciousness', 'free will',
+            'paradox', 'dilemma', 'thought experiment'
+        ]
+        has_phil_pattern = any('philosophical' in p for p in detected_patterns)
+        has_phil_keyword = any(ind in query_lower for ind in philosophical_indicators)
+        is_phil_type = query_type == QueryType.PHILOSOPHICAL
+        
+        if has_phil_pattern or has_phil_keyword or is_phil_type:
+            logger.info(
+                f"[QueryRouter._select_reasoning_tools] Philosophical query → ['philosophical', 'world_model']"
+            )
+            return ['philosophical', 'world_model']
+        
+        # ============================================================
+        # PRIORITY 6: Probabilistic Queries
+        # ============================================================
+        # Probabilistic queries need probabilistic reasoning engine
+        prob_indicators = ['probability', 'bayesian', 'likelihood', 'posterior', 'prior', 'conditional']
+        has_prob_keyword = any(ind in query_lower for ind in prob_indicators)
+        
+        if has_prob_keyword:
+            logger.info(
+                f"[QueryRouter._select_reasoning_tools] Probabilistic indicators → ['probabilistic']"
+            )
+            return ['probabilistic']
+        
+        # ============================================================
+        # ENSEMBLE DECISIONS: High Complexity/Uncertainty
+        # ============================================================
+        # Very complex queries may benefit from multiple reasoning tools
+        if complexity >= 0.8 and uncertainty >= 0.5:
+            logger.info(
+                f"[QueryRouter._select_reasoning_tools] High complexity + uncertainty → "
+                f"ensemble ['causal', 'probabilistic', 'world_model']"
+            )
+            return ['causal', 'probabilistic', 'world_model']
+        
+        # ============================================================
+        # DEFAULT: General Reasoning
+        # ============================================================
+        logger.debug(
+            f"[QueryRouter._select_reasoning_tools] No specific tools matched → ['general']"
+        )
+        return ['general']
 
     def _calculate_complexity(self, query_lower: str) -> float:
         """

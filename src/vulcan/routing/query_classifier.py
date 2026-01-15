@@ -292,15 +292,25 @@ LOGICAL_KEYWORDS: FrozenSet[str] = frozenset([
 # Strong logical indicators - these alone trigger LOGICAL classification
 # (without requiring the 2-keyword threshold)
 # These are highly specific to formal logic and should immediately route to symbolic
+# FIX #4: Added "satisfiability" and "boolean satisfiability" as strong indicators
 STRONG_LOGICAL_INDICATORS: FrozenSet[str] = frozenset([
     "formalize", "formalise",  # Explicit request for formalization
     "fol",  # First-order logic abbreviation
     "sat problem",  # SAT problem reference
     "propositional",  # Propositional logic
+    "satisfiability",  # SAT satisfiability
+    "boolean satisfiability",  # Explicit SAT reference
 ])
 
 # Logical symbols for quick detection of formal logic queries
 LOGICAL_SYMBOLS: Tuple[str, ...] = ('→', '∧', '∨', '¬', '↔', '⊢', '⊨', '∀', '∃')
+
+# Logical connective symbols (Unicode + ASCII representations) for SAT detection
+# Used in _classify_symbolic_logic() to detect logical formulas
+LOGICAL_CONNECTIVE_SYMBOLS: Tuple[str, ...] = (
+    '→', '∧', '∨', '¬', '↔', '⊢', '⊨',  # Unicode symbols
+    '->', '/\\', '\\/', '~',              # ASCII representations
+)
 
 # Domain-specific symbols used in pre-check before self-introspection
 DOMAIN_SYMBOLS: Tuple[str, ...] = ('→', '∧', '∨', '¬', '↔', 'P(', 'do(')
@@ -945,6 +955,14 @@ VALUE_CONFLICT_PATTERNS: Tuple[re.Pattern, ...] = (
 )
 
 # =============================================================================
+# FIX #4: SAT word-boundary pattern for robust SAT detection
+# =============================================================================
+# Word-boundary check for "sat" to avoid false positives like "I sat down"
+# Matches: "SAT problem", "sat solver", "Is it sat?"
+# Does NOT match: "satisfiable", "I sat down", "The cat sat"
+SAT_WORD_BOUNDARY_PATTERN: re.Pattern = re.compile(r'\bsat\b', re.IGNORECASE)
+
+# =============================================================================
 # SPECULATION patterns - Counterfactual/hypothetical reasoning queries
 # =============================================================================
 # These queries are semantically complex but syntactically simple.
@@ -1362,6 +1380,82 @@ class QueryClassifier:
         total_count = short_crypto_count + regular_crypto_count
         return total_count, regular_crypto_count, short_crypto_count
     
+    def _classify_symbolic_logic(self, query: str) -> Optional[str]:
+        """
+        Detect symbolic logic/SAT queries with robust pattern matching.
+        
+        FIXED: More robust detection of SAT queries to prevent misrouting
+        to probabilistic/ensemble engines.
+        
+        This method uses word-boundary checking to avoid false positives
+        (e.g., "I sat down" should not trigger SAT detection).
+        
+        Args:
+            query: Query string to check (original case)
+            
+        Returns:
+            "symbolic" if SAT/logic query detected, None otherwise
+        """
+        query_lower = query.lower()
+        
+        # SAT indicators with explicit context (INDUSTRY STANDARD)
+        # These are highly specific phrases that unambiguously indicate SAT queries
+        sat_explicit_phrases = [
+            'satisfiable', 'satisfiability', 'unsatisfiable',
+            'sat problem', 'sat-style', 'sat solver',
+            'boolean satisfiability', 'is the set satisfiable',
+            'unsat', 'cnf', 'dnf',
+            'propositions:', 'constraints:',
+            'propositional logic', 'propositional formula',
+        ]
+        
+        # Check for explicit SAT phrases (strong indicators)
+        for phrase in sat_explicit_phrases:
+            if phrase in query_lower:
+                logger.info(
+                    f"[QueryClassifier] FIX #4: Detected SAT phrase '{phrase}' - "
+                    f"routing to LOGICAL/symbolic (NOT probabilistic/ensemble)"
+                )
+                return "symbolic"
+        
+        # Word-boundary check for "sat" to avoid false positives
+        # Uses module-level SAT_WORD_BOUNDARY_PATTERN for efficiency
+        has_sat_word = SAT_WORD_BOUNDARY_PATTERN.search(query) is not None
+        
+        # Logical connective symbols - uses module-level constant for efficiency
+        has_logical_symbols = any(sym in query for sym in LOGICAL_CONNECTIVE_SYMBOLS)
+        
+        # If we have the word "sat" (not "satisfiable"), check for logic context
+        if has_sat_word:
+            # Context words that indicate logical reasoning
+            logic_context = [
+                'proposition', 'formula', 'clause', 'literal',
+                'constraint', 'valid', 'entail', 'prove',
+                'logic', 'logical', 'boolean', 'predicate'
+            ]
+            if any(ctx in query_lower for ctx in logic_context):
+                logger.info(
+                    f"[QueryClassifier] FIX #4: Detected 'sat' with logic context - "
+                    f"routing to LOGICAL/symbolic"
+                )
+                return "symbolic"
+        
+        # Combination: logical symbols + logic context words
+        # This handles queries like "A→B, B→C, ¬C" without explicit "SAT" keyword
+        if has_logical_symbols:
+            logic_context = [
+                'proposition', 'constraint', 'formula', 'valid', 'entail',
+                'satisfiable', 'consistent', 'derive', 'prove'
+            ]
+            if any(ctx in query_lower for ctx in logic_context):
+                logger.info(
+                    f"[QueryClassifier] FIX #4: Detected logical symbols with context - "
+                    f"routing to LOGICAL/symbolic"
+                )
+                return "symbolic"
+        
+        return None
+    
     def _classify_by_keywords(
         self, query_lower: str, query_original: str
     ) -> Optional[QueryClassification]:
@@ -1411,6 +1505,31 @@ class QueryClassifier:
                     confidence=0.95,
                     source="keyword",
                 )
+        
+        # =============================================================================
+        # FIX #4: Check SAT/SYMBOLIC LOGIC patterns EARLY (HIGH PRIORITY)
+        # =============================================================================
+        # Problem: "SAT Satisfiability - Is the set satisfiable?" was being misrouted
+        # to ensemble/probabilistic engines because SAT detection was too late or weak.
+        #
+        # Solution: Check for SAT/symbolic logic queries EARLY with robust detection
+        # that uses word-boundary matching to avoid false positives like "I sat down".
+        # This must happen BEFORE probabilistic checks to prevent misrouting.
+        # =============================================================================
+        symbolic_tool = self._classify_symbolic_logic(query_original)
+        if symbolic_tool:
+            # Increase confidence for explicit "satisfiable" keyword
+            has_satisfiable = "satisfiable" in query_lower or "satisfiability" in query_lower
+            confidence = 0.95 if has_satisfiable else 0.90
+            
+            return QueryClassification(
+                category=QueryCategory.LOGICAL.value,
+                complexity=0.7,
+                suggested_tools=["symbolic"],
+                skip_reasoning=False,
+                confidence=confidence,
+                source="keyword",
+            )
         
         # =============================================================================
         # FIX Issue #2: Check MATHEMATICAL PROOF patterns BEFORE cryptographic

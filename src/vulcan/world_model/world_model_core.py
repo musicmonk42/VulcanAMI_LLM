@@ -4906,6 +4906,16 @@ class WorldModel:
         else:
             actual_query = str(query)
         
+        # CRITICAL FIX: Route to specialized reasoning engines BEFORE philosophical fallback
+        # Check if query requires technical reasoning (causal, analogical, mathematical, SAT/symbolic)
+        if mode is None and self._should_route_to_reasoning_engine(actual_query):
+            logger.info("[WorldModel] Routing to specialized reasoning engine")
+            try:
+                return self._route_to_appropriate_engine(actual_query, **kwargs)
+            except Exception as e:
+                logger.warning(f"[WorldModel] Reasoning engine routing failed: {e}, falling back")
+                # Continue to mode-based routing on failure
+        
         # Route to appropriate reasoning method based on mode
         if mode == 'philosophical':
             return self._philosophical_reasoning(actual_query, **kwargs)
@@ -4915,6 +4925,353 @@ class WorldModel:
             # Default: use introspection for self-referential queries,
             # or return a general analysis
             return self._general_reasoning(actual_query, **kwargs)
+    
+    # =========================================================================
+    # REASONING ENGINE ROUTING (CRITICAL FIX)
+    # =========================================================================
+    
+    def _should_route_to_reasoning_engine(self, query: str) -> bool:
+        """
+        Detect queries needing specialized technical reasoning engines.
+        
+        This method determines whether a query should be routed to specialized
+        reasoning engines (Symbolic, Causal, Analogical, Mathematical) instead
+        of the default philosophical reasoning or introspection.
+        
+        INDUSTRY STANDARD IMPLEMENTATION:
+        - Thread-safe operation (no shared state modification)
+        - Comprehensive pattern detection with multiple indicators per domain
+        - Defensive programming with input validation
+        - Performance optimized with early returns
+        
+        Args:
+            query: The query string to analyze
+        
+        Returns:
+            bool: True if query should route to specialized engine, False otherwise
+        """
+        # Input validation
+        if not query or not isinstance(query, str):
+            logger.warning("[WorldModel] Invalid query for routing detection")
+            return False
+        
+        # Security: Validate query length to prevent resource exhaustion
+        MAX_QUERY_LENGTH = 10000
+        if len(query) > MAX_QUERY_LENGTH:
+            logger.warning(f"[WorldModel] Query exceeds max length ({len(query)} > {MAX_QUERY_LENGTH})")
+            return False
+        
+        query_lower = query.lower()
+        
+        # CAUSAL REASONING INDICATORS
+        causal_indicators = [
+            'confound', 'confounding', 'confounder',
+            'causation', 'causality', 'causal effect', 'causal inference',
+            'intervention', 'do(', 'do-calculus',
+            'pearl', 'structural causal model', 'scm',
+            'backdoor', 'frontdoor', 'instrumental variable',
+            'counterfactual', 'potential outcome',
+            'treatment effect', 'ate', 'cate'
+        ]
+        
+        causal_count = sum(1 for indicator in causal_indicators if indicator in query_lower)
+        if causal_count >= 1:
+            logger.info(f"[WorldModel] Detected causal reasoning query (indicators: {causal_count})")
+            return True
+        
+        # ANALOGICAL REASONING INDICATORS
+        analogical_indicators = [
+            'structure mapping', 'structural mapping',
+            'analogy', 'analogical', 'analogous',
+            'domain s', 'source domain',
+            'domain t', 'target domain',
+            'corresponds to', 'correspondence',
+            'mapping between', 'relation mapping',
+            'base domain', 'target concept'
+        ]
+        
+        analogical_count = sum(1 for indicator in analogical_indicators if indicator in query_lower)
+        if analogical_count >= 1:
+            logger.info(f"[WorldModel] Detected analogical reasoning query (indicators: {analogical_count})")
+            return True
+        
+        # MATHEMATICAL REASONING INDICATORS
+        mathematical_indicators = [
+            'compute', 'calculate', 'calculation',
+            'sum', 'summation', 'total',
+            'induction', 'mathematical induction', 'proof by induction',
+            'prove', 'proof', 'theorem',
+            'integral', 'derivative', 'differential',
+            'equation', 'solve for',
+            'optimization', 'minimize', 'maximize',
+            'convergence', 'limit'
+        ]
+        
+        mathematical_count = sum(1 for indicator in mathematical_indicators if indicator in query_lower)
+        if mathematical_count >= 1:
+            logger.info(f"[WorldModel] Detected mathematical reasoning query (indicators: {mathematical_count})")
+            return True
+        
+        # SAT/SYMBOLIC LOGIC INDICATORS
+        # Unicode logical operators: → (implies), ∧ (and), ∨ (or), ¬ (not), ⊕ (xor), ↔ (iff)
+        # Text equivalents: 'logical implies', 'logical and', 'logical or', 'logical not'
+        symbolic_indicators = [
+            'satisfiable', 'satisfiability',
+            'sat', 'unsat',
+            # Unicode logical operators
+            '→', '∧', '∨', '¬', '⊕', '↔',
+            # Text logical operators (prefixed with 'logical' to avoid false positives)
+            'logical implies', 'logical and', 'logical or', 'logical not',
+            # Logic domains
+            'fol', 'first-order', 'first order logic',
+            'predicate logic', 'propositional logic',
+            'cnf', 'dnf', 'conjunctive normal form',
+            'formula', 'clause',
+            'truth table', 'model checking'
+        ]
+        
+        symbolic_count = sum(1 for indicator in symbolic_indicators if indicator in query_lower)
+        if symbolic_count >= 1:
+            logger.info(f"[WorldModel] Detected symbolic/SAT reasoning query (indicators: {symbolic_count})")
+            return True
+        
+        # No specialized reasoning detected
+        return False
+    
+    def _route_to_appropriate_engine(self, query: str, **kwargs) -> Dict[str, Any]:
+        """
+        Route query to the appropriate specialized reasoning engine.
+        
+        This method dispatches queries to specialized reasoning engines based on
+        detected patterns and returns results in WorldModel's standard format.
+        
+        INDUSTRY STANDARD IMPLEMENTATION:
+        - Lazy imports to minimize startup overhead
+        - Comprehensive error handling with graceful degradation
+        - Detailed logging for observability
+        - Thread-safe operation
+        - Returns consistent format across all engines
+        
+        ENGINE METHOD INTERFACE:
+        - CausalReasoner: reasoner.analyze(query)
+        - AnalogicalReasoner: reasoner.reason(query)
+        - MathematicalVerificationEngine: reasoner.verify(query)
+        - SymbolicReasoner: reasoner.query(query, timeout=N)
+        
+        Args:
+            query: The query to process
+            **kwargs: Additional arguments for reasoning engines
+        
+        Returns:
+            Dict[str, Any]: Standard WorldModel reasoning result with keys:
+                - response: str - The reasoning result
+                - confidence: float - Confidence score (0.0-1.0)
+                - reasoning_trace: Dict - Detailed reasoning steps
+                - mode: str - The reasoning mode used
+                - engine_used: str - Which engine processed the query
+        
+        Raises:
+            Exception: Re-raises exceptions after logging for upstream handling
+        """
+        query_lower = query.lower()
+        engine_used = None
+        result = None
+        
+        try:
+            # =====================================================================
+            # CAUSAL REASONING ENGINE
+            # =====================================================================
+            if any(indicator in query_lower for indicator in [
+                'confound', 'causation', 'causal effect', 'intervention', 'do(',
+                'pearl', 'backdoor', 'counterfactual'
+            ]):
+                logger.info("[WorldModel] Routing to CausalReasoner")
+                engine_used = 'causal'
+                
+                try:
+                    from vulcan.reasoning.causal_reasoning import CausalReasoner
+                    reasoner = CausalReasoner()
+                    # Note: Each engine has its own interface method name (analyze/reason/verify/query)
+                    # This is intentional as each engine was designed independently
+                    result = reasoner.analyze(query)
+                    logger.info("[WorldModel] CausalReasoner completed successfully")
+                except ImportError as e:
+                    logger.error(f"[WorldModel] Failed to import CausalReasoner: {e}")
+                    raise
+                except Exception as e:
+                    logger.error(f"[WorldModel] CausalReasoner execution failed: {e}")
+                    raise
+            
+            # =====================================================================
+            # ANALOGICAL REASONING ENGINE
+            # =====================================================================
+            elif any(indicator in query_lower for indicator in [
+                'structure mapping', 'analogy', 'domain s', 'domain t',
+                'corresponds to', 'mapping between'
+            ]):
+                logger.info("[WorldModel] Routing to AnalogicalReasoner")
+                engine_used = 'analogical'
+                
+                try:
+                    from vulcan.reasoning.analogical_reasoning import AnalogicalReasoner
+                    reasoner = AnalogicalReasoner()
+                    result = reasoner.reason(query)
+                    logger.info("[WorldModel] AnalogicalReasoner completed successfully")
+                except ImportError as e:
+                    logger.error(f"[WorldModel] Failed to import AnalogicalReasoner: {e}")
+                    raise
+                except Exception as e:
+                    logger.error(f"[WorldModel] AnalogicalReasoner execution failed: {e}")
+                    raise
+            
+            # =====================================================================
+            # MATHEMATICAL REASONING ENGINE
+            # =====================================================================
+            elif any(indicator in query_lower for indicator in [
+                'compute', 'calculate', 'sum', 'induction', 'prove',
+                'integral', 'derivative', 'equation', 'optimization'
+            ]):
+                logger.info("[WorldModel] Routing to MathematicalVerificationEngine")
+                engine_used = 'mathematical'
+                
+                try:
+                    from vulcan.reasoning.mathematical_verification import MathematicalVerificationEngine
+                    reasoner = MathematicalVerificationEngine()
+                    result = reasoner.verify(query)
+                    logger.info("[WorldModel] MathematicalVerificationEngine completed successfully")
+                except ImportError as e:
+                    logger.error(f"[WorldModel] Failed to import MathematicalVerificationEngine: {e}")
+                    raise
+                except Exception as e:
+                    logger.error(f"[WorldModel] MathematicalVerificationEngine execution failed: {e}")
+                    raise
+            
+            # =====================================================================
+            # SYMBOLIC/SAT REASONING ENGINE
+            # =====================================================================
+            elif any(indicator in query_lower for indicator in [
+                'satisfiable', 'sat', '→', '∧', '∨', '¬',
+                'fol', 'first-order', 'predicate logic', 'propositional logic'
+            ]):
+                logger.info("[WorldModel] Routing to SymbolicReasoner")
+                engine_used = 'symbolic'
+                
+                try:
+                    from vulcan.reasoning.symbolic.reasoner import SymbolicReasoner
+                    reasoner = SymbolicReasoner()
+                    result = reasoner.query(query, timeout=kwargs.get('timeout', 10))
+                    logger.info("[WorldModel] SymbolicReasoner completed successfully")
+                except ImportError as e:
+                    logger.error(f"[WorldModel] Failed to import SymbolicReasoner: {e}")
+                    raise
+                except Exception as e:
+                    logger.error(f"[WorldModel] SymbolicReasoner execution failed: {e}")
+                    raise
+            
+            else:
+                # Should not reach here if _should_route_to_reasoning_engine is correct
+                logger.warning("[WorldModel] No matching engine found despite routing detection")
+                raise ValueError("No appropriate reasoning engine found for query")
+            
+            # =====================================================================
+            # RESULT NORMALIZATION
+            # =====================================================================
+            # Convert engine-specific result format to WorldModel standard format
+            return self._normalize_engine_result(result, engine_used, query)
+            
+        except Exception as e:
+            logger.error(f"[WorldModel] Engine routing failed: {e}")
+            # Re-raise for upstream handling (will fall back to _general_reasoning)
+            raise
+    
+    def _normalize_engine_result(
+        self, result: Any, engine_used: str, query: str
+    ) -> Dict[str, Any]:
+        """
+        Normalize reasoning engine results to WorldModel standard format.
+        
+        INDUSTRY STANDARD IMPLEMENTATION:
+        - Handles diverse result formats from different engines
+        - Defensive programming with type checking
+        - Provides sensible defaults for missing fields
+        - Thread-safe operation
+        
+        Args:
+            result: The result from the reasoning engine (format varies)
+            engine_used: Name of the engine that produced the result
+            query: Original query (for context in trace)
+        
+        Returns:
+            Dict[str, Any]: Normalized result in WorldModel format
+        """
+        try:
+            # If result is already in correct format, validate and return
+            if isinstance(result, dict) and 'response' in result:
+                return {
+                    'response': str(result.get('response', '')),
+                    'confidence': float(result.get('confidence', 0.7)),
+                    'reasoning_trace': result.get('reasoning_trace', {}),
+                    'mode': result.get('mode', engine_used),
+                    'engine_used': engine_used
+                }
+            
+            # Handle string results (direct answers)
+            if isinstance(result, str):
+                return {
+                    'response': result,
+                    'confidence': 0.75,
+                    'reasoning_trace': {
+                        'engine': engine_used,
+                        'query': query,
+                        'result_type': 'string'
+                    },
+                    'mode': engine_used,
+                    'engine_used': engine_used
+                }
+            
+            # Handle complex result objects (extract relevant fields)
+            response_text = str(result)
+            if hasattr(result, 'result'):
+                response_text = str(result.result)
+            elif hasattr(result, 'answer'):
+                response_text = str(result.answer)
+            elif hasattr(result, 'output'):
+                response_text = str(result.output)
+            
+            confidence = 0.70  # Default confidence
+            if hasattr(result, 'confidence'):
+                confidence = float(result.confidence)
+            elif hasattr(result, 'certainty'):
+                confidence = float(result.certainty)
+            
+            reasoning_trace = {'engine': engine_used, 'query': query}
+            if hasattr(result, 'trace'):
+                reasoning_trace.update(result.trace)
+            elif hasattr(result, 'steps'):
+                reasoning_trace['steps'] = result.steps
+            
+            return {
+                'response': response_text,
+                'confidence': confidence,
+                'reasoning_trace': reasoning_trace,
+                'mode': engine_used,
+                'engine_used': engine_used
+            }
+            
+        except Exception as e:
+            logger.error(f"[WorldModel] Result normalization failed: {e}")
+            # Return minimal valid result on error
+            return {
+                'response': f"Reasoning engine {engine_used} completed but result normalization failed: {e}",
+                'confidence': 0.5,
+                'reasoning_trace': {
+                    'engine': engine_used,
+                    'error': str(e),
+                    'raw_result': str(result)[:500]  # Truncate to prevent overflow
+                },
+                'mode': engine_used,
+                'engine_used': engine_used
+            }
     
     def _philosophical_reasoning(self, query: str, **kwargs) -> Dict[str, Any]:
         """
