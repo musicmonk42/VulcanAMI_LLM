@@ -28,7 +28,11 @@ Functions:
 
 import ast
 import logging
-from typing import Any, Dict, Union
+from typing import Any, Dict, Optional, Union, TYPE_CHECKING
+
+# Type-only import to avoid circular dependencies
+if TYPE_CHECKING:
+    from .reasoning_types import ReasoningType
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +111,9 @@ def reasoning_result_to_dict(result: Any) -> Dict[str, Any]:
     return result_dict if result_dict else {"value": str(result)}
 
 
-def reasoning_type_to_string(reasoning_type: Any) -> str:
+def reasoning_type_to_string(
+    reasoning_type: Optional[Union[str, "ReasoningType"]]
+) -> str:
     """
     Convert a reasoning_type to its string representation safely.
     
@@ -121,7 +127,7 @@ def reasoning_type_to_string(reasoning_type: Any) -> str:
     4. Other objects - converts via str()
     
     Args:
-        reasoning_type: The reasoning type (ReasoningType Enum, str, or other)
+        reasoning_type: The reasoning type (ReasoningType Enum, str, or None)
         
     Returns:
         String representation suitable for display formatting.
@@ -155,7 +161,10 @@ def reasoning_type_to_string(reasoning_type: Any) -> str:
     return str(reasoning_type)
 
 
-def format_reasoning_type_display(reasoning_type: Any, default: str = "Hybrid") -> str:
+def format_reasoning_type_display(
+    reasoning_type: Optional[Union[str, "ReasoningType"]],
+    default: str = "Hybrid"
+) -> str:
     """
     Format a reasoning_type for human-readable display.
     
@@ -189,9 +198,9 @@ def format_reasoning_type_display(reasoning_type: Any, default: str = "Hybrid") 
 def format_direct_reasoning_response(
     conclusion: Any,
     confidence: float,
-    reasoning_type: Union[str, Any],  # Accepts str or ReasoningType Enum
+    reasoning_type: Optional[Union[str, "ReasoningType"]],
     explanation: str,
-    reasoning_results: Dict[str, Any] = None,
+    reasoning_results: Optional[Dict[str, Any]] = None,
 ) -> str:
     """
     Format reasoning engine result as final user response.
