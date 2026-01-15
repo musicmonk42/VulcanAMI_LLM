@@ -418,6 +418,11 @@ services:
       # When false: Cache → Security → Greetings → Keywords → LLM (fallback)
       - LLM_FIRST_CLASSIFICATION=${LLM_FIRST_CLASSIFICATION:-true}
       # LLM classification timeout (short to prevent blocking)
+      # World Model Orchestration Configuration (NEW FEATURE v1.0)
+      # Enable World Model orchestration endpoint (/v1/chat/orchestrated)
+      # When true: LLMs only format verified content from reasoning engines
+      # When false: Only /v1/chat endpoint available (backward compatible)
+      - VULCAN_ENABLE_WM_ORCHESTRATION=${VULCAN_ENABLE_WM_ORCHESTRATION:-false}
       - CLASSIFICATION_LLM_TIMEOUT=${CLASSIFICATION_LLM_TIMEOUT:-3.0}
       # Model for classification (fast and cost-effective)
       - CLASSIFICATION_LLM_MODEL=${CLASSIFICATION_LLM_MODEL:-gpt-4o-mini}
