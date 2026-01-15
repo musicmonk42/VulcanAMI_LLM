@@ -2809,9 +2809,9 @@ class WorldModel:
             # Generate with LLM
             creative_output = self._format_with_llm(guidance)
             
-            # Verify the output
+            # Verify the output - pass full guidance, not just constraints
             verification = self.creative_handler.verify_creative_output(
-                creative_output, creative_guidance.constraints
+                creative_output, creative_guidance
             )
             
             if not verification['passed']:

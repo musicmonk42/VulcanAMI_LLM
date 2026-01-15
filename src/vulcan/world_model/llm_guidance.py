@@ -150,7 +150,7 @@ class LLMGuidanceBuilder:
     
     def build_for_reasoning(
         self,
-        reasoning_result: 'ReasoningResult',
+        reasoning_result: Dict[str, Any],
         original_query: str,
     ) -> LLMGuidance:
         """
@@ -160,7 +160,7 @@ class LLMGuidanceBuilder:
         natural language explanation with clear structure.
         
         Args:
-            reasoning_result: Result from reasoning engine
+            reasoning_result: Dictionary with reasoning output (conclusion, confidence, proof, etc.)
             original_query: Original user query for context
         
         Returns:
@@ -168,18 +168,19 @@ class LLMGuidanceBuilder:
         """
         logger.info(
             f"[LLMGuidanceBuilder] Building reasoning guidance: "
-            f"type={reasoning_result.reasoning_type.value}, "
-            f"confidence={reasoning_result.confidence}"
+            f"confidence={reasoning_result.get('confidence', 0.0)}"
         )
         
-        # Extract reasoning information
+        # Extract reasoning information - handle dict input
         verified_content = {
-            'conclusion': reasoning_result.conclusion,
-            'confidence': reasoning_result.confidence,
-            'reasoning_type': reasoning_result.reasoning_type.value,
-            'explanation': reasoning_result.explanation,
-            'evidence': reasoning_result.evidence,
-            'uncertainty': reasoning_result.uncertainty,
+            'conclusion': reasoning_result.get('conclusion'),
+            'confidence': reasoning_result.get('confidence'),
+            'reasoning_type': reasoning_result.get('reasoning_type'),
+            'explanation': reasoning_result.get('explanation'),
+            'evidence': reasoning_result.get('evidence'),
+            'uncertainty': reasoning_result.get('uncertainty'),
+            'proof': reasoning_result.get('proof'),
+            'status': reasoning_result.get('status'),
         }
         
         # Build structure for explanation
@@ -199,7 +200,7 @@ class LLMGuidanceBuilder:
             "Explain reasoning steps clearly",
             "Indicate confidence level and uncertainty",
             "Present conclusion prominently",
-            f"Base explanation on {reasoning_result.reasoning_type.value} reasoning",
+            "Base explanation on provided reasoning",
         ])
         
         # Reasoning-specific permissions
@@ -220,8 +221,8 @@ class LLMGuidanceBuilder:
             format='markdown',
             max_length=500,
             metadata={
-                'reasoning_type': reasoning_result.reasoning_type.value,
-                'confidence': reasoning_result.confidence,
+                'reasoning_type': reasoning_result.get('reasoning_type'),
+                'confidence': reasoning_result.get('confidence', 0.0),
             },
         )
     
