@@ -562,15 +562,18 @@ When VULCAN is mounted as a sub-app at `/vulcan`, there can be a mismatch betwee
 
 **Solution:**
 
-Use the debug endpoints to diagnose where the deployment is set:
+Use the debug endpoints to diagnose where the deployment is set (adjust host/port for your environment):
 
 ```bash
 # Check deployment state on the sub-app (VULCAN)
-curl http://localhost:8080/vulcan/debug/deployment
+curl http://localhost:<port>/vulcan/debug/deployment
 
 # Check deployment state on the parent app
-curl http://localhost:8080/debug/deployment
+curl http://localhost:<port>/debug/deployment
 ```
+
+> **Note:** Default ports are 8080 for the unified platform (`full_platform.py`) and 8000 for standalone API deployments.
+> See [OPERATIONS.md](OPERATIONS.md#23-health-checks) for additional debug endpoint details.
 
 **Expected Response (healthy state):**
 ```json

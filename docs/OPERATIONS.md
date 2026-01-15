@@ -103,8 +103,10 @@ docker compose -f docker-compose.dev.yml logs -f
 > These endpoints are faster (<100ms) than the comprehensive `/health` endpoint.
 
 > **Debug Endpoints:** Use `/vulcan/debug/deployment` and `/debug/deployment` to diagnose
-> sub-app deployment state issues. If either returns `"deployment": "None"`, the startup
-> process did not complete properly. See [troubleshooting.md](troubleshooting.md) for details.
+> sub-app deployment state issues. Port 8080 is used when running the unified platform
+> (`full_platform.py`); adjust as needed for your deployment. If either returns 
+> `"deployment": "None"`, the startup process did not complete properly. 
+> See [troubleshooting.md](troubleshooting.md#issue-sub-app-deployment-state-not-accessible) for details.
 
 ### 2.4 Smoke Tests
 
