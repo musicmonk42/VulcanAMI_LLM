@@ -768,7 +768,11 @@ class TelemetryRecorder:
         with self._memory_update_lock:
             # MEMORY LEAK FIX: Check if buffer is at capacity before append
             # deque with maxlen automatically drops oldest, but we track for observability
-            buffer_was_full = len(self._memory_update_buffer) >= self._memory_update_buffer_size
+            # Use maxlen property directly for accurate comparison
+            buffer_was_full = (
+                self._memory_update_buffer.maxlen is not None
+                and len(self._memory_update_buffer) == self._memory_update_buffer.maxlen
+            )
             
             # Append to bounded deque (oldest auto-dropped if full)
             self._memory_update_buffer.append(entry)

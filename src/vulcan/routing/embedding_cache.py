@@ -958,12 +958,13 @@ def get_embedding_cached(
         logger.warning(
             f"{LOG_PREFIX} Wait for computation timed out, computing directly"
         )
-        # Re-acquire computation right
+        # Re-acquire computation right for fallback computation
         acquired, _ = cache.try_acquire_computation(text)
-        if not acquired:
-            # Still couldn't acquire - another thread is computing, just compute anyway
-            # This is a rare race condition fallback
-            pass
+        # Note: acquired may be False if another thread is still computing
+        # In that case, we proceed with computation anyway (rare fallback case)
+
+    # Track whether we hold the computation lock for proper cleanup
+    holds_computation_lock = acquired
 
     # Compute embedding (outside of any lock)
     start = time.perf_counter()
@@ -978,8 +979,9 @@ def get_embedding_cached(
                 f"Model {type(model).__name__} has no encode() or embed() method"
             )
     except Exception as e:
-        # Release computation lock on error
-        cache.release_computation(text)
+        # Release computation lock on error ONLY if we acquired it
+        if holds_computation_lock:
+            cache.release_computation(text)
         logger.error(f"{LOG_PREFIX} Embedding computation failed: {e}")
         raise
 
@@ -989,9 +991,10 @@ def get_embedding_cached(
     if hasattr(embedding, "tolist"):
         embedding = embedding.tolist()
 
-    # Store in cache and release computation lock
+    # Store in cache and release computation lock ONLY if we acquired it
     cache.put(text, embedding)
-    cache.release_computation(text)
+    if holds_computation_lock:
+        cache.release_computation(text)
 
     stats = cache.get_stats()
     logger.info(
