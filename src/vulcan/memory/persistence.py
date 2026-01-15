@@ -39,6 +39,14 @@ except ImportError:
 # Set VULCAN_ENFORCE_SAFE_PICKLE=true to use RestrictedUnpickler for all pickle loads
 ENFORCE_SAFE_PICKLE = os.environ.get("VULCAN_ENFORCE_SAFE_PICKLE", "false").lower() in ("true", "1", "yes")
 
+# SECURITY: Validate configuration at import time (fail-fast principle)
+if ENFORCE_SAFE_PICKLE and not SAFE_PICKLE_AVAILABLE:
+    logging.error(
+        "SECURITY MISCONFIGURATION: VULCAN_ENFORCE_SAFE_PICKLE=true but "
+        "safe_pickle_load is not available. Pickle operations will raise RuntimeError. "
+        "Either install vulcan.security_fixes or disable enforcement."
+    )
+
 # Try to import advanced libraries
 try:
     from cryptography.fernet import Fernet

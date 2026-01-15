@@ -48,6 +48,15 @@ except ImportError:
 
 # Configuration flag for enforcing safe pickle loading
 ENFORCE_SAFE_PICKLE = os.environ.get("VULCAN_ENFORCE_SAFE_PICKLE", "false").lower() in ("true", "1", "yes")
+
+# SECURITY: Validate configuration at import time (fail-fast principle)
+if ENFORCE_SAFE_PICKLE and not SAFE_PICKLE_AVAILABLE:
+    logging.error(
+        "SECURITY MISCONFIGURATION: VULCAN_ENFORCE_SAFE_PICKLE=true but "
+        "safe_pickle_load is not available. Pickle operations will raise RuntimeError. "
+        "Either install vulcan.security_fixes or disable enforcement."
+    )
+
 import torch.nn as nn
 
 # REMOVED: sentence_transformers import - will use internal LLM-based encoder
@@ -534,7 +543,18 @@ class VersionedDataLogger:
         
         SECURITY: Uses safe_pickle_load when VULCAN_ENFORCE_SAFE_PICKLE=true
         to prevent arbitrary code execution from malicious pickle files.
+        
+        Raises:
+            RuntimeError: If VULCAN_ENFORCE_SAFE_PICKLE=true but safe_pickle_load
+                         is not available (security_fixes module not importable).
         """
+        # SECURITY: Validate enforcement is possible before proceeding
+        if ENFORCE_SAFE_PICKLE and not SAFE_PICKLE_AVAILABLE:
+            raise RuntimeError(
+                "VULCAN_ENFORCE_SAFE_PICKLE=true but safe_pickle_load is not available. "
+                "Ensure vulcan.security_fixes module is importable or disable enforcement."
+            )
+        
         # Find file with hash prefix
         for file in self.data_store.glob(f"*_{data_hash[:8]}.pkl"):
             with open(file, "rb") as f:
