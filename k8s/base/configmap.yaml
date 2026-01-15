@@ -171,6 +171,13 @@ data:
   DISTILLATION_ASYNC_WRITES: "true"
   DISTILLATION_ASYNC_BUFFER_SIZE: "100"
   DISTILLATION_ASYNC_FLUSH_INTERVAL: "5.0"
+  # P2 FIX: OpenAI Retry Configuration (Resilience)
+  # Maximum number of retry attempts for OpenAI API calls
+  OPENAI_MAX_RETRIES: "3"
+  # Base delay in seconds for exponential backoff
+  OPENAI_BASE_DELAY: "1.0"
+  # Maximum delay cap in seconds to prevent excessive waits
+  OPENAI_MAX_DELAY: "60.0"
   # Ray Docker Configuration (Container Optimization)
   # Suppresses spurious Ray warnings when running inside containers
   # The CPU detection warning is safe to suppress when CPU limits are correctly configured

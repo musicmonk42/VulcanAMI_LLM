@@ -34,17 +34,20 @@
 # VERSION HISTORY:
 #     1.0.0 - Extracted from main.py for modular architecture
 #     1.1.0 - P2 FIX: Added robust retry logic with exponential backoff
+#     1.1.1 - P2 FIX: Thread-safe retry stats, overflow protection, asyncio import fix
 # ============================================================
 
+import asyncio  # CODE REVIEW FIX: Move import to module level
 import logging
 import os
 import random
+import threading  # CODE REVIEW FIX: Thread safety for retry stats
 import time
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, TypeVar
 
 # Module metadata
-__version__ = "1.1.0"  # P2 FIX: Added retry logic with exponential backoff
+__version__ = "1.1.1"  # P2 FIX: Thread-safe retry stats, overflow protection
 __author__ = "VULCAN-AGI Team"
 
 logger = logging.getLogger(__name__)
@@ -59,7 +62,8 @@ DEFAULT_MAX_RETRIES = int(os.environ.get("OPENAI_MAX_RETRIES", "3"))
 DEFAULT_BASE_DELAY = float(os.environ.get("OPENAI_BASE_DELAY", "1.0"))
 DEFAULT_MAX_DELAY = float(os.environ.get("OPENAI_MAX_DELAY", "60.0"))
 
-# P2 FIX: Track retry statistics globally
+# CODE REVIEW FIX: Thread-safe retry statistics
+_retry_stats_lock = threading.Lock()
 _retry_stats: Dict[str, int] = {
     "total_calls": 0,
     "successful_calls": 0,
@@ -91,24 +95,45 @@ def get_retry_stats() -> Dict[str, int]:
     Get global retry statistics.
     
     P2 FIX: Exposes retry metrics for monitoring and alerting.
+    CODE REVIEW FIX: Thread-safe access to statistics.
     
     Returns:
-        Dictionary with retry statistics
+        Dictionary with retry statistics (copy for thread safety)
     """
-    return _retry_stats.copy()
+    with _retry_stats_lock:
+        return _retry_stats.copy()
 
 
 def reset_retry_stats() -> None:
-    """Reset global retry statistics."""
+    """
+    Reset global retry statistics.
+    
+    CODE REVIEW FIX: Thread-safe reset of statistics.
+    """
     global _retry_stats
-    _retry_stats = {
-        "total_calls": 0,
-        "successful_calls": 0,
-        "failed_calls": 0,
-        "total_retries": 0,
-        "rate_limit_errors": 0,
-        "other_errors": 0,
-    }
+    with _retry_stats_lock:
+        _retry_stats = {
+            "total_calls": 0,
+            "successful_calls": 0,
+            "failed_calls": 0,
+            "total_retries": 0,
+            "rate_limit_errors": 0,
+            "other_errors": 0,
+        }
+
+
+def _update_retry_stat(key: str, increment: int = 1) -> None:
+    """
+    Thread-safe update of a retry statistic.
+    
+    CODE REVIEW FIX: Helper function for atomic stat updates.
+    
+    Args:
+        key: The statistic key to update
+        increment: The value to add (default: 1)
+    """
+    with _retry_stats_lock:
+        _retry_stats[key] = _retry_stats.get(key, 0) + increment
 
 
 # ============================================================
@@ -245,6 +270,8 @@ def _calculate_backoff_delay(
     P2 FIX: Implements industry-standard exponential backoff with jitter
     to prevent thundering herd problems.
     
+    CODE REVIEW FIX: Added overflow protection for large attempt values.
+    
     Formula: min(max_delay, base_delay * 2^attempt) + random_jitter
     
     Args:
@@ -253,10 +280,21 @@ def _calculate_backoff_delay(
         max_delay: Maximum delay cap in seconds
         
     Returns:
-        Calculated delay in seconds
+        Calculated delay in seconds (always <= max_delay + jitter)
     """
-    # Exponential backoff
-    delay = min(max_delay, base_delay * (2 ** attempt))
+    # CODE REVIEW FIX: Overflow protection - cap exponent to prevent integer overflow
+    # For max_delay=60s and base_delay=1s, exponent 6 gives 64s which exceeds max_delay
+    # So we cap at 10 to be safe (2^10 = 1024 which is well within float range)
+    safe_attempt = min(attempt, 10)
+    
+    # Exponential backoff with overflow protection
+    try:
+        exponential_delay = base_delay * (2 ** safe_attempt)
+    except (OverflowError, ValueError):
+        # Fallback to max_delay if any calculation error
+        exponential_delay = max_delay
+    
+    delay = min(max_delay, exponential_delay)
     
     # Add jitter (10-30% of delay) to prevent thundering herd
     jitter = delay * random.uniform(0.1, 0.3)
@@ -300,15 +338,14 @@ def call_openai_with_retry(
         ...     max_retries=3
         ... )
     """
-    global _retry_stats
-    
-    _retry_stats["total_calls"] += 1
+    # CODE REVIEW FIX: Use thread-safe stat updates
+    _update_retry_stat("total_calls")
     
     # Get client
     openai_client = client or get_openai_client()
     if not openai_client:
         logger.error("[P2 FIX] OpenAI client not available for retry call")
-        _retry_stats["failed_calls"] += 1
+        _update_retry_stat("failed_calls")
         return None
     
     last_error: Optional[Exception] = None
@@ -317,7 +354,7 @@ def call_openai_with_retry(
     for attempt in range(max_retries + 1):  # +1 for initial attempt
         try:
             result = api_call(openai_client)
-            _retry_stats["successful_calls"] += 1
+            _update_retry_stat("successful_calls")
             
             if attempt > 0:
                 logger.info(
@@ -337,16 +374,16 @@ def call_openai_with_retry(
             ) or "rate" in str(e).lower()
             
             if is_rate_limit:
-                _retry_stats["rate_limit_errors"] += 1
+                _update_retry_stat("rate_limit_errors")
             else:
-                _retry_stats["other_errors"] += 1
+                _update_retry_stat("other_errors")
             
             # Check if error is retryable
             if not _is_retryable_error(e):
                 logger.error(
                     f"[P2 FIX] Non-retryable OpenAI error: {error_name}: {e}"
                 )
-                _retry_stats["failed_calls"] += 1
+                _update_retry_stat("failed_calls")
                 raise  # Re-raise non-retryable errors
             
             # Check if we have retries left
@@ -355,13 +392,13 @@ def call_openai_with_retry(
                     f"[P2 FIX] OpenAI call failed after {max_retries + 1} attempts. "
                     f"Last error: {error_name}: {e}"
                 )
-                _retry_stats["failed_calls"] += 1
+                _update_retry_stat("failed_calls")
                 break
             
             # Calculate backoff delay
             delay = _calculate_backoff_delay(attempt, base_delay, max_delay)
             total_delay += delay
-            _retry_stats["total_retries"] += 1
+            _update_retry_stat("total_retries")
             
             logger.warning(
                 f"[P2 FIX] OpenAI error (attempt {attempt + 1}/{max_retries + 1}): "
@@ -386,6 +423,7 @@ async def call_openai_with_retry_async(
     
     P2 FIX: Provides async retry handling for use in async contexts.
     Uses asyncio.sleep instead of time.sleep to avoid blocking.
+    CODE REVIEW FIX: Thread-safe stat updates, asyncio import moved to module level.
     
     Args:
         api_call: A callable that takes an OpenAI client and returns a result
@@ -397,17 +435,14 @@ async def call_openai_with_retry_async(
     Returns:
         The result of the API call, or None if all retries fail
     """
-    import asyncio
-    
-    global _retry_stats
-    
-    _retry_stats["total_calls"] += 1
+    # CODE REVIEW FIX: Use thread-safe stat updates
+    _update_retry_stat("total_calls")
     
     # Get client
     openai_client = client or get_openai_client()
     if not openai_client:
         logger.error("[P2 FIX] OpenAI client not available for async retry call")
-        _retry_stats["failed_calls"] += 1
+        _update_retry_stat("failed_calls")
         return None
     
     last_error: Optional[Exception] = None
@@ -416,7 +451,7 @@ async def call_openai_with_retry_async(
     for attempt in range(max_retries + 1):
         try:
             result = api_call(openai_client)
-            _retry_stats["successful_calls"] += 1
+            _update_retry_stat("successful_calls")
             
             if attempt > 0:
                 logger.info(
@@ -435,15 +470,15 @@ async def call_openai_with_retry_async(
             ) or "rate" in str(e).lower()
             
             if is_rate_limit:
-                _retry_stats["rate_limit_errors"] += 1
+                _update_retry_stat("rate_limit_errors")
             else:
-                _retry_stats["other_errors"] += 1
+                _update_retry_stat("other_errors")
             
             if not _is_retryable_error(e):
                 logger.error(
                     f"[P2 FIX] Non-retryable OpenAI error (async): {error_name}: {e}"
                 )
-                _retry_stats["failed_calls"] += 1
+                _update_retry_stat("failed_calls")
                 raise
             
             if attempt >= max_retries:
@@ -451,12 +486,12 @@ async def call_openai_with_retry_async(
                     f"[P2 FIX] Async OpenAI call failed after {max_retries + 1} attempts. "
                     f"Last error: {error_name}: {e}"
                 )
-                _retry_stats["failed_calls"] += 1
+                _update_retry_stat("failed_calls")
                 break
             
             delay = _calculate_backoff_delay(attempt, base_delay, max_delay)
             total_delay += delay
-            _retry_stats["total_retries"] += 1
+            _update_retry_stat("total_retries")
             
             logger.warning(
                 f"[P2 FIX] Async OpenAI error (attempt {attempt + 1}/{max_retries + 1}): "

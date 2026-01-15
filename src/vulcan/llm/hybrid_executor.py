@@ -138,24 +138,41 @@ def _is_reasoning_task(prompt: str) -> bool:
     reason, or solve problems - which is NOT the role of the LLM in VULCAN's
     architecture. LLMs should only format/paraphrase reasoning results.
     
+    CODE REVIEW FIX: Improved regex to reduce false positives by requiring
+    word boundaries and mathematical context.
+    
     Args:
         prompt: The input prompt to check
         
     Returns:
         True if the prompt appears to be a reasoning task, False otherwise
     """
+    import re
+    
     prompt_lower = prompt.lower().strip()
     
-    # Check for reasoning task indicator patterns
+    # Check for reasoning task indicator patterns with word boundaries
+    # This prevents false positives like "room 5-3" or "version 5-3"
     for indicator in REASONING_TASK_INDICATORS:
-        if indicator in prompt_lower:
+        # Use word boundary for multi-word indicators
+        pattern = r'\b' + re.escape(indicator) + r'\b'
+        if re.search(pattern, prompt_lower):
             return True
     
-    # Check for direct mathematical expressions (common reasoning bypass attempt)
-    # e.g., "2+2=?", "5*3", "sqrt(16)"
-    import re
-    math_pattern = r'\d+\s*[\+\-\*/\^]\s*\d+'
-    if re.search(math_pattern, prompt_lower):
+    # CODE REVIEW FIX: Improved mathematical expression detection
+    # Requires either:
+    # 1. Expression with equals sign (e.g., "2+2=?", "what is 5*3=")
+    # 2. Expression preceded by mathematical context words
+    # This avoids false positives like "room 5-3" or "version 2-1"
+    
+    # Pattern 1: Expression with equals or question
+    math_pattern_with_equals = r'\d+\s*[\+\-\*/\^]\s*\d+\s*[=?]'
+    if re.search(math_pattern_with_equals, prompt_lower):
+        return True
+    
+    # Pattern 2: Mathematical context words followed by expression
+    math_context_words = r'(?:calculate|compute|solve|evaluate|what\s+is|find)\s+.*?\d+\s*[\+\-\*/\^]\s*\d+'
+    if re.search(math_context_words, prompt_lower):
         return True
     
     return False
