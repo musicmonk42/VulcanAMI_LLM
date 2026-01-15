@@ -75,10 +75,91 @@ except ImportError:
         logger.debug("LLMMode not available - will use legacy mode parameter")
 
 # Module metadata
-__version__ = "1.6.0"  # Incremented for llm_mode parameter addition
+__version__ = "1.7.0"  # P0 FIX: Added NotReasoningEngineError and reasoning task detection
 __author__ = "VULCAN-AGI Team"
 
 logger = logging.getLogger(__name__)
+
+
+# ============================================================
+# CUSTOM EXCEPTIONS
+# ============================================================
+
+class NotReasoningEngineError(ValueError):
+    """
+    Raised when HybridLLMExecutor is asked to perform reasoning.
+    
+    ARCHITECTURE: HybridLLMExecutor is for LANGUAGE GENERATION only, not reasoning.
+    If this error is raised, the caller is misusing the executor by asking it
+    to reason about or solve a problem instead of formatting/paraphrasing 
+    already-computed reasoning results.
+    
+    CORRECT USAGE:
+        1. VULCAN's reasoning engines (symbolic, causal, mathematical) process the query
+        2. Pass the ReasoningResult to HybridLLMExecutor for language formatting
+        
+    INCORRECT USAGE:
+        - Passing raw user queries directly to HybridLLMExecutor expecting it to "think"
+        - Using LLM as a reasoning fallback when VULCAN reasoning fails
+    
+    Example:
+        >>> executor = HybridLLMExecutor()
+        >>> # WRONG - asking LLM to reason:
+        >>> result = await executor.execute("Solve: what is 2+2?")  # Raises NotReasoningEngineError
+        >>> # RIGHT - asking LLM to format reasoning output:
+        >>> result = await executor.format_output_for_user(
+        ...     reasoning_output={"result": 4, "method": "arithmetic"},
+        ...     original_prompt="What is 2+2?"
+        ... )
+    """
+    pass
+
+
+# ============================================================
+# REASONING TASK DETECTION
+# ============================================================
+
+# Patterns that indicate a reasoning/problem-solving request (not formatting)
+REASONING_TASK_INDICATORS = [
+    "solve", "calculate", "compute", "figure out", "work out",
+    "what is the answer", "what's the answer", "find the solution",
+    "prove", "derive", "demonstrate", "show that",
+    "why does", "why is", "why do", "explain why",
+    "analyze", "evaluate", "assess",
+    "how many", "how much", "how long", "how far",
+]
+
+
+def _is_reasoning_task(prompt: str) -> bool:
+    """
+    Detect if a prompt is asking for reasoning rather than formatting.
+    
+    This function identifies prompts that are requesting the LLM to think,
+    reason, or solve problems - which is NOT the role of the LLM in VULCAN's
+    architecture. LLMs should only format/paraphrase reasoning results.
+    
+    Args:
+        prompt: The input prompt to check
+        
+    Returns:
+        True if the prompt appears to be a reasoning task, False otherwise
+    """
+    prompt_lower = prompt.lower().strip()
+    
+    # Check for reasoning task indicator patterns
+    for indicator in REASONING_TASK_INDICATORS:
+        if indicator in prompt_lower:
+            return True
+    
+    # Check for direct mathematical expressions (common reasoning bypass attempt)
+    # e.g., "2+2=?", "5*3", "sqrt(16)"
+    import re
+    math_pattern = r'\d+\s*[\+\-\*/\^]\s*\d+'
+    if re.search(math_pattern, prompt_lower):
+        return True
+    
+    return False
+
 
 # ============================================================
 # CONFIGURATION
@@ -864,6 +945,50 @@ class HybridLLMExecutor:
         """
         self._execution_count += 1
         loop = asyncio.get_running_loop()
+        
+        # ============================================================
+        # P0 FIX: STOP LLM-AS-REASONER BYPASS
+        # ============================================================
+        # HybridLLMExecutor is for LANGUAGE GENERATION only, not reasoning.
+        # If the prompt appears to be a reasoning task (not a formatting request),
+        # we reject it with a clear error message.
+        #
+        # CORRECT FLOW:
+        # 1. VULCAN reasoning engines process the query
+        # 2. Pass the VulcanReasoningOutput to format_output_for_user() or
+        #    execute_with_structured_output() for language formatting
+        #
+        # This check can be disabled for specific use cases by passing
+        # llm_mode=LLMMode.GENERATE (for creative/open-ended queries)
+        #
+        # NOTE: We only apply this check when llm_mode is None (legacy usage)
+        # or FORMAT_ONLY. GENERATE and ENHANCE modes are intentionally creative.
+        should_check_reasoning_bypass = (
+            llm_mode is None or
+            (LLM_MODE_AVAILABLE and 
+             isinstance(llm_mode, str) and 
+             llm_mode.upper() == "FORMAT_ONLY") or
+            (LLM_MODE_AVAILABLE and 
+             hasattr(llm_mode, 'value') and 
+             llm_mode == LLMMode.FORMAT_ONLY if LLM_MODE_AVAILABLE else False)
+        )
+        
+        if should_check_reasoning_bypass and _is_reasoning_task(prompt):
+            self.logger.warning(
+                f"[HybridExecutor] P0 VIOLATION: Reasoning task detected in prompt. "
+                f"LLMs should NOT reason - use VULCAN reasoning engines first, then "
+                f"call format_output_for_user() with the reasoning result."
+            )
+            raise NotReasoningEngineError(
+                f"HybridLLMExecutor detected a reasoning task but LLMs are for "
+                f"LANGUAGE GENERATION only, not reasoning. The prompt appears to "
+                f"request computation/analysis: '{prompt[:100]}...'\n\n"
+                f"CORRECT USAGE:\n"
+                f"1. Process query with VULCAN reasoning engines first\n"
+                f"2. Call format_output_for_user(reasoning_output, original_prompt)\n\n"
+                f"If this is intentionally a creative/open-ended query, pass "
+                f"llm_mode=LLMMode.GENERATE to bypass this check."
+            )
         
         # ARCHITECTURE: Respect llm_mode from caller (router)
         # Industry Standard: Single source of truth - router decides, executor executes
@@ -3639,6 +3764,9 @@ __all__ = [
     "BASE_TIMEOUT_SECONDS",
     "TIMEOUT_PER_TOKEN_SECONDS",
     "calculate_adaptive_timeout",
+    # P0 FIX: LLM-as-Reasoner bypass prevention
+    "NotReasoningEngineError",
+    "REASONING_TASK_INDICATORS",
 ]
 
 

@@ -37,6 +37,10 @@ try:
         MockGraphixVulcanLLM,
         GraphixVulcanLLM,
         GRAPHIX_LLM_AVAILABLE,
+        # P1 FIX: Mock detection utilities
+        is_mock_llm,
+        is_mock_response,
+        MOCK_RESPONSE_PREFIX,
     )
 except ImportError as e:
     logger.warning(f"mock_llm module not available: {e}")
@@ -44,6 +48,9 @@ except ImportError as e:
     MockGraphixVulcanLLM = None
     GraphixVulcanLLM = None
     GRAPHIX_LLM_AVAILABLE = False
+    is_mock_llm = None
+    is_mock_response = None
+    MOCK_RESPONSE_PREFIX = ""
 
 try:
     from vulcan.llm.hybrid_executor import (
@@ -55,6 +62,9 @@ try:
         verify_hybrid_executor_setup,
         OPENAI_LANGUAGE_FORMATTING,
         OPENAI_LANGUAGE_POLISH,
+        # P0 FIX: LLM-as-Reasoner bypass prevention
+        NotReasoningEngineError,
+        REASONING_TASK_INDICATORS,
     )
 except ImportError as e:
     logger.warning(f"hybrid_executor module not available: {e}")
@@ -67,6 +77,8 @@ except ImportError as e:
     verify_hybrid_executor_setup = None
     OPENAI_LANGUAGE_FORMATTING = False
     OPENAI_LANGUAGE_POLISH = False
+    NotReasoningEngineError = None
+    REASONING_TASK_INDICATORS = []
 
 try:
     from vulcan.llm.openai_client import (
@@ -76,6 +88,12 @@ try:
         initialize_openai_client,
         verify_openai_configuration,
         log_openai_status,
+        # P2 FIX: Retry utilities for robust API calls
+        call_openai_with_retry,
+        call_openai_with_retry_async,
+        get_retry_stats,
+        reset_retry_stats,
+        DEFAULT_MAX_RETRIES,
     )
 except ImportError as e:
     logger.warning(f"openai_client module not available: {e}")
@@ -86,6 +104,11 @@ except ImportError as e:
     initialize_openai_client = None
     verify_openai_configuration = None
     log_openai_status = None
+    call_openai_with_retry = None
+    call_openai_with_retry_async = None
+    get_retry_stats = None
+    reset_retry_stats = None
+    DEFAULT_MAX_RETRIES = 3
 
 try:
     from vulcan.llm.query_parser import (
@@ -112,6 +135,10 @@ __all__ = [
     "MockGraphixVulcanLLM",
     "GraphixVulcanLLM",
     "GRAPHIX_LLM_AVAILABLE",
+    # P1 FIX: Mock detection utilities
+    "is_mock_llm",
+    "is_mock_response",
+    "MOCK_RESPONSE_PREFIX",
     # Hybrid Executor
     "HybridLLMExecutor",
     "VulcanReasoningOutput",
@@ -122,6 +149,9 @@ __all__ = [
     # Configuration flags for OpenAI language formatting
     "OPENAI_LANGUAGE_FORMATTING",
     "OPENAI_LANGUAGE_POLISH",
+    # P0 FIX: LLM-as-Reasoner bypass prevention
+    "NotReasoningEngineError",
+    "REASONING_TASK_INDICATORS",
     # OpenAI Client
     "get_openai_client",
     "get_openai_init_error",
@@ -129,6 +159,12 @@ __all__ = [
     "initialize_openai_client",
     "verify_openai_configuration",
     "log_openai_status",
+    # P2 FIX: OpenAI retry utilities
+    "call_openai_with_retry",
+    "call_openai_with_retry_async",
+    "get_retry_stats",
+    "reset_retry_stats",
+    "DEFAULT_MAX_RETRIES",
     # Query Parser (Language Interface)
     "StructuredQuery",
     "QueryIntent",
