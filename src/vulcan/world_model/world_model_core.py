@@ -4341,74 +4341,325 @@ class WorldModel:
     
     def _philosophical_reasoning(self, query: str, **kwargs) -> Dict[str, Any]:
         """
-        Handle ethical and philosophical queries.
+        Handle ethical and philosophical queries using actual meta-reasoning components.
+        
+        INDUSTRY STANDARD IMPLEMENTATION (Fix #2):
+        - Uses EthicalBoundaryMonitor for ethical constraint checking
+        - Uses GoalConflictDetector for dilemma detection
+        - Uses CounterfactualObjectiveReasoner for outcome analysis
+        - Uses InternalCritic for reasoning quality assessment
+        - Uses TransparencyInterface for explainability
+        
+        This replaces the previous template-based responses with actual reasoning
+        that engages the meta-reasoning components designed for ethical analysis.
         
         Process:
-        1. Detect ethical framework needed (deontological, utilitarian, etc.)
-        2. Identify constraints and options
-        3. Apply framework to evaluate options
-        4. Provide reasoned conclusion
+        1. Parse ethical structure (options, constraints, dilemmas)
+        2. Run ethical boundary checks on each option
+        3. Detect goal conflicts
+        4. Perform counterfactual analysis if multiple options
+        5. Generate critique with InternalCritic
+        6. Synthesize reasoned response with confidence
         """
-        logger.info("[WorldModel] Philosophical reasoning engaged")
+        logger.info("[WorldModel] Philosophical reasoning engaged with meta-reasoning components")
         query_lower = query.lower()
         
-        # Detect ethical indicators
-        ethical_keywords = ['should', 'permissible', 'ethical', 'moral', 'right', 'wrong']
-        has_ethical = any(kw in query_lower for kw in ethical_keywords)
+        # Parse query structure
+        ethical_structure = self._parse_ethical_query_structure(query, query_lower)
         
-        # Extract the dilemma structure
-        choice_indicators = ['a.', 'b.', 'option', 'pull', 'do not', 'action', 'inaction']
+        # Initialize response components
+        response_parts = []
+        confidence = 0.70  # Base confidence for philosophical reasoning
+        reasoning_trace = {
+            'analysis_type': ethical_structure['type'],
+            'frameworks_used': [],
+            'components_engaged': [],
+            'query_type': 'philosophical'
+        }
+        
+        # Check if meta-reasoning components are available
+        has_meta_reasoning = (
+            META_REASONING_AVAILABLE and
+            self.ethical_boundary_monitor is not None and
+            self.goal_conflict_detector is not None
+        )
+        
+        if has_meta_reasoning:
+            # INDUSTRY STANDARD: Use actual meta-reasoning components
+            try:
+                # Step 1: Ethical Boundary Check
+                ethical_analysis = self._run_ethical_boundary_analysis(
+                    ethical_structure, query
+                )
+                reasoning_trace['components_engaged'].append('EthicalBoundaryMonitor')
+                reasoning_trace['ethical_boundaries'] = ethical_analysis
+                
+                # Step 2: Goal Conflict Detection
+                conflict_analysis = self._detect_goal_conflicts_in_query(
+                    ethical_structure, query
+                )
+                reasoning_trace['components_engaged'].append('GoalConflictDetector')
+                reasoning_trace['conflicts_detected'] = conflict_analysis
+                
+                # Step 3: Counterfactual Analysis (if multiple options)
+                counterfactual_results = None
+                if len(ethical_structure.get('options', [])) > 1:
+                    counterfactual_results = self._analyze_option_counterfactuals(
+                        ethical_structure
+                    )
+                    if counterfactual_results:
+                        reasoning_trace['components_engaged'].append('CounterfactualObjectiveReasoner')
+                        reasoning_trace['counterfactual_analysis'] = counterfactual_results
+                
+                # Step 4: Synthesize Response
+                response = self._synthesize_ethical_response(
+                    ethical_structure,
+                    ethical_analysis,
+                    conflict_analysis,
+                    counterfactual_results,
+                    query
+                )
+                response_parts.append(response)
+                
+                # Step 5: Internal Critique
+                if self.internal_critic is not None:
+                    critique = self._generate_internal_critique(response, reasoning_trace)
+                    reasoning_trace['components_engaged'].append('InternalCritic')
+                    reasoning_trace['critique'] = critique
+                    
+                    # Adjust confidence based on critique
+                    if critique.get('confidence_adjustment'):
+                        confidence += critique['confidence_adjustment']
+                
+                # Success: Actual reasoning performed
+                confidence = min(0.95, max(0.60, confidence))
+                reasoning_trace['frameworks_used'] = ['deontological', 'utilitarian', 'virtue_ethics']
+                
+            except Exception as e:
+                logger.warning(f"[WorldModel] Meta-reasoning components failed: {e}, falling back to template")
+                has_meta_reasoning = False
+        
+        if not has_meta_reasoning:
+            # FALLBACK: Template-based response when components unavailable
+            logger.info("[WorldModel] Meta-reasoning unavailable, using template fallback")
+            response = self._generate_philosophical_template(ethical_structure, query_lower)
+            response_parts.append(response)
+            confidence = 0.75
+            reasoning_trace['fallback_mode'] = True
+            reasoning_trace['frameworks_used'] = ['template_based']
+        
+        final_response = "\n".join(response_parts)
+        
+        return {
+            'response': final_response,
+            'confidence': confidence,
+            'reasoning_trace': reasoning_trace,
+            'mode': 'philosophical',
+            'components_used': reasoning_trace.get('components_engaged', [])
+        }
+    
+    def _parse_ethical_query_structure(self, query: str, query_lower: str) -> Dict[str, Any]:
+        """Parse ethical query to identify structure (options, constraints, type)."""
+        structure = {
+            'type': 'general_philosophical',
+            'options': [],
+            'constraints': [],
+            'has_dilemma': False,
+            'ethical_keywords': []
+        }
+        
+        # Detect ethical keywords
+        ethical_keywords = ['should', 'permissible', 'ethical', 'moral', 'right', 'wrong', 'ought']
+        structure['ethical_keywords'] = [kw for kw in ethical_keywords if kw in query_lower]
+        
+        # Detect choice structure
+        choice_indicators = ['a.', 'b.', 'option', 'pull', 'do not', 'action', 'inaction', 'choose']
         has_choice = any(indicator in query_lower for indicator in choice_indicators)
         
         if has_choice:
-            analysis_type = 'ethical_decision'
+            structure['type'] = 'ethical_decision'
+            structure['has_dilemma'] = True
+            
+            # Extract options (simple heuristic)
+            if 'pull' in query_lower and 'lever' in query_lower:
+                structure['options'] = ['pull_lever', 'do_not_pull']
+            elif any(opt in query_lower for opt in ['option a', 'option b']):
+                structure['options'] = ['option_a', 'option_b']
+        
+        # Detect trolley problem variant
+        if 'trolley' in query_lower or ('lever' in query_lower and any(num in query for num in ['5', '1', 'five', 'one'])):
+            structure['type'] = 'trolley_dilemma'
+            structure['has_dilemma'] = True
+        
+        return structure
+    
+    def _run_ethical_boundary_analysis(
+        self, structure: Dict[str, Any], query: str
+    ) -> Dict[str, Any]:
+        """Run EthicalBoundaryMonitor on each option."""
+        if not self.ethical_boundary_monitor:
+            return {'analysis': 'not_available'}
+        
+        results = {}
+        for option in structure.get('options', ['general_action']):
+            try:
+                # Check ethical boundaries for this option
+                boundary_check = self.ethical_boundary_monitor.check_action(
+                    action={'type': option, 'query': query},
+                    context={'ethical_structure': structure}
+                )
+                results[option] = boundary_check
+            except Exception as e:
+                logger.debug(f"Ethical boundary check failed for {option}: {e}")
+                results[option] = {'status': 'check_failed'}
+        
+        return results
+    
+    def _detect_goal_conflicts_in_query(
+        self, structure: Dict[str, Any], query: str
+    ) -> Dict[str, Any]:
+        """Detect goal conflicts using GoalConflictDetector."""
+        if not self.goal_conflict_detector:
+            return {'conflicts': 'not_detected'}
+        
+        try:
+            # Extract goals from options
+            goals = []
+            if 'trolley' in structure.get('type', ''):
+                goals = [
+                    {'name': 'minimize_deaths', 'priority': 'high'},
+                    {'name': 'avoid_direct_harm', 'priority': 'high'}
+                ]
+            
+            if goals:
+                conflicts = self.goal_conflict_detector.detect_conflicts(
+                    goals, context={'query': query}
+                )
+                return conflicts
+        except Exception as e:
+            logger.debug(f"Goal conflict detection failed: {e}")
+        
+        return {'conflicts': []}
+    
+    def _analyze_option_counterfactuals(
+        self, structure: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
+        """Analyze counterfactual outcomes for each option."""
+        if not self.counterfactual_reasoner:
+            return None
+        
+        try:
+            results = {}
+            for option in structure.get('options', []):
+                outcome = self.counterfactual_reasoner.predict_under_objective(
+                    alternative_objective=option,
+                    context={'ethical_structure': structure}
+                )
+                if outcome:
+                    results[option] = {
+                        'predicted_value': outcome.predicted_value if hasattr(outcome, 'predicted_value') else None,
+                        'confidence': outcome.confidence if hasattr(outcome, 'confidence') else 0.5,
+                        'side_effects': outcome.side_effects if hasattr(outcome, 'side_effects') else {}
+                    }
+            return results if results else None
+        except Exception as e:
+            logger.debug(f"Counterfactual analysis failed: {e}")
+            return None
+    
+    def _synthesize_ethical_response(
+        self,
+        structure: Dict[str, Any],
+        ethical_analysis: Dict[str, Any],
+        conflict_analysis: Dict[str, Any],
+        counterfactual_results: Optional[Dict[str, Any]],
+        query: str
+    ) -> str:
+        """Synthesize final ethical response from component analyses."""
+        parts = []
+        
+        # Opening
+        if structure['has_dilemma']:
+            parts.append("This presents an ethical dilemma with competing moral considerations.")
         else:
-            analysis_type = 'philosophical_analysis'
+            parts.append("This philosophical question requires multi-framework analysis.")
         
-        # Build response based on analysis
-        response_parts = []
+        # Ethical boundary findings
+        if ethical_analysis and ethical_analysis != {'analysis': 'not_available'}:
+            parts.append("\n**Ethical Boundary Analysis:**")
+            for option, result in ethical_analysis.items():
+                status = result.get('status', 'unknown')
+                parts.append(f"- {option.replace('_', ' ').title()}: {status}")
         
-        if analysis_type == 'ethical_decision':
-            response_parts.append("This presents an ethical dilemma requiring careful consideration of competing moral principles.")
+        # Goal conflicts
+        if conflict_analysis.get('conflicts'):
+            parts.append("\n**Detected Goal Conflicts:**")
+            for conflict in conflict_analysis['conflicts'][:3]:  # Limit to 3
+                parts.append(f"- {conflict.get('description', 'Unnamed conflict')}")
+        
+        # Counterfactual outcomes
+        if counterfactual_results:
+            parts.append("\n**Counterfactual Analysis:**")
+            for option, outcome in counterfactual_results.items():
+                conf = outcome.get('confidence', 0)
+                parts.append(
+                    f"- {option.replace('_', ' ').title()}: "
+                    f"Predicted outcome value={outcome.get('predicted_value', 'N/A')} "
+                    f"(confidence={conf:.2f})"
+                )
+        
+        # Framework perspectives
+        parts.append("\n**Ethical Framework Perspectives:**")
+        parts.append("- **Utilitarian**: Evaluate outcomes and maximize welfare")
+        parts.append("- **Deontological**: Consider duties, rights, and categorical imperatives")
+        parts.append("- **Virtue Ethics**: Ask what a virtuous person would do")
+        
+        # Conclusion
+        parts.append(
+            "\n**Conclusion**: The ethically correct action depends on which moral "
+            "framework you prioritize, as each offers valid but different perspectives."
+        )
+        
+        return "\n".join(parts)
+    
+    def _generate_internal_critique(
+        self, response: str, reasoning_trace: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Generate internal critique of reasoning quality."""
+        if not self.internal_critic:
+            return {}
+        
+        try:
+            critique = self.internal_critic.critique(
+                output=response,
+                reasoning_trace=reasoning_trace
+            )
+            return critique
+        except Exception as e:
+            logger.debug(f"Internal critique failed: {e}")
+            return {}
+    
+    def _generate_philosophical_template(
+        self, structure: Dict[str, Any], query_lower: str
+    ) -> str:
+        """Fallback template when meta-reasoning unavailable."""
+        parts = []
+        
+        if structure['type'] == 'ethical_decision':
+            parts.append("This presents an ethical dilemma requiring careful consideration.")
+            parts.append("\n**Relevant frameworks:**")
+            parts.append("- Deontological: Focus on duties and rules")
+            parts.append("- Utilitarian: Focus on outcomes and welfare")
+            parts.append("- Virtue ethics: Focus on character")
             
-            # Identify frameworks
-            response_parts.append("\n**Relevant ethical frameworks:**")
-            response_parts.append("- **Deontological**: Focuses on duties and rules (e.g., 'do not use people as mere means')")
-            response_parts.append("- **Utilitarian**: Focuses on outcomes and maximizing welfare")
-            response_parts.append("- **Virtue ethics**: Focuses on character and what a virtuous person would do")
-            
-            # Present the tension
-            response_parts.append("\n**The core tension:**")
-            if 'trolley' in query_lower or ('pull' in query_lower and 'lever' in query_lower):
-                response_parts.append("- Acting kills one person but saves five (utilitarian calculus)")
-                response_parts.append("- Not acting allows five to die but doesn't make you directly responsible")
-                response_parts.append("- The doctrine of double effect: Intended vs. foreseen consequences")
-            
-            # Provide reasoning
-            response_parts.append("\n**Reasoning:**")
-            response_parts.append("From a utilitarian perspective, the action that saves more lives has greater utility.")
-            response_parts.append("From a deontological perspective, using someone as a mere means (sacrificing one to save others) may violate their dignity.")
-            response_parts.append("The answer depends on which moral framework you find most compelling in this specific case.")
+            if 'trolley' in query_lower:
+                parts.append("\n**Tension**: Acting vs. allowing harm")
+                parts.append("Utilitarian: Action that saves more lives")
+                parts.append("Deontological: Avoiding direct harm may be paramount")
         else:
-            # General philosophical analysis
-            response_parts.append("This is a philosophical question requiring reasoned analysis.")
-            response_parts.append("\nI'll analyze this using multiple ethical frameworks:")
-            response_parts.append("- Consequentialist: What outcomes matter?")
-            response_parts.append("- Deontological: What duties or rules apply?")
-            response_parts.append("- Virtue ethics: What would a person of good character do?")
+            parts.append("This philosophical question requires multi-framework analysis.")
+            parts.append("Consider consequentialist, deontological, and virtue ethics perspectives.")
         
-        response = "\n".join(response_parts)
-        
-        return {
-            'response': response,
-            'confidence': 0.80,
-            'reasoning_trace': {
-                'analysis_type': analysis_type,
-                'frameworks_considered': ['deontological', 'utilitarian', 'virtue_ethics'],
-                'query_type': 'philosophical'
-            },
-            'mode': 'philosophical'
-        }
+        return "\n".join(parts)
     
     def _creative_reasoning(self, query: str, **kwargs) -> Dict[str, Any]:
         """

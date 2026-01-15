@@ -2724,7 +2724,24 @@ class QueryAnalyzer:
             True if query is philosophical/paradox type AND user did NOT explicitly
             request mathematical/computational analysis.
         """
-        # Note: Check for explicit mathematical intent FIRST
+        # FIX: Check for explicit reasoning domain FIRST
+        # Queries with logic symbols, SAT/probability keywords should NOT be philosophical
+        reasoning_domain_indicators = [
+            'satisfiable', 'unsatisfiable', 'sat', 'unsat',
+            '→', '∧', '∨', '¬', '∀', '∃', '->', '<->',
+            'P(', 'probability', 'bayes', 'bayesian', 'posterior', 'prior',
+            'randomize', 'confound', 'causal effect', 'intervention',
+            'sensitivity', 'specificity', 'prevalence',
+            'fol', 'first-order logic', 'proposition', 'predicate'
+        ]
+        query_lower = query.lower()
+        if any(ind in query or ind.lower() in query_lower for ind in reasoning_domain_indicators):
+            logger.debug(
+                "[QueryRouter] Reasoning domain detected - NOT philosophical"
+            )
+            return False
+        
+        # Note: Check for explicit mathematical intent SECOND
         # If user explicitly says "ignore moral constraints" or "mathematically optimal",
         # we should NOT classify this as philosophical - mathematical intent overrides.
         if self._has_explicit_mathematical_intent(query):
@@ -2733,8 +2750,6 @@ class QueryAnalyzer:
                 "NOT classifying as philosophical despite ethical keywords"
             )
             return False
-        
-        query_lower = query.lower()
 
         # Check compiled regex patterns first (most specific)
         for pattern in PHILOSOPHICAL_PATTERNS:
