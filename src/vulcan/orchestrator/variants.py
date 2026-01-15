@@ -27,11 +27,12 @@ logger = logging.getLogger(__name__)
 # ============================================================
 
 # Default time budget for parallel orchestrator operations (in milliseconds)
-# TASK 3 FIX: Increased from 5000ms to 60000ms (60 seconds) to account for
-# slow local LLM inference (~1s per token on CPU). This prevents the
-# orchestrator from timing out and orphaning tasks that the Agent Pool
-# actually completed.
-DEFAULT_TIME_BUDGET_MS = 60000
+# TASK 3 FIX: Increased from 5000ms to 300000ms (5 minutes) to account for
+# slow local LLM inference (~1s per token on CPU) and observed system latencies
+# of 99-180 seconds. This prevents the orchestrator from timing out and
+# orphaning valid long-running reasoning tasks that would have succeeded.
+# Configurable via agent_config.time_budget_ms if needed.
+DEFAULT_TIME_BUDGET_MS = 300000
 
 
 # ============================================================

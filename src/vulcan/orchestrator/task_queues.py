@@ -1236,6 +1236,17 @@ class PriorityJobQueue:
     - High-frequency token processing
     - SLO-aware scheduling
     - Starvation prevention
+    
+    IMPORTANT - SERIALIZATION SAFETY:
+    This is an IN-MEMORY queue implementation that uses threading.RLock 
+    and heapq with Python objects. It does NOT support pickle serialization
+    and must NOT be used with distributed task queues (Ray/Celery).
+    
+    For distributed workloads, use TaskQueueInterface implementations
+    (RayTaskQueue, CeleryTaskQueue) which handle serialization properly.
+    
+    This class remains in task_queues.py for logical grouping but is
+    explicitly designed for local, in-process task scheduling only.
     """
     
     # Priority levels

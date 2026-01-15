@@ -5,8 +5,10 @@
 # INTEGRATED: Self-improvement drive with experiment generation and execution
 # ============================================================
 
+import atexit
 import hashlib
 import logging
+import os
 import threading
 import time
 from collections import deque
@@ -23,10 +25,20 @@ from .dependencies import EnhancedCollectiveDeps
 try:
     from ..world_model.world_model_core import WorldModel
 except ImportError:
-    # Use MagicMock if the world_model is not available (e.g., test environment)
-    from unittest.mock import MagicMock
-
-    WorldModel = MagicMock
+    # SAFETY: Only use MagicMock in explicit test mode to prevent silent failures
+    # in production. Without this check, broken import paths during refactoring
+    # would silently load a Mock object, causing the AI to return empty answers.
+    import os
+    if os.environ.get("VULCAN_TEST_MODE") == "1":
+        from unittest.mock import MagicMock
+        WorldModel = MagicMock
+        logger.warning("WorldModel not available - using MagicMock in test mode")
+    else:
+        # In production, fail loudly rather than silently using a mock
+        raise ImportError(
+            "WorldModel not available. Set VULCAN_TEST_MODE=1 to use MagicMock for testing, "
+            "or ensure world_model module is properly installed."
+        )
 
 # Import metrics for self-improvement tracking
 try:
@@ -136,6 +148,11 @@ class VULCANAGICollective:
 
         # Shutdown management
         self._shutdown_event = threading.Event()
+        
+        # SAFETY FIX: Register cleanup with atexit instead of __del__
+        # This ensures deterministic cleanup before interpreter shutdown,
+        # avoiding NameError/ImportError when global variables are destroyed.
+        atexit.register(self._atexit_cleanup)
 
         # Initialize agent pool
         # CPU OPTIMIZATION: Default reduced from min=10/max=100 to min=2/max=10
@@ -1777,13 +1794,33 @@ class VULCANAGICollective:
         else:
             logger.info("VULCAN-AGI Collective shutdown complete (no errors)")
 
-    def __del__(self):
-        """Destructor to ensure cleanup"""
+    def _atexit_cleanup(self):
+        """
+        Cleanup method registered with atexit for deterministic shutdown.
+        
+        SAFETY FIX: Replaces __del__ to avoid NameError/ImportError when
+        Python destroys global variables during interpreter shutdown.
+        This ensures logging and other globals are still available.
+        """
         try:
             if not self._shutdown_event.is_set():
+                logger.info("VULCANAGICollective atexit cleanup triggered")
                 self.shutdown()
         except Exception as e:
-            logger.debug(f"Error in destructor: {e}")
+            # Use print as fallback since logging might be unavailable
+            try:
+                logger.debug(f"Error in atexit cleanup: {e}")
+            except:
+                print(f"VULCANAGICollective: Error in atexit cleanup: {e}", file=sys.stderr)
+
+    def __enter__(self):
+        """Context manager entry - returns self for use in 'with' statements."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit - ensures cleanup on context exit."""
+        self.shutdown()
+        return False  # Don't suppress exceptions
 
 
 # ============================================================

@@ -22,10 +22,12 @@
 # ============================================================
 
 import asyncio
+import atexit
 import json
 import logging
 import os
 import pickle
+import sys
 import time
 from datetime import datetime
 from pathlib import Path
@@ -202,6 +204,11 @@ class ProductionDeployment:
         self.orchestrator_type = orchestrator_type
         self.redis_client = redis_client
         self._shutdown_requested = False
+        
+        # SAFETY FIX: Register cleanup with atexit instead of __del__
+        # This ensures deterministic cleanup before interpreter shutdown,
+        # avoiding NameError/ImportError when global variables are destroyed.
+        atexit.register(self._atexit_cleanup)
 
         # FIXED: Add checkpoint locking and step tracking to prevent race conditions
         self._checkpoint_lock = RLock()
@@ -1768,18 +1775,33 @@ class ProductionDeployment:
 
         logger.info("Shutdown complete")
 
-    def __del__(self):
-        """Destructor to ensure cleanup"""
+    def _atexit_cleanup(self):
+        """
+        Cleanup method registered with atexit for deterministic shutdown.
+        
+        SAFETY FIX: Replaces __del__ to avoid NameError/ImportError when
+        Python destroys global variables during interpreter shutdown.
+        This ensures logging and other globals are still available.
+        """
         try:
             if not self._shutdown_requested:
+                logger.info("ProductionDeployment atexit cleanup triggered")
                 self.shutdown()
         except Exception as e:
+            # Use print as fallback since logging might be unavailable
             try:
-                logger.error(f"Error during shutdown in destructor: {e}", exc_info=True)
-            except (
-                Exception
-            ):  # nosec B110 - Logger may be unavailable during interpreter shutdown
-                pass
+                logger.error(f"Error during atexit cleanup: {e}", exc_info=True)
+            except:
+                print(f"ProductionDeployment: Error in atexit cleanup: {e}", file=sys.stderr)
+
+    def __enter__(self):
+        """Context manager entry - returns self for use in 'with' statements."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit - ensures cleanup on context exit."""
+        self.shutdown()
+        return False  # Don't suppress exceptions
 
 
 # ============================================================
