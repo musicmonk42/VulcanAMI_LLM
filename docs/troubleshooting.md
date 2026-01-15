@@ -549,6 +549,70 @@ curl http://localhost:8080/arena/health
 
 ---
 
+### Issue: Sub-app deployment state not accessible
+
+**Symptoms:**
+- VULCAN endpoints return 503 "System not initialized"
+- `/vulcan/health` returns error about missing deployment
+- Status endpoints like `/vulcan/v1/status` fail with "VULCAN deployment not initialized"
+- Chat endpoints don't work even though VULCAN appears mounted
+
+**Cause:**
+When VULCAN is mounted as a sub-app at `/vulcan`, there can be a mismatch between which app object receives the deployment state. The `request.app` in FastAPI sub-app endpoints may point to the parent app rather than the sub-app where `deployment` was set.
+
+**Solution:**
+
+Use the debug endpoints to diagnose where the deployment is set:
+
+```bash
+# Check deployment state on the sub-app (VULCAN)
+curl http://localhost:8080/vulcan/debug/deployment
+
+# Check deployment state on the parent app
+curl http://localhost:8080/debug/deployment
+```
+
+**Expected Response (healthy state):**
+```json
+{
+  "deployment": "<ProductionDeployment object at 0x...>",
+  "deployment_type": "ProductionDeployment",
+  "app_title": "VULCAN-AGI",
+  "worker_id": 12345,
+  "startup_time": 1705298400.0,
+  "has_deployment_attr": true
+}
+```
+
+**Unhealthy Response (deployment missing):**
+```json
+{
+  "deployment": "None",
+  "deployment_type": "NoneType",
+  "app_title": "VULCAN-AGI",
+  "worker_id": 12345,
+  "startup_time": null,
+  "has_deployment_attr": false
+}
+```
+
+**If deployment is missing:**
+
+1. Check startup logs for deployment initialization:
+   ```
+   Initializing VULCAN deployment...
+   ✓ Deployment attached to both vulcan_module.app and parent app
+   ```
+
+2. Ensure `full_platform.py` is being used to start the server (it handles sub-app deployment wiring)
+
+3. For Kubernetes/Docker deployments, verify the entrypoint runs `full_platform.py`:
+   ```dockerfile
+   CMD ["python", "src/full_platform.py"]
+   ```
+
+---
+
 ### Issue: Entrypoint fails with JWT error
 
 **Symptoms:**
