@@ -3528,6 +3528,40 @@ async def vulcan_health_proxy():
         )
 
 
+@app.get("/debug/deployment")
+async def debug_parent_deployment(request: Request):
+    """
+    Debug endpoint to verify deployment state on the PARENT app.
+    
+    Use this endpoint to confirm that app.state.deployment is correctly set
+    on the parent app that hosts the VULCAN sub-app. Compare with
+    /vulcan/debug/deployment to verify both apps have deployment set.
+    
+    If this returns {"deployment": "None"}, the deployment was not
+    properly set on the parent app during startup in full_platform.py.
+    
+    Returns:
+        Dict containing:
+            - deployment: String representation of the deployment object (or "None")
+            - deployment_type: Type name of the deployment object
+            - app_title: Title of the parent app
+            - worker_id: Process ID of the worker handling this request
+            - startup_time: Timestamp when the app started (if available)
+            - has_deployment_attr: Whether app.state has a deployment attribute
+    """
+    pid = os.getpid()
+    deployment = getattr(request.app.state, "deployment", None)
+    
+    return {
+        "deployment": str(deployment) if deployment is not None else "None",
+        "deployment_type": type(deployment).__name__ if deployment is not None else "NoneType",
+        "app_title": getattr(request.app, "title", "unknown"),
+        "worker_id": pid,
+        "startup_time": getattr(request.app.state, "startup_time", None),
+        "has_deployment_attr": hasattr(request.app.state, "deployment"),
+    }
+
+
 @app.post("/vulcan/v1/chat")
 async def vulcan_chat_proxy(request: Request):
     """

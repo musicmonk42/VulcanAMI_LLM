@@ -96,9 +96,17 @@ docker compose -f docker-compose.dev.yml logs -f
 | **Fast Liveness** | `curl http://localhost:8000/health/live` | `{"status": "alive"}` |
 | **Fast Readiness** | `curl http://localhost:8000/health/ready` | `{"status": "ready"}` |
 | Metrics | `curl http://localhost:8000/metrics` | Prometheus payload |
+| **Debug (Sub-app)** | `curl http://localhost:8080/vulcan/debug/deployment` | Deployment state |
+| **Debug (Parent)** | `curl http://localhost:8080/debug/deployment` | Deployment state |
 
 > **Note:** Use `/health/live` and `/health/ready` for Kubernetes liveness/readiness probes.
 > These endpoints are faster (<100ms) than the comprehensive `/health` endpoint.
+
+> **Debug Endpoints:** Use `/vulcan/debug/deployment` and `/debug/deployment` to diagnose
+> sub-app deployment state issues. Port 8080 is used when running the unified platform
+> (`full_platform.py`); adjust as needed for your deployment. If either returns 
+> `"deployment": "None"`, the startup process did not complete properly. 
+> See [troubleshooting.md](troubleshooting.md#issue-sub-app-deployment-state-not-accessible) for details.
 
 ### 2.4 Smoke Tests
 

@@ -504,3 +504,39 @@ async def save_checkpoint(request: Request) -> Dict[str, str]:
         error_counter.labels(error_type="checkpoint").inc()
         logger.error(f"Checkpoint save failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/debug/deployment")
+async def debug_deployment(request: Request) -> Dict[str, Any]:
+    """
+    Debug endpoint to verify deployment state on the serving app.
+    
+    Use this endpoint to confirm that app.state.deployment is correctly set
+    on the app that receives requests. In sub-app setups (e.g., VULCAN mounted
+    at /vulcan), this verifies the deployment is accessible from request.app.
+    
+    If this returns {"deployment": "None"} or similar, the deployment was not
+    properly set on the serving app during startup.
+    
+    Returns:
+        Dict containing:
+            - deployment: String representation of the deployment object (or "None")
+            - deployment_type: Type name of the deployment object
+            - app_title: Title of the app receiving this request
+            - worker_id: Process ID of the worker handling this request
+            - startup_time: Timestamp when the app started (if available)
+            - has_deployment_attr: Whether app.state has a deployment attribute
+    """
+    app = request.app
+    pid = os.getpid()
+    
+    deployment = getattr(app.state, "deployment", None)
+    
+    return {
+        "deployment": str(deployment) if deployment is not None else "None",
+        "deployment_type": type(deployment).__name__ if deployment is not None else "NoneType",
+        "app_title": getattr(app, "title", "unknown"),
+        "worker_id": pid,
+        "startup_time": getattr(app.state, "startup_time", None),
+        "has_deployment_attr": hasattr(app.state, "deployment"),
+    }
