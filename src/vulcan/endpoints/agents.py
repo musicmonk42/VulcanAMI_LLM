@@ -107,7 +107,7 @@ async def get_agent_pool_status():
         )
 
 
-@router.post("/spawn")
+@router.post("/spawn", response_model=None)
 async def spawn_new_agent(request: SpawnAgentRequest):
     """
     Spawn a new autonomous agent.
@@ -157,7 +157,7 @@ async def spawn_new_agent(request: SpawnAgentRequest):
         )
 
 
-@router.post("/submit")
+@router.post("/submit", response_model=None)
 async def submit_job_to_pool(request: SubmitJobRequest):
     """
     Submit job to agent pool.

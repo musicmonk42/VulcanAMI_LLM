@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["planning"])
 
 
-@router.post("/v1/plan")
+@router.post("/v1/plan", response_model=None)
 async def create_plan(request: Request) -> dict:
     """
     Create execution plan with validation.

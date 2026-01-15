@@ -84,7 +84,7 @@ class DistillationConfigUpdate(BaseModel):
     )
 
 
-@router.get("/v1/llm/config")
+@router.get("/v1/llm/config", response_model=None)
 async def get_llm_config(request: Request) -> Dict[str, Any]:
     """
     Get current LLM execution configuration.
@@ -150,7 +150,7 @@ async def get_llm_config(request: Request) -> Dict[str, Any]:
     }
 
 
-@router.post("/v1/llm/config")
+@router.post("/v1/llm/config", response_model=None)
 async def update_llm_config(
     config: LLMConfigUpdate,
     request: Request
@@ -221,7 +221,7 @@ async def update_llm_config(
     }
 
 
-@router.get("/v1/distillation/status")
+@router.get("/v1/distillation/status", response_model=None)
 async def get_distillation_status(request: Request) -> Dict[str, Any]:
     """
     Get the current status of the OpenAI Knowledge Distiller.
@@ -272,7 +272,7 @@ async def get_distillation_status(request: Request) -> Dict[str, Any]:
     return status
 
 
-@router.post("/v1/distillation/train")
+@router.post("/v1/distillation/train", response_model=None)
 async def trigger_distillation_flush(request: Request) -> Dict[str, Any]:
     """
     Flush captured examples to storage for training system consumption.
@@ -328,7 +328,7 @@ async def trigger_distillation_flush(request: Request) -> Dict[str, Any]:
     }
 
 
-@router.delete("/v1/distillation/buffer")
+@router.delete("/v1/distillation/buffer", response_model=None)
 async def clear_distillation_buffer(request: Request) -> Dict[str, Any]:
     """
     Clear the distillation training buffer without training.
@@ -373,7 +373,7 @@ async def clear_distillation_buffer(request: Request) -> Dict[str, Any]:
     }
 
 
-@router.post("/v1/distillation/config")
+@router.post("/v1/distillation/config", response_model=None)
 async def update_distillation_config(
     config: DistillationConfigUpdate,
     request: Request

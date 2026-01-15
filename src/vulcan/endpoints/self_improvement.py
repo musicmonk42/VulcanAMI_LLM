@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["self-improvement"])
 
 
-@router.post("/v1/improvement/start")
+@router.post("/v1/improvement/start", response_model=None)
 async def start_self_improvement(request: Request) -> dict:
     """
     Start the autonomous self-improvement drive.
@@ -100,7 +100,7 @@ async def start_self_improvement(request: Request) -> dict:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/v1/improvement/stop")
+@router.post("/v1/improvement/stop", response_model=None)
 async def stop_self_improvement(request: Request) -> dict:
     """
     Stop the autonomous self-improvement drive.
@@ -158,7 +158,7 @@ async def stop_self_improvement(request: Request) -> dict:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/v1/improvement/status")
+@router.get("/v1/improvement/status", response_model=None)
 async def get_improvement_status(request: Request) -> dict:
     """
     Get current self-improvement status and statistics.
@@ -222,7 +222,7 @@ async def get_improvement_status(request: Request) -> dict:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/v1/improvement/report-error")
+@router.post("/v1/improvement/report-error", response_model=None)
 async def report_error(request: Request) -> dict:
     """
     Report an error to trigger self-improvement analysis.
@@ -291,7 +291,7 @@ async def report_error(request: Request) -> dict:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/v1/improvement/approve")
+@router.post("/v1/improvement/approve", response_model=None)
 async def approve_improvement(request: Request) -> dict:
     """
     Approve or reject a pending improvement action.
@@ -375,7 +375,7 @@ async def approve_improvement(request: Request) -> dict:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/v1/improvement/pending")
+@router.get("/v1/improvement/pending", response_model=None)
 async def get_pending_approvals(request: Request) -> dict:
     """
     Get list of pending improvement approvals.
@@ -427,7 +427,7 @@ async def get_pending_approvals(request: Request) -> dict:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/v1/improvement/update-metric")
+@router.post("/v1/improvement/update-metric", response_model=None)
 async def update_performance_metric(request: Request) -> dict:
     """
     Update a performance metric.

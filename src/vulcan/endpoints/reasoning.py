@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["reasoning"])
 
 
-@router.post("/llm/reason")
+@router.post("/llm/reason", response_model=None)
 async def reason(request: Request) -> dict:
     """
     LLM-enhanced reasoning using VULCAN's unified reasoning bridge.
@@ -93,7 +93,7 @@ async def reason(request: Request) -> dict:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/llm/explain")
+@router.post("/llm/explain", response_model=None)
 async def explain(request: Request) -> dict:
     """
     Natural language explanations using the LLM's world model bridge.

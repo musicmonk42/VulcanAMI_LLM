@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["execution"])
 
 
-@router.post("/v1/step")
+@router.post("/v1/step", response_model=None)
 async def execute_step(request: Request) -> dict:
     """
     Execute single cognitive step with timeout and resource limits.

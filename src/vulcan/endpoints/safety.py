@@ -84,7 +84,7 @@ async def get_safety_system_status():
         )
 
 
-@router.post("/validate")
+@router.post("/validate", response_model=None)
 async def validate_action_safety(request: ValidationRequest):
     """
     Pre-execution safety validation.
@@ -144,7 +144,7 @@ async def validate_action_safety(request: ValidationRequest):
         )
 
 
-@router.get("/audit-logs")
+@router.get("/audit-logs", response_model=None)
 async def get_audit_logs(limit: int = 100, severity: Optional[str] = None, action_type: Optional[str] = None):
     """
     Query recent audit logs.
