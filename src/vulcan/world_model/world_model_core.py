@@ -5013,11 +5013,16 @@ class WorldModel:
             return True
         
         # SAT/SYMBOLIC LOGIC INDICATORS
+        # Unicode logical operators: → (implies), ∧ (and), ∨ (or), ¬ (not), ⊕ (xor), ↔ (iff)
+        # Text equivalents: 'logical implies', 'logical and', 'logical or', 'logical not'
         symbolic_indicators = [
             'satisfiable', 'satisfiability',
             'sat', 'unsat',
+            # Unicode logical operators
             '→', '∧', '∨', '¬', '⊕', '↔',
+            # Text logical operators (prefixed with 'logical' to avoid false positives)
             'logical implies', 'logical and', 'logical or', 'logical not',
+            # Logic domains
             'fol', 'first-order', 'first order logic',
             'predicate logic', 'propositional logic',
             'cnf', 'dnf', 'conjunctive normal form',
@@ -5046,6 +5051,12 @@ class WorldModel:
         - Detailed logging for observability
         - Thread-safe operation
         - Returns consistent format across all engines
+        
+        ENGINE METHOD INTERFACE:
+        - CausalReasoner: reasoner.analyze(query)
+        - AnalogicalReasoner: reasoner.reason(query)
+        - MathematicalVerificationEngine: reasoner.verify(query)
+        - SymbolicReasoner: reasoner.query(query, timeout=N)
         
         Args:
             query: The query to process
