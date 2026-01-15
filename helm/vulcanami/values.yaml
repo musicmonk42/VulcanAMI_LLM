@@ -394,6 +394,10 @@ reasoning:
     thresholdPercent: 85.0
     # Check interval (seconds)
     checkIntervalSeconds: 5.0
+    # Death spiral prevention: Max backoff multiplier for sleep interval
+    # After consecutive critical events, sleep interval increases by up to this multiplier
+    # Example: With 5x multiplier and 5s interval, max sleep is 25s
+    maxBackoffMultiplier: 5
   # GC rate limiting for chat endpoints
   gcRateLimiting:
     # Number of requests between GC triggers

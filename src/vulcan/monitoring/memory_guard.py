@@ -9,6 +9,19 @@ where query routing times increased from 469ms to 152,048ms due to:
 - Repeated SentenceTransformer model loading (~300MB per instance)
 - Memory accumulation without garbage collection
 - Python's lazy GC not keeping up with allocation rate
+
+DEATH SPIRAL PREVENTION (Forensic Audit Fix):
+When memory stays stuck above the critical threshold, repeated aggressive GC
+calls can freeze the process for 1-5 seconds each time, creating a feedback loop
+where requests pile up during freezes, consuming more memory. This module
+implements exponential backoff for consecutive critical events:
+- After each critical event, the check interval increases by 1x (up to 5x max)
+- This gives the system time to process requests and memory to recover naturally
+- The counter resets when memory drops below critical threshold
+
+CALLBACK SAFETY (Forensic Audit Fix):
+The aggressive_gc_callback is wrapped in try/except to prevent callback exceptions
+from killing the monitoring thread silently.
 """
 
 import atexit
@@ -40,10 +53,19 @@ class MemoryGuard:
     3. GC threshold (75%): Trigger garbage collection
     4. Critical threshold (85%): Full GC + aggressive cleanup callback
     
+    Death Spiral Prevention:
+    When memory stays above critical threshold, consecutive GC triggers
+    use exponential backoff (up to max_backoff_multiplier) to prevent
+    CPU thrashing from repeated aggressive GC operations.
+    
     This prevents progressive degradation where:
     - Query routing degrades from 469ms to 152,048ms
     - Embedding batch times increase from 0.15s to 16s+
     - Memory usage grows unbounded
+    
+    Attributes:
+        max_backoff_multiplier: Maximum multiplier for sleep interval (default: 5)
+        _consecutive_criticals: Counter for consecutive critical events
     
     Args:
         warning_threshold: Memory percentage for warnings (default: 70.0%)
@@ -86,6 +108,14 @@ class MemoryGuard:
         self._gc_triggers = 0
         self._last_gc_time: Optional[float] = None
         self._peak_memory_percent: float = 0.0
+        
+        # Death spiral prevention: backoff after consecutive critical events
+        self._consecutive_criticals = 0
+        self.max_backoff_multiplier = 5  # Cap backoff at 5x normal interval
+    
+    def _calculate_backoff_multiplier(self) -> int:
+        """Calculate current backoff multiplier based on consecutive criticals."""
+        return min(self._consecutive_criticals + 1, self.max_backoff_multiplier)
     
     def _increment_gc_trigger(self):
         """Thread-safe GC trigger increment."""
@@ -167,8 +197,12 @@ class MemoryGuard:
         )
     
     def _monitor_loop(self):
-        """Background monitoring loop with graduated response."""
+        """Background monitoring loop with graduated response and death spiral prevention."""
         while self._running and not self._shutdown_event.is_set():
+            # Calculate sleep interval with backoff for consecutive critical events
+            backoff_multiplier = self._calculate_backoff_multiplier()
+            sleep_interval = self.interval * backoff_multiplier
+            
             try:
                 memory = psutil.virtual_memory()
                 percent = memory.percent
@@ -177,9 +211,12 @@ class MemoryGuard:
                 
                 if percent > self.critical_threshold:
                     # CRITICAL: Aggressive cleanup
+                    self._consecutive_criticals += 1
                     logger.critical(
                         f"[MemoryGuard] CRITICAL memory: {percent:.1f}% "
-                        f"(available: {memory.available / (1024**3):.1f}GB) - aggressive cleanup"
+                        f"(available: {memory.available / (1024**3):.1f}GB) - aggressive cleanup "
+                        f"(consecutive criticals: {self._consecutive_criticals}, "
+                        f"backoff: {backoff_multiplier}x)"
                     )
                     gc.collect(generation=2)  # Full collection
                     self._increment_gc_trigger()
@@ -199,7 +236,8 @@ class MemoryGuard:
                     )
                 
                 elif percent > self.gc_threshold:
-                    # ACTION: Trigger GC
+                    # ACTION: Trigger GC - reset consecutive criticals
+                    self._consecutive_criticals = 0
                     logger.warning(
                         f"[MemoryGuard] High memory usage: {percent:.1f}% "
                         f"(available: {memory.available / (1024**3):.1f}GB) - triggering GC"
@@ -216,17 +254,22 @@ class MemoryGuard:
                     )
                 
                 elif percent > self.warning_threshold:
-                    # WARNING: Just log
+                    # WARNING: Just log - reset consecutive criticals
+                    self._consecutive_criticals = 0
                     logger.warning(
                         f"[MemoryGuard] Memory warning: {percent:.1f}% "
                         f"(available: {memory.available / (1024**3):.1f}GB)"
                     )
                 
+                else:
+                    # NORMAL: Reset consecutive criticals
+                    self._consecutive_criticals = 0
+                
             except Exception as e:
                 logger.error(f"[MemoryGuard] Monitor error: {e}")
             
-            # Interruptible sleep
-            self._shutdown_event.wait(timeout=self.interval)
+            # Interruptible sleep with backoff
+            self._shutdown_event.wait(timeout=sleep_interval)
     
     def get_status(self) -> dict:
         """Get current memory guard status."""
@@ -240,6 +283,9 @@ class MemoryGuard:
             "last_gc_time": self.last_gc_time,
             "peak_memory_percent": self.peak_memory_percent,
             "has_aggressive_callback": self.aggressive_gc_callback is not None,
+            "consecutive_criticals": self._consecutive_criticals,
+            "current_backoff_multiplier": self._calculate_backoff_multiplier(),
+            "max_backoff_multiplier": self.max_backoff_multiplier,
         }
         
         if PSUTIL_AVAILABLE:
