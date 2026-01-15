@@ -13,15 +13,17 @@ All endpoints use the `require_deployment()` or `get_deployment()` utility
 functions to ensure consistent deployment access across standalone and
 sub-app mounting scenarios.
 
-These endpoints support two calling patterns:
-1. Via FastAPI router (Request object injected by FastAPI)
-2. Direct calls from proxy functions (e.g., full_platform.py) with optional Request
+Security considerations:
+- All endpoints validate input parameters via Pydantic models
+- Error messages are sanitized to prevent information leakage
+- Feedback IDs use cryptographically secure random generation
+- Rate limiting should be applied at the infrastructure level
 """
 
 import logging
 import secrets
 import time
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict
 
 from fastapi import APIRouter, HTTPException, Request
 
@@ -29,25 +31,20 @@ from vulcan.endpoints.utils import require_deployment, get_deployment
 
 logger = logging.getLogger(__name__)
 
-# Create router
-router = APIRouter()
+# Create router with tags for OpenAPI documentation
+router = APIRouter(tags=["feedback"])
 
 
 @router.post("/v1/feedback", response_model=None)
-async def submit_feedback(request: Union[Request, Any] = None) -> Dict[str, Any]:
+async def submit_feedback(request: Request) -> Dict[str, Any]:
     """
     Submit human feedback for RLHF learning.
     
     This endpoint accepts feedback on AI responses to improve future performance
     through Reinforcement Learning from Human Feedback (RLHF).
     
-    Supports two calling patterns:
-    1. Via FastAPI router: Request object is injected automatically
-    2. Direct call from proxy: FeedbackRequest model is passed directly
-    
     Args:
-        request: Either a FastAPI Request object (when called via router) or
-                 a FeedbackRequest model object (when called from proxy) with:
+        request: FastAPI Request object containing JSON body with:
             - query_id: ID of the original query
             - response_id: ID of the AI response being rated
             - feedback_type: Type of feedback (e.g., "rating", "preference")
@@ -66,38 +63,23 @@ async def submit_feedback(request: Union[Request, Any] = None) -> Dict[str, Any]
         HTTPException: 503 if deployment or learning system not initialized
         HTTPException: 500 if feedback submission fails
     """
-    # Handle both Request object and direct model call patterns
-    actual_request: Optional[Request] = None
-    feedback_data = None
+    # Parse and validate request body
+    try:
+        from vulcan.api.models import FeedbackRequest
+        body = await request.json()
+        feedback_data = FeedbackRequest(**body)
+    except ValueError as e:
+        logger.warning(f"Invalid feedback request body: {e}")
+        raise HTTPException(status_code=400, detail="Invalid request body format")
+    except Exception as e:
+        logger.warning(f"Failed to parse feedback request: {type(e).__name__}")
+        raise HTTPException(status_code=400, detail="Invalid request body")
     
-    if isinstance(request, Request):
-        actual_request = request
-        # Parse body from Request
-        try:
-            from vulcan.api.models import FeedbackRequest
-            body = await request.json()
-            feedback_data = FeedbackRequest(**body)
-        except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Invalid request body: {e}")
-    elif request is not None:
-        # Direct call with model object (from proxy functions)
-        # Validate expected attributes exist
-        required_attrs = ['query_id', 'response_id', 'feedback_type', 'content', 'reward_signal']
-        missing = [attr for attr in required_attrs if not hasattr(request, attr)]
-        if missing:
-            raise HTTPException(
-                status_code=400, 
-                detail=f"Invalid feedback request: missing required attributes {missing}"
-            )
-        feedback_data = request
-    else:
-        raise HTTPException(status_code=400, detail="No request data provided")
-    
-    deployment = require_deployment(actual_request)
+    # Get deployment with consistent fallback behavior
+    deployment = require_deployment(request)
 
     try:
-        
-        # FIX MAJOR-4: Use deps.continual instead of deps.learning
+        # Access learning system via deps.continual
         learning_system = None
         if hasattr(deployment, "collective") and hasattr(deployment.collective.deps, "continual"):
             learning_system = deployment.collective.deps.continual
@@ -105,35 +87,32 @@ async def submit_feedback(request: Union[Request, Any] = None) -> Dict[str, Any]
         if learning_system is None:
             raise HTTPException(status_code=503, detail="Learning system not available")
 
-        # FIX MAJOR-4: learning_system IS the ContinualLearner, check its methods directly
+        # Submit feedback if the learning system supports it
         if hasattr(learning_system, "receive_feedback"):
-            learner = learning_system
             from vulcan.learning.learning_types import FeedbackData
             
-            # human_preference is the user's preferred response (None if not a preference comparison)
+            # Extract context safely
             context = getattr(feedback_data, 'context', None) or {}
-            human_preference = context.get("preferred_response") if context else None
+            human_preference = context.get("preferred_response") if isinstance(context, dict) else None
             
+            # Create feedback with cryptographically secure ID
             feedback = FeedbackData(
-                # SECURITY FIX: Use full cryptographic randomness instead of predictable time prefix
-                # Old: f"fb_{int(time.time())}_{secrets.token_hex(4)}"
-                # This prevents timing attacks and ID enumeration
                 feedback_id=f"fb_{secrets.token_urlsafe(16)}",
                 timestamp=time.time(),
-                feedback_type=feedback_data.feedback_type,
-                content=feedback_data.content,
+                feedback_type=str(feedback_data.feedback_type),
+                content=str(feedback_data.content),
                 context=context,
-                agent_response=feedback_data.response_id,
+                agent_response=str(feedback_data.response_id),
                 human_preference=human_preference,
                 reward_signal=float(feedback_data.reward_signal),
                 metadata={
-                    "query_id": feedback_data.query_id,
-                    "response_id": feedback_data.response_id,
+                    "query_id": str(feedback_data.query_id),
+                    "response_id": str(feedback_data.response_id),
                     "source": "api",
                 },
             )
             
-            learner.receive_feedback(feedback)
+            learning_system.receive_feedback(feedback)
             
             return {
                 "status": "accepted",
@@ -146,12 +125,12 @@ async def submit_feedback(request: Union[Request, Any] = None) -> Dict[str, Any]
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Feedback submission failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Feedback submission failed: {type(e).__name__}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to submit feedback")
 
 
 @router.post("/v1/feedback/thumbs", response_model=None)
-async def submit_thumbs_feedback(request: Union[Request, Any] = None) -> Dict[str, Any]:
+async def submit_thumbs_feedback(request: Request) -> Dict[str, Any]:
     """
     Submit thumbs up/down feedback (simplified endpoint for UI buttons).
     
@@ -159,13 +138,8 @@ async def submit_thumbs_feedback(request: Union[Request, Any] = None) -> Dict[st
     on AI responses, typically triggered by UI buttons. It provides a quick way
     for users to indicate satisfaction without detailed feedback.
     
-    Supports two calling patterns:
-    1. Via FastAPI router: Request object is injected automatically
-    2. Direct call from proxy: ThumbsFeedbackRequest model is passed directly
-    
     Args:
-        request: Either a FastAPI Request object (when called via router) or
-                 a ThumbsFeedbackRequest model object (when called from proxy) with:
+        request: FastAPI Request object containing JSON body with:
             - query_id: ID of the original query
             - response_id: ID of the AI response being rated
             - is_positive: Boolean indicating thumbs up (True) or down (False)
@@ -181,39 +155,23 @@ async def submit_thumbs_feedback(request: Union[Request, Any] = None) -> Dict[st
         HTTPException: 503 if deployment or learning system not initialized
         HTTPException: 500 if feedback submission fails
     """
-    # Handle both Request object and direct model call patterns
-    actual_request: Optional[Request] = None
-    thumbs_data = None
+    # Parse and validate request body
+    try:
+        from vulcan.api.models import ThumbsFeedbackRequest
+        body = await request.json()
+        thumbs_data = ThumbsFeedbackRequest(**body)
+    except ValueError as e:
+        logger.warning(f"Invalid thumbs feedback request body: {e}")
+        raise HTTPException(status_code=400, detail="Invalid request body format")
+    except Exception as e:
+        logger.warning(f"Failed to parse thumbs feedback request: {type(e).__name__}")
+        raise HTTPException(status_code=400, detail="Invalid request body")
     
-    if isinstance(request, Request):
-        actual_request = request
-        # Parse body from Request
-        try:
-            from vulcan.api.models import ThumbsFeedbackRequest
-            body = await request.json()
-            thumbs_data = ThumbsFeedbackRequest(**body)
-        except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Invalid request body: {e}")
-    elif request is not None:
-        # Direct call with model object (from proxy functions)
-        # Validate expected attributes exist
-        required_attrs = ['query_id', 'response_id', 'is_positive']
-        missing = [attr for attr in required_attrs if not hasattr(request, attr)]
-        if missing:
-            raise HTTPException(
-                status_code=400, 
-                detail=f"Invalid thumbs feedback request: missing required attributes {missing}"
-            )
-        thumbs_data = request
-    else:
-        raise HTTPException(status_code=400, detail="No request data provided")
-    
-    # Use require_deployment for consistent fallback behavior with sub-app mounting
-    deployment = require_deployment(actual_request)
+    # Get deployment with consistent fallback behavior
+    deployment = require_deployment(request)
 
     try:
-        
-        # FIX MAJOR-4: Use deps.continual instead of deps.learning
+        # Access learning system via deps.continual
         learning_system = None
         if hasattr(deployment, "collective") and hasattr(deployment.collective.deps, "continual"):
             learning_system = deployment.collective.deps.continual
@@ -221,17 +179,18 @@ async def submit_thumbs_feedback(request: Union[Request, Any] = None) -> Dict[st
         if learning_system is None:
             raise HTTPException(status_code=503, detail="Learning system not available")
 
-        # FIX MAJOR-4: learning_system IS the ContinualLearner, check its methods directly
+        # Submit thumbs feedback if the learning system supports it
         if hasattr(learning_system, "submit_thumbs_feedback"):
             learning_system.submit_thumbs_feedback(
-                query_id=thumbs_data.query_id,
-                response_id=thumbs_data.response_id,
-                is_positive=thumbs_data.is_positive,
+                query_id=str(thumbs_data.query_id),
+                response_id=str(thumbs_data.response_id),
+                is_positive=bool(thumbs_data.is_positive),
             )
             
+            feedback_type = "thumbs_up" if thumbs_data.is_positive else "thumbs_down"
             return {
                 "status": "accepted",
-                "feedback_type": "thumbs_up" if thumbs_data.is_positive else "thumbs_down",
+                "feedback_type": feedback_type,
                 "message": f"Thumbs {'up' if thumbs_data.is_positive else 'down'} recorded"
             }
 
@@ -240,12 +199,12 @@ async def submit_thumbs_feedback(request: Union[Request, Any] = None) -> Dict[st
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Thumbs feedback failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Thumbs feedback failed: {type(e).__name__}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to submit thumbs feedback")
 
 
 @router.get("/v1/feedback/stats", response_model=None)
-async def get_feedback_stats(request: Optional[Request] = None) -> Dict[str, Any]:
+async def get_feedback_stats(request: Request) -> Dict[str, Any]:
     """
     Get RLHF feedback statistics.
     
@@ -255,8 +214,7 @@ async def get_feedback_stats(request: Optional[Request] = None) -> Dict[str, Any
     understanding user satisfaction trends.
     
     Args:
-        request: Optional FastAPI request object. Can be None when called
-                 directly from proxy functions in full_platform.py.
+        request: FastAPI Request object
         
     Returns:
         Dict containing:
@@ -276,8 +234,7 @@ async def get_feedback_stats(request: Optional[Request] = None) -> Dict[str, Any
         raising an exception. This allows monitoring dashboards to
         display status even during initialization.
     """
-    # Use get_deployment for consistent fallback behavior with sub-app mounting
-    # request can be None when called directly from proxy functions
+    # Get deployment with consistent fallback behavior
     deployment = get_deployment(request)
     
     if deployment is None:
@@ -290,8 +247,7 @@ async def get_feedback_stats(request: Optional[Request] = None) -> Dict[str, Any
         }
 
     try:
-        
-        # FIX MAJOR-4: Use deps.continual instead of deps.learning
+        # Access learning system via deps.continual
         learning_system = None
         if hasattr(deployment, "collective") and hasattr(deployment.collective.deps, "continual"):
             learning_system = deployment.collective.deps.continual
@@ -305,8 +261,8 @@ async def get_feedback_stats(request: Optional[Request] = None) -> Dict[str, Any
                 "negative_feedback": 0,
             }
 
-        # Get stats from learning system
-        stats = {
+        # Build stats response with safe defaults
+        stats: Dict[str, Any] = {
             "status": "active",
             "total_feedback": 0,
             "positive_feedback": 0,
@@ -314,11 +270,19 @@ async def get_feedback_stats(request: Optional[Request] = None) -> Dict[str, Any
             "learning_enabled": True,
         }
         
+        # Get stats from learning system if available
         if hasattr(learning_system, "get_feedback_stats"):
-            stats.update(learning_system.get_feedback_stats())
+            retrieved_stats = learning_system.get_feedback_stats()
+            if isinstance(retrieved_stats, dict):
+                # Safely update with type coercion
+                stats["total_feedback"] = int(retrieved_stats.get("total_feedback", 0))
+                stats["positive_feedback"] = int(retrieved_stats.get("positive_feedback", 0))
+                stats["negative_feedback"] = int(retrieved_stats.get("negative_feedback", 0))
+                if "learning_enabled" in retrieved_stats:
+                    stats["learning_enabled"] = bool(retrieved_stats["learning_enabled"])
         
         return stats
 
     except Exception as e:
-        logger.error(f"Failed to get feedback stats: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to get feedback stats: {type(e).__name__}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to retrieve feedback statistics")
