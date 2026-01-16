@@ -184,7 +184,6 @@ def test_backward_compat_imports_in_main():
         "submit_feedback",
         "submit_thumbs_feedback",
         "get_feedback_stats",
-        "_get_reasoning_attr",
     ]
     
     for name in required_names:
@@ -195,8 +194,6 @@ def test_backward_compat_imports_in_main():
         "Missing import from vulcan.api.models"
     assert "from vulcan.endpoints.feedback import" in content, \
         "Missing import from vulcan.endpoints.feedback"
-    assert "from vulcan.utils.reasoning_helpers import" in content, \
-        "Missing import from vulcan.utils.reasoning_helpers"
     
     print(f"✓ All backward compatibility imports present in main.py")
 
@@ -324,26 +321,27 @@ def test_model_field_definitions():
     print(f"✓ All models have expected field definitions")
 
 
-def test_reasoning_helper_exists():
+def test_reasoning_helper_in_unified_chat():
     """
-    TEST: Verify _get_reasoning_attr helper function exists
+    TEST: Verify _get_reasoning_attr helper function exists in unified_chat
     
     VALIDATES:
-        - reasoning_helpers.py module exists
-        - _get_reasoning_attr function is defined
+        - unified_chat.py module exists
+        - _get_reasoning_attr function is defined locally
     
     RATIONALE:
-        This helper was in original main.py and is used by tests.
-        Must be extracted and re-exported for backward compatibility.
+        After architecture consolidation, reasoning_helpers.py was deleted.
+        The _get_reasoning_attr function is now defined locally in unified_chat.py
+        since all reasoning results are ReasoningResult objects (no dict/object ambiguity).
     """
-    helper_file = Path("src/vulcan/utils/reasoning_helpers.py")
-    tree = parse_python_file(helper_file)
+    unified_chat_file = Path("src/vulcan/endpoints/unified_chat.py")
+    tree = parse_python_file(unified_chat_file)
     functions = extract_function_names(tree)
     
     assert "_get_reasoning_attr" in functions, \
-        "_get_reasoning_attr not defined in reasoning_helpers.py"
+        "_get_reasoning_attr not defined in unified_chat.py"
     
-    print(f"✓ _get_reasoning_attr helper function exists")
+    print(f"✓ _get_reasoning_attr helper function exists in unified_chat.py")
 
 
 def test_reasoning_helper_functionality():
@@ -358,11 +356,12 @@ def test_reasoning_helper_functionality():
     
     RATIONALE:
         Runtime behavior validation ensures the helper correctly handles
-        polymorphic reasoning results from different engines.
+        reasoning results. After architecture consolidation, this is now
+        tested from unified_chat.py instead of reasoning_helpers.py.
     """
-    # Import the helper
+    # Import the helper from unified_chat
     sys.path.insert(0, "src")
-    from vulcan.utils.reasoning_helpers import _get_reasoning_attr
+    from vulcan.endpoints.unified_chat import _get_reasoning_attr
     
     # Test with dict
     result_dict = {"conclusion": "test", "confidence": 0.8}
@@ -420,7 +419,7 @@ def run_tests() -> int:
         test_feedback_functions_exist,
         test_dependency_validation_recognizes_continual,
         test_model_field_definitions,
-        test_reasoning_helper_exists,
+        test_reasoning_helper_in_unified_chat,
         test_reasoning_helper_functionality,
     ]
     
