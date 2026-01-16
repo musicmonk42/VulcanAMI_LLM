@@ -1,0 +1,62 @@
+[
+    {
+        "prompt": "What is 2 + 2?",
+        "expected_contains": ["4"],
+        "domain": "arithmetic",
+        "category": "arithmetic"
+    },
+    {
+        "prompt": "What is 3 + 3?",
+        "expected_contains": ["6"],
+        "domain": "arithmetic",
+        "category": "arithmetic"
+    },
+    {
+        "prompt": "What is 7 * 8?",
+        "expected_contains": ["56"],
+        "domain": "arithmetic",
+        "category": "arithmetic"
+    },
+    {
+        "prompt": "What is the capital of France?",
+        "expected_contains": ["Paris"],
+        "domain": "factual",
+        "category": "factual"
+    },
+    {
+        "prompt": "What is the capital of Japan?",
+        "expected_contains": ["Tokyo"],
+        "domain": "factual",
+        "category": "factual"
+    },
+    {
+        "prompt": "What is the capital of Germany?",
+        "expected_contains": ["Berlin"],
+        "domain": "factual",
+        "category": "factual"
+    },
+    {
+        "prompt": "Is the statement 'All cats are mammals' logically valid?",
+        "expected_contains": ["valid", "true", "yes"],
+        "domain": "logical",
+        "category": "logical"
+    },
+    {
+        "prompt": "If A implies B, and A is true, what can we conclude about B?",
+        "expected_contains": ["true", "B is true", "B must be true"],
+        "domain": "logical",
+        "category": "logical"
+    },
+    {
+        "prompt": "Summarize the concept of photosynthesis in one sentence.",
+        "expected_contains": ["light", "energy", "plant", "glucose", "carbon dioxide"],
+        "domain": "comprehension",
+        "category": "comprehension"
+    },
+    {
+        "prompt": "What is the square root of 144?",
+        "expected_contains": ["12"],
+        "domain": "arithmetic",
+        "category": "arithmetic"
+    }
+]
