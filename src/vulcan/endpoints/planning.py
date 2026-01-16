@@ -109,6 +109,9 @@ async def create_plan(request: Request) -> dict:
             try:
                 from vulcan.problem_decomposer.problem_decomposer_core import ProblemGraph
                 
+                # Safely handle context which may be None
+                context = plan_request.context if plan_request.context is not None else {}
+                
                 problem = ProblemGraph(
                     nodes={
                         'goal': {
@@ -118,8 +121,8 @@ async def create_plan(request: Request) -> dict:
                     },
                     edges=[],
                     metadata={
-                        'context': plan_request.context,
-                        'domain': plan_request.context.get('domain', 'general'),
+                        'context': context,
+                        'domain': context.get('domain', 'general'),
                         'goal_text': plan_request.goal,
                         'method': plan_request.method
                     }
@@ -131,7 +134,7 @@ async def create_plan(request: Request) -> dict:
             except Exception as e:
                 logger.error(f"Failed to create ProblemGraph: {e}")
                 raise HTTPException(
-                    status_code=500,
+                    status_code=400,
                     detail=f"Failed to process goal: {str(e)}"
                 )
             
