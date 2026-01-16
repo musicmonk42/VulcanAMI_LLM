@@ -295,7 +295,7 @@ The **SystemObserver** (located in `vulcan/world_model/system_observer.py`) crea
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │ Query Processing Pipeline │
-│ QueryRouter → ReasoningIntegration → Engines → Response │
+│ QueryRouter → UnifiedReasoner → Engines → Response │
 └───┬─────────────────────────────────────────────────────────┘
  │ Events: query_start, engine_result, validation_failure,
  │ outcome, error
