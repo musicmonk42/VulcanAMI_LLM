@@ -87,8 +87,8 @@ class ProcessLock:
     def __init__(
         self,
         lock_path: Optional[str] = None,
-        heartbeat_interval: int = DEFAULT_HEARTBEAT_INTERVAL_SECONDS,
-        lock_ttl: int = DEFAULT_LOCK_TTL_SECONDS,
+        heartbeat_interval: float = DEFAULT_HEARTBEAT_INTERVAL_SECONDS,
+        lock_ttl: float = DEFAULT_LOCK_TTL_SECONDS,
         enable_heartbeat: bool = True,
     ):
         """
