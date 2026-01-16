@@ -55,8 +55,7 @@ def _lazy_import_safety_validator():
 
 # Protected imports with fallbacks
 try:
-    pass
-
+    import scipy
     SCIPY_AVAILABLE = True
 except ImportError:
     SCIPY_AVAILABLE = False
