@@ -23,43 +23,33 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 # ============================================================
-# Note: Global singleton for embeddings
+# MEMORY LEAK FIX: Global singleton for embeddings
 # ============================================================
-# This ensures the embedding model is loaded ONCE per process,
-# preventing 50ms→6400ms performance degradation from repeated loading.
+# This ensures the embedding model is loaded ONCE per process across
+# ALL reasoning components, preventing ~900MB memory accumulation.
+# Now uses the central singleton registry for consistency.
 # ============================================================
-
-_GLOBAL_EMBEDDING_MODEL = None
-_EMBEDDING_LOCK = threading.Lock()
 
 
 def get_global_embedding_model():
     """
     Get or create the global embedding model singleton.
     
-    Note: This function ensures the SentenceTransformer model
-    is loaded only ONCE per process, preventing expensive reloads that
-    cause performance degradation.
+    MEMORY LEAK FIX: Now delegates to the central singleton registry
+    to ensure only ONE model is loaded across ALL reasoning components
+    (semantic_enricher, memory_prior, embedding_cache, etc.).
     
     Returns:
         SentenceTransformer model instance, or None if unavailable.
     """
-    global _GLOBAL_EMBEDDING_MODEL
-    if _GLOBAL_EMBEDDING_MODEL is None:
-        with _EMBEDDING_LOCK:
-            # Double-check after acquiring lock
-            if _GLOBAL_EMBEDDING_MODEL is None:
-                try:
-                    from sentence_transformers import SentenceTransformer
-                    _GLOBAL_EMBEDDING_MODEL = SentenceTransformer('all-MiniLM-L6-v2')
-                    logger.info("[Embeddings] Loaded model ONCE (global singleton)")
-                except ImportError as e:
-                    logger.warning(f"[Embeddings] sentence-transformers not available: {e}")
-                    return None
-                except Exception as e:
-                    logger.error(f"[Embeddings] Failed to load model: {e}")
-                    return None
-    return _GLOBAL_EMBEDDING_MODEL
+    try:
+        from vulcan.reasoning.singletons import get_embedding_model
+        return get_embedding_model()
+    except ImportError:
+        # Fallback for when singletons module is unavailable
+        logger.warning("[Embeddings] Could not import global singleton, embeddings unavailable")
+        return None
+
 
 
 # Import semantic tool matcher for query-based tool selection
