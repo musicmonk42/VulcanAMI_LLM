@@ -57,6 +57,7 @@ from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 from vulcan.world_model.meta_reasoning.numpy_compat import np, NUMPY_AVAILABLE
+from vulcan.world_model.meta_reasoning.serialization_mixin import SerializationMixin
 
 logger = logging.getLogger(__name__)
 
@@ -276,7 +277,7 @@ class ComparisonResult:
         }
 
 
-class InternalCritic:
+class InternalCritic(SerializationMixin):
     """
     Multi-perspective internal critique and evaluation system
 
@@ -302,6 +303,8 @@ class InternalCritic:
     Thread-safe with comprehensive evaluation history.
     Integrates with VULCAN validation and safety systems.
     """
+
+    _unpickleable_attrs = ['lock', '_np', 'evaluation_criteria']
 
     def __init__(
         self,
@@ -400,115 +403,12 @@ class InternalCritic:
             f"  Perspective weights: {{p.value: w for p, w in self.perspective_weights.items()}}"
         )
 
-    def __getstate__(self) -> Dict[str, Any]:
-        """
-        Prepare instance state for pickle serialization.
-        
-        This method implements industry-standard serialization by:
-        1. Acquiring the lock for thread-safe state capture
-        2. Removing unpickleable objects (lock, module refs, bound methods)
-        3. Adding serialization metadata for debugging and versioning
-        4. Converting defaultdicts for pickle compatibility
-        
-        Returns:
-            Dictionary containing all pickleable state with metadata
-            
-        Thread Safety:
-            Acquires self.lock before capturing state to ensure consistency
-            
-        Removed Attributes:
-            - lock: threading.RLock (re-created on restore)
-            - _np: numpy module reference (re-created on restore)
-            - evaluation_criteria: dict with bound methods (re-initialized)
-            
-        See Also:
-            __setstate__: Restores state and re-creates unpickleable objects
-        """
-        # Acquire lock for thread-safe state capture
-        self.lock.acquire()
-        try:
-            state = self.__dict__.copy()
-            
-            # Remove unpickleable items
-            state.pop('lock', None)  # threading.RLock
-            state.pop('_np', None)  # numpy module reference
-            state.pop('evaluation_criteria', None)  # dict with bound methods
-            
-            # Convert defaultdicts to regular dicts
-            for key in list(state.keys()):
-                if isinstance(state[key], defaultdict):
-                    state[key] = dict(state[key])
-            
-            # Add serialization metadata for debugging and versioning
-            state['_serialization_metadata'] = {
-                'version': '1.0.0',
-                'serialized_at': time.time(),
-                'class': f"{self.__class__.__module__}.{self.__class__.__name__}",
-            }
-            
-            logger.debug(
-                f"InternalCritic serialized: {len(state)} keys, "
-                f"removed unpickleable: lock, _np, evaluation_criteria"
-            )
-            
-            return state
-        finally:
-            self.lock.release()
-
-    def __setstate__(self, state: Dict[str, Any]) -> None:
-        """
-        Restore instance state after pickle deserialization.
-        
-        This method implements industry-standard deserialization by:
-        1. Extracting and logging serialization metadata
-        2. Restoring all pickleable state
-        3. Re-creating the threading lock (RLock for reentrant support)
-        4. Re-establishing numpy module reference
-        5. Re-initializing evaluation criteria with bound methods
-        
-        Args:
-            state: Dictionary from __getstate__
-            
-        Post-Conditions:
-            - self.lock is a new RLock instance
-            - self._np references numpy or FakeNumpy
-            - self.evaluation_criteria is re-populated with bound methods
-            - Object is fully functional for thread-safe operations
-            
-        Note:
-            Any custom evaluation criteria added after initialization
-            will need to be re-added after deserialization.
-            
-        See Also:
-            __getstate__: Captures state for serialization
-            _initialize_default_criteria: Repopulates evaluation criteria
-        """
-        # Extract metadata for logging
-        metadata = state.pop('_serialization_metadata', {})
-        serialized_at = metadata.get('serialized_at')
-        version = metadata.get('version', 'unknown')
-        
-        if version != '1.0.0':
-            logger.warning(
-                f"InternalCritic deserialized from version {version}. "
-                f"Some state may not restore correctly."
-            )
-        
-        # Restore pickleable state
-        self.__dict__.update(state)
-        
-        # Re-create unpickleable objects
+    def _restore_unpickleable_attrs(self) -> None:
+        """Restore unpickleable attributes after deserialization."""
         self.lock = threading.RLock()
         self._np = np if NUMPY_AVAILABLE else FakeNumpy
-        
-        # Re-initialize evaluation criteria (bound method references)
         self.evaluation_criteria = {}
         self._initialize_default_criteria()
-        
-        logger.debug(
-            f"InternalCritic restored from serialization "
-            f"(serialized_at: {serialized_at}, version: {version})"
-        )
 
     def evaluate_proposal(
         self, proposal: Dict[str, Any], context: Optional[Dict[str, Any]] = None

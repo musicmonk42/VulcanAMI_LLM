@@ -40,6 +40,7 @@ from typing import Any, Callable, Dict, List, Optional, Set, Union
 from unittest.mock import MagicMock
 
 from vulcan.world_model.meta_reasoning.numpy_compat import np, NUMPY_AVAILABLE
+from vulcan.world_model.meta_reasoning.serialization_mixin import SerializationMixin
 
 logger = logging.getLogger(__name__)
 
@@ -121,7 +122,7 @@ MAX_FACTOR_VALUE_LENGTH = 100  # Maximum length for individual factor values
 MAX_REASONING_STEP_LENGTH = 200  # Maximum length for reasoning steps
 
 
-class TransparencyInterface:
+class TransparencyInterface(SerializationMixin):
     """
     Structured, machine-readable output for agent-to-agent communication
 
@@ -138,6 +139,8 @@ class TransparencyInterface:
     - Transmitted over network
     - Parsed by other agents
     """
+
+    _unpickleable_attrs = ['lock', '_np']
 
     # --- START REPLACEMENT ---
     def __init__(self, world_model: Optional["WorldModel"] = None):
@@ -198,20 +201,10 @@ class TransparencyInterface:
 
         logger.info("TransparencyInterface initialized")
 
-    def __getstate__(self) -> Dict[str, Any]:
-        """
-        Prepare state for pickling by removing unpickleable lock objects.
-        """
-        state = self.__dict__.copy()
-        state.pop('lock', None)
-        return state
-
-    def __setstate__(self, state: Dict[str, Any]) -> None:
-        """
-        Restore state after unpickling, re-creating the lock.
-        """
-        self.__dict__.update(state)
+    def _restore_unpickleable_attrs(self) -> None:
+        """Restore unpickleable attributes after deserialization."""
         self.lock = threading.RLock()
+        self._np = np if NUMPY_AVAILABLE else FakeNumpy
 
     # --- END REPLACEMENT ---
 

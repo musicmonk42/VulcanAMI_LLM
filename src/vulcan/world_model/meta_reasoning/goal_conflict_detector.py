@@ -32,6 +32,7 @@ from typing import Any, Dict, List, Optional
 from unittest.mock import MagicMock, Mock
 
 from vulcan.world_model.meta_reasoning.numpy_compat import np, NUMPY_AVAILABLE
+from vulcan.world_model.meta_reasoning.serialization_mixin import SerializationMixin
 
 logger = logging.getLogger(__name__)
 
@@ -183,7 +184,7 @@ class MultiObjectiveTension:
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 
-class GoalConflictDetector:
+class GoalConflictDetector(SerializationMixin):
     """
     Detects conflicts between objectives
 
@@ -195,6 +196,8 @@ class GoalConflictDetector:
 
     Suggests resolutions for detected conflicts.
     """
+
+    _unpickleable_attrs = ['lock', '_np']
 
     # --- START FIX: Modify __init__ for optional hierarchy ---
     def __init__(self, objective_hierarchy: Optional[ObjectiveHierarchy] = None):
@@ -302,83 +305,10 @@ class GoalConflictDetector:
 
         logger.info("GoalConflictDetector initialized successfully")
 
-    def __getstate__(self) -> Dict[str, Any]:
-        """
-        Prepare instance state for pickle serialization.
-        
-        Implements industry-standard serialization with:
-        - Thread-safe state capture (acquires lock)
-        - Explicit removal of unpickleable objects
-        - Serialization metadata for debugging/versioning
-        
-        Returns:
-            Dictionary containing all pickleable state
-            
-        Thread Safety:
-            Acquires self.lock before capturing state
-            
-        Removed Attributes:
-            - lock: threading.RLock (re-created on restore)
-            - _np: numpy module reference (re-created on restore)
-            
-        Note:
-            objective_hierarchy IS pickled. If it contains unpickleable
-            items (like locks), it must implement its own __getstate__.
-        """
-        self.lock.acquire()
-        try:
-            state = self.__dict__.copy()
-            
-            # Remove unpickleable items
-            state.pop('lock', None)
-            state.pop('_np', None)
-            
-            # Add serialization metadata
-            state['_serialization_metadata'] = {
-                'version': '1.0.0',
-                'serialized_at': time.time(),
-                'class': f"{self.__class__.__module__}.{self.__class__.__name__}",
-            }
-            
-            logger.debug(
-                f"GoalConflictDetector serialized: {len(state)} keys"
-            )
-            return state
-        finally:
-            self.lock.release()
-
-    def __setstate__(self, state: Dict[str, Any]) -> None:
-        """
-        Restore instance state after pickle deserialization.
-        
-        Implements industry-standard deserialization with:
-        - Metadata extraction and version checking
-        - Re-creation of threading locks
-        - Re-establishment of numpy module reference
-        
-        Args:
-            state: Dictionary from __getstate__
-            
-        Post-Conditions:
-            - self.lock is a new RLock instance
-            - self._np references numpy or FakeNumpy
-            - All other state is restored from pickle
-        """
-        metadata = state.pop('_serialization_metadata', {})
-        version = metadata.get('version', 'unknown')
-        
-        if version != '1.0.0':
-            logger.warning(
-                f"GoalConflictDetector deserialized from version {version}"
-            )
-        
-        self.__dict__.update(state)
-        
-        # Re-create unpickleable objects
+    def _restore_unpickleable_attrs(self) -> None:
+        """Restore unpickleable attributes after deserialization."""
         self.lock = threading.RLock()
         self._np = np if NUMPY_AVAILABLE else FakeNumpy
-        
-        logger.debug("GoalConflictDetector restored from serialization")
 
     def _initialize_conflict_rules(self) -> List[Dict[str, Any]]:
         """Initialize conflict detection rules"""

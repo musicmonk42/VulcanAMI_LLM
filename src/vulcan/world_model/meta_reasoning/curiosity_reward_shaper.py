@@ -48,6 +48,7 @@ from enum import Enum
 from typing import Any, Callable, Dict, List, Optional
 
 from vulcan.world_model.meta_reasoning.numpy_compat import np, NUMPY_AVAILABLE
+from vulcan.world_model.meta_reasoning.serialization_mixin import SerializationMixin
 
 logger = logging.getLogger(__name__)
 
@@ -211,7 +212,7 @@ class CuriosityStatistics:
         }
 
 
-class CuriosityRewardShaper:
+class CuriosityRewardShaper(SerializationMixin):
     """
     Multi-algorithm curiosity-driven exploration and reward shaping
 
@@ -233,6 +234,8 @@ class CuriosityRewardShaper:
     Thread-safe with comprehensive statistics.
     Integrates with VULCAN world model and learning systems.
     """
+
+    _unpickleable_attrs = ['lock', '_np', 'world_model']
 
     def __init__(
         self,
@@ -327,31 +330,12 @@ class CuriosityRewardShaper:
         logger.info(f"  Decay rate: {decay_rate}, Max bonus: {max_bonus}")
         logger.info(f"  Episodic memory size: {episodic_memory_size}")
 
-    def __getstate__(self) -> Dict[str, Any]:
-        """
-        Prepare state for pickling by removing unpickleable objects.
-        """
-        state = self.__dict__.copy()
-        state.pop('lock', None)  # threading.RLock
-        state.pop('_np', None)  # numpy module reference
-        state.pop('world_model', None)  # may be MagicMock
-        # Convert defaultdict to regular dict for pickling
-        if 'state_feature_distributions' in state:
-            state['state_feature_distributions'] = dict(state['state_feature_distributions'])
-        return state
-
-    def __setstate__(self, state: Dict[str, Any]) -> None:
-        """
-        Restore state after unpickling, re-creating unpickleable objects.
-        """
-        self.__dict__.update(state)
+    def _restore_unpickleable_attrs(self) -> None:
+        """Restore unpickleable attributes after deserialization."""
         self.lock = threading.RLock()
         self._np = np if NUMPY_AVAILABLE else FakeNumpy
         self.world_model = None  # Must be re-injected via set_world_model()
         self._world_model_injected = False  # Track injection state
-        # Restore defaultdict
-        if 'state_feature_distributions' in self.__dict__ and isinstance(self.state_feature_distributions, dict):
-            self.state_feature_distributions = defaultdict(list, self.state_feature_distributions)
 
     def set_world_model(self, world_model: Any) -> None:
         """
