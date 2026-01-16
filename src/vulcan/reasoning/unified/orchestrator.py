@@ -1541,21 +1541,41 @@ class UnifiedReasoner:
                 reasoning_type = self._determine_reasoning_type(input_data, query)
                 task.task_type = reasoning_type
 
-            # FIX: Extract selected_tools from query (set by QueryRouter)
-            # The QueryRouter passes selected tools in query dict, we need to extract them
-            # and make them available to the plan creation process
-            selected_tools_from_router = None
+            # =====================================================================
+            # INDUSTRY STANDARD: Extract router HINTS (not final tool selection)
+            # =====================================================================
+            # Router provides hints/suggestions with confidence weights.
+            # These influence ToolSelector but don't override its decision.
+            #
+            # OLD: selected_tools = ['symbolic', 'causal'] (commands)
+            # NEW: router_hints = {'symbolic': 0.9, 'causal': 0.7} (suggestions)
+            # =====================================================================
+            router_hints = None
             if query and isinstance(query, dict):
-                # Try multiple possible locations where selected_tools might be stored
-                selected_tools_from_router = (
-                    query.get('selected_tools') or
-                    query.get('parameters', {}).get('selected_tools') or
-                    constraints.get('selected_tools')
+                # Try multiple possible locations where router hints might be stored
+                router_hints = (
+                    query.get('tool_hints') or  # NEW: Router provides hints
+                    query.get('parameters', {}).get('tool_hints') or
+                    constraints.get('tool_hints')
                 )
                 
-                if selected_tools_from_router:
+                # Backward compatibility: Convert old selected_tools format to hints
+                if not router_hints:
+                    selected_tools_legacy = (
+                        query.get('selected_tools') or
+                        query.get('parameters', {}).get('selected_tools') or
+                        constraints.get('selected_tools')
+                    )
+                    if selected_tools_legacy and isinstance(selected_tools_legacy, list):
+                        # Convert list to hints dict with equal confidence
+                        router_hints = {tool: 0.8 for tool in selected_tools_legacy}
+                        logger.info(
+                            f"[UnifiedReasoner] Converted legacy selected_tools to hints: {router_hints}"
+                        )
+                
+                if router_hints:
                     logger.info(
-                        f"[UnifiedReasoner] Extracted selected_tools from query: {selected_tools_from_router}"
+                        f"[UnifiedReasoner] Router hints received: {router_hints}"
                     )
 
             if self.voi_gate and task.features is not None:
@@ -1572,29 +1592,34 @@ class UnifiedReasoner:
                 except Exception as e:
                     logger.warning(f"VOI gate failed: {e}")
 
-            plan = self._create_optimized_plan(task, strategy, selected_tools_from_router)
+            # Pass router hints (not commands) to plan creation
+            plan = self._create_optimized_plan(task, strategy, router_hints)
 
-            if strategy in [
+            # =====================================================================
+            # TOOL SELECTOR: THE AUTHORITY FOR ALL STRATEGIES
+            # =====================================================================
+            # ToolSelector should be invoked for ALL strategies, not just Portfolio/Utility.
+            # It considers router hints and makes the final decision.
+            # =====================================================================
+            if self.tool_selector and strategy in [
                 ReasoningStrategy.PORTFOLIO,
                 ReasoningStrategy.UTILITY_BASED,
+                ReasoningStrategy.ENSEMBLE,  # NEW: Also use ToolSelector for ensemble
             ]:
-                if self.tool_selector:
-                    try:
-                        selection_result = self._select_tools_for_plan(plan, task)
-                        # Only override if tool_selector provides tools and none were set from router
-                        if not hasattr(plan, 'selected_tools') or not plan.selected_tools:
-                            plan.selected_tools = (
-                                selection_result.selected_tool
-                                if hasattr(selection_result, "selected_tool")
-                                else None
-                            )
-                        plan.execution_strategy = (
-                            selection_result.strategy_used
-                            if hasattr(selection_result, "strategy_used")
-                            else None
+                try:
+                    selection_result = self._select_tools_for_plan(plan, task)
+                    # ToolSelector decision is authoritative
+                    if selection_result and hasattr(selection_result, "selected_tool"):
+                        plan.selected_tools = [selection_result.selected_tool]
+                        logger.info(
+                            f"[UnifiedReasoner] ToolSelector decision (THE AUTHORITY): "
+                            f"{selection_result.selected_tool}"
                         )
-                    except Exception as e:
-                        logger.warning(f"Tool selection failed: {e}")
+                    
+                    if hasattr(selection_result, "strategy_used"):
+                        plan.execution_strategy = selection_result.strategy_used
+                except Exception as e:
+                    logger.warning(f"Tool selection failed: {e}")
 
             strategy_func = self.reasoning_strategies.get(
                 strategy, self._adaptive_reasoning
@@ -1862,17 +1887,42 @@ class UnifiedReasoner:
             return None
 
     def _create_optimized_plan(
-        self, task: ReasoningTask, strategy: ReasoningStrategy, selected_tools_from_router: Optional[List[str]] = None
+        self, task: ReasoningTask, strategy: ReasoningStrategy, router_hints: Optional[Dict[str, float]] = None
     ) -> ReasoningPlan:
-        """Create execution plan optimized for utility"""
+        """
+        Create execution plan optimized for utility.
+        
+        INDUSTRY STANDARD - SINGLE AUTHORITY PATTERN:
+        ToolSelector is THE AUTHORITY for tool selection. Router provides HINTS
+        (suggestions with weights), ToolSelector makes final decision considering:
+        - Router hints (influence, not override)
+        - Semantic similarity (query → tool matching)
+        - Historical performance (Bayesian prior)
+        - Current context and constraints
+        
+        ARCHITECTURAL CHANGE:
+        - OLD: Router's selected_tools used directly (bypassed ToolSelector)
+        - NEW: Router's hints passed to ToolSelector as influence (+utility boost)
+        
+        Args:
+            task: The reasoning task to plan
+            strategy: Execution strategy (ENSEMBLE, PORTFOLIO, etc.)
+            router_hints: Optional hints from Router {tool_name: confidence_weight}
+                         Example: {'symbolic': 0.9, 'probabilistic': 0.2}
+                         These influence ToolSelector but don't override it
+        
+        Returns:
+            ReasoningPlan with tasks selected by ToolSelector
+        """
 
         cache_key = f"{task.task_type}_{strategy}"
         if cache_key in self.plan_cache:
             cached_plan = self.plan_cache[cache_key]
             cached_plan.tasks = [task]
-            # FIX: Also set selected_tools in cached plan if provided
-            if selected_tools_from_router:
-                cached_plan.selected_tools = selected_tools_from_router
+            # Store router hints in plan metadata (not as final selection)
+            if router_hints:
+                cached_plan.metadata = cached_plan.metadata or {}
+                cached_plan.metadata['router_hints'] = router_hints
             return cached_plan
 
         tasks = []
@@ -1909,6 +1959,17 @@ class UnifiedReasoner:
                         risk=0.2,
                         context=task.utility_context,
                     )
+                    
+                    # INDUSTRY STANDARD: Apply router hints as utility boost
+                    # Router suggestions influence (don't override) ToolSelector's decision
+                    if router_hints and str(reasoner_type.value).lower() in router_hints:
+                        hint_weight = router_hints[str(reasoner_type.value).lower()]
+                        utility_boost = hint_weight * 0.2  # Max +0.2 utility boost
+                        utility += utility_boost
+                        logger.debug(
+                            f"[Plan Creation] Applied router hint boost to {reasoner_type.value}: "
+                            f"+{utility_boost:.3f} (hint weight: {hint_weight:.2f})"
+                        )
 
                     if utility > best_utility:
                         best_utility = utility
@@ -1940,28 +2001,91 @@ class UnifiedReasoner:
                     tasks.append(sub_task)
 
             elif strategy == ReasoningStrategy.ENSEMBLE:
-                # FIX: Use selected_tools from router if available, otherwise check plan
-                # Router tools take precedence as they come from query-specific routing decision
+                # =====================================================================
+                # INDUSTRY STANDARD: ToolSelector makes ensemble tool selection
+                # =====================================================================
+                # Router hints influence but don't override ToolSelector's decision.
+                # ToolSelector considers:
+                # 1. Router hints (if provided)
+                # 2. Semantic similarity (query → tool matching)
+                # 3. Historical performance (Bayesian prior)
+                # 4. Current context and constraints
+                # =====================================================================
+                
                 tools_to_use = []
                 
-                # Priority 1: Use tools from router (passed as parameter)
-                if selected_tools_from_router:
-                    logger.info(f"[Ensemble] Using tools from router: {selected_tools_from_router}")
-                    for tool_name in selected_tools_from_router:
-                        try:
-                            # Map tool name string to ReasoningType enum
-                            reasoning_type = self._map_tool_name_to_reasoning_type(tool_name)
-                            if reasoning_type and reasoning_type in self.reasoners:
-                                tools_to_use.append(reasoning_type)
-                            else:
-                                logger.warning(f"[Ensemble] Tool '{tool_name}' not available in self.reasoners")
-                        except Exception as e:
-                            logger.warning(f"[Ensemble] Failed to map tool '{tool_name}': {e}")
+                # OPTION A: Use ToolSelector for intelligent selection (PREFERRED)
+                if self.tool_selector:
+                    try:
+                        logger.info("[Ensemble] Using ToolSelector for ensemble tool selection")
+                        # Create selection request with router hints as context
+                        SelectionRequest = self._selection_components.get("SelectionRequest")
+                        SelectionMode = self._selection_components.get("SelectionMode")
+                        
+                        if SelectionRequest and SelectionMode:
+                            selection_request = SelectionRequest(
+                                problem=task.input_data,
+                                features=task.features,
+                                constraints={
+                                    "time_budget_ms": task.constraints.get("time_budget_ms", 5000),
+                                    "energy_budget_mj": task.constraints.get("energy_budget_mj", 1000),
+                                    "min_confidence": task.constraints.get("confidence_threshold", 0.5),
+                                    "router_hints": router_hints,  # Pass hints as context
+                                },
+                                mode=SelectionMode.ACCURATE,  # Ensemble needs accuracy
+                                context=task.query,
+                            )
+                            
+                            # ToolSelector makes THE decision
+                            selection_result = self.tool_selector.select_and_execute(selection_request)
+                            
+                            # Extract selected tools from ToolSelector's decision
+                            if hasattr(selection_result, 'selected_tool'):
+                                primary_tool = selection_result.selected_tool
+                                # Map tool name to ReasoningType
+                                reasoning_type = self._map_tool_name_to_reasoning_type(primary_tool)
+                                if reasoning_type and reasoning_type in self.reasoners:
+                                    tools_to_use.append(reasoning_type)
+                                    logger.info(
+                                        f"[Ensemble] ToolSelector selected: {primary_tool} "
+                                        f"(mapped to {reasoning_type.value})"
+                                    )
+                            
+                            # Add complementary tools for ensemble (if ToolSelector suggested them)
+                            if hasattr(selection_result, 'alternative_tools'):
+                                for alt_tool in selection_result.alternative_tools[:2]:  # Max 2 alternatives
+                                    reasoning_type = self._map_tool_name_to_reasoning_type(alt_tool)
+                                    if reasoning_type and reasoning_type in self.reasoners:
+                                        if reasoning_type not in tools_to_use:
+                                            tools_to_use.append(reasoning_type)
+                                            logger.debug(f"[Ensemble] Added alternative: {alt_tool}")
+                    
+                    except Exception as e:
+                        logger.warning(f"[Ensemble] ToolSelector invocation failed: {e}, using fallback")
+                        # Fall through to OPTION B
                 
-                # Fall back to default ensemble if no tools selected
+                # OPTION B: Fallback to router hints if ToolSelector unavailable
+                if not tools_to_use and router_hints:
+                    logger.info("[Ensemble] ToolSelector unavailable, using router hints as fallback")
+                    # Sort hints by confidence weight (highest first)
+                    sorted_hints = sorted(router_hints.items(), key=lambda x: x[1], reverse=True)
+                    
+                    for tool_name, confidence in sorted_hints[:3]:  # Max 3 tools for ensemble
+                        if confidence >= 0.3:  # Minimum threshold for inclusion
+                            try:
+                                reasoning_type = self._map_tool_name_to_reasoning_type(tool_name)
+                                if reasoning_type and reasoning_type in self.reasoners:
+                                    tools_to_use.append(reasoning_type)
+                                    logger.debug(
+                                        f"[Ensemble] Added from router hints: {tool_name} "
+                                        f"(confidence: {confidence:.2f})"
+                                    )
+                            except Exception as e:
+                                logger.warning(f"[Ensemble] Failed to map tool '{tool_name}': {e}")
+                
+                # OPTION C: Final fallback to default ensemble if both above fail
                 if not tools_to_use:
-                    logger.info("[Ensemble] No selected_tools from router, using default ensemble types")
-                    # Use class constant for default ensemble tools
+                    logger.info("[Ensemble] No tools selected, using default ensemble types")
                     tools_to_use = [rt for rt in self.DEFAULT_ENSEMBLE_TOOLS if rt in self.reasoners]
                 
                 # Create tasks for each tool
@@ -2021,7 +2145,9 @@ class UnifiedReasoner:
             estimated_time=estimated_time,
             estimated_cost=estimated_cost,
             confidence_threshold=task.constraints.get("confidence_threshold", 0.5),
-            selected_tools=selected_tools_from_router,  # FIX: Store router's selected tools in plan
+            # INDUSTRY STANDARD: Store router hints as metadata (not final selection)
+            # ToolSelector makes final selection, hints are just influence
+            metadata={'router_hints': router_hints} if router_hints else {},
         )
 
         self.plan_cache[cache_key] = plan
