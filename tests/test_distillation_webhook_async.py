@@ -22,10 +22,13 @@ from vulcan.distillation.distiller import OpenAIKnowledgeDistiller
 class MockWebhookServer(BaseHTTPRequestHandler):
     """Mock webhook server for testing."""
     
-    # Class variable to track requests
-    requests_received: List[Dict] = []
+    # Class variables for configuration (read-only in handlers)
     response_delay: float = 0.0
     should_fail: bool = False
+    
+    # Use a class-level list but reset it per test
+    # Note: In real use, this should be instance-based or use a proper server instance
+    requests_received: List[Dict] = []
     
     def do_POST(self):
         """Handle POST requests."""
@@ -159,8 +162,8 @@ class TestWebhookNonBlocking:
             # Wait briefly for thread to be created
             time.sleep(0.1)
             
-            # Find webhook threads
-            webhook_threads = [t for t in created_threads if 'Webhook' in t.name]
+            # Find webhook threads (thread name starts with 'WebhookSender-')
+            webhook_threads = [t for t in created_threads if t.name.startswith('WebhookSender-')]
             
             # Should have created at least one webhook thread
             assert len(webhook_threads) > 0, "No webhook thread was created"
