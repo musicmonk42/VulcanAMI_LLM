@@ -6,7 +6,6 @@ Each endpoint category is in its own file for better organization.
 """
 
 from vulcan.endpoints.agents import router as agents_router
-from vulcan.endpoints.chat import router as chat_router
 from vulcan.endpoints.config import router as config_router
 from vulcan.endpoints.distillation import router as distillation_router
 from vulcan.endpoints.execution import router as execution_router
@@ -24,7 +23,6 @@ from vulcan.endpoints.world_model import router as world_model_router
 
 __all__ = [
     "agents_router",
-    "chat_router",
     "config_router",
     "distillation_router",
     "execution_router",

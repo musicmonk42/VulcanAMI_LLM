@@ -1431,9 +1431,12 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
             try:
                 # Note: Use retry loop with exponential backoff
                 # instead of single short poll that times out prematurely
-                MAX_POLL_ATTEMPTS = 5  # Max number of poll attempts
+                # FIX: Increased timeout to handle 9.5s reasoning engine execution
+                # Old values: MAX_POLL_ATTEMPTS=5, MAX_POLL_DELAY=1.0 (~2.5s total)
+                # New values allow up to ~12.7s total wait time
+                MAX_POLL_ATTEMPTS = 8  # Max number of poll attempts
                 INITIAL_POLL_DELAY = 0.1  # Start with 100ms
-                MAX_POLL_DELAY = 1.0  # Cap at 1 second per attempt
+                MAX_POLL_DELAY = 2.0  # Cap at 2 seconds per attempt (increased from 1.0)
                 BACKOFF_MULTIPLIER = 2.0  # Double delay each attempt
                 
                 poll_delay = INITIAL_POLL_DELAY
@@ -1613,9 +1616,9 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
                     
                     logger.info(
                         f"[VULCAN/v1/chat] Direct reasoning selection: "
-                        f"tools={integration_result.selected_tools}, "
-                        f"strategy={integration_result.reasoning_strategy}, "
-                        f"confidence={integration_result.confidence:.2f}"
+                        f"tools={getattr(integration_result, 'selected_tools', 'unknown')}, "
+                        f"strategy={getattr(integration_result, 'reasoning_strategy', 'unknown')}, "
+                        f"confidence={getattr(integration_result, 'confidence', 0.0):.2f}"
                     )
                     
                     # ================================================================
@@ -1630,29 +1633,32 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
                     # causal/probabilistic analysis instead of world_model responses.
                     # ================================================================
                     
+                    # Industry Standard: Defensive programming - extract metadata once with safe defaults
+                    # This prevents AttributeError if integration_result is in an unexpected state
+                    metadata = getattr(integration_result, 'metadata', None) or {}
+                    confidence = getattr(integration_result, 'confidence', 0.0)
+                    rationale = getattr(integration_result, 'rationale', None)
+                    
                     # PRIVILEGED QUERY FIX: Check for privileged_no_answer FIRST
                     # These are introspective/ethical/philosophical queries where world_model
                     # explicitly returned "no answer" with privileged routing.
                     # We MUST preserve this and NOT fall back to general reasoning/LLM.
-                    is_privileged_no_answer = (
-                        integration_result.metadata and 
-                        integration_result.metadata.get("privileged_no_answer") is True
-                    )
+                    is_privileged_no_answer = metadata.get("privileged_no_answer") is True
                     
                     # Check if world_model returned a complete response
+                    # Industry Standard: Safe attribute access with getattr() to prevent AttributeError
+                    selected_tools = getattr(integration_result, 'selected_tools', [])
                     has_world_model_result = (
-                        integration_result.metadata and 
-                        integration_result.metadata.get("world_model_response") and
-                        "world_model" in integration_result.selected_tools
+                        metadata.get("world_model_response") and
+                        "world_model" in selected_tools
                     )
                     
                     # FIX: Also check if tool_selector returned a complete execution result
                     # This handles results from non-world-model tools (probabilistic, causal, etc.)
                     # that went through select_and_execute() and have execution_result in metadata
                     has_tool_execution_result = (
-                        integration_result.metadata and
-                        integration_result.metadata.get("has_execution_result") is True and
-                        integration_result.metadata.get("conclusion") is not None
+                        metadata.get("has_execution_result") is True and
+                        metadata.get("conclusion") is not None
                     )
                     
                     if is_privileged_no_answer:
@@ -1664,8 +1670,8 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
                         # WITHOUT falling back to classifier/LLM/general reasoning.
                         # ============================================================
                         
-                        failure_reason = integration_result.metadata.get("world_model_failure_reason", "Unknown reason")
-                        rationale = integration_result.rationale or f"Unable to answer this privileged query: {failure_reason}"
+                        failure_reason = metadata.get("world_model_failure_reason", "Unknown reason")
+                        rationale = rationale or f"Unable to answer this privileged query: {failure_reason}"
                         
                         logger.warning(
                             f"[VULCAN/v1/chat] PRIVILEGED NO-ANSWER: World model cannot answer "
@@ -1675,7 +1681,7 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
                         
                         # Build a privileged no-answer response
                         # Industry Standard: Convert reasoning_type to string for JSON serialization
-                        privileged_reasoning_type = integration_result.metadata.get("reasoning_type", "meta_reasoning")
+                        privileged_reasoning_type = metadata.get("reasoning_type", "meta_reasoning")
                         privileged_reasoning_type_str = safe_reasoning_type_to_string(privileged_reasoning_type, default="meta_reasoning")
                         
                         direct_reasoning_output = {
@@ -1696,16 +1702,16 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
                     
                     elif has_world_model_result:
                         # World model already provided a response - use it directly
-                        wm_conclusion = integration_result.metadata.get("conclusion") or integration_result.metadata.get("world_model_response")
-                        wm_explanation = integration_result.metadata.get("explanation", "")
-                        wm_reasoning_type = integration_result.metadata.get("reasoning_type", "meta_reasoning")
+                        wm_conclusion = metadata.get("conclusion") or metadata.get("world_model_response")
+                        wm_explanation = metadata.get("explanation", "")
+                        wm_reasoning_type = metadata.get("reasoning_type", "meta_reasoning")
                         
                         # Industry Standard: Convert reasoning_type to string for JSON serialization
                         wm_reasoning_type_str = safe_reasoning_type_to_string(wm_reasoning_type, default="meta_reasoning")
                         
                         direct_reasoning_output = {
                             "conclusion": wm_conclusion,
-                            "confidence": integration_result.confidence,
+                            "confidence": confidence,
                             "reasoning_type": wm_reasoning_type_str,
                             "explanation": wm_explanation,
                         }
@@ -1717,26 +1723,26 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
                         conclusion_preview = str(wm_conclusion)[:100] if wm_conclusion else "None"
                         logger.info(
                             f"[VULCAN/v1/chat] Using world_model result directly: "
-                            f"type={wm_reasoning_type_str}, confidence={integration_result.confidence:.2f}, "
+                            f"type={wm_reasoning_type_str}, confidence={confidence:.2f}, "
                             f"has_conclusion={wm_conclusion is not None}, "
                             f"conclusion_preview='{conclusion_preview}'"
                         )
                         
                         # CRITICAL FIX: Warn if we have high confidence but no conclusion
-                        if integration_result.confidence >= 0.5 and wm_conclusion is None:
+                        if confidence >= 0.5 and wm_conclusion is None:
                             logger.warning(
                                 f"[VULCAN/v1/chat] BUG DETECTED: World model has high confidence "
-                                f"({integration_result.confidence:.2f}) but conclusion is None! "
+                                f"({confidence:.2f}) but conclusion is None! "
                                 f"This indicates content loss in world_model → reasoning_integration path. "
-                                f"integration_result_metadata_keys={list(integration_result.metadata.keys()) if integration_result.metadata else []}"
+                                f"integration_result_metadata_keys={list(metadata.keys())}"
                             )
                     elif has_tool_execution_result:
                         # FIX: Tool selector returned a complete execution result
                         # Extract the conclusion from metadata (was placed there by selection_strategies.py)
-                        tool_conclusion = integration_result.metadata.get("conclusion")
-                        tool_explanation = integration_result.metadata.get("explanation", "")
-                        tool_reasoning_type = integration_result.metadata.get("reasoning_type")
-                        tool_name = integration_result.metadata.get("selected_tool", "unknown")
+                        tool_conclusion = metadata.get("conclusion")
+                        tool_explanation = metadata.get("explanation", "")
+                        tool_reasoning_type = metadata.get("reasoning_type")
+                        tool_name = metadata.get("selected_tool", "unknown")
                         
                         # Industry Standard: Convert reasoning_type to string for JSON serialization
                         tool_reasoning_type_str = safe_reasoning_type_to_string(tool_reasoning_type, default=tool_name)
