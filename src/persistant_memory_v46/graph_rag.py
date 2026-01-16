@@ -162,6 +162,9 @@ class GraphRAG:
         if ST_AVAILABLE:
             try:
                 self.embedding_model = SentenceTransformer(embedding_model)
+                # Explicit parameters to prevent HuggingFace Hub timeout issues
+                # - automodel_args: Allow downloading from HF Hub (set to True if pre-downloaded)
+                # - revision: Explicitly specify main branch to avoid ambiguity
                 self.cross_encoder = CrossEncoder(
                     cross_encoder_model,
                     automodel_args={"local_files_only": False},
