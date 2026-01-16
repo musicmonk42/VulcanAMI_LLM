@@ -59,7 +59,7 @@ def test_immediate_healthcheck():
     for attempt in range(1, 12):  # Railway makes 11 attempts in the logs
         start = time.time()
         try:
-            response = requests.get("http://127.0.0.1:8000/health/live", timeout=10)
+            response = requests.get("http://127.0.0.1:8000/health/live", timeout=3)
             elapsed = time.time() - start
             
             if response.status_code == 200:
@@ -86,8 +86,17 @@ def test_immediate_healthcheck():
     print(f"Results: {success_count} success, {fail_count} failed")
     print()
     
-    process.terminate()
-    process.wait(timeout=5)
+    # Properly terminate the server process
+    print("Shutting down server...")
+    try:
+        process.terminate()
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        print("  Server didn't terminate gracefully, forcing kill...")
+        process.kill()
+        process.wait(timeout=2)
+    print("  Server stopped.")
+    print()
     
     # Evaluate results
     if success_count >= 10:  # At least 10 out of 11 should succeed
