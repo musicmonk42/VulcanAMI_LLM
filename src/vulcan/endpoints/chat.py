@@ -1715,16 +1715,29 @@ async def chat(request: Request) -> Dict[str, Any]:
     # Merge agent reasoning output into reasoning_insights (preserving existing data)
     if agent_reasoning_output:
         # Add agent-based reasoning as a distinct category (merges with existing insights)
-        # Note: Use helper to handle both dict and ReasoningResult objects
+        # ARCHITECTURE CONSOLIDATION: Direct attribute access (all results are ReasoningResult objects now)
         # Industry Standard: Convert reasoning_type to string for JSON serialization
-        extracted_reasoning_type = _get_reasoning_attr(agent_reasoning_output, "reasoning_type")
+        
+        # Safe attribute extraction handling both dict and object types
+        if isinstance(agent_reasoning_output, dict):
+            extracted_reasoning_type = agent_reasoning_output.get("reasoning_type")
+            conclusion = agent_reasoning_output.get("conclusion")
+            confidence = agent_reasoning_output.get("confidence")
+            explanation = agent_reasoning_output.get("explanation")
+        else:
+            # ReasoningResult object - use getattr for safety
+            extracted_reasoning_type = getattr(agent_reasoning_output, "reasoning_type", None)
+            conclusion = getattr(agent_reasoning_output, "conclusion", None)
+            confidence = getattr(agent_reasoning_output, "confidence", None)
+            explanation = getattr(agent_reasoning_output, "explanation", None)
+        
         reasoning_type_str = safe_reasoning_type_to_string(extracted_reasoning_type, default="unknown")
         
         reasoning_insights["agent_reasoning"] = {
-            "conclusion": _get_reasoning_attr(agent_reasoning_output, "conclusion"),
-            "confidence": _get_reasoning_attr(agent_reasoning_output, "confidence"),
+            "conclusion": conclusion,
+            "confidence": confidence,
             "reasoning_type": reasoning_type_str,
-            "explanation": _get_reasoning_attr(agent_reasoning_output, "explanation"),
+            "explanation": explanation,
         }
         logger.info(
             f"[VULCAN] Agent reasoning injected into context: "
