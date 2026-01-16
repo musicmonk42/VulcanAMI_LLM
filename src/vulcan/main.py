@@ -100,7 +100,6 @@ from vulcan.endpoints.unified_chat import (
 # Import all endpoint routers
 from vulcan.endpoints import (
     agents_router,
-    chat_router,
     config_router,
     distillation_router,
     execution_router,
@@ -169,8 +168,7 @@ app.include_router(world_model_router, tags=["world-model"])
 # Safety
 app.include_router(safety_router, tags=["safety"])
 
-# Chat Endpoints (Legacy and Unified)
-app.include_router(chat_router, tags=["chat"])
+# Chat Endpoint (Unified)
 app.include_router(unified_chat_router, tags=["chat"])
 
 logger.info("VULCAN-AGI: All endpoint routers mounted successfully")
