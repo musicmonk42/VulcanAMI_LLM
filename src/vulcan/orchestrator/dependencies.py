@@ -602,6 +602,52 @@ class EnhancedCollectiveDeps:
             "meta_reasoning_import_status": meta_reasoning_deps,  # Include meta-reasoning import status
         }
 
+    def get_planner(self) -> Optional[Any]:
+        """
+        Get the best available planner - prefers ProblemDecomposer over legacy stub.
+        
+        This method provides a unified interface for accessing planning capabilities,
+        automatically selecting the most capable planner available:
+        
+        1. First tries ProblemDecomposer (full-featured with 6 strategies)
+        2. Falls back to goal_system (legacy HierarchicalGoalSystem stub)
+        
+        The ProblemDecomposer is preferred because it provides:
+        - Multiple decomposition strategies (Exact, Semantic, Structural, etc.)
+        - Intelligent strategy selection
+        - Confidence scoring and validation
+        - Learning and caching capabilities
+        
+        Returns:
+            ProblemDecomposer if available, otherwise goal_system (may be None)
+        
+        Example:
+            >>> planner = deps.get_planner()
+            >>> if planner is None:
+            ...     raise HTTPException(503, "No planner available")
+            >>> 
+            >>> # Use with ProblemDecomposer
+            >>> if hasattr(planner, 'decompose_novel_problem'):
+            ...     problem = ProblemGraph(...)
+            ...     plan = planner.decompose_novel_problem(problem)
+            >>> # Or use with legacy goal_system
+            >>> elif hasattr(planner, 'generate_plan'):
+            ...     plan = planner.generate_plan(context)
+        
+        Note:
+            The returned planner may have different interfaces depending on which
+            implementation is available. Check for the appropriate method before use.
+        """
+        from vulcan.reasoning.singletons import get_problem_decomposer
+        
+        # Try ProblemDecomposer first (preferred)
+        decomposer = get_problem_decomposer()
+        if decomposer is not None:
+            return decomposer
+        
+        # Fallback to legacy goal_system
+        return self.goal_system
+
     def get_available_components(self) -> Set[str]:
         """
         Get set of available component names

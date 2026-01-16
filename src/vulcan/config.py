@@ -765,7 +765,42 @@ logger.info("WorldModelConfig defined successfully")
 
 @dataclass
 class HierarchicalGoalSystem:
-    """Legacy hierarchical goal system configuration."""
+    """
+    DEPRECATED: Legacy hierarchical goal system configuration.
+    
+    This is a non-functional stub implementation that returns empty plans.
+    For real planning functionality, use ProblemDecomposer instead via:
+    
+        from vulcan.reasoning.singletons import get_problem_decomposer
+        decomposer = get_problem_decomposer()
+        plan = decomposer.decompose_novel_problem(problem_graph)
+    
+    The ProblemDecomposer provides:
+    - 6 decomposition strategies (Exact, Semantic, Structural, Analogical, 
+      SyntheticBridging, BruteForce)
+    - Predictive strategy selection based on problem characteristics
+    - Caching and learning integration for improved performance
+    - Safety validation and compliance checking
+    - Confidence scoring and metadata
+    
+    Migration Guide:
+    ---------------
+    Old code:
+        goal_system = HierarchicalGoalSystem()
+        plan = goal_system.generate_plan({"high_level_goal": "task"})
+    
+    New code:
+        from vulcan.reasoning.singletons import get_problem_decomposer
+        from vulcan.problem_decomposer.problem_decomposer_core import ProblemGraph
+        
+        decomposer = get_problem_decomposer()
+        problem = ProblemGraph(
+            nodes={'goal': {'description': 'task', 'type': 'objective'}},
+            edges=[],
+            metadata={'domain': 'planning'}
+        )
+        plan = decomposer.decompose_novel_problem(problem)
+    """
 
     max_depth: int = 5
     goal_types: List[GoalType] = field(default_factory=lambda: list(GoalType))
@@ -774,7 +809,18 @@ class HierarchicalGoalSystem:
     def decompose_goal(
         self, goal: str, context: Dict[str, Any]
     ) -> List[Dict[str, Any]]:
-        """Decompose high-level goal into subgoals."""
+        """
+        Decompose high-level goal into subgoals.
+        
+        DEPRECATED: This is a stub implementation. Use ProblemDecomposer instead.
+        """
+        import warnings
+        warnings.warn(
+            "HierarchicalGoalSystem.decompose_goal() is deprecated and returns "
+            "stub data. Use ProblemDecomposer.decompose_novel_problem() instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
         # Basic decomposition - return simple subgoal structure
         return [
             {"subgoal": f"analyze_{goal}", "priority": 1.0, "estimated_cost": 0.5},
@@ -782,12 +828,45 @@ class HierarchicalGoalSystem:
         ]
 
     def prioritize_goals(self, resources: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Prioritize goals based on available resources."""
+        """
+        Prioritize goals based on available resources.
+        
+        DEPRECATED: This is a stub implementation. Use ProblemDecomposer instead.
+        """
+        import warnings
+        warnings.warn(
+            "HierarchicalGoalSystem.prioritize_goals() is deprecated and returns "
+            "stub data. Use ProblemDecomposer.decompose_novel_problem() instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
         # Return basic prioritized goal list
         return [{"subgoal": "explore", "priority": 1.0, "feasible": True}]
 
     def generate_plan(self, context: Dict[str, Any]) -> Dict[str, Any]:
-        """Generate plan from context."""
+        """
+        Generate plan from context.
+        
+        DEPRECATED: This is a non-functional stub that returns empty plans.
+        Use ProblemDecomposer.decompose_novel_problem() for real planning.
+        
+        Args:
+            context: Context dictionary (ignored by stub)
+        
+        Returns:
+            Empty plan structure (stub response)
+        
+        Raises:
+            DeprecationWarning: Always emitted to indicate this method is deprecated
+        """
+        import warnings
+        warnings.warn(
+            "HierarchicalGoalSystem.generate_plan() is deprecated and returns empty "
+            "plans. Use ProblemDecomposer.decompose_novel_problem() instead. "
+            "See class docstring for migration guide.",
+            DeprecationWarning,
+            stacklevel=2
+        )
         return {"actions": [], "estimated_duration": 0, "resources_needed": {}}
 
     def update_progress(self, goal_id: str, progress: float) -> None:
