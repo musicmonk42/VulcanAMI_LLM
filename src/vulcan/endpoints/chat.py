@@ -29,6 +29,35 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["chat"])
 
 # ============================================================
+# HELPER FUNCTIONS
+# ============================================================
+
+def _safe_get_attr(obj: Any, attr: str, default: Any = None) -> Any:
+    """
+    Safely extract attribute from reasoning output (dict or object).
+    
+    Industry Standard: Defensive attribute access with proper type checking.
+    Local helper to avoid circular imports from unified_chat.
+    
+    Args:
+        obj: The reasoning output object (dict, ReasoningResult, or other)
+        attr: Name of the attribute to extract
+        default: Default value to return if attribute is not found
+    
+    Returns:
+        The extracted attribute value, or default if not found
+    """
+    if obj is None:
+        return default
+    
+    # Handle dictionary-based results
+    if isinstance(obj, dict):
+        return obj.get(attr, default)
+    
+    # Handle object-based results (ReasoningResult, custom classes, etc.)
+    return getattr(obj, attr, default)
+
+# ============================================================
 # FEATURE FLAGS: Reasoning Execution Path Control
 # ============================================================
 # Industry Standard: Environment-based feature flags for safe rollout
@@ -1715,16 +1744,17 @@ async def chat(request: Request) -> Dict[str, Any]:
     # Merge agent reasoning output into reasoning_insights (preserving existing data)
     if agent_reasoning_output:
         # Add agent-based reasoning as a distinct category (merges with existing insights)
-        # Note: Use helper to handle both dict and ReasoningResult objects
+        # ARCHITECTURE CONSOLIDATION: Use helper for safe attribute extraction
         # Industry Standard: Convert reasoning_type to string for JSON serialization
-        extracted_reasoning_type = _get_reasoning_attr(agent_reasoning_output, "reasoning_type")
+        
+        extracted_reasoning_type = _safe_get_attr(agent_reasoning_output, "reasoning_type")
         reasoning_type_str = safe_reasoning_type_to_string(extracted_reasoning_type, default="unknown")
         
         reasoning_insights["agent_reasoning"] = {
-            "conclusion": _get_reasoning_attr(agent_reasoning_output, "conclusion"),
-            "confidence": _get_reasoning_attr(agent_reasoning_output, "confidence"),
+            "conclusion": _safe_get_attr(agent_reasoning_output, "conclusion"),
+            "confidence": _safe_get_attr(agent_reasoning_output, "confidence"),
             "reasoning_type": reasoning_type_str,
-            "explanation": _get_reasoning_attr(agent_reasoning_output, "explanation"),
+            "explanation": _safe_get_attr(agent_reasoning_output, "explanation"),
         }
         logger.info(
             f"[VULCAN] Agent reasoning injected into context: "

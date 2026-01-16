@@ -97,12 +97,6 @@ from vulcan.endpoints.unified_chat import (
     unified_chat,              # POST /v1/chat handler
 )
 
-# Reasoning helpers (used by tests and external code)
-# Location: tests/test_reasoning_content_propagation.py:73
-from vulcan.utils.reasoning_helpers import (
-    _get_reasoning_attr,       # Safe attribute extraction from reasoning results
-)
-
 # Import all endpoint routers
 from vulcan.endpoints import (
     agents_router,

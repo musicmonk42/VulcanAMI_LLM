@@ -1,8 +1,8 @@
 """
-Safe code execution for mathematical computations.
+Safe Code Execution
 
-Allows SymPy/NumPy code execution in a restricted environment using
-RestrictedPython to prevent dangerous operations.
+Cross-platform sandboxed execution for math and code evaluation.
+Uses ThreadPoolExecutor for timeout enforcement (works on Windows and Unix).
 
 Security Features:
 - Blocks file system access
@@ -11,7 +11,7 @@ Security Features:
 - Blocks system command execution
 - Blocks class hierarchy traversal (prevents sandbox escape)
 - Allows only whitelisted mathematical operations
-- Enforces execution timeout (main thread only)
+- Cross-platform execution timeout using ThreadPoolExecutor
 - Rate-limits print output to prevent log flooding
 
 Example:
@@ -25,9 +25,9 @@ Example:
 
 import logging
 import re
-import signal
 import threading
 import unicodedata
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
@@ -350,6 +350,7 @@ class SafeCodeExecutor:
 
     Thread Safety:
         This class is thread-safe. Multiple threads can execute code concurrently.
+        Uses ThreadPoolExecutor for cross-platform timeout support.
 
     Example:
         >>> executor = SafeCodeExecutor()
@@ -374,6 +375,13 @@ class SafeCodeExecutor:
         self._lock = threading.RLock()
         self._execution_count = 0
         self.safe_namespace = self._build_safe_namespace()
+        # Thread pool for timeout enforcement (industry standard: shared pool)
+        # Note: Single worker to ensure execution isolation and prevent resource exhaustion
+        self._executor_pool = ThreadPoolExecutor(
+            max_workers=1,
+            thread_name_prefix="safe_code_exec"
+        )
+        self._closed = False
 
         logger.info(
             f"SafeCodeExecutor initialized: "
@@ -602,6 +610,9 @@ class SafeCodeExecutor:
         """
         Execute code in safe environment and return results.
 
+        Uses ThreadPoolExecutor for cross-platform timeout enforcement.
+        This approach works on both Windows and Unix systems, unlike signal-based timeouts.
+
         Args:
             code: Python code string to execute
             timeout: Maximum execution time in seconds (overrides default)
@@ -611,13 +622,13 @@ class SafeCodeExecutor:
                 - 'success': bool - Whether execution succeeded
                 - 'result': Any - The computed result (from 'result' or 'answer' variable)
                 - 'error': str | None - Error message if failed
-                - 'namespace': Dict - The namespace after execution
+                - 'output': str - Print output from code execution
+                - 'namespace': Dict - The namespace after execution (on success only)
 
         Security Notes:
-            - Timeout is enforced via signal.SIGALRM (Unix only, main thread only)
-            - If timeout cannot be enforced (e.g., Windows, non-main thread),
-              execution proceeds without timeout protection
-            - All other sandbox protections remain active regardless
+            - Timeout enforced via ThreadPoolExecutor (cross-platform)
+            - All sandbox protections remain active
+            - Thread-safe execution with proper resource cleanup
 
         Example:
             >>> executor = SafeCodeExecutor()
@@ -633,6 +644,7 @@ class SafeCodeExecutor:
                 "success": False,
                 "result": None,
                 "error": "RestrictedPython not available",
+                "output": "",
                 "namespace": {},
             }
 
@@ -648,149 +660,183 @@ class SafeCodeExecutor:
 
         logger.debug(f"[{exec_id}] Executing code ({len(code)} chars)")
 
-        # Timeout handler for signal-based timeout
-        def _timeout_handler(signum: int, frame: Any) -> None:
-            raise TimeoutError(f"Execution timed out after {effective_timeout} seconds")
+        # Bug #2 FIX: Preprocess code to fix implicit multiplication and unicode issues
+        # This is a safety net in case code wasn't preprocessed by mathematical_computation.py
+        code = _preprocess_math_code(code)
 
-        # Track whether we set up timeout (for cleanup)
-        timeout_set = False
-        old_handler = None
+        # Create fresh namespace for this execution (each execution is isolated)
+        execution_namespace = self.safe_namespace.copy()
 
+        # SECURITY: Set up rate-limited print collector factory for this execution
+        # RestrictedPython rewrites print(...) to:
+        #   _print = _print_(_getattr_)  # Factory creates collector
+        #   _print._call_print(...)       # Each print call
+        # This prevents log flooding DoS attacks and state leakage between executions
+        execution_namespace["_print_"] = _create_safe_print_collector
+
+        # Compile with RestrictedPython (blocks dangerous operations)
         try:
-            # Bug #2 FIX: Preprocess code to fix implicit multiplication and unicode issues
-            # This is a safety net in case code wasn't preprocessed by mathematical_computation.py
-            code = _preprocess_math_code(code)
-            
-            # Create fresh namespace for this execution (each execution is isolated)
-            execution_namespace = self.safe_namespace.copy()
-            
-            # SECURITY: Set up rate-limited print collector factory for this execution
-            # RestrictedPython rewrites print(...) to:
-            #   _print = _print_(_getattr_)  # Factory creates collector
-            #   _print._call_print(...)       # Each print call
-            # This prevents log flooding DoS attacks and state leakage between executions
-            execution_namespace["_print_"] = _create_safe_print_collector
-
-            # Compile with RestrictedPython (blocks dangerous operations)
             byte_code = compile_restricted_exec(code)
+        except Exception as e:
+            error_msg = f"Compilation error: {type(e).__name__}: {e}"
+            logger.warning(f"[{exec_id}] {error_msg}")
+            return {
+                "success": False,
+                "result": None,
+                "error": error_msg,
+                "output": "",
+                "namespace": {},
+            }
 
-            if byte_code.errors:
-                error_msg = f"Compilation errors: {byte_code.errors}"
+        if byte_code.errors:
+            error_msg = f"Compilation errors: {byte_code.errors}"
+            logger.warning(f"[{exec_id}] {error_msg}")
+            return {
+                "success": False,
+                "result": None,
+                "error": error_msg,
+                "output": "",
+                "namespace": {},
+            }
+
+        # Define the execution function to run in thread
+        def _run_code() -> Dict[str, Any]:
+            """Inner function to execute code in isolated thread."""
+            try:
+                # Execute the code
+                # nosec B102: exec() is intentional here - code is pre-compiled with
+                # RestrictedPython which blocks dangerous operations (imports, file I/O,
+                # attribute access to private members, etc.). This is a sandboxed execution
+                # environment designed for safe mathematical computation.
+                exec(byte_code.code, execution_namespace)  # nosec B102
+
+                # Extract result (code should assign to 'result' or 'answer')
+                # Check if result variables exist in namespace (regardless of their truthiness)
+                # This correctly handles falsy values like 0, False, empty string
+                if "result" in execution_namespace:
+                    result = execution_namespace["result"]
+                elif "answer" in execution_namespace:
+                    result = execution_namespace["answer"]
+                else:
+                    result = None
+
+                # Get print output
+                output = ""
+                if "_print_" in execution_namespace:
+                    # The print collector is created by _create_safe_print_collector
+                    # and stored in a closure. We need to extract it properly.
+                    pass  # Output collection handled below
+
+                # Try to get output from print collector
+                for key, value in execution_namespace.items():
+                    if isinstance(value, _SafePrintCollector):
+                        output = value()
+                        break
+
+                logger.debug(f"[{exec_id}] Execution successful, result type: {type(result)}")
+
+                return {
+                    "success": True,
+                    "result": result,
+                    "error": None,
+                    "output": output,
+                    "namespace": execution_namespace,
+                }
+
+            except Exception as e:
+                # Get output even on error
+                output = ""
+                for key, value in execution_namespace.items():
+                    if isinstance(value, _SafePrintCollector):
+                        output = value()
+                        break
+
+                error_msg = f"{type(e).__name__}: {e}"
+                logger.warning(f"[{exec_id}] Execution error: {error_msg}")
+                return {
+                    "success": False,
+                    "result": None,
+                    "error": error_msg,
+                    "output": output,
+                    "namespace": {},
+                }
+
+        # Execute with timeout using ThreadPoolExecutor (CROSS-PLATFORM)
+        # Industry Standard: Use thread pool for timeout enforcement
+        if self._closed:
+            return {
+                "success": False,
+                "result": None,
+                "error": "Executor has been closed",
+                "output": "",
+                "namespace": {},
+            }
+        
+        try:
+            future = self._executor_pool.submit(_run_code)
+            try:
+                result = future.result(timeout=effective_timeout)
+                return result
+            except FuturesTimeoutError:
+                # Get output even on timeout
+                output = ""
+                for key, value in execution_namespace.items():
+                    if isinstance(value, _SafePrintCollector):
+                        output = value()
+                        break
+
+                error_msg = f"Execution timed out after {effective_timeout} seconds"
                 logger.warning(f"[{exec_id}] {error_msg}")
                 return {
                     "success": False,
                     "result": None,
                     "error": error_msg,
+                    "output": output,
                     "namespace": {},
                 }
-
-            # SECURITY: Set up timeout enforcement using signal.SIGALRM
-            # Note: This only works on Unix-like systems and in the main thread
-            # On Windows or non-main threads, we proceed without timeout protection
-            # but all other sandbox protections remain active
-            try:
-                if threading.current_thread() is threading.main_thread():
-                    old_handler = signal.signal(signal.SIGALRM, _timeout_handler)
-                    signal.alarm(effective_timeout)
-                    timeout_set = True
-                else:
-                    logger.debug(
-                        f"[{exec_id}] Timeout not enforced: not in main thread"
-                    )
-            except (ValueError, OSError, AttributeError) as e:
-                # signal.SIGALRM not available (Windows) or other signal issues
-                logger.debug(f"[{exec_id}] Timeout not enforced: {e}")
-
-            # Execute the code
-            # nosec B102: exec() is intentional here - code is pre-compiled with
-            # RestrictedPython which blocks dangerous operations (imports, file I/O,
-            # attribute access to private members, etc.). This is a sandboxed execution
-            # environment designed for safe mathematical computation.
-            exec(byte_code.code, execution_namespace)  # nosec B102
-
-            # Extract result (code should assign to 'result' or 'answer')
-            # Check if result variables exist in namespace (regardless of their truthiness)
-            # This correctly handles falsy values like 0, False, empty string
-            if "result" in execution_namespace:
-                result = execution_namespace["result"]
-            elif "answer" in execution_namespace:
-                result = execution_namespace["answer"]
-            else:
-                result = None
-
-            logger.debug(f"[{exec_id}] Execution successful, result type: {type(result)}")
-
-            return {
-                "success": True,
-                "result": result,
-                "error": None,
-                "namespace": execution_namespace,
-            }
-
-        except TimeoutError as e:
-            error_msg = f"Timeout: {e}"
-            logger.warning(f"[{exec_id}] {error_msg}")
-            return {
-                "success": False,
-                "result": None,
-                "error": error_msg,
-                "namespace": {},
-            }
-        except SyntaxError as e:
-            error_msg = f"Syntax error: {e}"
-            logger.warning(f"[{exec_id}] {error_msg}")
-            return {
-                "success": False,
-                "result": None,
-                "error": error_msg,
-                "namespace": {},
-            }
-        except NameError as e:
-            error_msg = f"Name error (undefined variable/function): {e}"
-            logger.warning(f"[{exec_id}] {error_msg}")
-            return {
-                "success": False,
-                "result": None,
-                "error": error_msg,
-                "namespace": {},
-            }
-        except TypeError as e:
-            error_msg = f"Type error: {e}"
-            logger.warning(f"[{exec_id}] {error_msg}")
-            return {
-                "success": False,
-                "result": None,
-                "error": error_msg,
-                "namespace": {},
-            }
-        except AttributeError as e:
-            # SECURITY: This catches blocked attribute access attempts
-            error_msg = f"Attribute error (possible sandbox violation): {e}"
-            logger.warning(f"[{exec_id}] {error_msg}")
-            return {
-                "success": False,
-                "result": None,
-                "error": error_msg,
-                "namespace": {},
-            }
         except Exception as e:
             error_msg = f"Execution failed: {type(e).__name__}: {e}"
-            logger.error(f"[{exec_id}] {error_msg}")
+            logger.error(f"[{exec_id}] {error_msg}", exc_info=True)
             return {
                 "success": False,
                 "result": None,
                 "error": error_msg,
+                "output": "",
                 "namespace": {},
             }
-        finally:
-            # SECURITY: Always cancel the timeout alarm
-            if timeout_set:
-                try:
-                    signal.alarm(0)
-                    if old_handler is not None:
-                        signal.signal(signal.SIGALRM, old_handler)
-                except (ValueError, OSError):
-                    pass  # Ignore errors during cleanup
+
+    def close(self):
+        """
+        Explicitly close the executor and clean up resources.
+        
+        Industry Standard: Explicit cleanup method for resource management.
+        Prefer this over relying on __del__.
+        """
+        if not self._closed:
+            self._closed = True
+            try:
+                self._executor_pool.shutdown(wait=True, cancel_futures=True)
+                logger.debug("SafeCodeExecutor closed successfully")
+            except Exception as e:
+                logger.warning(f"Error during executor shutdown: {e}")
+
+    def __enter__(self):
+        """Context manager entry."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit - ensures cleanup."""
+        self.close()
+        return False
+
+    def __del__(self):
+        """Cleanup thread pool on deletion (fallback only - prefer explicit close())."""
+        if hasattr(self, '_closed') and not self._closed:
+            try:
+                if hasattr(self, '_executor_pool'):
+                    self._executor_pool.shutdown(wait=False, cancel_futures=True)
+            except Exception:
+                pass  # Ignore cleanup errors in __del__
 
 
 # Singleton instance

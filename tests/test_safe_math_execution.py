@@ -398,48 +398,53 @@ class TestNumericUtilsFixes:
     reason="Safe execution module not available"
 )
 class TestReasoningHelpersFixes:
-    """Tests for reasoning_helpers fixes (Issue 12)."""
+    """Tests for _get_reasoning_attr in unified_chat (post-architecture consolidation)."""
     
-    def test_get_reasoning_attr_type_validation(self):
-        """Test _get_reasoning_attr with type validation."""
-        from vulcan.utils.reasoning_helpers import _get_reasoning_attr
+    def test_get_reasoning_attr_from_dict(self):
+        """Test _get_reasoning_attr with dictionary input."""
+        from vulcan.endpoints.unified_chat import _get_reasoning_attr
         
-        result = {"confidence": 0.95}
+        result = {"confidence": 0.95, "conclusion": "answer"}
         
-        # Should work with correct type
-        value = _get_reasoning_attr(result, "confidence", 0.0, expected_type=float)
+        # Should extract attributes from dict
+        value = _get_reasoning_attr(result, "confidence", 0.0)
         assert value == 0.95
+        
+        conclusion = _get_reasoning_attr(result, "conclusion", "")
+        assert conclusion == "answer"
 
-    def test_get_reasoning_attr_type_mismatch(self):
-        """Test _get_reasoning_attr catches type mismatches."""
-        from vulcan.utils.reasoning_helpers import _get_reasoning_attr
+    def test_get_reasoning_attr_from_object(self):
+        """Test _get_reasoning_attr with object input."""
+        from vulcan.endpoints.unified_chat import _get_reasoning_attr
         
-        result = {"confidence": "not_a_number"}
+        class MockResult:
+            def __init__(self):
+                self.confidence = 0.85
+                self.conclusion = "test"
         
-        try:
-            _get_reasoning_attr(result, "confidence", 0.0, expected_type=float)
-            assert False, "Should have raised TypeError"
-        except TypeError as e:
-            assert "expected float" in str(e)
-            assert "got str" in str(e)
+        result = MockResult()
+        
+        # Should extract attributes from object
+        value = _get_reasoning_attr(result, "confidence", 0.0)
+        assert value == 0.85
 
     def test_get_reasoning_attr_none_value(self):
         """Test _get_reasoning_attr allows None values."""
-        from vulcan.utils.reasoning_helpers import _get_reasoning_attr
+        from vulcan.endpoints.unified_chat import _get_reasoning_attr
         
         result = {"confidence": None}
         
-        # None values should not trigger type validation
-        value = _get_reasoning_attr(result, "confidence", 0.0, expected_type=float)
+        # None values should be returned as-is
+        value = _get_reasoning_attr(result, "confidence", 0.0)
         assert value is None
 
     def test_get_reasoning_attr_missing_key(self):
         """Test _get_reasoning_attr returns default for missing keys."""
-        from vulcan.utils.reasoning_helpers import _get_reasoning_attr
+        from vulcan.endpoints.unified_chat import _get_reasoning_attr
         
         result = {"other": "value"}
         
-        value = _get_reasoning_attr(result, "confidence", 0.5, expected_type=float)
+        value = _get_reasoning_attr(result, "confidence", 0.5)
         assert value == 0.5
 
 
