@@ -309,6 +309,15 @@ REASONING_TOOL_NAMES = frozenset({
     'deductive', 'inductive', 'abductive', 'multimodal', 'hybrid', 'ensemble'
 })
 
+# BUG FIX #2: Tool selection priority order
+# Specific reasoning engines must be checked before generic world_model/general
+# This prevents world_model from hijacking tasks meant for specialized engines
+TOOL_SELECTION_PRIORITY_ORDER = [
+    'causal', 'symbolic', 'probabilistic', 'mathematical',
+    'analogical', 'multimodal', 'cryptographic',
+    'philosophical', 'world_model', 'general'
+]
+
 # Redis keys for agent pool state persistence
 REDIS_KEY_AGENT_POOL_STATS = "vulcan:agent_pool:stats"
 REDIS_KEY_PROVENANCE_COUNT = "vulcan:agent_pool:provenance_records_count"
@@ -2825,15 +2834,9 @@ class AgentPoolManager:
                         }
                         
                         # BUG FIX #2: Check tools in priority order (specific engines before generic)
-                        # Priority: causal, symbolic, probabilistic, mathematical > world_model, general
-                        priority_order = [
-                            'causal', 'symbolic', 'probabilistic', 'mathematical',
-                            'analogical', 'multimodal', 'cryptographic',
-                            'philosophical', 'world_model', 'general'
-                        ]
-                        
+                        # Use module-level constant for consistency
                         primary_tool = None
-                        for priority_tool in priority_order:
+                        for priority_tool in TOOL_SELECTION_PRIORITY_ORDER:
                             if priority_tool in [t.lower() for t in selected_tools]:
                                 primary_tool = priority_tool
                                 break
@@ -3317,21 +3320,17 @@ class AgentPoolManager:
                                         'analogical': ReasoningType.ANALOGICAL,
                                         'mathematical': ReasoningType.MATHEMATICAL,
                                         'philosophical': ReasoningType.PHILOSOPHICAL,
-                                        'world_model': ReasoningType.PHILOSOPHICAL,
+                                        'world_model': ReasoningType.PHILOSOPHICAL,  # BUG FIX: Added for consistency
+                                        'general': ReasoningType.SYMBOLIC,  # BUG FIX: Added for consistency
                                         'multimodal': ReasoningType.MULTIMODAL,
                                         # Pattern 9 FIX: Add cryptographic mapping
                                         'cryptographic': ReasoningType.SYMBOLIC,  # Crypto uses deterministic symbolic reasoning
                                     }
                                     
                                     # BUG FIX #2: Check tools in priority order (specific engines before generic)
-                                    priority_order = [
-                                        'causal', 'symbolic', 'probabilistic', 'mathematical',
-                                        'analogical', 'multimodal', 'cryptographic',
-                                        'philosophical', 'world_model'
-                                    ]
-                                    
+                                    # Use module-level constant for consistency
                                     primary_tool = None
-                                    for priority_tool in priority_order:
+                                    for priority_tool in TOOL_SELECTION_PRIORITY_ORDER:
                                         if priority_tool in [t.lower() for t in result_selected_tools]:
                                             primary_tool = priority_tool
                                             break
