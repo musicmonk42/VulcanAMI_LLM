@@ -375,11 +375,13 @@ class SafeCodeExecutor:
         self._lock = threading.RLock()
         self._execution_count = 0
         self.safe_namespace = self._build_safe_namespace()
-        # Thread pool for timeout enforcement (industry standard: reuse executor)
+        # Thread pool for timeout enforcement (industry standard: shared pool)
+        # Note: Single worker to ensure execution isolation and prevent resource exhaustion
         self._executor_pool = ThreadPoolExecutor(
             max_workers=1,
             thread_name_prefix="safe_code_exec"
         )
+        self._closed = False
 
         logger.info(
             f"SafeCodeExecutor initialized: "
@@ -761,6 +763,15 @@ class SafeCodeExecutor:
 
         # Execute with timeout using ThreadPoolExecutor (CROSS-PLATFORM)
         # Industry Standard: Use thread pool for timeout enforcement
+        if self._closed:
+            return {
+                "success": False,
+                "result": None,
+                "error": "Executor has been closed",
+                "output": "",
+                "namespace": {},
+            }
+        
         try:
             future = self._executor_pool.submit(_run_code)
             try:
@@ -794,13 +805,38 @@ class SafeCodeExecutor:
                 "namespace": {},
             }
 
+    def close(self):
+        """
+        Explicitly close the executor and clean up resources.
+        
+        Industry Standard: Explicit cleanup method for resource management.
+        Prefer this over relying on __del__.
+        """
+        if not self._closed:
+            self._closed = True
+            try:
+                self._executor_pool.shutdown(wait=True, cancel_futures=True)
+                logger.debug("SafeCodeExecutor closed successfully")
+            except Exception as e:
+                logger.warning(f"Error during executor shutdown: {e}")
+
+    def __enter__(self):
+        """Context manager entry."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit - ensures cleanup."""
+        self.close()
+        return False
+
     def __del__(self):
-        """Cleanup thread pool on deletion."""
-        try:
-            if hasattr(self, '_executor_pool'):
-                self._executor_pool.shutdown(wait=False)
-        except Exception:
-            pass  # Ignore cleanup errors
+        """Cleanup thread pool on deletion (fallback only - prefer explicit close())."""
+        if hasattr(self, '_closed') and not self._closed:
+            try:
+                if hasattr(self, '_executor_pool'):
+                    self._executor_pool.shutdown(wait=False, cancel_futures=True)
+            except Exception:
+                pass  # Ignore cleanup errors in __del__
 
 
 # Singleton instance
