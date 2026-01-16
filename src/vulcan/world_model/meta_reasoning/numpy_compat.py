@@ -17,7 +17,7 @@ Usage:
 
 import logging
 import math
-import random
+import random as _random
 
 logger = logging.getLogger(__name__)
 
@@ -406,12 +406,12 @@ except ImportError:
             def random(size=None):
                 """Random floats in [0, 1)"""
                 if size is None:
-                    return random.random()
+                    return _random.random()
                 if isinstance(size, int):
-                    return [random.random() for _ in range(size)]
+                    return [_random.random() for _ in range(size)]
                 elif isinstance(size, (tuple, list)) and len(size) == 2:
                     rows, cols = size
-                    return [[random.random() for _ in range(cols)] for _ in range(rows)]
+                    return [[_random.random() for _ in range(cols)] for _ in range(rows)]
                 else:
                     raise ValueError(f"Unsupported size for random: {size}")
             
@@ -423,13 +423,13 @@ except ImportError:
                 Raises error if dimensions are invalid instead of ignoring them.
                 """
                 if not dims:
-                    return random.gauss(0, 1)
+                    return _random.gauss(0, 1)
                 
                 if len(dims) == 1:
                     n = dims[0]
                     if not isinstance(n, int) or n < 0:
                         raise ValueError(f"Invalid dimension: {n}")
-                    return [random.gauss(0, 1) for _ in range(n)]
+                    return [_random.gauss(0, 1) for _ in range(n)]
                 
                 elif len(dims) == 2:
                     rows, cols = dims
@@ -437,7 +437,7 @@ except ImportError:
                         raise ValueError(f"Invalid dimensions: {dims}")
                     if rows < 0 or cols < 0:
                         raise ValueError(f"Dimensions must be non-negative: {dims}")
-                    return [[random.gauss(0, 1) for _ in range(cols)] for _ in range(rows)]
+                    return [[_random.gauss(0, 1) for _ in range(cols)] for _ in range(rows)]
                 
                 else:
                     raise ValueError(
@@ -448,12 +448,12 @@ except ImportError:
             def normal(loc=0.0, scale=1.0, size=None):
                 """Random numbers from normal distribution"""
                 if size is None:
-                    return random.gauss(loc, scale)
+                    return _random.gauss(loc, scale)
                 if isinstance(size, int):
-                    return [random.gauss(loc, scale) for _ in range(size)]
+                    return [_random.gauss(loc, scale) for _ in range(size)]
                 elif isinstance(size, (tuple, list)) and len(size) == 2:
                     rows, cols = size
-                    return [[random.gauss(loc, scale) for _ in range(cols)] 
+                    return [[_random.gauss(loc, scale) for _ in range(cols)] 
                             for _ in range(rows)]
                 else:
                     raise ValueError(f"Unsupported size for normal: {size}")
@@ -464,13 +464,13 @@ except ImportError:
                 if not arr:
                     raise ValueError("Cannot choose from empty array")
                 if size is None:
-                    return random.choice(arr)
+                    return _random.choice(arr)
                 if replace:
-                    return [random.choice(arr) for _ in range(size)]
+                    return [_random.choice(arr) for _ in range(size)]
                 else:
                     if size > len(arr):
                         raise ValueError("Cannot sample more items than available without replacement")
-                    return random.sample(arr, size)
+                    return _random.sample(arr, size)
             
             @staticmethod
             def beta(a, b):
@@ -490,7 +490,7 @@ except ImportError:
                 std_dev = math.sqrt(variance)
                 
                 # Sample from Gaussian and clamp to [0, 1]
-                sample = random.gauss(mean, std_dev * 0.5)  # Dampen to reduce out-of-bounds
+                sample = _random.gauss(mean, std_dev * 0.5)  # Dampen to reduce out-of-bounds
                 return max(0.0, min(1.0, sample))
     
     # Create module-level instance
