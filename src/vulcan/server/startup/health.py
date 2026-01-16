@@ -302,6 +302,64 @@ class HealthCheck:
                 message="Models will load on demand"
             )
     
+    def check_unified_reasoner(self) -> ComponentHealth:
+        """
+        Check unified reasoner health.
+        
+        Validates that the UnifiedReasoner singleton is properly initialized
+        and operational. This is part of the migration from legacy
+        ReasoningIntegration to the unified reasoning system.
+        
+        Returns:
+            ComponentHealth result for unified reasoner
+        """
+        try:
+            if not hasattr(self.app_state, "deployment"):
+                return ComponentHealth(
+                    name="unified_reasoner",
+                    healthy=False,
+                    critical=False,
+                    message="Deployment not available"
+                )
+            
+            # Check for unified reasoner via singleton
+            try:
+                from vulcan.reasoning.singletons import get_unified_reasoner
+                reasoner = get_unified_reasoner()
+                
+                if reasoner is None:
+                    return ComponentHealth(
+                        name="unified_reasoner",
+                        healthy=False,
+                        critical=False,
+                        message="UnifiedReasoner not initialized"
+                    )
+                
+                return ComponentHealth(
+                    name="unified_reasoner",
+                    healthy=True,
+                    critical=False,
+                    message="Operational",
+                    details={"type": type(reasoner).__name__}
+                )
+                
+            except ImportError:
+                return ComponentHealth(
+                    name="unified_reasoner",
+                    healthy=False,
+                    critical=False,
+                    message="UnifiedReasoner module not available"
+                )
+                
+        except Exception as e:
+            logger.warning(f"Unified reasoner health check failed: {e}")
+            return ComponentHealth(
+                name="unified_reasoner",
+                healthy=False,
+                critical=False,
+                message=f"Health check error: {str(e)}"
+            )
+    
     def run_all_checks(self, redis_client: Any = None) -> Dict[str, Any]:
         """
         Run all health checks and determine overall status.
@@ -320,6 +378,9 @@ class HealthCheck:
         self.component_results.append(self.check_redis(redis_client))
         self.component_results.append(self.check_agent_pool())
         self.component_results.append(self.check_models())
+        
+        # Add unified reasoner check (part of unified reasoning migration)
+        self.component_results.append(self.check_unified_reasoner())
         
         # Determine overall status
         critical_failed = any(
