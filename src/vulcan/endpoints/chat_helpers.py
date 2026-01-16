@@ -9,6 +9,7 @@ type-safe enum handling to prevent AttributeError when serializing
 ReasoningType enums to strings.
 """
 
+import itertools
 import logging
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union
@@ -633,11 +634,11 @@ def _format_causal_reasoning(result: Dict[str, Any]) -> str:
     causal_graph = result.get('causal_graph')
     if causal_graph and isinstance(causal_graph, dict):
         parts.append("\n- Causal Graph:")
-        # Industry Standard: Limit output size to prevent overwhelming display
+        # Industry Standard: Limit output size and use itertools.islice for memory efficiency
         edge_count = 0
-        for cause, effects in list(causal_graph.items())[:MAX_LIST_ITEMS_TO_SHOW]:
+        for cause, effects in itertools.islice(causal_graph.items(), MAX_LIST_ITEMS_TO_SHOW):
             if isinstance(effects, dict):
-                for effect, properties in list(effects.items())[:MAX_LIST_ITEMS_TO_SHOW]:
+                for effect, properties in itertools.islice(effects.items(), MAX_LIST_ITEMS_TO_SHOW):
                     edge_count += 1
                     if edge_count > MAX_LIST_ITEMS_TO_SHOW:
                         parts.append(f"\n  ... ({len(causal_graph)} total causal relationships)")
@@ -661,7 +662,8 @@ def _format_causal_reasoning(result: Dict[str, Any]) -> str:
     confounders = result.get('confounders')
     if confounders:
         if isinstance(confounders, (list, set, tuple)):
-            safe_confounders = [safe_truncate_utf8(str(c), 100) for c in list(confounders)[:MAX_LIST_ITEMS_TO_SHOW]]
+            # Industry Standard: Use itertools.islice for memory-efficient iteration
+            safe_confounders = [safe_truncate_utf8(str(c), 100) for c in itertools.islice(confounders, MAX_LIST_ITEMS_TO_SHOW)]
             parts.append(f"\n- Confounders: {', '.join(safe_confounders)}")
         else:
             parts.append(f"\n- Confounders: {safe_truncate_utf8(str(confounders), MAX_REASONING_RESULT_LENGTH)}")
@@ -711,7 +713,8 @@ def _format_probabilistic_reasoning(result: Dict[str, Any]) -> str:
         try:
             if isinstance(posterior, dict):
                 parts.append("\n- Posterior Distribution:")
-                for param, value in list(posterior.items())[:MAX_LIST_ITEMS_TO_SHOW]:
+                # Industry Standard: Use itertools.islice for memory efficiency
+                for param, value in itertools.islice(posterior.items(), MAX_LIST_ITEMS_TO_SHOW):
                     safe_param = safe_truncate_utf8(str(param), 100)
                     if isinstance(value, (int, float)):
                         parts.append(f"\n  {safe_param}: {value:.4f}")
@@ -742,7 +745,8 @@ def _format_probabilistic_reasoning(result: Dict[str, Any]) -> str:
     parameters = result.get('parameters')
     if parameters and isinstance(parameters, dict):
         parts.append("\n- Parameters:")
-        for param_name, param_value in list(parameters.items())[:MAX_LIST_ITEMS_TO_SHOW]:
+        # Industry Standard: Use itertools.islice for memory efficiency
+        for param_name, param_value in itertools.islice(parameters.items(), MAX_LIST_ITEMS_TO_SHOW):
             safe_name = safe_truncate_utf8(str(param_name), 100)
             if isinstance(param_value, (int, float)):
                 parts.append(f"\n  {safe_name}: {param_value:.4f}")
@@ -754,7 +758,8 @@ def _format_probabilistic_reasoning(result: Dict[str, Any]) -> str:
     intermediate = result.get('intermediate_values')
     if intermediate and isinstance(intermediate, dict):
         parts.append("\n- Intermediate Values:")
-        for key, value in list(intermediate.items())[:MAX_LIST_ITEMS_TO_SHOW]:
+        # Industry Standard: Use itertools.islice for memory efficiency
+        for key, value in itertools.islice(intermediate.items(), MAX_LIST_ITEMS_TO_SHOW):
             safe_key = safe_truncate_utf8(str(key), 100)
             safe_value = safe_truncate_utf8(str(value), 100)
             parts.append(f"\n  {safe_key}: {safe_value}")
@@ -790,7 +795,8 @@ def _format_analogical_reasoning(result: Dict[str, Any]) -> str:
     entity_mappings = result.get('entity_mappings')
     if entity_mappings and isinstance(entity_mappings, dict):
         parts.append("\n- Entity Mappings:")
-        for source, target in list(entity_mappings.items())[:MAX_LIST_ITEMS_TO_SHOW]:
+        # Industry Standard: Use itertools.islice for memory efficiency
+        for source, target in itertools.islice(entity_mappings.items(), MAX_LIST_ITEMS_TO_SHOW):
             safe_source = safe_truncate_utf8(str(source), 100)
             safe_target = safe_truncate_utf8(str(target), 100)
             parts.append(f"\n  {safe_source} → {safe_target}")
@@ -806,7 +812,8 @@ def _format_analogical_reasoning(result: Dict[str, Any]) -> str:
     if inferences:
         if isinstance(inferences, (list, tuple)):
             parts.append("\n- Inferences:")
-            for i, inference in enumerate(inferences[:MAX_LIST_ITEMS_TO_SHOW], 1):
+            # Industry Standard: Use itertools.islice for memory efficiency with enumerate
+            for i, inference in enumerate(itertools.islice(inferences, MAX_LIST_ITEMS_TO_SHOW), 1):
                 safe_inference = safe_truncate_utf8(str(inference), MAX_REASONING_RESULT_LENGTH)
                 parts.append(f"\n  {i}. {safe_inference}")
         else:

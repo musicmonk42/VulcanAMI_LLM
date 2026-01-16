@@ -458,7 +458,7 @@ class TestUTF8SafetyAndTruncation:
         
         formatted = _format_fol_formalization(result)
         
-        # Should be truncated to MAX_REASONING_RESULT_LENGTH (1500)
+        # Should be truncated to MAX_REASONING_RESULT_LENGTH
         assert len(formatted) < len(long_string)
         assert "A" in formatted  # Some content should be there
 
