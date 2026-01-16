@@ -157,13 +157,8 @@ def _init_lazy_imports():
     
     logger.debug("Lazy imports initialized successfully")
 
-        ValidationOutcome.REJECTED = "rejected"
-        ValidationOutcome.UNKNOWN = "unknown"
-    if isinstance(PatternType, MagicMock):
-        PatternType.SUCCESS = "success"
-        PatternType.RISKY = "risky"
 
-    logger.debug("Lazy imports for meta_reasoning initialized.")
+# --- END OF _init_lazy_imports ---
 
 
 class ObjectiveStatus(Enum):

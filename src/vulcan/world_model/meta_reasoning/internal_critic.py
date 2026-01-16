@@ -16,6 +16,69 @@ validation layers. Real-world usage requires:
 - Expert system review for safety-critical applications
 - DO NOT rely on these placeholders for actual security/safety decisions
 
+ERROR HANDLING POLICY (Meta-Reasoning Module):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. CRITICAL ERRORS (System Cannot Function):
+   - Import failures for required components → Raise ImportError with clear message
+   - Missing critical dependencies (numpy, etc.) → Raise ImportError with install instructions
+   - Invalid configuration that prevents initialization → Raise ValueError/ConfigurationError
+   - Thread lock failures during critical operations → Log critical + re-raise
+   
+   Actions: logger.critical() + raise exception
+   Rationale: Fail fast rather than operate incorrectly
+
+2. OPERATIONAL ERRORS (Feature Cannot Complete):
+   - Invalid input data types → Log error + raise TypeError/ValueError with clear message
+   - Serialization failures → Log error + raise SerializationError
+   - File I/O failures → Log error + raise IOError with context
+   - Network failures (if applicable) → Log error + raise ConnectionError
+   
+   Actions: logger.error() + raise exception OR return error result with clear status
+   Rationale: Caller should know operation failed and why
+
+3. DEGRADED FUNCTIONALITY (Feature Works With Limitations):
+   - Optional component unavailable → Log warning + use fallback/skip feature
+   - Cache miss/stale data → Log debug + recompute
+   - Non-critical parsing errors → Log warning + use default/skip entry
+   - Performance degradation → Log warning + continue with slower path
+   
+   Actions: logger.warning() + graceful degradation
+   Rationale: System continues operating, user notified of limitations
+
+4. EXPECTED CONDITIONS (Normal Operation):
+   - Empty result sets → Log debug + return empty
+   - Cache hits → Log debug + return cached
+   - Validation failures (expected) → Log info + return validation result
+   - Successfully handled edge cases → Log debug
+   
+   Actions: logger.debug() or logger.info() + return appropriate result
+   Rationale: These are normal conditions, not errors
+
+5. SILENCE IS FAILURE:
+   - Never silently swallow exceptions without logging
+   - Never return None/empty without clear reason
+   - Never use bare 'except:' or 'except Exception:' without re-raise
+   - Always provide actionable error messages with context
+
+6. SECURITY/SAFETY ERRORS:
+   - Boundary violations → Log error + alert monitors + return rejection
+   - Suspicious inputs → Log warning + return validation failure
+   - Rate limit exceeded → Log warning + return throttled response
+   - Authentication/authorization failures → Log warning + raise PermissionError
+   
+   Actions: logger.warning/error + structured response + alert external monitors
+   Rationale: Security events need audit trail and appropriate response
+
+CONSISTENCY GUIDELINES:
+- Use consistent exception types across the module
+- Include original error in 'from e' when re-raising
+- Always log before raising to ensure audit trail
+- Include relevant context in log messages (IDs, values, state)
+- Use structured logging where possible for machine parsing
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 Comprehensive internal critique system with:
 - Multi-perspective evaluation (logic, feasibility, safety, alignment, efficiency)
 - Automated risk identification and assessment (PLACEHOLDER - see warning above)
