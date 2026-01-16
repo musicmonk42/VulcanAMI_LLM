@@ -231,6 +231,32 @@ spec:
           value: {{ .Values.distillation.escalationThreshold | quote }}
         - name: DISTILLATION_HYBRID_ROUTING
           value: {{ .Values.distillation.hybridRouting | quote }}
+        {{- /* Training trigger configuration (NEW - Issue #1 Fix) */}}
+        {{- if .Values.distillation.training }}
+        {{- if .Values.distillation.training.webhookUrl }}
+        - name: DISTILLATION_TRAINING_WEBHOOK_URL
+          value: {{ .Values.distillation.training.webhookUrl | quote }}
+        {{- end }}
+        {{- if .Values.distillation.training.triggerThreshold }}
+        - name: DISTILLATION_TRAINING_TRIGGER_THRESHOLD
+          value: {{ .Values.distillation.training.triggerThreshold | quote }}
+        {{- end }}
+        {{- end }}
+        {{- /* Evaluator configuration (NEW - Issue #2 Fix) */}}
+        {{- if .Values.distillation.evaluator }}
+        {{- if .Values.distillation.evaluator.promptsPath }}
+        - name: DISTILLATION_EVALUATOR_PROMPTS_PATH
+          value: {{ .Values.distillation.evaluator.promptsPath | quote }}
+        {{- end }}
+        {{- if .Values.distillation.evaluator.sampleSize }}
+        - name: DISTILLATION_EVALUATOR_SAMPLE_SIZE
+          value: {{ .Values.distillation.evaluator.sampleSize | quote }}
+        {{- end }}
+        {{- if .Values.distillation.evaluator.randomSeed }}
+        - name: DISTILLATION_EVALUATOR_RANDOM_SEED
+          value: {{ .Values.distillation.evaluator.randomSeed | quote }}
+        {{- end }}
+        {{- end }}
         {{- end }}
         {{- /* Ray Configuration (Architectural Fix #3) */}}
         {{- if .Values.ray }}
