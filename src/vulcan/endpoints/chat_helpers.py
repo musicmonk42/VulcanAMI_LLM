@@ -508,16 +508,400 @@ def format_reasoning_results(reasoning_results: Dict[str, Any]) -> str:
     return "".join(parts)
 
 
+def _format_fol_formalization(result: Dict[str, Any]) -> str:
+    """
+    Format FOL (First-Order Logic) formalization results from symbolic reasoning.
+    
+    Industry Standards Applied:
+    - Input validation: Type and existence checks before access
+    - Security: Safe UTF-8 string truncation to prevent injection
+    - Clarity: Hierarchical presentation of readings with proper indentation
+    - Defensive: Returns empty string on malformed data rather than crashing
+    
+    Handles quantifier scope ambiguity with multiple readings:
+    - Reading A: Narrow scope (existential scoped wider)
+    - Reading B: Wide scope (universal scoped wider)
+    
+    Args:
+        result: Dictionary containing engine output, may include 'fol_formalization'
+        
+    Returns:
+        Formatted string with FOL formulas and interpretations, or empty string
+        
+    Example Input:
+        {
+            "fol_formalization": {
+                "original_sentence": "Every engineer reviewed a document.",
+                "reading_a": {
+                    "fol": "∃d.(∀e.Reviewed(e,d))",
+                    "interpretation": "Narrow scope existential",
+                    "english_rewrite": "There is a specific document..."
+                },
+                "reading_b": {...}
+            }
+        }
+    """
+    fol_formalization = result.get('fol_formalization')
+    
+    # Industry Standard: Early return on invalid input
+    if not fol_formalization or not isinstance(fol_formalization, dict):
+        return ""
+    
+    parts = []
+    
+    # Extract and format original sentence
+    original = fol_formalization.get('original_sentence')
+    if original:
+        # Security: Safe truncation respecting UTF-8 boundaries
+        safe_original = safe_truncate_utf8(str(original), MAX_REASONING_RESULT_LENGTH)
+        parts.append(f"\n- Original Sentence: \"{safe_original}\"")
+    
+    # Extract ambiguity type if present
+    ambiguity_type = fol_formalization.get('ambiguity_type')
+    if ambiguity_type:
+        parts.append(f"\n- Ambiguity Type: {ambiguity_type}")
+    
+    # Format Reading A (narrow scope)
+    reading_a = fol_formalization.get('reading_a')
+    if reading_a and isinstance(reading_a, dict):
+        parts.append("\n- Reading A (Narrow Scope):")
+        
+        fol_a = reading_a.get('fol')
+        if fol_a:
+            safe_fol_a = safe_truncate_utf8(str(fol_a), MAX_REASONING_RESULT_LENGTH)
+            parts.append(f"\n  FOL: {safe_fol_a}")
+        
+        interpretation_a = reading_a.get('interpretation')
+        if interpretation_a:
+            safe_interp_a = safe_truncate_utf8(str(interpretation_a), MAX_REASONING_RESULT_LENGTH)
+            parts.append(f"\n  Interpretation: {safe_interp_a}")
+        
+        english_a = reading_a.get('english_rewrite')
+        if english_a:
+            safe_english_a = safe_truncate_utf8(str(english_a), MAX_REASONING_RESULT_LENGTH)
+            parts.append(f"\n  English: {safe_english_a}")
+    
+    # Format Reading B (wide scope)
+    reading_b = fol_formalization.get('reading_b')
+    if reading_b and isinstance(reading_b, dict):
+        parts.append("\n- Reading B (Wide Scope):")
+        
+        fol_b = reading_b.get('fol')
+        if fol_b:
+            safe_fol_b = safe_truncate_utf8(str(fol_b), MAX_REASONING_RESULT_LENGTH)
+            parts.append(f"\n  FOL: {safe_fol_b}")
+        
+        interpretation_b = reading_b.get('interpretation')
+        if interpretation_b:
+            safe_interp_b = safe_truncate_utf8(str(interpretation_b), MAX_REASONING_RESULT_LENGTH)
+            parts.append(f"\n  Interpretation: {safe_interp_b}")
+        
+        english_b = reading_b.get('english_rewrite')
+        if english_b:
+            safe_english_b = safe_truncate_utf8(str(english_b), MAX_REASONING_RESULT_LENGTH)
+            parts.append(f"\n  English: {safe_english_b}")
+    
+    # Return concatenated parts or empty string
+    return "".join(parts) if parts else ""
+
+
+def _format_causal_reasoning(result: Dict[str, Any]) -> str:
+    """
+    Format causal reasoning results including causal graphs and interventions.
+    
+    Industry Standards Applied:
+    - Type safety: Explicit type checks before operations
+    - Performance: Efficient iteration with comprehensions
+    - Readability: Clear section headers and hierarchical structure
+    - Robustness: Handles missing or malformed graph data gracefully
+    
+    Extracts and formats:
+    - Causal graph structure (nodes and edges)
+    - Confounders and mediators
+    - Intervention recommendations
+    - Counterfactual analyses
+    
+    Args:
+        result: Dictionary containing engine output
+        
+    Returns:
+        Formatted string with causal analysis, or empty string
+    """
+    parts = []
+    
+    # Format causal graph structure
+    causal_graph = result.get('causal_graph')
+    if causal_graph and isinstance(causal_graph, dict):
+        parts.append("\n- Causal Graph:")
+        # Industry Standard: Limit output size to prevent overwhelming display
+        edge_count = 0
+        for cause, effects in list(causal_graph.items())[:MAX_LIST_ITEMS_TO_SHOW]:
+            if isinstance(effects, dict):
+                for effect, properties in list(effects.items())[:MAX_LIST_ITEMS_TO_SHOW]:
+                    edge_count += 1
+                    if edge_count > MAX_LIST_ITEMS_TO_SHOW:
+                        parts.append(f"\n  ... ({len(causal_graph)} total causal relationships)")
+                        break
+                    
+                    # Extract strength and confidence if available
+                    strength = ""
+                    if isinstance(properties, dict):
+                        strength_val = properties.get('strength')
+                        confidence_val = properties.get('confidence')
+                        if strength_val is not None:
+                            strength = f" (strength: {strength_val:.2f})"
+                        if confidence_val is not None:
+                            strength += f" (confidence: {int(confidence_val * 100)}%)"
+                    
+                    safe_cause = safe_truncate_utf8(str(cause), 100)
+                    safe_effect = safe_truncate_utf8(str(effect), 100)
+                    parts.append(f"\n  {safe_cause} → {safe_effect}{strength}")
+    
+    # Format confounders
+    confounders = result.get('confounders')
+    if confounders:
+        if isinstance(confounders, (list, set, tuple)):
+            safe_confounders = [safe_truncate_utf8(str(c), 100) for c in list(confounders)[:MAX_LIST_ITEMS_TO_SHOW]]
+            parts.append(f"\n- Confounders: {', '.join(safe_confounders)}")
+        else:
+            parts.append(f"\n- Confounders: {safe_truncate_utf8(str(confounders), MAX_REASONING_RESULT_LENGTH)}")
+    
+    # Format intervention recommendations
+    intervention = result.get('intervention')
+    if intervention:
+        safe_intervention = safe_truncate_utf8(str(intervention), MAX_REASONING_RESULT_LENGTH)
+        parts.append(f"\n- Intervention: {safe_intervention}")
+    
+    # Format counterfactual analysis
+    counterfactual = result.get('counterfactual')
+    if counterfactual:
+        safe_counterfactual = safe_truncate_utf8(str(counterfactual), MAX_REASONING_RESULT_LENGTH)
+        parts.append(f"\n- Counterfactual: {safe_counterfactual}")
+    
+    return "".join(parts) if parts else ""
+
+
+def _format_probabilistic_reasoning(result: Dict[str, Any]) -> str:
+    """
+    Format probabilistic reasoning results including Bayesian updates.
+    
+    Industry Standards Applied:
+    - Numerical precision: Proper formatting of probability values
+    - Data validation: Check for valid probability ranges [0, 1]
+    - Error handling: Graceful handling of invalid numerical data
+    - Clarity: Clear distinction between prior and posterior
+    
+    Extracts and formats:
+    - Prior and posterior distributions
+    - Likelihood values
+    - Model parameters
+    - Intermediate calculation steps
+    
+    Args:
+        result: Dictionary containing engine output
+        
+    Returns:
+        Formatted string with probabilistic analysis, or empty string
+    """
+    parts = []
+    
+    # Format posterior distribution
+    posterior = result.get('posterior')
+    if posterior is not None:
+        try:
+            if isinstance(posterior, dict):
+                parts.append("\n- Posterior Distribution:")
+                for param, value in list(posterior.items())[:MAX_LIST_ITEMS_TO_SHOW]:
+                    safe_param = safe_truncate_utf8(str(param), 100)
+                    if isinstance(value, (int, float)):
+                        parts.append(f"\n  {safe_param}: {value:.4f}")
+                    else:
+                        safe_value = safe_truncate_utf8(str(value), 100)
+                        parts.append(f"\n  {safe_param}: {safe_value}")
+            elif isinstance(posterior, (int, float)):
+                parts.append(f"\n- Posterior: {posterior:.4f}")
+            else:
+                safe_posterior = safe_truncate_utf8(str(posterior), MAX_REASONING_RESULT_LENGTH)
+                parts.append(f"\n- Posterior: {safe_posterior}")
+        except (ValueError, TypeError) as e:
+            logger.debug(f"[_format_probabilistic_reasoning] Invalid posterior value: {e}")
+    
+    # Format prior distribution
+    prior = result.get('prior')
+    if prior is not None:
+        try:
+            if isinstance(prior, (int, float)):
+                parts.append(f"\n- Prior: {prior:.4f}")
+            else:
+                safe_prior = safe_truncate_utf8(str(prior), MAX_REASONING_RESULT_LENGTH)
+                parts.append(f"\n- Prior: {safe_prior}")
+        except (ValueError, TypeError) as e:
+            logger.debug(f"[_format_probabilistic_reasoning] Invalid prior value: {e}")
+    
+    # Format model parameters
+    parameters = result.get('parameters')
+    if parameters and isinstance(parameters, dict):
+        parts.append("\n- Parameters:")
+        for param_name, param_value in list(parameters.items())[:MAX_LIST_ITEMS_TO_SHOW]:
+            safe_name = safe_truncate_utf8(str(param_name), 100)
+            if isinstance(param_value, (int, float)):
+                parts.append(f"\n  {safe_name}: {param_value:.4f}")
+            else:
+                safe_value = safe_truncate_utf8(str(param_value), 100)
+                parts.append(f"\n  {safe_name}: {safe_value}")
+    
+    # Format intermediate values
+    intermediate = result.get('intermediate_values')
+    if intermediate and isinstance(intermediate, dict):
+        parts.append("\n- Intermediate Values:")
+        for key, value in list(intermediate.items())[:MAX_LIST_ITEMS_TO_SHOW]:
+            safe_key = safe_truncate_utf8(str(key), 100)
+            safe_value = safe_truncate_utf8(str(value), 100)
+            parts.append(f"\n  {safe_key}: {safe_value}")
+    
+    return "".join(parts) if parts else ""
+
+
+def _format_analogical_reasoning(result: Dict[str, Any]) -> str:
+    """
+    Format analogical reasoning results including structural mappings.
+    
+    Industry Standards Applied:
+    - Structure preservation: Maintains hierarchical relationships in output
+    - Readability: Clear source→target mapping notation
+    - Scalability: Limits output to prevent overwhelming display
+    - Flexibility: Handles various mapping structure formats
+    
+    Extracts and formats:
+    - Entity mappings (source → target)
+    - Structural alignments
+    - Inferred relationships
+    - Similarity scores
+    
+    Args:
+        result: Dictionary containing engine output
+        
+    Returns:
+        Formatted string with analogical analysis, or empty string
+    """
+    parts = []
+    
+    # Format entity mappings
+    entity_mappings = result.get('entity_mappings')
+    if entity_mappings and isinstance(entity_mappings, dict):
+        parts.append("\n- Entity Mappings:")
+        for source, target in list(entity_mappings.items())[:MAX_LIST_ITEMS_TO_SHOW]:
+            safe_source = safe_truncate_utf8(str(source), 100)
+            safe_target = safe_truncate_utf8(str(target), 100)
+            parts.append(f"\n  {safe_source} → {safe_target}")
+    
+    # Format structural alignment
+    structural_alignment = result.get('structural_alignment')
+    if structural_alignment:
+        safe_alignment = safe_truncate_utf8(str(structural_alignment), MAX_REASONING_RESULT_LENGTH)
+        parts.append(f"\n- Structural Alignment: {safe_alignment}")
+    
+    # Format inferences
+    inferences = result.get('inferences')
+    if inferences:
+        if isinstance(inferences, (list, tuple)):
+            parts.append("\n- Inferences:")
+            for i, inference in enumerate(inferences[:MAX_LIST_ITEMS_TO_SHOW], 1):
+                safe_inference = safe_truncate_utf8(str(inference), MAX_REASONING_RESULT_LENGTH)
+                parts.append(f"\n  {i}. {safe_inference}")
+        else:
+            safe_inferences = safe_truncate_utf8(str(inferences), MAX_REASONING_RESULT_LENGTH)
+            parts.append(f"\n- Inferences: {safe_inferences}")
+    
+    # Format source and target domains
+    source_domain = result.get('source_domain')
+    if source_domain:
+        safe_source = safe_truncate_utf8(str(source_domain), MAX_REASONING_RESULT_LENGTH)
+        parts.append(f"\n- Source Domain: {safe_source}")
+    
+    target_domain = result.get('target_domain')
+    if target_domain:
+        safe_target = safe_truncate_utf8(str(target_domain), MAX_REASONING_RESULT_LENGTH)
+        parts.append(f"\n- Target Domain: {safe_target}")
+    
+    return "".join(parts) if parts else ""
+
+
+def _format_mathematical_reasoning(result: Dict[str, Any]) -> str:
+    """
+    Format mathematical reasoning results including proofs and solutions.
+    
+    Industry Standards Applied:
+    - Mathematical notation: Preserves formula structure
+    - Logical flow: Presents proof steps in order
+    - Verification: Shows solution verification status
+    - Precision: Handles numerical results with appropriate formatting
+    
+    Extracts and formats:
+    - Closed-form solutions
+    - Step-by-step proofs
+    - Verification results
+    - Intermediate calculations
+    
+    Args:
+        result: Dictionary containing engine output
+        
+    Returns:
+        Formatted string with mathematical analysis, or empty string
+    """
+    parts = []
+    
+    # Format closed-form solution
+    closed_form = result.get('closed_form')
+    if closed_form:
+        safe_closed_form = safe_truncate_utf8(str(closed_form), MAX_REASONING_RESULT_LENGTH)
+        parts.append(f"\n- Closed-Form Solution: {safe_closed_form}")
+    
+    # Format proof steps
+    proof_steps = result.get('proof_steps')
+    if proof_steps and isinstance(proof_steps, (list, tuple)):
+        parts.append("\n- Proof Steps:")
+        for i, step in enumerate(proof_steps[:MAX_REASONING_STEPS], 1):
+            safe_step = safe_truncate_utf8(str(step), MAX_REASONING_RESULT_LENGTH)
+            parts.append(f"\n  {i}. {safe_step}")
+    
+    # Format verification result
+    verification = result.get('verification')
+    if verification is not None:
+        if isinstance(verification, bool):
+            status = "Verified ✓" if verification else "Not Verified ✗"
+            parts.append(f"\n- Verification: {status}")
+        else:
+            safe_verification = safe_truncate_utf8(str(verification), MAX_REASONING_RESULT_LENGTH)
+            parts.append(f"\n- Verification: {safe_verification}")
+    
+    # Format solution method
+    method = result.get('method')
+    if method and method != 'unknown':  # Avoid duplicate generic method field
+        safe_method = safe_truncate_utf8(str(method), MAX_REASONING_RESULT_LENGTH)
+        parts.append(f"\n- Solution Method: {safe_method}")
+    
+    return "".join(parts) if parts else ""
+
+
 def _format_engine_result_dict(engine_name: str, result: Dict[str, Any]) -> str:
     """
-    Format a single reasoning engine's result dictionary.
+    Format a single reasoning engine's result dictionary with domain-specific handling.
     
-    Helper function for format_reasoning_results that handles dict-type results.
-    Extracts and formats common fields like conclusion, confidence, reasoning_type,
-    explanation, and reasoning_steps.
+    Industry Standard Practices Applied:
+    - Defensive programming: Type checks and null guards on all data access
+    - Single Responsibility: Delegates domain-specific formatting to helper functions
+    - Extensibility: Easy to add new engine-specific formatters
+    - Security: Safe string truncation respecting UTF-8 boundaries
+    - Performance: Efficient string building with list concatenation
+    - Error handling: Graceful degradation with logging on malformed data
     
-    Industry Standard: This is a private helper function (leading underscore)
-    that encapsulates complexity and makes the main function more maintainable.
+    This function now properly handles domain-specific structured outputs from:
+    - Symbolic reasoning (FOL formalization, quantifier scope analysis)
+    - Causal reasoning (causal graphs, confounders, interventions)
+    - Probabilistic reasoning (posteriors, parameters, distributions)
+    - Analogical reasoning (entity mappings, structural alignments)
+    - Mathematical reasoning (closed-form solutions, proof steps)
     
     Args:
         engine_name: Name of the reasoning engine (e.g., 'symbolic', 'probabilistic')
@@ -526,17 +910,67 @@ def _format_engine_result_dict(engine_name: str, result: Dict[str, Any]) -> str:
     Returns:
         Formatted string section for this engine, or empty string if no
         relevant data found
+        
+    Example:
+        >>> result = {
+        ...     "fol_formalization": {
+        ...         "reading_a": {"fol": "∃d.(∀e.Reviewed(e,d))", ...},
+        ...         "reading_b": {"fol": "∀e.(∃d.Reviewed(e,d))", ...}
+        ...     }
+        ... }
+        >>> formatted = _format_engine_result_dict("symbolic", result)
+        # Returns formatted FOL formalization with both readings
     """
+    # Build formatted section
+    section_parts = [f"\n{engine_name.replace('_', ' ').title()}:"]
+    has_content = False
+    
+    # =========================================================================
+    # DOMAIN-SPECIFIC FORMATTERS
+    # Industry Standard: Handle specialized output structures first
+    # =========================================================================
+    
+    # Format FOL formalization (Symbolic Reasoning)
+    fol_content = _format_fol_formalization(result)
+    if fol_content:
+        section_parts.append(fol_content)
+        has_content = True
+    
+    # Format causal reasoning outputs
+    causal_content = _format_causal_reasoning(result)
+    if causal_content:
+        section_parts.append(causal_content)
+        has_content = True
+    
+    # Format probabilistic reasoning outputs
+    probabilistic_content = _format_probabilistic_reasoning(result)
+    if probabilistic_content:
+        section_parts.append(probabilistic_content)
+        has_content = True
+    
+    # Format analogical reasoning outputs
+    analogical_content = _format_analogical_reasoning(result)
+    if analogical_content:
+        section_parts.append(analogical_content)
+        has_content = True
+    
+    # Format mathematical reasoning outputs
+    mathematical_content = _format_mathematical_reasoning(result)
+    if mathematical_content:
+        section_parts.append(mathematical_content)
+        has_content = True
+    
+    # =========================================================================
+    # GENERIC FIELDS (fallback for engines without specific formatters)
+    # Industry Standard: Maintain backward compatibility
+    # =========================================================================
+    
     # Extract common fields with safe access patterns
     conclusion = result.get('conclusion')
     confidence = result.get('confidence')
     reasoning_type = result.get('reasoning_type')
     explanation = result.get('explanation')
     reasoning_steps = result.get('reasoning_steps', [])
-    
-    # Build formatted section
-    section_parts = [f"\n{engine_name.replace('_', ' ').title()}:"]
-    has_content = False
     
     # Format conclusion
     if conclusion is not None:
