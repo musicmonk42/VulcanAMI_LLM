@@ -2799,6 +2799,7 @@ class AgentPoolManager:
             router_tool_name = None
             
             # Method 1: Check if routing instructions are in graph metadata (new path)
+            # Type safety: Validate graph is dict before accessing as dict
             if isinstance(graph, dict):
                 router_reasoning_type = graph.get("reasoning_type")
                 router_tool_name = graph.get("tool_name")
@@ -2810,10 +2811,12 @@ class AgentPoolManager:
                 router_tool_name = parameters.get("tool_name")
             
             # Method 3: Fallback to selected_tools for backward compatibility
-            if not router_tool_name and selected_tools:
+            # Performance: Pre-compute lowercased selected_tools once
+            selected_tools_lower = [t.lower() for t in selected_tools] if selected_tools else []
+            if not router_tool_name and selected_tools_lower:
                 # Use priority order to select primary tool
                 for priority_tool in TOOL_SELECTION_PRIORITY_ORDER:
-                    if priority_tool in [t.lower() for t in selected_tools]:
+                    if priority_tool in selected_tools_lower:
                         router_tool_name = priority_tool
                         break
                 if not router_tool_name:
@@ -2859,7 +2862,8 @@ class AgentPoolManager:
                     reasoning_type = None
                     
                     # PRIORITY 0: Router's explicit instruction (if provided)
-                    if router_reasoning_type and ReasoningType is not None:
+                    # Type safety: Validate router_reasoning_type is not None before calling .lower()
+                    if router_reasoning_type and isinstance(router_reasoning_type, str) and ReasoningType is not None:
                         # Map string to enum if needed
                         reasoning_type_map = {
                             "cryptographic": ReasoningType.SYMBOLIC,
@@ -2882,7 +2886,8 @@ class AgentPoolManager:
                     # PRIORITY 1: Check selected_tools from QueryRouter/QueryClassifier (legacy fallback)
                     # BUG FIX #2: Prioritize specific reasoning engines over generic world_model
                     # When router returns ['world_model', 'causal'], we should use 'causal' not 'world_model'
-                    elif selected_tools and ReasoningType is not None:
+                    # Performance: Use pre-computed selected_tools_lower
+                    elif selected_tools_lower and ReasoningType is not None:
                         tool_to_reasoning_type = {
                             'symbolic': ReasoningType.SYMBOLIC,
                             'probabilistic': ReasoningType.PROBABILISTIC,

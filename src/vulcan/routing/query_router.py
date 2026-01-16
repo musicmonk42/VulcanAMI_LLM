@@ -1851,8 +1851,8 @@ class AgentTask:
     task_type: str
     capability: str
     prompt: str
-    reasoning_type: Optional[str] = None  # MANDATORY routing instruction
-    tool_name: Optional[str] = None  # MANDATORY routing instruction
+    reasoning_type: Optional[str] = None  # Router's instruction (SHOULD be provided)
+    tool_name: Optional[str] = None  # Router's instruction (SHOULD be provided)
     priority: int = 1
     timeout_seconds: float = 15.0
     parameters: Dict[str, Any] = field(default_factory=dict)
@@ -1861,21 +1861,24 @@ class AgentTask:
 
     def validate_routing_instructions(self) -> Tuple[bool, Optional[str]]:
         """
-        Validate that mandatory routing instructions are provided.
+        Validate that routing instructions are provided and non-empty.
         
         INDUSTRY STANDARD: Defensive Programming
         Ensures the command pattern is followed - agent pool should NEVER
         make its own tool selection decisions.
         
+        Note: Empty strings are considered invalid as they provide no routing information.
+        None and empty string are both treated as "missing instruction".
+        
         Returns:
             Tuple of (is_valid, error_message)
-            - (True, None) if valid
-            - (False, error_message) if invalid
+            - (True, None) if both fields are non-empty strings
+            - (False, error_message) if either field is None or empty
         """
-        if not self.reasoning_type:
-            return False, "Missing mandatory field: reasoning_type (router must specify)"
-        if not self.tool_name:
-            return False, "Missing mandatory field: tool_name (router must specify)"
+        if not self.reasoning_type or (isinstance(self.reasoning_type, str) and not self.reasoning_type.strip()):
+            return False, "Missing or empty field: reasoning_type (router must specify non-empty value)"
+        if not self.tool_name or (isinstance(self.tool_name, str) and not self.tool_name.strip()):
+            return False, "Missing or empty field: tool_name (router must specify non-empty value)"
         return True, None
 
     def to_dict(self) -> Dict[str, Any]:
