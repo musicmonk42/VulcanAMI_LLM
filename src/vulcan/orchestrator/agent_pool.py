@@ -2986,19 +2986,19 @@ class AgentPoolManager:
                             # Extract conclusion from metadata or rationale
                             conclusion = integration_result.metadata.get(
                                 "conclusion",
-                                integration_result.metadata.get("world_model_response", integration_result.rationale)
+                                integration_result.metadata.get("world_model_response", _safe_get_attr(integration_result, "rationale", ""))
                             )
                             
                             reasoning_result = UR_ReasoningResult(
                                 conclusion=conclusion,
                                 confidence=integration_result.confidence,
-                                reasoning_type=integration_result.reasoning_strategy,
-                                explanation=integration_result.metadata.get("explanation", integration_result.rationale),
+                                reasoning_type=result_reasoning_strategy,
+                                explanation=result_metadata.get("explanation") or _safe_get_attr(integration_result, 'rationale', ''),
                                 metadata={
-                                    **integration_result.metadata,
+                                    **result_metadata,
                                     "source": "privileged_path",
                                     "selected_tools": result_selected_tools,
-                                    "strategy": integration_result.reasoning_strategy,
+                                    "strategy": result_reasoning_strategy,
                                 }
                             )
                         except ImportError:
@@ -3013,16 +3013,16 @@ class AgentPoolManager:
                             
                             conclusion = integration_result.metadata.get(
                                 "conclusion",
-                                integration_result.metadata.get("world_model_response", integration_result.rationale)
+                                integration_result.metadata.get("world_model_response", _safe_get_attr(integration_result, "rationale", ""))
                             )
                             
                             reasoning_result = PrivilegedReasoningResult(
                                 conclusion=conclusion,
                                 confidence=integration_result.confidence,
-                                reasoning_type=integration_result.reasoning_strategy,
-                                explanation=integration_result.metadata.get("explanation", integration_result.rationale),
+                                reasoning_type=result_reasoning_strategy,
+                                explanation=result_metadata.get("explanation") or _safe_get_attr(integration_result, 'rationale', ''),
                                 metadata={
-                                    **integration_result.metadata,
+                                    **result_metadata,
                                     "source": "privileged_path",
                                 }
                             )
@@ -3038,7 +3038,7 @@ class AgentPoolManager:
                                 "reasoning_applied": True,
                                 "privileged_result": True,
                                 "selected_tools": result_selected_tools,
-                                "reasoning_strategy": integration_result.reasoning_strategy,
+                                "reasoning_strategy": result_reasoning_strategy,
                             }
                         
                         # Continue to result extraction (skip all other reasoning paths)
@@ -3122,8 +3122,8 @@ class AgentPoolManager:
                             result_dict = {
                                 "confidence": integration_result.confidence,
                                 "selected_tools": result_selected_tools,
-                                "strategy": integration_result.reasoning_strategy,
-                                "conclusion": integration_result.metadata.get("conclusion", ""),
+                                "strategy": result_reasoning_strategy,
+                                "conclusion": result_metadata.get("conclusion", ""),
                             }
                             
                             # Record the successful execution (execution time not tracked here, use 0)
@@ -3193,24 +3193,24 @@ class AgentPoolManager:
                             # Extract conclusion from metadata or rationale
                             conclusion = integration_result.metadata.get(
                                 "conclusion",
-                                integration_result.metadata.get("world_model_response", integration_result.rationale)
+                                integration_result.metadata.get("world_model_response", _safe_get_attr(integration_result, "rationale", ""))
                             )
                             
                             reasoning_result = UR_ReasoningResult(
                                 conclusion=conclusion,
                                 confidence=integration_result.confidence,
                                 reasoning_type=selected_reasoning_type,
-                                explanation=integration_result.metadata.get("explanation", integration_result.rationale),
+                                explanation=result_metadata.get("explanation") or _safe_get_attr(integration_result, 'rationale', ''),
                                 metadata={
                                     "source": source_name,
                                     "selected_tools": result_selected_tools,
-                                    "strategy": integration_result.reasoning_strategy,
+                                    "strategy": result_reasoning_strategy,
                                     # Preserve world model metadata if present
-                                    "self_referential": integration_result.metadata.get("self_referential", False),
-                                    "ethical_query": integration_result.metadata.get("ethical_query", False),
-                                    "preserve_content": integration_result.metadata.get("preserve_content", False),
-                                    "no_openai_replacement": integration_result.metadata.get("no_openai_replacement", False),
-                                    "is_introspection": integration_result.metadata.get("is_introspection", False),
+                                    "self_referential": result_metadata.get("self_referential", False),
+                                    "ethical_query": result_metadata.get("ethical_query", False),
+                                    "preserve_content": result_metadata.get("preserve_content", False),
+                                    "no_openai_replacement": result_metadata.get("no_openai_replacement", False),
+                                    "is_introspection": result_metadata.get("is_introspection", False),
                                     # Add flag to indicate this came from high-confidence path
                                     "high_confidence_direct_use": True,
                                 }
@@ -3244,14 +3244,14 @@ class AgentPoolManager:
                             
                             conclusion = integration_result.metadata.get(
                                 "conclusion",
-                                integration_result.metadata.get("world_model_response", integration_result.rationale)
+                                integration_result.metadata.get("world_model_response", _safe_get_attr(integration_result, "rationale", ""))
                             )
                             
                             reasoning_result = HighConfidenceReasoningResult(
                                 conclusion=conclusion,
                                 confidence=integration_result.confidence,
                                 reasoning_type=rt_string,
-                                explanation=integration_result.metadata.get("explanation", integration_result.rationale),
+                                explanation=integration_result.metadata.get("explanation", _safe_get_attr(integration_result, "rationale", "")),
                                 metadata={
                                     "source": source_name if is_world_model_result else primary_engine,
                                     "selected_tools": result_selected_tools,
@@ -3380,7 +3380,7 @@ class AgentPoolManager:
                             "node_type": node_type,
                             "reasoning_applied": True,
                             "selected_tools": result_selected_tools,
-                            "reasoning_strategy": integration_result.reasoning_strategy,
+                            "reasoning_strategy": result_reasoning_strategy,
                         }
                     
                     # Note: Mark that reasoning was actually invoked
