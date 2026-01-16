@@ -244,6 +244,8 @@ class ReasoningResult:
     reasoning_chain: Optional[ReasoningChain] = None
     safety_status: Dict[str, Any] = field(default_factory=dict)
     metadata: Dict[str, Any] = field(default_factory=dict)
+    reasoning_strategy: Optional[ReasoningStrategy] = None  # Strategy used to produce this result
+    selected_tools: Optional[List[str]] = None  # Tools selected/used in reasoning
 
     def __post_init__(self):
         """Validate reasoning result"""
@@ -278,6 +280,22 @@ class ReasoningResult:
             self.reasoning_chain, ReasoningChain
         ):
             raise TypeError("reasoning_chain must be a ReasoningChain instance or None")
+        # Validate optional reasoning_strategy
+        if self.reasoning_strategy is not None and not isinstance(
+            self.reasoning_strategy, ReasoningStrategy
+        ):
+            raise TypeError(
+                f"reasoning_strategy must be ReasoningStrategy enum or None, got {type(self.reasoning_strategy)}"
+            )
+        # Validate optional selected_tools
+        if self.selected_tools is not None:
+            if not isinstance(self.selected_tools, list):
+                raise TypeError("selected_tools must be a list or None")
+            for idx, tool in enumerate(self.selected_tools):
+                if not isinstance(tool, str):
+                    raise TypeError(
+                        f"Tool at index {idx} in selected_tools must be a string, got {type(tool)}: {tool!r}"
+                    )
 
 
 @dataclass
@@ -1010,6 +1028,8 @@ def reasoning_result_to_dict(
             "evidence": result.evidence,
             "safety_status": result.safety_status,
             "metadata": result.metadata,
+            "reasoning_strategy": result.reasoning_strategy.value if result.reasoning_strategy else None,
+            "selected_tools": result.selected_tools,
         }
         # Include reasoning_chain if present
         if result.reasoning_chain:
@@ -1022,7 +1042,7 @@ def reasoning_result_to_dict(
     
     # Fallback: try to convert any object with common attributes
     result_dict = {}
-    for attr in ["conclusion", "confidence", "reasoning_type", "explanation"]:
+    for attr in ["conclusion", "confidence", "reasoning_type", "explanation", "reasoning_strategy", "selected_tools"]:
         if hasattr(result, attr):
             value = getattr(result, attr)
             # Handle enum values
