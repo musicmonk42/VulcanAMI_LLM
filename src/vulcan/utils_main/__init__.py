@@ -4,10 +4,10 @@
 # ============================================================
 #
 # MODULES:
-#     process_lock  - File-based process lock for split-brain prevention
+#     process_lock  - Cross-platform file-based process lock (uses filelock)
 #     timing        - Performance instrumentation decorators
 #     sanitize      - JSON sanitization utilities
-#     components    - Component initialization tracking
+#     components    - DEPRECATED: Use vulcan.reasoning.singletons instead
 #     network       - Network utilities (port scanning)
 #
 # USAGE:
@@ -22,7 +22,7 @@ import sys
 from typing import Any, Callable, Dict, Optional
 
 # Module metadata
-__version__ = "1.0.0"
+__version__ = "2.0.0"
 __author__ = "VULCAN-AGI Team"
 
 logger = logging.getLogger(__name__)
@@ -37,6 +37,7 @@ try:
     from vulcan.utils_main.process_lock import (
         ProcessLock,
         FCNTL_AVAILABLE,
+        FILELOCK_AVAILABLE,
         get_process_lock,
         set_process_lock,
     )
@@ -45,6 +46,7 @@ except ImportError as e:
     _imports_successful = False
     ProcessLock = None
     FCNTL_AVAILABLE = False
+    FILELOCK_AVAILABLE = False
     get_process_lock = None
     set_process_lock = None
 
@@ -116,7 +118,8 @@ __all__ = [
     "__author__",
     # Process Lock
     "ProcessLock",
-    "FCNTL_AVAILABLE",
+    "FCNTL_AVAILABLE",  # Backward compatibility
+    "FILELOCK_AVAILABLE",
     "get_process_lock",
     "set_process_lock",
     # Timing
@@ -130,7 +133,7 @@ __all__ = [
     "DEEP_SANITIZE_MAX_DEPTH",
     "_sanitize_payload",  # Backward compatibility
     "_deep_sanitize_for_json",  # Backward compatibility
-    # Components
+    # Components (DEPRECATED - use vulcan.reasoning.singletons)
     "initialize_component",
     "get_initialized_components",
     "set_component",
@@ -168,7 +171,8 @@ def get_module_info() -> Dict[str, Any]:
             "components": initialize_component is not None,
             "network": find_available_port is not None,
         },
-        "fcntl_available": FCNTL_AVAILABLE,
+        "fcntl_available": FCNTL_AVAILABLE,  # Backward compatibility
+        "filelock_available": FILELOCK_AVAILABLE,
     }
 
 
