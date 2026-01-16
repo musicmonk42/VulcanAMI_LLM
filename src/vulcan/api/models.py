@@ -9,11 +9,13 @@
 # VERSION HISTORY:
 #     1.0.0 - Extracted from main.py for modular architecture
 #     1.1.0 - Added request ID tracking and auto-timestamps
+#     2.0.0 - Deprecated ChatRequest in favor of UnifiedChatRequest
 # ============================================================
 
 import logging
 import secrets
 import time
+import warnings
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -21,7 +23,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from enum import Enum
 
 # Module metadata
-__version__ = "1.1.0"
+__version__ = "2.0.0"
 __author__ = "VULCAN-AGI Team"
 
 logger = logging.getLogger(__name__)
@@ -112,7 +114,7 @@ class ApprovalRequest(BaseModel):
 
 class ChatHistoryMessage(BaseModel):
     """
-    Model for a single message in chat history.
+    Model for a single chat history message.
     
     Enforces strict validation of role and content fields to ensure
     chat history integrity and prevent injection attacks.
@@ -130,7 +132,7 @@ class ChatHistoryMessage(BaseModel):
     """
     role: str = Field(
         ...,
-        description="Role of the message sender",
+        description="Role of the message sender ('user' or 'assistant')",
         pattern="^(user|assistant|system)$",
         examples=["user", "assistant", "system"]
     )
@@ -146,16 +148,65 @@ class ChatHistoryMessage(BaseModel):
         json_schema_extra={
             "example": {
                 "role": "user",
-                "content": "What is quantum entanglement?"
+                "content": "What is the capital of France?"
             }
         }
     )
 
 
 class ChatRequest(BaseModel):
-    """Request model for chat endpoint."""
-    prompt: str
-    max_tokens: int = 2000  # Increased for diagnostic purposes
+    """
+    DEPRECATED: Use UnifiedChatRequest instead.
+    
+    This model exists for backwards compatibility only.
+    It converts to UnifiedChatRequest internally.
+    
+    Migration:
+        # Old way (deprecated):
+        request = ChatRequest(prompt="Hello", max_tokens=1000)
+        
+        # New way (recommended):
+        request = UnifiedChatRequest(message="Hello", max_tokens=1000)
+    """
+    prompt: str = Field(
+        ...,
+        description="DEPRECATED: Use 'message' field in UnifiedChatRequest"
+    )
+    max_tokens: int = Field(
+        default=2000,
+        description="Maximum tokens in response"
+    )
+    
+    def __init__(self, **data):
+        warnings.warn(
+            "ChatRequest is deprecated. Use UnifiedChatRequest instead. "
+            "Change 'prompt' to 'message' in your request.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        super().__init__(**data)
+    
+    def to_unified(self) -> "UnifiedChatRequest":
+        """Convert to UnifiedChatRequest for processing."""
+        return UnifiedChatRequest(
+            message=self.prompt,
+            max_tokens=self.max_tokens,
+            history=[],
+            enable_reasoning=True,
+            enable_memory=True,
+            enable_safety=True,
+            enable_planning=True,
+            enable_causal=True,
+        )
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "prompt": "Hello (DEPRECATED - use UnifiedChatRequest)",
+                "max_tokens": 2000
+            }
+        }
+    )
 
 
 class ReasonRequest(BaseModel):
@@ -296,7 +347,10 @@ class ThumbsFeedbackRequest(BaseModel):
 
 class UnifiedChatRequest(BaseModel):
     """
-    Request model for the unified chat endpoint with full platform integration.
+    Standard request model for all chat endpoints.
+    
+    This is the canonical request model that supports all features.
+    Legacy ChatRequest is deprecated and redirects here.
     
     This endpoint orchestrates the entire VulcanAMI platform, providing access to:
     - Multi-modal processing and understanding
@@ -307,7 +361,7 @@ class UnifiedChatRequest(BaseModel):
     - World model predictions and simulations
     
     Attributes:
-        message: The user's chat message/query (required)
+        message: The user's message/prompt (required)
         max_tokens: Maximum tokens in the response (default: 2000)
         history: Conversation history as list of {"role": "...", "content": "..."} dicts
         conversation_id: Optional conversation identifier for context continuity.
@@ -332,24 +386,24 @@ class UnifiedChatRequest(BaseModel):
     """
     message: str = Field(
         ...,
-        description="User's chat message or query",
+        description="The user's message/prompt",
         min_length=1,
         max_length=10000
     )
     max_tokens: int = Field(
         default=2000,
         ge=1,
-        le=8000,
-        description="Maximum tokens in the response"
+        le=32000,
+        description="Maximum tokens in response (increased from 8000 to 32000 to support longer responses)"
     )
     history: List[ChatHistoryMessage] = Field(
         default_factory=list,
-        description="Conversation history with validated role/content messages",
+        description="Conversation history for context",
         max_length=100
     )
     conversation_id: Optional[str] = Field(
         default=None,
-        description="Optional conversation ID for context continuity (auto-generated if None)",
+        description="Optional conversation ID for tracking",
         max_length=256
     )
     # Feature toggles for fine-grained control
@@ -378,17 +432,9 @@ class UnifiedChatRequest(BaseModel):
         json_schema_extra={
             "example": {
                 "message": "Explain quantum entanglement",
-                "max_tokens": 1500,
-                "history": [
-                    {"role": "user", "content": "Hi"},
-                    {"role": "assistant", "content": "Hello! How can I help you?"}
-                ],
-                "conversation_id": "conv_12345",
-                "enable_reasoning": True,
-                "enable_memory": True,
-                "enable_safety": True,
-                "enable_planning": True,
-                "enable_causal": True
+                "max_tokens": 2000,
+                "history": [],
+                "enable_reasoning": True
             }
         }
     )

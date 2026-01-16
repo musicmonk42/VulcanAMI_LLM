@@ -220,24 +220,7 @@ async def security_headers_middleware(
     """
     Add security headers to all responses.
     
-    Implements defense-in-depth security by adding standard security headers:
-    - X-Content-Type-Options: Prevents MIME sniffing
-    - X-Frame-Options: Prevents clickjacking
-    - X-XSS-Protection: Enables XSS filtering
-    - Strict-Transport-Security: Enforces HTTPS
-    - Content-Security-Policy: Controls resource loading
-    
-    Args:
-        request: FastAPI request object
-        call_next: Next middleware or route handler
-    
-    Returns:
-        Response from handler with security headers added
-    
-    Note:
-        CSP policy is relaxed to allow CDN scripts and inline styles for
-        the chat interface. For production environments with stricter
-        security requirements, consider using nonce-based CSP.
+    Implements defense-in-depth security with strict CSP.
     """
     response = await call_next(request)
 
@@ -247,27 +230,34 @@ async def security_headers_middleware(
     # Prevent clickjacking
     response.headers["X-Frame-Options"] = "DENY"
     
-    # Enable XSS protection in older browsers
+    # Enable XSS protection
     response.headers["X-XSS-Protection"] = "1; mode=block"
     
-    # Enforce HTTPS (1 year max-age)
+    # Enforce HTTPS
     response.headers["Strict-Transport-Security"] = (
         "max-age=31536000; includeSubDomains"
     )
     
-    # Content Security Policy
-    # NOTE: 'unsafe-inline' and 'unsafe-eval' are required for:
-    # - marked.js (Markdown rendering) which may use eval internally
-    # - highlight.js (syntax highlighting) for code blocks
-    # - Inline event handlers in the chat HTML
-    # For production, consider moving to nonce-based CSP if security requirements increase
+    # Strict Content Security Policy
+    # NOTE: Removed 'unsafe-eval' - if marked.js/highlight.js break,
+    # consider using DOMPurify for markdown or a Web Worker for syntax highlighting
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
+        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
         "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; "
         "img-src 'self' data: https:; "
         "font-src 'self' data:; "
-        "connect-src 'self' https:"
+        "connect-src 'self' https:; "
+        "frame-ancestors 'none'; "
+        "base-uri 'self'; "
+        "form-action 'self'"
+    )
+    
+    # Additional security headers
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = (
+        "accelerometer=(), camera=(), geolocation=(), gyroscope=(), "
+        "magnetometer=(), microphone=(), payment=(), usb=()"
     )
 
     return response

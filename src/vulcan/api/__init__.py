@@ -44,6 +44,8 @@ try:
         # Request models
         StepRequest,
         ChatRequest,
+        UnifiedChatRequest,
+        ChatHistoryMessage,
         # Response models
         StepResponse,
         ChatMessage,
@@ -63,6 +65,8 @@ except ImportError as e:
     ErrorType = None
     StepRequest = None
     ChatRequest = None
+    UnifiedChatRequest = None
+    ChatHistoryMessage = None
     StepResponse = None
     ChatMessage = None
     ChatResponse = None
@@ -83,6 +87,10 @@ try:
         start_rate_limit_cleanup,
         stop_rate_limit_cleanup,
         check_rate_limit,
+        check_rate_limit_redis,
+        check_rate_limit_sync_redis,
+        clear_rate_limits_redis,
+        get_client_id_from_request,
     )
 except ImportError as e:
     logger.warning(f"Rate limiting module not available: {e}")
@@ -94,6 +102,10 @@ except ImportError as e:
     start_rate_limit_cleanup = None
     stop_rate_limit_cleanup = None
     check_rate_limit = None
+    check_rate_limit_redis = None
+    check_rate_limit_sync_redis = None
+    clear_rate_limits_redis = None
+    get_client_id_from_request = None
 
 try:
     from vulcan.api.middleware import (
@@ -121,6 +133,8 @@ __all__ = [
     # Request models
     "StepRequest",
     "ChatRequest",
+    "UnifiedChatRequest",
+    "ChatHistoryMessage",
     # Response models
     "StepResponse",
     "ChatMessage",
@@ -132,7 +146,7 @@ __all__ = [
     "HealthResponse",
     "MetricsResponse",
     "ErrorResponse",
-    # Rate limiting
+    # Rate limiting - In-memory
     "rate_limit_storage",
     "rate_limit_lock",
     "rate_limit_cleanup_thread",
@@ -140,6 +154,11 @@ __all__ = [
     "start_rate_limit_cleanup",
     "stop_rate_limit_cleanup",
     "check_rate_limit",
+    # Rate limiting - Redis
+    "check_rate_limit_redis",
+    "check_rate_limit_sync_redis",
+    "clear_rate_limits_redis",
+    "get_client_id_from_request",
     # Middleware
     "validate_api_key_middleware",
     "rate_limiting_middleware",

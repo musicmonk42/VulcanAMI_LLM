@@ -1455,7 +1455,11 @@ def make_request_with_retry(url, headers, data, max_retries=3):
 
 ## 8. Rate Limiting
 
-### 8.1 Default Limits
+### 8.1 Overview
+
+VulcanAMI implements distributed rate limiting with Redis support for multi-instance deployments. When Redis is unavailable, the system falls back to in-memory rate limiting (single-instance only).
+
+### 8.2 Default Limits
 
 | Endpoint Category | Limit | Window | Scope |
 |------------------|-------|--------|-------|
@@ -1465,7 +1469,21 @@ def make_request_with_retry(url, headers, data, max_retries=3):
 | Heavy Processing | 20/minute | Per user | User |
 | Health/Metrics | Unlimited | - | - |
 
-### 8.2 Rate Limit Headers
+### 8.3 Distributed Rate Limiting
+
+For production deployments with multiple workers or server instances, configure Redis:
+
+```yaml
+# Environment variables
+REDIS_URL: redis://redis-service:6379
+RATE_LIMIT_ENABLED: true
+RATE_LIMIT_REQUESTS: 100
+RATE_LIMIT_WINDOW_SECONDS: 60
+```
+
+The system uses Redis sorted sets for atomic sliding window rate limiting across all instances.
+
+### 8.4 Rate Limit Headers
 
 Responses include rate limit information:
 
@@ -1475,12 +1493,14 @@ X-RateLimit-Remaining: 95
 X-RateLimit-Reset: 1702540860
 ```
 
-### 8.3 Rate Limit Response
+### 8.5 Rate Limit Response
 
 ```json
 {
  "error": "Rate limit exceeded",
- "retry_after_seconds": 30
+ "retry_after": 60,
+ "limit": 100,
+ "window_seconds": 60
 }
 ```
 
@@ -1488,17 +1508,33 @@ X-RateLimit-Reset: 1702540860
 
 ## 9. Security Headers
 
-All responses include security headers:
+All responses include security headers following industry best practices:
 
 ```
 X-Content-Type-Options: nosniff
 X-Frame-Options: DENY
-Referrer-Policy: no-referrer
-Content-Security-Policy: default-src 'none'
-Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
-Cache-Control: no-store
+X-XSS-Protection: 1; mode=block
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+Referrer-Policy: strict-origin-when-cross-origin
+Permissions-Policy: accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()
+Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
 X-Request-ID: req_abc123xyz
 ```
+
+### 9.1 Content Security Policy (CSP)
+
+**Important:** The CSP header does **not** include `unsafe-eval` for enhanced security. If your frontend uses libraries that require `eval()` (e.g., some markdown renderers), consider:
+
+1. Using DOMPurify for safe markdown rendering
+2. Pre-rendering markdown on the server
+3. Using a Web Worker for syntax highlighting
+
+### 9.2 Security Recommendations
+
+- **HTTPS Only**: Always use HTTPS in production
+- **API Keys**: Store API keys securely using environment variables or secret management systems
+- **Token Rotation**: Rotate authentication tokens regularly
+- **Input Validation**: All inputs are validated server-side
 
 ---
 
