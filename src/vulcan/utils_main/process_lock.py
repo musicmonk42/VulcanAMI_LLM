@@ -1,690 +1,349 @@
-# ============================================================
-# VULCAN-AGI Process Lock Module
-# File-based process lock to prevent split-brain race conditions
-# ============================================================
-#
-# This lock serves as a fallback when Redis is unavailable for state
-# synchronization. If a second process attempts to start while the
-# lock is held, it will detect the existing lock file and shut down.
-#
-# PLATFORM SUPPORT:
-#     - Unix/Linux: Full support via fcntl.flock()
-#     - Windows: Graceful degradation (lock always succeeds with warning)
-#     - macOS: Full support via fcntl.flock()
-#
-# CONFIGURATION:
-#     Environment Variable: VULCAN_LOCK_PATH
-#     Default Paths:
-#         - /var/lock/vulcan_orchestrator.lock (if writable)
-#         - /tmp/vulcan_orchestrator.lock (fallback)
-#
-# USAGE:
-#     # Context manager (recommended)
-#     with ProcessLock() as lock:
-#         # Critical section - only one process can execute
-#         pass
-#     
-#     # Manual control
-#     lock = ProcessLock()
-#     if lock.acquire():
-#         try:
-#             # Critical section
-#             pass
-#         finally:
-#             lock.release()
-#
-# HEARTBEAT (v1.1.0):
-#     The lock now supports a heartbeat mechanism for distributed systems.
-#     When enabled, the lock file is periodically updated with a timestamp
-#     to indicate the process is still alive. Other processes can detect
-#     stale locks by checking if the timestamp is older than the TTL.
-#
-# VERSION HISTORY:
-#     1.0.0 - Extracted from main.py for modular architecture
-#     1.0.1 - Added comprehensive documentation and error handling
-#     1.1.0 - Added heartbeat mechanism for self-healing distributed systems
-# ============================================================
+"""
+Process Lock Module - Cross-Platform Implementation
+
+Provides file-based process locking that works on Windows, macOS, and Linux.
+Uses the `filelock` library for cross-platform compatibility.
+"""
 
 import logging
 import os
 import tempfile
-import time
 import threading
+import time
 from typing import Optional
-
-# Module metadata
-__version__ = "1.1.0"
-__author__ = "VULCAN-AGI Team"
-
-# ============================================================
-# HEARTBEAT CONFIGURATION
-# ============================================================
-
-# Default heartbeat interval in seconds - how often to refresh the lock timestamp
-DEFAULT_HEARTBEAT_INTERVAL_SECONDS = 30
-"""
-Heartbeat interval: How frequently the lock timestamp is updated.
-
-Rationale: 30 seconds provides a good balance between responsiveness
-(detecting dead processes quickly) and avoiding excessive I/O overhead.
-"""
-
-# Default TTL in seconds - how long before a lock is considered stale
-DEFAULT_LOCK_TTL_SECONDS = 90
-"""
-Lock TTL: How long after the last heartbeat before a lock is considered stale.
-
-Rationale: 3x the heartbeat interval (90 seconds) allows for some timing
-variance and brief I/O delays while still detecting crashed processes
-within a reasonable timeframe.
-"""
 
 logger = logging.getLogger(__name__)
 
+# Module metadata
+__version__ = "2.0.0"
+__author__ = "VULCAN-AGI Team"
 
-# ============================================================
-# UTILITY FUNCTIONS
-# ============================================================
+# Configuration
+DEFAULT_HEARTBEAT_INTERVAL_SECONDS = 30
+DEFAULT_LOCK_TTL_SECONDS = 90
+
+# Check for filelock availability
+try:
+    from filelock import FileLock, Timeout as FileLockTimeout
+    FILELOCK_AVAILABLE = True
+except ImportError:
+    FileLock = None
+    FileLockTimeout = None
+    FILELOCK_AVAILABLE = False
+    logger.warning(
+        "filelock library not available. Install with: pip install filelock. "
+        "Process locking will be disabled, risking split-brain conditions."
+    )
+
+# Backwards compatibility alias
+FCNTL_AVAILABLE = FILELOCK_AVAILABLE
 
 
 def is_process_running(pid: int) -> bool:
-    """
-    Check if a process with given PID is running.
-    
-    Uses os.kill with signal 0 (null signal) to check process existence.
-    This is a standard Unix technique for checking if a process is alive.
-    
-    Args:
-        pid: Process ID to check
-        
-    Returns:
-        True if process exists and is running, False otherwise
-    """
+    """Check if a process with the given PID is running."""
     if pid <= 0:
         return False
     try:
-        # Signal 0 doesn't send a signal but checks if process exists
-        os.kill(pid, 0)
-        return True
-    except ProcessLookupError:
-        # Process does not exist
-        return False
-    except PermissionError:
-        # Process exists but we don't have permission to signal it
+        os.kill(pid, 0)  # Signal 0 doesn't kill, just checks
         return True
     except OSError:
-        # Other OS errors - assume process doesn't exist
         return False
-
-
-# ============================================================
-# PLATFORM-SPECIFIC IMPORTS
-# ============================================================
-
-# File-based locking for split-brain prevention when Redis is unavailable
-try:
-    import fcntl
-    FCNTL_AVAILABLE = True
-    logger.debug("fcntl module available - file locking enabled")
-except ImportError:
-    fcntl = None
-    FCNTL_AVAILABLE = False
-    logger.warning(
-        "fcntl module not available (non-Unix system). "
-        "File-based locking disabled - split-brain prevention unavailable."
-    )
-
-
-# ============================================================
-# PROCESS LOCK CLASS
-# ============================================================
+    except Exception:
+        return False
 
 
 class ProcessLock:
     """
-    File-based process lock to prevent split-brain race conditions.
+    Cross-platform file-based process lock for split-brain prevention.
     
-    This lock serves as a fallback when Redis is unavailable for state synchronization.
-    If a second process attempts to start while the lock is held, it will detect
-    the existing lock file and shut down immediately.
+    Uses the `filelock` library which works on Windows, macOS, and Linux.
+    Includes heartbeat mechanism for detecting stale locks from crashed processes.
     
-    Uses fcntl.flock() on Unix systems for advisory file locking.
+    Usage:
+        lock = ProcessLock()
+        if lock.acquire():
+            try:
+                # Protected code here
+                pass
+            finally:
+                lock.release()
+        
+        # Or as context manager:
+        with ProcessLock() as lock:
+            if lock.is_locked():
+                # Protected code here
+                pass
     
-    Heartbeat Support (v1.1.0):
-        The lock now supports a heartbeat mechanism that periodically updates
-        the lock file with a timestamp. This allows other processes to detect
-        stale locks from crashed processes and safely acquire them. The heartbeat
-        runs in a daemon thread that automatically stops on shutdown.
-    
-    The lock file path can be configured via:
-    - VULCAN_LOCK_PATH environment variable
-    - Constructor parameter
-    - Default: /var/lock/vulcan_orchestrator.lock (falls back to /tmp if /var/lock doesn't exist)
-    
-    Lock File Format:
-        Line 1: PID
-        Line 2: Timestamp (Unix time) - added by heartbeat
+    Attributes:
+        lock_path: Path to the lock file
+        heartbeat_interval: Seconds between heartbeat updates
+        lock_ttl: Seconds before a lock is considered stale
     """
     
-    # Default paths - /var/lock is preferred for container environments
     DEFAULT_LOCK_DIR = "/var/lock"
-    # Use tempfile.gettempdir() instead of hardcoded /tmp for security (B108)
     FALLBACK_LOCK_DIR = tempfile.gettempdir()
     LOCK_FILENAME = "vulcan_orchestrator.lock"
     
     def __init__(
         self,
-        lock_path: str = None,
-        heartbeat_interval: float = DEFAULT_HEARTBEAT_INTERVAL_SECONDS,
-        lock_ttl: float = DEFAULT_LOCK_TTL_SECONDS,
+        lock_path: Optional[str] = None,
+        heartbeat_interval: int = DEFAULT_HEARTBEAT_INTERVAL_SECONDS,
+        lock_ttl: int = DEFAULT_LOCK_TTL_SECONDS,
         enable_heartbeat: bool = True,
     ):
         """
         Initialize the process lock.
         
         Args:
-            lock_path: Optional custom path for the lock file
-            heartbeat_interval: How often to update the lock timestamp (seconds)
-            lock_ttl: How long before a lock is considered stale (seconds)
-            enable_heartbeat: Whether to start the heartbeat thread on acquire
+            lock_path: Path to lock file (default: auto-detect)
+            heartbeat_interval: Seconds between heartbeat updates
+            lock_ttl: Seconds before lock is considered stale
+            enable_heartbeat: Whether to run heartbeat thread
         """
         self.lock_path = lock_path or self._get_default_lock_path()
-        self._lock_file = None
-        self._locked = False
-        self._logger = logging.getLogger("ProcessLock")
+        self.heartbeat_interval = heartbeat_interval
+        self.lock_ttl = lock_ttl
+        self.enable_heartbeat = enable_heartbeat
         
-        # Heartbeat configuration
-        self._heartbeat_interval = heartbeat_interval
-        self._lock_ttl = lock_ttl
-        self._enable_heartbeat = enable_heartbeat
+        self._lock: Optional[FileLock] = None
+        self._locked = False
         self._heartbeat_thread: Optional[threading.Thread] = None
         self._heartbeat_stop_event = threading.Event()
-        self._last_heartbeat: float = 0.0
+        self._pid = os.getpid()
+        
+        # Metadata file for heartbeat (separate from lock file)
+        self._metadata_path = self.lock_path + ".meta"
+        
+        if FILELOCK_AVAILABLE:
+            self._lock = FileLock(self.lock_path, timeout=0)
     
     @classmethod
     def _get_default_lock_path(cls) -> str:
-        """Get the default lock file path, respecting environment variable."""
-        # Priority 1: Environment variable
-        env_path = os.getenv("VULCAN_LOCK_PATH")
-        if env_path:
-            return env_path
-        
-        # Priority 2: /var/lock if it exists and is writable
+        """Get the default lock file path."""
+        # Try /var/lock first (Linux standard), fall back to temp dir
         if os.path.isdir(cls.DEFAULT_LOCK_DIR) and os.access(cls.DEFAULT_LOCK_DIR, os.W_OK):
             return os.path.join(cls.DEFAULT_LOCK_DIR, cls.LOCK_FILENAME)
-        
-        # Priority 3: /tmp as fallback
         return os.path.join(cls.FALLBACK_LOCK_DIR, cls.LOCK_FILENAME)
     
-    def _read_lock_info(self) -> tuple[Optional[int], Optional[float]]:
-        """
-        Read PID and timestamp from lock file.
-        
-        Returns:
-            Tuple of (pid, timestamp) where either may be None if not available.
-            
-        Thread Safety:
-            This method should only be called when holding the file lock
-            or when the lock file is known to be stable.
-        """
+    def _read_metadata(self) -> tuple[Optional[int], Optional[float]]:
+        """Read PID and timestamp from metadata file."""
         try:
-            with open(self.lock_path, "r") as f:
-                lines = f.read().strip().split("\n")
-                pid = int(lines[0]) if lines and lines[0] else None
-                timestamp = float(lines[1]) if len(lines) > 1 and lines[1] else None
-                return pid, timestamp
-        except (FileNotFoundError, ValueError, IndexError, OSError):
-            return None, None
+            if os.path.exists(self._metadata_path):
+                with open(self._metadata_path, 'r') as f:
+                    content = f.read().strip()
+                    if content:
+                        parts = content.split(':')
+                        if len(parts) == 2:
+                            return int(parts[0]), float(parts[1])
+        except (ValueError, IOError, OSError) as e:
+            logger.debug(f"Could not read lock metadata: {e}")
+        return None, None
     
-    def _write_lock_info(self, pid: int, timestamp: float) -> None:
-        """
-        Write PID and timestamp to lock file.
-        
-        Args:
-            pid: Process ID to write
-            timestamp: Unix timestamp to write
-            
-        Thread Safety:
-            This method should only be called when holding the file lock.
-        """
-        if self._lock_file:
-            self._lock_file.seek(0)
-            self._lock_file.truncate(0)
-            self._lock_file.write(f"{pid}\n{timestamp}\n")
-            self._lock_file.flush()
-            # Ensure data is written to disk for durability
-            os.fsync(self._lock_file.fileno())
+    def _write_metadata(self) -> None:
+        """Write PID and timestamp to metadata file."""
+        try:
+            with open(self._metadata_path, 'w') as f:
+                f.write(f"{self._pid}:{time.time()}")
+        except (IOError, OSError) as e:
+            logger.warning(f"Could not write lock metadata: {e}")
     
-    def _is_lock_stale(self, pid: Optional[int], timestamp: Optional[float]) -> bool:
-        """
-        Check if a lock is stale based on PID and timestamp.
+    def _clear_metadata(self) -> None:
+        """Remove the metadata file."""
+        try:
+            if os.path.exists(self._metadata_path):
+                os.remove(self._metadata_path)
+        except (IOError, OSError) as e:
+            logger.debug(f"Could not remove lock metadata: {e}")
+    
+    def _is_lock_stale(self) -> bool:
+        """Check if an existing lock is stale (from crashed process)."""
+        pid, timestamp = self._read_metadata()
         
-        A lock is considered stale if:
-        1. The process is no longer running, OR
-        2. The timestamp is older than the TTL (heartbeat expired)
+        if pid is None or timestamp is None:
+            return True  # No metadata = stale
         
-        Args:
-            pid: Process ID from lock file
-            timestamp: Timestamp from lock file
-            
-        Returns:
-            True if lock is stale and can be safely acquired, False otherwise.
-        """
-        # If no PID, lock file is corrupted - treat as stale
-        if pid is None:
-            self._logger.warning("Lock file has no PID - treating as stale")
-            return True
-        
-        # Check if process is still running
+        # Check if holding process is still alive
         if not is_process_running(pid):
-            self._logger.warning(
-                f"Lock held by PID {pid} which is no longer running - treating as stale"
-            )
+            logger.info(f"Lock holder (PID {pid}) is no longer running - lock is stale")
             return True
         
-        # If heartbeat is enabled, check timestamp
-        if self._enable_heartbeat and timestamp is not None:
-            age = time.time() - timestamp
-            if age > self._lock_ttl:
-                self._logger.warning(
-                    f"Lock heartbeat expired: last update {age:.1f}s ago "
-                    f"(TTL: {self._lock_ttl}s) - treating as stale. "
-                    f"PID {pid} may be a zombie or frozen process."
-                )
-                return True
+        # Check if heartbeat is too old
+        age = time.time() - timestamp
+        if age > self.lock_ttl:
+            logger.info(f"Lock heartbeat is {age:.1f}s old (TTL: {self.lock_ttl}s) - lock is stale")
+            return True
         
         return False
     
     def _heartbeat_loop(self) -> None:
-        """
-        Background thread that periodically updates the lock timestamp.
-        
-        This provides a heartbeat mechanism for distributed systems:
-        - Other processes can detect if this process has crashed by checking
-          if the timestamp is older than the TTL
-        - Enables self-healing: crashed processes' locks can be safely acquired
-        
-        Thread Safety:
-            This method runs in its own daemon thread and uses the stop event
-            for clean shutdown. File operations are atomic via fsync.
-        """
-        self._logger.debug(
-            f"Heartbeat thread started (interval: {self._heartbeat_interval}s, "
-            f"TTL: {self._lock_ttl}s)"
-        )
-        
-        consecutive_failures = 0
-        max_failures = 3
-        
+        """Background thread that updates the heartbeat timestamp."""
+        logger.debug("Heartbeat thread started")
         while not self._heartbeat_stop_event.is_set():
             try:
-                if self._locked and self._lock_file:
-                    current_time = time.time()
-                    self._write_lock_info(os.getpid(), current_time)
-                    self._last_heartbeat = current_time
-                    consecutive_failures = 0
-                    self._logger.debug(
-                        f"Heartbeat updated: PID {os.getpid()}, timestamp {current_time:.3f}"
-                    )
+                self._write_metadata()
             except Exception as e:
-                consecutive_failures += 1
-                self._logger.warning(
-                    f"Heartbeat update failed ({consecutive_failures}/{max_failures}): {e}"
-                )
-                if consecutive_failures >= max_failures:
-                    self._logger.error(
-                        f"Heartbeat failed {max_failures} consecutive times. "
-                        "Lock may become stale. Consider investigating disk I/O issues."
-                    )
-                    # Don't break - keep trying, the issue may be transient
+                logger.warning(f"Heartbeat update failed: {e}")
             
-            # Wait for next heartbeat interval or until stopped
-            self._heartbeat_stop_event.wait(self._heartbeat_interval)
-        
-        self._logger.debug("Heartbeat thread stopped")
+            # Wait for interval or stop event
+            self._heartbeat_stop_event.wait(self.heartbeat_interval)
+        logger.debug("Heartbeat thread stopped")
     
     def _start_heartbeat(self) -> None:
-        """
-        Start the heartbeat background thread.
-        
-        Thread Safety:
-            Safe to call multiple times - will only start one thread.
-        """
-        if not self._enable_heartbeat:
-            return
-        
-        if self._heartbeat_thread is not None and self._heartbeat_thread.is_alive():
-            self._logger.debug("Heartbeat thread already running")
+        """Start the heartbeat background thread."""
+        if not self.enable_heartbeat:
             return
         
         self._heartbeat_stop_event.clear()
         self._heartbeat_thread = threading.Thread(
             target=self._heartbeat_loop,
             name="ProcessLock-Heartbeat",
-            daemon=True  # Daemon thread - won't prevent process exit
+            daemon=True,
         )
         self._heartbeat_thread.start()
-        self._logger.info(
-            f"Heartbeat thread started (interval={self._heartbeat_interval}s, "
-            f"ttl={self._lock_ttl}s)"
-        )
     
     def _stop_heartbeat(self) -> None:
-        """
-        Stop the heartbeat background thread gracefully.
-        
-        Thread Safety:
-            Safe to call multiple times. Uses event signaling for clean shutdown.
-        """
-        if self._heartbeat_thread is None:
-            return
-        
-        self._heartbeat_stop_event.set()
-        
-        # Wait for thread to finish with timeout
-        if self._heartbeat_thread.is_alive():
-            self._heartbeat_thread.join(timeout=self._heartbeat_interval + 1)
-            if self._heartbeat_thread.is_alive():
-                self._logger.warning(
-                    "Heartbeat thread did not stop within timeout. "
-                    "Thread will be terminated on process exit (daemon thread)."
-                )
-        
-        self._heartbeat_thread = None
-        self._logger.debug("Heartbeat thread stopped")
+        """Stop the heartbeat background thread."""
+        if self._heartbeat_thread is not None:
+            self._heartbeat_stop_event.set()
+            self._heartbeat_thread.join(timeout=2.0)
+            self._heartbeat_thread = None
     
     def acquire(self) -> bool:
         """
         Attempt to acquire the process lock.
         
-        This method implements a robust lock acquisition strategy:
-        1. Try to acquire the file lock (non-blocking)
-        2. If lock is held, check if it's stale (dead process or expired heartbeat)
-        3. If stale, remove and retry
-        4. If acquired, start heartbeat thread (if enabled)
-        
         Returns:
-            True if lock was acquired successfully, False otherwise.
-            
-        Thread Safety:
-            This method is not thread-safe. Only one thread per process
-            should attempt to acquire the lock.
+            True if lock was acquired, False if another process holds it.
+        
+        Note:
+            If the existing lock is stale (holder crashed), it will be
+            forcibly acquired after clearing the stale lock.
         """
-        if not FCNTL_AVAILABLE:
-            self._logger.warning(
-                "fcntl not available (non-Unix system). "
-                "File-based locking disabled - split-brain prevention unavailable."
+        if not FILELOCK_AVAILABLE:
+            logger.error(
+                "CRITICAL: filelock library not available! "
+                "Install with: pip install filelock. "
+                "Running without lock protection - RISK OF DATA CORRUPTION!"
             )
-            return True  # Allow process to continue without lock on non-Unix systems
+            # Return False to indicate lock failure, not True (which would be a lie)
+            return False
         
         try:
-            # Ensure parent directory exists
-            lock_dir = os.path.dirname(self.lock_path)
-            if lock_dir and not os.path.exists(lock_dir):
-                os.makedirs(lock_dir, exist_ok=True)
-            
-            # Open file for reading and writing
-            # Use 'a+' to create if not exists, then seek to beginning
-            # This is safer than 'w+' which would truncate before we can read
-            # existing lock info, and handles the race condition better than
-            # checking existence first.
-            self._lock_file = open(self.lock_path, "a+")
-            self._lock_file.seek(0)
-            
-            # Try to acquire exclusive lock (non-blocking)
-            fcntl.flock(self._lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-            
-            # We now hold the lock - write our PID and initial timestamp
-            current_time = time.time()
-            self._write_lock_info(os.getpid(), current_time)
-            self._last_heartbeat = current_time
-            
+            # Try to acquire the lock (non-blocking)
+            self._lock.acquire(timeout=0)
             self._locked = True
-            self._logger.info(
-                f"Process lock acquired (PID: {os.getpid()}, file: {self.lock_path})"
-            )
-            
-            # Start heartbeat thread if enabled
+            self._write_metadata()
             self._start_heartbeat()
-            
+            logger.info(f"Process lock acquired: {self.lock_path} (PID: {self._pid})")
             return True
             
-        except (IOError, OSError) as e:
-            # Lock is held by another process - check if it's stale
-            if self._lock_file:
-                self._lock_file.close()
-                self._lock_file = None
-            
-            # Read existing lock info
-            existing_pid, existing_timestamp = self._read_lock_info()
-            
-            # Check if lock is stale
-            if self._is_lock_stale(existing_pid, existing_timestamp):
-                self._logger.warning(
-                    f"Detected stale lock (PID: {existing_pid}, "
-                    f"timestamp: {existing_timestamp}). "
-                    "Removing stale lock and retrying acquisition."
-                )
-                
-                # Remove stale lock file
+        except FileLockTimeout:
+            # Lock is held by another process - check if stale
+            if self._is_lock_stale():
+                logger.warning("Stale lock detected - forcibly acquiring")
                 try:
-                    os.remove(self.lock_path)
-                except OSError as remove_error:
-                    self._logger.debug(
-                        f"Lock file already removed or inaccessible: {remove_error}"
-                    )
-                
-                # Retry lock acquisition once
-                try:
-                    self._lock_file = open(self.lock_path, "a+")
-                    self._lock_file.seek(0)
-                    fcntl.flock(self._lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    # Force release stale lock
+                    self._lock.release(force=True)
+                    self._clear_metadata()
                     
-                    current_time = time.time()
-                    self._write_lock_info(os.getpid(), current_time)
-                    self._last_heartbeat = current_time
-                    
+                    # Try again
+                    self._lock.acquire(timeout=0)
                     self._locked = True
-                    self._logger.info(
-                        f"Process lock acquired after removing stale lock "
-                        f"(PID: {os.getpid()}, file: {self.lock_path})"
-                    )
-                    
-                    # Start heartbeat thread if enabled
+                    self._write_metadata()
                     self._start_heartbeat()
-                    
+                    logger.info(f"Process lock acquired (after clearing stale): {self.lock_path}")
                     return True
-                except (IOError, OSError) as retry_error:
-                    if self._lock_file:
-                        self._lock_file.close()
-                        self._lock_file = None
-                    self._logger.error(
-                        f"Failed to acquire lock after removing stale lock: {retry_error}"
-                    )
+                except Exception as e:
+                    logger.error(f"Failed to acquire lock after clearing stale: {e}")
                     return False
-            
-            # Lock is held by an active process
-            pid_info = f" (held by PID: {existing_pid})" if existing_pid else ""
-            timestamp_info = ""
-            if existing_timestamp:
-                age = time.time() - existing_timestamp
-                timestamp_info = f", last heartbeat: {age:.1f}s ago"
-            
-            self._logger.error(
-                f"Failed to acquire process lock: {e}.{pid_info}{timestamp_info} "
-                f"Another vulcan.orchestrator instance is running. "
-                f"Lock file: {self.lock_path}"
-            )
-            return False
-            
+            else:
+                pid, _ = self._read_metadata()
+                logger.warning(
+                    f"Process lock held by another process (PID: {pid}). "
+                    f"Cannot start - would cause split-brain condition."
+                )
+                return False
+                
         except Exception as e:
-            self._logger.error(f"Unexpected error acquiring process lock: {e}")
-            if self._lock_file:
-                self._lock_file.close()
-                self._lock_file = None
+            logger.error(f"Unexpected error acquiring lock: {e}")
             return False
     
     def release(self) -> None:
-        """
-        Release the process lock.
-        
-        This method:
-        1. Stops the heartbeat thread (if running)
-        2. Releases the file lock
-        3. Removes the lock file
-        
-        Thread Safety:
-            Safe to call multiple times. Subsequent calls are no-ops.
-        """
-        if not self._locked:
-            return
-        
-        # Mark as unlocked first to prevent re-entry issues
-        # This is safe because we check _locked at entry
-        was_locked = self._locked
-        self._locked = False
-        
-        # Stop heartbeat thread first
+        """Release the process lock."""
         self._stop_heartbeat()
         
-        try:
-            if self._lock_file:
-                if FCNTL_AVAILABLE:
-                    fcntl.flock(self._lock_file.fileno(), fcntl.LOCK_UN)
-                self._lock_file.close()
-                self._lock_file = None
-            
-            # Remove lock file
+        if self._lock is not None and self._locked:
             try:
-                os.remove(self.lock_path)
-            except OSError as remove_error:
-                self._logger.debug(
-                    f"Lock file already removed or inaccessible during release: {remove_error}"
-                )
-                
-            self._logger.info("Process lock released")
-        except Exception as e:
-            self._logger.warning(f"Error releasing process lock: {e}")
-            # _locked is already False, so no need to set it again
+                self._lock.release()
+                self._clear_metadata()
+                logger.info(f"Process lock released: {self.lock_path}")
+            except Exception as e:
+                logger.warning(f"Error releasing lock: {e}")
+            finally:
+                self._locked = False
     
     def is_locked(self) -> bool:
-        """
-        Check if lock is currently held by this process.
-        
-        Returns:
-            True if this process holds the lock, False otherwise.
-        """
+        """Check if this instance holds the lock."""
         return self._locked
     
     def get_heartbeat_status(self) -> dict:
-        """
-        Get current heartbeat status for monitoring/diagnostics.
-        
-        Returns:
-            Dictionary with heartbeat status information:
-            - enabled: Whether heartbeat is enabled
-            - thread_alive: Whether heartbeat thread is running
-            - last_heartbeat: Timestamp of last successful heartbeat
-            - interval: Configured heartbeat interval
-            - ttl: Configured lock TTL
-        """
+        """Get status information about the heartbeat."""
+        pid, timestamp = self._read_metadata()
         return {
-            "enabled": self._enable_heartbeat,
-            "thread_alive": (
-                self._heartbeat_thread is not None and 
-                self._heartbeat_thread.is_alive()
-            ),
-            "last_heartbeat": self._last_heartbeat,
-            "seconds_since_heartbeat": (
-                time.time() - self._last_heartbeat if self._last_heartbeat > 0 else None
-            ),
-            "interval": self._heartbeat_interval,
-            "ttl": self._lock_ttl,
+            "locked": self._locked,
+            "lock_path": self.lock_path,
+            "pid": pid,
+            "last_heartbeat": timestamp,
+            "heartbeat_age": time.time() - timestamp if timestamp else None,
+            "thread_alive": self._heartbeat_thread.is_alive() if self._heartbeat_thread else False,
         }
     
-    def __enter__(self):
-        """Context manager entry - acquire lock."""
-        if not self.acquire():
-            raise RuntimeError(
-                "Failed to acquire process lock - another instance may be running. "
-                "This prevents split-brain race conditions when Redis is unavailable."
-            )
+    def __enter__(self) -> 'ProcessLock':
+        """Context manager entry."""
+        self.acquire()
         return self
     
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """Context manager exit - release lock."""
+    def __exit__(self, exc_type, exc_val, exc_tb) -> bool:
+        """Context manager exit."""
         self.release()
         return False
     
     def __repr__(self) -> str:
-        """String representation of the lock."""
-        status = "locked" if self._locked else "unlocked"
-        heartbeat = "heartbeat=on" if self._enable_heartbeat else "heartbeat=off"
-        return f"ProcessLock(path={self.lock_path!r}, status={status}, {heartbeat})"
+        return f"ProcessLock(path={self.lock_path}, locked={self._locked})"
 
 
-# ============================================================
-# GLOBAL PROCESS LOCK MANAGEMENT
-# ============================================================
-
-# Global process lock instance (initialized during startup)
+# Module-level singleton
 _process_lock: Optional[ProcessLock] = None
 
 
 def get_process_lock() -> Optional[ProcessLock]:
-    """
-    Get the global process lock instance.
-    
-    Returns:
-        The global ProcessLock instance, or None if not initialized
-    """
+    """Get the global process lock instance."""
     return _process_lock
 
 
 def set_process_lock(lock: ProcessLock) -> None:
-    """
-    Set the global process lock instance.
-    
-    Args:
-        lock: The ProcessLock instance to set as global
-    """
+    """Set the global process lock instance."""
     global _process_lock
     _process_lock = lock
-    logger.debug(f"Global process lock set: {lock}")
 
 
 def create_and_acquire_lock(lock_path: str = None) -> Optional[ProcessLock]:
-    """
-    Create a new process lock and attempt to acquire it.
-    
-    Args:
-        lock_path: Optional path for the lock file
-        
-    Returns:
-        ProcessLock instance if acquired successfully, None otherwise
-    """
-    lock = ProcessLock(lock_path)
+    """Create a process lock and attempt to acquire it."""
+    lock = ProcessLock(lock_path=lock_path)
     if lock.acquire():
         set_process_lock(lock)
         return lock
     return None
 
 
-# ============================================================
-# MODULE EXPORTS
-# ============================================================
-
 __all__ = [
     "ProcessLock",
-    "FCNTL_AVAILABLE",
-    "is_process_running",
+    "FILELOCK_AVAILABLE",
+    "FCNTL_AVAILABLE",  # Backwards compatibility
     "get_process_lock",
     "set_process_lock",
     "create_and_acquire_lock",
+    "is_process_running",
     "DEFAULT_HEARTBEAT_INTERVAL_SECONDS",
     "DEFAULT_LOCK_TTL_SECONDS",
 ]
-
-
-# Log module initialization
-logger.debug(f"Process lock module v{__version__} loaded (fcntl available: {FCNTL_AVAILABLE})")
