@@ -27,73 +27,14 @@ from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
 
-# import numpy as np # Original import
 from typing import Any, Dict, List, Optional
 
-# FIXED: Import Mock for type checking in __init__
 from unittest.mock import MagicMock, Mock
 
-# --- START FIX: Add numpy fallback ---
-logger = logging.getLogger(__name__)  # Moved logger init up
-try:
-    import numpy as np
+from vulcan.world_model.meta_reasoning.numpy_compat import np, NUMPY_AVAILABLE
+from vulcan.world_model.meta_reasoning.serialization_mixin import SerializationMixin
 
-    NUMPY_AVAILABLE = True
-except ImportError:
-    NUMPY_AVAILABLE = False
-    logger.warning(
-        "NumPy not available. Using limited FakeNumpy fallback. "
-        "Some advanced features may not work correctly. "
-        "For full functionality, install numpy: pip install numpy"
-    )
-
-    class FakeNumpy:
-        # Define necessary numpy functions used in this file
-        @staticmethod
-        def zeros(shape):
-            if isinstance(shape, int):
-                return [0.0] * shape
-            if len(shape) == 1:
-                return [0.0] * shape[0]
-            if len(shape) == 2:
-                return [[0.0] * shape[1] for _ in range(shape[0])]
-            raise NotImplementedError("FakeNumpy only supports 1D/2D zeros")
-
-        @staticmethod
-        def array(data):
-            return list(data)  # Just return list
-
-        @staticmethod
-        def mean(lst):
-            return sum(lst) / len(lst) if lst else 0.0
-
-        @staticmethod
-        def max(a, axis=None, out=None, keepdims=False, initial=None, where=True):
-            if not a or (
-                isinstance(a, list)
-                and not any(isinstance(row, list) for row in a)
-                and not a
-            ):  # Empty list or list of empty lists
-                return 0.0  # Or raise error
-            if isinstance(a[0], list):  # 2D list
-                return max(max(row) for row in a if row)
-            else:  # 1D list
-                return max(a)
-
-        @staticmethod
-        def triu_indices(n, k=0, m=None):
-            if m is None:
-                m = n
-            rows, cols = [], []
-            for i in range(n):
-                for j in range(m):
-                    if i <= j - k:
-                        rows.append(i)
-                        cols.append(j)
-            return (rows, cols)
-
-    np = FakeNumpy()
-# --- END FIX ---
+logger = logging.getLogger(__name__)
 
 
 # --- START FIX: Strengthen ObjectiveHierarchy fallback ---
@@ -243,7 +184,7 @@ class MultiObjectiveTension:
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 
-class GoalConflictDetector:
+class GoalConflictDetector(SerializationMixin):
     """
     Detects conflicts between objectives
 
@@ -255,6 +196,8 @@ class GoalConflictDetector:
 
     Suggests resolutions for detected conflicts.
     """
+
+    _unpickleable_attrs = ['lock', '_np']
 
     # --- START FIX: Modify __init__ for optional hierarchy ---
     def __init__(self, objective_hierarchy: Optional[ObjectiveHierarchy] = None):
@@ -362,83 +305,10 @@ class GoalConflictDetector:
 
         logger.info("GoalConflictDetector initialized successfully")
 
-    def __getstate__(self) -> Dict[str, Any]:
-        """
-        Prepare instance state for pickle serialization.
-        
-        Implements industry-standard serialization with:
-        - Thread-safe state capture (acquires lock)
-        - Explicit removal of unpickleable objects
-        - Serialization metadata for debugging/versioning
-        
-        Returns:
-            Dictionary containing all pickleable state
-            
-        Thread Safety:
-            Acquires self.lock before capturing state
-            
-        Removed Attributes:
-            - lock: threading.RLock (re-created on restore)
-            - _np: numpy module reference (re-created on restore)
-            
-        Note:
-            objective_hierarchy IS pickled. If it contains unpickleable
-            items (like locks), it must implement its own __getstate__.
-        """
-        self.lock.acquire()
-        try:
-            state = self.__dict__.copy()
-            
-            # Remove unpickleable items
-            state.pop('lock', None)
-            state.pop('_np', None)
-            
-            # Add serialization metadata
-            state['_serialization_metadata'] = {
-                'version': '1.0.0',
-                'serialized_at': time.time(),
-                'class': f"{self.__class__.__module__}.{self.__class__.__name__}",
-            }
-            
-            logger.debug(
-                f"GoalConflictDetector serialized: {len(state)} keys"
-            )
-            return state
-        finally:
-            self.lock.release()
-
-    def __setstate__(self, state: Dict[str, Any]) -> None:
-        """
-        Restore instance state after pickle deserialization.
-        
-        Implements industry-standard deserialization with:
-        - Metadata extraction and version checking
-        - Re-creation of threading locks
-        - Re-establishment of numpy module reference
-        
-        Args:
-            state: Dictionary from __getstate__
-            
-        Post-Conditions:
-            - self.lock is a new RLock instance
-            - self._np references numpy or FakeNumpy
-            - All other state is restored from pickle
-        """
-        metadata = state.pop('_serialization_metadata', {})
-        version = metadata.get('version', 'unknown')
-        
-        if version != '1.0.0':
-            logger.warning(
-                f"GoalConflictDetector deserialized from version {version}"
-            )
-        
-        self.__dict__.update(state)
-        
-        # Re-create unpickleable objects
+    def _restore_unpickleable_attrs(self) -> None:
+        """Restore unpickleable attributes after deserialization."""
         self.lock = threading.RLock()
         self._np = np if NUMPY_AVAILABLE else FakeNumpy
-        
-        logger.debug("GoalConflictDetector restored from serialization")
 
     def _initialize_conflict_rules(self) -> List[Dict[str, Any]]:
         """Initialize conflict detection rules"""

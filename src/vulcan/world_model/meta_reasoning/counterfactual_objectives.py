@@ -19,9 +19,10 @@ import time
 from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
-from unittest.mock import MagicMock  # ADDED as per fix steps
+from unittest.mock import MagicMock
 
-import numpy as np
+from vulcan.world_model.meta_reasoning.numpy_compat import np, NUMPY_AVAILABLE
+from vulcan.world_model.meta_reasoning.serialization_mixin import SerializationMixin
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +68,7 @@ class ParetoPoint:
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 
-class CounterfactualObjectiveReasoner:
+class CounterfactualObjectiveReasoner(SerializationMixin):
     """
     Answers: 'What if I optimized for X instead of Y?'
 
@@ -83,15 +84,40 @@ class CounterfactualObjectiveReasoner:
     Learns from validation history to improve predictions over time.
     """
 
+    _unpickleable_attrs = ['lock']
+
+    # Default objective estimates used as fallback when no learned estimates available
+    # These are heuristic estimates representing typical achievable values in production systems
+    # Values should be overridden with domain-specific estimates when available
+    DEFAULT_OBJECTIVE_ESTIMATES = {
+        "prediction_accuracy": 0.95,
+        "uncertainty_calibration": 0.90,
+        "safety": 1.0,  # Aspirational target, not guaranteed
+        "efficiency": 0.85,
+        "latency": 0.80,
+        "energy_efficiency": 0.75,
+    }
+
     # --- START FIX: Modified __init__ ---
-    def __init__(self, world_model=None):
+    def __init__(self, world_model=None, objective_estimates: Optional[Dict[str, float]] = None):
         """
         Initialize counterfactual reasoner
 
         Args:
             world_model: Reference to parent WorldModel instance (optional, defaults to MagicMock)
+            objective_estimates: Custom objective estimates dict. If None, uses DEFAULT_OBJECTIVE_ESTIMATES.
+                                Keys are objective names, values are typical achievable values [0.0-1.0].
+                                These are used as fallback when no learned estimates are available.
         """
         self.world_model = world_model or MagicMock()
+        
+        # Store objective estimates, using defaults if not provided
+        self.objective_estimates = objective_estimates or self.DEFAULT_OBJECTIVE_ESTIMATES.copy()
+        if objective_estimates is None:
+            logger.warning(
+                "Using default objective estimates as fallback. "
+                "For production use, provide domain-specific estimates via objective_estimates parameter."
+            )
 
         # Prediction cache
         self.prediction_cache: Dict[str, CounterfactualOutcome] = {}
@@ -122,19 +148,12 @@ class CounterfactualObjectiveReasoner:
 
         logger.info("CounterfactualObjectiveReasoner initialized")
 
-    def __getstate__(self) -> Dict[str, Any]:
-        """
-        Prepare state for pickling by removing unpickleable lock objects.
-        """
-        state = self.__dict__.copy()
-        state.pop('lock', None)
-        return state
+    def _restore_unpickleable_attrs(self) -> None:
+        """Restore unpickleable attributes after deserialization."""
+        self.lock = threading.RLock()
 
-    def __setstate__(self, state: Dict[str, Any]) -> None:
-        """
-        Restore state after unpickling, re-creating the lock.
-        """
-        self.__dict__.update(state)
+    def _restore_unpickleable_attrs(self) -> None:
+        """Restore unpickleable attributes after deserialization."""
         self.lock = threading.RLock()
 
     # --- END FIX ---
@@ -748,19 +767,20 @@ class CounterfactualObjectiveReasoner:
     def _estimate_objective_value(
         self, objective: str, context: Dict[str, Any]
     ) -> float:
-        """Estimate achievable value for objective"""
-
-        # Map objectives to typical achievable values
-        objective_estimates = {
-            "prediction_accuracy": 0.95,
-            "uncertainty_calibration": 0.90,
-            "safety": 1.0,
-            "efficiency": 0.85,
-            "latency": 0.80,
-            "energy_efficiency": 0.75,
-        }
-
-        base_value = objective_estimates.get(objective, 0.7)
+        """
+        Estimate achievable value for objective.
+        
+        Uses configurable objective estimates (self.objective_estimates) as base values,
+        then adjusts based on historical accuracy and context.
+        
+        Args:
+            objective: Name of the objective to estimate
+            context: Context dict that may contain difficulty or other modifiers
+            
+        Returns:
+            Estimated achievable value in range [0.0, 1.0]
+        """
+        base_value = self.objective_estimates.get(objective, 0.7)
 
         # Adjust based on historical accuracy if available
         if objective in self.prediction_accuracy_by_objective:

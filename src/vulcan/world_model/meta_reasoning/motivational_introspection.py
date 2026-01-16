@@ -30,23 +30,43 @@ from unittest.mock import MagicMock  # FIXED: Added import
 
 import numpy as np
 
+from vulcan.world_model.meta_reasoning.serialization_mixin import SerializationMixin
+
 logger = logging.getLogger(__name__)
 
 
 # REPLACED existing try-except block with robust lazy loading as per fix steps
 def _lazy_import_component(component_name):
-    """Helper to lazy-load components, falling back to MagicMock on failure."""
+    """
+    Helper to lazy-load components, raising ImportError on failure.
+    
+    CRITICAL: This function does NOT use MagicMock fallbacks.
+    If a component fails to import, the system should fail fast rather than
+    silently using mock objects that could lead to incorrect behavior.
+    
+    Args:
+        component_name: Name of the component module to import
+        
+    Returns:
+        Imported module
+        
+    Raises:
+        ImportError: If the component cannot be imported
+    """
     try:
         module = importlib.import_module(f".{component_name}", __package__)
-        # Note Issue #29: Downgrade to DEBUG since these are loaded at startup
-        # not truly "lazy" (on-demand). The INFO log was misleading.
         logger.debug(f"Loaded meta-reasoning component: {component_name}")
         return module
     except ImportError as e:
-        logger.error(f"Failed to load {component_name}: {e}")
-        # Return a MagicMock object that can be called to produce another MagicMock
-        # This allows ClassName() to work, returning a mock instance.
-        return MagicMock()
+        logger.critical(
+            f"CRITICAL: Failed to load required component '{component_name}': {e}. "
+            f"This is a fatal error. The system cannot function without this component. "
+            f"Check for missing dependencies or broken imports."
+        )
+        raise ImportError(
+            f"Required meta-reasoning component '{component_name}' could not be imported. "
+            f"Original error: {e}"
+        ) from e
 
 
 # Globals for lazy-loaded types
@@ -67,67 +87,78 @@ def _init_lazy_imports():
     """
     Populate global type/class variables by lazy-loading modules.
     Called from MotivationalIntrospection.__init__ to break import cycles.
+    
+    CRITICAL: This function uses fail-fast loading.
+    If any required component fails to load, an ImportError will be raised.
+    Optional components should be handled with try-except in the calling code.
     """
     global ObjectiveHierarchy, CounterfactualObjectiveReasoner, GoalConflictDetector, ValidationTracker, TransparencyInterface, ConflictType, ConflictSeverity, ValidationOutcome, PatternType, ObjectiveBlocker, ValidationPattern
 
     logger.debug("Initializing lazy imports for meta_reasoning...")
 
-    # Load modules
+    # Load modules - these will raise ImportError if they fail
     mod_objective_hierarchy = _lazy_import_component("objective_hierarchy")
     mod_counterfactual_objectives = _lazy_import_component("counterfactual_objectives")
     mod_goal_conflict_detector = _lazy_import_component("goal_conflict_detector")
     mod_validation_tracker = _lazy_import_component("validation_tracker")
     mod_transparency_interface = _lazy_import_component("transparency_interface")
 
-    # Assign classes/types from modules, falling back to MagicMock if module failed
+    # Assign classes/types from modules
     ObjectiveHierarchy = getattr(
-        mod_objective_hierarchy, "ObjectiveHierarchy", MagicMock()
+        mod_objective_hierarchy, "ObjectiveHierarchy", None
     )
     CounterfactualObjectiveReasoner = getattr(
-        mod_counterfactual_objectives, "CounterfactualObjectiveReasoner", MagicMock()
+        mod_counterfactual_objectives, "CounterfactualObjectiveReasoner", None
     )
     GoalConflictDetector = getattr(
-        mod_goal_conflict_detector, "GoalConflictDetector", MagicMock()
+        mod_goal_conflict_detector, "GoalConflictDetector", None
     )
     ValidationTracker = getattr(
-        mod_validation_tracker, "ValidationTracker", MagicMock()
+        mod_validation_tracker, "ValidationTracker", None
     )
     TransparencyInterface = getattr(
-        mod_transparency_interface, "TransparencyInterface", MagicMock()
+        mod_transparency_interface, "TransparencyInterface", None
     )
 
     # Assign Enums and other types
     ConflictType = getattr(
-        mod_goal_conflict_detector, "ConflictType", MagicMock(spec=Enum)
+        mod_goal_conflict_detector, "ConflictType", None
     )
     ConflictSeverity = getattr(
-        mod_goal_conflict_detector, "ConflictSeverity", MagicMock(spec=Enum)
+        mod_goal_conflict_detector, "ConflictSeverity", None
     )
     ValidationOutcome = getattr(
-        mod_validation_tracker, "ValidationOutcome", MagicMock(spec=Enum)
+        mod_validation_tracker, "ValidationOutcome", None
     )
-    PatternType = getattr(mod_validation_tracker, "PatternType", MagicMock(spec=Enum))
-    ObjectiveBlocker = getattr(mod_validation_tracker, "ObjectiveBlocker", MagicMock())
+    PatternType = getattr(mod_validation_tracker, "PatternType", None)
+    ObjectiveBlocker = getattr(mod_validation_tracker, "ObjectiveBlocker", None)
     ValidationPattern = getattr(
-        mod_validation_tracker, "ValidationPattern", MagicMock()
+        mod_validation_tracker, "ValidationPattern", None
     )
+    
+    # Validate critical components are available
+    critical_components = {
+        "ObjectiveHierarchy": ObjectiveHierarchy,
+        "CounterfactualObjectiveReasoner": CounterfactualObjectiveReasoner,
+        "GoalConflictDetector": GoalConflictDetector,
+        "ValidationTracker": ValidationTracker,
+        "TransparencyInterface": TransparencyInterface,
+    }
+    
+    missing = [name for name, cls in critical_components.items() if cls is None]
+    if missing:
+        logger.critical(
+            f"CRITICAL: Required components not found in modules: {', '.join(missing)}. "
+            f"System cannot function without these components."
+        )
+        raise ImportError(
+            f"Required meta-reasoning components not available: {', '.join(missing)}"
+        )
+    
+    logger.debug("Lazy imports initialized successfully")
 
-    # Handle mock enum fallbacks gracefully
-    if isinstance(ConflictType, MagicMock):
-        ConflictType.TRADEOFF = "tradeoff"
-    if isinstance(ConflictSeverity, MagicMock):
-        ConflictSeverity.CRITICAL = "critical"
-        ConflictSeverity.HIGH = "high"
-        ConflictSeverity.MEDIUM = "medium"
-    if isinstance(ValidationOutcome, MagicMock):
-        ValidationOutcome.APPROVED = "approved"
-        ValidationOutcome.REJECTED = "rejected"
-        ValidationOutcome.UNKNOWN = "unknown"
-    if isinstance(PatternType, MagicMock):
-        PatternType.SUCCESS = "success"
-        PatternType.RISKY = "risky"
 
-    logger.debug("Lazy imports for meta_reasoning initialized.")
+# --- END OF _init_lazy_imports ---
 
 
 class ObjectiveStatus(Enum):
@@ -185,6 +216,8 @@ class ProposalValidation:
         # Use a robust serializer that handles dataclasses, lists, dicts, and mocks
         # WITH CYCLE DETECTION to prevent infinite recursion
         # --- START FIX: Implement robust _make_serializable with cycle detection ---
+        # NOTE: This is a JSON serialization utility (to_dict), NOT for pickle.
+        # For pickle serialization, this class uses SerializationMixin.
         def _make_serializable(
             data: Any,
             seen: Optional[Set[int]] = None,
@@ -193,6 +226,30 @@ class ProposalValidation:
         ) -> Any:
             """
             Recursively make data JSON serializable, handling common types and circular references.
+            
+            NOTE: This is a JSON serialization utility, NOT for pickle serialization.
+            For pickle serialization, classes use SerializationMixin from serialization_mixin.py.
+            
+            This utility handles:
+            - Dataclasses (via asdict)
+            - Enums (to value)
+            - NumPy arrays and scalars
+            - Sets (to sorted lists)
+            - Circular references (via seen tracking)
+            - MagicMock objects (for testing)
+            - Objects with to_dict() methods
+            - Maximum recursion depth protection
+            
+            Industry Standard Alternative:
+            For simple cases, use:
+                - json.dumps(obj, default=str) for basic serialization
+                - dataclasses.asdict() for dataclass conversion
+            
+            This custom implementation is needed here for:
+                - Circular reference detection in complex object graphs
+                - Consistent handling of NumPy types
+                - Deep serialization of nested dataclasses with custom types
+                - Maximum depth protection for untrusted data
 
             Args:
                 data: The data to serialize.
@@ -313,7 +370,7 @@ class ProposalValidation:
         return _make_serializable(self, seen=None)
 
 
-class MotivationalIntrospection:
+class MotivationalIntrospection(SerializationMixin):
     """
     Core meta-reasoning engine for VULCAN-AMI
 
@@ -326,6 +383,8 @@ class MotivationalIntrospection:
     - Reasoning about what would happen under alternative objectives
     - Maintaining alignment with design specification
     """
+
+    _unpickleable_attrs = ['lock']
 
     def __init__(
         self,
@@ -410,19 +469,8 @@ class MotivationalIntrospection:
             len(self.active_objectives),
         )
 
-    def __getstate__(self) -> Dict[str, Any]:
-        """
-        Prepare state for pickling by removing unpickleable lock objects.
-        """
-        state = self.__dict__.copy()
-        state.pop('lock', None)
-        return state
-
-    def __setstate__(self, state: Dict[str, Any]) -> None:
-        """
-        Restore state after unpickling, re-creating the lock.
-        """
-        self.__dict__.update(state)
+    def _restore_unpickleable_attrs(self) -> None:
+        """Restore unpickleable attributes after deserialization."""
         self.lock = threading.RLock()
 
     def _initialize_components(self):

@@ -27,6 +27,8 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from vulcan.world_model.meta_reasoning.serialization_mixin import SerializationMixin
+
 logger = logging.getLogger(__name__)
 
 
@@ -76,7 +78,7 @@ class CSIUEnforcementConfig:
     audit_trail_max_entries: int = 10000
 
 
-class CSIUEnforcement:
+class CSIUEnforcement(SerializationMixin):
     """
     CSIU Enforcement and Monitoring
 
@@ -87,6 +89,8 @@ class CSIUEnforcement:
     4. Audit trail is maintained
     5. Cumulative effects are tracked
     """
+
+    _unpickleable_attrs = ['_lock']
 
     def __init__(self, config: Optional[CSIUEnforcementConfig] = None):
         """Initialize CSIU enforcement"""
@@ -110,24 +114,8 @@ class CSIUEnforcement:
             "[INTERNAL] CSIU Enforcement initialized with 5% single cap, 10% cumulative cap"
         )
 
-    def __getstate__(self) -> Dict[str, Any]:
-        """
-        Prepare state for pickling by removing unpickleable lock objects.
-        
-        This fixes the persistence firewall issue where threading locks cannot
-        be pickled, causing state serialization to fail.
-        """
-        state = self.__dict__.copy()
-        # Remove the lock - it will be re-created on unpickle
-        state.pop('_lock', None)
-        return state
-
-    def __setstate__(self, state: Dict[str, Any]) -> None:
-        """
-        Restore state after unpickling, re-creating the lock.
-        """
-        self.__dict__.update(state)
-        # Re-create the lock after unpickling
+    def _restore_unpickleable_attrs(self) -> None:
+        """Restore unpickleable attributes after deserialization."""
         self._lock = threading.RLock()
 
     def is_enabled(self) -> bool:

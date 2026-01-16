@@ -36,58 +36,13 @@ from collections import defaultdict, deque
 from dataclasses import asdict, dataclass, is_dataclass
 from enum import Enum
 
-# import numpy as np # Original import
-from typing import Any, Callable, Dict, List, Optional, Set, Union  # Add Union here
-from unittest.mock import MagicMock  # ADDED for fallback
+from typing import Any, Callable, Dict, List, Optional, Set, Union
+from unittest.mock import MagicMock
 
-# --- START FIX: Add numpy fallback ---
-# logger = logging.getLogger(__name__) # Original logger placement
-logger = logging.getLogger(__name__)  # Moved logger init up
-try:
-    import numpy as np
+from vulcan.world_model.meta_reasoning.numpy_compat import np, NUMPY_AVAILABLE
+from vulcan.world_model.meta_reasoning.serialization_mixin import SerializationMixin
 
-    NUMPY_AVAILABLE = True
-except ImportError:
-    NUMPY_AVAILABLE = False
-    logger.warning("NumPy not available, using list-based math")
-
-    class FakeNumpy:
-        @staticmethod
-        def mean(lst):
-            return sum(lst) / len(lst) if lst else 0.0  # Return float
-
-        @staticmethod
-        def array(lst):
-            return list(lst)
-
-        # Add generic type placeholder if needed elsewhere, though not directly used here
-        class generic:
-            pass
-
-        # Add ndarray type placeholder if needed elsewhere
-        class ndarray:
-            pass
-
-        # Add item method for scalars if needed (though FakeNumpy won't produce np scalars)
-        # item = lambda x: x # Simplistic item method
-
-        # Add other necessary numpy functions if used later
-        @staticmethod
-        def sqrt(x):
-            import math
-
-            return math.sqrt(x) if x >= 0 else float("nan")
-
-        @staticmethod
-        def log(x):
-            import math
-
-            if isinstance(x, list):
-                return [math.log(i) if i > 0 else -float("inf") for i in x]
-            return math.log(x) if x > 0 else -float("inf")
-
-    np = FakeNumpy()
-# --- END FIX ---
+logger = logging.getLogger(__name__)
 
 
 # Import necessary types for type checking if possible, handle gracefully if not
@@ -167,7 +122,7 @@ MAX_FACTOR_VALUE_LENGTH = 100  # Maximum length for individual factor values
 MAX_REASONING_STEP_LENGTH = 200  # Maximum length for reasoning steps
 
 
-class TransparencyInterface:
+class TransparencyInterface(SerializationMixin):
     """
     Structured, machine-readable output for agent-to-agent communication
 
@@ -184,6 +139,8 @@ class TransparencyInterface:
     - Transmitted over network
     - Parsed by other agents
     """
+
+    _unpickleable_attrs = ['lock', '_np']
 
     # --- START REPLACEMENT ---
     def __init__(self, world_model: Optional["WorldModel"] = None):
@@ -244,20 +201,10 @@ class TransparencyInterface:
 
         logger.info("TransparencyInterface initialized")
 
-    def __getstate__(self) -> Dict[str, Any]:
-        """
-        Prepare state for pickling by removing unpickleable lock objects.
-        """
-        state = self.__dict__.copy()
-        state.pop('lock', None)
-        return state
-
-    def __setstate__(self, state: Dict[str, Any]) -> None:
-        """
-        Restore state after unpickling, re-creating the lock.
-        """
-        self.__dict__.update(state)
+    def _restore_unpickleable_attrs(self) -> None:
+        """Restore unpickleable attributes after deserialization."""
         self.lock = threading.RLock()
+        self._np = np if NUMPY_AVAILABLE else FakeNumpy
 
     # --- END REPLACEMENT ---
 
@@ -265,6 +212,28 @@ class TransparencyInterface:
     def _make_serializable(self, data: Any, seen: Optional[Set[int]] = None) -> Any:
         """
         Recursively make data JSON serializable, handling common types and circular references.
+        
+        NOTE: This is a JSON serialization utility, NOT for pickle serialization.
+        For pickle serialization, classes use SerializationMixin from serialization_mixin.py.
+        
+        This utility handles:
+        - Dataclasses (via asdict)
+        - Enums (to value)
+        - NumPy arrays and scalars
+        - Sets (to sorted lists)
+        - Circular references (via seen tracking)
+        - MagicMock objects (for testing)
+        - Objects with to_dict() methods
+        
+        Industry Standard Alternative:
+        For simple cases, use:
+            - json.dumps(obj, default=str) for basic serialization
+            - dataclasses.asdict() for dataclass conversion
+        
+        This custom implementation is needed here for:
+            - Circular reference detection in complex object graphs
+            - Consistent handling of NumPy types
+            - Deep serialization of nested dataclasses with custom types
 
         Args:
             data: The data to serialize.

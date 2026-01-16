@@ -45,157 +45,12 @@ from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
 
-# import time # Original import
-# import numpy as np # Original import
 from typing import Any, Callable, Dict, List, Optional
 
-# --- START FIX: Add numpy fallback ---
-# logger = logging.getLogger(__name__) # Original logger placement
-logger = logging.getLogger(__name__)  # Moved logger init up
-try:
-    import numpy as np
+from vulcan.world_model.meta_reasoning.numpy_compat import np, NUMPY_AVAILABLE
+from vulcan.world_model.meta_reasoning.serialization_mixin import SerializationMixin
 
-    NUMPY_AVAILABLE = True
-except ImportError:
-    NUMPY_AVAILABLE = False
-    logger.warning("NumPy not available, using list-based math")
-
-    class FakeNumpy:
-        @staticmethod
-        def mean(lst):
-            return sum(lst) / len(lst) if lst else 0
-
-        @staticmethod
-        def array(lst):
-            return list(lst)
-
-        @staticmethod
-        def vstack(arrs):
-            return [list(arr) for arr in arrs]
-
-        @staticmethod
-        def ones(n):
-            return [1] * int(n)  # Ensure n is int for range
-
-        @staticmethod
-        def lstsq(A, b, rcond=None):
-            # Simplified fallback: returns mock slope (0) and residuals (None)
-            # Ensure dimensions match expected output structure if possible
-            num_cols = len(A[0]) if A else 0
-            mock_solution = (
-                [0.0] * num_cols,
-            )  # Solution array (tuple for lstsq structure)
-            mock_residuals = np.array([])  # Empty residuals array
-            mock_rank = min(len(A), num_cols) if A else 0  # Estimated rank
-            mock_s = np.array([])  # Empty singular values
-            return (
-                mock_solution,
-                mock_residuals,
-                mock_rank,
-                mock_s,
-            )  # Match full lstsq return
-
-        # Add missing numpy functions used in the file
-        @staticmethod
-        def sqrt(x):
-            return x**0.5
-
-        @staticmethod
-        def abs(x):
-            if isinstance(x, list):
-                return [abs(i) for i in x]
-            return abs(x)
-
-        @staticmethod
-        def dot(a, b):
-            if not isinstance(a, list) or not isinstance(b, list) or len(a) != len(b):
-                # Handle basic scalar multiplication or raise error
-                if isinstance(a, (int, float)) and isinstance(b, list):
-                    return [a * x for x in b]
-                if isinstance(a, list) and isinstance(b, (int, float)):
-                    return [x * b for x in a]
-                # Fallback for incompatible types/shapes
-                logger.warning(
-                    f"FakeNumpy.dot called with incompatible types/shapes: {type(a)}, {type(b)}"
-                )
-                return 0  # Or raise TypeError
-            return sum(x * y for x, y in zip(a, b))
-
-        @staticmethod
-        def linalg_norm(x):
-            if not isinstance(x, list):
-                return abs(x)
-            return sum(i * i for i in x) ** 0.5
-
-        # Add linalg attribute for norm
-        class FakeLinalg:
-            norm = None  # Will assign linalg_norm below
-
-        linalg = FakeLinalg()
-        linalg.norm = linalg_norm  # Assign the static method
-
-        @staticmethod
-        def histogram(a, bins=10, range=None, normed=None, weights=None, density=None):
-            if not a:
-                return ([], [])
-            a_min, a_max = min(a), max(a)
-            if a_min == a_max:
-                a_max = a_min + 1  # Avoid zero range
-            bin_edges = [a_min + i * (a_max - a_min) / bins for i in range(bins + 1)]
-            hist = [0] * bins
-            for x in a:
-                for i in range(bins):
-                    if bin_edges[i] <= x < bin_edges[i + 1]:
-                        hist[i] += 1
-                        break
-                else:  # Handle value equal to max edge
-                    if x == a_max:
-                        hist[bins - 1] += 1
-            if density:
-                total = sum(hist) or 1
-                width = (a_max - a_min) / bins
-                hist = [h / (total * width) for h in hist]
-            return (hist, bin_edges)
-
-        @staticmethod
-        def sum(a, axis=None, dtype=None, keepdims=False, initial=0, where=True):
-            # Simplified sum for lists
-            if isinstance(a, list):
-                return sum(a)
-            return a  # Assume scalar
-
-        @staticmethod
-        def log2(x):
-            import math
-
-            if isinstance(x, list):
-                return [math.log2(i) if i > 0 else -float("inf") for i in x]
-            return math.log2(x) if x > 0 else -float("inf")
-
-        @staticmethod
-        def random_randn(*dims):
-            import random
-
-            if not dims:
-                return random.gauss(0, 1)
-            size = 1
-            for d in dims:
-                size *= d
-            # This is NOT a proper multi-dimensional array, just a flat list
-            return [random.gauss(0, 1) for _ in range(size)]
-
-        @staticmethod
-        def arange(stop, start=0, step=1, dtype=None):
-            return list(range(start, stop, step))
-
-        @staticmethod
-        def clip(a, a_min, a_max, out=None):
-            if isinstance(a, list):
-                return [max(a_min, min(a_max, x)) for x in a]
-            return max(a_min, min(a_max, a))
-
-    np = FakeNumpy()
-# --- END FIX ---
+logger = logging.getLogger(__name__)
 
 
 # --- START FIX: Add missing helper function ---
@@ -357,7 +212,7 @@ class CuriosityStatistics:
         }
 
 
-class CuriosityRewardShaper:
+class CuriosityRewardShaper(SerializationMixin):
     """
     Multi-algorithm curiosity-driven exploration and reward shaping
 
@@ -379,6 +234,8 @@ class CuriosityRewardShaper:
     Thread-safe with comprehensive statistics.
     Integrates with VULCAN world model and learning systems.
     """
+
+    _unpickleable_attrs = ['lock', '_np', 'world_model']
 
     def __init__(
         self,
@@ -473,31 +330,12 @@ class CuriosityRewardShaper:
         logger.info(f"  Decay rate: {decay_rate}, Max bonus: {max_bonus}")
         logger.info(f"  Episodic memory size: {episodic_memory_size}")
 
-    def __getstate__(self) -> Dict[str, Any]:
-        """
-        Prepare state for pickling by removing unpickleable objects.
-        """
-        state = self.__dict__.copy()
-        state.pop('lock', None)  # threading.RLock
-        state.pop('_np', None)  # numpy module reference
-        state.pop('world_model', None)  # may be MagicMock
-        # Convert defaultdict to regular dict for pickling
-        if 'state_feature_distributions' in state:
-            state['state_feature_distributions'] = dict(state['state_feature_distributions'])
-        return state
-
-    def __setstate__(self, state: Dict[str, Any]) -> None:
-        """
-        Restore state after unpickling, re-creating unpickleable objects.
-        """
-        self.__dict__.update(state)
+    def _restore_unpickleable_attrs(self) -> None:
+        """Restore unpickleable attributes after deserialization."""
         self.lock = threading.RLock()
         self._np = np if NUMPY_AVAILABLE else FakeNumpy
         self.world_model = None  # Must be re-injected via set_world_model()
         self._world_model_injected = False  # Track injection state
-        # Restore defaultdict
-        if 'state_feature_distributions' in self.__dict__ and isinstance(self.state_feature_distributions, dict):
-            self.state_feature_distributions = defaultdict(list, self.state_feature_distributions)
 
     def set_world_model(self, world_model: Any) -> None:
         """

@@ -19,61 +19,12 @@ from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
 
-# import numpy as np # Original import
-# FIXED: Added Union to the import
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
-from unittest.mock import MagicMock, Mock  # FIXED: Import Mock
+from unittest.mock import MagicMock, Mock
 
-# --- START FIX: Add numpy fallback ---
-# logger = logging.getLogger(__name__) # Original logger placement
-logger = logging.getLogger(__name__)  # Moved logger init up
-try:
-    import numpy as np
+from vulcan.world_model.meta_reasoning.numpy_compat import np, NUMPY_AVAILABLE
 
-    NUMPY_AVAILABLE = True
-except ImportError:
-    NUMPY_AVAILABLE = False
-    logger.warning("NumPy not available, using list-based math")
-
-    class FakeNumpy:
-        @staticmethod
-        def mean(lst):
-            return sum(lst) / len(lst) if lst else 0.0  # Return float
-
-        @staticmethod
-        def array(lst):
-            return list(lst)
-
-        @staticmethod
-        def var(lst):
-            if not lst or len(lst) < 2:
-                return 0.0
-            mean_val = sum(lst) / len(lst)
-            return sum((x - mean_val) ** 2 for x in lst) / len(
-                lst
-            )  # Population variance
-
-        @staticmethod
-        def linspace(
-            start, stop, num=50, endpoint=True, retstep=False, dtype=None, axis=0
-        ):
-            if num <= 0:
-                return []
-            if endpoint:
-                if num == 1:
-                    return [start]
-                step = (stop - start) / (num - 1)
-            else:
-                step = (stop - start) / num
-            result = [start + i * step for i in range(num)]
-            if retstep:
-                return result, step
-            return result
-
-        # Add other numpy functions if needed later
-
-    np = FakeNumpy()
-# --- END FIX ---
+logger = logging.getLogger(__name__)
 
 
 # Assuming ObjectiveHierarchy and Objective are importable from sibling modules

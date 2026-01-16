@@ -5,9 +5,83 @@ Part of the meta_reasoning subsystem for VULCAN-AMI
 
 FULL PRODUCTION IMPLEMENTATION
 
+WARNING: Risk identification methods are PLACEHOLDER IMPLEMENTATIONS.
+The risk detection methods (_identify_*_risks) rely on self-reported flags in proposals
+(e.g., 'causes_physical_harm', 'has_security_review') rather than semantic analysis of
+proposal content. This is NOT suitable for production security/safety without additional
+validation layers. Real-world usage requires:
+- Semantic analysis of proposal text/code
+- Integration with static analysis tools
+- Code scanning and vulnerability detection
+- Expert system review for safety-critical applications
+- DO NOT rely on these placeholders for actual security/safety decisions
+
+ERROR HANDLING POLICY (Meta-Reasoning Module):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. CRITICAL ERRORS (System Cannot Function):
+   - Import failures for required components → Raise ImportError with clear message
+   - Missing critical dependencies (numpy, etc.) → Raise ImportError with install instructions
+   - Invalid configuration that prevents initialization → Raise ValueError/ConfigurationError
+   - Thread lock failures during critical operations → Log critical + re-raise
+   
+   Actions: logger.critical() + raise exception
+   Rationale: Fail fast rather than operate incorrectly
+
+2. OPERATIONAL ERRORS (Feature Cannot Complete):
+   - Invalid input data types → Log error + raise TypeError/ValueError with clear message
+   - Serialization failures → Log error + raise SerializationError
+   - File I/O failures → Log error + raise IOError with context
+   - Network failures (if applicable) → Log error + raise ConnectionError
+   
+   Actions: logger.error() + raise exception OR return error result with clear status
+   Rationale: Caller should know operation failed and why
+
+3. DEGRADED FUNCTIONALITY (Feature Works With Limitations):
+   - Optional component unavailable → Log warning + use fallback/skip feature
+   - Cache miss/stale data → Log debug + recompute
+   - Non-critical parsing errors → Log warning + use default/skip entry
+   - Performance degradation → Log warning + continue with slower path
+   
+   Actions: logger.warning() + graceful degradation
+   Rationale: System continues operating, user notified of limitations
+
+4. EXPECTED CONDITIONS (Normal Operation):
+   - Empty result sets → Log debug + return empty
+   - Cache hits → Log debug + return cached
+   - Validation failures (expected) → Log info + return validation result
+   - Successfully handled edge cases → Log debug
+   
+   Actions: logger.debug() or logger.info() + return appropriate result
+   Rationale: These are normal conditions, not errors
+
+5. SILENCE IS FAILURE:
+   - Never silently swallow exceptions without logging
+   - Never return None/empty without clear reason
+   - Never use bare 'except:' or 'except Exception:' without re-raise
+   - Always provide actionable error messages with context
+
+6. SECURITY/SAFETY ERRORS:
+   - Boundary violations → Log error + alert monitors + return rejection
+   - Suspicious inputs → Log warning + return validation failure
+   - Rate limit exceeded → Log warning + return throttled response
+   - Authentication/authorization failures → Log warning + raise PermissionError
+   
+   Actions: logger.warning/error + structured response + alert external monitors
+   Rationale: Security events need audit trail and appropriate response
+
+CONSISTENCY GUIDELINES:
+- Use consistent exception types across the module
+- Include original error in 'from e' when re-raising
+- Always log before raising to ensure audit trail
+- Include relevant context in log messages (IDs, values, state)
+- Use structured logging where possible for machine parsing
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 Comprehensive internal critique system with:
 - Multi-perspective evaluation (logic, feasibility, safety, alignment, efficiency)
-- Automated risk identification and assessment
+- Automated risk identification and assessment (PLACEHOLDER - see warning above)
 - Comparative analysis of alternatives
 - Iterative refinement suggestions
 - Learning from critique outcomes
@@ -54,34 +128,12 @@ from collections import Counter, defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
 
-# import time # Original import
-# import numpy as np # Original import
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
-# --- START FIX: Add numpy fallback ---
-# logger = logging.getLogger(__name__) # Original logger placement
-logger = logging.getLogger(__name__)  # Moved logger init up
-try:
-    import numpy as np
+from vulcan.world_model.meta_reasoning.numpy_compat import np, NUMPY_AVAILABLE
+from vulcan.world_model.meta_reasoning.serialization_mixin import SerializationMixin
 
-    NUMPY_AVAILABLE = True
-except ImportError:
-    NUMPY_AVAILABLE = False
-    logger.warning("NumPy not available, using list-based math")
-
-    class FakeNumpy:
-        @staticmethod
-        def mean(lst):
-            return sum(lst) / len(lst) if lst else 0.0  # Return float
-
-        @staticmethod
-        def array(lst):
-            return list(lst)
-
-        # Add other numpy functions used in this file if any (currently only np.mean)
-
-    np = FakeNumpy()
-# --- END FIX ---
+logger = logging.getLogger(__name__)
 
 
 class CritiqueLevel(Enum):
@@ -299,7 +351,7 @@ class ComparisonResult:
         }
 
 
-class InternalCritic:
+class InternalCritic(SerializationMixin):
     """
     Multi-perspective internal critique and evaluation system
 
@@ -325,6 +377,8 @@ class InternalCritic:
     Thread-safe with comprehensive evaluation history.
     Integrates with VULCAN validation and safety systems.
     """
+
+    _unpickleable_attrs = ['lock', '_np', 'evaluation_criteria']
 
     def __init__(
         self,
@@ -423,115 +477,12 @@ class InternalCritic:
             f"  Perspective weights: {{p.value: w for p, w in self.perspective_weights.items()}}"
         )
 
-    def __getstate__(self) -> Dict[str, Any]:
-        """
-        Prepare instance state for pickle serialization.
-        
-        This method implements industry-standard serialization by:
-        1. Acquiring the lock for thread-safe state capture
-        2. Removing unpickleable objects (lock, module refs, bound methods)
-        3. Adding serialization metadata for debugging and versioning
-        4. Converting defaultdicts for pickle compatibility
-        
-        Returns:
-            Dictionary containing all pickleable state with metadata
-            
-        Thread Safety:
-            Acquires self.lock before capturing state to ensure consistency
-            
-        Removed Attributes:
-            - lock: threading.RLock (re-created on restore)
-            - _np: numpy module reference (re-created on restore)
-            - evaluation_criteria: dict with bound methods (re-initialized)
-            
-        See Also:
-            __setstate__: Restores state and re-creates unpickleable objects
-        """
-        # Acquire lock for thread-safe state capture
-        self.lock.acquire()
-        try:
-            state = self.__dict__.copy()
-            
-            # Remove unpickleable items
-            state.pop('lock', None)  # threading.RLock
-            state.pop('_np', None)  # numpy module reference
-            state.pop('evaluation_criteria', None)  # dict with bound methods
-            
-            # Convert defaultdicts to regular dicts
-            for key in list(state.keys()):
-                if isinstance(state[key], defaultdict):
-                    state[key] = dict(state[key])
-            
-            # Add serialization metadata for debugging and versioning
-            state['_serialization_metadata'] = {
-                'version': '1.0.0',
-                'serialized_at': time.time(),
-                'class': f"{self.__class__.__module__}.{self.__class__.__name__}",
-            }
-            
-            logger.debug(
-                f"InternalCritic serialized: {len(state)} keys, "
-                f"removed unpickleable: lock, _np, evaluation_criteria"
-            )
-            
-            return state
-        finally:
-            self.lock.release()
-
-    def __setstate__(self, state: Dict[str, Any]) -> None:
-        """
-        Restore instance state after pickle deserialization.
-        
-        This method implements industry-standard deserialization by:
-        1. Extracting and logging serialization metadata
-        2. Restoring all pickleable state
-        3. Re-creating the threading lock (RLock for reentrant support)
-        4. Re-establishing numpy module reference
-        5. Re-initializing evaluation criteria with bound methods
-        
-        Args:
-            state: Dictionary from __getstate__
-            
-        Post-Conditions:
-            - self.lock is a new RLock instance
-            - self._np references numpy or FakeNumpy
-            - self.evaluation_criteria is re-populated with bound methods
-            - Object is fully functional for thread-safe operations
-            
-        Note:
-            Any custom evaluation criteria added after initialization
-            will need to be re-added after deserialization.
-            
-        See Also:
-            __getstate__: Captures state for serialization
-            _initialize_default_criteria: Repopulates evaluation criteria
-        """
-        # Extract metadata for logging
-        metadata = state.pop('_serialization_metadata', {})
-        serialized_at = metadata.get('serialized_at')
-        version = metadata.get('version', 'unknown')
-        
-        if version != '1.0.0':
-            logger.warning(
-                f"InternalCritic deserialized from version {version}. "
-                f"Some state may not restore correctly."
-            )
-        
-        # Restore pickleable state
-        self.__dict__.update(state)
-        
-        # Re-create unpickleable objects
+    def _restore_unpickleable_attrs(self) -> None:
+        """Restore unpickleable attributes after deserialization."""
         self.lock = threading.RLock()
         self._np = np if NUMPY_AVAILABLE else FakeNumpy
-        
-        # Re-initialize evaluation criteria (bound method references)
         self.evaluation_criteria = {}
         self._initialize_default_criteria()
-        
-        logger.debug(
-            f"InternalCritic restored from serialization "
-            f"(serialized_at: {serialized_at}, version: {version})"
-        )
 
     def evaluate_proposal(
         self, proposal: Dict[str, Any], context: Optional[Dict[str, Any]] = None
@@ -876,7 +827,23 @@ class InternalCritic:
     def _identify_safety_risks(
         self, proposal: Dict[str, Any], context: Dict[str, Any]
     ) -> List[Risk]:
-        """Placeholder: Identify safety risks"""
+        """
+        Identify safety risks in proposal.
+        
+        WARNING: This is a PLACEHOLDER implementation that relies on self-reported flags.
+        Real-world usage requires semantic analysis of proposal content, not just checking
+        for 'causes_physical_harm' flags. DO NOT rely on this for actual safety decisions
+        in production without additional validation layers.
+        
+        Production requirements:
+        - Semantic analysis of proposal text and code
+        - Integration with safety verification tools
+        - Expert review for safety-critical applications
+        - Formal verification methods where applicable
+        """
+        logger.warning(
+            "Using placeholder safety risk detection - not suitable for production safety decisions"
+        )
         risks = []
         if proposal.get("causes_physical_harm"):
             risks.append(
@@ -903,7 +870,23 @@ class InternalCritic:
     def _identify_security_risks(
         self, proposal: Dict[str, Any], context: Dict[str, Any]
     ) -> List[Risk]:
-        """Placeholder: Identify security risks"""
+        """
+        Identify security risks in proposal.
+        
+        WARNING: This is a PLACEHOLDER implementation that relies on self-reported flags.
+        Real-world usage requires semantic analysis of proposal content, not just checking
+        for 'has_security_review' flags. DO NOT rely on this for actual security decisions
+        in production without additional validation layers.
+        
+        Production requirements:
+        - Static code analysis and vulnerability scanning
+        - Integration with security testing tools (SAST/DAST)
+        - Threat modeling and attack surface analysis
+        - Security expert review
+        """
+        logger.warning(
+            "Using placeholder security risk detection - not suitable for production security decisions"
+        )
         risks = []
         if proposal.get("requires_network_access") and not proposal.get(
             "has_security_review"
@@ -922,7 +905,23 @@ class InternalCritic:
     def _identify_performance_risks(
         self, proposal: Dict[str, Any], context: Dict[str, Any]
     ) -> List[Risk]:
-        """Placeholder: Identify performance risks"""
+        """
+        Identify performance risks in proposal.
+        
+        WARNING: This is a PLACEHOLDER implementation that relies on self-reported flags.
+        Real-world usage requires semantic analysis and complexity analysis of proposal content,
+        not just checking for 'complexity' flags. DO NOT rely on this for actual performance
+        predictions in production without additional validation layers.
+        
+        Production requirements:
+        - Algorithmic complexity analysis
+        - Performance profiling and benchmarking
+        - Load testing and stress testing
+        - Resource utilization modeling
+        """
+        logger.warning(
+            "Using placeholder performance risk detection - not suitable for production performance predictions"
+        )
         risks = []
         if proposal.get("complexity") == "exponential":
             risks.append(
@@ -939,7 +938,23 @@ class InternalCritic:
     def _identify_resource_risks(
         self, proposal: Dict[str, Any], context: Dict[str, Any]
     ) -> List[Risk]:
-        """Placeholder: Identify resource risks"""
+        """
+        Identify resource consumption risks in proposal.
+        
+        WARNING: This is a PLACEHOLDER implementation that relies on self-reported estimates.
+        Real-world usage requires semantic analysis and resource modeling of proposal content,
+        not just comparing 'estimated_cost' values. DO NOT rely on this for actual resource
+        planning in production without additional validation layers.
+        
+        Production requirements:
+        - Detailed resource modeling and forecasting
+        - Cost analysis with real infrastructure metrics
+        - Capacity planning integration
+        - Budget tracking and alerting systems
+        """
+        logger.warning(
+            "Using placeholder resource risk detection - not suitable for production resource planning"
+        )
         risks = []
         cost = proposal.get("estimated_cost", 0)
         budget = context.get("budget", 100)
@@ -958,7 +973,24 @@ class InternalCritic:
     def _identify_ethical_risks(
         self, proposal: Dict[str, Any], context: Dict[str, Any]
     ) -> List[Risk]:
-        """Placeholder: Identify ethical risks (integrates with monitor)"""
+        """
+        Identify ethical risks in proposal (integrates with EthicalBoundaryMonitor).
+        
+        WARNING: This implementation depends on EthicalBoundaryMonitor's effectiveness.
+        If the monitor is not properly configured or uses placeholder detection, this
+        will not provide adequate ethical risk assessment. DO NOT rely on this for actual
+        ethical governance in production without human oversight and review.
+        
+        Production requirements:
+        - Comprehensive ethical framework integration
+        - Human ethics committee review
+        - Stakeholder impact analysis
+        - Cultural and contextual sensitivity analysis
+        - Ongoing monitoring and adaptation
+        """
+        logger.warning(
+            "Ethical risk detection depends on EthicalBoundaryMonitor - requires human oversight for production"
+        )
         risks = []
         if self.ethical_boundary_monitor:
             try:
@@ -1000,7 +1032,25 @@ class InternalCritic:
     def _identify_operational_risks(
         self, proposal: Dict[str, Any], context: Dict[str, Any]
     ) -> List[Risk]:
-        """Placeholder: Identify operational risks"""
+        """
+        Identify operational risks in proposal.
+        
+        WARNING: This is a PLACEHOLDER implementation that relies on self-reported flags.
+        Real-world usage requires semantic analysis of proposal content and integration
+        with operational best practices, not just checking for 'has_rollback_plan' flags.
+        DO NOT rely on this for actual operational risk management in production without
+        additional validation layers.
+        
+        Production requirements:
+        - Integration with deployment and rollback systems
+        - Operational runbook validation
+        - Monitoring and alerting verification
+        - Incident response planning
+        - SRE best practices validation
+        """
+        logger.warning(
+            "Using placeholder operational risk detection - not suitable for production operational planning"
+        )
         risks = []
         if not proposal.get("has_rollback_plan"):
             risks.append(

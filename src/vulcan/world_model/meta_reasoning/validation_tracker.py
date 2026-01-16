@@ -39,71 +39,12 @@ from collections import Counter, defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
 
-# import numpy as np # Original import
 from typing import Any, Dict, List, Optional
-from unittest.mock import MagicMock  # --- START FIX: Import MagicMock ---
+from unittest.mock import MagicMock
 
-# --- START FIX: Add numpy fallback ---
-# logger = logging.getLogger(__name__) # Original logger placement
-logger = logging.getLogger(__name__)  # Moved logger init up
-try:
-    import numpy as np
+from vulcan.world_model.meta_reasoning.numpy_compat import np, NUMPY_AVAILABLE
 
-    NUMPY_AVAILABLE = True
-except ImportError:
-    NUMPY_AVAILABLE = False
-    logger.warning("NumPy not available, using list-based math")
-
-    class FakeNumpy:
-        @staticmethod
-        def mean(lst):
-            return sum(lst) / len(lst) if lst else 0.0  # Return float
-
-        @staticmethod
-        def array(lst):
-            return list(lst)
-
-        @staticmethod
-        def log2(x):
-            if isinstance(x, list):
-                return [math.log2(i) if i > 0 else -float("inf") for i in x]
-            return math.log2(x) if x > 0 else -float("inf")
-
-        @staticmethod
-        def diff(a, n=1, axis=-1, prepend=None, append=None):
-            # Simplified diff for 1D list
-            if not isinstance(a, list) or n != 1 or axis != -1:
-                raise NotImplementedError(
-                    "FakeNumpy diff only supports n=1, axis=-1 on lists"
-                )
-            if len(a) < 2:
-                return []
-            result = [a[i] - a[i - 1] for i in range(1, len(a))]
-            # Prepend/append not implemented simply here
-            return result
-
-        @staticmethod
-        def std(a, axis=None, dtype=None, out=None, ddof=0, keepdims=False):
-            # Simplified std dev for 1D list
-            if not isinstance(a, list):
-                raise NotImplementedError("FakeNumpy std only supports lists")
-            n = len(a)
-            if n <= ddof:
-                return float("nan")  # Cannot compute std dev
-            mean_val = sum(a) / n if n > 0 else 0
-            variance = sum((x - mean_val) ** 2 for x in a) / (n - ddof)
-            return math.sqrt(variance)
-
-        # Add generic type placeholder if needed elsewhere
-        class generic:
-            pass
-
-        # Add ndarray type placeholder if needed elsewhere
-        class ndarray:
-            pass
-
-    np = FakeNumpy()
-# --- END FIX ---
+logger = logging.getLogger(__name__)
 
 
 # Assuming ProposalValidation is available from motivational_introspection
