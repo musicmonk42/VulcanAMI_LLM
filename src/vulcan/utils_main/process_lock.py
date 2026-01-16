@@ -240,13 +240,21 @@ class ProcessLock:
         except FileLockTimeout:
             # Lock is held by another process - check if stale
             if self._is_lock_stale():
-                logger.warning("Stale lock detected - forcibly acquiring")
+                logger.warning("Stale lock detected - attempting to remove lock file")
                 try:
-                    # Force release stale lock
-                    self._lock.release(force=True)
+                    # Remove the lock file directly (stale lock)
+                    # Note: This is safe because we've verified the holder is dead/stale
+                    if os.path.exists(self.lock_path):
+                        try:
+                            os.remove(self.lock_path)
+                        except OSError as e:
+                            logger.error(f"Failed to remove stale lock file: {e}")
+                            return False
+                    
                     self._clear_metadata()
                     
-                    # Try again
+                    # Try again with fresh FileLock
+                    self._lock = FileLock(self.lock_path, timeout=0)
                     self._lock.acquire(timeout=0)
                     self._locked = True
                     self._write_metadata()
@@ -289,13 +297,15 @@ class ProcessLock:
     def get_heartbeat_status(self) -> dict:
         """Get status information about the heartbeat."""
         pid, timestamp = self._read_metadata()
+        # Store thread reference to avoid race condition
+        thread = self._heartbeat_thread
         return {
             "locked": self._locked,
             "lock_path": self.lock_path,
             "pid": pid,
             "last_heartbeat": timestamp,
             "heartbeat_age": time.time() - timestamp if timestamp else None,
-            "thread_alive": self._heartbeat_thread.is_alive() if self._heartbeat_thread else False,
+            "thread_alive": thread.is_alive() if thread is not None else False,
         }
     
     def __enter__(self) -> 'ProcessLock':

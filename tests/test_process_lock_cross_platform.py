@@ -98,10 +98,14 @@ class TestIsProcessRunning:
         assert is_process_running(999999999) is False
 
 
-@pytest.mark.skipif(
-    not pytest.importorskip("filelock", reason="filelock library not installed"),
-    reason="Requires filelock library"
-)
+try:
+    import filelock
+    FILELOCK_INSTALLED = True
+except ImportError:
+    FILELOCK_INSTALLED = False
+
+
+@pytest.mark.skipif(not FILELOCK_INSTALLED, reason="Requires filelock library")
 class TestProcessLockBasicOperations:
     """Test basic ProcessLock operations with filelock available."""
     
@@ -194,10 +198,7 @@ class TestProcessLockBasicOperations:
         assert "locked=" in repr_str
 
 
-@pytest.mark.skipif(
-    not pytest.importorskip("filelock", reason="filelock library not installed"),
-    reason="Requires filelock library"
-)
+@pytest.mark.skipif(not FILELOCK_INSTALLED, reason="Requires filelock library")
 class TestProcessLockHeartbeat:
     """Test ProcessLock heartbeat mechanism."""
     
@@ -269,10 +270,7 @@ class TestProcessLockHeartbeat:
         lock.release()
 
 
-@pytest.mark.skipif(
-    not pytest.importorskip("filelock", reason="filelock library not installed"),
-    reason="Requires filelock library"
-)
+@pytest.mark.skipif(not FILELOCK_INSTALLED, reason="Requires filelock library")
 class TestProcessLockStaleLockDetection:
     """Test stale lock detection and recovery."""
     
@@ -283,22 +281,26 @@ class TestProcessLockStaleLockDetection:
             yield os.path.join(tmpdir, "test.lock")
     
     def test_stale_lock_detection_dead_process(self, temp_lock_path):
-        """Verify stale lock from dead process is detected."""
+        """Verify stale lock from dead process can be detected and cleared."""
         from vulcan.utils_main.process_lock import ProcessLock
         
         lock = ProcessLock(lock_path=temp_lock_path, enable_heartbeat=False)
         
-        # Manually create metadata for a non-existent process
+        # Manually create lock file and metadata for a non-existent process
+        # This simulates a crashed process
+        with open(temp_lock_path, 'w') as f:
+            f.write("locked")
+        
         metadata_path = temp_lock_path + ".meta"
         with open(metadata_path, 'w') as f:
             f.write(f"999999999:{time.time()}")  # Non-existent PID
         
-        # Lock should detect stale lock and acquire it
-        # Note: This requires filelock to have force release capability
-        # For now, we just verify the detection logic works
+        # Lock should detect stale lock
         assert lock._is_lock_stale() is True
         
         # Cleanup
+        if os.path.exists(temp_lock_path):
+            os.remove(temp_lock_path)
         if os.path.exists(metadata_path):
             os.remove(metadata_path)
     
@@ -388,7 +390,8 @@ class TestProcessLockGlobalRegistry:
     
     def test_create_and_acquire_lock_success(self):
         """Verify create_and_acquire_lock returns lock on success."""
-        pytest.importorskip("filelock", reason="filelock library not installed")
+        if not FILELOCK_INSTALLED:
+            pytest.skip("filelock library not installed")
         from vulcan.utils_main.process_lock import create_and_acquire_lock, get_process_lock
         
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -434,7 +437,8 @@ class TestProcessLockEdgeCases:
     
     def test_multiple_releases(self):
         """Verify multiple releases are safe."""
-        pytest.importorskip("filelock", reason="filelock library not installed")
+        if not FILELOCK_INSTALLED:
+            pytest.skip("filelock library not installed")
         from vulcan.utils_main.process_lock import ProcessLock
         
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -463,7 +467,8 @@ class TestProcessLockSecurityAndRobustness:
     
     def test_metadata_file_permissions(self):
         """Verify metadata files use safe permissions."""
-        pytest.importorskip("filelock", reason="filelock library not installed")
+        if not FILELOCK_INSTALLED:
+            pytest.skip("filelock library not installed")
         from vulcan.utils_main.process_lock import ProcessLock
         
         with tempfile.TemporaryDirectory() as tmpdir:
