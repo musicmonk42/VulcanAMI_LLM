@@ -190,6 +190,21 @@ uvicorn src.graphix_arena:app --host 127.0.0.1 --port 8000 --reload
 python src/minimal_executor.py
 ```
 
+6) **Interactive CLI (NEW - v2.0.0)** 🆕
+```bash
+# Cross-platform interactive command-line interface
+# Works on Windows, Linux, and macOS
+python -m vulcan.cli
+
+# Configure with environment variables
+export VULCAN_SERVER_URL=http://localhost:8000
+export VULCAN_API_KEY=your-api-key-here
+
+# Available commands: query, status, memory, config, help, exit
+# Features: command history, tab completion, syntax colors
+# See docs/CLI_USAGE.md for complete documentation
+```
+
 Notes
 - The services above are alternative entry points commonly used during development. Your licensed deployment may provide a consolidated or managed runtime with additional controls.
 - Do not use development defaults in production.

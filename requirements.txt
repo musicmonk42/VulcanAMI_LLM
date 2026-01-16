@@ -300,6 +300,7 @@ preshed==3.0.12
 progressbar2==4.5.0
 prometheus-fastapi-instrumentator==6.1.0
 prometheus_client==0.23.1
+prompt_toolkit==3.0.48
 propcache==0.4.1
 proto-plus==1.26.0
 protobuf==4.25.3
