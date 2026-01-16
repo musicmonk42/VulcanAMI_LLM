@@ -146,7 +146,7 @@ except ImportError:
 
 # Import QueryClassifier for LLM-based tool classification
 try:
-    from ...routing.query_classifier import classify_query, QueryClassification
+    from vulcan.llm.query_classifier import classify_query, QueryClassification
     QUERY_CLASSIFIER_AVAILABLE = True
     logger.info("QueryClassifier imported for LLM-based tool selection")
 except ImportError as e:

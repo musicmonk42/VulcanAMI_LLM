@@ -72,7 +72,7 @@ except ImportError:
 
 # QueryClassifier availability for LLM-based tool selection
 try:
-    from ...routing.query_classifier import (
+    from vulcan.llm.query_classifier import (
         classify_query,
         QueryClassification,
         QueryClassifier,

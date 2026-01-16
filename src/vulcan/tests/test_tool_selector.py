@@ -1246,7 +1246,7 @@ class TestQueryClassifier:
     
     def test_hello_classified_as_greeting(self):
         """Test that 'hello' is classified as GREETING with low complexity"""
-        from vulcan.routing.query_classifier import classify_query
+        from vulcan.llm.query_classifier import classify_query
         
         result = classify_query("hello")
         
@@ -1256,7 +1256,7 @@ class TestQueryClassifier:
     
     def test_hi_classified_as_greeting(self):
         """Test that 'hi' is classified as GREETING"""
-        from vulcan.routing.query_classifier import classify_query
+        from vulcan.llm.query_classifier import classify_query
         
         result = classify_query("hi")
         
@@ -1265,7 +1265,7 @@ class TestQueryClassifier:
     
     def test_thanks_classified_as_greeting(self):
         """Test that 'thanks' is classified as GREETING"""
-        from vulcan.routing.query_classifier import classify_query
+        from vulcan.llm.query_classifier import classify_query
         
         result = classify_query("thanks")
         
@@ -1274,7 +1274,7 @@ class TestQueryClassifier:
     
     def test_sat_problem_classified_as_logical(self):
         """Test that SAT problem is classified as LOGICAL with high complexity"""
-        from vulcan.routing.query_classifier import classify_query
+        from vulcan.llm.query_classifier import classify_query
         
         query = "Is A→B, B→C, ¬C, A∨B satisfiable?"
         result = classify_query(query)
@@ -1286,7 +1286,7 @@ class TestQueryClassifier:
     
     def test_bayes_problem_classified_as_probabilistic(self):
         """Test that Bayes problem is classified as PROBABILISTIC"""
-        from vulcan.routing.query_classifier import classify_query
+        from vulcan.llm.query_classifier import classify_query
         
         query = "Sensitivity=0.99, Specificity=0.95, Prevalence=0.01. Compute P(X|+)"
         result = classify_query(query)
@@ -1298,7 +1298,7 @@ class TestQueryClassifier:
     
     def test_causal_problem_classified_correctly(self):
         """Test that causal inference problem is classified as CAUSAL"""
-        from vulcan.routing.query_classifier import classify_query
+        from vulcan.llm.query_classifier import classify_query
         
         query = "Does correlation imply causation? How do we control for confounding?"
         result = classify_query(query)
@@ -1308,7 +1308,7 @@ class TestQueryClassifier:
     
     def test_complexity_differs_by_query_type(self):
         """Test that 'hello' and SAT problem get DIFFERENT complexity scores"""
-        from vulcan.routing.query_classifier import classify_query
+        from vulcan.llm.query_classifier import classify_query
         
         hello_result = classify_query("hello")
         sat_result = classify_query("Is A→B, ¬B, A satisfiable?")
@@ -1325,7 +1325,7 @@ class TestQueryClassifier:
 
     def test_creative_writing_skips_reasoning(self):
         """BUG A FIX: Test that creative writing queries skip reasoning"""
-        from vulcan.routing.query_classifier import classify_query
+        from vulcan.llm.query_classifier import classify_query
         
         # Test various creative writing patterns
         creative_queries = [
@@ -1346,7 +1346,7 @@ class TestQueryClassifier:
 
     def test_conversational_skips_reasoning(self):
         """BUG A FIX: Test that conversational queries skip reasoning"""
-        from vulcan.routing.query_classifier import classify_query
+        from vulcan.llm.query_classifier import classify_query
         
         conversational_queries = [
             "what's the capital of France?",

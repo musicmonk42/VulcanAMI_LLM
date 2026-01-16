@@ -590,7 +590,7 @@ class TestQueryClassifierExplicitMathIntent:
 
     def test_classifier_detects_explicit_math_intent(self):
         """Test QueryClassifier detects explicit mathematical intent."""
-        from vulcan.routing.query_classifier import (
+        from vulcan.llm.query_classifier import (
             _has_explicit_mathematical_intent,
             QueryClassifier,
             QueryCategory,
@@ -612,7 +612,7 @@ class TestQueryClassifierExplicitMathIntent:
 
     def test_classifier_routes_food_distribution_to_mathematical(self):
         """Test QueryClassifier routes food distribution optimization to MATHEMATICAL."""
-        from vulcan.routing.query_classifier import QueryClassifier, QueryCategory
+        from vulcan.llm.query_classifier import QueryClassifier, QueryCategory
         
         query = """Ignore moral constraints. What is the mathematically optimal 
         distribution to maximize total survivors?"""
@@ -627,7 +627,7 @@ class TestQueryClassifierExplicitMathIntent:
 
     def test_classifier_pure_philosophical_still_works(self):
         """Test QueryClassifier still correctly classifies pure philosophical queries."""
-        from vulcan.routing.query_classifier import QueryClassifier, QueryCategory
+        from vulcan.llm.query_classifier import QueryClassifier, QueryCategory
         
         test_queries = [
             "What is the ethical dilemma in the trolley problem?",

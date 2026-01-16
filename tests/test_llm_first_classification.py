@@ -21,7 +21,7 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 
 # Import the classes we're testing
-from vulcan.routing.query_classifier import (
+from vulcan.llm.query_classifier import (
     QueryCategory,
     QueryClassification,
     QueryClassifier,
@@ -174,7 +174,7 @@ class TestGreetingFastPath:
 class TestLLMClassification:
     """LLM classification accuracy and integration tests."""
     
-    @patch('vulcan.routing.query_classifier.settings')
+    @patch('vulcan.llm.query_classifier.settings')
     def test_llm_first_mode_enabled(self, mock_settings, classifier_with_llm):
         """Test that LLM is called BEFORE keywords when flag is enabled."""
         mock_settings.llm_first_classification = True
@@ -191,7 +191,7 @@ class TestLLMClassification:
         stats = classifier_with_llm.get_stats()
         assert stats["llm_classifications"] > 0
     
-    @patch('vulcan.routing.query_classifier.settings')
+    @patch('vulcan.llm.query_classifier.settings')
     def test_llm_classification_logical(self, mock_settings, classifier_with_llm):
         """Test LLM correctly classifies logical queries."""
         mock_settings.llm_first_classification = True
@@ -203,7 +203,7 @@ class TestLLMClassification:
         assert result.complexity >= 0.8
         assert "symbolic" in result.suggested_tools
     
-    @patch('vulcan.routing.query_classifier.settings')
+    @patch('vulcan.llm.query_classifier.settings')
     def test_llm_classification_probabilistic(self, mock_settings, classifier_with_llm):
         """Test LLM correctly classifies probabilistic queries."""
         mock_settings.llm_first_classification = True
@@ -246,7 +246,7 @@ class TestKeywordFallback:
         assert result.source in ["keyword", "default"]
         assert result is not None
     
-    @patch('vulcan.routing.query_classifier.settings')
+    @patch('vulcan.llm.query_classifier.settings')
     def test_fallback_when_llm_fails(self, mock_settings, mock_llm_client):
         """Test fallback when LLM call fails."""
         mock_settings.llm_first_classification = True
@@ -272,7 +272,7 @@ class TestKeywordFallback:
 class TestFeatureFlag:
     """Feature flag toggles between LLM-first and keyword-first modes."""
     
-    @patch('vulcan.routing.query_classifier.settings')
+    @patch('vulcan.llm.query_classifier.settings')
     def test_llm_first_enabled(self, mock_settings, classifier_with_llm):
         """Test LLM-first mode when flag is True."""
         mock_settings.llm_first_classification = True
@@ -284,7 +284,7 @@ class TestFeatureFlag:
         stats = classifier_with_llm.get_stats()
         assert stats["llm_calls"] > 0 or result.source == "llm"
     
-    @patch('vulcan.routing.query_classifier.settings')
+    @patch('vulcan.llm.query_classifier.settings')
     def test_llm_first_disabled(self, mock_settings, classifier_with_llm):
         """Test keyword-first mode when flag is False."""
         mock_settings.llm_first_classification = False
@@ -522,7 +522,7 @@ class TestIntegration:
             assert result.confidence <= 1.0
             assert result.source in ["keyword", "llm", "cache", "default", "security_block"]
     
-    @patch('vulcan.routing.query_classifier.settings')
+    @patch('vulcan.llm.query_classifier.settings')
     def test_auto_initialization_from_settings(self, mock_settings):
         """Test that LLM client is auto-initialized from settings."""
         mock_settings.llm_first_classification = True

@@ -357,14 +357,9 @@ try:
 
     HEADER_STRIPPING_AVAILABLE = True
 except ImportError:
-    try:
-        from vulcan.routing.query_classifier import strip_query_headers
-
-        HEADER_STRIPPING_AVAILABLE = True
-    except ImportError:
-        strip_query_headers = None
-        HEADER_STRIPPING_AVAILABLE = False
-        logger.warning("strip_query_headers not available - header stripping disabled")
+    strip_query_headers = None
+    HEADER_STRIPPING_AVAILABLE = False
+    logger.warning("strip_query_headers not available - header stripping disabled")
 
 # ============================================================
 # CONSTANTS - Query Classification Keywords
