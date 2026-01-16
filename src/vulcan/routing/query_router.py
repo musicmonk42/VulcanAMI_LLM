@@ -353,7 +353,7 @@ except ImportError:
 #   3. route_to_engine() → correct engine
 
 try:
-    from .query_classifier import strip_query_headers
+    from vulcan.llm.query_classifier import strip_query_headers
 
     HEADER_STRIPPING_AVAILABLE = True
 except ImportError:
@@ -3592,7 +3592,7 @@ class QueryAnalyzer:
         # 3. Caching to avoid repeated classifications
         # =================================================================
         try:
-            from .query_classifier import classify_query, QueryCategory
+            from vulcan.llm.query_classifier import classify_query, QueryCategory
             
             classification = classify_query(query)
             
