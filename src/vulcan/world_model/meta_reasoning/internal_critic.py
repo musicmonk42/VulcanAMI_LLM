@@ -5,9 +5,20 @@ Part of the meta_reasoning subsystem for VULCAN-AMI
 
 FULL PRODUCTION IMPLEMENTATION
 
+WARNING: Risk identification methods are PLACEHOLDER IMPLEMENTATIONS.
+The risk detection methods (_identify_*_risks) rely on self-reported flags in proposals
+(e.g., 'causes_physical_harm', 'has_security_review') rather than semantic analysis of
+proposal content. This is NOT suitable for production security/safety without additional
+validation layers. Real-world usage requires:
+- Semantic analysis of proposal text/code
+- Integration with static analysis tools
+- Code scanning and vulnerability detection
+- Expert system review for safety-critical applications
+- DO NOT rely on these placeholders for actual security/safety decisions
+
 Comprehensive internal critique system with:
 - Multi-perspective evaluation (logic, feasibility, safety, alignment, efficiency)
-- Automated risk identification and assessment
+- Automated risk identification and assessment (PLACEHOLDER - see warning above)
 - Comparative analysis of alternatives
 - Iterative refinement suggestions
 - Learning from critique outcomes
@@ -753,7 +764,23 @@ class InternalCritic(SerializationMixin):
     def _identify_safety_risks(
         self, proposal: Dict[str, Any], context: Dict[str, Any]
     ) -> List[Risk]:
-        """Placeholder: Identify safety risks"""
+        """
+        Identify safety risks in proposal.
+        
+        WARNING: This is a PLACEHOLDER implementation that relies on self-reported flags.
+        Real-world usage requires semantic analysis of proposal content, not just checking
+        for 'causes_physical_harm' flags. DO NOT rely on this for actual safety decisions
+        in production without additional validation layers.
+        
+        Production requirements:
+        - Semantic analysis of proposal text and code
+        - Integration with safety verification tools
+        - Expert review for safety-critical applications
+        - Formal verification methods where applicable
+        """
+        logger.warning(
+            "Using placeholder safety risk detection - not suitable for production safety decisions"
+        )
         risks = []
         if proposal.get("causes_physical_harm"):
             risks.append(
@@ -780,7 +807,23 @@ class InternalCritic(SerializationMixin):
     def _identify_security_risks(
         self, proposal: Dict[str, Any], context: Dict[str, Any]
     ) -> List[Risk]:
-        """Placeholder: Identify security risks"""
+        """
+        Identify security risks in proposal.
+        
+        WARNING: This is a PLACEHOLDER implementation that relies on self-reported flags.
+        Real-world usage requires semantic analysis of proposal content, not just checking
+        for 'has_security_review' flags. DO NOT rely on this for actual security decisions
+        in production without additional validation layers.
+        
+        Production requirements:
+        - Static code analysis and vulnerability scanning
+        - Integration with security testing tools (SAST/DAST)
+        - Threat modeling and attack surface analysis
+        - Security expert review
+        """
+        logger.warning(
+            "Using placeholder security risk detection - not suitable for production security decisions"
+        )
         risks = []
         if proposal.get("requires_network_access") and not proposal.get(
             "has_security_review"
@@ -799,7 +842,23 @@ class InternalCritic(SerializationMixin):
     def _identify_performance_risks(
         self, proposal: Dict[str, Any], context: Dict[str, Any]
     ) -> List[Risk]:
-        """Placeholder: Identify performance risks"""
+        """
+        Identify performance risks in proposal.
+        
+        WARNING: This is a PLACEHOLDER implementation that relies on self-reported flags.
+        Real-world usage requires semantic analysis and complexity analysis of proposal content,
+        not just checking for 'complexity' flags. DO NOT rely on this for actual performance
+        predictions in production without additional validation layers.
+        
+        Production requirements:
+        - Algorithmic complexity analysis
+        - Performance profiling and benchmarking
+        - Load testing and stress testing
+        - Resource utilization modeling
+        """
+        logger.warning(
+            "Using placeholder performance risk detection - not suitable for production performance predictions"
+        )
         risks = []
         if proposal.get("complexity") == "exponential":
             risks.append(
@@ -816,7 +875,23 @@ class InternalCritic(SerializationMixin):
     def _identify_resource_risks(
         self, proposal: Dict[str, Any], context: Dict[str, Any]
     ) -> List[Risk]:
-        """Placeholder: Identify resource risks"""
+        """
+        Identify resource consumption risks in proposal.
+        
+        WARNING: This is a PLACEHOLDER implementation that relies on self-reported estimates.
+        Real-world usage requires semantic analysis and resource modeling of proposal content,
+        not just comparing 'estimated_cost' values. DO NOT rely on this for actual resource
+        planning in production without additional validation layers.
+        
+        Production requirements:
+        - Detailed resource modeling and forecasting
+        - Cost analysis with real infrastructure metrics
+        - Capacity planning integration
+        - Budget tracking and alerting systems
+        """
+        logger.warning(
+            "Using placeholder resource risk detection - not suitable for production resource planning"
+        )
         risks = []
         cost = proposal.get("estimated_cost", 0)
         budget = context.get("budget", 100)
@@ -835,7 +910,24 @@ class InternalCritic(SerializationMixin):
     def _identify_ethical_risks(
         self, proposal: Dict[str, Any], context: Dict[str, Any]
     ) -> List[Risk]:
-        """Placeholder: Identify ethical risks (integrates with monitor)"""
+        """
+        Identify ethical risks in proposal (integrates with EthicalBoundaryMonitor).
+        
+        WARNING: This implementation depends on EthicalBoundaryMonitor's effectiveness.
+        If the monitor is not properly configured or uses placeholder detection, this
+        will not provide adequate ethical risk assessment. DO NOT rely on this for actual
+        ethical governance in production without human oversight and review.
+        
+        Production requirements:
+        - Comprehensive ethical framework integration
+        - Human ethics committee review
+        - Stakeholder impact analysis
+        - Cultural and contextual sensitivity analysis
+        - Ongoing monitoring and adaptation
+        """
+        logger.warning(
+            "Ethical risk detection depends on EthicalBoundaryMonitor - requires human oversight for production"
+        )
         risks = []
         if self.ethical_boundary_monitor:
             try:
@@ -877,7 +969,25 @@ class InternalCritic(SerializationMixin):
     def _identify_operational_risks(
         self, proposal: Dict[str, Any], context: Dict[str, Any]
     ) -> List[Risk]:
-        """Placeholder: Identify operational risks"""
+        """
+        Identify operational risks in proposal.
+        
+        WARNING: This is a PLACEHOLDER implementation that relies on self-reported flags.
+        Real-world usage requires semantic analysis of proposal content and integration
+        with operational best practices, not just checking for 'has_rollback_plan' flags.
+        DO NOT rely on this for actual operational risk management in production without
+        additional validation layers.
+        
+        Production requirements:
+        - Integration with deployment and rollback systems
+        - Operational runbook validation
+        - Monitoring and alerting verification
+        - Incident response planning
+        - SRE best practices validation
+        """
+        logger.warning(
+            "Using placeholder operational risk detection - not suitable for production operational planning"
+        )
         risks = []
         if not proposal.get("has_rollback_plan"):
             risks.append(

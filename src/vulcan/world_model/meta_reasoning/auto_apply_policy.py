@@ -30,15 +30,49 @@ try:
     YAML_AVAILABLE = True
 except ImportError:
     YAML_AVAILABLE = False
-    logger.warning("YAML not available, falling back to JSON")
+    logger.warning(
+        "PyYAML not available, falling back to JSON parser. "
+        "NOTE: JSON is NOT a strict superset of YAML - complex YAML features "
+        "(anchors, multi-line strings, custom tags) will NOT work. "
+        "Install PyYAML for full YAML support: pip install pyyaml"
+    )
     import json
 
-    # Create a mock 'yaml' object with a 'safe_load' method that uses json.load
-    # This allows the rest of the file to call yaml.safe_load()
     class YamlJsonFallback:
+        """
+        Fallback YAML parser using JSON when PyYAML is unavailable.
+        
+        WARNING: This is a limited fallback. JSON syntax is a subset of YAML 1.2,
+        but many YAML features are not supported:
+        - Anchors and aliases (&anchor, *alias)
+        - Multi-line strings with | or >
+        - Custom tags (!tag)
+        - Comments (though JSON doesn't have them either)
+        - Unquoted strings with special characters
+        
+        Only use for simple YAML files that are effectively JSON.
+        """
         def safe_load(self, stream):
-            # json.load reads from a stream (like yaml.safe_load)
-            return json.load(stream)
+            """
+            Attempt to parse YAML file using JSON parser.
+            
+            Args:
+                stream: File-like object to read from
+                
+            Returns:
+                Parsed data structure
+                
+            Raises:
+                json.JSONDecodeError: If file is not valid JSON
+            """
+            try:
+                return json.load(stream)
+            except json.JSONDecodeError as e:
+                logger.error(
+                    f"Failed to parse YAML file as JSON: {e}. "
+                    "Install PyYAML for proper YAML parsing: pip install pyyaml"
+                )
+                raise
 
     yaml = YamlJsonFallback()
 # --- END FIX ---

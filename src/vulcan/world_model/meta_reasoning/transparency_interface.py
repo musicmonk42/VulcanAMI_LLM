@@ -212,6 +212,28 @@ class TransparencyInterface(SerializationMixin):
     def _make_serializable(self, data: Any, seen: Optional[Set[int]] = None) -> Any:
         """
         Recursively make data JSON serializable, handling common types and circular references.
+        
+        NOTE: This is a JSON serialization utility, NOT for pickle serialization.
+        For pickle serialization, classes use SerializationMixin from serialization_mixin.py.
+        
+        This utility handles:
+        - Dataclasses (via asdict)
+        - Enums (to value)
+        - NumPy arrays and scalars
+        - Sets (to sorted lists)
+        - Circular references (via seen tracking)
+        - MagicMock objects (for testing)
+        - Objects with to_dict() methods
+        
+        Industry Standard Alternative:
+        For simple cases, use:
+            - json.dumps(obj, default=str) for basic serialization
+            - dataclasses.asdict() for dataclass conversion
+        
+        This custom implementation is needed here for:
+            - Circular reference detection in complex object graphs
+            - Consistent handling of NumPy types
+            - Deep serialization of nested dataclasses with custom types
 
         Args:
             data: The data to serialize.
