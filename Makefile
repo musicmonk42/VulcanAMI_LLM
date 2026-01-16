@@ -659,6 +659,50 @@ disable-semantic-matching: ## Disable semantic matching for faster routing
 	@echo "Note: This uses keyword-only tool selection (faster but less accurate)."
 
 ################################################################################
+# CLI (Interactive Command-Line Interface)
+################################################################################
+
+.PHONY: cli
+cli: ## Start VULCAN interactive CLI (cross-platform)
+	@echo "$(GREEN)Starting VULCAN Interactive CLI...$(NC)"
+	@echo "$(YELLOW)Tip: Set VULCAN_SERVER_URL and VULCAN_API_KEY environment variables$(NC)"
+	PYTHONPATH=src python3 -m vulcan.cli
+
+.PHONY: cli-help
+cli-help: ## Show CLI usage and configuration
+	@echo "$(BLUE)VULCAN CLI - Cross-Platform Interactive Interface$(NC)"
+	@echo ""
+	@echo "$(YELLOW)Quick Start:$(NC)"
+	@echo "  make cli                    # Start interactive mode"
+	@echo ""
+	@echo "$(YELLOW)Configuration:$(NC)"
+	@echo "  export VULCAN_SERVER_URL=http://localhost:8000"
+	@echo "  export VULCAN_API_KEY=your-api-key-here"
+	@echo ""
+	@echo "$(YELLOW)Features:$(NC)"
+	@echo "  ✓ Cross-platform (Windows, Linux, macOS)"
+	@echo "  ✓ Command history (↑↓ arrows)"
+	@echo "  ✓ Tab completion"
+	@echo "  ✓ Syntax colors"
+	@echo "  ✓ Real-time API integration"
+	@echo ""
+	@echo "$(YELLOW)Available Commands:$(NC)"
+	@echo "  query <text>   - Query VULCAN (alias: q)"
+	@echo "  status         - System health check (alias: s)"
+	@echo "  memory <query> - Search memories (alias: m)"
+	@echo "  config         - Show configuration"
+	@echo "  help           - Show help (alias: h, ?)"
+	@echo "  exit           - Exit CLI"
+	@echo ""
+	@echo "$(YELLOW)Documentation:$(NC)"
+	@echo "  See docs/CLI_USAGE.md for complete guide"
+
+.PHONY: test-cli
+test-cli: ## Run CLI tests
+	@echo "$(GREEN)Running CLI tests...$(NC)"
+	PYTHONPATH=src pytest tests/test_cli_client.py tests/test_cli_config.py -v --tb=short
+
+################################################################################
 # Utilities
 ################################################################################
 
