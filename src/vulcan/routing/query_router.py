@@ -4860,22 +4860,23 @@ class QueryAnalyzer:
             plan.telemetry_data["reasoning_confidence"] = reasoning_result.confidence
 
         except ImportError:
-            logger.debug("[QueryRouter] Reasoning integration not available - using fallback tool selection")
-            # MEDIUM Priority Fix #5: Fallback to _select_reasoning_tools when integration unavailable
-            selected_tools = self._select_reasoning_tools(plan)
-            plan.telemetry_data["selected_tools"] = selected_tools
+            logger.debug("[QueryRouter] Reasoning integration not available - using fallback hint generation")
+            # ARCHITECTURAL CHANGE: Router provides HINTS, not final tool selection
+            # ToolSelector makes the final decision based on these hints
+            tool_hints = self._select_reasoning_tools(plan)
+            plan.telemetry_data["tool_hints"] = tool_hints  # Store hints for ToolSelector
             plan.telemetry_data["reasoning_strategy"] = "pattern_based"
             logger.info(
-                f"[QueryRouter] Tool selection fallback: tools={selected_tools}, strategy=pattern_based"
+                f"[QueryRouter] Tool hints (fallback): hints={tool_hints}, strategy=pattern_based"
             )
         except Exception as e:
             logger.warning(f"[QueryRouter] Reasoning integration failed: {e} - using fallback")
-            # MEDIUM Priority Fix #5: Fallback to _select_reasoning_tools on error
-            selected_tools = self._select_reasoning_tools(plan)
-            plan.telemetry_data["selected_tools"] = selected_tools
+            # ARCHITECTURAL CHANGE: Router provides HINTS, not final tool selection
+            tool_hints = self._select_reasoning_tools(plan)
+            plan.telemetry_data["tool_hints"] = tool_hints  # Store hints for ToolSelector
             plan.telemetry_data["reasoning_strategy"] = "pattern_based"
             logger.info(
-                f"[QueryRouter] Tool selection fallback (after error): tools={selected_tools}"
+                f"[QueryRouter] Tool hints (fallback after error): hints={tool_hints}"
             )
 
         # Decompose into agent tasks (only if safety passed)
@@ -5370,41 +5371,48 @@ class QueryAnalyzer:
 
         return QueryType.GENERAL
 
-    def _select_reasoning_tools(self, plan: ProcessingPlan) -> List[str]:
+    def _select_reasoning_tools(self, plan: ProcessingPlan) -> Dict[str, float]:
         """
-        Select appropriate reasoning tools based on query classification.
+        Provide reasoning tool HINTS/SUGGESTIONS to ToolSelector.
         
-        INDUSTRY STANDARD: Maps query characteristics to specialized engines
-        with proper priority ordering to prevent misrouting.
+        INDUSTRY STANDARD - COMMAND vs SUGGESTION:
+        Router SUGGESTS tools with confidence weights, ToolSelector DECIDES final tools.
+        This establishes clear hierarchy: Router→hints, ToolSelector→authority.
         
-        This method ensures that technical queries (causal, analogical, mathematical, SAT)
-        are routed to the correct reasoning engines based on their detected patterns,
-        query type, and complexity scores.
+        ARCHITECTURAL CHANGE (Industry Standard):
+        - OLD: Router returned List[str] - direct tool selection (bypassed ToolSelector)
+        - NEW: Router returns Dict[str, float] - tool suggestions with weights
+        - ToolSelector is THE AUTHORITY for final tool selection
+        - Router hints influence ToolSelector (e.g., +0.2 utility boost)
         
-        Priority Ordering:
-            1. SAT/symbolic queries → ['symbolic'] (HIGHEST PRIORITY)
-            2. Causal queries → ['causal']
-            3. Analogical queries → ['analogical']
-            4. Mathematical queries → ['mathematical', 'symbolic']
-            5. Philosophical queries → ['philosophical', 'world_model']
-            6. Probabilistic queries → ['probabilistic']
+        This ensures single decision authority (ToolSelector) while preserving
+        Router's domain knowledge through weighted suggestions.
+        
+        Priority Ordering (for hint generation):
+            1. SAT/symbolic queries → {'symbolic': 0.9} (HIGHEST CONFIDENCE)
+            2. Causal queries → {'causal': 0.85}
+            3. Analogical queries → {'analogical': 0.8}
+            4. Mathematical queries → {'mathematical': 0.8, 'symbolic': 0.5}
+            5. Philosophical queries → {'philosophical': 0.85, 'world_model': 0.6}
+            6. Probabilistic queries → {'probabilistic': 0.8}
         
         Args:
             plan: ProcessingPlan with query_type, detected_patterns, complexity_score
             
         Returns:
-            List of tool names (e.g., ['symbolic'], ['causal', 'world_model'])
+            Dict[str, float]: Tool name → confidence weight (0.0-1.0)
+            Higher weight = stronger suggestion to ToolSelector
             
         Example:
             >>> plan = ProcessingPlan(...)
             >>> plan.detected_patterns = ['sat_problem', 'logic_symbols']
             >>> router._select_reasoning_tools(plan)
-            ['symbolic']
+            {'symbolic': 0.9, 'probabilistic': 0.3}  # Hints, not commands
         """
         # Defensive programming: validate plan parameter
         if not plan or not isinstance(plan, ProcessingPlan):
             logger.warning("[QueryRouter._select_reasoning_tools] Invalid plan parameter")
-            return ['general']
+            return {'general': 0.5}  # Low confidence fallback hint
         
         query_lower = plan.original_query.lower() if plan.original_query else ""
         detected_patterns = plan.detected_patterns or []
@@ -5412,16 +5420,21 @@ class QueryAnalyzer:
         complexity = plan.complexity_score
         uncertainty = plan.uncertainty_score
         
+        # Initialize hints dictionary
+        tool_hints = {}
+        
         # ============================================================
         # PRIORITY 1: SAT/Symbolic Queries (HIGHEST PRIORITY)
         # ============================================================
-        # SAT queries must route to symbolic engine for satisfiability checking
+        # SAT queries should strongly suggest symbolic engine
         sat_patterns = ['sat_', 'satisfiable', 'unsatisfiable', 'cnf', 'dnf']
         if any(p.startswith('sat_') for p in detected_patterns):
             logger.info(
-                f"[QueryRouter._select_reasoning_tools] SAT pattern detected → ['symbolic']"
+                f"[QueryRouter._select_reasoning_tools] SAT pattern detected → symbolic hint 0.9"
             )
-            return ['symbolic']
+            tool_hints['symbolic'] = 0.9  # Very strong suggestion
+            tool_hints['probabilistic'] = 0.2  # Weak fallback
+            return tool_hints
         
         # Check for SAT keywords in query
         sat_keywords = ['satisfiable', 'unsatisfiable', 'sat', 'unsat', 'cnf', 'dnf']
@@ -5431,9 +5444,11 @@ class QueryAnalyzer:
             has_logic = any(sym in plan.original_query or sym in query_lower for sym in logic_symbols)
             if has_logic:
                 logger.info(
-                    f"[QueryRouter._select_reasoning_tools] SAT keywords + logic symbols → ['symbolic']"
+                    f"[QueryRouter._select_reasoning_tools] SAT keywords + logic symbols → symbolic hint 0.9"
                 )
-                return ['symbolic']
+                tool_hints['symbolic'] = 0.9
+                tool_hints['probabilistic'] = 0.2
+                return tool_hints
         
         # ============================================================
         # PRIORITY 2: Causal Queries
@@ -5446,9 +5461,11 @@ class QueryAnalyzer:
         
         if has_causal_pattern or has_causal_keyword or is_causal_type:
             logger.info(
-                f"[QueryRouter._select_reasoning_tools] Causal indicators detected → ['causal']"
+                f"[QueryRouter._select_reasoning_tools] Causal indicators detected → causal hint 0.85"
             )
-            return ['causal']
+            tool_hints['causal'] = 0.85  # Strong suggestion
+            tool_hints['probabilistic'] = 0.4  # Moderate fallback
+            return tool_hints
         
         # ============================================================
         # PRIORITY 3: Analogical Queries
@@ -5463,9 +5480,11 @@ class QueryAnalyzer:
         
         if has_analogical_pattern or has_analogical_keyword:
             logger.info(
-                f"[QueryRouter._select_reasoning_tools] Analogical indicators detected → ['analogical']"
+                f"[QueryRouter._select_reasoning_tools] Analogical indicators detected → analogical hint 0.8"
             )
-            return ['analogical']
+            tool_hints['analogical'] = 0.8
+            tool_hints['probabilistic'] = 0.3
+            return tool_hints
         
         # ============================================================
         # PRIORITY 4: Mathematical Queries
@@ -5485,14 +5504,18 @@ class QueryAnalyzer:
             # Complex math problems may need symbolic reasoning too
             if complexity >= 0.7 or 'prove' in query_lower or 'theorem' in query_lower:
                 logger.info(
-                    f"[QueryRouter._select_reasoning_tools] Complex math → ['mathematical', 'symbolic']"
+                    f"[QueryRouter._select_reasoning_tools] Complex math → mathematical hint 0.8, symbolic hint 0.6"
                 )
-                return ['mathematical', 'symbolic']
+                tool_hints['mathematical'] = 0.8
+                tool_hints['symbolic'] = 0.6  # Support for proofs
+                return tool_hints
             else:
                 logger.info(
-                    f"[QueryRouter._select_reasoning_tools] Mathematical indicators → ['mathematical']"
+                    f"[QueryRouter._select_reasoning_tools] Mathematical indicators → mathematical hint 0.8"
                 )
-                return ['mathematical']
+                tool_hints['mathematical'] = 0.8
+                tool_hints['symbolic'] = 0.3  # Weak support
+                return tool_hints
         
         # ============================================================
         # PRIORITY 5: Philosophical Queries
@@ -5508,9 +5531,11 @@ class QueryAnalyzer:
         
         if has_phil_pattern or has_phil_keyword or is_phil_type:
             logger.info(
-                f"[QueryRouter._select_reasoning_tools] Philosophical query → ['philosophical', 'world_model']"
+                f"[QueryRouter._select_reasoning_tools] Philosophical query → philosophical hint 0.85, world_model hint 0.6"
             )
-            return ['philosophical', 'world_model']
+            tool_hints['philosophical'] = 0.85
+            tool_hints['world_model'] = 0.6  # Support for introspection
+            return tool_hints
         
         # ============================================================
         # PRIORITY 6: Probabilistic Queries
@@ -5521,28 +5546,33 @@ class QueryAnalyzer:
         
         if has_prob_keyword:
             logger.info(
-                f"[QueryRouter._select_reasoning_tools] Probabilistic indicators → ['probabilistic']"
+                f"[QueryRouter._select_reasoning_tools] Probabilistic indicators → probabilistic hint 0.8"
             )
-            return ['probabilistic']
+            tool_hints['probabilistic'] = 0.8
+            return tool_hints
         
         # ============================================================
-        # ENSEMBLE DECISIONS: High Complexity/Uncertainty
+        # ENSEMBLE HINTS: High Complexity/Uncertainty
         # ============================================================
         # Very complex queries may benefit from multiple reasoning tools
         if complexity >= 0.8 and uncertainty >= 0.5:
             logger.info(
                 f"[QueryRouter._select_reasoning_tools] High complexity + uncertainty → "
-                f"ensemble ['causal', 'probabilistic', 'world_model']"
+                f"ensemble hints (causal 0.7, probabilistic 0.7, world_model 0.5)"
             )
-            return ['causal', 'probabilistic', 'world_model']
+            tool_hints['causal'] = 0.7
+            tool_hints['probabilistic'] = 0.7
+            tool_hints['world_model'] = 0.5
+            return tool_hints
         
         # ============================================================
-        # DEFAULT: General Reasoning
+        # DEFAULT: General Reasoning Hint
         # ============================================================
         logger.debug(
-            f"[QueryRouter._select_reasoning_tools] No specific tools matched → ['general']"
+            f"[QueryRouter._select_reasoning_tools] No specific tools matched → general hint 0.5"
         )
-        return ['general']
+        tool_hints['general'] = 0.5
+        return tool_hints
 
     def _calculate_complexity(self, query_lower: str) -> float:
         """

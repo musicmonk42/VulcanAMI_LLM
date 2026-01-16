@@ -4906,15 +4906,46 @@ class WorldModel:
         else:
             actual_query = str(query)
         
-        # CRITICAL FIX: Route to specialized reasoning engines BEFORE philosophical fallback
-        # Check if query requires technical reasoning (causal, analogical, mathematical, SAT/symbolic)
+        # =========================================================================
+        # INDUSTRY STANDARD - SINGLE AUTHORITY PATTERN
+        # =========================================================================
+        # World Model is the "self" and "awareness" of the platform, but it
+        # DELEGATES tool selection to ToolSelector (THE authority).
+        #
+        # OLD APPROACH (competing decision):
+        #   World Model → detect patterns → directly call engines
+        #   This bypassed ToolSelector, creating competing decisions
+        #
+        # NEW APPROACH (single authority):
+        #   World Model → detect IF reasoning needed → delegate to UnifiedReasoner
+        #   UnifiedReasoner → asks ToolSelector → selects tool → executes
+        #
+        # World Model's role:
+        #   - Orchestrate overall platform awareness
+        #   - Handle introspection/meta-reasoning (self-referential queries)
+        #   - Provide context about platform state
+        #   - Delegate technical reasoning to proper authority (ToolSelector)
+        # =========================================================================
+        
+        # Check if query requires technical reasoning (not introspection/meta-reasoning)
         if mode is None and self._should_route_to_reasoning_engine(actual_query):
-            logger.info("[WorldModel] Routing to specialized reasoning engine")
+            logger.info("[WorldModel] Technical reasoning detected, delegating to UnifiedReasoner")
             try:
-                return self._route_to_appropriate_engine(actual_query, **kwargs)
+                return self._delegate_to_reasoning_system(actual_query, **kwargs)
             except Exception as e:
-                logger.warning(f"[WorldModel] Reasoning engine routing failed: {e}, falling back")
+                logger.warning(f"[WorldModel] Reasoning system delegation failed: {e}, falling back")
                 # Continue to mode-based routing on failure
+        
+        # =========================================================================
+        # WORLD MODEL's CORE RESPONSIBILITY: SELF-AWARENESS & INTROSPECTION
+        # =========================================================================
+        # These methods handle the platform's sense of "self":
+        # - Philosophical reasoning about consciousness, ethics, values
+        # - Creative reasoning requiring internal state
+        # - General introspection and self-referential queries
+        # 
+        # World Model does NOT delegate these - they ARE the platform's awareness
+        # =========================================================================
         
         # Route to appropriate reasoning method based on mode
         if mode == 'philosophical':
@@ -4928,6 +4959,129 @@ class WorldModel:
     
     # =========================================================================
     # REASONING ENGINE ROUTING (CRITICAL FIX)
+    # =========================================================================
+    
+    def _delegate_to_reasoning_system(self, query: str, **kwargs) -> Dict[str, Any]:
+        """
+        Delegate technical reasoning to UnifiedReasoner (which uses ToolSelector).
+        
+        INDUSTRY STANDARD - DELEGATION PATTERN:
+        World Model is the "self" and "awareness" of the platform. When technical
+        reasoning is needed (causal, symbolic, mathematical), World Model DELEGATES
+        to the reasoning system rather than making tool selection decisions itself.
+        
+        ARCHITECTURAL HIERARCHY:
+        1. World Model: Orchestrator, self-awareness, decides IF reasoning needed
+        2. UnifiedReasoner: Accepts query, delegates to ToolSelector
+        3. ToolSelector: THE AUTHORITY for which tool to use
+        4. Reasoning Engine: Executes the selected tool
+        
+        This establishes clear separation of concerns:
+        - World Model: "Does this need technical reasoning?" (YES/NO)
+        - Tool Selector: "Which tool should handle it?" (SYMBOLIC/CAUSAL/etc)
+        - Engine: "Execute the tool" (DOES THE WORK)
+        
+        Args:
+            query: The query requiring technical reasoning
+            **kwargs: Additional arguments for reasoning system
+            
+        Returns:
+            Dict[str, Any]: Standardized reasoning result
+            
+        Raises:
+            ImportError: If UnifiedReasoner is not available
+            Exception: If reasoning execution fails
+        """
+        try:
+            # Import UnifiedReasoner (lazy import for performance)
+            from ..reasoning.unified import UnifiedReasoner
+            from ..reasoning.singletons import get_unified_reasoner
+            
+            # Get or create unified reasoner instance
+            reasoner = get_unified_reasoner()
+            if reasoner is None:
+                logger.info("[WorldModel] Creating new UnifiedReasoner instance")
+                reasoner = UnifiedReasoner()
+            
+            # Prepare reasoning request
+            # UnifiedReasoner will call ToolSelector to determine which engine to use
+            reasoning_request = {
+                'query': query,
+                'context': {
+                    'from_world_model': True,  # Indicate request comes from platform's "self"
+                    'world_model_state': self.get_system_status(),  # Provide self-awareness context
+                    **kwargs
+                }
+            }
+            
+            logger.info(
+                f"[WorldModel] Delegating to UnifiedReasoner, "
+                f"ToolSelector will determine appropriate engine"
+            )
+            
+            # Call unified reasoner - it will use ToolSelector for tool selection
+            result = reasoner.reason(reasoning_request)
+            
+            # Normalize result to World Model's standard format
+            return self._normalize_reasoning_result(result)
+            
+        except ImportError as e:
+            logger.error(f"[WorldModel] Failed to import UnifiedReasoner: {e}")
+            logger.error("[WorldModel] Cannot delegate - falling back to direct engine routing")
+            # Fallback to old method if UnifiedReasoner unavailable
+            return self._route_to_appropriate_engine(query, **kwargs)
+        except Exception as e:
+            logger.error(f"[WorldModel] Reasoning delegation failed: {e}")
+            raise
+    
+    def _normalize_reasoning_result(self, result: Any) -> Dict[str, Any]:
+        """
+        Normalize UnifiedReasoner result to World Model's standard format.
+        
+        Args:
+            result: Result from UnifiedReasoner (may be ReasoningResult or dict)
+            
+        Returns:
+            Dict with World Model's standard keys: response, confidence, reasoning_trace, etc.
+        """
+        # Handle ReasoningResult object
+        if hasattr(result, 'content'):
+            return {
+                'response': result.content,
+                'confidence': getattr(result, 'confidence', 0.8),
+                'reasoning_trace': getattr(result, 'metadata', {}),
+                'mode': 'delegated',
+                'engine_used': getattr(result, 'selected_tools', ['unified'])[0] if hasattr(result, 'selected_tools') else 'unified',
+                'tool_selector_decision': True,  # Indicates ToolSelector made the decision
+            }
+        
+        # Handle dict result
+        elif isinstance(result, dict):
+            return {
+                'response': result.get('content', result.get('response', str(result))),
+                'confidence': result.get('confidence', 0.8),
+                'reasoning_trace': result.get('metadata', result.get('reasoning_trace', {})),
+                'mode': 'delegated',
+                'engine_used': result.get('selected_tools', ['unified'])[0] if 'selected_tools' in result else 'unified',
+                'tool_selector_decision': True,
+            }
+        
+        # Fallback for unknown result types
+        else:
+            return {
+                'response': str(result),
+                'confidence': 0.7,
+                'reasoning_trace': {},
+                'mode': 'delegated',
+                'engine_used': 'unified',
+                'tool_selector_decision': True,
+            }
+    
+    # =========================================================================
+    # LEGACY METHOD - KEPT FOR FALLBACK ONLY
+    # =========================================================================
+    # This method will be used ONLY if UnifiedReasoner/ToolSelector unavailable
+    # Normally, _delegate_to_reasoning_system() should be used instead
     # =========================================================================
     
     def _should_route_to_reasoning_engine(self, query: str) -> bool:
@@ -5040,39 +5194,37 @@ class WorldModel:
     
     def _route_to_appropriate_engine(self, query: str, **kwargs) -> Dict[str, Any]:
         """
-        Route query to the appropriate specialized reasoning engine.
+        [LEGACY/FALLBACK] Route query to specialized reasoning engine.
         
-        This method dispatches queries to specialized reasoning engines based on
-        detected patterns and returns results in WorldModel's standard format.
+        ⚠️  DEPRECATED: This method bypasses ToolSelector and should NOT be used
+        in normal operation. It exists ONLY as a fallback when UnifiedReasoner
+        is unavailable.
         
-        INDUSTRY STANDARD IMPLEMENTATION:
-        - Lazy imports to minimize startup overhead
-        - Comprehensive error handling with graceful degradation
-        - Detailed logging for observability
-        - Thread-safe operation
-        - Returns consistent format across all engines
+        CORRECT FLOW (use instead):
+            World Model → _delegate_to_reasoning_system() → UnifiedReasoner → ToolSelector → Engine
         
-        ENGINE METHOD INTERFACE:
-        - CausalReasoner: reasoner.analyze(query)
-        - AnalogicalReasoner: reasoner.reason(query)
-        - MathematicalVerificationEngine: reasoner.verify(query)
-        - SymbolicReasoner: reasoner.query(query, timeout=N)
+        OLD FLOW (this method - creates competing decisions):
+            World Model → _route_to_appropriate_engine() → directly calls Engine
+        
+        This method will be removed in a future version once all deployments
+        have UnifiedReasoner/ToolSelector available.
+        
+        INDUSTRY STANDARD VIOLATION:
+        - Bypasses ToolSelector (THE authority for tool selection)
+        - Creates competing decision system
+        - Makes debugging difficult (who decided which tool?)
         
         Args:
             query: The query to process
             **kwargs: Additional arguments for reasoning engines
         
         Returns:
-            Dict[str, Any]: Standard WorldModel reasoning result with keys:
-                - response: str - The reasoning result
-                - confidence: float - Confidence score (0.0-1.0)
-                - reasoning_trace: Dict - Detailed reasoning steps
-                - mode: str - The reasoning mode used
-                - engine_used: str - Which engine processed the query
-        
-        Raises:
-            Exception: Re-raises exceptions after logging for upstream handling
+            Dict[str, Any]: Standard WorldModel reasoning result
         """
+        logger.warning(
+            "[WorldModel] Using legacy _route_to_appropriate_engine() - "
+            "this bypasses ToolSelector. Use _delegate_to_reasoning_system() instead."
+        )
         query_lower = query.lower()
         engine_used = None
         result = None
