@@ -406,7 +406,8 @@ try:
         UNIFIED_AVAILABLE,
         create_unified_reasoner,
     )
-    from vulcan.reasoning.integration import (
+    # ARCHITECTURE CONSOLIDATION: Import from unified compatibility layer via reasoning
+    from vulcan.reasoning import (
         apply_reasoning,
         get_reasoning_integration,
         ReasoningResult as IntegrationReasoningResult,
@@ -437,7 +438,8 @@ except ImportError as e:
 # Import SystemObserver functions to make world model aware of Arena activity
 # This ensures the world model knows about all reasoning executed via Arena
 try:
-    from vulcan.reasoning.integration import (
+    # ARCHITECTURE CONSOLIDATION: Import from unified compatibility layer via reasoning
+    from vulcan.reasoning import (
         observe_query_start,
         observe_engine_result,
         observe_outcome,

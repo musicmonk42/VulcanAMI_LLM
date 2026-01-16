@@ -4814,7 +4814,8 @@ class QueryAnalyzer:
         # ================================================================
         reasoning_result = None
         try:
-            from vulcan.reasoning.integration import apply_reasoning
+            # ARCHITECTURE CONSOLIDATION: Import from unified compatibility layer
+            from vulcan.reasoning import apply_reasoning
 
             reasoning_result = apply_reasoning(
                 query=query,

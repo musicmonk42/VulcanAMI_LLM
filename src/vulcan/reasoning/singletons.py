@@ -154,33 +154,27 @@ def save_tool_selector_state():
 
 def get_reasoning_integration():
     """
-    Get or create the global ReasoningIntegration instance.
+    DEPRECATED: Use get_unified_reasoner() instead.
+    
+    This function now returns a UnifiedReasoner instance for backwards
+    compatibility. New code should use get_unified_reasoner() directly.
+    
+    ARCHITECTURE CONSOLIDATION: The legacy ReasoningIntegration has been
+    replaced by UnifiedReasoner to eliminate split-brain behavior and
+    ensure all reasoning goes through a single, unified system.
     
     Returns:
-        ReasoningIntegration instance (singleton).
+        UnifiedReasoner instance (singleton), wrapped as ReasoningIntegration for compatibility.
     """
-    global _reasoning_integration
+    import warnings
+    warnings.warn(
+        "get_reasoning_integration() is deprecated. Use get_unified_reasoner() instead.",
+        DeprecationWarning,
+        stacklevel=2
+    )
     
-    if _reasoning_integration is not None:
-        logger.debug("[Singletons] Returning cached ReasoningIntegration")
-        return _reasoning_integration
-    
-    with _singleton_lock:
-        if _reasoning_integration is not None:
-            return _reasoning_integration
-        
-        logger.info("[Singletons] Creating global ReasoningIntegration (ONCE)")
-        try:
-            from vulcan.reasoning.integration import ReasoningIntegration
-            _reasoning_integration = ReasoningIntegration()
-            logger.info("[Singletons] ✓ ReasoningIntegration created and cached")
-            return _reasoning_integration
-        except ImportError as e:
-            logger.warning(f"[Singletons] ReasoningIntegration not available: {e}")
-            return None
-        except Exception as e:
-            logger.error(f"[Singletons] Failed to create ReasoningIntegration: {e}")
-            return None
+    # Return the unified reasoner singleton
+    return get_unified_reasoner()
 
 
 def get_portfolio_executor():

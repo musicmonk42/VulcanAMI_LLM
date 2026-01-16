@@ -41,7 +41,8 @@ from vulcan.endpoints.chat_helpers import (
 from vulcan.reasoning.formatters import format_direct_reasoning_response as _format_direct_reasoning_response
 from vulcan.endpoints.utils import require_deployment
 from vulcan.metrics import error_counter
-from vulcan.reasoning.integration.utils import observe_query_start, observe_outcome, observe_engine_result
+# ARCHITECTURE CONSOLIDATION: Now import from unified compatibility layer via reasoning
+from vulcan.reasoning import observe_query_start, observe_outcome, observe_engine_result
 from vulcan.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -1581,7 +1582,8 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
                     # NOTE: Imports are inside try-except intentionally because these modules
                     # may not be available in all deployments. If they're not available,
                     # we gracefully fall back to agent pool results (or no reasoning).
-                    from vulcan.reasoning.integration import apply_reasoning
+                    # ARCHITECTURE CONSOLIDATION: Import from unified compatibility layer
+                    from vulcan.reasoning import apply_reasoning
                     from vulcan.reasoning import create_unified_reasoner, ReasoningType
                     
                     # FIX #1: Use router's complexity and type, not hardcoded defaults

@@ -783,7 +783,8 @@ class StartupManager:
             # Fallback to legacy integration if unified not available
             if reasoning_component is None:
                 try:
-                    from vulcan.reasoning.integration import get_reasoning_integration
+                    # ARCHITECTURE CONSOLIDATION: Import from unified compatibility layer
+                    from vulcan.reasoning import get_reasoning_integration
                     reasoning_component = get_reasoning_integration()
                     component_type = "ReasoningIntegration"
                     logger.debug("Using legacy ReasoningIntegration for cognitive callbacks")
