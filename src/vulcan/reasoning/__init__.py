@@ -398,6 +398,9 @@ __all__ = [
     "observe_outcome",
     "observe_validation_failure",
     "observe_error",
+    # ===== Type Conversion Utilities (Pipeline Drop Prevention) =====
+    "convert_reasoning_type_to_enum",
+    "ensure_reasoning_type_enum",
     # ===== Availability Flags =====
     "PROBABILISTIC_AVAILABLE",
     "CAUSAL_AVAILABLE",
@@ -559,25 +562,33 @@ logger.info(
 
 # ============================================================================
 # Reasoning Integration - Query Flow Integration (FIX: Wire into Query Flow)
+# ARCHITECTURE CONSOLIDATION: Now imports from unified compatibility layer
 # ============================================================================
 try:
-    from .integration import (
+    # Import from unified compatibility layer instead of legacy integration
+    from .unified import (
         ReasoningIntegration,
-        ReasoningResult as IntegrationReasoningResult,
         apply_reasoning,
         run_portfolio_reasoning,
         get_reasoning_integration,
         get_reasoning_statistics,
         shutdown_reasoning,
-        # BUG #3 FIX: SystemObserver integration functions
+        # SystemObserver integration functions
         observe_query_start,
         observe_engine_result,
         observe_outcome,
         observe_validation_failure,
         observe_error,
+        # Type conversion utilities
+        convert_reasoning_type_to_enum,
+        ensure_reasoning_type_enum,
     )
+    
+    # Import ReasoningResult from reasoning_types for compatibility
+    from .reasoning_types import ReasoningResult as IntegrationReasoningResult
 
     INTEGRATION_AVAILABLE = True
+    logger.info("Reasoning integration loaded from unified compatibility layer")
 except ImportError as e:
     logger.warning(f"Reasoning integration import failed: {e}")
     ReasoningIntegration = None
@@ -587,12 +598,14 @@ except ImportError as e:
     get_reasoning_integration = None
     get_reasoning_statistics = None
     shutdown_reasoning = None
-    # BUG #3 FIX: No-op fallbacks for observer functions
+    # No-op fallbacks for observer functions
     observe_query_start = None
     observe_engine_result = None
     observe_outcome = None
     observe_validation_failure = None
     observe_error = None
+    convert_reasoning_type_to_enum = None
+    ensure_reasoning_type_enum = None
     INTEGRATION_AVAILABLE = False
 
 # ============================================================================
