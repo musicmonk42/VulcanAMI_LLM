@@ -280,7 +280,6 @@ class ReasoningResult:
             self.reasoning_chain, ReasoningChain
         ):
             raise TypeError("reasoning_chain must be a ReasoningChain instance or None")
-        
         # Validate optional reasoning_strategy
         if self.reasoning_strategy is not None and not isinstance(
             self.reasoning_strategy, ReasoningStrategy
@@ -288,14 +287,15 @@ class ReasoningResult:
             raise TypeError(
                 f"reasoning_strategy must be ReasoningStrategy enum or None, got {type(self.reasoning_strategy)}"
             )
-        
         # Validate optional selected_tools
         if self.selected_tools is not None:
             if not isinstance(self.selected_tools, list):
                 raise TypeError("selected_tools must be a list or None")
-            for tool in self.selected_tools:
+            for idx, tool in enumerate(self.selected_tools):
                 if not isinstance(tool, str):
-                    raise TypeError(f"All tools in selected_tools must be strings, got {type(tool)}")
+                    raise TypeError(
+                        f"Tool at index {idx} in selected_tools must be a string, got {type(tool)}: {tool!r}"
+                    )
 
 
 @dataclass
