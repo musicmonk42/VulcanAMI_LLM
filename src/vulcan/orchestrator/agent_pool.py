@@ -309,13 +309,42 @@ REASONING_TOOL_NAMES = frozenset({
     'deductive', 'inductive', 'abductive', 'multimodal', 'hybrid', 'ensemble'
 })
 
-# BUG FIX #2: Tool selection priority order
-# Specific reasoning engines must be checked before generic world_model/general
-# This prevents world_model from hijacking tasks meant for specialized engines
+# BUG FIX #1: Tool Priority Collision (The Hijack)
+# INDUSTRY STANDARD: Specific-to-General tool priority
+# Most specialized tools first, most general last
+# This prevents generic tools (symbolic, probabilistic) from hijacking specialized queries
+# 
+# Tier 1: Highly specialized (check first)
+# - causal: Pearl-style causal reasoning
+# - analogical: Structure mapping
+# - multimodal: Cross-domain constraints
+# - mathematical: Proof verification
+#
+# Tier 2: Domain-specific
+# - philosophical: Ethics, thought experiments
+# - language: FOL, quantifier scope
+#
+# Tier 3: General reasoning (check last)
+# - symbolic: SAT, propositional logic
+# - probabilistic: Bayesian inference
+# - general: Fallback
 TOOL_SELECTION_PRIORITY_ORDER = [
-    'causal', 'symbolic', 'probabilistic', 'mathematical',
-    'analogical', 'multimodal', 'cryptographic',
-    'philosophical', 'world_model', 'general'
+    # Tier 1: Highly specialized (check first)
+    'causal',           # Pearl-style causal reasoning
+    'analogical',       # Structure mapping
+    'multimodal',       # Cross-domain constraints
+    'mathematical',     # Proof verification
+    
+    # Tier 2: Domain-specific
+    'philosophical',    # Ethics, thought experiments
+    'language',         # FOL, quantifier scope
+    'cryptographic',    # Cryptographic operations
+    
+    # Tier 3: General reasoning (check last)
+    'symbolic',         # SAT, propositional logic
+    'probabilistic',    # Bayesian inference
+    'world_model',      # Meta-reasoning
+    'general',          # Fallback
 ]
 
 # Redis keys for agent pool state persistence
