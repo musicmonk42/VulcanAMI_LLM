@@ -2783,6 +2783,52 @@ class AgentPoolManager:
                     f"query_len={query_len}, tools={selected_tools}, "
                     f"task_type={task_type}, agent={agent_id}"
                 )
+            
+            # ===============================================================================
+            # INDUSTRY STANDARD: Command Pattern - Execute ONLY Router's Instruction
+            # ===============================================================================
+            # The router (BRAIN) already decided which tool to use. The agent pool (HANDS)
+            # MUST execute that decision WITHOUT re-selection. This enforces:
+            # 1. Single Source of Truth (router is authority)
+            # 2. Command Pattern (clear separation of decision vs execution)
+            # 3. No redundant tool selection (DRY principle)
+            #
+            # Extract mandatory routing instructions from task parameters or graph
+            # ===============================================================================
+            router_reasoning_type = None
+            router_tool_name = None
+            
+            # Method 1: Check if routing instructions are in graph metadata (new path)
+            if isinstance(graph, dict):
+                router_reasoning_type = graph.get("reasoning_type")
+                router_tool_name = graph.get("tool_name")
+            
+            # Method 2: Check parameters (backward compatibility)
+            if not router_reasoning_type:
+                router_reasoning_type = parameters.get("reasoning_type")
+            if not router_tool_name:
+                router_tool_name = parameters.get("tool_name")
+            
+            # Method 3: Fallback to selected_tools for backward compatibility
+            if not router_tool_name and selected_tools:
+                # Use priority order to select primary tool
+                for priority_tool in TOOL_SELECTION_PRIORITY_ORDER:
+                    if priority_tool in [t.lower() for t in selected_tools]:
+                        router_tool_name = priority_tool
+                        break
+                if not router_tool_name:
+                    router_tool_name = selected_tools[0] if selected_tools else None
+            
+            # VALIDATION: Warn if routing instructions are missing (indicates router bug)
+            if is_reasoning_task and not (router_reasoning_type and router_tool_name):
+                logger.warning(
+                    f"[AgentPool] COMMAND PATTERN VIOLATION: Task {task_id} is reasoning task "
+                    f"but missing routing instructions! reasoning_type={router_reasoning_type}, "
+                    f"tool_name={router_tool_name}. This indicates a bug in the router. "
+                    f"Falling back to legacy behavior (BAD - causes three-way collision)."
+                )
+            
+            # ===============================================================================
 
             # CIRCULAR IMPORT FIX: Trigger lazy import of reasoning components
             # This ensures UnifiedReasoner and other components are available
@@ -2792,7 +2838,8 @@ class AgentPoolManager:
             if is_reasoning_task and REASONING_AVAILABLE:
                 logger.info(
                     f"Agent {agent_id} invoking reasoning engine for task {task_id} "
-                    f"(type={task_type}, capability={metadata.capability.value})"
+                    f"(type={task_type}, capability={metadata.capability.value}, "
+                    f"ROUTER INSTRUCTION: reasoning_type={router_reasoning_type}, tool={router_tool_name})"
                 )
                 
                 # FIX TASK 6: Validate query before reasoning
@@ -2804,22 +2851,38 @@ class AgentPoolManager:
                 
                 try:
                     # =========================================================
-                    # CRITICAL FIX: Check selected_tools FIRST (Priority 1)
+                    # INDUSTRY STANDARD FIX: Use Router's Decision (Command Pattern)
                     # =========================================================
-                    # ISSUE: Task type mapping was taking precedence over selected_tools
-                    # from QueryRouter/QueryClassifier, causing queries to route to wrong
-                    # reasoning engines (e.g., SAT queries → MathTool instead of SymbolicReasoner)
-                    #
-                    # FIX: Check selected_tools BEFORE _map_task_to_reasoning_type()
-                    # This ensures QueryRouter/QueryClassifier selections always override
-                    # task_type string matching.
+                    # OLD BUG: Agent pool re-selected tool using its own logic
+                    # NEW FIX: Agent pool executes router's instruction
                     # =========================================================
-                    reasoning_type = None  # Initialize to None
+                    reasoning_type = None
                     
-                    # PRIORITY 1: Check selected_tools from QueryRouter/QueryClassifier
+                    # PRIORITY 0: Router's explicit instruction (if provided)
+                    if router_reasoning_type and ReasoningType is not None:
+                        # Map string to enum if needed
+                        reasoning_type_map = {
+                            "cryptographic": ReasoningType.SYMBOLIC,
+                            "mathematical": ReasoningType.MATHEMATICAL,
+                            "philosophical": ReasoningType.PHILOSOPHICAL,
+                            "symbolic": ReasoningType.SYMBOLIC,
+                            "probabilistic": ReasoningType.PROBABILISTIC,
+                            "causal": ReasoningType.CAUSAL,
+                            "analogical": ReasoningType.ANALOGICAL,
+                            "multimodal": ReasoningType.MULTIMODAL,
+                            "hybrid": ReasoningType.HYBRID,
+                            "general": ReasoningType.SYMBOLIC,
+                        }
+                        reasoning_type = reasoning_type_map.get(router_reasoning_type.lower(), ReasoningType.HYBRID)
+                        logger.info(
+                            f"[AgentPool] Task {task_id}: EXECUTING ROUTER INSTRUCTION: "
+                            f"reasoning_type={reasoning_type} (from router={router_reasoning_type})"
+                        )
+                    
+                    # PRIORITY 1: Check selected_tools from QueryRouter/QueryClassifier (legacy fallback)
                     # BUG FIX #2: Prioritize specific reasoning engines over generic world_model
                     # When router returns ['world_model', 'causal'], we should use 'causal' not 'world_model'
-                    if selected_tools and ReasoningType is not None:
+                    elif selected_tools and ReasoningType is not None:
                         tool_to_reasoning_type = {
                             'symbolic': ReasoningType.SYMBOLIC,
                             'probabilistic': ReasoningType.PROBABILISTIC,
