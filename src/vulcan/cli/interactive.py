@@ -296,12 +296,17 @@ def run_interactive_mode():
     """
     print_header()
     
-    # Initialize API client
+    # Initialize API client using CLIConfig for consistent configuration
     try:
-        client = VulcanClient.from_settings()
+        from vulcan.cli.config import CLIConfig
+        config = CLIConfig()
+        client = VulcanClient(
+            base_url=config.get_server_url(),
+            api_key=config.get_api_key()
+        )
         print_colored(f"Connected to: {client.base_url}", 'info')
         
-        if client.client.headers.get("X-API-Key"):
+        if config.get_api_key():
             print_colored("Authentication: Enabled ✓", 'success')
         else:
             print_colored("Authentication: Not configured", 'warning')
