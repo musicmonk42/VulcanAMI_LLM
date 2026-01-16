@@ -162,7 +162,11 @@ class GraphRAG:
         if ST_AVAILABLE:
             try:
                 self.embedding_model = SentenceTransformer(embedding_model)
-                self.cross_encoder = CrossEncoder(cross_encoder_model)
+                self.cross_encoder = CrossEncoder(
+                    cross_encoder_model,
+                    automodel_args={"local_files_only": False},
+                    revision="main"
+                )
             except Exception as e:
                 logger.warning(f"Failed to load models: {e}, using mock embeddings")
                 self.embedding_model = None
