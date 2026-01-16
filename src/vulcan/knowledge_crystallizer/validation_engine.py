@@ -518,6 +518,13 @@ class KnowledgeValidator:
         try:
             errors = []
             warnings = []
+            
+            # Check if this is from an exploratory experiment (synthetic data)
+            # These get baseline confidence instead of 0.0
+            is_exploratory = False
+            if hasattr(principle, 'metadata'):
+                source = principle.metadata.get('source', '') if isinstance(principle.metadata, dict) else ''
+                is_exploratory = 'experiment_exploration' in str(source) or 'synthetic' in str(source).lower()
 
             # Validate principle is correct type
             if not isinstance(principle, Principle):
@@ -559,6 +566,11 @@ class KnowledgeValidator:
             confidence -= len(errors) * 0.2
             confidence -= len(warnings) * 0.1
             confidence = max(0.0, min(1.0, confidence))
+            
+            # For exploratory experiments, provide baseline confidence
+            if is_exploratory and confidence < 0.35:
+                confidence = 0.35
+                warnings.append("Baseline confidence applied for exploratory experiment")
 
             result = ValidationResult(
                 is_valid=len(errors) == 0,

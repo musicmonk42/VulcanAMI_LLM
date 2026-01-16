@@ -495,7 +495,7 @@ class AgentConfig:
     checkpoint_interval: int = 100
     log_level: str = "INFO"
     max_working_memory: int = 20
-    enable_self_improvement: bool = False
+    enable_self_improvement: bool = True
     intrinsic_drives_config_file: str = ""
     intrinsic_drives_state_file: str = ""
 
@@ -523,6 +523,13 @@ class AgentConfig:
             self.intrinsic_drives_state_file = get_config(
                 "intrinsic_drives_config.state_file", "data/agent_state.json"
             )
+        
+        # Check environment variable override for enable_self_improvement
+        env_self_improvement = os.environ.get("VULCAN_ENABLE_SELF_IMPROVEMENT", "").lower()
+        if env_self_improvement in ("true", "1", "yes"):
+            self.enable_self_improvement = True
+        elif env_self_improvement in ("false", "0", "no"):
+            self.enable_self_improvement = False
 
     @property
     def safety_policies(self):

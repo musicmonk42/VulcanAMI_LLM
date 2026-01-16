@@ -7,6 +7,7 @@ import copy
 import hashlib
 import json
 import logging
+import os
 import threading
 import time
 from collections import defaultdict, deque
@@ -250,10 +251,16 @@ class KnowledgeCrystallizer:
         self.batch_accumulator = defaultdict(list)  # For batch processing
 
         # Configuration
-        # FIX OPERATIONAL: Lowered from 0.6 to 0.4 to allow more principles to crystallize
-        # Zero crystallization issue: principles were being extracted but not stored
-        # due to confidence threshold being too high
-        self.min_confidence_threshold = 0.4
+        # Detect development mode
+        self.development_mode = os.environ.get("VULCAN_DEVELOPMENT_MODE", "false").lower() in ("true", "1", "yes")
+        
+        # FIX: Lower threshold for development/exploration
+        if self.development_mode:
+            self.min_confidence_threshold = 0.2  # Lower for development
+            logger.info("Development mode enabled: using min_confidence_threshold=0.2")
+        else:
+            self.min_confidence_threshold = 0.4  # Production threshold
+        
         self.cascade_detection_enabled = True
 
         # Thread safety
