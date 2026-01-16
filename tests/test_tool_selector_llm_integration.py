@@ -179,7 +179,7 @@ class TestSemanticToolMatcherLLMIntegration:
             confidence=0.9
         )
         
-        with patch('vulcan.routing.query_classifier.classify_query', return_value=mock_classification):
+        with patch('vulcan.llm.query_classifier.classify_query', return_value=mock_classification):
             result = mock_semantic_matcher.match_query(
                 "Is A→B satisfiable?",
                 available_tools=["symbolic", "probabilistic"],
@@ -192,7 +192,7 @@ class TestSemanticToolMatcherLLMIntegration:
     
     def test_uses_embeddings_when_llm_disabled(self, mock_semantic_matcher):
         """SemanticToolMatcher should use embeddings when LLM disabled."""
-        with patch('vulcan.routing.query_classifier.classify_query') as mock_classify:
+        with patch('vulcan.llm.query_classifier.classify_query') as mock_classify:
             result = mock_semantic_matcher.match_query(
                 "Test query",
                 available_tools=["symbolic", "probabilistic"],
@@ -215,7 +215,7 @@ class TestSemanticToolMatcherLLMIntegration:
             confidence=0.85
         )
         
-        with patch('vulcan.routing.query_classifier.classify_query', return_value=mock_classification):
+        with patch('vulcan.llm.query_classifier.classify_query', return_value=mock_classification):
             result = mock_semantic_matcher.match_query(
                 "What is the causal effect?",
                 available_tools=["causal", "probabilistic", "symbolic"],
@@ -235,7 +235,7 @@ class TestSemanticToolMatcherLLMIntegration:
     def test_llm_failure_falls_back_to_embeddings(self, mock_semantic_matcher):
         """When LLM fails, should fall back to embedding-based matching."""
         # Mock LLM to raise exception
-        with patch('vulcan.routing.query_classifier.classify_query', side_effect=Exception("LLM error")):
+        with patch('vulcan.llm.query_classifier.classify_query', side_effect=Exception("LLM error")):
             result = mock_semantic_matcher.match_query(
                 "Test query",
                 available_tools=["symbolic", "probabilistic"],

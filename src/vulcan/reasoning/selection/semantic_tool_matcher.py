@@ -1387,7 +1387,7 @@ class SemanticToolMatcher:
         # ==============================================================================
         if use_llm_classification:
             try:
-                from ...routing.query_classifier import classify_query
+                from vulcan.llm.query_classifier import classify_query
                 classification = classify_query(query)
                 
                 if classification.confidence >= 0.8 and classification.suggested_tools:

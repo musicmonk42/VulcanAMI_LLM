@@ -40,7 +40,7 @@ from typing import TYPE_CHECKING, List
 import pytest
 
 if TYPE_CHECKING:
-    from vulcan.routing.query_classifier import QueryClassification, QueryClassifier
+    from vulcan.llm.query_classifier import QueryClassification, QueryClassifier
 
 # =============================================================================
 # Constants
@@ -80,7 +80,7 @@ def query_classifier() -> "QueryClassifier":
         The classifier is imported inside the fixture to avoid import
         errors if the module structure changes.
     """
-    from vulcan.routing.query_classifier import QueryClassifier
+    from vulcan.llm.query_classifier import QueryClassifier
     return QueryClassifier()
 
 
@@ -131,7 +131,7 @@ class TestSpeculationCategoryExists:
 
     def test_speculation_enum_value_exists(self) -> None:
         """Verify SPECULATION is defined in QueryCategory enum."""
-        from vulcan.routing.query_classifier import QueryCategory
+        from vulcan.llm.query_classifier import QueryCategory
         
         assert hasattr(QueryCategory, "SPECULATION"), (
             "QueryCategory enum must have SPECULATION member. "
@@ -140,7 +140,7 @@ class TestSpeculationCategoryExists:
 
     def test_speculation_enum_value_correct(self) -> None:
         """Verify SPECULATION enum has correct string value."""
-        from vulcan.routing.query_classifier import QueryCategory
+        from vulcan.llm.query_classifier import QueryCategory
         
         assert QueryCategory.SPECULATION.value == SPECULATION_CATEGORY, (
             f"QueryCategory.SPECULATION.value should be '{SPECULATION_CATEGORY}', "
@@ -149,14 +149,14 @@ class TestSpeculationCategoryExists:
 
     def test_speculation_patterns_defined(self) -> None:
         """Verify SPECULATION_PATTERNS constant is defined and non-empty."""
-        from vulcan.routing.query_classifier import SPECULATION_PATTERNS
+        from vulcan.llm.query_classifier import SPECULATION_PATTERNS
         
         assert SPECULATION_PATTERNS is not None, "SPECULATION_PATTERNS must be defined"
         assert len(SPECULATION_PATTERNS) > 0, "SPECULATION_PATTERNS must contain at least one pattern"
 
     def test_speculation_keywords_defined(self) -> None:
         """Verify SPECULATION_KEYWORDS constant is defined and non-empty."""
-        from vulcan.routing.query_classifier import SPECULATION_KEYWORDS
+        from vulcan.llm.query_classifier import SPECULATION_KEYWORDS
         
         assert SPECULATION_KEYWORDS is not None, "SPECULATION_KEYWORDS must be defined"
         assert len(SPECULATION_KEYWORDS) > 0, "SPECULATION_KEYWORDS must contain at least one keyword"

@@ -27,7 +27,7 @@ class TestCreativeWritingWithIntrospectiveThemes:
     @pytest.fixture
     def query_classifier(self):
         """Create a QueryClassifier instance for testing."""
-        from vulcan.routing.query_classifier import QueryClassifier
+        from vulcan.llm.query_classifier import QueryClassifier
         return QueryClassifier()
 
     def test_poem_about_self_awareness_is_creative(self, query_classifier):
@@ -90,7 +90,7 @@ class TestPureIntrospectionQuestions:
     @pytest.fixture
     def query_classifier(self):
         """Create a QueryClassifier instance for testing."""
-        from vulcan.routing.query_classifier import QueryClassifier
+        from vulcan.llm.query_classifier import QueryClassifier
         return QueryClassifier()
 
     def test_would_you_become_self_aware_is_introspection(self, query_classifier):
@@ -130,7 +130,7 @@ class TestEdgeCaseClassification:
     @pytest.fixture
     def query_classifier(self):
         """Create a QueryClassifier instance for testing."""
-        from vulcan.routing.query_classifier import QueryClassifier
+        from vulcan.llm.query_classifier import QueryClassifier
         return QueryClassifier()
 
     def test_poem_about_you_is_creative(self, query_classifier):
@@ -176,7 +176,7 @@ class TestMetaReasoningDoesNotOverrideCreative:
     @pytest.fixture
     def query_classifier(self):
         """Create a QueryClassifier instance for testing."""
-        from vulcan.routing.query_classifier import QueryClassifier
+        from vulcan.llm.query_classifier import QueryClassifier
         return QueryClassifier()
 
     def test_creative_takes_precedence_over_introspection_keywords(self, query_classifier):

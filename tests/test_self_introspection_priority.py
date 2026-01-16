@@ -27,7 +27,7 @@ class TestSelfIntrospectionPriority:
     @pytest.fixture
     def query_classifier(self):
         """Create a QueryClassifier instance for testing."""
-        from vulcan.routing.query_classifier import QueryClassifier
+        from vulcan.llm.query_classifier import QueryClassifier
         return QueryClassifier()
 
     def test_causal_with_you_not_introspection(self, query_classifier):
@@ -158,7 +158,7 @@ class TestDomainKeywordPreCheck:
     @pytest.fixture
     def query_classifier(self):
         """Create a QueryClassifier instance for testing."""
-        from vulcan.routing.query_classifier import QueryClassifier
+        from vulcan.llm.query_classifier import QueryClassifier
         return QueryClassifier()
 
     def test_causal_do_operator(self, query_classifier):
@@ -214,7 +214,7 @@ class TestPriorityOrder:
     @pytest.fixture
     def query_classifier(self):
         """Create a QueryClassifier instance for testing."""
-        from vulcan.routing.query_classifier import QueryClassifier
+        from vulcan.llm.query_classifier import QueryClassifier
         return QueryClassifier()
 
     def test_causal_beats_introspection(self, query_classifier):

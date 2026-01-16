@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 def test_sat_logic_routing():
     """Test that SAT/logic queries route to symbolic engine."""
     print("\n=== Test 1: SAT/Logic Query Routing ===")
-    from vulcan.routing.query_classifier import classify_query
+    from vulcan.llm.query_classifier import classify_query
     
     # Test queries that should go to symbolic
     logic_queries = [
@@ -48,7 +48,7 @@ def test_sat_logic_routing():
 def test_probabilistic_routing():
     """Test that probabilistic queries route to probabilistic reasoner."""
     print("\n=== Test 2: Probabilistic Query Routing ===")
-    from vulcan.routing.query_classifier import classify_query
+    from vulcan.llm.query_classifier import classify_query
     
     # Test queries that should go to probabilistic
     prob_queries = [
@@ -76,7 +76,7 @@ def test_probabilistic_routing():
 def test_mathematical_routing():
     """Test that math queries route to math engine."""
     print("\n=== Test 3: Mathematical Query Routing ===")
-    from vulcan.routing.query_classifier import classify_query
+    from vulcan.llm.query_classifier import classify_query
     
     # Test queries that should go to mathematical
     math_queries = [
@@ -105,7 +105,7 @@ def test_mathematical_routing():
 def test_philosophical_routing():
     """Test that meta/ethical/philosophical queries route to meta/world_model."""
     print("\n=== Test 4: Philosophical/Meta Query Routing ===")
-    from vulcan.routing.query_classifier import classify_query
+    from vulcan.llm.query_classifier import classify_query
     
     # Test queries that should go to philosophical/world_model
     phil_queries = [
@@ -135,7 +135,7 @@ def test_philosophical_routing():
 def test_causal_routing():
     """Test that causal queries route to causal engine."""
     print("\n=== Test 5: Causal Query Routing ===")
-    from vulcan.routing.query_classifier import classify_query
+    from vulcan.llm.query_classifier import classify_query
     
     # Test queries that should go to causal (NOT philosophical)
     causal_queries = [
@@ -166,7 +166,7 @@ def test_causal_routing():
 def test_analogical_routing():
     """Test that analogical queries route to analogical engine."""
     print("\n=== Test 6: Analogical Query Routing ===")
-    from vulcan.routing.query_classifier import classify_query
+    from vulcan.llm.query_classifier import classify_query
     
     # Test queries that should go to analogical
     analogical_queries = [
@@ -195,7 +195,7 @@ def test_analogical_routing():
 def test_metadata_fields():
     """Test that classification includes required metadata fields."""
     print("\n=== Test 7: Metadata Fields ===")
-    from vulcan.routing.query_classifier import classify_query
+    from vulcan.llm.query_classifier import classify_query
     
     test_query = "If P then Q. P is true. What is Q?"
     result = classify_query(test_query)

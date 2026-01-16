@@ -270,8 +270,9 @@ except ImportError as e:
     clear_and_rebuild_embedding_cache = None
 
 # Query Classifier
+# MOVED to vulcan.llm.query_classifier for better module organization
 try:
-    from .query_classifier import (
+    from vulcan.llm.query_classifier import (
         QueryClassifier,
         QueryCategory,
         QueryClassification,

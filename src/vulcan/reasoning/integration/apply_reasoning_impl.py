@@ -435,7 +435,7 @@ def apply_reasoning(
             # for classification. The reasoning engines provide correctness.
             # =================================================================
             try:
-                from vulcan.routing.query_classifier import classify_query, QueryCategory
+                from vulcan.llm.query_classifier import classify_query, QueryCategory
                 
                 classification = classify_query(query)
                 
