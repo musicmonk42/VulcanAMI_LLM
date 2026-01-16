@@ -194,6 +194,9 @@ async def check_rate_limit_redis(
     and server instances.
     
     Falls back to in-memory rate limiting if Redis is unavailable.
+    Note: The fallback to synchronous in-memory rate limiting from
+    an async context is intentional - the in-memory operation is fast
+    enough that blocking is acceptable, and this simplifies error handling.
     
     Args:
         client_id: Client identifier (IP or API key hash)
@@ -214,6 +217,7 @@ async def check_rate_limit_redis(
         ... )
     """
     # Fallback to in-memory if Redis unavailable
+    # Note: Calling sync function from async context is intentional for simplicity
     if redis_client is None:
         logger.debug("Redis unavailable, using in-memory rate limiting")
         return check_rate_limit(client_id, max_requests, window_seconds)

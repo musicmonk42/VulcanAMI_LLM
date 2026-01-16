@@ -394,7 +394,7 @@ class UnifiedChatRequest(BaseModel):
         default=2000,
         ge=1,
         le=32000,
-        description="Maximum tokens in response"
+        description="Maximum tokens in response (increased from 8000 to 32000 to support longer responses)"
     )
     history: List[ChatHistoryMessage] = Field(
         default_factory=list,
