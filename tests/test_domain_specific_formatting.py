@@ -1,15 +1,22 @@
 """
 Test suite for domain-specific reasoning engine output formatting.
 
-Industry Standards Applied:
-- Comprehensive coverage: Tests all formatting functions
-- Edge cases: Handles None, empty, and malformed data
-- Security: Tests UTF-8 handling and truncation
-- Maintainability: Clear test names and documentation
-- Isolation: Each test is independent and focused
+This module tests the formatting functions that extract and display structured
+outputs from various reasoning engines (symbolic, causal, probabilistic,
+analogical, mathematical).
 
-Tests the fix for the critical issue where domain-specific structured outputs
-from reasoning engines were being discarded by the generic formatter.
+Test Coverage:
+    - FOL formalization formatting (quantifier scope ambiguity)
+    - Causal reasoning formatting (graphs, confounders, interventions)
+    - Probabilistic reasoning formatting (posteriors, priors, parameters)
+    - Analogical reasoning formatting (entity mappings, alignments)
+    - Mathematical reasoning formatting (proofs, solutions, verification)
+    - Edge cases (None, empty, malformed data)
+    - UTF-8 safety and truncation
+    - Integration with main formatting function
+
+Tests validate the fix for the issue where domain-specific structured outputs
+were being discarded by the generic formatter.
 """
 
 import pytest

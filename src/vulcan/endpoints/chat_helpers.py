@@ -166,6 +166,9 @@ HANDLED_DICT_RESULT_KEYS = frozenset({
     'source_domain', 'target_domain'
 })
 
+# Generic method field values to ignore (avoid duplication in output)
+GENERIC_METHOD_VALUES = frozenset({'unknown', 'generic', 'fallback'})
+
 
 def safe_truncate_utf8(text: str, max_chars: int, ellipsis: str = "...") -> str:
     """
@@ -636,12 +639,14 @@ def _format_causal_reasoning(result: Dict[str, Any]) -> str:
         parts.append("\n- Causal Graph:")
         # Industry Standard: Limit output size and use itertools.islice for memory efficiency
         edge_count = 0
+        should_break = False
         for cause, effects in itertools.islice(causal_graph.items(), MAX_LIST_ITEMS_TO_SHOW):
             if isinstance(effects, dict):
                 for effect, properties in itertools.islice(effects.items(), MAX_LIST_ITEMS_TO_SHOW):
                     edge_count += 1
                     if edge_count > MAX_LIST_ITEMS_TO_SHOW:
-                        parts.append(f"\n  ... ({len(causal_graph)} total causal relationships)")
+                        parts.append(f"\n  ... (showing {MAX_LIST_ITEMS_TO_SHOW} of many causal edges)")
+                        should_break = True
                         break
                     
                     # Extract strength and confidence if available
@@ -657,6 +662,10 @@ def _format_causal_reasoning(result: Dict[str, Any]) -> str:
                     safe_cause = safe_truncate_utf8(str(cause), 100)
                     safe_effect = safe_truncate_utf8(str(effect), 100)
                     parts.append(f"\n  {safe_cause} → {safe_effect}{strength}")
+            
+            # Break outer loop if limit reached
+            if should_break:
+                break
     
     # Format confounders
     confounders = result.get('confounders')
@@ -884,7 +893,8 @@ def _format_mathematical_reasoning(result: Dict[str, Any]) -> str:
     
     # Format solution method
     method = result.get('method')
-    if method and method != 'unknown':  # Avoid duplicate generic method field
+    # Industry Standard: Use constant set to avoid magic string dependencies
+    if method and str(method).lower() not in GENERIC_METHOD_VALUES:
         safe_method = safe_truncate_utf8(str(method), MAX_REASONING_RESULT_LENGTH)
         parts.append(f"\n- Solution Method: {safe_method}")
     
