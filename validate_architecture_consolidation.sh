@@ -111,9 +111,19 @@ check "compile_manager" \
     "Compile src/vulcan/server/startup/manager.py" \
     python -m py_compile src/vulcan/server/startup/manager.py
 
+check "compile_full_platform" \
+    "Compile src/full_platform.py" \
+    python -m py_compile src/full_platform.py
+
 echo ""
 echo -e "${YELLOW}Phase 2: Legacy Package Deletion Verification${NC}"
 echo "-----------------------------------------------"
+
+# Verify full_platform.py has no integration references
+check_not_found "full_platform_integration" \
+    "full_platform.py has no reasoning.integration references" \
+    "vulcan\.reasoning\.integration\|from vulcan.reasoning.integration" \
+    src/full_platform.py
 
 # Verify integration package directory is deleted
 check "integration_dir_deleted" \
