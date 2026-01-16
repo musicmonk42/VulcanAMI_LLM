@@ -16,28 +16,51 @@
 import asyncio
 import json
 import logging
+import os
 import threading
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 
 # Module metadata
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 __author__ = "VULCAN-AGI Team"
 
 logger = logging.getLogger(__name__)
 
 # ============================================================
+# ENVIRONMENT CONFIGURATION
+# ============================================================
+
+# Override default timeouts via environment variables
+_env_timeout = os.getenv("VULCAN_ARENA_TIMEOUT")
+if _env_timeout:
+    try:
+        GENERATOR_TIMEOUT = float(_env_timeout)
+        logger.info(f"[ARENA] Using custom timeout from env: {GENERATOR_TIMEOUT}s")
+    except ValueError:
+        logger.warning(f"[ARENA] Invalid VULCAN_ARENA_TIMEOUT value: {_env_timeout}, using default")
+
+# Redis URL for distributed circuit breaker
+REDIS_URL = os.getenv("VULCAN_ARENA_REDIS_URL", os.getenv("REDIS_URL"))
+
+# Max retry attempts for feedback submission
+MAX_FEEDBACK_RETRIES = int(os.getenv("VULCAN_ARENA_FEEDBACK_RETRIES", "3"))
+
+# ============================================================
 # FIX #2: TIMEOUT AND CIRCUIT BREAKER CONSTANTS
 # ============================================================
 
-# PERFORMANCE FIX: Generator timeout increased from 30s to 45s to allow Arena
+# PERFORMANCE FIX: Generator timeout increased from 45s to 90s to allow Arena
 # operations to complete. Evidence from logs shows Arena completing in 47-53s.
-# The 30s timeout was causing circuit breaker trips (2/3 consecutive timeouts)
+# The 45s timeout was causing circuit breaker trips (2/3 consecutive timeouts)
 # and wasting work that would have completed in 15-23 more seconds.
-# Coordinated with settings.arena_timeout (60s) to ensure we don't timeout
-# before Arena has a chance to complete.
-GENERATOR_TIMEOUT = 45.0
+# Increased to 90s to accommodate complex tasks like tournaments, graph evolution,
+# and agent training which can take 50-80s to complete.
+GENERATOR_TIMEOUT = 90.0
+
+# Simple task timeout for quick operations (feedback submission, health checks)
+SIMPLE_TASK_TIMEOUT = 30.0
 
 # Progress monitoring - abort if no progress after this time
 PROGRESS_TIMEOUT_SECONDS = 15.0
@@ -144,8 +167,381 @@ class ArenaCircuitBreaker:
             }
 
 
-# Global circuit breaker instance
-_circuit_breaker = ArenaCircuitBreaker()
+@dataclass
+class DistributedCircuitBreaker:
+    """
+    Redis-backed circuit breaker for multi-worker deployments.
+    
+    In production environments with multiple Uvicorn/Gunicorn workers, each worker
+    has its own process memory. A process-local circuit breaker causes inconsistent
+    behavior where one worker trips the breaker while others continue hammering
+    the failing service (thundering herd problem).
+    
+    This distributed circuit breaker uses Redis to share state across all workers,
+    ensuring consistent behavior. Falls back to local circuit breaker if Redis
+    is unavailable (graceful degradation).
+    
+    Redis Schema:
+        vulcan:arena:circuit_breaker:consecutive_timeouts - INT with TTL
+        vulcan:arena:circuit_breaker:total_timeouts - INT (no TTL)
+        vulcan:arena:circuit_breaker:total_successes - INT (no TTL)
+        vulcan:arena:circuit_breaker:last_failure_time - FLOAT (no TTL)
+        vulcan:arena:circuit_breaker:is_open - BOOL with TTL
+    """
+    
+    REDIS_KEY_PREFIX = "vulcan:arena:circuit_breaker:"
+    
+    _redis: Optional[Any] = None
+    _local_fallback: ArenaCircuitBreaker = field(default_factory=ArenaCircuitBreaker)
+    _lock: threading.Lock = field(default_factory=threading.Lock)
+    _redis_available: bool = False
+    
+    def __post_init__(self):
+        """Initialize Redis connection if available."""
+        if REDIS_URL and not self._redis:
+            try:
+                import redis
+                self._redis = redis.from_url(
+                    REDIS_URL,
+                    decode_responses=True,
+                    socket_connect_timeout=2,
+                    socket_timeout=2
+                )
+                # Test connection
+                self._redis.ping()
+                self._redis_available = True
+                logger.info("[ARENA] Distributed circuit breaker initialized with Redis")
+            except ImportError:
+                logger.warning("[ARENA] redis package not available, using local circuit breaker")
+                self._redis_available = False
+            except Exception as e:
+                logger.warning(f"[ARENA] Redis connection failed: {e}, using local circuit breaker")
+                self._redis_available = False
+    
+    def _get_redis_key(self, suffix: str) -> str:
+        """Generate Redis key for circuit breaker state."""
+        return f"{self.REDIS_KEY_PREFIX}{suffix}"
+    
+    def record_timeout(self) -> None:
+        """Record a timeout and potentially open the circuit."""
+        if self._redis_available and self._redis:
+            try:
+                with self._lock:
+                    pipe = self._redis.pipeline()
+                    
+                    # Increment consecutive timeouts
+                    consecutive_key = self._get_redis_key("consecutive_timeouts")
+                    pipe.incr(consecutive_key)
+                    pipe.expire(consecutive_key, int(CIRCUIT_BREAKER_RESET_TIME))
+                    
+                    # Increment total timeouts
+                    total_key = self._get_redis_key("total_timeouts")
+                    pipe.incr(total_key)
+                    
+                    # Update last failure time
+                    failure_time_key = self._get_redis_key("last_failure_time")
+                    current_time = time.time()
+                    pipe.set(failure_time_key, current_time)
+                    
+                    results = pipe.execute()
+                    consecutive_count = results[0]  # Result of incr
+                    
+                    # Open circuit if threshold reached
+                    if consecutive_count >= CIRCUIT_BREAKER_THRESHOLD:
+                        is_open_key = self._get_redis_key("is_open")
+                        self._redis.set(is_open_key, "1", ex=int(CIRCUIT_BREAKER_RESET_TIME))
+                        
+                        # Log only on transition to open
+                        if consecutive_count == CIRCUIT_BREAKER_THRESHOLD:
+                            logger.warning(
+                                f"[ARENA] Distributed circuit breaker OPEN: {consecutive_count} consecutive timeouts. "
+                                f"Arena bypassed for {CIRCUIT_BREAKER_RESET_TIME}s across all workers"
+                            )
+            except Exception as e:
+                logger.warning(f"[ARENA] Redis operation failed in record_timeout: {e}, using local fallback")
+                self._local_fallback.record_timeout()
+        else:
+            self._local_fallback.record_timeout()
+    
+    def record_success(self) -> None:
+        """Record a success and reset consecutive timeout counter."""
+        if self._redis_available and self._redis:
+            try:
+                with self._lock:
+                    pipe = self._redis.pipeline()
+                    
+                    # Reset consecutive timeouts
+                    consecutive_key = self._get_redis_key("consecutive_timeouts")
+                    pipe.delete(consecutive_key)
+                    
+                    # Increment total successes
+                    success_key = self._get_redis_key("total_successes")
+                    pipe.incr(success_key)
+                    
+                    pipe.execute()
+            except Exception as e:
+                logger.warning(f"[ARENA] Redis operation failed in record_success: {e}, using local fallback")
+                self._local_fallback.record_success()
+        else:
+            self._local_fallback.record_success()
+    
+    def should_bypass(self) -> bool:
+        """
+        Check if Arena should be bypassed.
+        
+        Returns:
+            True if circuit is open and should bypass Arena
+        """
+        if self._redis_available and self._redis:
+            try:
+                with self._lock:
+                    is_open_key = self._get_redis_key("is_open")
+                    is_open = self._redis.get(is_open_key)
+                    
+                    if is_open == "1":
+                        # Circuit is open - check if enough time has passed
+                        failure_time_key = self._get_redis_key("last_failure_time")
+                        last_failure = self._redis.get(failure_time_key)
+                        
+                        if last_failure:
+                            elapsed = time.time() - float(last_failure)
+                            if elapsed >= CIRCUIT_BREAKER_RESET_TIME:
+                                # Reset circuit
+                                pipe = self._redis.pipeline()
+                                pipe.delete(is_open_key)
+                                pipe.delete(self._get_redis_key("consecutive_timeouts"))
+                                pipe.execute()
+                                
+                                logger.info(
+                                    f"[ARENA] Distributed circuit breaker RESET: {elapsed:.1f}s since last failure. "
+                                    f"Attempting Arena call."
+                                )
+                                return False
+                        
+                        return True
+                    
+                    return False
+            except Exception as e:
+                logger.warning(f"[ARENA] Redis operation failed in should_bypass: {e}, using local fallback")
+                return self._local_fallback.should_bypass()
+        else:
+            return self._local_fallback.should_bypass()
+    
+    def get_stats(self) -> Dict[str, Any]:
+        """Get circuit breaker statistics."""
+        if self._redis_available and self._redis:
+            try:
+                with self._lock:
+                    pipe = self._redis.pipeline()
+                    pipe.get(self._get_redis_key("consecutive_timeouts"))
+                    pipe.get(self._get_redis_key("total_timeouts"))
+                    pipe.get(self._get_redis_key("total_successes"))
+                    pipe.get(self._get_redis_key("last_failure_time"))
+                    pipe.get(self._get_redis_key("is_open"))
+                    
+                    results = pipe.execute()
+                    
+                    consecutive_timeouts = int(results[0] or 0)
+                    total_timeouts = int(results[1] or 0)
+                    total_successes = int(results[2] or 0)
+                    last_failure_time = float(results[3] or 0)
+                    is_open = results[4] == "1"
+                    
+                    return {
+                        "is_open": is_open,
+                        "consecutive_timeouts": consecutive_timeouts,
+                        "total_timeouts": total_timeouts,
+                        "total_successes": total_successes,
+                        "last_failure_time": last_failure_time,
+                        "time_since_failure": (
+                            time.time() - last_failure_time
+                            if last_failure_time > 0
+                            else None
+                        ),
+                        "distributed": True,
+                        "redis_available": True,
+                    }
+            except Exception as e:
+                logger.warning(f"[ARENA] Redis operation failed in get_stats: {e}, using local fallback")
+                stats = self._local_fallback.get_stats()
+                stats["distributed"] = False
+                stats["redis_available"] = False
+                return stats
+        else:
+            stats = self._local_fallback.get_stats()
+            stats["distributed"] = False
+            stats["redis_available"] = False
+            return stats
+
+
+class FeedbackRetryQueue:
+    """
+    Async queue for retrying failed feedback submissions with exponential backoff.
+    
+    When feedback submission fails due to transient errors (network blips, temporary
+    service unavailability), the RLHF training data would be permanently lost with
+    fire-and-forget submission. This queue ensures feedback is eventually delivered
+    by retrying with exponential backoff.
+    
+    Features:
+        - Exponential backoff: 1s → 2s → 4s → 8s → ... → 30s max
+        - Jitter: Randomized delays to prevent thundering herd
+        - Max retries: Configurable (default 3 attempts)
+        - Background worker: Async task that processes queue without blocking
+        - Thread-safe: Can be called from multiple async contexts
+    
+    Usage:
+        queue = FeedbackRetryQueue()
+        await queue.enqueue(feedback_data)
+        # Background worker automatically retries failed submissions
+    """
+    
+    MAX_RETRIES = MAX_FEEDBACK_RETRIES
+    INITIAL_DELAY = 1.0  # seconds
+    MAX_DELAY = 30.0  # seconds
+    
+    def __init__(self):
+        self._queue: Optional[asyncio.Queue] = None
+        self._worker_task: Optional[asyncio.Task] = None
+        self._lock = asyncio.Lock()
+        self._initialized = False
+    
+    async def _ensure_initialized(self):
+        """Lazy initialization of queue and worker (thread-safe)."""
+        if not self._initialized:
+            async with self._lock:
+                if not self._initialized:
+                    self._queue = asyncio.Queue()
+                    self._worker_task = asyncio.create_task(self._retry_worker())
+                    self._initialized = True
+                    logger.info("[ARENA] Feedback retry queue initialized")
+    
+    async def enqueue(self, feedback_data: dict) -> None:
+        """
+        Add failed feedback to retry queue.
+        
+        Args:
+            feedback_data: The feedback payload that failed to submit
+        """
+        await self._ensure_initialized()
+        
+        retry_item = {
+            "data": feedback_data,
+            "attempts": 0,
+            "next_retry": time.time()
+        }
+        
+        await self._queue.put(retry_item)
+        logger.info(f"[ARENA] Enqueued feedback for retry: {feedback_data.get('graph_id', 'unknown')}")
+    
+    def _calculate_backoff(self, attempt: int) -> float:
+        """
+        Calculate exponential backoff with jitter.
+        
+        Args:
+            attempt: Current attempt number (0-indexed)
+        
+        Returns:
+            Delay in seconds
+        """
+        import random
+        
+        # Exponential backoff: delay = initial * (2 ^ attempt)
+        delay = self.INITIAL_DELAY * (2 ** attempt)
+        delay = min(delay, self.MAX_DELAY)
+        
+        # Add jitter: ±25% randomization to prevent thundering herd
+        jitter = delay * 0.25 * (random.random() * 2 - 1)
+        delay += jitter
+        
+        return max(0, delay)
+    
+    async def _retry_worker(self) -> None:
+        """Background worker that processes retry queue."""
+        logger.info("[ARENA] Feedback retry worker started")
+        
+        while True:
+            try:
+                # Get next item from queue
+                retry_item = await self._queue.get()
+                
+                # Wait until it's time to retry
+                now = time.time()
+                if retry_item["next_retry"] > now:
+                    delay = retry_item["next_retry"] - now
+                    await asyncio.sleep(delay)
+                
+                # Attempt to submit feedback
+                feedback_data = retry_item["data"]
+                attempt = retry_item["attempts"]
+                
+                logger.info(
+                    f"[ARENA] Retrying feedback submission "
+                    f"(attempt {attempt + 1}/{self.MAX_RETRIES}): "
+                    f"{feedback_data.get('graph_id', 'unknown')}"
+                )
+                
+                # Import here to avoid circular dependency
+                from vulcan.arena.client import submit_arena_feedback
+                
+                result = await submit_arena_feedback(
+                    proposal_id=feedback_data["graph_id"],
+                    score=feedback_data["score"],
+                    rationale=feedback_data["rationale"],
+                    arena_base_url=feedback_data.get("arena_base_url")
+                )
+                
+                if result.get("status") == "success":
+                    logger.info(
+                        f"[ARENA] Feedback retry succeeded "
+                        f"(attempt {attempt + 1}): "
+                        f"{feedback_data.get('graph_id', 'unknown')}"
+                    )
+                elif attempt + 1 < self.MAX_RETRIES:
+                    # Schedule next retry with exponential backoff
+                    backoff = self._calculate_backoff(attempt + 1)
+                    retry_item["attempts"] = attempt + 1
+                    retry_item["next_retry"] = time.time() + backoff
+                    
+                    await self._queue.put(retry_item)
+                    logger.warning(
+                        f"[ARENA] Feedback retry failed, will retry in {backoff:.1f}s "
+                        f"(attempt {attempt + 2}/{self.MAX_RETRIES}): "
+                        f"{feedback_data.get('graph_id', 'unknown')}"
+                    )
+                else:
+                    # Max retries exceeded
+                    logger.error(
+                        f"[ARENA] Feedback permanently failed after {self.MAX_RETRIES} attempts: "
+                        f"{feedback_data.get('graph_id', 'unknown')}"
+                    )
+                
+                self._queue.task_done()
+                
+            except asyncio.CancelledError:
+                logger.info("[ARENA] Feedback retry worker cancelled")
+                break
+            except Exception as e:
+                logger.error(f"[ARENA] Feedback retry worker error: {e}")
+                # Continue processing queue despite errors
+                await asyncio.sleep(1)
+    
+    async def shutdown(self):
+        """Gracefully shutdown the retry queue and worker."""
+        if self._worker_task and not self._worker_task.done():
+            self._worker_task.cancel()
+            try:
+                await self._worker_task
+            except asyncio.CancelledError:
+                pass
+        logger.info("[ARENA] Feedback retry queue shutdown")
+
+
+# Global circuit breaker instance - use distributed version if Redis available
+_circuit_breaker = DistributedCircuitBreaker()
+
+# Global feedback retry queue (lazy initialization)
+_feedback_retry_queue: Optional[FeedbackRetryQueue] = None
 
 # Semaphore for limiting concurrent Arena requests
 _arena_semaphore: Optional[asyncio.Semaphore] = None
@@ -187,7 +583,7 @@ def reset_circuit_breaker() -> None:
     Use this to force Arena to be tried again after manual intervention.
     """
     global _circuit_breaker
-    _circuit_breaker = ArenaCircuitBreaker()
+    _circuit_breaker = DistributedCircuitBreaker()
     logger.info("[ARENA] Circuit breaker manually reset")
 
 
@@ -654,6 +1050,10 @@ async def submit_arena_feedback(
 ) -> dict:
     """
     Submit feedback to Arena for RLHF (Reinforcement Learning from Human Feedback).
+    
+    Now includes automatic retry queue for failed submissions. If submission fails,
+    feedback is automatically enqueued for retry with exponential backoff to ensure
+    RLHF training data is not lost due to transient failures.
 
     This enables the evolution loop where:
     - User feedback influences agent training
@@ -669,6 +1069,8 @@ async def submit_arena_feedback(
     Returns:
         dict with feedback submission result
     """
+    global _feedback_retry_queue
+    
     if not AIOHTTP_AVAILABLE:
         logger.warning("[ARENA] aiohttp not available, cannot submit feedback")
         return {"status": "error", "reason": "aiohttp not available"}
@@ -714,11 +1116,12 @@ async def submit_arena_feedback(
 
     try:
         session = await get_http_session()
+        # Use SIMPLE_TASK_TIMEOUT for feedback submission (quick operation)
         async with session.post(
             url,
             data=payload_json,
             headers=headers,
-            timeout=aiohttp.ClientTimeout(total=30),
+            timeout=aiohttp.ClientTimeout(total=SIMPLE_TASK_TIMEOUT),
         ) as resp:
             if resp.status == 200:
                 result = await resp.json()
@@ -729,11 +1132,37 @@ async def submit_arena_feedback(
             else:
                 error_text = await resp.text()
                 logger.error(f"[ARENA] Feedback submission failed: {resp.status}")
-                return {"status": "error", "error": error_text}
+                
+                # Enqueue for retry
+                if _feedback_retry_queue is None:
+                    _feedback_retry_queue = FeedbackRetryQueue()
+                
+                feedback_data = {
+                    "graph_id": proposal_id,
+                    "score": score,
+                    "rationale": rationale,
+                    "arena_base_url": base_url
+                }
+                await _feedback_retry_queue.enqueue(feedback_data)
+                
+                return {"status": "error", "error": error_text, "retry_queued": True}
 
     except Exception as e:
         logger.error(f"[ARENA] Feedback submission error: {e}")
-        return {"status": "error", "error": str(e)}
+        
+        # Enqueue for retry on any exception
+        if _feedback_retry_queue is None:
+            _feedback_retry_queue = FeedbackRetryQueue()
+        
+        feedback_data = {
+            "graph_id": proposal_id,
+            "score": score,
+            "rationale": rationale,
+            "arena_base_url": base_url
+        }
+        await _feedback_retry_queue.enqueue(feedback_data)
+        
+        return {"status": "error", "error": str(e), "retry_queued": True}
 
 
 # Backward compatibility aliases
@@ -751,10 +1180,15 @@ __all__ = [
     "AIOHTTP_AVAILABLE",
     # FIX #2: Circuit breaker and timeout constants
     "GENERATOR_TIMEOUT",
+    "SIMPLE_TASK_TIMEOUT",
     "MAX_CONCURRENT_ARENA",
     "CIRCUIT_BREAKER_THRESHOLD",
     "get_circuit_breaker_stats",
     "reset_circuit_breaker",
+    # New resilience classes
+    "ArenaCircuitBreaker",
+    "DistributedCircuitBreaker",
+    "FeedbackRetryQueue",
     # Backward compatibility
     "_select_arena_agent",
     "_build_arena_payload",
