@@ -471,6 +471,27 @@ except ImportError:
                     if size > len(arr):
                         raise ValueError("Cannot sample more items than available without replacement")
                     return random.sample(arr, size)
+            
+            @staticmethod
+            def beta(a, b):
+                """
+                Sample from Beta distribution (simplified approximation).
+                
+                Uses Gaussian approximation with proper mean and variance clamping.
+                This is not a true Beta distribution but provides reasonable behavior
+                for most use cases in preference learning.
+                """
+                if a <= 0 or b <= 0:
+                    return 0.5  # Invalid parameters, return neutral value
+                
+                # Beta distribution mean and variance
+                mean = a / (a + b)
+                variance = (a * b) / ((a + b) ** 2 * (a + b + 1))
+                std_dev = math.sqrt(variance)
+                
+                # Sample from Gaussian and clamp to [0, 1]
+                sample = random.gauss(mean, std_dev * 0.5)  # Dampen to reduce out-of-bounds
+                return max(0.0, min(1.0, sample))
     
     # Create module-level instance
     np = FakeNumpy()
