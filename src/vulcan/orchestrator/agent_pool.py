@@ -2854,6 +2854,38 @@ class AgentPoolManager:
                         context=context,
                     )
                     
+                    # =================================================================
+                    # CRITICAL FIX: Safe attribute access for integration_result
+                    # =================================================================
+                    # PROBLEM: integration_result may be ReasoningResult (no selected_tools)
+                    # or IntegrationReasoningResult (has selected_tools). Accessing
+                    # result_selected_tools directly causes AttributeError.
+                    #
+                    # SOLUTION: Use helper function for safe attribute access
+                    # =================================================================
+                    def _safe_get_attr(obj, attr_name, default=None):
+                        """Safely get attribute from result object, with fallback."""
+                        return getattr(obj, attr_name, default)
+                    
+                    def _safe_get_selected_tools(result):
+                        """Safely extract selected_tools from result."""
+                        tools = _safe_get_attr(result, 'selected_tools', None)
+                        return tools if tools is not None else []
+                    
+                    def _safe_get_reasoning_strategy(result):
+                        """Safely extract reasoning_strategy from result."""
+                        return _safe_get_attr(result, 'reasoning_strategy', 'unknown')
+                    
+                    def _safe_get_metadata(result):
+                        """Safely extract metadata from result."""
+                        meta = _safe_get_attr(result, 'metadata', None)
+                        return meta if meta is not None else {}
+                    
+                    # Extract safely once for reuse
+                    result_selected_tools = _safe_get_selected_tools(integration_result)
+                    result_reasoning_strategy = _safe_get_reasoning_strategy(integration_result)
+                    result_metadata = _safe_get_metadata(integration_result)
+                    
                     # ═══════════════════════════════════════════════════════════════════
                     # BUG FIX: Convert reasoning_type to enum if needed
                     # ═══════════════════════════════════════════════════════════════════
@@ -2886,7 +2918,9 @@ class AgentPoolManager:
                     # =================================================================
                     best_result = integration_result
                     best_confidence = integration_result.confidence
-                    best_source = integration_result.selected_tools[0] if integration_result.selected_tools else "unknown"
+                    
+                    # Use safely extracted selected_tools
+                    best_source = result_selected_tools[0] if result_selected_tools else "unknown"
                     
                     logger.info(
                         f"[AgentPool] Initial result from '{best_source}': "
@@ -2896,8 +2930,8 @@ class AgentPoolManager:
                     # FIX TASK 6: Log and validate result
                     logger.info(
                         f"Agent {agent_id} reasoning selection complete: "
-                        f"tools={integration_result.selected_tools}, "
-                        f"strategy={integration_result.reasoning_strategy}, "
+                        f"tools={result_selected_tools}, "
+                        f"strategy={result_reasoning_strategy}, "
                         f"confidence={integration_result.confidence:.2f}"
                     )
                     
@@ -2918,20 +2952,22 @@ class AgentPoolManager:
                     # =================================================================
                     if _is_privileged_result(integration_result):
                         privileged_type = "UNKNOWN"
-                        if 'world_model' in integration_result.selected_tools:
+                        
+                        # Use safely extracted values
+                        if 'world_model' in result_selected_tools:
                             privileged_type = "world_model"
-                        elif integration_result.reasoning_strategy in ('meta_reasoning', 'philosophical_reasoning'):
-                            privileged_type = integration_result.reasoning_strategy
-                        elif integration_result.metadata.get('is_self_introspection'):
+                        elif result_reasoning_strategy in ('meta_reasoning', 'philosophical_reasoning'):
+                            privileged_type = result_reasoning_strategy
+                        elif result_metadata.get('is_self_introspection'):
                             privileged_type = "self_introspection"
-                        elif integration_result.metadata.get('self_referential'):
+                        elif result_metadata.get('self_referential'):
                             privileged_type = "self_referential"
                         
                         logger.info(
                             f"[AgentPool] ⚠️ PRIVILEGED RESULT DETECTED: {privileged_type} - "
                             f"IMMEDIATELY returning without fallback/consensus/blending. "
-                            f"tools={integration_result.selected_tools}, "
-                            f"strategy={integration_result.reasoning_strategy}, "
+                            f"tools={result_selected_tools}, "
+                            f"strategy={result_reasoning_strategy}, "
                             f"confidence={integration_result.confidence:.2f}"
                         )
                         
@@ -2950,19 +2986,19 @@ class AgentPoolManager:
                             # Extract conclusion from metadata or rationale
                             conclusion = integration_result.metadata.get(
                                 "conclusion",
-                                integration_result.metadata.get("world_model_response", integration_result.rationale)
+                                integration_result.metadata.get("world_model_response", _safe_get_attr(integration_result, "rationale", ""))
                             )
                             
                             reasoning_result = UR_ReasoningResult(
                                 conclusion=conclusion,
                                 confidence=integration_result.confidence,
-                                reasoning_type=integration_result.reasoning_strategy,
-                                explanation=integration_result.metadata.get("explanation", integration_result.rationale),
+                                reasoning_type=result_reasoning_strategy,
+                                explanation=result_metadata.get("explanation") or _safe_get_attr(integration_result, 'rationale', ''),
                                 metadata={
-                                    **integration_result.metadata,
+                                    **result_metadata,
                                     "source": "privileged_path",
-                                    "selected_tools": integration_result.selected_tools,
-                                    "strategy": integration_result.reasoning_strategy,
+                                    "selected_tools": result_selected_tools,
+                                    "strategy": result_reasoning_strategy,
                                 }
                             )
                         except ImportError:
@@ -2977,16 +3013,16 @@ class AgentPoolManager:
                             
                             conclusion = integration_result.metadata.get(
                                 "conclusion",
-                                integration_result.metadata.get("world_model_response", integration_result.rationale)
+                                integration_result.metadata.get("world_model_response", _safe_get_attr(integration_result, "rationale", ""))
                             )
                             
                             reasoning_result = PrivilegedReasoningResult(
                                 conclusion=conclusion,
                                 confidence=integration_result.confidence,
-                                reasoning_type=integration_result.reasoning_strategy,
-                                explanation=integration_result.metadata.get("explanation", integration_result.rationale),
+                                reasoning_type=result_reasoning_strategy,
+                                explanation=result_metadata.get("explanation") or _safe_get_attr(integration_result, 'rationale', ''),
                                 metadata={
-                                    **integration_result.metadata,
+                                    **result_metadata,
                                     "source": "privileged_path",
                                 }
                             )
@@ -3001,8 +3037,8 @@ class AgentPoolManager:
                                 "node_type": node_type,
                                 "reasoning_applied": True,
                                 "privileged_result": True,
-                                "selected_tools": integration_result.selected_tools,
-                                "reasoning_strategy": integration_result.reasoning_strategy,
+                                "selected_tools": result_selected_tools,
+                                "reasoning_strategy": result_reasoning_strategy,
                             }
                         
                         # Continue to result extraction (skip all other reasoning paths)
@@ -3040,7 +3076,7 @@ class AgentPoolManager:
                     
                     # Special handling for world_model results (backward compatibility)
                     is_world_model_result = (
-                        integration_result.selected_tools == ["world_model"] and
+                        result_selected_tools == ["world_model"] and
                         integration_result.confidence >= WORLD_MODEL_CONFIDENCE_THRESHOLD and
                         not is_privileged  # Skip if already handled as privileged
                     )
@@ -3062,7 +3098,7 @@ class AgentPoolManager:
                     # BUT skip if already handled as privileged result
                     if is_high_confidence_result or (is_world_model_result and not is_privileged):
                         # Determine the primary reasoning engine from selected tools
-                        primary_engine = integration_result.selected_tools[0] if integration_result.selected_tools else "general"
+                        primary_engine = result_selected_tools[0] if result_selected_tools else "general"
                         
                         logger.info(
                             f"[AgentPool] High-confidence result from '{primary_engine}' engine "
@@ -3085,9 +3121,9 @@ class AgentPoolManager:
                             # Prepare result dict for observation
                             result_dict = {
                                 "confidence": integration_result.confidence,
-                                "selected_tools": integration_result.selected_tools,
-                                "strategy": integration_result.reasoning_strategy,
-                                "conclusion": integration_result.metadata.get("conclusion", ""),
+                                "selected_tools": result_selected_tools,
+                                "strategy": result_reasoning_strategy,
+                                "conclusion": result_metadata.get("conclusion", ""),
                             }
                             
                             # Record the successful execution (execution time not tracked here, use 0)
@@ -3157,24 +3193,24 @@ class AgentPoolManager:
                             # Extract conclusion from metadata or rationale
                             conclusion = integration_result.metadata.get(
                                 "conclusion",
-                                integration_result.metadata.get("world_model_response", integration_result.rationale)
+                                integration_result.metadata.get("world_model_response", _safe_get_attr(integration_result, "rationale", ""))
                             )
                             
                             reasoning_result = UR_ReasoningResult(
                                 conclusion=conclusion,
                                 confidence=integration_result.confidence,
                                 reasoning_type=selected_reasoning_type,
-                                explanation=integration_result.metadata.get("explanation", integration_result.rationale),
+                                explanation=result_metadata.get("explanation") or _safe_get_attr(integration_result, 'rationale', ''),
                                 metadata={
                                     "source": source_name,
-                                    "selected_tools": integration_result.selected_tools,
-                                    "strategy": integration_result.reasoning_strategy,
+                                    "selected_tools": result_selected_tools,
+                                    "strategy": result_reasoning_strategy,
                                     # Preserve world model metadata if present
-                                    "self_referential": integration_result.metadata.get("self_referential", False),
-                                    "ethical_query": integration_result.metadata.get("ethical_query", False),
-                                    "preserve_content": integration_result.metadata.get("preserve_content", False),
-                                    "no_openai_replacement": integration_result.metadata.get("no_openai_replacement", False),
-                                    "is_introspection": integration_result.metadata.get("is_introspection", False),
+                                    "self_referential": result_metadata.get("self_referential", False),
+                                    "ethical_query": result_metadata.get("ethical_query", False),
+                                    "preserve_content": result_metadata.get("preserve_content", False),
+                                    "no_openai_replacement": result_metadata.get("no_openai_replacement", False),
+                                    "is_introspection": result_metadata.get("is_introspection", False),
                                     # Add flag to indicate this came from high-confidence path
                                     "high_confidence_direct_use": True,
                                 }
@@ -3208,17 +3244,17 @@ class AgentPoolManager:
                             
                             conclusion = integration_result.metadata.get(
                                 "conclusion",
-                                integration_result.metadata.get("world_model_response", integration_result.rationale)
+                                integration_result.metadata.get("world_model_response", _safe_get_attr(integration_result, "rationale", ""))
                             )
                             
                             reasoning_result = HighConfidenceReasoningResult(
                                 conclusion=conclusion,
                                 confidence=integration_result.confidence,
                                 reasoning_type=rt_string,
-                                explanation=integration_result.metadata.get("explanation", integration_result.rationale),
+                                explanation=integration_result.metadata.get("explanation", _safe_get_attr(integration_result, "rationale", "")),
                                 metadata={
                                     "source": source_name if is_world_model_result else primary_engine,
-                                    "selected_tools": integration_result.selected_tools,
+                                    "selected_tools": result_selected_tools,
                                     "high_confidence_direct_use": True,
                                 }
                             )
@@ -3242,8 +3278,8 @@ class AgentPoolManager:
                                 
                                 # Pattern 2 FIX: Check if ReasoningType is available before building map
                                 # The global ReasoningType may be None if lazy import failed
-                                if integration_result.selected_tools and ReasoningType is not None:
-                                    primary_tool = integration_result.selected_tools[0].lower()
+                                if result_selected_tools and ReasoningType is not None:
+                                    primary_tool = result_selected_tools[0].lower()
                                     # Map tool name to ReasoningType
                                     tool_to_reasoning_type_map = {
                                         'symbolic': ReasoningType.SYMBOLIC,
@@ -3263,10 +3299,10 @@ class AgentPoolManager:
                                             f"[AgentPool] Note: Using reasoning type '{mapped_type}' "
                                             f"from selected tool '{primary_tool}' instead of task_type mapping"
                                         )
-                                elif integration_result.selected_tools and ReasoningType is None:
+                                elif result_selected_tools and ReasoningType is None:
                                     logger.warning(
                                         f"[AgentPool] Pattern#2 FIX: ReasoningType not available, "
-                                        f"cannot map tool '{integration_result.selected_tools[0]}' to reasoning type"
+                                        f"cannot map tool '{result_selected_tools[0]}' to reasoning type"
                                     )
                                 
                                 # Invoke the actual reasoning engine with the correct type
@@ -3343,8 +3379,8 @@ class AgentPoolManager:
                             "status": "completed",
                             "node_type": node_type,
                             "reasoning_applied": True,
-                            "selected_tools": integration_result.selected_tools,
-                            "reasoning_strategy": integration_result.reasoning_strategy,
+                            "selected_tools": result_selected_tools,
+                            "reasoning_strategy": result_reasoning_strategy,
                         }
                     
                     # Note: Mark that reasoning was actually invoked
@@ -3357,7 +3393,7 @@ class AgentPoolManager:
                     # The router's tool selection should be respected unless there's a 
                     # good reason to override (e.g., self-introspection detection)
                     # ==================================================================
-                    if hasattr(integration_result, 'selected_tools') and integration_result.selected_tools:
+                    if hasattr(integration_result, 'selected_tools') and result_selected_tools:
                         # Check if integration explicitly requests override
                         should_override = (
                             # Explicit override flag from integration
@@ -3375,7 +3411,7 @@ class AgentPoolManager:
                         
                         # DON'T override if integration just returns ['general'] as a fallback
                         is_general_fallback = (
-                            integration_result.selected_tools == ['general'] and
+                            result_selected_tools == ['general'] and
                             selected_tools and 
                             selected_tools != ['general'] and
                             not should_override
@@ -3389,7 +3425,7 @@ class AgentPoolManager:
                             # Keep the router's original selection
                         elif should_override:
                             old_tools = selected_tools
-                            selected_tools = integration_result.selected_tools
+                            selected_tools = result_selected_tools
                             logger.info(
                                 f"[AgentPool] AUTHORITATIVE override: Updated selected_tools from "
                                 f"'{old_tools}' to '{selected_tools}' (override_requested=True)"
@@ -3397,10 +3433,10 @@ class AgentPoolManager:
                         else:
                             # No explicit override - prefer more specific tools
                             # If router gave specific tools and integration gave general, keep router's
-                            if selected_tools and integration_result.selected_tools:
+                            if selected_tools and result_selected_tools:
                                 router_is_more_specific = (
                                     selected_tools != ['general'] and
-                                    integration_result.selected_tools == ['general']
+                                    result_selected_tools == ['general']
                                 )
                                 if router_is_more_specific:
                                     logger.info(
@@ -3409,7 +3445,7 @@ class AgentPoolManager:
                                     )
                                 else:
                                     old_tools = selected_tools
-                                    selected_tools = integration_result.selected_tools
+                                    selected_tools = result_selected_tools
                                     if old_tools != selected_tools:
                                         logger.info(
                                             f"[AgentPool] Updated selected_tools from '{old_tools}' "

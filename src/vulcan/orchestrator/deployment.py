@@ -505,6 +505,13 @@ class ProductionDeployment:
                 state_file = getattr(
                     self.config, "intrinsic_drives_state_file", "data/agent_state.json"
                 )
+                
+                # Log warning if self-improvement is disabled
+                if not enable_si:
+                    logger.warning(
+                        "⚠ Self-improvement DISABLED - set enable_self_improvement=True in config "
+                        "or VULCAN_ENABLE_SELF_IMPROVEMENT=true in environment to enable CSIU governance"
+                    )
 
                 wm_config = {
                     "enable_meta_reasoning": True,

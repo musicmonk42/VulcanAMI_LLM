@@ -495,7 +495,7 @@ class AgentConfig:
     checkpoint_interval: int = 100
     log_level: str = "INFO"
     max_working_memory: int = 20
-    enable_self_improvement: bool = False
+    enable_self_improvement: bool = True
     intrinsic_drives_config_file: str = ""
     intrinsic_drives_state_file: str = ""
 
@@ -511,10 +511,13 @@ class AgentConfig:
             self.version = get_config("agent_config.version", "1.0.0")
         if self.max_working_memory == 20:
             self.max_working_memory = get_config("memory_config.max_working_memory", 20)
-        if not self.enable_self_improvement:
-            self.enable_self_improvement = get_config(
-                "intrinsic_drives_config.enabled", False
-            )
+        
+        # Initialize enable_self_improvement from global config if using default value
+        # This allows intrinsic_drives_config.enabled to override the dataclass default
+        config_self_improvement = get_config("intrinsic_drives_config.enabled", None)
+        if config_self_improvement is not None:
+            self.enable_self_improvement = bool(config_self_improvement)
+        
         if not self.intrinsic_drives_config_file:
             self.intrinsic_drives_config_file = get_config(
                 "intrinsic_drives_config.config_file", "configs/intrinsic_drives.json"
@@ -523,6 +526,30 @@ class AgentConfig:
             self.intrinsic_drives_state_file = get_config(
                 "intrinsic_drives_config.state_file", "data/agent_state.json"
             )
+        
+        # Environment variable override for enable_self_improvement (highest precedence)
+        # This allows runtime control without modifying config files
+        env_self_improvement = os.environ.get("VULCAN_ENABLE_SELF_IMPROVEMENT", "").strip().lower()
+        if env_self_improvement:
+            if env_self_improvement in ("true", "1", "yes", "on"):
+                original_value = self.enable_self_improvement
+                self.enable_self_improvement = True
+                if not original_value:
+                    logger.info(
+                        "Self-improvement ENABLED via VULCAN_ENABLE_SELF_IMPROVEMENT environment variable"
+                    )
+            elif env_self_improvement in ("false", "0", "no", "off"):
+                original_value = self.enable_self_improvement
+                self.enable_self_improvement = False
+                if original_value:
+                    logger.warning(
+                        "Self-improvement DISABLED via VULCAN_ENABLE_SELF_IMPROVEMENT environment variable"
+                    )
+            else:
+                logger.warning(
+                    f"Invalid value for VULCAN_ENABLE_SELF_IMPROVEMENT: '{env_self_improvement}'. "
+                    f"Valid values are: true/false, 1/0, yes/no, on/off. Using config value: {self.enable_self_improvement}"
+                )
 
     @property
     def safety_policies(self):

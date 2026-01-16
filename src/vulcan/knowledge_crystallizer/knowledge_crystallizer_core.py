@@ -7,6 +7,7 @@ import copy
 import hashlib
 import json
 import logging
+import os
 import threading
 import time
 from collections import defaultdict, deque
@@ -219,11 +220,16 @@ class KnowledgeCrystallizer:
 
     def __init__(self, vulcan_memory=None, semantic_bridge=None):
         """
-        Initialize knowledge crystallizer
+        Initialize knowledge crystallizer with adaptive configuration.
+        
+        The crystallizer supports different operational modes via environment variables:
+        
+        - VULCAN_DEVELOPMENT_MODE: Enable relaxed thresholds for experimental learning
+        - VULCAN_MIN_CONFIDENCE_THRESHOLD: Explicitly set minimum confidence (0.0-1.0)
 
         Args:
-            vulcan_memory: VULCAN memory system
-            semantic_bridge: Semantic bridge component
+            vulcan_memory: VULCAN memory system for storing crystallized knowledge
+            semantic_bridge: Semantic bridge component for knowledge integration
         """
         self.memory = vulcan_memory
         self.semantic = semantic_bridge
@@ -238,7 +244,7 @@ class KnowledgeCrystallizer:
         )
         self.knowledge_base = VersionedKnowledgeBase()
         self.imbalance_handler = ImbalanceHandler()
-        self.method_selector = CrystallizationSelector()  # NEW
+        self.method_selector = CrystallizationSelector()
 
         # Application component
         self.applicator = KnowledgeApplicator(self)
@@ -249,11 +255,10 @@ class KnowledgeCrystallizer:
         self.incremental_state = {}  # For incremental crystallization
         self.batch_accumulator = defaultdict(list)  # For batch processing
 
-        # Configuration
-        # FIX OPERATIONAL: Lowered from 0.6 to 0.4 to allow more principles to crystallize
-        # Zero crystallization issue: principles were being extracted but not stored
-        # due to confidence threshold being too high
-        self.min_confidence_threshold = 0.4
+        # Configuration - Adaptive thresholds based on environment
+        # VULCAN_DEVELOPMENT_MODE enables more lenient crystallization for experimental learning
+        self.development_mode = self._detect_development_mode()
+        self.min_confidence_threshold = self._determine_confidence_threshold()
         self.cascade_detection_enabled = True
 
         # Thread safety
@@ -264,10 +269,84 @@ class KnowledgeCrystallizer:
         self.has_semantic = semantic_bridge is not None
 
         logger.info(
-            "KnowledgeCrystallizer initialized (memory: %s, semantic: %s)",
+            "KnowledgeCrystallizer initialized (memory: %s, semantic: %s, "
+            "development_mode: %s, min_confidence: %.2f)",
             self.has_memory,
             self.has_semantic,
+            self.development_mode,
+            self.min_confidence_threshold,
         )
+    
+    def _detect_development_mode(self) -> bool:
+        """
+        Detect if running in development mode via environment variable.
+        
+        Development mode enables more lenient crystallization thresholds to allow
+        experimental learning and exploration without strict production constraints.
+        
+        Returns:
+            True if VULCAN_DEVELOPMENT_MODE is set to a truthy value, False otherwise
+        """
+        env_value = os.environ.get("VULCAN_DEVELOPMENT_MODE", "").strip().lower()
+        is_dev_mode = env_value in ("true", "1", "yes", "on")
+        
+        if is_dev_mode:
+            logger.info(
+                "Development mode ENABLED via VULCAN_DEVELOPMENT_MODE environment variable. "
+                "Using relaxed crystallization thresholds for experimental learning."
+            )
+        
+        return is_dev_mode
+    
+    def _determine_confidence_threshold(self) -> float:
+        """
+        Determine the minimum confidence threshold for crystallization.
+        
+        In development mode, uses a lower threshold (0.2) to enable more exploratory
+        learning. In production mode, uses a higher threshold (0.4) for quality assurance.
+        
+        Can be overridden via VULCAN_MIN_CONFIDENCE_THRESHOLD environment variable.
+        
+        Returns:
+            Minimum confidence threshold (0.0-1.0)
+        """
+        # Check for explicit override first
+        env_threshold = os.environ.get("VULCAN_MIN_CONFIDENCE_THRESHOLD", "").strip()
+        if env_threshold:
+            try:
+                threshold = float(env_threshold)
+                if 0.0 <= threshold <= 1.0:
+                    logger.info(
+                        f"Using min_confidence_threshold={threshold:.2f} from "
+                        f"VULCAN_MIN_CONFIDENCE_THRESHOLD environment variable"
+                    )
+                    return threshold
+                else:
+                    logger.warning(
+                        f"Invalid VULCAN_MIN_CONFIDENCE_THRESHOLD value '{env_threshold}' "
+                        f"(must be 0.0-1.0). Using default based on mode."
+                    )
+            except ValueError:
+                logger.warning(
+                    f"Invalid VULCAN_MIN_CONFIDENCE_THRESHOLD value '{env_threshold}' "
+                    f"(must be numeric). Using default based on mode."
+                )
+        
+        # Use mode-based defaults
+        if self.development_mode:
+            threshold = 0.2  # Lower for development/exploration
+            logger.info(
+                f"Using development mode min_confidence_threshold={threshold:.2f} "
+                f"(set VULCAN_MIN_CONFIDENCE_THRESHOLD to override)"
+            )
+        else:
+            threshold = 0.4  # Higher for production quality
+            logger.info(
+                f"Using production mode min_confidence_threshold={threshold:.2f} "
+                f"(set VULCAN_MIN_CONFIDENCE_THRESHOLD to override)"
+            )
+        
+        return threshold
 
     def crystallize(
         self, execution_trace: ExecutionTrace, context: Optional[Dict[str, Any]] = None

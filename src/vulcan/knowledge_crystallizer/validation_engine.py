@@ -507,17 +507,36 @@ class KnowledgeValidator:
 
     def validate(self, principle) -> ValidationResult:
         """
-        Perform basic validation
+        Perform basic validation of a principle.
+        
+        For exploratory experiments (identified by metadata source containing 
+        'experiment_exploration' or 'synthetic'), provides a baseline confidence
+        of 0.35 instead of potentially 0.0, allowing them to be crystallized for
+        further evaluation rather than being immediately rejected.
 
         Args:
             principle: Principle to validate
 
         Returns:
-            Validation result
+            ValidationResult with is_valid flag, confidence score, and any errors/warnings
         """
         try:
             errors = []
             warnings = []
+            
+            # Detect exploratory/synthetic experiments that lack traditional evidence
+            # These principles are from experimental exploration rather than proven traces,
+            # so we apply more lenient validation criteria
+            is_exploratory = False
+            exploratory_source = None
+            if hasattr(principle, 'metadata') and isinstance(principle.metadata, dict):
+                source = str(principle.metadata.get('source', ''))
+                if 'experiment_exploration' in source.lower() or 'synthetic' in source.lower():
+                    is_exploratory = True
+                    exploratory_source = source
+                    logger.debug(
+                        f"Detected exploratory experiment principle from source: {source}"
+                    )
 
             # Validate principle is correct type
             if not isinstance(principle, Principle):
@@ -554,11 +573,27 @@ class KnowledgeValidator:
                     "No execution logic defined - principle cannot be executed"
                 )
 
-            # Calculate validation confidence
+            # Calculate validation confidence based on errors and warnings
             confidence = 1.0
-            confidence -= len(errors) * 0.2
-            confidence -= len(warnings) * 0.1
+            confidence -= len(errors) * 0.2  # Each error reduces confidence by 20%
+            confidence -= len(warnings) * 0.1  # Each warning reduces confidence by 10%
             confidence = max(0.0, min(1.0, confidence))
+            
+            # Apply baseline confidence for exploratory experiments
+            # This prevents immediate rejection of experimental principles that lack
+            # traditional evidence but may still be valuable for learning
+            EXPLORATORY_BASELINE_CONFIDENCE = 0.35
+            if is_exploratory and confidence < EXPLORATORY_BASELINE_CONFIDENCE:
+                original_confidence = confidence
+                confidence = EXPLORATORY_BASELINE_CONFIDENCE
+                warnings.append(
+                    f"Baseline confidence ({EXPLORATORY_BASELINE_CONFIDENCE:.2f}) applied for "
+                    f"exploratory experiment (was {original_confidence:.2f})"
+                )
+                logger.info(
+                    f"Applied exploratory baseline confidence for principle {getattr(principle, 'id', 'unknown')}: "
+                    f"{original_confidence:.2f} -> {confidence:.2f} (source: {exploratory_source})"
+                )
 
             result = ValidationResult(
                 is_valid=len(errors) == 0,
