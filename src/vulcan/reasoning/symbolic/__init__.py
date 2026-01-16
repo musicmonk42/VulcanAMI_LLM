@@ -290,5 +290,5 @@ def check_consistency(formulas: List[str], timeout: float = 5.0) -> bool:
         return not proven
         
     except Exception as e:
-        logger.warning(f"Consistency check failed: {e}, assuming consistent")
-        return True  # Default to consistent on error
+        logger.error(f"Consistency check failed: {e}")
+        raise  # Don't hide failures

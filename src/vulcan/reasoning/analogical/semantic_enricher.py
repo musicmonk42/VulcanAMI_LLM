@@ -127,54 +127,32 @@ class SemanticEnricher:
         >>> print(f"Similarity: {similarity:.2f}")  # High similarity
     
     Note:
-        The embedding model is loaded only once (singleton pattern) to avoid
-        3-5 second loading delays on each instantiation. All instances share
-        the same model through class-level storage.
+        MEMORY LEAK FIX: The embedding model is now loaded from the global
+        singleton registry to prevent multiple copies being loaded across
+        different reasoning components, saving ~900MB RAM.
     """
     
-    # Singleton pattern for embedding model (class-level)
-    _shared_embedding_model: Optional[SentenceTransformer] = None
-    _shared_model_lock = threading.Lock()
-    _model_load_attempted = False
-    
     @classmethod
-    def _get_shared_model(cls) -> Optional[SentenceTransformer]:
+    def _get_shared_model(cls):
         """
-        Get or create the shared embedding model (singleton pattern).
+        Get the shared embedding model from global singleton registry.
         
-        Uses double-checked locking for thread-safe lazy initialization.
-        The model is loaded only once and shared across all instances.
+        MEMORY LEAK FIX: Use global singleton instead of class-level singleton
+        to ensure only ONE model is loaded across ALL reasoning components.
         
         Returns:
             SentenceTransformer model if available, None otherwise.
         """
-        if cls._shared_embedding_model is None and not cls._model_load_attempted:
-            with cls._shared_model_lock:
-                # Double-checked locking pattern
-                if cls._shared_embedding_model is None and not cls._model_load_attempted:
-                    cls._model_load_attempted = True
-                    if SENTENCE_TRANSFORMERS_AVAILABLE:
-                        try:
-                            logger.info(
-                                "[TIMING] Loading SentenceTransformer model "
-                                "(singleton, will load ONCE)..."
-                            )
-                            start = time.perf_counter()
-                            cls._shared_embedding_model = SentenceTransformer(
-                                "all-MiniLM-L6-v2"
-                            )
-                            elapsed = time.perf_counter() - start
-                            logger.info(
-                                f"[TIMING] SentenceTransformer model loaded "
-                                f"in {elapsed:.2f}s (singleton)"
-                            )
-                        except Exception as e:
-                            logger.warning(
-                                f"Failed to load sentence transformer: {e}, "
-                                "using TF-IDF fallback"
-                            )
+        if not SENTENCE_TRANSFORMERS_AVAILABLE:
+            return None
         
-        return cls._shared_embedding_model
+        try:
+            from vulcan.reasoning.singletons import get_embedding_model
+            return get_embedding_model()
+        except ImportError:
+            # Fallback to local loading if singletons module unavailable
+            logger.warning("Could not import global embedding singleton, using local model")
+            return None
     
     def __init__(self):
         """

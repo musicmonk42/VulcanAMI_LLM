@@ -47,6 +47,7 @@ _unified_reasoner: Optional[Any] = None  # Note: Add singleton for UnifiedReason
 _math_verification_engine: Optional[Any] = None  # CACHING FIX: Singleton for MathematicalVerificationEngine
 _hierarchical_memory: Optional[Any] = None  # PERF FIX Issue #2: Singleton for HierarchicalMemory
 _unified_learning_system: Optional[Any] = None  # PERF FIX Issue #5: Singleton for UnifiedLearningSystem
+_embedding_model: Optional[Any] = None  # MEMORY LEAK FIX: Singleton for SentenceTransformer model
 _singleton_lock = threading.Lock()
 
 
@@ -308,7 +309,7 @@ def reset_all() -> None:
     global _world_model, _self_improvement_drive, _unified_runtime
     global _ai_runtime, _multimodal_engine, _unified_reasoner
     global _math_verification_engine, _hierarchical_memory
-    global _unified_learning_system
+    global _unified_learning_system, _embedding_model
     
     with _singleton_lock:
         _tool_selector = None
@@ -330,6 +331,7 @@ def reset_all() -> None:
         _math_verification_engine = None
         _hierarchical_memory = None
         _unified_learning_system = None
+        _embedding_model = None
         _instances.clear()
         logger.info("[Singletons] All singletons reset")
 
@@ -1189,6 +1191,58 @@ def get_unified_learning_system() -> Optional[Any]:
             return None
         except Exception as e:
             logger.error(f"[Singletons] Failed to create UnifiedLearningSystem: {e}")
+            return None
+
+
+# ============================================
+# EMBEDDING MODEL SINGLETON (Memory Leak Fix)
+# ============================================
+
+_embedding_model_lock = threading.Lock()
+
+
+def get_embedding_model(model_name: str = 'all-MiniLM-L6-v2') -> Optional[Any]:
+    """
+    Get singleton SentenceTransformer embedding model.
+    
+    MEMORY LEAK FIX: The SentenceTransformer model (~300MB+ VRAM) was being
+    loaded 4 separate times across:
+    - semantic_enricher.py
+    - memory_prior.py  
+    - embedding_cache.py
+    - other components
+    
+    This singleton ensures the model is loaded once at startup and shared
+    across all reasoning components, saving ~900MB RAM.
+    
+    Args:
+        model_name: Name of the SentenceTransformer model to load
+                    (default: 'all-MiniLM-L6-v2')
+        
+    Returns:
+        SentenceTransformer model instance (singleton), or None if unavailable.
+    """
+    global _embedding_model
+    
+    if _embedding_model is not None:
+        logger.debug("[Singletons] Returning cached embedding model")
+        return _embedding_model
+    
+    with _embedding_model_lock:
+        if _embedding_model is not None:
+            return _embedding_model
+        
+        logger.info(f"[Singletons] Loading global embedding model '{model_name}' (ONCE)")
+        try:
+            from sentence_transformers import SentenceTransformer
+            _embedding_model = SentenceTransformer(model_name)
+            logger.info("[Singletons] ✓ Embedding model loaded and cached")
+            return _embedding_model
+        except ImportError as e:
+            logger.warning(f"[Singletons] sentence-transformers not available: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"[Singletons] Failed to load embedding model: {e}")
             return None
 
 

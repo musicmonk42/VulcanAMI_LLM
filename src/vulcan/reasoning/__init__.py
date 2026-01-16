@@ -36,11 +36,25 @@ except ImportError as e:
     from enum import Enum
 
     class ReasoningType(Enum):
-        SYMBOLIC = "symbolic"
+        """Fallback ReasoningType enum with ALL values from reasoning_types.py"""
+        DEDUCTIVE = "deductive"
+        INDUCTIVE = "inductive"
+        ABDUCTIVE = "abductive"
+        ANALOGICAL = "analogical"
         CAUSAL = "causal"
         PROBABILISTIC = "probabilistic"
-        ANALOGICAL = "analogical"
+        COUNTERFACTUAL = "counterfactual"
+        SYMBOLIC = "symbolic"
         MULTIMODAL = "multimodal"
+        HYBRID = "hybrid"
+        ENSEMBLE = "ensemble"
+        BAYESIAN = "bayesian"
+        ABSTRACT = "abstract"
+        HIERARCHICAL = "hierarchical"
+        MATHEMATICAL = "mathematical"
+        PHILOSOPHICAL = "philosophical"
+        LANGUAGE = "language"
+        UNKNOWN = "unknown"
 
     class ReasoningStrategy(Enum):
         """Fallback ReasoningStrategy enum.
