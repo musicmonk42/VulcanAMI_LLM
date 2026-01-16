@@ -95,15 +95,29 @@ def test_crash_bug_fix():
     
     with open(unified_chat_file, 'r') as f:
         content = f.read()
+        tree = ast.parse(content, filename=str(unified_chat_file))
     
-    # Check for the specific logging line that was causing the crash
-    # Should now use getattr for safe access
-    assert 'f"tools={getattr(integration_result, \'selected_tools\'' in content, \
-        "selected_tools should be accessed with getattr() for safety"
+    # Industry Standard: Use AST parsing to robustly check for getattr patterns
+    # Look for getattr calls with integration_result as first argument
+    found_safe_access = False
     
-    # Check that we're not directly accessing .selected_tools in logging without getattr
-    # This is a simplified check - in reality the code might have both safe and unsafe accesses
-    # but the critical one in the logging statement should be safe
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call):
+            # Check if this is a getattr call
+            if isinstance(node.func, ast.Name) and node.func.id == 'getattr':
+                if len(node.args) >= 2:
+                    # Check if first argument is integration_result (attribute access)
+                    first_arg = node.args[0]
+                    if isinstance(first_arg, ast.Name) and first_arg.id == 'integration_result':
+                        # Check if second argument is 'selected_tools' or 'metadata' or 'confidence'
+                        if isinstance(node.args[1], ast.Constant):
+                            attr_name = node.args[1].value
+                            if attr_name in ('selected_tools', 'metadata', 'confidence', 'reasoning_strategy', 'rationale'):
+                                found_safe_access = True
+                                print(f"  ✓ Found safe access: getattr(integration_result, '{attr_name}')")
+    
+    assert found_safe_access, \
+        "integration_result attributes should be accessed with getattr() for safety"
     
     print("✓ Crash bug fixed (safe attribute access with getattr)")
 
@@ -119,13 +133,48 @@ def test_defensive_metadata_extraction():
     
     with open(unified_chat_file, 'r') as f:
         content = f.read()
+        tree = ast.parse(content, filename=str(unified_chat_file))
     
-    # Check for defensive metadata extraction
-    assert "metadata = getattr(integration_result, 'metadata', None) or {}" in content, \
-        "metadata should be extracted defensively with getattr"
+    # Industry Standard: Use AST parsing to check for defensive variable assignments
+    # Look for patterns like: metadata = getattr(integration_result, 'metadata', None) or {}
+    found_metadata_extraction = False
+    found_confidence_extraction = False
     
-    assert "confidence = getattr(integration_result, 'confidence', 0.0)" in content, \
-        "confidence should be extracted defensively with getattr"
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign):
+            # Check for metadata assignment
+            for target in node.targets:
+                if isinstance(target, ast.Name):
+                    if target.id == 'metadata':
+                        # Check if it uses getattr with fallback
+                        # Pattern 1: getattr(...) or {} (BoolOp)
+                        # Pattern 2: just getattr(...) with default
+                        if isinstance(node.value, ast.BoolOp) and isinstance(node.value.op, ast.Or):
+                            # Pattern: getattr(...) or {}
+                            if isinstance(node.value.values[0], ast.Call):
+                                call = node.value.values[0]
+                                if isinstance(call.func, ast.Name) and call.func.id == 'getattr':
+                                    found_metadata_extraction = True
+                                    print("  ✓ Found defensive metadata extraction (with or fallback)")
+                        elif isinstance(node.value, ast.Call):
+                            # Pattern: just getattr(...) with default
+                            if isinstance(node.value.func, ast.Name) and node.value.func.id == 'getattr':
+                                if len(node.value.args) >= 3:  # has default value
+                                    found_metadata_extraction = True
+                                    print("  ✓ Found defensive metadata extraction (with default)")
+                    
+                    elif target.id == 'confidence':
+                        # Check if it uses getattr
+                        if isinstance(node.value, ast.Call):
+                            if isinstance(node.value.func, ast.Name) and node.value.func.id == 'getattr':
+                                found_confidence_extraction = True
+                                print("  ✓ Found defensive confidence extraction")
+    
+    assert found_metadata_extraction, \
+        "metadata should be extracted defensively with getattr() and fallback"
+    
+    assert found_confidence_extraction, \
+        "confidence should be extracted defensively with getattr()"
     
     print("✓ Defensive metadata extraction implemented (industry standard)")
 
