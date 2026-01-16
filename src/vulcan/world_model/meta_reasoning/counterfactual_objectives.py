@@ -19,9 +19,9 @@ import time
 from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
-from unittest.mock import MagicMock  # ADDED as per fix steps
+from unittest.mock import MagicMock
 
-import numpy as np
+from vulcan.world_model.meta_reasoning.numpy_compat import np, NUMPY_AVAILABLE
 
 logger = logging.getLogger(__name__)
 

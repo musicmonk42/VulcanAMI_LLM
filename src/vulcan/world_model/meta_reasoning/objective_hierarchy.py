@@ -17,44 +17,11 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
 
-# import numpy as np # Original import
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-# --- START FIX: Add numpy fallback ---
-# logger = logging.getLogger(__name__) # Original logger placement
-logger = logging.getLogger(__name__)  # Moved logger init up
-try:
-    import numpy as np
+from vulcan.world_model.meta_reasoning.numpy_compat import np, NUMPY_AVAILABLE
 
-    NUMPY_AVAILABLE = True
-except ImportError:
-    NUMPY_AVAILABLE = False
-    logger.warning("NumPy not available, using list-based math")
-
-    class FakeNumpy:
-        @staticmethod
-        def mean(lst):
-            return sum(lst) / len(lst) if lst else 0.0  # Return float
-
-        @staticmethod
-        def array(lst):
-            return list(lst)
-
-        @staticmethod
-        def zeros(shape):
-            # Handle int or tuple/list shape
-            if isinstance(shape, int):
-                return [0.0] * shape
-            if len(shape) == 1:
-                return [0.0] * shape[0]
-            if len(shape) == 2:
-                return [[0.0] * shape[1] for _ in range(shape[0])]
-            raise NotImplementedError("FakeNumpy only supports 1D/2D zeros")
-
-        # Add other numpy functions used in this file if any
-
-    np = FakeNumpy()
-# --- END FIX ---
+logger = logging.getLogger(__name__)
 
 
 class ObjectiveType(Enum):

@@ -38,95 +38,11 @@ from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
 
-# import numpy as np # Original import
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
-# --- START FIX: Add numpy fallback ---
-# logger = logging.getLogger(__name__) # Original logger placement
-logger = logging.getLogger(__name__)  # Moved logger init up
-try:
-    import numpy as np
+from vulcan.world_model.meta_reasoning.numpy_compat import np, NUMPY_AVAILABLE
 
-    NUMPY_AVAILABLE = True
-except ImportError:
-    NUMPY_AVAILABLE = False
-    logger.warning("NumPy not available, using list-based math")
-
-    class FakeNumpy:
-        @staticmethod
-        def mean(lst):
-            return sum(lst) / len(lst) if lst else 0.0  # Return float
-
-        @staticmethod
-        def array(lst):
-            return list(lst)
-
-        @staticmethod
-        def sqrt(x):
-            return math.sqrt(x) if x >= 0 else float("nan")
-
-        @staticmethod
-        def average(a, axis=None, weights=None, returned=False):
-            if weights is None:
-                return FakeNumpy.mean(a)
-            if not a or not weights or len(a) != len(weights):
-                raise ValueError("Weights must match array size")
-            weighted_sum = sum(v * w for v, w in zip(a, weights))
-            total_weight = sum(weights)
-            if total_weight == 0:
-                return 0.0  # Or raise error?
-            avg = weighted_sum / total_weight
-            if returned:
-                return avg, total_weight
-            return avg
-
-        @staticmethod
-        def log(x):
-            # Handle list input for KL divergence
-            if isinstance(x, list):
-                return [math.log(i) if i > 0 else -float("inf") for i in x]
-            return math.log(x) if x > 0 else -float("inf")
-
-        # --- Nested Random class ---
-        class FakeRandom:
-            @staticmethod
-            def beta(a, b):
-                # Simple approximation: use mean +/- noise, clamped
-                # This doesn't capture the shape of Beta but is better than const 0.5
-                if a <= 0 or b <= 0:
-                    return 0.5  # Invalid params
-                mean = a / (a + b)
-                # Scale noise roughly by variance (max variance is 0.25 at a=b=1)
-                std_dev = (
-                    math.sqrt((a * b) / ((a + b) ** 2 * (a + b + 1)))
-                    if (a + b + 1) > 0
-                    else 0
-                )
-                sample = random.gauss(mean, std_dev * 0.5)  # Dampen noise
-                return max(0.0, min(1.0, sample))
-
-            @staticmethod
-            def random():
-                return random.random()
-
-            @staticmethod
-            def choice(a, size=None, replace=True, p=None):
-                if not isinstance(a, list):  # Handle non-list input if needed
-                    a = list(a)
-                if not a:
-                    return None  # Handle empty sequence
-                # Simple choice without weights or replacement options
-                return random.choice(a)
-
-            @staticmethod
-            def normal(loc=0.0, scale=1.0, size=None):
-                # size param ignored for simplicity, returns single sample
-                return random.gauss(loc, scale)
-
-        random = FakeRandom()  # Assign nested class instance
-
-    np = FakeNumpy()
-# --- END FIX ---
+logger = logging.getLogger(__name__)
 
 
 class PreferenceSignalType(Enum):

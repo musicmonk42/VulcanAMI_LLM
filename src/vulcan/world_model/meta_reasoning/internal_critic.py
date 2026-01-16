@@ -54,34 +54,11 @@ from collections import Counter, defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
 
-# import time # Original import
-# import numpy as np # Original import
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
-# --- START FIX: Add numpy fallback ---
-# logger = logging.getLogger(__name__) # Original logger placement
-logger = logging.getLogger(__name__)  # Moved logger init up
-try:
-    import numpy as np
+from vulcan.world_model.meta_reasoning.numpy_compat import np, NUMPY_AVAILABLE
 
-    NUMPY_AVAILABLE = True
-except ImportError:
-    NUMPY_AVAILABLE = False
-    logger.warning("NumPy not available, using list-based math")
-
-    class FakeNumpy:
-        @staticmethod
-        def mean(lst):
-            return sum(lst) / len(lst) if lst else 0.0  # Return float
-
-        @staticmethod
-        def array(lst):
-            return list(lst)
-
-        # Add other numpy functions used in this file if any (currently only np.mean)
-
-    np = FakeNumpy()
-# --- END FIX ---
+logger = logging.getLogger(__name__)
 
 
 class CritiqueLevel(Enum):

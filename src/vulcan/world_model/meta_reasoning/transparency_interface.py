@@ -36,58 +36,12 @@ from collections import defaultdict, deque
 from dataclasses import asdict, dataclass, is_dataclass
 from enum import Enum
 
-# import numpy as np # Original import
-from typing import Any, Callable, Dict, List, Optional, Set, Union  # Add Union here
-from unittest.mock import MagicMock  # ADDED for fallback
+from typing import Any, Callable, Dict, List, Optional, Set, Union
+from unittest.mock import MagicMock
 
-# --- START FIX: Add numpy fallback ---
-# logger = logging.getLogger(__name__) # Original logger placement
-logger = logging.getLogger(__name__)  # Moved logger init up
-try:
-    import numpy as np
+from vulcan.world_model.meta_reasoning.numpy_compat import np, NUMPY_AVAILABLE
 
-    NUMPY_AVAILABLE = True
-except ImportError:
-    NUMPY_AVAILABLE = False
-    logger.warning("NumPy not available, using list-based math")
-
-    class FakeNumpy:
-        @staticmethod
-        def mean(lst):
-            return sum(lst) / len(lst) if lst else 0.0  # Return float
-
-        @staticmethod
-        def array(lst):
-            return list(lst)
-
-        # Add generic type placeholder if needed elsewhere, though not directly used here
-        class generic:
-            pass
-
-        # Add ndarray type placeholder if needed elsewhere
-        class ndarray:
-            pass
-
-        # Add item method for scalars if needed (though FakeNumpy won't produce np scalars)
-        # item = lambda x: x # Simplistic item method
-
-        # Add other necessary numpy functions if used later
-        @staticmethod
-        def sqrt(x):
-            import math
-
-            return math.sqrt(x) if x >= 0 else float("nan")
-
-        @staticmethod
-        def log(x):
-            import math
-
-            if isinstance(x, list):
-                return [math.log(i) if i > 0 else -float("inf") for i in x]
-            return math.log(x) if x > 0 else -float("inf")
-
-    np = FakeNumpy()
-# --- END FIX ---
+logger = logging.getLogger(__name__)
 
 
 # Import necessary types for type checking if possible, handle gracefully if not

@@ -45,38 +45,11 @@ from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
 
-# import time # Original import
-# import numpy as np # Original import
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-# --- START FIX: Add numpy fallback ---
-# logger = logging.getLogger(__name__) # Original logger placement
-logger = logging.getLogger(__name__)  # Moved logger init up
-try:
-    import numpy as np
+from vulcan.world_model.meta_reasoning.numpy_compat import np, NUMPY_AVAILABLE
 
-    NUMPY_AVAILABLE = True
-except ImportError:
-    NUMPY_AVAILABLE = False
-    logger.warning("NumPy not available, using list-based math")
-
-    class FakeNumpy:
-        # Define necessary numpy functions used in this file (if any)
-        # Based on the code, numpy seems only used for potential future extensions or maybe type hints.
-        # Currently, no direct np calls are made that need replacement.
-        # Add common fallbacks just in case.
-        @staticmethod
-        def mean(lst):
-            return sum(lst) / len(lst) if lst else 0
-
-        @staticmethod
-        def array(lst):
-            return list(lst)
-
-        # Add other potential fallbacks if needed later
-
-    np = FakeNumpy()
-# --- END FIX ---
+logger = logging.getLogger(__name__)
 
 
 class BoundaryCategory(Enum):

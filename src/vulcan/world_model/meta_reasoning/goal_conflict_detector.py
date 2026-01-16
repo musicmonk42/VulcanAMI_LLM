@@ -27,73 +27,13 @@ from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
 
-# import numpy as np # Original import
 from typing import Any, Dict, List, Optional
 
-# FIXED: Import Mock for type checking in __init__
 from unittest.mock import MagicMock, Mock
 
-# --- START FIX: Add numpy fallback ---
-logger = logging.getLogger(__name__)  # Moved logger init up
-try:
-    import numpy as np
+from vulcan.world_model.meta_reasoning.numpy_compat import np, NUMPY_AVAILABLE
 
-    NUMPY_AVAILABLE = True
-except ImportError:
-    NUMPY_AVAILABLE = False
-    logger.warning(
-        "NumPy not available. Using limited FakeNumpy fallback. "
-        "Some advanced features may not work correctly. "
-        "For full functionality, install numpy: pip install numpy"
-    )
-
-    class FakeNumpy:
-        # Define necessary numpy functions used in this file
-        @staticmethod
-        def zeros(shape):
-            if isinstance(shape, int):
-                return [0.0] * shape
-            if len(shape) == 1:
-                return [0.0] * shape[0]
-            if len(shape) == 2:
-                return [[0.0] * shape[1] for _ in range(shape[0])]
-            raise NotImplementedError("FakeNumpy only supports 1D/2D zeros")
-
-        @staticmethod
-        def array(data):
-            return list(data)  # Just return list
-
-        @staticmethod
-        def mean(lst):
-            return sum(lst) / len(lst) if lst else 0.0
-
-        @staticmethod
-        def max(a, axis=None, out=None, keepdims=False, initial=None, where=True):
-            if not a or (
-                isinstance(a, list)
-                and not any(isinstance(row, list) for row in a)
-                and not a
-            ):  # Empty list or list of empty lists
-                return 0.0  # Or raise error
-            if isinstance(a[0], list):  # 2D list
-                return max(max(row) for row in a if row)
-            else:  # 1D list
-                return max(a)
-
-        @staticmethod
-        def triu_indices(n, k=0, m=None):
-            if m is None:
-                m = n
-            rows, cols = [], []
-            for i in range(n):
-                for j in range(m):
-                    if i <= j - k:
-                        rows.append(i)
-                        cols.append(j)
-            return (rows, cols)
-
-    np = FakeNumpy()
-# --- END FIX ---
+logger = logging.getLogger(__name__)
 
 
 # --- START FIX: Strengthen ObjectiveHierarchy fallback ---
