@@ -25,13 +25,15 @@
 # =============================================================================
 # CRITICAL PERFORMANCE FIX: Limit PyTorch/NumPy Thread Count
 # =============================================================================
-# Set these environment variables BEFORE any imports to limit threading overhead.
+# Set environment variables BEFORE any imports to limit threading overhead.
 # Without this, embedding operations can take 10x longer due to excessive parallelism.
-# Based on production logs, embedding batch times went from 1.3s to 13.8s due to 
-# thread thrashing when PyTorch uses all CPU cores.
 #
-# NOTE: We use print() here instead of logger because logging isn't configured yet.
-# These messages appear during module initialization before FastAPI lifespan runs.
+# RAILWAY HEALTHCHECK FIX: The actual torch import and torch.set_num_threads() call
+# is now deferred until AFTER the server starts accepting connections. This ensures
+# /health/live responds immediately, preventing Railway deployment failures.
+#
+# The torch import/configuration happens in _background_model_loading() which runs
+# AFTER lifespan yields, allowing healthchecks to succeed before heavy ML loading.
 # =============================================================================
 import os
 import sys
@@ -43,30 +45,11 @@ os.environ["OPENBLAS_NUM_THREADS"] = "4"
 os.environ["NUMEXPR_NUM_THREADS"] = "4"
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-# Force threadpoolctl if available - this is more effective than env vars alone
-# because it sets limits at runtime after libraries are loaded
-try:
-    from threadpoolctl import threadpool_limits
-    threadpool_limits(limits=4, user_api='blas')
-    threadpool_limits(limits=4, user_api='openmp')
-    print("[THREAD_LIMIT] threadpoolctl limits applied: blas=4, openmp=4")  # noqa: T201
-except ImportError:
-    print("[THREAD_LIMIT] threadpoolctl not available, using env vars only")  # noqa: T201
-
-# Import torch early and set thread limits
-# This must be done before other modules import torch
-try:
-    import torch
-    current_threads = torch.get_num_threads()
-    print(f"[THREAD_LIMIT] torch.get_num_threads() = {current_threads}")  # noqa: T201
-    if current_threads > 4:
-        torch.set_num_threads(4)
-        print(f"[THREAD_LIMIT] Reduced torch threads to {torch.get_num_threads()}")  # noqa: T201
-except ImportError:
-    print("[THREAD_LIMIT] torch not available, skipping torch thread limits")  # noqa: T201
-except RuntimeError as e:
-    # "cannot set number of interop threads after parallel work has started"
-    print(f"[THREAD_LIMIT] Could not set torch threads (already started): {e}")  # noqa: T201
+# NOTE: Thread limits are set via environment variables above.
+# PyTorch and other ML library imports are deferred until AFTER the server
+# starts accepting connections to prevent blocking healthchecks.
+# The actual torch.set_num_threads() call is now in _background_model_loading()
+# which runs AFTER lifespan yields.
 # =============================================================================
 
 # Now proceed with all imports
@@ -1273,6 +1256,39 @@ _background_init_started = False
 _background_init_complete = False
 
 
+def _configure_ml_threading(logger) -> None:
+    """
+    Configure thread limits for ML libraries (PyTorch, BLAS, OpenMP).
+    
+    This function should be called AFTER the server starts accepting connections
+    to avoid blocking healthchecks during module import.
+    
+    Environment variables are already set at module level, but this function
+    applies runtime configuration for libraries that need it.
+    """
+    # Configure threadpoolctl for BLAS/OpenMP
+    try:
+        from threadpoolctl import threadpool_limits
+        threadpool_limits(limits=4, user_api='blas')
+        threadpool_limits(limits=4, user_api='openmp')
+        logger.info("[THREAD_LIMIT] threadpoolctl limits applied: blas=4, openmp=4")
+    except ImportError:
+        logger.info("[THREAD_LIMIT] threadpoolctl not available, using env vars only")
+    
+    # Import and configure PyTorch
+    try:
+        import torch
+        current_threads = torch.get_num_threads()
+        logger.info(f"[THREAD_LIMIT] torch.get_num_threads() = {current_threads}")
+        if current_threads > 4:
+            torch.set_num_threads(4)
+            logger.info(f"[THREAD_LIMIT] Reduced torch threads to {torch.get_num_threads()}")
+    except ImportError:
+        logger.info("[THREAD_LIMIT] torch not available, skipping torch thread limits")
+    except RuntimeError as e:
+        logger.warning(f"[THREAD_LIMIT] Could not set torch threads: {e}")
+
+
 async def _background_model_loading(app_state: Any, components_status: dict, logger) -> None:
     """
     Background task to load heavy ML models AFTER server starts accepting connections.
@@ -1289,6 +1305,9 @@ async def _background_model_loading(app_state: Any, components_status: dict, log
         logger.info("=" * 70)
         logger.info("Background Model Loading Started (non-blocking)")
         logger.info("=" * 70)
+        
+        # Configure thread limits for ML libraries NOW (after server is accepting connections)
+        _configure_ml_threading(logger)
         
         # Give the event loop time to process incoming requests
         await asyncio.sleep(0.1)
