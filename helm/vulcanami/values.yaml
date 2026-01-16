@@ -244,6 +244,33 @@ distillation:
   teacherTimeoutSeconds: 60
   studentTimeoutSeconds: 5
   captureForTraining: true  # Capture responses for knowledge distillation
+  
+  # Training trigger configuration (NEW - Issue #1 Fix)
+  training:
+    # Webhook URL for training notifications (optional)
+    # When set, a non-blocking webhook is sent when training threshold is reached
+    # Example: "https://training-server.example.com/api/v1/trigger"
+    webhookUrl: ""
+    
+    # Number of captured examples before triggering training
+    triggerThreshold: 500
+    
+    # Webhook timeout in seconds (fire-and-forget, runs in background)
+    webhookTimeoutSeconds: 10
+  
+  # Shadow model evaluator configuration (NEW - Issue #2 Fix)
+  evaluator:
+    # Path to evaluation prompts JSON file (relative to deployment)
+    # Falls back to built-in defaults if file not found
+    promptsPath: "config/evaluation_prompts.json"
+    
+    # Number of prompts to sample per evaluation (prevents memorization)
+    # Set to null/empty to use all prompts
+    sampleSize: ""
+    
+    # Random seed for reproducible sampling (optional)
+    # Leave empty for random sampling each time
+    randomSeed: ""
 
 # Ray Configuration (Architectural Fix #3)
 # Ray Actors manage memory/CPU better than subprocess

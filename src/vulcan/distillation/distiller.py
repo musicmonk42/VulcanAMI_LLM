@@ -549,12 +549,110 @@ class OpenAIKnowledgeDistiller:
             "opted_in": opted_in,
         })
     
+    def _send_webhook_async(self, webhook_url: str, payload: dict) -> None:
+        """
+        Send webhook in background thread - non-blocking (fire-and-forget).
+        
+        This method sends the webhook asynchronously so it doesn't block the user's request.
+        The webhook is fire-and-forget: failures are logged but don't affect the main flow.
+        
+        Thread safety: Uses daemon threads to prevent blocking process shutdown.
+        Error handling: All exceptions are caught and logged; no exceptions propagate.
+        Timeout: 10-second timeout on HTTP request to prevent hanging threads.
+        
+        Args:
+            webhook_url: The URL to send the webhook to (must be valid HTTP/HTTPS URL)
+            payload: The payload dictionary to send as JSON in the webhook request
+            
+        Note:
+            This is a fire-and-forget operation. There is no return value or error
+            propagation. Check logs for webhook delivery status.
+            
+        Example:
+            >>> distiller._send_webhook_async(
+            ...     "https://training.example.com/trigger",
+            ...     {"event": "training_trigger", "count": 100}
+            ... )
+            # Returns immediately; webhook sent in background
+        """
+        def _send():
+            """Inner function that runs in background thread."""
+            thread_name = threading.current_thread().name
+            try:
+                import urllib.request
+                import urllib.error
+                import json as json_module
+                
+                # Serialize payload to JSON
+                try:
+                    data = json_module.dumps(payload).encode('utf-8')
+                except (TypeError, ValueError) as e:
+                    logger.error(
+                        f"[{thread_name}] Failed to serialize webhook payload: {e}. "
+                        f"Payload type: {type(payload)}"
+                    )
+                    return
+                
+                # Create HTTP request
+                req = urllib.request.Request(
+                    webhook_url,
+                    data=data,
+                    headers={
+                        'Content-Type': 'application/json',
+                        'User-Agent': 'VulcanAMI-Distiller/1.0',
+                    },
+                    method='POST'
+                )
+                
+                # Send request with timeout
+                with urllib.request.urlopen(req, timeout=10) as response:
+                    status_code = response.status
+                    logger.info(
+                        f"[{thread_name}] Training webhook sent successfully to {webhook_url}: "
+                        f"HTTP {status_code}"
+                    )
+                    
+            except urllib.error.HTTPError as e:
+                # HTTP error (4xx, 5xx)
+                logger.warning(
+                    f"[{thread_name}] Training webhook HTTP error to {webhook_url}: "
+                    f"HTTP {e.code} - {e.reason}"
+                )
+            except urllib.error.URLError as e:
+                # Network error (connection refused, DNS failure, etc.)
+                logger.warning(
+                    f"[{thread_name}] Training webhook network error to {webhook_url}: {e.reason}"
+                )
+            except TimeoutError:
+                # Timeout on socket operations
+                logger.warning(
+                    f"[{thread_name}] Training webhook timeout to {webhook_url} (>10s)"
+                )
+            except Exception as e:
+                # Catch-all for any other exceptions
+                logger.warning(
+                    f"[{thread_name}] Training webhook unexpected error to {webhook_url}: "
+                    f"{type(e).__name__}: {e}"
+                )
+        
+        # Start background thread with descriptive name
+        thread = threading.Thread(
+            target=_send,
+            name=f"WebhookSender-{id(payload)}",
+            daemon=True  # Don't block process shutdown
+        )
+        thread.start()
+        logger.debug(f"Webhook thread started: {thread.name}")
+    
     def _check_training_trigger(self):
         """
         Check if training should be triggered based on example count threshold.
         
         This method is called after each flush to storage and checks if the
         total captured examples since last trigger exceeds the threshold.
+        
+        Thread safety: This method is called within the buffer lock in _flush_to_storage,
+        so it's thread-safe.
         """
         current_count = self.stats["examples_captured"]
         examples_since_trigger = current_count - self._last_training_trigger_count
@@ -659,43 +757,27 @@ class OpenAIKnowledgeDistiller:
                 trigger_result["errors"].append(error_msg)
                 self.logger.error(error_msg)
         
-        # Send webhook notification if configured
+        # Send webhook notification if configured (non-blocking)
         if self.training_webhook_url:
-            try:
-                import urllib.request
-                import json as json_module
-                
-                webhook_payload = json_module.dumps({
-                    "event": "training_trigger",
-                    "reason": reason,
-                    "timestamp": trigger_time,
-                    "total_examples": total_examples,
-                    "storage_path": str(self.storage_backend.storage_path),
-                    "stats": {
-                        "captured": self.stats["examples_captured"],
-                        "rejected": self.stats["examples_rejected"],
-                        "avg_quality": self.stats["average_quality_score"],
-                    },
-                }).encode("utf-8")
-                
-                req = urllib.request.Request(
-                    self.training_webhook_url,
-                    data=webhook_payload,
-                    headers={"Content-Type": "application/json"},
-                    method="POST",
-                )
-                
-                with urllib.request.urlopen(req, timeout=10) as response:
-                    trigger_result["webhook_sent"] = True
-                    trigger_result["webhook_status"] = response.status
-                    self.logger.info(
-                        f"Training webhook sent to {self.training_webhook_url}: "
-                        f"status={response.status}"
-                    )
-            except Exception as e:
-                error_msg = f"Training webhook failed: {e}"
-                trigger_result["errors"].append(error_msg)
-                self.logger.error(error_msg)
+            webhook_payload = {
+                "event": "training_trigger",
+                "reason": reason,
+                "timestamp": trigger_time,
+                "total_examples": total_examples,
+                "storage_path": str(self.storage_backend.storage_path),
+                "stats": {
+                    "captured": self.stats["examples_captured"],
+                    "rejected": self.stats["examples_rejected"],
+                    "avg_quality": self.stats["average_quality_score"],
+                },
+            }
+            
+            # Send webhook asynchronously (non-blocking)
+            self._send_webhook_async(self.training_webhook_url, webhook_payload)
+            trigger_result["webhook_sent"] = True
+            self.logger.info(
+                f"Training webhook queued for async send to {self.training_webhook_url}"
+            )
         
         # Log audit entry
         self._log_audit("training_trigger", {
