@@ -39,6 +39,13 @@ try:
         select_arena_agent,
         build_arena_payload,
         AIOHTTP_AVAILABLE,
+        GENERATOR_TIMEOUT,
+        SIMPLE_TASK_TIMEOUT,
+        ArenaCircuitBreaker,
+        DistributedCircuitBreaker,
+        FeedbackRetryQueue,
+        get_circuit_breaker_stats,
+        reset_circuit_breaker,
     )
     _imports_successful = True
 except ImportError as e:
@@ -49,6 +56,13 @@ except ImportError as e:
     select_arena_agent = None
     build_arena_payload = None
     AIOHTTP_AVAILABLE = False
+    GENERATOR_TIMEOUT = 90.0
+    SIMPLE_TASK_TIMEOUT = 30.0
+    ArenaCircuitBreaker = None
+    DistributedCircuitBreaker = None
+    FeedbackRetryQueue = None
+    get_circuit_breaker_stats = None
+    reset_circuit_breaker = None
 
 try:
     from vulcan.arena.http_session import (
@@ -80,6 +94,15 @@ __all__ = [
     "select_arena_agent",
     "build_arena_payload",
     "AIOHTTP_AVAILABLE",
+    # Timeouts and constants
+    "GENERATOR_TIMEOUT",
+    "SIMPLE_TASK_TIMEOUT",
+    # Resilience classes
+    "ArenaCircuitBreaker",
+    "DistributedCircuitBreaker",
+    "FeedbackRetryQueue",
+    "get_circuit_breaker_stats",
+    "reset_circuit_breaker",
     # HTTP session
     "get_http_session",
     "close_http_session",
