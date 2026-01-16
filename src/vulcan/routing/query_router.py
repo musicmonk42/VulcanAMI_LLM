@@ -1822,47 +1822,64 @@ def shutdown_blocking_executor(wait: bool = True) -> None:
 class AgentTask:
     """
     Represents a task to be submitted to the Agent Pool.
+    
+    INDUSTRY STANDARD: Command Pattern Implementation
+    This class carries MANDATORY routing instructions from the query router
+    to the agent pool. The agent pool MUST execute the specified tool/reasoning
+    type without re-selection. This enforces Single Source of Truth principle.
 
     Attributes:
         task_id: Unique identifier for this task
         task_type: Classification of task type
         capability: Required agent capability
         prompt: The task prompt/query
+        reasoning_type: MANDATORY - Reasoning type to execute (from router)
+        tool_name: MANDATORY - Primary tool to use (from router)
         priority: Task priority (higher = more important)
         timeout_seconds: Maximum execution time
         parameters: Additional task parameters
         source_agent: Originating agent (for agent-to-agent tasks)
         target_agent: Target agent (for agent-to-agent tasks)
+        
+    Industry Standards:
+        - Command Pattern: task carries execution instructions
+        - Single Source of Truth: router decides, agent executes
+        - Defensive Programming: validation ensures instructions provided
     """
 
     task_id: str
     task_type: str
     capability: str
     prompt: str
+    reasoning_type: Optional[str] = None  # Router's instruction (SHOULD be provided)
+    tool_name: Optional[str] = None  # Router's instruction (SHOULD be provided)
     priority: int = 1
     timeout_seconds: float = 15.0
     parameters: Dict[str, Any] = field(default_factory=dict)
     source_agent: Optional[str] = None
     target_agent: Optional[str] = None
 
-    @property
-    def tool_name(self) -> str:
+    def validate_routing_instructions(self) -> Tuple[bool, Optional[str]]:
         """
-        Get the primary tool name for this task.
+        Validate that routing instructions are provided and non-empty.
         
-        Returns the first tool from parameters['tools'] if available,
-        otherwise falls back to the capability field.
+        INDUSTRY STANDARD: Defensive Programming
+        Ensures the command pattern is followed - agent pool should NEVER
+        make its own tool selection decisions.
         
-        This property provides backward compatibility for code that expects
-        a tool_name attribute on AgentTask objects.
+        Note: Empty strings are considered invalid as they provide no routing information.
+        None and empty string are both treated as "missing instruction".
+        
+        Returns:
+            Tuple of (is_valid, error_message)
+            - (True, None) if both fields are non-empty strings
+            - (False, error_message) if either field is None or empty
         """
-        tools = self.parameters.get("tools", [])
-        if tools and isinstance(tools, list):
-            first_tool = tools[0]
-            if first_tool is not None and first_tool != "":
-                return str(first_tool)
-        # Fall back to capability if no tools specified
-        return self.capability
+        if not self.reasoning_type or (isinstance(self.reasoning_type, str) and not self.reasoning_type.strip()):
+            return False, "Missing or empty field: reasoning_type (router must specify non-empty value)"
+        if not self.tool_name or (isinstance(self.tool_name, str) and not self.tool_name.strip()):
+            return False, "Missing or empty field: tool_name (router must specify non-empty value)"
+        return True, None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization."""
@@ -1871,6 +1888,8 @@ class AgentTask:
             "task_type": self.task_type,
             "capability": self.capability,
             "prompt": self.prompt,
+            "reasoning_type": self.reasoning_type,
+            "tool_name": self.tool_name,
             "priority": self.priority,
             "timeout_seconds": self.timeout_seconds,
             "parameters": self.parameters,
@@ -3541,6 +3560,8 @@ class QueryAnalyzer:
                         task_type="cryptographic_task",
                         capability="execution",
                         prompt=query,
+                        reasoning_type="cryptographic",  # MANDATORY: deterministic crypto
+                        tool_name="cryptographic_engine",  # MANDATORY: specific tool
                         priority=3,  # High priority - deterministic
                         timeout_seconds=2.0,  # Very short - result already computed
                         parameters={
@@ -4227,6 +4248,8 @@ class QueryAnalyzer:
                     task_type="mathematical_task",
                     capability="reasoning",  # Use probabilistic reasoning
                     prompt=query,
+                    reasoning_type="mathematical",  # MANDATORY: math reasoning
+                    tool_name="probabilistic",  # MANDATORY: primary tool for math
                     priority=2,  # Higher priority for math
                     timeout_seconds=MATH_QUERY_TIMEOUT_SECONDS,  # Short timeout (5s)
                     parameters={
@@ -6288,11 +6311,43 @@ class QueryAnalyzer:
             )
 
         # Create primary task
+        # ===============================================================================
+        # INDUSTRY STANDARD: Command Pattern - Router Specifies, Agent Executes
+        # ===============================================================================
+        # reasoning_type and tool_name are MANDATORY routing instructions
+        # Agent pool MUST execute these without re-selection
+        # ===============================================================================
+        
+        # Extract selected tools from plan (router's decision)
+        selected_tools = plan.telemetry_data.get("selected_tools", []) if plan else []
+        reasoning_strategy = plan.telemetry_data.get("reasoning_strategy", "single") if plan else "single"
+        primary_tool = selected_tools[0] if selected_tools else "general"
+        
+        # Map query_type to reasoning_type for command pattern
+        reasoning_type_map = {
+            "mathematical": "mathematical",
+            "philosophical": "philosophical",
+            "causal": "causal",
+            "symbolic": "symbolic",
+            "probabilistic": "probabilistic",
+            "analogical": "analogical",
+            "multimodal": "multimodal",
+            "perception": "perception",
+            "planning": "planning",
+            "execution": "execution",
+            "learning": "learning",
+            "reasoning": "hybrid",
+            "general": "general",
+        }
+        reasoning_type = reasoning_type_map.get(query_type.value, "general")
+        
         primary_task = AgentTask(
             task_id=f"task_{base_task_id}_primary",
             task_type=f"{query_type.value}_task",
             capability=primary_capability,
             prompt=modified_prompt,  # Use modified prompt with safety context
+            reasoning_type=reasoning_type,  # MANDATORY: Router's decision
+            tool_name=primary_tool,  # MANDATORY: Router's decision
             priority=2,  # Higher priority for primary task
             timeout_seconds=15.0,
             parameters={
