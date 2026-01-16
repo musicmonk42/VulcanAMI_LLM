@@ -309,6 +309,15 @@ REASONING_TOOL_NAMES = frozenset({
     'deductive', 'inductive', 'abductive', 'multimodal', 'hybrid', 'ensemble'
 })
 
+# BUG FIX #2: Tool selection priority order
+# Specific reasoning engines must be checked before generic world_model/general
+# This prevents world_model from hijacking tasks meant for specialized engines
+TOOL_SELECTION_PRIORITY_ORDER = [
+    'causal', 'symbolic', 'probabilistic', 'mathematical',
+    'analogical', 'multimodal', 'cryptographic',
+    'philosophical', 'world_model', 'general'
+]
+
 # Redis keys for agent pool state persistence
 REDIS_KEY_AGENT_POOL_STATS = "vulcan:agent_pool:stats"
 REDIS_KEY_PROVENANCE_COUNT = "vulcan:agent_pool:provenance_records_count"
@@ -391,9 +400,10 @@ def _is_privileged_result(reasoning_result) -> bool:
     
     # Handle both dict and object formats
     if isinstance(reasoning_result, dict):
-        selected_tools = reasoning_result.get('selected_tools', [])
-        metadata = reasoning_result.get('metadata', {})
-        strategy = reasoning_result.get('reasoning_strategy', '')
+        # BUG FIX #1: Ensure tools is always a list, never None
+        selected_tools = reasoning_result.get('selected_tools', []) or []
+        metadata = reasoning_result.get('metadata', {}) or {}
+        strategy = reasoning_result.get('reasoning_strategy', '') or ''
         # Extract response for template detection
         response = str(reasoning_result.get('response', ''))
         if not response:
@@ -405,9 +415,10 @@ def _is_privileged_result(reasoning_result) -> bool:
             )
     else:
         # Object with attributes
-        selected_tools = getattr(reasoning_result, 'selected_tools', [])
-        metadata = getattr(reasoning_result, 'metadata', {})
-        strategy = getattr(reasoning_result, 'reasoning_strategy', '')
+        # BUG FIX #1: Ensure tools is always a list, never None
+        selected_tools = getattr(reasoning_result, 'selected_tools', []) or []
+        metadata = getattr(reasoning_result, 'metadata', {}) or {}
+        strategy = getattr(reasoning_result, 'reasoning_strategy', '') or ''
         # Extract response from object
         response = str(getattr(reasoning_result, 'response', ''))
         if not response:
@@ -2806,8 +2817,9 @@ class AgentPoolManager:
                     reasoning_type = None  # Initialize to None
                     
                     # PRIORITY 1: Check selected_tools from QueryRouter/QueryClassifier
+                    # BUG FIX #2: Prioritize specific reasoning engines over generic world_model
+                    # When router returns ['world_model', 'causal'], we should use 'causal' not 'world_model'
                     if selected_tools and ReasoningType is not None:
-                        primary_tool = selected_tools[0].lower()
                         tool_to_reasoning_type = {
                             'symbolic': ReasoningType.SYMBOLIC,
                             'probabilistic': ReasoningType.PROBABILISTIC,
@@ -2820,13 +2832,33 @@ class AgentPoolManager:
                             'multimodal': ReasoningType.MULTIMODAL,
                             'cryptographic': ReasoningType.SYMBOLIC,  # crypto uses symbolic
                         }
-                        mapped_reasoning_type = tool_to_reasoning_type.get(primary_tool)
-                        if mapped_reasoning_type:
-                            reasoning_type = mapped_reasoning_type
-                            logger.info(
-                                f"[AgentPool] Task {task_id}: Using reasoning type {reasoning_type} "
-                                f"from selected_tools={selected_tools} (overriding task_type={task_type})"
-                            )
+                        
+                        # BUG FIX #2: Check tools in priority order (specific engines before generic)
+                        # Use module-level constant for consistency
+                        primary_tool = None
+                        for priority_tool in TOOL_SELECTION_PRIORITY_ORDER:
+                            if priority_tool in [t.lower() for t in selected_tools]:
+                                primary_tool = priority_tool
+                                break
+                        
+                        # Fallback to first tool if none matched priority order
+                        if not primary_tool and selected_tools:
+                            primary_tool = selected_tools[0].lower()
+                        
+                        if primary_tool:
+                            mapped_reasoning_type = tool_to_reasoning_type.get(primary_tool)
+                            if mapped_reasoning_type:
+                                reasoning_type = mapped_reasoning_type
+                                if len(selected_tools) > 1:
+                                    logger.info(
+                                        f"[AgentPool] Task {task_id}: Prioritized '{primary_tool}' from "
+                                        f"selected_tools={selected_tools} (specific engine over generic)"
+                                    )
+                                else:
+                                    logger.info(
+                                        f"[AgentPool] Task {task_id}: Using reasoning type {reasoning_type} "
+                                        f"from selected_tools={selected_tools} (overriding task_type={task_type})"
+                                    )
                     elif selected_tools and ReasoningType is None:
                         logger.warning(
                             f"[AgentPool] Task {task_id}: selected_tools={selected_tools} but "
@@ -3278,8 +3310,8 @@ class AgentPoolManager:
                                 
                                 # Pattern 2 FIX: Check if ReasoningType is available before building map
                                 # The global ReasoningType may be None if lazy import failed
+                                # BUG FIX #2: Prioritize specific reasoning engines over generic world_model
                                 if result_selected_tools and ReasoningType is not None:
-                                    primary_tool = result_selected_tools[0].lower()
                                     # Map tool name to ReasoningType
                                     tool_to_reasoning_type_map = {
                                         'symbolic': ReasoningType.SYMBOLIC,
@@ -3288,17 +3320,39 @@ class AgentPoolManager:
                                         'analogical': ReasoningType.ANALOGICAL,
                                         'mathematical': ReasoningType.MATHEMATICAL,
                                         'philosophical': ReasoningType.PHILOSOPHICAL,
+                                        'world_model': ReasoningType.PHILOSOPHICAL,  # BUG FIX: Added for consistency
+                                        'general': ReasoningType.SYMBOLIC,  # BUG FIX: Added for consistency
                                         'multimodal': ReasoningType.MULTIMODAL,
                                         # Pattern 9 FIX: Add cryptographic mapping
                                         'cryptographic': ReasoningType.SYMBOLIC,  # Crypto uses deterministic symbolic reasoning
                                     }
-                                    mapped_type = tool_to_reasoning_type_map.get(primary_tool)
-                                    if mapped_type is not None:
-                                        selected_tool_reasoning_type = mapped_type
-                                        logger.info(
-                                            f"[AgentPool] Note: Using reasoning type '{mapped_type}' "
-                                            f"from selected tool '{primary_tool}' instead of task_type mapping"
-                                        )
+                                    
+                                    # BUG FIX #2: Check tools in priority order (specific engines before generic)
+                                    # Use module-level constant for consistency
+                                    primary_tool = None
+                                    for priority_tool in TOOL_SELECTION_PRIORITY_ORDER:
+                                        if priority_tool in [t.lower() for t in result_selected_tools]:
+                                            primary_tool = priority_tool
+                                            break
+                                    
+                                    # Fallback to first tool if none matched priority order
+                                    if not primary_tool and result_selected_tools:
+                                        primary_tool = result_selected_tools[0].lower()
+                                    
+                                    if primary_tool:
+                                        mapped_type = tool_to_reasoning_type_map.get(primary_tool)
+                                        if mapped_type is not None:
+                                            selected_tool_reasoning_type = mapped_type
+                                            if len(result_selected_tools) > 1:
+                                                logger.info(
+                                                    f"[AgentPool] Note: Prioritized '{primary_tool}' from "
+                                                    f"result_selected_tools={result_selected_tools} (specific engine over generic)"
+                                                )
+                                            else:
+                                                logger.info(
+                                                    f"[AgentPool] Note: Using reasoning type '{mapped_type}' "
+                                                    f"from selected tool '{primary_tool}' instead of task_type mapping"
+                                                )
                                 elif result_selected_tools and ReasoningType is None:
                                     logger.warning(
                                         f"[AgentPool] Pattern#2 FIX: ReasoningType not available, "

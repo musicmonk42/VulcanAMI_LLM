@@ -1647,7 +1647,8 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
                     
                     # Check if world_model returned a complete response
                     # Industry Standard: Safe attribute access with getattr() to prevent AttributeError
-                    selected_tools = getattr(integration_result, 'selected_tools', [])
+                    # BUG FIX #3: Ensure tools is always a list, never None
+                    selected_tools = getattr(integration_result, 'selected_tools', []) or []
                     has_world_model_result = (
                         metadata.get("world_model_response") and
                         "world_model" in selected_tools
@@ -2693,7 +2694,8 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
             # Extract selected tools from routing_plan telemetry_data or metadata
             selected_tools = []
             if routing_plan and hasattr(routing_plan, 'telemetry_data'):
-                selected_tools = routing_plan.telemetry_data.get('selected_tools', [])
+                # BUG FIX #3: Ensure tools is always a list, never None
+                selected_tools = routing_plan.telemetry_data.get('selected_tools', []) or []
             # Fallback to tool_selected from metadata if available
             if not selected_tools and metadata.get("tool_selected"):
                 selected_tools = [metadata["tool_selected"]]
