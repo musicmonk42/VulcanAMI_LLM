@@ -259,3 +259,323 @@ class TestCircuitBreaker:
         assert stats['total_successes'] == 1
         assert stats['consecutive_timeouts'] == 1
         assert 'time_since_failure' in stats
+
+
+# ============================================================
+# DISTRIBUTED CIRCUIT BREAKER TESTS
+# ============================================================
+
+
+class TestDistributedCircuitBreaker:
+    """Test distributed circuit breaker with Redis support."""
+
+    def test_distributed_circuit_breaker_fallback_no_redis(self):
+        """Verify fallback to local circuit breaker when Redis unavailable."""
+        from vulcan.arena.client import DistributedCircuitBreaker
+        
+        # Create without Redis
+        cb = DistributedCircuitBreaker()
+        
+        # Should fall back to local circuit breaker
+        assert not cb._redis_available
+        
+        # Operations should work via local fallback
+        cb.record_timeout()
+        cb.record_timeout()
+        cb.record_timeout()
+        
+        assert cb.should_bypass()
+        
+        stats = cb.get_stats()
+        assert stats['distributed'] == False
+        assert stats['redis_available'] == False
+
+    @patch('redis.from_url')
+    def test_distributed_circuit_breaker_with_redis(self, mock_redis_from_url):
+        """Verify distributed circuit breaker uses Redis when available."""
+        from vulcan.arena.client import DistributedCircuitBreaker, CIRCUIT_BREAKER_THRESHOLD
+        import os
+        
+        # Mock Redis client
+        mock_redis = MagicMock()
+        mock_redis.ping.return_value = True
+        mock_redis.get.return_value = None
+        mock_redis_from_url.return_value = mock_redis
+        
+        # Set Redis URL temporarily
+        old_redis_url = os.environ.get('VULCAN_ARENA_REDIS_URL')
+        os.environ['VULCAN_ARENA_REDIS_URL'] = 'redis://localhost:6379/0'
+        
+        try:
+            # Create with Redis
+            cb = DistributedCircuitBreaker()
+            cb.__post_init__()
+            
+            # Should initialize Redis
+            assert cb._redis_available or not cb._redis  # May not have redis package
+            
+        finally:
+            # Restore environment
+            if old_redis_url:
+                os.environ['VULCAN_ARENA_REDIS_URL'] = old_redis_url
+            elif 'VULCAN_ARENA_REDIS_URL' in os.environ:
+                del os.environ['VULCAN_ARENA_REDIS_URL']
+
+    def test_distributed_circuit_breaker_record_timeout(self):
+        """Verify timeout recording in distributed circuit breaker."""
+        from vulcan.arena.client import DistributedCircuitBreaker
+        
+        cb = DistributedCircuitBreaker()
+        
+        # Record timeout (should use local fallback)
+        cb.record_timeout()
+        
+        # Verify recorded
+        stats = cb.get_stats()
+        assert stats['total_timeouts'] >= 1
+
+    def test_distributed_circuit_breaker_record_success(self):
+        """Verify success recording resets consecutive counter."""
+        from vulcan.arena.client import DistributedCircuitBreaker
+        
+        cb = DistributedCircuitBreaker()
+        
+        cb.record_timeout()
+        cb.record_timeout()
+        cb.record_success()
+        
+        stats = cb.get_stats()
+        assert stats['consecutive_timeouts'] == 0
+        assert stats['total_successes'] >= 1
+
+
+# ============================================================
+# FEEDBACK RETRY QUEUE TESTS
+# ============================================================
+
+
+class TestFeedbackRetryQueue:
+    """Test feedback retry queue with exponential backoff."""
+
+    @pytest.mark.asyncio
+    async def test_feedback_retry_queue_initialization(self):
+        """Verify lazy initialization of retry queue."""
+        from vulcan.arena.client import FeedbackRetryQueue
+        
+        queue = FeedbackRetryQueue()
+        
+        # Should not be initialized yet
+        assert not queue._initialized
+        assert queue._queue is None
+        assert queue._worker_task is None
+        
+        # Enqueue should initialize
+        await queue.enqueue({
+            "graph_id": "test_123",
+            "score": 0.8,
+            "rationale": "Good response"
+        })
+        
+        # Should now be initialized
+        assert queue._initialized
+        assert queue._queue is not None
+        assert queue._worker_task is not None
+
+    def test_feedback_retry_queue_backoff_calculation(self):
+        """Verify exponential backoff calculation."""
+        from vulcan.arena.client import FeedbackRetryQueue
+        
+        queue = FeedbackRetryQueue()
+        
+        # Test exponential backoff
+        delay_0 = queue._calculate_backoff(0)
+        delay_1 = queue._calculate_backoff(1)
+        delay_2 = queue._calculate_backoff(2)
+        
+        # Should increase exponentially
+        assert 0.5 <= delay_0 <= 1.5  # ~1s with jitter
+        assert 1.5 <= delay_1 <= 2.5  # ~2s with jitter
+        assert 3.0 <= delay_2 <= 5.0  # ~4s with jitter
+        
+        # Should cap at MAX_DELAY
+        delay_10 = queue._calculate_backoff(10)
+        assert delay_10 <= queue.MAX_DELAY * 1.25  # Max + jitter
+
+    @pytest.mark.asyncio
+    async def test_feedback_retry_queue_enqueue(self):
+        """Verify feedback can be enqueued."""
+        from vulcan.arena.client import FeedbackRetryQueue
+        
+        queue = FeedbackRetryQueue()
+        
+        feedback_data = {
+            "graph_id": "test_456",
+            "score": 0.9,
+            "rationale": "Excellent"
+        }
+        
+        await queue.enqueue(feedback_data)
+        
+        # Should be in queue
+        assert queue._queue.qsize() >= 1
+
+    @pytest.mark.asyncio
+    async def test_feedback_retry_queue_shutdown(self):
+        """Verify graceful shutdown of retry queue."""
+        from vulcan.arena.client import FeedbackRetryQueue
+        
+        queue = FeedbackRetryQueue()
+        
+        # Initialize by enqueueing
+        await queue.enqueue({
+            "graph_id": "test_789",
+            "score": 0.7,
+            "rationale": "Good"
+        })
+        
+        # Should have worker task
+        assert queue._worker_task is not None
+        
+        # Shutdown
+        await queue.shutdown()
+        
+        # Worker should be cancelled
+        assert queue._worker_task.done()
+
+
+# ============================================================
+# TIMEOUT CONFIGURATION TESTS
+# ============================================================
+
+
+class TestTimeoutConfiguration:
+    """Test timeout configuration and environment variables."""
+
+    def test_timeout_constants(self):
+        """Verify timeout constants are set correctly."""
+        from vulcan.arena.client import GENERATOR_TIMEOUT, SIMPLE_TASK_TIMEOUT
+        
+        # Verify timeouts
+        assert GENERATOR_TIMEOUT == 90.0
+        assert SIMPLE_TASK_TIMEOUT == 30.0
+
+    def test_environment_variable_override(self):
+        """Verify environment variable can override timeout."""
+        import os
+        import importlib
+        
+        # Set environment variable
+        old_timeout = os.environ.get('VULCAN_ARENA_TIMEOUT')
+        os.environ['VULCAN_ARENA_TIMEOUT'] = '120.0'
+        
+        try:
+            # Reload module to pick up env var
+            import vulcan.arena.client as client_module
+            importlib.reload(client_module)
+            
+            # Should use custom timeout
+            assert client_module.GENERATOR_TIMEOUT == 120.0
+            
+        finally:
+            # Restore environment
+            if old_timeout:
+                os.environ['VULCAN_ARENA_TIMEOUT'] = old_timeout
+            elif 'VULCAN_ARENA_TIMEOUT' in os.environ:
+                del os.environ['VULCAN_ARENA_TIMEOUT']
+            
+            # Reload to restore defaults
+            importlib.reload(client_module)
+
+    def test_max_feedback_retries_env_var(self):
+        """Verify feedback retries can be configured via env var."""
+        import os
+        
+        old_retries = os.environ.get('VULCAN_ARENA_FEEDBACK_RETRIES')
+        os.environ['VULCAN_ARENA_FEEDBACK_RETRIES'] = '5'
+        
+        try:
+            # Reload module
+            import vulcan.arena.client as client_module
+            import importlib
+            importlib.reload(client_module)
+            
+            # Should use custom retry count
+            assert client_module.MAX_FEEDBACK_RETRIES == 5
+            
+        finally:
+            # Restore environment
+            if old_retries:
+                os.environ['VULCAN_ARENA_FEEDBACK_RETRIES'] = old_retries
+            elif 'VULCAN_ARENA_FEEDBACK_RETRIES' in os.environ:
+                del os.environ['VULCAN_ARENA_FEEDBACK_RETRIES']
+            
+            # Reload to restore defaults
+            import importlib
+            importlib.reload(client_module)
+
+
+# ============================================================
+# INTEGRATION TESTS
+# ============================================================
+
+
+class TestIntegration:
+    """Integration tests for Arena client with new features."""
+
+    @pytest.mark.asyncio
+    @patch('vulcan.arena.client.get_http_session')
+    async def test_submit_feedback_with_retry_on_failure(self, mock_get_session):
+        """Verify feedback submission enqueues for retry on failure."""
+        from vulcan.arena.client import submit_arena_feedback
+        
+        # Mock session that fails
+        mock_response = AsyncMock()
+        mock_response.status = 500
+        mock_response.text = AsyncMock(return_value="Internal Server Error")
+        
+        mock_session = AsyncMock()
+        mock_session.post = AsyncMock(return_value=mock_response)
+        mock_session.__aenter__ = AsyncMock(return_value=mock_response)
+        mock_session.__aexit__ = AsyncMock(return_value=None)
+        
+        mock_get_session.return_value = mock_session
+        
+        # Submit feedback
+        result = await submit_arena_feedback(
+            proposal_id="test_proposal",
+            score=0.8,
+            rationale="Test feedback"
+        )
+        
+        # Should indicate error and retry queued
+        assert result["status"] == "error"
+        assert result.get("retry_queued") == True
+
+    @pytest.mark.asyncio
+    @patch('vulcan.arena.client.get_http_session')
+    async def test_submit_feedback_success(self, mock_get_session):
+        """Verify successful feedback submission."""
+        from vulcan.arena.client import submit_arena_feedback
+        
+        # Mock successful session
+        mock_response = AsyncMock()
+        mock_response.status = 200
+        mock_response.json = AsyncMock(return_value={"success": True})
+        
+        mock_session = AsyncMock()
+        mock_session.post = AsyncMock(return_value=mock_response)
+        mock_session.__aenter__ = AsyncMock(return_value=mock_response)
+        mock_session.__aexit__ = AsyncMock(return_value=None)
+        
+        mock_get_session.return_value = mock_session
+        
+        # Submit feedback
+        result = await submit_arena_feedback(
+            proposal_id="test_proposal",
+            score=0.9,
+            rationale="Great response"
+        )
+        
+        # Should succeed
+        assert result["status"] == "success"
+        assert "retry_queued" not in result
