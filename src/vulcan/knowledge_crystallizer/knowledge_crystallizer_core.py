@@ -220,11 +220,16 @@ class KnowledgeCrystallizer:
 
     def __init__(self, vulcan_memory=None, semantic_bridge=None):
         """
-        Initialize knowledge crystallizer
+        Initialize knowledge crystallizer with adaptive configuration.
+        
+        The crystallizer supports different operational modes via environment variables:
+        
+        - VULCAN_DEVELOPMENT_MODE: Enable relaxed thresholds for experimental learning
+        - VULCAN_MIN_CONFIDENCE_THRESHOLD: Explicitly set minimum confidence (0.0-1.0)
 
         Args:
-            vulcan_memory: VULCAN memory system
-            semantic_bridge: Semantic bridge component
+            vulcan_memory: VULCAN memory system for storing crystallized knowledge
+            semantic_bridge: Semantic bridge component for knowledge integration
         """
         self.memory = vulcan_memory
         self.semantic = semantic_bridge
@@ -239,7 +244,7 @@ class KnowledgeCrystallizer:
         )
         self.knowledge_base = VersionedKnowledgeBase()
         self.imbalance_handler = ImbalanceHandler()
-        self.method_selector = CrystallizationSelector()  # NEW
+        self.method_selector = CrystallizationSelector()
 
         # Application component
         self.applicator = KnowledgeApplicator(self)
@@ -342,39 +347,6 @@ class KnowledgeCrystallizer:
             )
         
         return threshold
-
-    def __init__(self, vulcan_memory=None, semantic_bridge=None):
-        """
-        Initialize knowledge crystallizer with adaptive configuration.
-        
-        The crystallizer supports different operational modes via environment variables:
-        
-        - VULCAN_DEVELOPMENT_MODE: Enable relaxed thresholds for experimental learning
-        - VULCAN_MIN_CONFIDENCE_THRESHOLD: Explicitly set minimum confidence (0.0-1.0)
-
-        Args:
-            vulcan_memory: VULCAN memory system for storing crystallized knowledge
-            semantic_bridge: Semantic bridge component for knowledge integration
-        """
-        self.memory = vulcan_memory
-        self.semantic = semantic_bridge
-
-        # Core components
-        self.extractor = PrincipleExtractor()
-        self.validator = KnowledgeValidator()
-        self.contraindication_db = ContraindicationDatabase()
-        self.contraindication_graph = ContraindicationGraph()
-        self.cascade_analyzer = CascadeAnalyzer(
-            self.contraindication_db, self.contraindication_graph
-        )
-        self.knowledge_base = VersionedKnowledgeBase()
-        self.imbalance_handler = ImbalanceHandler()
-        self.method_selector = CrystallizationSelector()
-
-        # Application component
-        self.applicator = KnowledgeApplicator(self)
-            self.has_semantic,
-        )
 
     def crystallize(
         self, execution_trace: ExecutionTrace, context: Optional[Dict[str, Any]] = None
