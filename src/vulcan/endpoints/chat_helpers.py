@@ -170,6 +170,111 @@ HANDLED_DICT_RESULT_KEYS = frozenset({
 GENERIC_METHOD_VALUES = frozenset({'unknown', 'generic', 'fallback'})
 
 
+# ============================================================
+# BUG FIX #2: Silent Success - Dictionary Conclusion Formatting (The Mute)
+# Industry Standard: Defensive type handling with explicit coercion
+# ============================================================
+
+class ConclusionFormatter:
+    """
+    Formats reasoning conclusions for user display.
+    
+    Design Pattern: Adapter Pattern
+    Handles: str, dict, list, dataclass, object with to_dict(), None
+    
+    Industry Standard: Exhaustive type handling with fallback chain
+    """
+    
+    @staticmethod
+    def format(conclusion: Any) -> Optional[str]:
+        """
+        Convert any conclusion type to displayable string.
+        
+        Industry Standard: Exhaustive type handling with fallback chain
+        
+        Args:
+            conclusion: The conclusion value (may be str, dict, list, object, or None)
+        
+        Returns:
+            Formatted string or None if no valid content
+        """
+        if conclusion is None:
+            return None
+        
+        # String - return as-is
+        if isinstance(conclusion, str):
+            return conclusion.strip() if conclusion.strip() else None
+        
+        # Dict - JSON serialize with pretty printing
+        if isinstance(conclusion, dict):
+            return ConclusionFormatter._format_dict(conclusion)
+        
+        # List - format as enumerated items
+        if isinstance(conclusion, list):
+            return ConclusionFormatter._format_list(conclusion)
+        
+        # Object with to_dict() method (dataclasses, Pydantic models)
+        if hasattr(conclusion, 'to_dict') and callable(conclusion.to_dict):
+            try:
+                return ConclusionFormatter._format_dict(conclusion.to_dict())
+            except Exception:
+                pass
+        
+        # Object with __dict__ (regular classes)
+        if hasattr(conclusion, '__dict__'):
+            try:
+                return ConclusionFormatter._format_dict(vars(conclusion))
+            except Exception:
+                pass
+        
+        # Last resort - string conversion
+        str_repr = str(conclusion)
+        return str_repr if str_repr and str_repr != 'None' else None
+    
+    @staticmethod
+    def _format_dict(d: dict) -> Optional[str]:
+        """Format dictionary as readable output."""
+        import json
+        
+        # Filter out internal/metadata keys
+        display_keys = {k: v for k, v in d.items() 
+                       if not k.startswith('_') and v is not None}
+        
+        if not display_keys:
+            return None
+        
+        # Check for common conclusion patterns
+        if 'result' in display_keys:
+            return str(display_keys['result'])
+        if 'answer' in display_keys:
+            return str(display_keys['answer'])
+        if 'conclusion' in display_keys:
+            return str(display_keys['conclusion'])
+        
+        # Full JSON output for complex results
+        try:
+            return json.dumps(display_keys, indent=2, default=str)
+        except (TypeError, ValueError):
+            return str(display_keys)
+    
+    @staticmethod
+    def _format_list(items: list) -> Optional[str]:
+        """Format list as enumerated items."""
+        if not items:
+            return None
+        
+        if len(items) == 1:
+            return ConclusionFormatter.format(items[0])
+        
+        formatted = []
+        for i, item in enumerate(items, 1):
+            item_str = ConclusionFormatter.format(item)
+            if item_str:
+                formatted.append(f"{i}. {item_str}")
+        
+        return "\n".join(formatted) if formatted else None
+
+
 def safe_truncate_utf8(text: str, max_chars: int, ellipsis: str = "...") -> str:
     """
     Safely truncate text respecting UTF-8 character boundaries.
@@ -989,16 +1094,16 @@ def _format_engine_result_dict(engine_name: str, result: Dict[str, Any]) -> str:
     explanation = result.get('explanation')
     reasoning_steps = result.get('reasoning_steps', [])
     
-    # Format conclusion
+    # Format conclusion using ConclusionFormatter (BUG FIX #2)
     if conclusion is not None:
-        # Handle nested dict in conclusion
-        if isinstance(conclusion, dict):
-            conclusion_str = conclusion.get('result') or conclusion.get('answer') or str(conclusion)[:MAX_REASONING_RESULT_LENGTH]
-        else:
-            conclusion_str = str(conclusion)[:MAX_REASONING_RESULT_LENGTH]
-        
-        section_parts.append(f"\n- Conclusion: {conclusion_str}")
-        has_content = True
+        # Use the robust ConclusionFormatter to handle dict, list, object types
+        conclusion_str = ConclusionFormatter.format(conclusion)
+        if conclusion_str:
+            # Truncate if needed
+            if len(conclusion_str) > MAX_REASONING_RESULT_LENGTH:
+                conclusion_str = conclusion_str[:MAX_REASONING_RESULT_LENGTH] + "..."
+            section_parts.append(f"\n- Conclusion: {conclusion_str}")
+            has_content = True
     
     # Format confidence
     if confidence is not None:
