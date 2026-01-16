@@ -204,7 +204,8 @@ _reasoning_import_attempted = False  # Track if we've tried to import
 # only depends on reasoning_types.py which is a leaf module.
 # ═══════════════════════════════════════════════════════════════════
 try:
-    from vulcan.reasoning.integration.utils import ensure_reasoning_type_enum
+    # ARCHITECTURE CONSOLIDATION: Import from unified compatibility layer via reasoning
+    from vulcan.reasoning import ensure_reasoning_type_enum
     TYPE_CONVERSION_AVAILABLE = True
 except ImportError:
     ensure_reasoning_type_enum = None
@@ -3072,7 +3073,8 @@ class AgentPoolManager:
                         # Call observe_engine_result() to enable the learning system to
                         # record this successful high-confidence result for future optimization
                         try:
-                            from vulcan.reasoning.integration.utils import observe_engine_result
+                            # ARCHITECTURE CONSOLIDATION: Import from unified compatibility layer
+                            from vulcan.reasoning import observe_engine_result
                             
                             # Generate query ID for tracking
                             query_id = context.get("conversation_id", f"query_{task_id}")
