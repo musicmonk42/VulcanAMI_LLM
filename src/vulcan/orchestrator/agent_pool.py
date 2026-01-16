@@ -242,9 +242,11 @@ def _lazy_import_reasoning():
     _reasoning_import_attempted = True
     
     # Try multiple import paths for robustness
+    # ARCHITECTURE CONSOLIDATION: Integration package has been consolidated into unified
+    # All functions now available through vulcan.reasoning via compatibility layer
     import_paths = [
-        ('vulcan.reasoning', 'vulcan.reasoning.integration'),
-        ('src.vulcan.reasoning', 'src.vulcan.reasoning.integration'),
+        ('vulcan.reasoning', 'vulcan.reasoning'),  # Both from same place now
+        ('src.vulcan.reasoning', 'src.vulcan.reasoning'),  # Both from same place now
     ]
     
     for reasoning_path, integration_path in import_paths:
@@ -254,6 +256,7 @@ def _lazy_import_reasoning():
                 'UnifiedReasoner', 'ReasoningType', 'ReasoningResult',
                 'UNIFIED_AVAILABLE', 'create_unified_reasoner'
             ])
+            # ARCHITECTURE CONSOLIDATION: Import from same module (compatibility layer)
             integration_module = __import__(integration_path, fromlist=[
                 'apply_reasoning', 'get_reasoning_integration', 'ReasoningResult'
             ])
