@@ -32,6 +32,10 @@ logger = logging.getLogger(__name__)
 # ENVIRONMENT CONFIGURATION
 # ============================================================
 
+# Default timeout values
+GENERATOR_TIMEOUT = 90.0  # Complex tasks (tournaments, evolution)
+SIMPLE_TASK_TIMEOUT = 30.0  # Simple tasks (feedback submission, health checks)
+
 # Override default timeouts via environment variables
 _env_timeout = os.getenv("VULCAN_ARENA_TIMEOUT")
 if _env_timeout:
@@ -481,14 +485,13 @@ class FeedbackRetryQueue:
                     f"{feedback_data.get('graph_id', 'unknown')}"
                 )
                 
-                # Import here to avoid circular dependency
-                from vulcan.arena.client import submit_arena_feedback
-                
-                result = await submit_arena_feedback(
+                # Call _submit_feedback_internal directly to avoid circular import
+                result = await _submit_feedback_internal(
                     proposal_id=feedback_data["graph_id"],
                     score=feedback_data["score"],
                     rationale=feedback_data["rationale"],
-                    arena_base_url=feedback_data.get("arena_base_url")
+                    arena_base_url=feedback_data.get("arena_base_url"),
+                    retry=False  # Don't retry from within a retry
                 )
                 
                 if result.get("status") == "success":
@@ -1045,27 +1048,19 @@ async def execute_via_arena(
         }
 
 
-async def submit_arena_feedback(
-    proposal_id: str, score: float, rationale: str, arena_base_url: str = None
+async def _submit_feedback_internal(
+    proposal_id: str, score: float, rationale: str, arena_base_url: str = None, retry: bool = True
 ) -> dict:
     """
-    Submit feedback to Arena for RLHF (Reinforcement Learning from Human Feedback).
+    Internal feedback submission function.
     
-    Now includes automatic retry queue for failed submissions. If submission fails,
-    feedback is automatically enqueued for retry with exponential backoff to ensure
-    RLHF training data is not lost due to transient failures.
-
-    This enables the evolution loop where:
-    - User feedback influences agent training
-    - Successful patterns are reinforced
-    - Losers get diversity penalty applied
-
     Args:
         proposal_id: ID of the proposal/graph to provide feedback on
         score: Feedback score (typically -1.0 to 1.0)
         rationale: Human-readable explanation of the feedback
         arena_base_url: Base URL for Arena API
-
+        retry: Whether to enqueue for retry on failure (default: True)
+    
     Returns:
         dict with feedback submission result
     """
@@ -1133,36 +1128,65 @@ async def submit_arena_feedback(
                 error_text = await resp.text()
                 logger.error(f"[ARENA] Feedback submission failed: {resp.status}")
                 
-                # Enqueue for retry
-                if _feedback_retry_queue is None:
-                    _feedback_retry_queue = FeedbackRetryQueue()
+                # Enqueue for retry if enabled
+                if retry:
+                    if _feedback_retry_queue is None:
+                        _feedback_retry_queue = FeedbackRetryQueue()
+                    
+                    feedback_data = {
+                        "graph_id": proposal_id,
+                        "score": score,
+                        "rationale": rationale,
+                        "arena_base_url": base_url
+                    }
+                    await _feedback_retry_queue.enqueue(feedback_data)
                 
-                feedback_data = {
-                    "graph_id": proposal_id,
-                    "score": score,
-                    "rationale": rationale,
-                    "arena_base_url": base_url
-                }
-                await _feedback_retry_queue.enqueue(feedback_data)
-                
-                return {"status": "error", "error": error_text, "retry_queued": True}
+                return {"status": "error", "error": error_text, "retry_queued": retry}
 
     except Exception as e:
         logger.error(f"[ARENA] Feedback submission error: {e}")
         
-        # Enqueue for retry on any exception
-        if _feedback_retry_queue is None:
-            _feedback_retry_queue = FeedbackRetryQueue()
+        # Enqueue for retry on any exception if enabled
+        if retry:
+            if _feedback_retry_queue is None:
+                _feedback_retry_queue = FeedbackRetryQueue()
+            
+            feedback_data = {
+                "graph_id": proposal_id,
+                "score": score,
+                "rationale": rationale,
+                "arena_base_url": base_url
+            }
+            await _feedback_retry_queue.enqueue(feedback_data)
         
-        feedback_data = {
-            "graph_id": proposal_id,
-            "score": score,
-            "rationale": rationale,
-            "arena_base_url": base_url
-        }
-        await _feedback_retry_queue.enqueue(feedback_data)
-        
-        return {"status": "error", "error": str(e), "retry_queued": True}
+        return {"status": "error", "error": str(e), "retry_queued": retry}
+
+
+async def submit_arena_feedback(
+    proposal_id: str, score: float, rationale: str, arena_base_url: str = None
+) -> dict:
+    """
+    Submit feedback to Arena for RLHF (Reinforcement Learning from Human Feedback).
+    
+    Now includes automatic retry queue for failed submissions. If submission fails,
+    feedback is automatically enqueued for retry with exponential backoff to ensure
+    RLHF training data is not lost due to transient failures.
+
+    This enables the evolution loop where:
+    - User feedback influences agent training
+    - Successful patterns are reinforced
+    - Losers get diversity penalty applied
+
+    Args:
+        proposal_id: ID of the proposal/graph to provide feedback on
+        score: Feedback score (typically -1.0 to 1.0)
+        rationale: Human-readable explanation of the feedback
+        arena_base_url: Base URL for Arena API
+
+    Returns:
+        dict with feedback submission result
+    """
+    return await _submit_feedback_internal(proposal_id, score, rationale, arena_base_url, retry=True)
 
 
 # Backward compatibility aliases
@@ -1189,6 +1213,8 @@ __all__ = [
     "ArenaCircuitBreaker",
     "DistributedCircuitBreaker",
     "FeedbackRetryQueue",
+    # Internal function (not for public use but exported for internal modules)
+    "_submit_feedback_internal",
     # Backward compatibility
     "_select_arena_agent",
     "_build_arena_payload",
