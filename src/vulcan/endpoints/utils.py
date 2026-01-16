@@ -61,19 +61,13 @@ def get_deployment_from_module() -> Optional["ProductionDeployment"]:
 
 def get_deployment(request: Optional[Request] = None) -> Optional["ProductionDeployment"]:
     """
-    Get the ProductionDeployment instance from any valid location.
+    Get the ProductionDeployment instance from app state.
     
-    Handles both standalone VULCAN and mounted sub-app scenarios.
-    
-    This function addresses the sub-app state isolation bug where:
-    1. Deployment is attached to vulcan_module.app.state.deployment
-    2. VULCAN is mounted as sub-app: app.mount("/vulcan", vulcan_module.app)
-    3. Request.app references the parent app, not vulcan_module.app
-    4. Parent app never has deployment set on its state
-    
-    When deployment is found via module import (fallback path), this function
-    also propagates it to request.app.state.deployment for faster access on
-    subsequent requests from the same app instance.
+    Simplified version that relies on proper initialization rather than
+    module hacking. This implements proper dependency injection by:
+    1. Primary: Using request.app.state (proper DI)
+    2. Fallback: Module import for backwards compatibility
+    3. Auto-propagation: Caching deployment in app.state when found
     
     Args:
         request: Optional FastAPI request object. If None, falls back to
@@ -82,74 +76,38 @@ def get_deployment(request: Optional[Request] = None) -> Optional["ProductionDep
     Returns:
         ProductionDeployment instance or None if not found
     """
-    # If no request provided, use module fallback only
     if request is None:
+        # No request context - use module fallback only
         return get_deployment_from_module()
     
-    # Try 1: Direct app.state (standalone mode or properly propagated)
+    # Primary path: get from request.app.state (proper DI)
     if hasattr(request.app.state, "deployment") and request.app.state.deployment is not None:
         logger.debug("Deployment found in request.app.state")
         return request.app.state.deployment
     
-    # Log which app we're checking (useful for debugging sub-app issues)
+    # Log warning if not found (indicates initialization issue)
     app_title = getattr(request.app, "title", "unknown")
-    logger.debug(f"Deployment not in request.app.state (app.title={app_title}), trying module fallback")
-    
-    # Try 2: vulcan.main module (when imported as vulcan.main)
-    # Try 3: src.vulcan.main module (full_platform mounting pattern)
-    for module_path in ["vulcan.main", "src.vulcan.main"]:
-        try:
-            vulcan_module = importlib.import_module(module_path)
-            # Use getattr chain with None defaults for cleaner access
-            app = getattr(vulcan_module, "app", None)
-            if app is None:
-                continue
-            state = getattr(app, "state", None)
-            if state is None:
-                continue
-            deployment = getattr(state, "deployment", None)
-            if deployment is not None:
-                logger.info(f"Deployment found via module {module_path}")
-                
-                # FIX: Propagate deployment to request.app.state for faster
-                # access on subsequent requests. This avoids repeated module
-                # imports on every request when running as mounted sub-app.
-                try:
-                    request.app.state.deployment = deployment
-                    logger.info(
-                        f"Propagated deployment to request.app.state "
-                        f"(app.title={app_title}) for faster subsequent access"
-                    )
-                except (AttributeError, TypeError) as prop_err:
-                    # Non-fatal: propagation failure just means slower subsequent lookups
-                    # AttributeError: state doesn't exist or is read-only
-                    # TypeError: state object doesn't support attribute assignment
-                    logger.debug(f"Could not propagate deployment to request.app: {type(prop_err).__name__}: {prop_err}")
-                
-                return deployment
-        except ImportError as e:
-            logger.debug(f"Could not import {module_path}: {e}")
-            continue
-        except AttributeError as e:
-            logger.debug(f"Module {module_path} exists but deployment not accessible: {e}")
-            continue
-    
-    # Log detailed diagnostic information when deployment is not found
-    # Use getattr with default to safely get state attributes
-    try:
-        state_attrs = list(dir(request.app.state)) if hasattr(request.app, 'state') else []
-        # Filter to only show deployment-related or custom attributes (not dunder methods)
-        state_attrs = [a for a in state_attrs if not a.startswith('_')]
-    except (TypeError, AttributeError):
-        state_attrs = ['<unable to inspect>']
-    
     logger.warning(
-        f"Deployment not found. Diagnostics: "
-        f"request.app.title={app_title}, "
-        f"request.app.state attrs={state_attrs}"
+        f"Deployment not found in request.app.state (app.title={app_title}). "
+        "This indicates startup may not have completed properly. Trying module fallback."
     )
     
-    return None
+    # Fallback to module import (for backwards compatibility during transition)
+    deployment = get_deployment_from_module()
+    
+    # Propagate deployment to app.state if found (for faster subsequent access)
+    if deployment is not None:
+        try:
+            request.app.state.deployment = deployment
+            logger.info(
+                f"Propagated deployment to request.app.state (app.title={app_title}) "
+                "for faster subsequent access"
+            )
+        except (AttributeError, TypeError) as e:
+            # Non-fatal: propagation failure just means slower subsequent lookups
+            logger.debug(f"Could not propagate deployment to request.app: {type(e).__name__}: {e}")
+    
+    return deployment
 
 
 def require_deployment(request: Optional[Request] = None) -> "ProductionDeployment":

@@ -41,20 +41,32 @@ async def lifespan(app: FastAPI):
     worker_id = os.getpid()
     
     # ============================================================
-    # TEST MODE BYPASS
+    # TEST MODE BYPASS (Explicit Opt-In Required)
     # ============================================================
-    # If deployment exists in app.state, we're in test mode with mocks.
-    # Skip all initialization and provide clean exception handling.
+    # Test mode now requires explicit VULCAN_TEST_MODE environment variable
+    # to prevent configuration errors from being masked by accidental deployment
+    # state initialization.
+    TEST_MODE = os.environ.get("VULCAN_TEST_MODE", "false").lower() in ("true", "1", "yes")
+    
     if hasattr(app.state, "deployment") and app.state.deployment is not None:
-        logger.info("Test mode detected - using existing mock deployment")
-        try:
-            yield
-        except Exception as e:
-            logger.error(f"Test mode error: {e}", exc_info=True)
-            raise
-        finally:
-            logger.info("Test mode shutdown complete")
-        return
+        if TEST_MODE:
+            logger.info("VULCAN_TEST_MODE enabled - using existing mock deployment")
+            try:
+                yield
+            except Exception as e:
+                logger.error(f"Test mode error: {e}", exc_info=True)
+                raise
+            finally:
+                logger.info("Test mode shutdown complete")
+            return
+        else:
+            # Warn if deployment exists but TEST_MODE not explicitly set
+            logger.warning(
+                "Deployment already exists in app.state but VULCAN_TEST_MODE not set. "
+                "This may indicate a configuration error or improper initialization. "
+                "Set VULCAN_TEST_MODE=true to suppress this warning in test environments."
+            )
+            # Continue with normal startup to avoid masking issues
 
     # ============================================================
     # SETTINGS INITIALIZATION (P0 Fix: Issue #1)

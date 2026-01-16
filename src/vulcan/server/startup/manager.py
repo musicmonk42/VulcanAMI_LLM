@@ -686,11 +686,12 @@ class StartupManager:
             # CRITICAL: Register callbacks between components
             # This ensures proper workflow orchestration after modular refactoring.
             # Callbacks established:
-            # 1. agent_pool → reasoning_integration: Job execution results
-            # 2. reasoning_integration → telemetry_recorder: Tool selection metrics
-            # 3. reasoning_integration → governance_logger: Audit trail for decisions
+            # 1. agent_pool → reasoning_component: Job execution results
+            # 2. reasoning_component → telemetry_recorder: Tool selection metrics
+            # 3. reasoning_component → governance_logger: Audit trail for decisions
             # 4. world_model → audit_logger: Meta-reasoning decisions (if available)
             # These callbacks restore the data flow that was implicit in the monolithic main.py
+            # Note: reasoning_component can be UnifiedReasoner (preferred) or ReasoningIntegration (legacy fallback)
             self._register_cognitive_callbacks(deployment)
             
             self.phase_results[phase] = True
@@ -753,26 +754,62 @@ class StartupManager:
         Register callbacks between cognitive components for proper workflow orchestration.
         
         This is CRITICAL after modular refactoring to ensure:
-        - Agent pool results flow to reasoning integration
-        - Reasoning integration results flow to telemetry
+        - Agent pool results flow to reasoning component (UnifiedReasoner or legacy)
+        - Reasoning component results flow to telemetry
         - World model decisions flow to audit logger
         - Tool selection events are recorded
         
         All callbacks are logged to startup trace for auditability.
+        
+        Note: Supports both UnifiedReasoner (preferred) and ReasoningIntegration (legacy)
+        for backwards compatibility during migration.
         """
         logger.info(f"{LogEmoji.SUCCESS} Registering cognitive workflow callbacks...")
         
         try:
-            # Get reasoning integration singleton
-            from vulcan.reasoning.integration import get_reasoning_integration
-            reasoning_integration = get_reasoning_integration()
+            # Try to get unified reasoner first (new path)
+            reasoning_component = None
+            component_type = "unknown"
             
-            # Log reasoning integration initialization
-            self.trace.log_orchestrator_init(
-                "reasoning_integration",
-                status="registered",
-                details={"type": "ReasoningIntegration", "singleton": True}
-            )
+            try:
+                from vulcan.reasoning.singletons import get_unified_reasoner
+                reasoning_component = get_unified_reasoner()
+                if reasoning_component:
+                    component_type = "UnifiedReasoner"
+                    logger.debug("Using UnifiedReasoner for cognitive callbacks")
+            except Exception as e:
+                logger.debug(f"UnifiedReasoner not available: {e}")
+            
+            # Fallback to legacy integration if unified not available
+            if reasoning_component is None:
+                try:
+                    from vulcan.reasoning.integration import get_reasoning_integration
+                    reasoning_component = get_reasoning_integration()
+                    component_type = "ReasoningIntegration"
+                    logger.debug("Using legacy ReasoningIntegration for cognitive callbacks")
+                except Exception as e:
+                    logger.debug(f"ReasoningIntegration not available: {e}")
+            
+            # Log component initialization
+            if reasoning_component:
+                self.trace.log_orchestrator_init(
+                    "reasoning_component",
+                    status="registered",
+                    details={"type": component_type, "singleton": True}
+                )
+                
+                # Store in app state for endpoint access
+                if component_type == "UnifiedReasoner":
+                    self.app.state.unified_reasoner = reasoning_component
+                else:
+                    self.app.state.reasoning_integration = reasoning_component
+            else:
+                logger.warning("No reasoning component available (neither unified nor integration)")
+                self.trace.log_orchestrator_init(
+                    "reasoning_component",
+                    status="failed",
+                    error="Neither UnifiedReasoner nor ReasoningIntegration available"
+                )
             
             # Register tools with trace logger
             # Note: Tools are registered dynamically via reasoning engines
@@ -827,37 +864,34 @@ class StartupManager:
             except Exception as e:
                 logger.debug(f"Query analyzer init logging failed: {e}")
             
-            # Store reasoning integration in app state for endpoint access
-            self.app.state.reasoning_integration = reasoning_integration
-            
-            # Log callback: Reasoning integration → Telemetry
+            # Log callback: Reasoning component → Telemetry
             if hasattr(self.app.state, "telemetry_recorder") and self.app.state.telemetry_recorder:
                 self.trace.log_callback_registration(
-                    source="reasoning_integration",
+                    source="reasoning_component",
                     target="telemetry_recorder",
                     callback_type="result_logging",
                     status="registered"
                 )
             else:
                 self.trace.log_callback_registration(
-                    source="reasoning_integration",
+                    source="reasoning_component",
                     target="telemetry_recorder",
                     callback_type="result_logging",
                     status="skipped",
                     error="Telemetry recorder not available"
                 )
             
-            # Log callback: Reasoning integration → Governance logger
+            # Log callback: Reasoning component → Governance logger
             if hasattr(self.app.state, "governance_logger") and self.app.state.governance_logger:
                 self.trace.log_callback_registration(
-                    source="reasoning_integration",
+                    source="reasoning_component",
                     target="governance_logger",
                     callback_type="audit_logging",
                     status="registered"
                 )
             else:
                 self.trace.log_callback_registration(
-                    source="reasoning_integration",
+                    source="reasoning_component",
                     target="governance_logger",
                     callback_type="audit_logging",
                     status="skipped",
@@ -881,10 +915,10 @@ class StartupManager:
                         details={"pool_managed": True}
                     )
                 
-                # Log callback: Agent pool → Reasoning integration
+                # Log callback: Agent pool → Reasoning component
                 self.trace.log_callback_registration(
                     source="agent_pool",
-                    target="reasoning_integration",
+                    target="reasoning_component",
                     callback_type="job_execution",
                     status="registered"
                 )
@@ -985,7 +1019,7 @@ class StartupManager:
                 self._preload_hierarchical_memory(),
                 self._preload_unified_learning_system(),
                 self._preload_reasoning_singletons(),
-                self._preload_reasoning_integration(),
+                self._preload_unified_reasoner(),
                 return_exceptions=True
             )
             
@@ -1097,28 +1131,32 @@ class StartupManager:
         except Exception as e:
             logger.warning(f"Reasoning singletons prewarm failed: {e}")  # Changed from debug to warning
     
-    async def _preload_reasoning_integration(self) -> None:
+    async def _preload_unified_reasoner(self) -> None:
         """
-        Preload ReasoningIntegration and ToolSelector.
+        Preload the unified reasoning system (replaces legacy integration).
         
-        P2 Fix: Issue #10 - Log failures as warnings, not debug.
+        This method preloads the UnifiedReasoner instead of the legacy
+        ReasoningIntegration to ensure:
+        1. Single brain initialization (not duplicate models)
+        2. Memory efficiency (no private model copies)
+        3. Unified reasoning path across all queries
         """
         try:
-            from vulcan.reasoning.integration import get_reasoning_integration
-            reasoning_integration = get_reasoning_integration()
-            reasoning_integration._init_components()
-            logger.debug(f"{LogEmoji.SUCCESS} ReasoningIntegration preloaded")
+            from vulcan.reasoning.singletons import get_embedding_model
             
-            # Preload SemanticToolMatcher
-            try:
-                from vulcan.reasoning.selection.semantic_tool_matcher import SemanticToolMatcher
-                SemanticToolMatcher._get_shared_model()
-                logger.debug(f"{LogEmoji.SUCCESS} SemanticToolMatcher preloaded")
-            except Exception:
-                pass
-                
+            # Preload the singleton embedding model
+            get_embedding_model()
+            logger.info("✓ Embedding model singleton preloaded")
+            
+            # Initialize unified reasoner
+            from vulcan.reasoning.singletons import get_unified_reasoner
+            reasoner = get_unified_reasoner()
+            logger.info("✓ UnifiedReasoner preloaded")
+            
+        except ImportError as e:
+            logger.warning(f"UnifiedReasoner import failed (may not be installed): {e}")
         except Exception as e:
-            logger.warning(f"ReasoningIntegration preload failed: {e}")  # Changed from debug to warning
+            logger.warning(f"UnifiedReasoner preload failed: {e}")
     
     async def _phase_monitoring(self) -> None:
         """Phase 6: Start monitoring services."""

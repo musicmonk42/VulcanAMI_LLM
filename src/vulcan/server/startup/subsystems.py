@@ -199,11 +199,13 @@ class SubsystemManager:
     
     def activate_reasoning_subsystems(self) -> int:
         """
-        Activate reasoning subsystems.
+        Activate reasoning subsystems using UNIFIED reasoner.
         
-        Activates symbolic, probabilistic, causal, analogical, and cross-modal
-        reasoning components. These subsystems provide the core cognitive
-        capabilities for problem-solving and inference.
+        This method activates the UnifiedReasoner instead of individual
+        reasoning engines to ensure:
+        1. Single reasoning path across all queries
+        2. Consistent tool selection and ensemble strategies
+        3. Better performance through singleton pattern
         
         P3 Fix: Issue #16 - Add comprehensive docstring.
         
@@ -211,11 +213,32 @@ class SubsystemManager:
             Number of subsystems successfully activated
         """
         configs = [
-            SubsystemConfig("symbolic", "Symbolic Reasoning"),
-            SubsystemConfig("probabilistic", "Probabilistic Reasoning"),
-            SubsystemConfig("causal", "Causal Reasoning"),
-            SubsystemConfig("abstract", "Analogical/Abstract Reasoning"),
-            SubsystemConfig("cross_modal", "Cross-Modal Reasoning"),
+            SubsystemConfig(
+                attr_name="unified_reasoner",
+                display_name="Unified Reasoner",
+                critical=False,
+                needs_init=False,  # Already initialized via singleton
+            ),
+            SubsystemConfig(
+                attr_name="symbolic_reasoner",
+                display_name="Symbolic Reasoner",
+                critical=False,
+            ),
+            SubsystemConfig(
+                attr_name="probabilistic_reasoner",
+                display_name="Probabilistic Reasoner",
+                critical=False,
+            ),
+            SubsystemConfig(
+                attr_name="causal_reasoner",
+                display_name="Causal Reasoner",
+                critical=False,
+            ),
+            SubsystemConfig(
+                attr_name="analogical_reasoner",
+                display_name="Analogical Reasoner",
+                critical=False,
+            ),
         ]
         
         count = sum(1 for config in configs if self._activate_single(config))
