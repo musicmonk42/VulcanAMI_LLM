@@ -3488,39 +3488,41 @@ class UnifiedReasoner:
             return result.confidence
 
     def _execute_task(self, task: ReasoningTask) -> ReasoningResult:
-        """Execute a single reasoning task"""
+        """
+        Execute a single reasoning task.
+        
+        INDUSTRY STANDARD - COMMAND PATTERN:
+        Task execution MUST NOT re-select tools. Tool selection happens ONCE
+        (by ToolSelector during planning), and execution simply runs the selected tool.
+        
+        This ensures:
+        - Single decision authority (ToolSelector)
+        - Predictable execution (no runtime surprises)
+        - Proper separation of concerns (planning vs execution)
+        
+        REMOVED: Execution-time tool re-selection (was Lines 3502-3523)
+        - Violated Command Pattern
+        - Created competing decision system
+        - Made debugging impossible (decision changed during execution)
+        
+        CORRECT FLOW:
+        1. Router provides hints → ToolSelector
+        2. ToolSelector decides tool → stored in task.task_type
+        3. Execution uses task.task_type → NO RE-DECISION
+        """
 
         try:
             # =========================================================
-            # CRITICAL FIX: Check if task has explicit tool selection
+            # COMMAND PATTERN: Execute the pre-selected tool
             # =========================================================
-            # If the task has selected_tools from QueryRouter/QueryClassifier,
-            # those should override the task_type mapping. This ensures queries
-            # route to the correct reasoning engine (e.g., SAT → SymbolicReasoner
-            # instead of MathematicalComputationTool).
+            # task.task_type was determined during planning by ToolSelector.
+            # We EXECUTE that decision, we do NOT re-decide here.
+            # 
+            # If you're seeing incorrect tool selection, fix it in:
+            # - ToolSelector (reasoning/selection/tool_selector.py)
+            # - QueryRouter hints (routing/query_router.py)
+            # NOT here at execution time.
             # =========================================================
-            if task.query and isinstance(task.query, dict):
-                selected_tools = task.query.get('selected_tools', []) or task.query.get('tools', [])
-                if selected_tools:
-                    primary_tool = selected_tools[0].lower()
-                    tool_type_map = {
-                        'symbolic': ReasoningType.SYMBOLIC,
-                        'probabilistic': ReasoningType.PROBABILISTIC,
-                        'causal': ReasoningType.CAUSAL,
-                        'analogical': ReasoningType.ANALOGICAL,
-                        'mathematical': ReasoningType.MATHEMATICAL,
-                        'philosophical': ReasoningType.PHILOSOPHICAL,
-                        'world_model': ReasoningType.PHILOSOPHICAL,
-                        'general': ReasoningType.SYMBOLIC,
-                        'multimodal': ReasoningType.MULTIMODAL,
-                    }
-                    if primary_tool in tool_type_map:
-                        original_type = task.task_type
-                        task.task_type = tool_type_map[primary_tool]
-                        logger.info(
-                            f"[UnifiedReasoner] Task {task.task_id}: Overriding task_type "
-                            f"{original_type} → {task.task_type} based on selected_tools={selected_tools}"
-                        )
             
             if task.task_type in self.reasoners:
                 reasoner = self.reasoners[task.task_type]
