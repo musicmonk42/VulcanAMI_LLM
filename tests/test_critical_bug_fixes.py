@@ -316,7 +316,7 @@ class TestPhantomResolutionCircuitBreaker:
         key = f"{gap_type}:{domain}"
         
         # Clear any existing history
-        if key in curiosity_engine._gap_resolution_history:
+        if hasattr(curiosity_engine, '_gap_resolution_history') and key in curiosity_engine._gap_resolution_history:
             del curiosity_engine._gap_resolution_history[key]
         
         # Simulate increasing phantom resolutions
@@ -333,7 +333,8 @@ class TestPhantomResolutionCircuitBreaker:
             
             # Clear suppression and history for next test
             del curiosity_engine._suppressed_gaps[key]
-            curiosity_engine._gap_resolution_history[key] = []
+            if hasattr(curiosity_engine, '_gap_resolution_history'):
+                curiosity_engine._gap_resolution_history[key] = []
             
             # Simulate more resolutions (threshold + 1)
             for i in range(threshold + 1):

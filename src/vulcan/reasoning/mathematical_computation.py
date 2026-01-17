@@ -1853,8 +1853,8 @@ Brief explanation:"""
             if re.search(r'\d', query):  # Has numbers
                 return True
         
-        # Calculus limit notation in natural language: lim x→a
-        if re.search(r'lim.*[→x]', query_lower):
+        # Calculus limit notation in natural language: lim x→a, lim as x approaches
+        if re.search(r'lim.*x\s*→', query_lower) or re.search(r'lim.*as.*x.*approach', query_lower):
             return True
         
         return False
