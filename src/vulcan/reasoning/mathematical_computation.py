@@ -872,20 +872,49 @@ result = simplify(integral)
                         classification, strategy, time.time() - start_time
                     )
 
-                execution_result = execute_math_code(code)
-
+                # FIX Issue #2: Implement retry loop with error feedback
+                # When code generation fails with syntax errors, retry with error feedback
+                MAX_RETRIES = 3
+                for attempt in range(MAX_RETRIES):
+                    execution_result = execute_math_code(code)
+                    
+                    if execution_result["success"]:
+                        # Success - break out of retry loop
+                        break
+                    
+                    # Execution failed
+                    error_msg = execution_result["error"]
+                    logger.info(f"Code execution failed (attempt {attempt + 1}/{MAX_RETRIES}): {error_msg}")
+                    
+                    # If not the last attempt and LLM is available, try to correct the code
+                    if attempt < MAX_RETRIES - 1 and llm is not None:
+                        corrected_code = self._request_code_correction(
+                            query, code, error_msg, llm
+                        )
+                        if corrected_code and corrected_code != code:
+                            logger.info(f"Attempting retry with corrected code (attempt {attempt + 2}/{MAX_RETRIES})")
+                            code = corrected_code
+                            continue
+                    
+                    # Last attempt or LLM not available - try fallback strategy
+                    if attempt == MAX_RETRIES - 1:
+                        logger.info("All retry attempts exhausted, trying fallback strategy")
+                        fallback_result = self._try_fallback(
+                            query, classification, strategy, llm, error_msg
+                        )
+                        if fallback_result and fallback_result.success:
+                            return fallback_result
+                        
+                        return self._create_error_result(
+                            query, code, error_msg,
+                            classification, strategy, time.time() - start_time
+                        )
+                
+                # If we get here without breaking, execution_result must have succeeded
                 if not execution_result["success"]:
-                    logger.info(f"Code execution failed: {execution_result['error']}")
-                    
-                    # Try fallback strategy
-                    fallback_result = self._try_fallback(
-                        query, classification, strategy, llm
-                    )
-                    if fallback_result and fallback_result.success:
-                        return fallback_result
-                    
+                    # Fallback for unexpected flow
                     return self._create_error_result(
-                        query, code, execution_result["error"],
+                        query, code, execution_result.get("error", "Unknown error"),
                         classification, strategy, time.time() - start_time
                     )
 
@@ -1795,25 +1824,133 @@ Brief explanation:"""
         
         return False
 
+    def _request_code_correction(
+        self, 
+        query: str, 
+        failed_code: str, 
+        error_msg: str, 
+        llm
+    ) -> Optional[str]:
+        """
+        FIX Issue #2: Request LLM to correct code based on error feedback.
+        
+        This implements the retry loop error feedback mechanism where the LLM
+        is given the original query, the failed code, and the error message,
+        then asked to generate corrected code.
+        
+        Args:
+            query: Original mathematical query
+            failed_code: The code that failed to execute
+            error_msg: The error message from execution
+            llm: Language model for code correction
+            
+        Returns:
+            Corrected code string, or None if correction fails
+        """
+        if llm is None:
+            return None
+        
+        correction_prompt = f"""{self.CODE_GENERATION_PROMPT}
+
+ERROR CORRECTION REQUEST:
+
+Original Problem: {query}
+
+Failed Code:
+```python
+{failed_code}
+```
+
+Error Message:
+{error_msg}
+
+Please generate CORRECTED Python code that fixes this error. Common issues to check:
+1. Unclosed parentheses: '(' was never closed
+2. Syntax errors: invalid syntax at statement
+3. Undefined variables: name 'X' is not defined
+4. Type errors: unsupported operand type(s)
+5. Import errors: module imports are not allowed (use only pre-imported functions)
+
+Generate ONLY the corrected Python code (no markdown, no explanations):"""
+
+        try:
+            corrected_code = None
+            
+            # Try different LLM interfaces
+            if hasattr(llm, "chat") and hasattr(llm.chat, "completions"):
+                response = llm.chat.completions.create(
+                    model=getattr(llm, "model", DEFAULT_OPENAI_MODEL),
+                    messages=[{"role": "user", "content": correction_prompt}],
+                    max_tokens=self.max_tokens,
+                )
+                corrected_code = response.choices[0].message.content
+                logger.debug("Using OpenAI chat.completions interface for correction")
+                
+            elif hasattr(llm, "invoke"):
+                response = llm.invoke(correction_prompt)
+                corrected_code = response.content if hasattr(response, "content") else str(response)
+                logger.debug("Using LangChain invoke interface for correction")
+                
+            elif hasattr(llm, "generate"):
+                corrected_code = llm.generate(correction_prompt, max_tokens=self.max_tokens)
+                logger.debug("Using generate interface for correction")
+                
+            elif hasattr(llm, "__call__"):
+                corrected_code = llm(correction_prompt)
+                logger.debug("Using callable interface for correction")
+            else:
+                logger.warning("Unknown LLM interface for code correction")
+                return None
+            
+            if corrected_code is None:
+                logger.warning("LLM returned None response for correction")
+                return None
+            
+            # Clean the corrected code
+            return self._clean_code(corrected_code)
+            
+        except Exception as e:
+            logger.warning(f"LLM code correction failed: {e}")
+            return None
+
     def _try_fallback(
         self, 
         query: str, 
         classification: ProblemClassification,
         failed_strategy: SolutionStrategy,
-        llm
+        llm,
+        error_msg: Optional[str] = None
     ) -> Optional[ComputationResult]:
-        """Try alternative strategy if primary fails."""
+        """
+        FIX Issue #2: Try alternative strategy if primary fails.
+        
+        Updated to accept error_msg parameter for better context in fallback attempts.
+        
+        Args:
+            query: Original query
+            classification: Problem classification
+            failed_strategy: Strategy that failed
+            llm: Language model (optional)
+            error_msg: Error message from failed execution (optional)
+            
+        Returns:
+            ComputationResult if fallback succeeds, None otherwise
+        """
         # If LLM failed, try template
         if failed_strategy in [SolutionStrategy.LLM_GENERATED, SolutionStrategy.SYMBOLIC]:
             template_code = self._generate_template_code(query, classification)
             if template_code and SAFE_EXECUTION_AVAILABLE and execute_math_code:
                 result = execute_math_code(template_code)
                 if result["success"]:
+                    explanation = f"Solved using template approach. Result: {result['result']}"
+                    if error_msg:
+                        explanation += f"\n(Original error: {error_msg})"
+                    
                     return ComputationResult(
                         success=True,
                         code=template_code,
                         result=str(result["result"]),
-                        explanation=f"Solved using template approach. Result: {result['result']}",
+                        explanation=explanation,
                         tool=self.name,
                         problem_type=classification.problem_type,
                         strategy=SolutionStrategy.TEMPLATE,

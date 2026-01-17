@@ -1931,6 +1931,45 @@ class ProbabilisticReasoner(EnhancedProbabilisticReasoner):
         # =====================================================================
         # TIER 3: COMMON PROBABILITY SCENARIOS
         # =====================================================================
+        # FIX Issue #1: Enhanced scenario-based detection for classic problems
+        # Check for multi-keyword combinations that indicate probability scenarios
+        # even without explicit "probability" keywords
+        
+        # Monty Hall scenario: doors + (choose/pick/select) + (switch/stay/change)
+        has_doors = bool(re.search(r'\bdoors?\b', query_lower))
+        has_choose = bool(re.search(r'\b(choose|pick|select|chose|picked|selected)\b', query_lower))
+        has_switch = bool(re.search(r'\b(switch|stay|change|switched|stayed|changed)\b', query_lower))
+        has_host = bool(re.search(r'\bhost\b', query_lower))
+        has_open = bool(re.search(r'\b(open|opens|opened|reveal|reveals|revealed|show|shows|showed)\b', query_lower))
+        
+        # Monty Hall: needs doors + (choose OR pick) + (switch OR stay)
+        # OR doors + host + (open OR reveal)
+        if has_doors and ((has_choose and has_switch) or (has_host and has_open)):
+            logger.debug(f"[ProbabilisticReasoner] Gate check PASS: Monty Hall scenario detected (doors + choose/switch or doors + host/open)")
+            return True
+        
+        # Card drawing scenario: cards/deck + draw/drawn
+        has_cards = bool(re.search(r'\b(card|cards|deck)\b', query_lower))
+        has_draw = bool(re.search(r'\b(draw|drawing|drawn|dealt|deal)\b', query_lower))
+        if has_cards and has_draw:
+            logger.debug(f"[ProbabilisticReasoner] Gate check PASS: Card probability scenario detected (cards + draw)")
+            return True
+        
+        # Dice rolling scenario: dice/die + roll
+        has_dice = bool(re.search(r'\b(dice|die)\b', query_lower))
+        has_roll = bool(re.search(r'\b(roll|rolling|rolled)\b', query_lower))
+        if has_dice and has_roll:
+            logger.debug(f"[ProbabilisticReasoner] Gate check PASS: Dice probability scenario detected (dice + roll)")
+            return True
+        
+        # Coin flipping scenario: coin + flip/toss
+        has_coin = bool(re.search(r'\b(coin|coins)\b', query_lower))
+        has_flip = bool(re.search(r'\b(flip|flipping|flipped|toss|tossing|tossed)\b', query_lower))
+        if has_coin and has_flip:
+            logger.debug(f"[ProbabilisticReasoner] Gate check PASS: Coin probability scenario detected (coin + flip)")
+            return True
+        
+        # Now check individual scenario keywords (fallback)
         scenario_patterns = [
             # Coin scenarios
             (r'\bcoin\b', 'coin'),
