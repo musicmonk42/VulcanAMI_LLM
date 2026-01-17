@@ -5693,6 +5693,61 @@ class QueryAnalyzer:
                 return tool_hints
         
         # ============================================================
+        # FIX Issue #3: Natural Language Logic Queries
+        # ============================================================
+        # Detect natural language queries about logical reasoning
+        # Examples: "Birds fly. Penguins are birds. Do penguins fly?"
+        # These should route to world_model with LLM knowledge instead of
+        # symbolic reasoner with empty knowledge base (which returns confidence=0.1)
+        
+        # Detection patterns for natural language logic:
+        # 1. Multiple declarative statements followed by a question
+        # 2. Logical relationships: "if X then Y", "all X are Y", "X implies Y"
+        # 3. Common logic terms: "all", "some", "none", "every", "any"
+        
+        logic_relationship_keywords = [
+            'all', 'some', 'none', 'every', 'any', 'if', 'then',
+            'implies', 'therefore', 'thus', 'hence', 'because',
+            'always', 'never', 'sometimes', 'necessarily', 'possibly'
+        ]
+        
+        # Count declarative statements (sentences ending with period, not question mark)
+        declarative_count = query_lower.count('.') - query_lower.count('?.')
+        # Count questions
+        question_count = query_lower.count('?')
+        # Count logic relationship keywords
+        logic_keyword_count = sum(1 for kw in logic_relationship_keywords if f' {kw} ' in f' {query_lower} ')
+        
+        # Heuristic: If query has multiple statements + question + logic keywords,
+        # it's likely a natural language logic query
+        is_nl_logic_query = (
+            declarative_count >= 2 and  # At least 2 declarative statements
+            question_count >= 1 and     # At least 1 question
+            logic_keyword_count >= 1    # At least 1 logic keyword
+        )
+        
+        # Additional check: common natural language logic patterns
+        nl_logic_patterns = [
+            r'\b(all|every)\s+\w+\s+(are|is|can|do|have)\b',  # "All birds fly", "Every dog barks"
+            r'\b(some|any)\s+\w+\s+(are|is|can|do|have)\b',   # "Some birds swim"
+            r'\b(no|none)\s+\w+\s+(are|is|can|do|have)\b',    # "No fish fly"
+            r'\bif\s+.+\s+then\b',                             # "If X then Y"
+            r'\b\w+\s+implies?\s+\w+\b',                       # "X implies Y"
+        ]
+        
+        has_nl_logic_pattern = any(re.search(pattern, query_lower) for pattern in nl_logic_patterns)
+        
+        if is_nl_logic_query or has_nl_logic_pattern:
+            logger.info(
+                f"[QueryRouter._select_reasoning_tools] FIX Issue #3: Natural language logic query detected → "
+                f"world_model hint 0.85 (avoids symbolic reasoner with empty KB)"
+            )
+            tool_hints['world_model'] = 0.85  # Strong suggestion for world_model
+            tool_hints['symbolic'] = 0.2      # Weak fallback (might have formal logic too)
+            tool_hints['philosophical'] = 0.3  # Moderate fallback (might involve reasoning)
+            return tool_hints
+        
+        # ============================================================
         # PRIORITY 2: Causal Queries
         # ============================================================
         # Causal queries need causal inference engine
