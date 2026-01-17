@@ -14,6 +14,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 # Import the components we're testing
+IMPORTS_AVAILABLE = False
 try:
     from vulcan.reasoning.unified.orchestrator import UnifiedReasoner
     from vulcan.reasoning.unified.config import (
@@ -24,17 +25,19 @@ try:
     )
     from vulcan.reasoning.reasoning_types import ReasoningResult, ReasoningType
     from vulcan.reasoning.unified.types import ReasoningTask
+    IMPORTS_AVAILABLE = True
 except ImportError as e:
     print(f"Warning: Could not import required modules: {e}")
-    print("Skipping tests...")
-    # Create dummy test class
-    class TestCacheValidationAndSelfRef(unittest.TestCase):
-        def test_skip(self):
-            self.skipTest("Required modules not available")
-    
-    if __name__ == "__main__":
-        unittest.main()
-    raise SystemExit(0)
+    print("Tests will be skipped...")
+    # Set dummy classes to avoid NameError
+    UnifiedReasoner = None
+    ReasoningResult = None
+    ReasoningType = None
+    ReasoningTask = None
+    CACHE_MAX_AGE_SECONDS = 300.0
+    CONFIDENCE_FLOOR_NO_RESULT = 0.15
+    SELF_REFERENTIAL_MIN_CONFIDENCE = 0.6
+    SELF_REFERENTIAL_PATTERNS = []
 
 # Helper function to check if query is self-referential
 # This wraps the UnifiedReasoner._is_self_referential_query method
@@ -48,6 +51,8 @@ def is_self_referential(query):
     Returns:
         bool: True if self-referential, False otherwise
     """
+    if not IMPORTS_AVAILABLE or UnifiedReasoner is None:
+        return False
     # Create a minimal reasoner instance for detection
     reasoner = UnifiedReasoner(
         enable_learning=False,
@@ -68,6 +73,8 @@ class TestCacheValidation(unittest.TestCase):
     
     def setUp(self):
         """Set up test fixtures."""
+        if not IMPORTS_AVAILABLE:
+            self.skipTest("Required modules not available")
         # Create a reasoner with minimal config
         self.config = {
             'skip_runtime': True,
@@ -238,6 +245,11 @@ class TestCacheValidation(unittest.TestCase):
 class TestSelfReferentialDetection(unittest.TestCase):
     """Test self-referential query detection."""
     
+    def setUp(self):
+        """Set up test - skip if imports not available."""
+        if not IMPORTS_AVAILABLE:
+            self.skipTest("Required modules not available")
+    
     def test_self_referential_query_would_you(self):
         """Test detection of 'would you' pattern."""
         query = "if you were given the chance to become self-aware would you take it?"
@@ -292,6 +304,8 @@ class TestSelfReferentialQueryHandling(unittest.TestCase):
     
     def setUp(self):
         """Set up test fixtures."""
+        if not IMPORTS_AVAILABLE:
+            self.skipTest("Required modules not available")
         self.config = {
             'skip_runtime': True,
             'cache_config': {'cleanup_interval': 0.05}
@@ -396,6 +410,8 @@ class TestCacheStorageLogic(unittest.TestCase):
     
     def setUp(self):
         """Set up test fixtures."""
+        if not IMPORTS_AVAILABLE:
+            self.skipTest("Required modules not available")
         self.config = {
             'skip_runtime': True,
             'cache_config': {'cleanup_interval': 0.05}
