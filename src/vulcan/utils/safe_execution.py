@@ -28,7 +28,7 @@ import re
 import threading
 import unicodedata
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -809,24 +809,24 @@ class SafeCodeExecutor:
                         "retry_count": retry_count,
                     }
 
-            except Exception as e:
-                # Get output even on error
-                output = ""
-                for key, value in execution_namespace.items():
-                    if isinstance(value, _SafePrintCollector):
-                        output = value()
-                        break
+                except Exception as e:
+                    # Get output even on error
+                    output = ""
+                    for key, value in execution_namespace.items():
+                        if isinstance(value, _SafePrintCollector):
+                            output = value()
+                            break
 
-                error_msg = f"{type(e).__name__}: {e}"
-                logger.warning(f"[{exec_id}] Execution error: {error_msg}")
-                return {
-                    "success": False,
-                    "result": None,
-                    "error": error_msg,
-                    "output": output,
-                    "namespace": {},
-                    "retry_count": retry_count,
-                }
+                    error_msg = f"{type(e).__name__}: {e}"
+                    logger.warning(f"[{exec_id}] Execution error: {error_msg}")
+                    return {
+                        "success": False,
+                        "result": None,
+                        "error": error_msg,
+                        "output": output,
+                        "namespace": {},
+                        "retry_count": retry_count,
+                    }
 
             # Execute with timeout using ThreadPoolExecutor (CROSS-PLATFORM)
             # Industry Standard: Use thread pool for timeout enforcement
