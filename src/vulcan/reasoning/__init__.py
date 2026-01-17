@@ -351,8 +351,6 @@ __all__ = [
     "MultiModalReasoningEngine",
     "MultimodalReasoner",
     "CrossModalReasoner",  # ADDED: Export CrossModalReasoner
-    "PhilosophicalReasoner",  # DEPRECATED: Returns None, use World Model
-    "is_philosophical_query",  # DEPRECATED: Returns None
     # ===== Note: Cryptographic Engine =====
     "CryptographicEngine",
     "CryptoOperation",
