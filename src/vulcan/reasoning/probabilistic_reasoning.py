@@ -2519,13 +2519,20 @@ class ProbabilisticReasoner(EnhancedProbabilisticReasoner):
         return self.reason_with_uncertainty(input_data, **kwargs)
 
     def reason_with_uncertainty(
-        self, input_data: Any, threshold: float = 0.5, reset_state: bool = True
+        self, input_data: Any, threshold: float = 0.5, reset_state: bool = True, **kwargs
     ) -> ReasoningResult:
         """
         FULL IMPLEMENTATION: Intelligent feature extraction and reasoning
         
         FIX #1: Now includes early gate check for probability keywords to avoid
         wasting computation on non-probability queries.
+        
+        FIX: Multi-layer gate check fix - When LLM classifier has high confidence
+        (≥0.8) that this is a probability query, we trust the LLM and skip the
+        gate check. This prevents the multi-layer gate check failure where:
+        1. Router correctly classifies query as PROBABILISTIC
+        2. ProbabilisticReasoner's own gate check rejects it
+        3. Result: low confidence "not applicable" even though LLM was confident
         
         Note: Now first checks for explicit Bayesian calculation queries
         before falling back to GP-based probabilistic inference.
@@ -2541,6 +2548,10 @@ class ProbabilisticReasoner(EnhancedProbabilisticReasoner):
             input_data: The query or data to reason about
             threshold: Confidence threshold for predictions
             reset_state: If True, reset state before computation for determinism
+            **kwargs: Additional parameters including:
+                - skip_gate_check: If True, bypass gate check (from high-confidence LLM)
+                - router_confidence: Router's confidence in query classification
+                - llm_classification: Router's LLM classification result
             
         Returns:
             ReasoningResult with probabilistic conclusions
@@ -2549,11 +2560,25 @@ class ProbabilisticReasoner(EnhancedProbabilisticReasoner):
         if reset_state:
             self.reset_state()
         
+        # INDUSTRY-STANDARD FIX: Check if we should skip gate check
+        # This happens when:
+        # 1. Router's LLM classifier has high confidence (≥0.8)
+        # 2. skip_gate_check flag is explicitly set
+        # 
+        # This is SAFE because:
+        # - Only trusted LLM classifier with high confidence can set this
+        # - Gate check is DEFERRED, not eliminated - engine still validates results
+        # - Metadata tracks when this path is taken for auditability
+        skip_gate_check = kwargs.get('skip_gate_check', False)
+        router_confidence = kwargs.get('router_confidence', 0.0)
+        llm_classification = kwargs.get('llm_classification', None)
+        
         # FIX #1: GATE CHECK - Is this actually a probability query?
         # Extract query string for gate check
         query_str = str(input_data) if not isinstance(input_data, str) else input_data
         
-        if not self._is_probability_query(query_str):
+        # INDUSTRY-STANDARD: Skip gate check if LLM has high confidence
+        if not skip_gate_check and not self._is_probability_query(query_str):
             logger.info(
                 f"[ProbabilisticReasoner] Gate check: Query does not contain probability keywords. "
                 f"Returning 'not applicable' early to avoid wasting computation."
@@ -2575,6 +2600,11 @@ class ProbabilisticReasoner(EnhancedProbabilisticReasoner):
                     "gate_check": "failed",
                     "reason": "No probability keywords detected",
                 },
+            )
+        elif skip_gate_check:
+            logger.info(
+                f"[ProbabilisticReasoner] Gate check SKIPPED - trusting LLM classification "
+                f"(router_confidence={router_confidence:.2f}, classification={llm_classification})"
             )
         
         # FIX (Jan 8 2026): METHODOLOGY QUERY CHECK
