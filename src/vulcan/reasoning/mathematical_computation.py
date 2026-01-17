@@ -1845,7 +1845,7 @@ Brief explanation:"""
         ]
         if any(kw in query_lower for kw in bayes_keywords):
             if re.search(r'\d+\.\d+', query):  # Has decimal numbers
-                logger.info(f"[MathTool] BUG A FIX: Detected Bayesian keyword with numerical data")
+                logger.info("[MathTool] BUG A FIX: Detected Bayesian keyword with numerical data")
                 return True
         
         # BUG A FIX: Natural language mathematical commands
@@ -1859,7 +1859,7 @@ Brief explanation:"""
             'derive the formula', 'find the formula'
         ]
         if any(cmd in query_lower for cmd in natural_math_commands):
-            logger.info(f"[MathTool] BUG A FIX: Detected natural language math command")
+            logger.info("[MathTool] BUG A FIX: Detected natural language math command")
             return True
         
         # BUG A FIX: Enhanced summation detection with unicode handling
@@ -1868,11 +1868,11 @@ Brief explanation:"""
         if '∑' in query:
             # Look for summation patterns: ∑...to, ∑...from...to, ∑(expression)
             if re.search(r'∑.*\bto\b', query_lower) or re.search(r'∑.*\bfrom\b.*\bto\b', query_lower):
-                logger.info(f"[MathTool] BUG A FIX: Detected summation with bounds (∑...from...to)")
+                logger.info("[MathTool] BUG A FIX: Detected summation with bounds (∑...from...to)")
                 return True
             # Also accept bare summation symbol with variables/numbers
             if re.search(r'∑\s*[\(\[]?[a-z0-9]', query_lower):
-                logger.info(f"[MathTool] BUG A FIX: Detected summation expression")
+                logger.info("[MathTool] BUG A FIX: Detected summation expression")
                 return True
         
         # Mathematical verification with calculus terms
@@ -1881,7 +1881,7 @@ Brief explanation:"""
         calculus_keywords = ['differentiable', 'continuous', 'limit', 'derivative', 'integral', 'lim']
         if any(kw in query_lower for kw in verification_keywords):
             if any(calc in query_lower for calc in calculus_keywords):
-                logger.info(f"[MathTool] BUG A FIX: Detected verification with calculus terms")
+                logger.info("[MathTool] BUG A FIX: Detected verification with calculus terms")
                 return True
         
         # Optimization/constraint problems with mathematical notation (e.g., E > E_safe)

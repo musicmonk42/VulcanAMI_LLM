@@ -4246,7 +4246,9 @@ class UnifiedReasoner:
                         extraction_method = None
                         
                         # Priority 1: Use formatted_output if it's a non-empty string
-                        if isinstance(formatted_output, str) and formatted_output.strip():
+                        # Industry Standard: Cache .strip() result to avoid redundant operations
+                        formatted_output_stripped = formatted_output.strip() if isinstance(formatted_output, str) else ""
+                        if formatted_output_stripped:
                             user_conclusion = formatted_output
                             extraction_method = "formatted_output"
                         

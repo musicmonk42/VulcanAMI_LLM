@@ -88,7 +88,7 @@ class TestBugA_MathematicalPatternRecognition:
         
         for query in queries:
             is_math = tool._is_genuinely_mathematical(query)
-            assert is_math, f"Bayesian query should be mathematical: {query[:50]}..."
+            assert is_math, f"Bayesian query should be mathematical: {query!r}"
         
         logger.info("✓ All Bayesian keyword queries correctly recognized")
     
@@ -107,7 +107,7 @@ class TestBugA_MathematicalPatternRecognition:
         
         for query in queries:
             is_math = tool._is_genuinely_mathematical(query)
-            assert is_math, f"Summation query should be mathematical: {query[:50]}..."
+            assert is_math, f"Summation query should be mathematical: {query!r}"
         
         logger.info("✓ All summation queries with ∑ correctly recognized")
     
@@ -130,7 +130,7 @@ class TestBugA_MathematicalPatternRecognition:
         
         for query in queries:
             is_math = tool._is_genuinely_mathematical(query)
-            assert is_math, f"Natural language math command should be mathematical: {query[:50]}..."
+            assert is_math, f"Natural language math command should be mathematical: {query!r}"
         
         logger.info("✓ All natural language math commands correctly recognized")
     
@@ -150,7 +150,7 @@ class TestBugA_MathematicalPatternRecognition:
         
         for query in queries:
             is_math = tool._is_genuinely_mathematical(query)
-            assert is_math, f"Verification with calculus should be mathematical: {query[:50]}..."
+            assert is_math, f"Verification with calculus should be mathematical: {query!r}"
         
         logger.info("✓ All proof verification queries correctly recognized")
     
@@ -170,7 +170,7 @@ class TestBugA_MathematicalPatternRecognition:
         
         for query in non_math_queries:
             is_math = tool._is_genuinely_mathematical(query)
-            assert not is_math, f"Non-math query should be rejected: {query[:50]}..."
+            assert not is_math, f"Non-math query should be rejected: {query!r}"
         
         logger.info("✓ All non-mathematical queries correctly rejected")
 
