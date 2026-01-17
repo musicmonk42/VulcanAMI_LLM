@@ -2828,14 +2828,26 @@ class AgentPoolManager:
             router_tool_name = None
             
             # Method 0: Check task object directly (HIGHEST PRIORITY - Router sets these)
-            # BUG FIX #1: The router sets reasoning_type and tool_name on the task object,
-            # but the agent pool was only checking graph and parameters. This caused
-            # "COMMAND PATTERN VIOLATION" errors. Now we check the task object FIRST.
-            # Industry Standard: Single Source of Truth - task object carries router's decision
+            # BUG C FIX: Router passes reasoning_type/tool_name in task["parameters"] dict
+            # but code was only checking task attributes with hasattr(). Added dict access first.
+            # Industry Standard: Single Source of Truth - task parameters carry router's decision
             if task is not None:
-                if hasattr(task, 'reasoning_type') and task.reasoning_type:
+                # BUG C FIX: Priority 0a - Check task["parameters"] dict (router sets these)
+                task_params = task.get("parameters", {}) if isinstance(task, dict) else {}
+                if task_params:
+                    if not router_reasoning_type and "reasoning_type" in task_params:
+                        router_reasoning_type = task_params.get("reasoning_type")
+                        logger.debug(f"[BUG C FIX] Found reasoning_type in task.parameters: {router_reasoning_type}")
+                    if not router_tool_name:
+                        # Check both tool_name and selected_tool variants
+                        router_tool_name = task_params.get("tool_name") or task_params.get("selected_tool")
+                        if router_tool_name:
+                            logger.debug(f"[BUG C FIX] Found tool_name in task.parameters: {router_tool_name}")
+                
+                # Priority 0b - Check task object attributes (backward compatibility)
+                if hasattr(task, 'reasoning_type') and task.reasoning_type and not router_reasoning_type:
                     router_reasoning_type = task.reasoning_type
-                if hasattr(task, 'tool_name') and task.tool_name:
+                if hasattr(task, 'tool_name') and task.tool_name and not router_tool_name:
                     router_tool_name = task.tool_name
             
             # Method 1: Check if routing instructions are in graph metadata (new path)

@@ -1825,22 +1825,63 @@ Brief explanation:"""
         # BUG FIX #2: Enhanced natural language mathematical query detection
         # These patterns recognize mathematical queries that don't use literal arithmetic syntax
         
-        # Bayesian/probability problems: P(X|Y) notation
+        # Bayesian/probability problems: P(X|Y) notation with conditional bar
+        # BUG A FIX: Enhanced to detect P(X|Y) conditional probability notation
+        if re.search(r'P\s*\([^)]+\|[^)]+\)', query):
+            logger.info("[MathTool] BUG A FIX: Detected Bayesian conditional probability P(X|Y) notation")
+            return True
+        
+        # Also check for P(X) without conditional (simpler probability)
         if re.search(r'P\s*\([^)]+\)', query):
             return True
         
-        # Bayesian/probability keywords with decimal numbers (e.g., sensitivity 0.99)
-        bayes_keywords = ['bayes', 'sensitivity', 'specificity', 'prevalence', 'posterior', 
-                          'prior', 'likelihood', 'conditional probability']
+        # BUG A FIX: Expanded Bayesian/probability keywords with decimal numbers
+        # Added 'bayes theorem', 'bayes rule', and standalone probability terms
+        bayes_keywords = [
+            'bayes', "bayes'", "bayes's", 'bayesian', 'bayes theorem', 'bayes rule',
+            'sensitivity', 'specificity', 'prevalence', 'posterior', 
+            'prior', 'likelihood', 'conditional probability',
+            'false positive', 'false negative', 'true positive', 'true negative'
+        ]
         if any(kw in query_lower for kw in bayes_keywords):
             if re.search(r'\d+\.\d+', query):  # Has decimal numbers
+                logger.info(f"[MathTool] BUG A FIX: Detected Bayesian keyword with numerical data")
+                return True
+        
+        # BUG A FIX: Natural language mathematical commands
+        # These indicate explicit mathematical computation requests
+        natural_math_commands = [
+            'compute exactly', 'calculate exactly', 'evaluate exactly',
+            'compute the', 'calculate the', 'evaluate the',
+            'show steps', 'show all steps', 'show the steps',
+            'verify by induction', 'prove by induction', 'proof by induction',
+            'closed form', 'closed-form', 'closed form solution',
+            'derive the formula', 'find the formula'
+        ]
+        if any(cmd in query_lower for cmd in natural_math_commands):
+            logger.info(f"[MathTool] BUG A FIX: Detected natural language math command")
+            return True
+        
+        # BUG A FIX: Enhanced summation detection with unicode handling
+        # Matches patterns like "∑(2k-1) from k=1 to n" or "∑ ... to ..."
+        # Also handles line breaks and fragmentation in the summation expression
+        if '∑' in query:
+            # Look for summation patterns: ∑...to, ∑...from...to, ∑(expression)
+            if re.search(r'∑.*\bto\b', query_lower) or re.search(r'∑.*\bfrom\b.*\bto\b', query_lower):
+                logger.info(f"[MathTool] BUG A FIX: Detected summation with bounds (∑...from...to)")
+                return True
+            # Also accept bare summation symbol with variables/numbers
+            if re.search(r'∑\s*[\(\[]?[a-z0-9]', query_lower):
+                logger.info(f"[MathTool] BUG A FIX: Detected summation expression")
                 return True
         
         # Mathematical verification with calculus terms
-        verification_keywords = ['verify', 'proof check', 'mathematical verification', 'valid', 'invalid']
+        # BUG A FIX: Enhanced to catch "verify" with broader mathematical terms
+        verification_keywords = ['verify', 'proof check', 'mathematical verification', 'valid', 'invalid', 'check']
         calculus_keywords = ['differentiable', 'continuous', 'limit', 'derivative', 'integral', 'lim']
         if any(kw in query_lower for kw in verification_keywords):
             if any(calc in query_lower for calc in calculus_keywords):
+                logger.info(f"[MathTool] BUG A FIX: Detected verification with calculus terms")
                 return True
         
         # Optimization/constraint problems with mathematical notation (e.g., E > E_safe)
