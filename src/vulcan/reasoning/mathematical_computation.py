@@ -1822,6 +1822,41 @@ Brief explanation:"""
                                    re.search(r'[+\-*/^()²³]', query))
             return has_math_content
         
+        # BUG FIX #2: Enhanced natural language mathematical query detection
+        # These patterns recognize mathematical queries that don't use literal arithmetic syntax
+        
+        # Bayesian/probability problems: P(X|Y) notation
+        if re.search(r'P\s*\([^)]+\)', query):
+            return True
+        
+        # Bayesian/probability keywords with decimal numbers (e.g., sensitivity 0.99)
+        bayes_keywords = ['bayes', 'sensitivity', 'specificity', 'prevalence', 'posterior', 
+                          'prior', 'likelihood', 'conditional probability']
+        if any(kw in query_lower for kw in bayes_keywords):
+            if re.search(r'\d+\.\d+', query):  # Has decimal numbers
+                return True
+        
+        # Mathematical verification with calculus terms
+        verification_keywords = ['verify', 'proof check', 'mathematical verification', 'valid', 'invalid']
+        calculus_keywords = ['differentiable', 'continuous', 'limit', 'derivative', 'integral', 'lim']
+        if any(kw in query_lower for kw in verification_keywords):
+            if any(calc in query_lower for calc in calculus_keywords):
+                return True
+        
+        # Optimization/constraint problems with mathematical notation (e.g., E > E_safe)
+        if re.search(r'[A-Z]\s*[<>=]+\s*[A-Z]', query):
+            return True
+        
+        # Optimization keywords with numerical constraints
+        optimization_keywords = ['maximize', 'minimize', 'constraint', 'permissible', 'optimal']
+        if any(kw in query_lower for kw in optimization_keywords):
+            if re.search(r'\d', query):  # Has numbers
+                return True
+        
+        # Calculus limit notation in natural language: lim x→a, lim as x approaches
+        if re.search(r'lim.*x\s*→', query_lower) or re.search(r'lim.*as.*x.*approach', query_lower):
+            return True
+        
         return False
 
     def _request_code_correction(

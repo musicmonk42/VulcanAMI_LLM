@@ -2827,11 +2827,25 @@ class AgentPoolManager:
             router_reasoning_type = None
             router_tool_name = None
             
+            # Method 0: Check task object directly (HIGHEST PRIORITY - Router sets these)
+            # BUG FIX #1: The router sets reasoning_type and tool_name on the task object,
+            # but the agent pool was only checking graph and parameters. This caused
+            # "COMMAND PATTERN VIOLATION" errors. Now we check the task object FIRST.
+            # Industry Standard: Single Source of Truth - task object carries router's decision
+            if task is not None:
+                if hasattr(task, 'reasoning_type') and task.reasoning_type:
+                    router_reasoning_type = task.reasoning_type
+                if hasattr(task, 'tool_name') and task.tool_name:
+                    router_tool_name = task.tool_name
+            
             # Method 1: Check if routing instructions are in graph metadata (new path)
             # Type safety: Validate graph is dict before accessing as dict
-            if isinstance(graph, dict):
-                router_reasoning_type = graph.get("reasoning_type")
-                router_tool_name = graph.get("tool_name")
+            if not router_reasoning_type or not router_tool_name:
+                if isinstance(graph, dict):
+                    if not router_reasoning_type:
+                        router_reasoning_type = graph.get("reasoning_type")
+                    if not router_tool_name:
+                        router_tool_name = graph.get("tool_name")
             
             # Method 2: Check parameters (backward compatibility)
             if not router_reasoning_type:
