@@ -1472,7 +1472,7 @@ class GraphixArena:
                 logger.warning(f"DistributedSharder initialization failed: {e}")
                 self.sharder = None
         else:
-            logger.warning("⚠️ DistributedSharder not available - large tensor handling limited")
+            logger.info("⚠️ DistributedSharder not available - large tensor handling limited")
 
         # Initialize interpretability components
         self.interpret_engine = (
