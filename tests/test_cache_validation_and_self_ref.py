@@ -24,7 +24,6 @@ try:
     )
     from vulcan.reasoning.reasoning_types import ReasoningResult, ReasoningType
     from vulcan.reasoning.unified.types import ReasoningTask
-    from vulcan.reasoning.integration.query_analysis import is_self_referential
 except ImportError as e:
     print(f"Warning: Could not import required modules: {e}")
     print("Skipping tests...")
@@ -36,6 +35,32 @@ except ImportError as e:
     if __name__ == "__main__":
         unittest.main()
     raise SystemExit(0)
+
+# Helper function to check if query is self-referential
+# This wraps the UnifiedReasoner._is_self_referential_query method
+def is_self_referential(query):
+    """
+    Check if a query is self-referential using UnifiedReasoner's detection logic.
+    
+    Args:
+        query: Query string or dict to check
+        
+    Returns:
+        bool: True if self-referential, False otherwise
+    """
+    # Create a minimal reasoner instance for detection
+    reasoner = UnifiedReasoner(
+        enable_learning=False,
+        enable_safety=False,
+        max_workers=1,
+        config={'skip_runtime': True}
+    )
+    try:
+        result = reasoner._is_self_referential_query(query)
+        return result
+    finally:
+        # Clean up the reasoner
+        reasoner.shutdown(timeout=1.0, skip_save=True)
 
 
 class TestCacheValidation(unittest.TestCase):
