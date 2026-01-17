@@ -1469,6 +1469,10 @@ class CuriosityEngine:
         self.PHANTOM_RESOLUTION_WINDOW = 3600  # 1 hour window for counting phantom resolutions
         # Note: Phantom Resolution Loop - extended cooldown for gaps that keep returning
         self.PHANTOM_GAP_COOLDOWN_SECONDS = 3600  # 1 hour cooldown for phantom gaps
+        # BUG FIX #3: Circuit breaker for phantom resolutions
+        # Track suppressed gaps to prevent infinite loop of same gap being re-injected
+        # key -> timestamp when suppression expires
+        self._suppressed_gaps: Dict[str, float] = {}
         # Note: Learning System Give-Up Threshold
         # Increased from 3 to 10 - don't mark gaps as "resolved" after only 3 failures
         # Use environment variable to configure: VULCAN_GAP_GIVEUP_THRESHOLD
@@ -1865,7 +1869,23 @@ class CuriosityEngine:
         except Exception:
             recent_resolutions = len(self._gap_resolution_history[key])
         
+        # BUG FIX #3: Phantom resolution circuit breaker
         if recent_resolutions >= self.PHANTOM_RESOLUTION_THRESHOLD:
+            # Calculate exponential backoff: 2^(resolutions - threshold) hours
+            # 3 resolutions -> 1 hour, 4 -> 2 hours, 5 -> 4 hours, etc.
+            backoff_hours = 2 ** (recent_resolutions - self.PHANTOM_RESOLUTION_THRESHOLD)
+            backoff_seconds = min(backoff_hours * 3600, 24 * 3600)  # Cap at 24 hours
+            
+            logger.error(
+                f"[CuriosityEngine] PHANTOM RESOLUTION CIRCUIT BREAKER: "
+                f"Gap {key} 'resolved' {recent_resolutions}x in last hour. "
+                f"SUPPRESSING this gap type for {backoff_hours} hours to prevent infinite loop."
+            )
+            
+            # Suppress the gap for the calculated backoff period
+            self._suppressed_gaps[key] = time.time() + backoff_seconds
+        elif recent_resolutions > 1:
+            # Still log warning for tracking, but don't suppress yet
             logger.warning(
                 f"[CuriosityEngine] PHANTOM RESOLUTION: Gap {key} 'resolved' {recent_resolutions}x "
                 f"in last hour - underlying issue likely NOT fixed"
@@ -2392,6 +2412,8 @@ class CuriosityEngine:
         When the system can't find real gaps and enters dormant mode, this generates
         synthetic gaps to maintain continuous learning and exploration.
         
+        BUG FIX #3: Check suppressed gaps to prevent phantom resolution loop.
+        
         Returns:
             List of synthetic knowledge gaps for exploration
         """
@@ -2406,9 +2428,28 @@ class CuriosityEngine:
                 ("unexplored_domains", "Explore underutilized reasoning capabilities"),
             ]
             
+            current_time = time.time()
+            
             for domain, description in synthetic_domains:
+                # BUG FIX #3: Check if this gap type is suppressed (phantom resolution)
+                gap_type = "exploration"
+                key = f"{gap_type}:{domain}"
+                
+                if key in self._suppressed_gaps:
+                    if current_time < self._suppressed_gaps[key]:
+                        # Still suppressed, skip this gap
+                        suppression_remaining = int((self._suppressed_gaps[key] - current_time) / 60)
+                        logger.debug(
+                            f"[CuriosityEngine] Skipping suppressed gap {key} "
+                            f"({suppression_remaining} minutes remaining)"
+                        )
+                        continue
+                    else:
+                        # Suppression expired, remove from suppressed list
+                        del self._suppressed_gaps[key]
+                
                 gap = KnowledgeGap(
-                    type="exploration",
+                    type=gap_type,
                     domain=domain,
                     priority=0.4,
                     estimated_cost=10.0,
@@ -2416,10 +2457,15 @@ class CuriosityEngine:
                 )
                 synthetic_gaps.append(gap)
             
-            logger.info(
-                f"[CuriosityEngine] FIX OPERATIONAL: Injected {len(synthetic_gaps)} "
-                f"synthetic gaps to prevent dormancy"
-            )
+            if synthetic_gaps:
+                logger.info(
+                    f"[CuriosityEngine] FIX OPERATIONAL: Injected {len(synthetic_gaps)} "
+                    f"synthetic gaps to prevent dormancy"
+                )
+            else:
+                logger.info(
+                    "[CuriosityEngine] All synthetic gaps are suppressed due to phantom resolutions"
+                )
             
             return synthetic_gaps
         except Exception as e:
