@@ -723,6 +723,7 @@ jobs:
 
           # Run perf tests with pytest
           # Capture output to file without using pipe/tee to prevent buffering issues
+          PERF_EXIT=0
           pytest tests/perf/ \
             -m "perf or boundedness" \
             -v \
@@ -734,7 +735,6 @@ jobs:
           # Display the log content to GitHub Actions console
           cat logs/perf-test-output.log
           
-          PERF_EXIT=${PERF_EXIT:-0}
           echo "perf_exit_code=$PERF_EXIT" >> $GITHUB_OUTPUT
           exit $PERF_EXIT
 
