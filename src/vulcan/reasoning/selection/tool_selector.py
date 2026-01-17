@@ -3913,11 +3913,14 @@ class MathematicalToolWrapper:
         """
         Execute mathematical computation on the problem.
         
+        BUG FIX #4: Added early gate check to reject non-mathematical queries.
+        This prevents logical/philosophical queries from being sent to MathTool.
+        
         Args:
             problem: Dict with query, or string query
             
         Returns:
-            Dict with computation result and confidence
+            Dict with computation result and confidence, or rejection if not mathematical
         """
         start_time = time.perf_counter()
         
@@ -3929,6 +3932,26 @@ class MathematicalToolWrapper:
                 query = problem.get("query") or problem.get("text") or problem.get("problem", "")
             else:
                 query = str(problem)
+            
+            # BUG FIX #4: Early Gate Check - Reject non-mathematical queries
+            # Industry Standard: Fail-fast at component boundaries
+            # This prevents queries like "with exceptions (nonmonotonic-ish)" from reaching MathTool
+            if not self._is_mathematical_query(query):
+                execution_time = (time.perf_counter() - start_time) * 1000
+                logger.info(
+                    f"[MathematicalEngine] Gate check REJECTED query (not mathematical): "
+                    f"'{query[:100]}...' - Returning low confidence (0.0) to trigger tool re-selection"
+                )
+                return {
+                    "tool": self.name,
+                    "result": None,
+                    "confidence": 0.0,  # Low confidence triggers fallback to other tools
+                    "success": False,
+                    "applicable": False,  # Flag indicating query not applicable to this tool
+                    "reason": "Query does not contain mathematical content",
+                    "engine": "MathematicalComputationTool",
+                    "execution_time_ms": execution_time,
+                }
             
             logger.info(f"[MathematicalEngine] Computing: {query[:100]}...")
             
@@ -3982,6 +4005,69 @@ class MathematicalToolWrapper:
                 "engine": "MathematicalComputationTool",
                 "execution_time_ms": (time.perf_counter() - start_time) * 1000,
             }
+    
+    def _is_mathematical_query(self, query: str) -> bool:
+        """
+        BUG FIX #4: Gate check to determine if query contains mathematical content.
+        
+        Industry Standard: Defense in Depth - Multiple detection layers
+        - Layer 1: Explicit math keywords (calculate, compute, solve, etc.)
+        - Layer 2: Mathematical symbols (=, +, -, *, /, ^, etc.)
+        - Layer 3: Mathematical notation (∫, ∑, ∂, √, etc.)
+        - Layer 4: Numbers with operations
+        
+        Returns:
+            True if query appears to be mathematical, False otherwise
+        """
+        if not query or not isinstance(query, str):
+            return False
+        
+        query_lower = query.lower()
+        
+        # Layer 1: Mathematical keywords
+        math_keywords = (
+            'calculate', 'compute', 'solve', 'evaluate', 'simplify',
+            'integrate', 'derivative', 'differentiate', 'limit',
+            'sum', 'product', 'matrix', 'vector', 'equation',
+            'formula', 'algebra', 'calculus', 'geometry', 
+            'trigonometry', 'logarithm', 'exponential',
+            'probability', 'statistics', 'factorial', 'permutation',
+            'what is', 'how much', 'how many',  # Quantitative questions
+        )
+        has_math_keyword = any(kw in query_lower for kw in math_keywords)
+        
+        # Layer 2: Mathematical operators and symbols
+        math_symbols = ('=', '+', '-', '*', '/', '^', '**', '%', '√', '±')
+        has_math_symbol = any(sym in query for sym in math_symbols)
+        
+        # Layer 3: Mathematical notation (Unicode)
+        math_notation = ('∫', '∑', '∏', '∂', '∇', '∞', '≈', '≠', '≤', '≥', 'π', 'θ', 'α', 'β')
+        has_math_notation = any(sym in query for sym in math_notation)
+        
+        # Layer 4: Numbers with context (not just a single number)
+        # Look for patterns like "2x", "x^2", "3.14", "1/2"
+        import re
+        has_number_with_operation = bool(re.search(r'\d+\s*[\+\-\*/\^]|\d*\.\d+|x\^?\d+|\d+x', query))
+        
+        # Anti-pattern: Logic/philosophical keywords that indicate NOT math
+        # These queries should go to SymbolicEngine or PhilosophicalEngine instead
+        logic_keywords = (
+            'nonmonotonic', 'exception', 'if and only if', 'implies',
+            'therefore', 'necessarily', 'possibly', 'forall', 'exists',
+            'entails', 'satisfiable', 'valid', 'sound', 'complete',
+            'belief', 'knowledge', 'ethical', 'moral', 'ought',
+        )
+        has_logic_keyword = any(kw in query_lower for kw in logic_keywords)
+        
+        # Decision: Query is mathematical if it has math indicators and no strong logic indicators
+        is_math = (has_math_keyword or has_math_symbol or has_math_notation or has_number_with_operation)
+        
+        # Override: If query has logic keywords, it's likely NOT a math query even if it has numbers
+        # Example: "with exceptions (nonmonotonic-ish)" should NOT be treated as mathematical
+        if has_logic_keyword and not (has_math_symbol or has_math_notation):
+            return False
+        
+        return is_math
 
 
 class ToolSelector:

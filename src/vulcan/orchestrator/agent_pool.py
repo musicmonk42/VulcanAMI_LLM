@@ -2852,13 +2852,26 @@ class AgentPoolManager:
                     router_tool_name = selected_tools[0] if selected_tools else None
             
             # VALIDATION: Warn if routing instructions are missing (indicates router bug)
+            # BUG FIX #3: Replace silent fallback with explicit error logging
+            # Industry Standard: Fail-Fast principle - make bugs visible
             if is_reasoning_task and not (router_reasoning_type and router_tool_name):
-                logger.warning(
+                logger.error(
                     f"[AgentPool] COMMAND PATTERN VIOLATION: Task {task_id} is reasoning task "
                     f"but missing routing instructions! reasoning_type={router_reasoning_type}, "
-                    f"tool_name={router_tool_name}. This indicates a bug in the router. "
-                    f"Falling back to legacy behavior (BAD - causes three-way collision)."
+                    f"tool_name={router_tool_name}. This indicates a BUG in the router. "
+                    f"Router MUST provide routing instructions for reasoning tasks. "
+                    f"Attempting recovery with fallback behavior (degrades performance)."
                 )
+                # BUG FIX #3: Set explicit error metadata for observability
+                # This makes the bug traceable in logs and metrics
+                if 'error_metadata' not in parameters:
+                    parameters['error_metadata'] = {}
+                parameters['error_metadata']['command_pattern_violation'] = True
+                parameters['error_metadata']['missing_routing_instructions'] = {
+                    'reasoning_type': router_reasoning_type,
+                    'tool_name': router_tool_name,
+                    'task_type': task_type,
+                }
             
             # ===============================================================================
 
