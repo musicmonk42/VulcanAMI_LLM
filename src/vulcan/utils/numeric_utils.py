@@ -24,34 +24,6 @@ DEFAULT_EPSILON = 1e-9
 MAX_EPSILON = 1e-3
 
 
-def float_equals(a: float, b: float, epsilon: float = DEFAULT_EPSILON) -> bool:
-    """
-    Check if two floats are equal within epsilon tolerance
-
-    Args:
-        a: First value
-        b: Second value
-        epsilon: Tolerance (default 1e-9)
-
-    Returns:
-        True if |a - b| < epsilon
-
-    Note:
-        For very large or small numbers, consider using is_close() instead,
-        which handles both relative and absolute tolerance.
-    """
-    if not isinstance(a, (int, float)) or not isinstance(b, (int, float)):
-        return False
-
-    # Handle infinity and NaN
-    if math.isnan(a) or math.isnan(b):
-        return False
-    if math.isinf(a) or math.isinf(b):
-        return a == b
-
-    return abs(a - b) < epsilon
-
-
 def is_close(a: float, b: float, rel_tol: float = 1e-9, abs_tol: float = 0.0) -> bool:
     """
     Check if two values are close using both relative and absolute tolerance.
@@ -82,13 +54,6 @@ def clamp(value: float, min_val: float, max_val: float) -> float:
     if min_val > max_val:
         min_val, max_val = max_val, min_val
     return max(min_val, min(max_val, value))
-
-
-def is_in_range(
-    value: float, min_val: float, max_val: float, epsilon: float = DEFAULT_EPSILON
-) -> bool:
-    """Check if value is in range [min_val, max_val] with epsilon tolerance"""
-    return (value >= min_val - epsilon) and (value <= max_val + epsilon)
 
 
 def safe_divide(numerator: float, denominator: float, default: float = 0.0) -> float:
@@ -130,20 +95,4 @@ def normalize_weights(weights: list, epsilon: float = DEFAULT_EPSILON) -> list:
     return [w / total for w in weights]
 
 
-def check_finite(value: Union[float, list, tuple], name: str = "value") -> bool:
-    """Check if value(s) are finite (not inf, not nan)"""
-    if isinstance(value, (list, tuple)):
-        return all(check_finite(v, f"{name}[{i}]") for i, v in enumerate(value))
 
-    if not isinstance(value, (int, float)):
-        return False
-
-    if math.isnan(value) or math.isinf(value):
-        return False
-
-    return True
-
-
-def validate_probability(p: float, epsilon: float = DEFAULT_EPSILON) -> bool:
-    """Validate that p is a valid probability in [0, 1]"""
-    return check_finite(p) and is_in_range(p, 0.0, 1.0, epsilon)
