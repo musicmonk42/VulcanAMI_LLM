@@ -875,7 +875,7 @@ result = simplify(integral)
                 execution_result = execute_math_code(code)
 
                 if not execution_result["success"]:
-                    logger.warning(f"Code execution failed: {execution_result['error']}")
+                    logger.info(f"Code execution failed: {execution_result['error']}")
                     
                     # Try fallback strategy
                     fallback_result = self._try_fallback(

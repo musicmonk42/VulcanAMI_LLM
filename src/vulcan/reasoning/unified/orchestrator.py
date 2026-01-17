@@ -387,7 +387,7 @@ class UnifiedReasoner:
             
             # Log final status
             if llm_client is None:
-                logger.warning(
+                logger.info(
                     "[MathTool] No LLM client found from any source. "
                     "Mathematical reasoning may have reduced capabilities. "
                     "Consider calling set_llm_client() in singletons during startup."
