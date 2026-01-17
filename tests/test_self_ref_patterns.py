@@ -132,31 +132,48 @@ class TestConfigConstants(unittest.TestCase):
 
 
 class TestQueryAnalysisFunction(unittest.TestCase):
-    """Test the is_self_referential function in query_analysis.py."""
+    """Test the is_self_referential functionality using UnifiedReasoner."""
     
     def test_import_is_self_referential(self):
-        """Test that is_self_referential can be imported."""
+        """Test that UnifiedReasoner._is_self_referential_query is available."""
         try:
-            from vulcan.reasoning.integration.query_analysis import is_self_referential
-            self.assertIsNotNone(is_self_referential)
+            from vulcan.reasoning.unified.orchestrator import UnifiedReasoner
+            reasoner = UnifiedReasoner(
+                enable_learning=False,
+                enable_safety=False,
+                max_workers=1,
+                config={'skip_runtime': True}
+            )
+            self.assertTrue(hasattr(reasoner, '_is_self_referential_query'))
+            reasoner.shutdown(timeout=1.0, skip_save=True)
         except ImportError as e:
-            self.skipTest(f"Could not import is_self_referential: {e}")
+            self.skipTest(f"Could not import UnifiedReasoner: {e}")
     
     def test_is_self_referential_basic(self):
         """Test basic self-referential detection."""
         try:
-            from vulcan.reasoning.integration.query_analysis import is_self_referential
+            from vulcan.reasoning.unified.orchestrator import UnifiedReasoner
         except ImportError:
-            self.skipTest("Could not import is_self_referential")
+            self.skipTest("Could not import UnifiedReasoner")
         
-        # Test self-referential queries
-        self.assertTrue(is_self_referential("would you become self-aware?"))
-        self.assertTrue(is_self_referential("What are your goals?"))
-        self.assertTrue(is_self_referential("Are you conscious?"))
+        reasoner = UnifiedReasoner(
+            enable_learning=False,
+            enable_safety=False,
+            max_workers=1,
+            config={'skip_runtime': True}
+        )
         
-        # Test non-self-referential queries
-        self.assertFalse(is_self_referential("What is photosynthesis?"))
-        self.assertFalse(is_self_referential("Calculate 2+2"))
+        try:
+            # Test self-referential queries
+            self.assertTrue(reasoner._is_self_referential_query("would you become self-aware?"))
+            self.assertTrue(reasoner._is_self_referential_query("What are your goals?"))
+            self.assertTrue(reasoner._is_self_referential_query("Are you conscious?"))
+            
+            # Test non-self-referential queries
+            self.assertFalse(reasoner._is_self_referential_query("What is photosynthesis?"))
+            self.assertFalse(reasoner._is_self_referential_query("Calculate 2+2"))
+        finally:
+            reasoner.shutdown(timeout=1.0, skip_save=True)
 
 
 def run_tests():
