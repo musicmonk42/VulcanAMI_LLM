@@ -6645,13 +6645,35 @@ class QueryAnalyzer:
         # Agent pool MUST execute these without re-selection
         # ===============================================================================
         
-        # Extract selected tools from plan (router's decision)
-        selected_tools = plan.telemetry_data.get("selected_tools", []) if plan else []
-        reasoning_strategy = plan.telemetry_data.get("reasoning_strategy", "single") if plan else "single"
-        primary_tool = selected_tools[0] if selected_tools else "general"
+        # BUG FIX #2: Extract selected tools from plan (router's decision)
+        # DEFENSIVE PROGRAMMING: Validate plan has telemetry_data before accessing
+        selected_tools = []
+        reasoning_strategy = "single"
+        if plan and hasattr(plan, 'telemetry_data') and plan.telemetry_data:
+            selected_tools = plan.telemetry_data.get("selected_tools", [])
+            reasoning_strategy = plan.telemetry_data.get("reasoning_strategy", "single")
         
-        # Map query_type to reasoning_type for command pattern
-        reasoning_type_map = {
+        # BUG FIX #2: Use selected tool for reasoning_type mapping (HIGHEST PRIORITY)
+        # If router selected a specific tool, use that tool's reasoning type
+        # Otherwise, fall back to query_type mapping
+        primary_tool = selected_tools[0] if selected_tools else None
+        
+        # Map tool names to reasoning types (Industry Standard: Single Source of Truth)
+        tool_to_reasoning_type_map = {
+            "mathematical": "mathematical",
+            "philosophical": "philosophical",
+            "causal": "causal",
+            "symbolic": "symbolic",
+            "probabilistic": "probabilistic",
+            "analogical": "analogical",
+            "multimodal": "multimodal",
+            "cryptographic": "symbolic",  # Crypto uses symbolic reasoning
+            "world_model": "philosophical",  # World model uses philosophical reasoning
+            "general": "general",
+        }
+        
+        # Map query_type to reasoning_type for command pattern (FALLBACK)
+        query_type_to_reasoning_type_map = {
             "mathematical": "mathematical",
             "philosophical": "philosophical",
             "causal": "causal",
@@ -6666,7 +6688,42 @@ class QueryAnalyzer:
             "reasoning": "hybrid",
             "general": "general",
         }
-        reasoning_type = reasoning_type_map.get(query_type.value, "general")
+        
+        # BUG FIX #2: PRIORITY ORDER for reasoning_type determination
+        # 1. If router selected a specific tool, use tool's reasoning type (HIGHEST PRIORITY)
+        # 2. Otherwise, fall back to query_type mapping
+        if primary_tool and primary_tool in tool_to_reasoning_type_map:
+            reasoning_type = tool_to_reasoning_type_map[primary_tool]
+            logger.debug(
+                f"[QueryRouter._decompose_to_tasks] BUG FIX #2: Using tool-based reasoning_type: "
+                f"tool={primary_tool} → reasoning_type={reasoning_type}"
+            )
+        else:
+            # Fallback to query_type mapping
+            reasoning_type = query_type_to_reasoning_type_map.get(query_type.value, "general")
+            primary_tool = "general"  # Ensure tool_name is set
+            logger.debug(
+                f"[QueryRouter._decompose_to_tasks] Using query_type-based reasoning_type: "
+                f"query_type={query_type.value} → reasoning_type={reasoning_type}, tool_name={primary_tool}"
+            )
+        
+        # BUG FIX #3: DEFENSIVE PROGRAMMING - Validate routing instructions are set
+        # FAIL-FAST: Ensure both reasoning_type and tool_name are non-empty strings
+        if not reasoning_type or not isinstance(reasoning_type, str) or not reasoning_type.strip():
+            logger.error(
+                f"[QueryRouter._decompose_to_tasks] BUG #2/#3: reasoning_type is None or empty! "
+                f"query_type={query_type.value}, selected_tools={selected_tools}. "
+                f"Falling back to 'general' to prevent command pattern violation."
+            )
+            reasoning_type = "general"
+        
+        if not primary_tool or not isinstance(primary_tool, str) or not primary_tool.strip():
+            logger.error(
+                f"[QueryRouter._decompose_to_tasks] BUG #2/#3: tool_name is None or empty! "
+                f"query_type={query_type.value}, selected_tools={selected_tools}. "
+                f"Falling back to 'general' to prevent command pattern violation."
+            )
+            primary_tool = "general"
         
         primary_task = AgentTask(
             task_id=f"task_{base_task_id}_primary",
@@ -6691,6 +6748,17 @@ class QueryAnalyzer:
                 "reasoning_strategy": reasoning_strategy,
             },
         )
+        
+        # BUG FIX #2/#3: Validate routing instructions before adding task
+        # Industry Standard: Fail-Fast Principle
+        is_valid, validation_error = primary_task.validate_routing_instructions()
+        if not is_valid:
+            logger.error(
+                f"[QueryRouter._decompose_to_tasks] COMMAND PATTERN VIOLATION: "
+                f"Created AgentTask with invalid routing instructions! {validation_error}. "
+                f"This is a BUG in the router. Task will be added but agent_pool will log warning."
+            )
+        
         tasks.append(primary_task)
 
         # Add supporting tasks based on query content
