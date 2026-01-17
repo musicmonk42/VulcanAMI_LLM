@@ -2953,7 +2953,7 @@ class WorldModel:
                 'source': 'meta_reasoning',
                 'analysis': ethical_analysis,
                 'metadata': {
-                    'classification': classification.to_dict(),
+                    'classification': classification.to_dict() if hasattr(classification, 'to_dict') else {},
                 },
             }
         except Exception as e:
@@ -2964,6 +2964,188 @@ class WorldModel:
                 'source': 'error',
                 'metadata': {'error': str(e)},
             }
+    
+    def _handle_self_referential_request(
+        self,
+        query: str,
+        context: Optional[Dict[str, Any]] = None,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Handle self-referential queries - "What are you?", "What is your purpose?"
+        
+        **Industry Standard: Meta-Reasoning for Self-Awareness**
+        Uses motivational_introspection to understand and explain VULCAN's self.
+        This is where VULCAN's identity, purpose, and self-model live.
+        
+        Examples:
+            - "What are you?"
+            - "Who made you?"
+            - "What is your purpose?"
+            - "What do you believe?"
+        
+        Args:
+            query: The self-referential query
+            context: Optional context dictionary
+            **kwargs: Additional parameters
+            
+        Returns:
+            Dict with response, confidence, source, and metadata
+        """
+        logger.info(f"[WorldModel] Handling self-referential request")
+        
+        try:
+            introspection = None
+            motivation = None
+            
+            # Use motivational_introspection if available
+            if hasattr(self, 'motivational_introspection') and self.motivational_introspection:
+                try:
+                    introspection = self.motivational_introspection.introspect_current_objective()
+                    motivation = self.motivational_introspection.explain_motivation_structure()
+                except Exception as e:
+                    logger.warning(f"[WorldModel] Motivational introspection failed: {e}")
+            
+            # Synthesize response from introspection
+            response = self._synthesize_self_response(query, introspection, motivation, context)
+            
+            return {
+                'response': response.get('response', 'I am VULCAN, an AI reasoning system.'),
+                'confidence': response.get('confidence', 0.75),
+                'source': 'meta_reasoning',
+                'category': 'self_referential',
+                'metadata': {
+                    'introspection': introspection if introspection else {},
+                    'motivation': motivation if motivation else {},
+                },
+            }
+        except Exception as e:
+            logger.error(f"[WorldModel] Self-referential request failed: {e}", exc_info=True)
+            return {
+                'response': "I am VULCAN, an AI reasoning system designed to help with complex reasoning tasks.",
+                'confidence': 0.60,
+                'source': 'fallback',
+                'metadata': {'error': str(e)},
+            }
+    
+    def _handle_introspection_request(
+        self,
+        query: str,
+        context: Optional[Dict[str, Any]] = None,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Handle introspection queries - "How did you decide?", "Why did you choose X?"
+        
+        **Industry Standard: Transparency and Explainability**
+        Uses transparency_interface to explain VULCAN's decisions and reasoning.
+        This is critical for AI alignment and trustworthiness.
+        
+        Examples:
+            - "How did you decide that?"
+            - "Why did you choose X?"
+            - "Explain your reasoning"
+            - "What were you thinking?"
+        
+        Args:
+            query: The introspection query
+            context: Optional context with decision history
+            **kwargs: Additional parameters
+            
+        Returns:
+            Dict with response, confidence, source, and metadata
+        """
+        logger.info(f"[WorldModel] Handling introspection request")
+        
+        try:
+            explanation = None
+            
+            # Use transparency_interface if available
+            if hasattr(self, 'transparency_interface') and self.transparency_interface:
+                try:
+                    explanation = self.transparency_interface.explain_decision(
+                        decision=context.get('last_decision') if context else None,
+                        factors=context.get('decision_factors') if context else None,
+                        reasoning_steps=context.get('reasoning_steps') if context else None,
+                    )
+                except Exception as e:
+                    logger.warning(f"[WorldModel] Transparency interface failed: {e}")
+            
+            # Synthesize response from explanation
+            response = self._synthesize_introspection_response(query, explanation, context)
+            
+            return {
+                'response': response.get('response', 'I can explain my reasoning process.'),
+                'confidence': response.get('confidence', 0.70),
+                'source': 'meta_reasoning',
+                'category': 'introspection',
+                'metadata': {
+                    'explanation': explanation if explanation else {},
+                },
+            }
+        except Exception as e:
+            logger.error(f"[WorldModel] Introspection request failed: {e}", exc_info=True)
+            return {
+                'response': "I make decisions based on the available information and reasoning methods.",
+                'confidence': 0.60,
+                'source': 'fallback',
+                'metadata': {'error': str(e)},
+            }
+    
+    def _synthesize_self_response(
+        self,
+        query: str,
+        introspection: Any,
+        motivation: Any,
+        context: Optional[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """
+        Synthesize self-referential response from introspection data.
+        
+        **Industry Standard: Template-based Response Generation with Fallback**
+        """
+        # Default response
+        response = "I am VULCAN, an AI reasoning system designed to assist with complex reasoning, causal analysis, and decision support."
+        confidence = 0.75
+        
+        # Enhance with introspection if available
+        if introspection and isinstance(introspection, dict):
+            if 'purpose' in introspection:
+                response += f" My purpose is: {introspection['purpose']}"
+                confidence = 0.85
+        
+        return {
+            'response': response,
+            'confidence': confidence,
+        }
+    
+    def _synthesize_introspection_response(
+        self,
+        query: str,
+        explanation: Any,
+        context: Optional[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """
+        Synthesize introspection response from explanation data.
+        
+        **Industry Standard: Template-based Response Generation with Fallback**
+        """
+        # Default response
+        response = "I make decisions by analyzing the available information, considering multiple perspectives, and applying appropriate reasoning methods."
+        confidence = 0.70
+        
+        # Enhance with explanation if available
+        if explanation and isinstance(explanation, dict):
+            if 'reasoning_steps' in explanation:
+                steps = explanation['reasoning_steps']
+                if steps:
+                    response += f" The key steps were: {', '.join(str(s) for s in steps[:3])}"
+                    confidence = 0.80
+        
+        return {
+            'response': response,
+            'confidence': confidence,
+        }
     
     def _handle_conversational_request(
         self,
