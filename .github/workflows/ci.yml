@@ -271,6 +271,9 @@ jobs:
           exit_code=0
           ulimit -Sn 10240 || true
           
+          # Run pytest and capture output to file without using pipe/tee
+          # This prevents buffering issues that can cause hanging
+          # Removed -n 1 --dist=loadscope as they're not needed for single-worker execution
           pytest --cov=src -q \
             --cov-report=xml \
             --cov-report=html \
@@ -278,11 +281,12 @@ jobs:
             --junitxml=results/junit.xml \
             --timeout=600 \
             --maxfail=10 \
-            -n 1 \
-            --dist=loadscope \
             -m "not slow and not load_test and not benchmark" \
-            -v \
-            2>&1 | tee $GITHUB_WORKSPACE/logs/pytest-output.log || exit_code=$?
+            -v > $GITHUB_WORKSPACE/logs/pytest-output.log 2>&1 || exit_code=$?
+          
+          # Display the log content to GitHub Actions console
+          cat $GITHUB_WORKSPACE/logs/pytest-output.log
+          
           echo "PYTEST_EXIT=$exit_code" > $GITHUB_WORKSPACE/results/exitcode.txt
           echo "Test exit code: $exit_code"
           exit $exit_code
@@ -420,7 +424,13 @@ jobs:
           exit_code=0
           # Run specific integration test files if they exist
           if [ -d "tests/integration" ]; then
-            pytest tests/integration/ -v --timeout=300 --maxfail=5 --junitxml=results/integration-junit.xml 2>&1 | tee $GITHUB_WORKSPACE/logs/integration-test-output.log || exit_code=$?
+            # Run pytest and capture output to file without using pipe/tee
+            # This prevents buffering issues that can cause hanging
+            pytest tests/integration/ -v --timeout=300 --maxfail=5 --junitxml=results/integration-junit.xml > $GITHUB_WORKSPACE/logs/integration-test-output.log 2>&1 || exit_code=$?
+            
+            # Display the log content to GitHub Actions console
+            cat $GITHUB_WORKSPACE/logs/integration-test-output.log
+            
             echo "PYTEST_EXIT=$exit_code" > $GITHUB_WORKSPACE/results/integration-exitcode.txt
           else
             echo "No integration tests directory found"
@@ -712,15 +722,19 @@ jobs:
           echo ""
 
           # Run perf tests with pytest
+          # Capture output to file without using pipe/tee to prevent buffering issues
           pytest tests/perf/ \
             -m "perf or boundedness" \
             -v \
             --timeout=300 \
             --tb=short \
             --junitxml=perf/perf-junit.xml \
-            2>&1 | tee logs/perf-test-output.log
-
-          PERF_EXIT=${PIPESTATUS[0]}
+            > logs/perf-test-output.log 2>&1 || PERF_EXIT=$?
+          
+          # Display the log content to GitHub Actions console
+          cat logs/perf-test-output.log
+          
+          PERF_EXIT=${PERF_EXIT:-0}
           echo "perf_exit_code=$PERF_EXIT" >> $GITHUB_OUTPUT
           exit $PERF_EXIT
 
