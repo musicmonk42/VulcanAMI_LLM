@@ -4113,6 +4113,24 @@ class QueryAnalyzer:
                 else:
                     tools_to_use = classification.suggested_tools or ["general"]
                 
+                # ===================================================================
+                # MULTI-LAYER GATE CHECK FIX - Part 1: Set skip_gate_checks flag
+                # ===================================================================
+                # When LLM classifier has high confidence (≥0.8), reasoning engines
+                # should trust the LLM's classification and skip their own gate checks.
+                # This prevents the multi-layer gate check failure where:
+                # 1. Router LLM correctly classifies query (MATHEMATICAL/PROBABILISTIC)
+                # 2. Reasoning engine's gate check rejects it
+                # 3. Result: low-confidence "not applicable" even though LLM was confident
+                # ===================================================================
+                llm_authoritative = classification.confidence >= 0.8
+                skip_gate_checks = llm_authoritative
+                
+                logger.info(
+                    f"[QueryRouter] {query_id}: LLM confidence={classification.confidence:.2f}, "
+                    f"llm_authoritative={llm_authoritative}, skip_gate_checks={skip_gate_checks}"
+                )
+                
                 plan.agent_tasks = [
                     AgentTask(
                         task_id=f"task_{uuid.uuid4().hex[:8]}_{classification.category.lower()}",
@@ -4127,12 +4145,21 @@ class QueryAnalyzer:
                             "skip_arena": True,
                             "tools": tools_to_use,
                             "response_type": "conversational",
+                            # MULTI-LAYER GATE CHECK FIX: Propagate flags to reasoning engines
+                            "skip_gate_checks": skip_gate_checks,
+                            "llm_authoritative": llm_authoritative,
+                            "router_confidence": classification.confidence,
+                            "llm_classification": classification.category,
                         },
                     )
                 ]
                 
                 plan.telemetry_data["selected_tools"] = tools_to_use
                 plan.telemetry_data["reasoning_strategy"] = f"classifier_{classification.category.lower()}"
+                # MULTI-LAYER GATE CHECK FIX: Record in telemetry
+                plan.telemetry_data["llm_authoritative"] = llm_authoritative
+                plan.telemetry_data["skip_gate_checks"] = skip_gate_checks
+                plan.telemetry_data["router_confidence"] = classification.confidence
                 
                 # ARCHITECTURE: Set LLM mode based on query characteristics
                 plan.llm_mode = self._determine_llm_mode(

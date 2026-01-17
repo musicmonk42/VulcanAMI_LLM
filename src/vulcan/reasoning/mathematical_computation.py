@@ -1848,11 +1848,13 @@ Brief explanation:"""
         
         # BUG A FIX: Expanded Bayesian/probability keywords with decimal numbers
         # Added 'bayes theorem', 'bayes rule', and standalone probability terms
+        # GATE CHECK EXPANSION: Added more Bayesian/medical terminology
         bayes_keywords = [
             'bayes', "bayes'", "bayes's", 'bayesian', 'bayes theorem', 'bayes rule',
             'sensitivity', 'specificity', 'prevalence', 'posterior', 
             'prior', 'likelihood', 'conditional probability',
-            'false positive', 'false negative', 'true positive', 'true negative'
+            'false positive', 'false negative', 'true positive', 'true negative',
+            'base rate', 'predictive value'  # Added per problem statement
         ]
         if any(kw in query_lower for kw in bayes_keywords):
             if re.search(r'\d+\.\d+', query):  # Has decimal numbers
@@ -1861,11 +1863,13 @@ Brief explanation:"""
         
         # BUG A FIX: Natural language mathematical commands
         # These indicate explicit mathematical computation requests
+        # GATE CHECK EXPANSION: Added induction patterns per problem statement
         natural_math_commands = [
             'compute exactly', 'calculate exactly', 'evaluate exactly',
             'compute the', 'calculate the', 'evaluate the',
             'show steps', 'show all steps', 'show the steps',
             'verify by induction', 'prove by induction', 'proof by induction',
+            'induction proof', 'mathematical induction', 'inductive step',  # Added per problem statement
             'closed form', 'closed-form', 'closed form solution',
             'derive the formula', 'find the formula'
         ]
@@ -1876,14 +1880,16 @@ Brief explanation:"""
         # BUG A FIX: Enhanced summation detection with unicode handling
         # Matches patterns like "∑(2k-1) from k=1 to n" or "∑ ... to ..."
         # Also handles line breaks and fragmentation in the summation expression
-        if '∑' in query:
+        # GATE CHECK EXPANSION: Added Σ (uppercase sigma), ∏ (product), ∫ (integral)
+        math_notation_symbols = ['∑', 'Σ', '∏', '∫']
+        if any(sym in query for sym in math_notation_symbols):
             # Look for summation patterns: ∑...to, ∑...from...to, ∑(expression)
-            if re.search(r'∑.*\bto\b', query_lower) or re.search(r'∑.*\bfrom\b.*\bto\b', query_lower):
-                logger.info("[MathTool] BUG A FIX: Detected summation with bounds (∑...from...to)")
+            if re.search(r'[∑Σ∏∫].*\bto\b', query_lower) or re.search(r'[∑Σ∏∫].*\bfrom\b.*\bto\b', query_lower):
+                logger.info("[MathTool] BUG A FIX: Detected mathematical notation with bounds")
                 return True
-            # Also accept bare summation symbol with variables/numbers
-            if re.search(r'∑\s*[\(\[]?[a-z0-9]', query_lower):
-                logger.info("[MathTool] BUG A FIX: Detected summation expression")
+            # Also accept bare summation/product/integral symbol with variables/numbers
+            if re.search(r'[∑Σ∏∫]\s*[\(\[]?[a-z0-9]', query_lower):
+                logger.info("[MathTool] BUG A FIX: Detected mathematical notation expression")
                 return True
         
         # Mathematical verification with calculus terms
