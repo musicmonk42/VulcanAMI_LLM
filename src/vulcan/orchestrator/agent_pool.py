@@ -2734,6 +2734,32 @@ class AgentPoolManager:
             input_data = parameters.get("input_data") or parameters.get("input", "")
             context = parameters.get("context", {})
             
+            # =========================================================================
+            # MULTI-LAYER GATE CHECK FIX: Extract flags from task parameters
+            # =========================================================================
+            # Extract skip_gate_checks, llm_authoritative, router_confidence from parameters
+            # and add them to context so reasoning engines can access them
+            # Note: Both 'skip_gate_checks' and 'skip_gate_check' variants are set because:
+            #   - Different reasoning engines use different key names
+            #   - This ensures compatibility with both conventions
+            # =========================================================================
+            if "skip_gate_checks" in parameters:
+                context["skip_gate_checks"] = parameters["skip_gate_checks"]
+                context["skip_gate_check"] = parameters["skip_gate_checks"]  # Both variants for compatibility
+                logger.debug(f"[AgentPool] Extracted skip_gate_checks={parameters['skip_gate_checks']} from parameters")
+            
+            if "llm_authoritative" in parameters:
+                context["llm_authoritative"] = parameters["llm_authoritative"]
+                logger.debug(f"[AgentPool] Extracted llm_authoritative={parameters['llm_authoritative']} from parameters")
+            
+            if "router_confidence" in parameters:
+                context["router_confidence"] = parameters["router_confidence"]
+                logger.debug(f"[AgentPool] Extracted router_confidence={parameters['router_confidence']} from parameters")
+            
+            if "llm_classification" in parameters:
+                context["llm_classification"] = parameters["llm_classification"]
+                logger.debug(f"[AgentPool] Extracted llm_classification={parameters['llm_classification']} from parameters")
+            
             # Also preserve full reasoning context from parameters
             reasoning_context = parameters.get("reasoning_context", {})
             if reasoning_context:
