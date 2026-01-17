@@ -21,7 +21,6 @@
 
 import logging
 import socket
-from typing import List, Optional, Tuple
 
 # Module metadata
 __version__ = "1.0.2"
@@ -35,9 +34,6 @@ logger = logging.getLogger(__name__)
 
 # Maximum number of ports to try when searching for available port
 MAX_PORT_SEARCH_ATTEMPTS = 100
-
-# Default timeout for connection tests (seconds)
-DEFAULT_CONNECTION_TIMEOUT = 1.0
 
 
 # ============================================================
@@ -111,7 +107,6 @@ __all__ = [
     "find_available_port",
     # Constants
     "MAX_PORT_SEARCH_ATTEMPTS",
-    "DEFAULT_CONNECTION_TIMEOUT",
 ]
 
 

@@ -3,25 +3,22 @@
 Numeric Utilities for Safe Numerical Comparisons
 
 Provides utilities for:
-- Safe float comparisons with epsilon tolerance
-- Bounds checking
-- Range validation
-- Overflow protection
+- Safe float comparisons with relative and absolute tolerance
+- Value clamping to valid ranges
+- Safe division with fallback defaults
+- Weight normalization for probability distributions
 
 Security: LOW-MEDIUM (Correctness)
 """
 
 import logging
 import math
-from typing import Union
+from typing import List
 
 logger = logging.getLogger(__name__)
 
 # Default epsilon for float comparisons
 DEFAULT_EPSILON = 1e-9
-
-# Absolute max epsilon (safety)
-MAX_EPSILON = 1e-3
 
 
 def is_close(a: float, b: float, rel_tol: float = 1e-9, abs_tol: float = 0.0) -> bool:
@@ -63,7 +60,7 @@ def safe_divide(numerator: float, denominator: float, default: float = 0.0) -> f
     return numerator / denominator
 
 
-def normalize_weights(weights: list, epsilon: float = DEFAULT_EPSILON) -> list:
+def normalize_weights(weights: List[float], epsilon: float = DEFAULT_EPSILON) -> List[float]:
     """
     Normalize weights to sum to 1.0.
     
@@ -93,6 +90,4 @@ def normalize_weights(weights: list, epsilon: float = DEFAULT_EPSILON) -> list:
         raise ValueError(f"Cannot normalize: total weight {total} too small (abs <= {epsilon})")
 
     return [w / total for w in weights]
-
-
 
