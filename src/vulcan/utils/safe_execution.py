@@ -681,13 +681,13 @@ class SafeCodeExecutor:
 
         # BUG FIX #5: Retry loop with error feedback
         # Industry Standard: Retry with exponential backoff for transient failures
-        retry_count = 0
         last_error = None
         current_code = code
         
         for attempt in range(max_retries + 1):  # +1 for initial attempt
+            retry_count = attempt  # Track current attempt number for observability
+            
             if attempt > 0:
-                retry_count = attempt
                 logger.info(
                     f"[{exec_id}] BUG FIX #5: Retry attempt {retry_count}/{max_retries} "
                     f"after error: {last_error[:100] if last_error else 'unknown'}"
@@ -908,13 +908,20 @@ class SafeCodeExecutor:
                     "retry_count": retry_count,
                 }
         
-        # BUG FIX #5: If we exit the retry loop without returning, all retries exhausted
-        # This should not normally happen due to returns above, but defensive programming
-        logger.error(f"[{exec_id}] Retry loop exhausted without returning result (should not happen)")
+        # BUG FIX #5: Defensive Programming - Fallback if loop exits without return
+        # This code should never execute due to returns within the loop, but provides
+        # fail-safe behavior in case of unexpected control flow (e.g., future code changes
+        # that introduce break statements or other loop exits). The explicit error helps
+        # identify bugs during development.
+        # INDUSTRY STANDARD: Defense in Depth - multiple layers of error handling
+        logger.error(
+            f"[{exec_id}] DEFENSIVE FALLBACK: Retry loop exited without returning. "
+            f"This indicates a bug in the retry logic. Attempts: {max_retries + 1}"
+        )
         return {
             "success": False,
             "result": None,
-            "error": f"All {max_retries} retry attempts exhausted",
+            "error": f"Internal error: Retry loop completed without result (max_retries={max_retries})",
             "output": "",
             "namespace": {},
             "retry_count": max_retries,

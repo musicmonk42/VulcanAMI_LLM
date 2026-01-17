@@ -3633,8 +3633,6 @@ class CryptographicToolWrapper:
         self.name = "cryptographic"
         self.config = config or {}
         logger.debug(f"[CryptographicToolWrapper] Initialized with engine type: {type(engine).__name__}")
-        self.name = "cryptographic"
-        self.config = config or {}
     
     def reason(self, problem: Any) -> Dict[str, Any]:
         """
