@@ -202,3 +202,14 @@ data/agent_state.json
 data/agent_state.json.tmp
 data/llm_meta_state.json
 data/llm_meta_state.json.tmp
+
+# Temporary markdown reports (should be in docs/archive_reports/)
+# Only README.md should be in root
+/*_SUMMARY.md
+/*_COMPLETE.md
+/*_REPORT.md
+/*_FIX.md
+/*_FIXES.md
+/IMPLEMENTATION_*.md
+/INFRASTRUCTURE_*.md
+/VERIFICATION_*.md
