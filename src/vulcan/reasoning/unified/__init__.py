@@ -157,17 +157,26 @@ def apply_reasoning(
     query_type: str,
     complexity: float,
     context: Optional[Dict[str, Any]] = None,
+    selected_tools: Optional[List[str]] = None,
+    skip_tool_selection: bool = False,
 ) -> Any:
     """
     DEPRECATED: Use UnifiedReasoner.reason() directly instead.
     
     Compatibility wrapper for the legacy apply_reasoning() function.
     
+    **SINGLE AUTHORITY PATTERN (Chain of Command Fix):**
+    If `selected_tools` is provided with `skip_tool_selection=True`,
+    the tools are used WITHOUT re-selection. This honors ToolSelector's
+    authoritative decision and prevents competing tool selections.
+    
     Args:
         query: The user query to process
         query_type: Type from router (general, reasoning, execution, etc.)
         complexity: Complexity score (0.0 to 1.0)
         context: Optional context dict
+        selected_tools: Pre-selected tools from ToolSelector (authoritative)
+        skip_tool_selection: If True, use selected_tools without re-selecting
         
     Returns:
         ReasoningResult from UnifiedReasoner
@@ -182,6 +191,13 @@ def apply_reasoning(
         >>> from vulcan.reasoning.singletons import get_unified_reasoner
         >>> reasoner = get_unified_reasoner() or UnifiedReasoner()
         >>> result = reasoner.reason({"query": "query", "type": query_type})
+        >>>
+        >>> # AUTHORITY PATTERN (with pre-selected tools):
+        >>> result = reasoner.reason(
+        ...     {"query": "query"},
+        ...     pre_selected_tools=["symbolic"],
+        ...     skip_tool_selection=True
+        ... )
     """
     warnings.warn(
         "apply_reasoning() is deprecated. "
@@ -200,12 +216,17 @@ def apply_reasoning(
         reasoner = UnifiedReasoner()
     
     # Convert to UnifiedReasoner input format
-    return reasoner.reason({
-        "query": query,
-        "type": query_type,
-        "complexity": complexity,
-        "context": context or {},
-    })
+    # Pass pre-selected tools to honor ToolSelector authority
+    return reasoner.reason(
+        input_data={
+            "query": query,
+            "type": query_type,
+            "complexity": complexity,
+            "context": context or {},
+        },
+        pre_selected_tools=selected_tools,
+        skip_tool_selection=skip_tool_selection,
+    )
 
 
 def run_portfolio_reasoning(

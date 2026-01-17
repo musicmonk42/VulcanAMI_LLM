@@ -2969,10 +2969,20 @@ class AgentPoolManager:
                     # Calculate complexity from graph structure
                     complexity = self._calculate_task_complexity(graph, parameters)
                     
+                    # =========================================================================
+                    # SINGLE AUTHORITY PATTERN: Pass pre-selected tools to apply_reasoning
+                    # =========================================================================
+                    # If tools were selected by ToolSelector (via Router), pass them through
+                    # to apply_reasoning with skip_tool_selection=True to prevent re-selection.
+                    # This honors the Chain of Command: Router→hints, ToolSelector→authority.
+                    # =========================================================================
+                    skip_tool_selection = bool(selected_tools and selected_tools != ["general"])
+                    
                     # FIX TASK 6: Log what we're passing to reasoning
                     logger.info(
                         f"[AgentPool] Calling apply_reasoning: query_len={query_len}, "
-                        f"query_type={task_type}, complexity={complexity:.2f}"
+                        f"query_type={task_type}, complexity={complexity:.2f}, "
+                        f"selected_tools={selected_tools}, skip_tool_selection={skip_tool_selection}"
                     )
                     
                     # Apply reasoning via the integration layer
@@ -2981,6 +2991,8 @@ class AgentPoolManager:
                         query_type=task_type,
                         complexity=complexity,
                         context=context,
+                        selected_tools=selected_tools if skip_tool_selection else None,
+                        skip_tool_selection=skip_tool_selection,
                     )
                     
                     # =================================================================
