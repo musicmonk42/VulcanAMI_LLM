@@ -1033,12 +1033,13 @@ class HybridLLMExecutor:
         enable_distillation: bool = True,
         conversation_history: Optional[List[Dict[str, str]]] = None,
         llm_mode: Optional[Union[str, "LLMMode"]] = None,
+        skip_reasoning: Optional[bool] = None,
     ) -> Dict[str, Any]:
         """
         Execute LLM request using configured mode.
 
         Args:
-            prompt: The input prompt
+            prompt: The input prompt (user query only, not system prompt)
             max_tokens: Maximum tokens for response
             temperature: Sampling temperature
             system_prompt: System prompt for OpenAI (defaults to DEFAULT_SYSTEM_PROMPT if None)
@@ -1049,6 +1050,9 @@ class HybridLLMExecutor:
             llm_mode: Optional LLM execution mode from router (FORMAT_ONLY, GENERATE, ENHANCE).
                      Industry Standard: Router decides LLM behavior, executor respects it.
                      If None, uses legacy self.mode behavior with deprecation warning.
+            skip_reasoning: Optional flag from router indicating this query doesn't need reasoning.
+                           If True, bypasses reasoning detection check. Router sets this for
+                           simple factual queries, greetings, and other non-reasoning tasks.
 
         Returns:
             Dict with 'text', 'source', 'systems_used', and optional 'metadata'
@@ -1063,26 +1067,39 @@ class HybridLLMExecutor:
         # If the prompt appears to be a reasoning task (not a formatting request),
         # we reject it with a clear error message.
         #
+        # MULTI-LAYER DECISION OVERRIDE FIX:
+        # ===================================
+        # Trust the router's decision when skip_reasoning=True is passed.
+        # This prevents false positives where:
+        # 1. Router correctly classifies query as FACTUAL (skip_reasoning=True)
+        # 2. HybridExecutor's _is_reasoning_task() detects reasoning keywords
+        # 3. Query is incorrectly rejected even though router said it's OK
+        #
         # CORRECT FLOW:
-        # 1. VULCAN reasoning engines process the query
+        # 1. VULCAN reasoning engines process the query (if needed)
         # 2. Pass the VulcanReasoningOutput to format_output_for_user() or
         #    execute_with_structured_output() for language formatting
         #
-        # This check can be disabled for specific use cases by passing
-        # llm_mode=LLMMode.GENERATE (for creative/open-ended queries)
+        # BYPASS CONDITIONS (reasoning check is skipped when):
+        # - skip_reasoning=True (router explicitly said no reasoning needed)
+        # - llm_mode=GENERATE (creative/open-ended or simple factual queries)
+        # - llm_mode=ENHANCE (simple response enhancement)
         #
-        # NOTE: We only apply this check when llm_mode is None (legacy usage)
-        # or FORMAT_ONLY. GENERATE and ENHANCE modes are intentionally creative.
+        # NOTE: We only apply this check when llm_mode=None (legacy) or FORMAT_ONLY
         should_check_reasoning_bypass = (
-            llm_mode is None or
-            (LLM_MODE_AVAILABLE and 
-             isinstance(llm_mode, str) and 
-             llm_mode.upper() == "FORMAT_ONLY") or
-            (LLM_MODE_AVAILABLE and 
-             hasattr(llm_mode, 'value') and 
-             llm_mode == LLMMode.FORMAT_ONLY if LLM_MODE_AVAILABLE else False)
+            skip_reasoning is not True and  # NEW: Trust router's skip_reasoning flag
+            (llm_mode is None or
+             (LLM_MODE_AVAILABLE and 
+              isinstance(llm_mode, str) and 
+              llm_mode.upper() == "FORMAT_ONLY") or
+             (LLM_MODE_AVAILABLE and 
+              hasattr(llm_mode, 'value') and 
+              llm_mode == LLMMode.FORMAT_ONLY if LLM_MODE_AVAILABLE else False))
         )
         
+        # NEW: Only check the USER QUERY (prompt), not system_prompt
+        # This prevents false positives from system instructions containing
+        # reasoning-related words like "analyze", "classify", etc.
         if should_check_reasoning_bypass and _is_reasoning_task(prompt):
             self.logger.warning(
                 f"[HybridExecutor] P0 VIOLATION: Reasoning task detected in prompt. "
@@ -1096,8 +1113,8 @@ class HybridLLMExecutor:
                 f"CORRECT USAGE:\n"
                 f"1. Process query with VULCAN reasoning engines first\n"
                 f"2. Call format_output_for_user(reasoning_output, original_prompt)\n\n"
-                f"If this is intentionally a creative/open-ended query, pass "
-                f"llm_mode=LLMMode.GENERATE to bypass this check."
+                f"If this is intentionally a simple factual or creative query, "
+                f"the router should pass skip_reasoning=True or llm_mode=LLMMode.GENERATE."
             )
         
         # ARCHITECTURE: Respect llm_mode from caller (router)
