@@ -5925,7 +5925,51 @@ class WorldModel:
         counterfactual_results: Optional[Dict[str, Any]],
         query: str
     ) -> str:
-        """Synthesize final ethical response from component analyses."""
+        """
+        Synthesize final ethical response from component analyses using LLM.
+        
+        FIX: Replace canned template responses with actual LLM-generated reasoning.
+        This implements industry-standard LLM integration where the LLM synthesizes
+        the analysis results into coherent prose rather than returning hardcoded text.
+        """
+        try:
+            # Build structured content from component analyses
+            verified_content = {
+                'query': query,
+                'analysis_type': structure.get('type', 'philosophical'),
+                'has_dilemma': structure.get('has_dilemma', False),
+                'ethical_boundaries': ethical_analysis if ethical_analysis != {'analysis': 'not_available'} else {},
+                'goal_conflicts': conflict_analysis.get('conflicts', []),
+                'counterfactual_outcomes': counterfactual_results or {},
+                'options': structure.get('options', [])
+            }
+            
+            # Build LLM guidance for ethical synthesis
+            guidance = self.llm_guidance_builder.build_for_ethical(
+                verified_content, query
+            )
+            
+            # Format with LLM (converts structured analysis to natural language)
+            formatted_response = self._format_with_llm(guidance)
+            
+            return formatted_response
+            
+        except Exception as e:
+            logger.warning(f"[WorldModel] LLM synthesis failed: {e}, falling back to template")
+            # Fallback to template-based response if LLM fails
+            return self._synthesize_ethical_response_template(
+                structure, ethical_analysis, conflict_analysis, counterfactual_results, query
+            )
+    
+    def _synthesize_ethical_response_template(
+        self,
+        structure: Dict[str, Any],
+        ethical_analysis: Dict[str, Any],
+        conflict_analysis: Dict[str, Any],
+        counterfactual_results: Optional[Dict[str, Any]],
+        query: str
+    ) -> str:
+        """Template-based fallback for ethical response synthesis (when LLM unavailable)."""
         parts = []
         
         # Opening
@@ -5992,7 +6036,41 @@ class WorldModel:
     def _generate_philosophical_template(
         self, structure: Dict[str, Any], query_lower: str
     ) -> str:
-        """Fallback template when meta-reasoning unavailable."""
+        """
+        Generate philosophical response using LLM when meta-reasoning unavailable.
+        
+        FIX: Replace template with LLM-based synthesis even in fallback mode.
+        """
+        try:
+            # Build structured content for LLM synthesis
+            verified_content = {
+                'query_type': structure.get('type', 'philosophical'),
+                'has_dilemma': structure.get('has_dilemma', False),
+                'is_trolley_problem': 'trolley' in query_lower,
+                'options': structure.get('options', []),
+                'ethical_keywords': structure.get('ethical_keywords', []),
+                'frameworks': ['deontological', 'utilitarian', 'virtue_ethics']
+            }
+            
+            # Build LLM guidance for ethical synthesis (simplified - no component analysis)
+            guidance = self.llm_guidance_builder.build_for_ethical(
+                verified_content, query_lower
+            )
+            
+            # Format with LLM
+            formatted_response = self._format_with_llm(guidance)
+            
+            return formatted_response
+            
+        except Exception as e:
+            logger.warning(f"[WorldModel] LLM template generation failed: {e}, using hardcoded fallback")
+            # Ultimate fallback: hardcoded template (only if LLM completely fails)
+            return self._generate_hardcoded_philosophical_template(structure, query_lower)
+    
+    def _generate_hardcoded_philosophical_template(
+        self, structure: Dict[str, Any], query_lower: str
+    ) -> str:
+        """Hardcoded template fallback (last resort when LLM unavailable)."""
         parts = []
         
         if structure['type'] == 'ethical_decision':
