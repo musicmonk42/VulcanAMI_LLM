@@ -1877,17 +1877,17 @@ Brief explanation:"""
             logger.info("[MathTool] BUG A FIX: Detected natural language math command")
             return True
         
-        # BUG A FIX: Enhanced summation detection with unicode handling
-        # Matches patterns like "∑(2k-1) from k=1 to n" or "∑ ... to ..."
-        # Also handles line breaks and fragmentation in the summation expression
+        # BUG A FIX: Enhanced mathematical notation detection with unicode handling
+        # Matches patterns like "∑(2k-1) from k=1 to n", "∏ ... to ...", or "∫(expression)"
+        # Also handles line breaks and fragmentation in notation expressions
         # GATE CHECK EXPANSION: Added Σ (uppercase sigma), ∏ (product), ∫ (integral)
         math_notation_symbols = ['∑', 'Σ', '∏', '∫']
         if any(sym in query for sym in math_notation_symbols):
-            # Look for summation patterns: ∑...to, ∑...from...to, ∑(expression)
+            # Look for mathematical notation patterns: ∑...to, ∏...from...to, ∫(expression)
             if re.search(r'[∑Σ∏∫].*\bto\b', query_lower) or re.search(r'[∑Σ∏∫].*\bfrom\b.*\bto\b', query_lower):
                 logger.info("[MathTool] BUG A FIX: Detected mathematical notation with bounds")
                 return True
-            # Also accept bare summation/product/integral symbol with variables/numbers
+            # Also accept bare notation symbol with variables/numbers
             if re.search(r'[∑Σ∏∫]\s*[\(\[]?[a-z0-9]', query_lower):
                 logger.info("[MathTool] BUG A FIX: Detected mathematical notation expression")
                 return True

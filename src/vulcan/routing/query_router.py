@@ -4122,9 +4122,15 @@ class QueryAnalyzer:
                 # 1. Router LLM correctly classifies query (MATHEMATICAL/PROBABILISTIC)
                 # 2. Reasoning engine's gate check rejects it
                 # 3. Result: low-confidence "not applicable" even though LLM was confident
+                #
+                # Note: skip_gate_checks is set equal to llm_authoritative for semantic clarity.
+                # llm_authoritative indicates the LLM had high confidence in its classification,
+                # and skip_gate_checks is the instruction to reasoning engines. Using both names
+                # makes the code more self-documenting and helps maintain the distinction between
+                # the reason (LLM is authoritative) and the action (skip gate checks).
                 # ===================================================================
                 llm_authoritative = classification.confidence >= 0.8
-                skip_gate_checks = llm_authoritative
+                skip_gate_checks = llm_authoritative  # Semantic clarity: action follows from reason
                 
                 logger.info(
                     f"[QueryRouter] {query_id}: LLM confidence={classification.confidence:.2f}, "

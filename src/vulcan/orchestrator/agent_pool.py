@@ -2739,10 +2739,13 @@ class AgentPoolManager:
             # =========================================================================
             # Extract skip_gate_checks, llm_authoritative, router_confidence from parameters
             # and add them to context so reasoning engines can access them
+            # Note: Both 'skip_gate_checks' and 'skip_gate_check' variants are set because:
+            #   - Different reasoning engines use different key names
+            #   - This ensures compatibility with both conventions
             # =========================================================================
             if "skip_gate_checks" in parameters:
                 context["skip_gate_checks"] = parameters["skip_gate_checks"]
-                context["skip_gate_check"] = parameters["skip_gate_checks"]  # Both variants
+                context["skip_gate_check"] = parameters["skip_gate_checks"]  # Both variants for compatibility
                 logger.debug(f"[AgentPool] Extracted skip_gate_checks={parameters['skip_gate_checks']} from parameters")
             
             if "llm_authoritative" in parameters:
