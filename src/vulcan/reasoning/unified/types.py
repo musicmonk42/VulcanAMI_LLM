@@ -100,6 +100,7 @@ class ReasoningPlan:
         confidence_threshold: Minimum confidence for accepting results (0.0-1.0)
         execution_strategy: Optional advanced execution strategy object
         selected_tools: Optional list of specific tools to use
+        metadata: Additional metadata for tracking, debugging, and context
         
     Examples:
         >>> plan = ReasoningPlan(
@@ -138,3 +139,4 @@ class ReasoningPlan:
     confidence_threshold: float = 0.5
     execution_strategy: Optional[Any] = None
     selected_tools: Optional[List[str]] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
