@@ -128,11 +128,12 @@ try:
         CountingBloomFilter = None
         ScalableBloomFilter = None
     
-    # MerkleTree from local implementation if available
+    # MerkleTree and MerkleProof from local implementation if available
     try:
-        from .merkle import MerkleTree
+        from .merkle import MerkleTree, MerkleProof
     except ImportError:
         MerkleTree = None
+        MerkleProof = None
     
     logger.info("Deprecated storage components available (BloomFilter, MerkleLSMDAG)")
             
@@ -140,13 +141,14 @@ except ImportError as e:
     # Fall back to local implementations if persistant_memory_v46 not available
     logger.debug(f"persistant_memory_v46 not available: {e}")
     try:
-        from .merkle import MerkleLSMDAG, MerkleTree
+        from .merkle import MerkleLSMDAG, MerkleTree, MerkleProof
         from .bloom import BloomFilter, CountingBloomFilter, ScalableBloomFilter
         logger.info("Using local implementations of storage components")
     except ImportError as e:
         logger.warning(f"Local storage implementations not available: {e}")
         MerkleLSMDAG = None
         MerkleTree = None
+        MerkleProof = None
         BloomFilter = None
         CountingBloomFilter = None
         ScalableBloomFilter = None
@@ -185,7 +187,7 @@ except ImportError as e:
 
 # Configuration management (unique to gvulcan)
 try:
-    from .config import GVulcanConfig, ConfigurationManager, ConfigurationFactory
+    from .config import GVulcanConfig, ConfigurationManager, ConfigurationFactory, get_config
     CONFIG_AVAILABLE = True
     logger.info("GVulcan configuration management available")
 except ImportError as e:
@@ -194,6 +196,7 @@ except ImportError as e:
     GVulcanConfig = None
     ConfigurationManager = None
     ConfigurationFactory = None
+    get_config = None
 
 # Additional modules (if they exist)
 try:
@@ -229,6 +232,7 @@ __all__ = [
     "GVulcanConfig",
     "ConfigurationManager",
     "ConfigurationFactory",
+    "get_config",
     "CONFIG_AVAILABLE",
     # Deprecated (use persistant_memory_v46 instead)
     "BloomFilter",
@@ -236,6 +240,7 @@ __all__ = [
     "ScalableBloomFilter",
     "MerkleLSMDAG",
     "MerkleTree",
+    "MerkleProof",
 ]
 
 logger.debug(f"GVulcan package v{__version__} loaded")
