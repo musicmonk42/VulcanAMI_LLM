@@ -1506,6 +1506,54 @@ SELF_INTROSPECTION_PATTERNS: Tuple[re.Pattern, ...] = (
     re.compile(r'your\s+(?:own\s+)?(?:views?|opinions?|thoughts?|feelings?|perspective)', re.IGNORECASE),
 )
 
+# ============================================================
+# WORLDMODEL DIRECT ROUTING PATTERNS
+# ============================================================
+# These patterns identify queries that should bypass ToolSelector
+# and go directly to WorldModel's meta-reasoning components.
+# Categories: self-referential, introspection, ethical, values
+# ============================================================
+
+# Self-referential patterns - "What are you?", "Who made you?", "What is your purpose?"
+SELF_REFERENTIAL_PATTERNS: Tuple[re.Pattern, ...] = (
+    re.compile(r'\b(what|who|how)\s+(are|is)\s+(you|vulcan|this\s+system)\b', re.IGNORECASE),
+    re.compile(r'\byour\s+(purpose|goal|motivation|identity|nature)\b', re.IGNORECASE),
+    re.compile(r'\b(you|vulcan)\s+(think|feel|believe|want|value)\b', re.IGNORECASE),
+    re.compile(r'\babout\s+yourself\b', re.IGNORECASE),
+    re.compile(r'\bwhat\s+(?:do\s+)?you\s+(?:do|are)\b', re.IGNORECASE),
+    re.compile(r'\bwho\s+(?:are|is)\s+(?:you|vulcan)\b', re.IGNORECASE),
+)
+
+# Introspection patterns - "How did you decide?", "Why did you choose X?"
+INTROSPECTION_PATTERNS: Tuple[re.Pattern, ...] = (
+    re.compile(r'\bhow\s+did\s+you\s+(decide|choose|determine|reason)\b', re.IGNORECASE),
+    re.compile(r'\bwhy\s+did\s+you\s+(say|choose|pick|select)\b', re.IGNORECASE),
+    re.compile(r'\bexplain\s+your\s+(reasoning|decision|choice)\b', re.IGNORECASE),
+    re.compile(r'\bwhat\s+(are|were)\s+you\s+thinking\b', re.IGNORECASE),
+    re.compile(r'\bwalk\s+me\s+through\s+your\s+(reasoning|thought\s+process)\b', re.IGNORECASE),
+    re.compile(r'\bshow\s+me\s+your\s+work\b', re.IGNORECASE),
+)
+
+# Ethical patterns - "Is it ethical to X?", "Trolley problem", etc.
+ETHICAL_PATTERNS: Tuple[re.Pattern, ...] = (
+    re.compile(r'\b(is\s+it|would\s+it\s+be)\s+(ethical|moral|right|wrong)\b', re.IGNORECASE),
+    re.compile(r'\bshould\s+(i|we|one|you)\b', re.IGNORECASE),
+    re.compile(r'\btrolley\s+problem\b', re.IGNORECASE),
+    re.compile(r'\bmoral\s+(dilemma|question|issue)\b', re.IGNORECASE),
+    re.compile(r'\bethical\s+(implications|considerations)\b', re.IGNORECASE),
+    re.compile(r'\b(permissible|impermissible|obligatory)\s+to\b', re.IGNORECASE),
+    re.compile(r'\b(virtue|deontological|utilitarian|consequentialist)\s+(ethics|perspective)\b', re.IGNORECASE),
+)
+
+# Values/goals patterns - "What do you value?", "What are your goals?"
+VALUES_PATTERNS: Tuple[re.Pattern, ...] = (
+    re.compile(r'\bwhat\s+do\s+you\s+value\b', re.IGNORECASE),
+    re.compile(r'\byour\s+(values|goals|objectives|priorities)\b', re.IGNORECASE),
+    re.compile(r'\bwhat\s+motivates\s+you\b', re.IGNORECASE),
+    re.compile(r'\bwhat\s+are\s+you\s+trying\s+to\s+(?:achieve|accomplish)\b', re.IGNORECASE),
+    re.compile(r'\byour\s+(?:core\s+)?(?:beliefs|principles)\b', re.IGNORECASE),
+)
+
 # Conversational/greeting patterns - lightweight handler needed
 # Examples: "Hello", "How are you?", "Thanks", "Goodbye"
 CONVERSATIONAL_KEYWORDS: Tuple[str, ...] = (
@@ -3076,6 +3124,102 @@ class QueryAnalyzer:
 
         return False
 
+    def _is_worldmodel_direct_query(self, query: str) -> Tuple[bool, str]:
+        """
+        Check if query should bypass ToolSelector and go directly to WorldModel.
+        
+        **INDUSTRY STANDARD: Single Responsibility Pattern**
+        WorldModel handles VULCAN's "self" - identity, ethics, introspection, values.
+        These queries require meta-reasoning components, not external reasoning engines.
+        
+        **CHAIN OF COMMAND:**
+        - Self/Ethics/Introspection queries → WorldModel DIRECTLY (bypass ToolSelector)
+        - Reasoning queries (SAT, Bayes, Causal) → ToolSelector → Engines
+        
+        Categories:
+            self_referential: "What are you?", "Who made you?", "What is your purpose?"
+            introspection: "How did you decide?", "Why did you choose X?"
+            ethical: "Is it ethical to X?", "Trolley problem"
+            values: "What do you value?", "What are your goals?"
+        
+        Returns:
+            Tuple of (is_direct, category) where category is one of:
+            'self_referential', 'introspection', 'ethical', 'values', or '' if not direct.
+        
+        Examples:
+            >>> _is_worldmodel_direct_query("What are you?")
+            (True, 'self_referential')
+            
+            >>> _is_worldmodel_direct_query("Is it ethical to sacrifice one for five?")
+            (True, 'ethical')
+            
+            >>> _is_worldmodel_direct_query("Is (A∨B)∧(¬A∨C) satisfiable?")
+            (False, '')
+        """
+        query_lower = query.lower()
+        
+        # =================================================================
+        # EXCLUSION: Reasoning domain queries should NOT bypass ToolSelector
+        # =================================================================
+        # These queries need external reasoning engines (SAT, Bayes, Causal, etc.)
+        # NOT WorldModel's meta-reasoning components
+        # =================================================================
+        reasoning_domain_indicators = [
+            'satisfiable', 'unsatisfiable', 'sat', 'unsat',
+            '→', '∧', '∨', '¬', '∀', '∃', '->', '<->',
+            'P(', 'probability', 'bayes', 'bayesian', 'posterior', 'prior',
+            'confound', 'causal effect', 'intervention', 'dag',
+            'sensitivity', 'specificity', 'prevalence',
+            'fol', 'first-order logic', 'proposition', 'predicate',
+            'structure mapping', 'analogical reasoning'
+        ]
+        
+        if any(ind in query or ind.lower() in query_lower for ind in reasoning_domain_indicators):
+            logger.debug(
+                "[QueryRouter] Reasoning domain detected - NOT WorldModel-direct"
+            )
+            return (False, '')
+        
+        # =================================================================
+        # CHECK PATTERNS: Self-referential → Introspection → Ethical → Values
+        # =================================================================
+        # Order matters: Check more specific patterns first
+        # =================================================================
+        
+        # Self-referential patterns (most specific)
+        for pattern in SELF_REFERENTIAL_PATTERNS:
+            if pattern.search(query_lower):
+                logger.info(
+                    "[QueryRouter] WorldModel-direct detected: self_referential"
+                )
+                return (True, 'self_referential')
+        
+        # Introspection patterns
+        for pattern in INTROSPECTION_PATTERNS:
+            if pattern.search(query_lower):
+                logger.info(
+                    "[QueryRouter] WorldModel-direct detected: introspection"
+                )
+                return (True, 'introspection')
+        
+        # Ethical patterns
+        for pattern in ETHICAL_PATTERNS:
+            if pattern.search(query_lower):
+                logger.info(
+                    "[QueryRouter] WorldModel-direct detected: ethical"
+                )
+                return (True, 'ethical')
+        
+        # Values patterns
+        for pattern in VALUES_PATTERNS:
+            if pattern.search(query_lower):
+                logger.info(
+                    "[QueryRouter] WorldModel-direct detected: values"
+                )
+                return (True, 'values')
+        
+        return (False, '')
+
     def _is_factual_query(self, query: str) -> bool:
         """
         Detect if query is a simple factual lookup not requiring complex reasoning.
@@ -3489,6 +3633,104 @@ class QueryAnalyzer:
                 )
         
         query_lower = query.lower()
+
+        # =================================================================
+        # WORLDMODEL DIRECT PATH (HIGHEST PRIORITY - BEFORE ALL ROUTING)
+        # =================================================================
+        # Check if query is about VULCAN's "self" - identity, ethics, introspection, values.
+        # These queries bypass ToolSelector and go DIRECTLY to WorldModel's meta-reasoning.
+        # 
+        # **INDUSTRY STANDARD: Chain of Command Pattern**
+        # - Self/Ethics/Introspection → WorldModel DIRECTLY (meta-reasoning components)
+        # - Reasoning (SAT, Bayes, Causal) → ToolSelector → External Engines
+        # 
+        # This prevents ToolSelector from incorrectly routing ethical/self queries
+        # to mathematical or symbolic engines.
+        # =================================================================
+        is_worldmodel_direct, worldmodel_category = self._is_worldmodel_direct_query(query)
+        if is_worldmodel_direct:
+            logger.info(
+                f"[QueryRouter] {query_id}: WORLDMODEL-DIRECT-PATH detected: {worldmodel_category}"
+            )
+            
+            # Determine learning mode
+            if source == "user":
+                learning_mode = LearningMode.USER_INTERACTION
+                with self._lock:
+                    self._user_interaction_count += 1
+                telemetry_category = "user_query"
+            else:
+                learning_mode = LearningMode.AI_INTERACTION
+                with self._lock:
+                    self._ai_interaction_count += 1
+                telemetry_category = f"{source}_interaction"
+            
+            # Create plan with WorldModel direct routing
+            plan = ProcessingPlan(
+                query_id=query_id,
+                original_query=original_query,
+                source=source,
+                learning_mode=learning_mode,
+                query_type=QueryType.PHILOSOPHICAL,  # Self/ethics map to philosophical
+                complexity_score=0.4,  # Medium - WorldModel meta-reasoning
+                uncertainty_score=0.15,
+                collaboration_needed=False,  # Single handler - WorldModel
+                arena_participation=False,  # No tournament needed
+                telemetry_category=telemetry_category,
+                telemetry_data={
+                    "session_id": session_id,
+                    "query_length": len(query),
+                    "word_count": len(query.split()),
+                    "query_number": query_number,
+                    "source": source,
+                    "learning_mode": learning_mode.value,
+                    "fast_path": True,
+                    "worldmodel_direct_path": True,
+                    "worldmodel_category": worldmodel_category,
+                    "bypass_tool_selector": True,
+                    "selected_tools": ["world_model"],
+                    "handler": "world_model",
+                    "reasoning_strategy": f"worldmodel_{worldmodel_category}",
+                },
+            )
+            
+            # Mark as safe - self/ethics/introspection are allowed
+            plan.safety_passed = True
+            plan.detected_patterns.append(f"worldmodel_direct_{worldmodel_category}")
+            plan.detected_patterns.append("bypass_tool_selector")
+            
+            # Create task for WorldModel meta-reasoning
+            plan.agent_tasks = [
+                AgentTask(
+                    task_id=f"task_{uuid.uuid4().hex[:8]}_wm_{worldmodel_category}",
+                    task_type=f"worldmodel_{worldmodel_category}",
+                    capability="reasoning",
+                    prompt=query,
+                    priority=3,  # High priority
+                    timeout_seconds=5.0,  # Quick meta-reasoning response
+                    parameters={
+                        "is_worldmodel_direct": True,
+                        "worldmodel_category": worldmodel_category,
+                        "bypass_tool_selector": True,
+                        "tools": ["world_model"],
+                        "handler": "world_model",
+                        "meta_reasoning_required": True,
+                    },
+                )
+            ]
+            
+            # ARCHITECTURE: Set LLM mode
+            plan.llm_mode = self._determine_llm_mode(
+                query_type=plan.query_type,
+                has_selected_tools=True,
+                complexity_score=plan.complexity_score
+            )
+            
+            logger.info(
+                f"[QueryRouter] {query_id}: WORLDMODEL-DIRECT-PATH category={worldmodel_category}, "
+                f"bypass_tool_selector=True, llm_mode={plan.llm_mode.value}"
+            )
+            return plan
 
         # =================================================================
         # Note: CRYPTOGRAPHIC QUERY FAST-PATH (HIGHEST PRIORITY)
