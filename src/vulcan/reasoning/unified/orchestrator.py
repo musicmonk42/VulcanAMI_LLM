@@ -1410,8 +1410,34 @@ class UnifiedReasoner:
         strategy: ReasoningStrategy = ReasoningStrategy.ADAPTIVE,
         confidence_threshold: Optional[float] = None,
         constraints: Optional[Dict[str, Any]] = None,
+        pre_selected_tools: Optional[List[str]] = None,
+        skip_tool_selection: bool = False,
     ) -> ReasoningResult:
-        """Enhanced reasoning interface with production tool selection"""
+        """
+        Enhanced reasoning interface with production tool selection.
+        
+        **SINGLE AUTHORITY PATTERN (Chain of Command Fix):**
+        When `pre_selected_tools` is provided with `skip_tool_selection=True`,
+        those tools are used WITHOUT re-selection. This honors ToolSelector's
+        authoritative decision and prevents competing tool selection decisions.
+        
+        Args:
+            input_data: The input to reason about
+            query: Optional query dictionary
+            reasoning_type: Optional reasoning type hint
+            strategy: Reasoning strategy to use
+            confidence_threshold: Minimum confidence threshold
+            constraints: Optional execution constraints
+            pre_selected_tools: Tools pre-selected by ToolSelector (authoritative)
+            skip_tool_selection: If True, skip tool selection and use pre_selected_tools
+            
+        Returns:
+            ReasoningResult with the reasoning outcome
+            
+        Note:
+            The authority chain is: Router→hints, ToolSelector→authority, UnifiedReasoner→execution.
+            When skip_tool_selection=True, this method respects ToolSelector's decision.
+        """
 
         with self._shutdown_lock:
             if self._is_shutdown:
@@ -1592,34 +1618,52 @@ class UnifiedReasoner:
                 except Exception as e:
                     logger.warning(f"VOI gate failed: {e}")
 
-            # Pass router hints (not commands) to plan creation
-            plan = self._create_optimized_plan(task, strategy, router_hints)
+            # =====================================================================
+            # SINGLE AUTHORITY PATTERN: Honor pre-selected tools
+            # =====================================================================
+            # If tools were pre-selected by ToolSelector (skip_tool_selection=True),
+            # use them directly WITHOUT re-selecting. This prevents competing decisions.
+            # =====================================================================
+            if skip_tool_selection and pre_selected_tools:
+                logger.info(
+                    f"[SingleAuthority] Using pre-selected tools from ToolSelector: "
+                    f"{pre_selected_tools}"
+                )
+                # Create plan with pre-selected tools - NO RE-SELECTION
+                plan = self._create_optimized_plan(
+                    task, strategy, router_hints,
+                    pre_selected_tools=pre_selected_tools,
+                    skip_tool_selection=True
+                )
+            else:
+                # Normal flow: Pass router hints (not commands) to plan creation
+                plan = self._create_optimized_plan(task, strategy, router_hints)
 
-            # =====================================================================
-            # TOOL SELECTOR: THE AUTHORITY FOR ALL STRATEGIES
-            # =====================================================================
-            # ToolSelector should be invoked for ALL strategies, not just Portfolio/Utility.
-            # It considers router hints and makes the final decision.
-            # =====================================================================
-            if self.tool_selector and strategy in [
-                ReasoningStrategy.PORTFOLIO,
-                ReasoningStrategy.UTILITY_BASED,
-                ReasoningStrategy.ENSEMBLE,  # NEW: Also use ToolSelector for ensemble
-            ]:
-                try:
-                    selection_result = self._select_tools_for_plan(plan, task)
-                    # ToolSelector decision is authoritative
-                    if selection_result and hasattr(selection_result, "selected_tool"):
-                        plan.selected_tools = [selection_result.selected_tool]
-                        logger.info(
-                            f"[UnifiedReasoner] ToolSelector decision (THE AUTHORITY): "
-                            f"{selection_result.selected_tool}"
-                        )
-                    
-                    if hasattr(selection_result, "strategy_used"):
-                        plan.execution_strategy = selection_result.strategy_used
-                except Exception as e:
-                    logger.warning(f"Tool selection failed: {e}")
+                # =====================================================================
+                # TOOL SELECTOR: THE AUTHORITY FOR ALL STRATEGIES
+                # =====================================================================
+                # ToolSelector should be invoked for ALL strategies, not just Portfolio/Utility.
+                # It considers router hints and makes the final decision.
+                # =====================================================================
+                if self.tool_selector and strategy in [
+                    ReasoningStrategy.PORTFOLIO,
+                    ReasoningStrategy.UTILITY_BASED,
+                    ReasoningStrategy.ENSEMBLE,  # NEW: Also use ToolSelector for ensemble
+                ]:
+                    try:
+                        selection_result = self._select_tools_for_plan(plan, task)
+                        # ToolSelector decision is authoritative
+                        if selection_result and hasattr(selection_result, "selected_tool"):
+                            plan.selected_tools = [selection_result.selected_tool]
+                            logger.info(
+                                f"[UnifiedReasoner] ToolSelector decision (THE AUTHORITY): "
+                                f"{selection_result.selected_tool}"
+                            )
+                        
+                        if hasattr(selection_result, "strategy_used"):
+                            plan.execution_strategy = selection_result.strategy_used
+                    except Exception as e:
+                        logger.warning(f"Tool selection failed: {e}")
 
             strategy_func = self.reasoning_strategies.get(
                 strategy, self._adaptive_reasoning
@@ -1887,12 +1931,17 @@ class UnifiedReasoner:
             return None
 
     def _create_optimized_plan(
-        self, task: ReasoningTask, strategy: ReasoningStrategy, router_hints: Optional[Dict[str, float]] = None
+        self, 
+        task: ReasoningTask, 
+        strategy: ReasoningStrategy, 
+        router_hints: Optional[Dict[str, float]] = None,
+        pre_selected_tools: Optional[List[str]] = None,
+        skip_tool_selection: bool = False,
     ) -> ReasoningPlan:
         """
         Create execution plan optimized for utility.
         
-        INDUSTRY STANDARD - SINGLE AUTHORITY PATTERN:
+        **INDUSTRY STANDARD - SINGLE AUTHORITY PATTERN:**
         ToolSelector is THE AUTHORITY for tool selection. Router provides HINTS
         (suggestions with weights), ToolSelector makes final decision considering:
         - Router hints (influence, not override)
@@ -1900,7 +1949,12 @@ class UnifiedReasoner:
         - Historical performance (Bayesian prior)
         - Current context and constraints
         
-        ARCHITECTURAL CHANGE:
+        **CHAIN OF COMMAND FIX:**
+        If `skip_tool_selection=True` and `pre_selected_tools` is provided,
+        use those tools WITHOUT re-selecting. This honors ToolSelector's
+        authoritative decision and prevents competing tool selections.
+        
+        **ARCHITECTURAL CHANGE:**
         - OLD: Router's selected_tools used directly (bypassed ToolSelector)
         - NEW: Router's hints passed to ToolSelector as influence (+utility boost)
         
@@ -1910,6 +1964,8 @@ class UnifiedReasoner:
             router_hints: Optional hints from Router {tool_name: confidence_weight}
                          Example: {'symbolic': 0.9, 'probabilistic': 0.2}
                          These influence ToolSelector but don't override it
+            pre_selected_tools: Tools pre-selected by ToolSelector (authoritative)
+            skip_tool_selection: If True, use pre_selected_tools without re-selecting
         
         Returns:
             ReasoningPlan with tasks selected by ToolSelector
@@ -1923,7 +1979,71 @@ class UnifiedReasoner:
             if router_hints:
                 cached_plan.metadata = cached_plan.metadata or {}
                 cached_plan.metadata['router_hints'] = router_hints
+            # Store pre-selected tools if provided
+            if skip_tool_selection and pre_selected_tools:
+                cached_plan.selected_tools = pre_selected_tools
+                cached_plan.metadata = cached_plan.metadata or {}
+                cached_plan.metadata['skip_tool_selection'] = True
             return cached_plan
+
+        # =========================================================================
+        # SINGLE AUTHORITY PATTERN: Honor pre-selected tools
+        # =========================================================================
+        # If ToolSelector has already made the decision (skip_tool_selection=True),
+        # use those tools WITHOUT re-selecting. This prevents competing decisions.
+        # =========================================================================
+        if skip_tool_selection and pre_selected_tools:
+            logger.info(
+                f"[SingleAuthority] Using pre-selected tools in plan: {pre_selected_tools}"
+            )
+            tasks = []
+            for tool_name in pre_selected_tools:
+                reasoning_type = self._map_tool_name_to_reasoning_type(tool_name)
+                if reasoning_type and reasoning_type in self.reasoners:
+                    sub_task = ReasoningTask(
+                        task_id=f"{task.task_id}_{reasoning_type.value}",
+                        task_type=reasoning_type,
+                        input_data=task.input_data,
+                        query=task.query,
+                        constraints=task.constraints,
+                        utility_context=task.utility_context,
+                    )
+                    tasks.append(sub_task)
+                else:
+                    logger.warning(
+                        f"[SingleAuthority] Pre-selected tool '{tool_name}' not available, skipping"
+                    )
+            
+            if not tasks:
+                logger.error(
+                    f"[SingleAuthority] No valid tools from pre-selection: {pre_selected_tools}"
+                )
+                tasks = [task]  # Fallback to original task
+            
+            # Create plan with pre-selected tools - NO dependencies for single authority
+            dependencies = {}
+            estimated_time, estimated_cost = self._compute_plan_estimates_using_plan_class(
+                tasks, dependencies, task
+            )
+            
+            plan = ReasoningPlan(
+                plan_id=str(uuid.uuid4()),
+                tasks=tasks,
+                strategy=strategy,
+                dependencies=dependencies,
+                estimated_time=estimated_time,
+                estimated_cost=estimated_cost,
+                confidence_threshold=task.constraints.get("confidence_threshold", 0.5),
+                selected_tools=pre_selected_tools,
+                metadata={
+                    'skip_tool_selection': True,
+                    'pre_selected_tools': pre_selected_tools,
+                    'authority': 'ToolSelector',
+                },
+            )
+            
+            self.plan_cache[cache_key] = plan
+            return plan
 
         tasks = []
         dependencies = {}
