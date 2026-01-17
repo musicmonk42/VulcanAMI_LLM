@@ -4209,19 +4209,78 @@ class UnifiedReasoner:
                     if isinstance(raw_result, ReasoningResult):
                         result = raw_result
                     elif isinstance(raw_result, dict):
-                        # Extract the actual computed result for user-friendly conclusion
+                        # ═══════════════════════════════════════════════════════════════════
+                        # BUG B FIX: Enhanced conclusion extraction with proper validation
+                        # ═══════════════════════════════════════════════════════════════════
+                        # PROBLEM: formatted_output might be empty string (falsy), causing
+                        # fallback to raw_result dict instead of using computed_result.
+                        # Also, conclusion.result might be nested and not extracted properly.
+                        #
+                        # SOLUTION: 
+                        # 1. Check formatted_output is non-empty string, not just truthy
+                        # 2. Extract from nested conclusion.result if conclusion is dict
+                        # 3. Add defensive type checking and logging for debugging
+                        # ═══════════════════════════════════════════════════════════════════
+                        
+                        # Extract conclusion field (might be dict or simple value)
                         conclusion = raw_result.get('conclusion', {})
-                        computed_result = conclusion.get('result') if isinstance(conclusion, dict) else conclusion
+                        
+                        # Extract computed_result with defensive programming
+                        computed_result = None
+                        if isinstance(conclusion, dict):
+                            # BUG B FIX: Extract from nested 'result' field
+                            computed_result = conclusion.get('result')
+                            # Fallback to 'success' field if present (some tools use this)
+                            if not computed_result and conclusion.get('success'):
+                                computed_result = conclusion.get('value') or conclusion.get('answer')
+                        elif conclusion:
+                            # conclusion is a simple value (string, number, etc.)
+                            computed_result = conclusion
+                        
+                        # Extract formatted_output with type safety
                         formatted_output = raw_result.get('formatted_output', '')
-
-                        # Build a user-friendly conclusion
-                        # Prefer formatted_output (includes full explanation) over simple result
-                        if formatted_output:
+                        
+                        # BUG B FIX: Build user-friendly conclusion with proper priority
+                        # Priority: formatted_output (non-empty) > computed_result > fallback
+                        user_conclusion = None
+                        extraction_method = None
+                        
+                        # Priority 1: Use formatted_output if it's a non-empty string
+                        # Industry Standard: Cache .strip() result to avoid redundant operations
+                        formatted_output_stripped = formatted_output.strip() if isinstance(formatted_output, str) else ""
+                        if formatted_output_stripped:
                             user_conclusion = formatted_output
-                        elif computed_result:
-                            user_conclusion = f"The answer is: {computed_result}"
+                            extraction_method = "formatted_output"
+                        
+                        # Priority 2: Use computed_result if available
+                        elif computed_result is not None:
+                            # Handle different result types appropriately
+                            if isinstance(computed_result, dict):
+                                # If result is still a dict, try to extract meaningful value
+                                user_conclusion = computed_result.get('value') or computed_result.get('answer') or str(computed_result)
+                                extraction_method = "computed_result_dict"
+                            else:
+                                user_conclusion = f"**Result:** {computed_result}"
+                                extraction_method = "computed_result"
+                        
+                        # Priority 3: Fallback to raw_result with warning
                         else:
+                            logger.warning(
+                                f"[BUG B FIX] Failed to extract user-friendly conclusion. "
+                                f"formatted_output={type(formatted_output).__name__}, "
+                                f"conclusion={type(conclusion).__name__}, "
+                                f"computed_result={computed_result}. "
+                                f"Falling back to raw_result."
+                            )
                             user_conclusion = raw_result
+                            extraction_method = "fallback_raw_result"
+                        
+                        # Debug logging for monitoring extraction success
+                        logger.debug(
+                            f"[BUG B FIX] Conclusion extraction: method={extraction_method}, "
+                            f"has_formatted_output={bool(formatted_output and formatted_output.strip())}, "
+                            f"has_computed_result={computed_result is not None}"
+                        )
 
                         raw_confidence = raw_result.get('confidence', 0.9)
                         result = ReasoningResult(
