@@ -1191,11 +1191,15 @@ class UnifiedReasoner:
             
             # Get relevant objectives from hierarchy
             try:
-                relevant_objectives = hierarchy.get_top_objectives(limit=5)
-                analysis['objectives'] = [
-                    {'name': obj.name, 'priority': obj.priority}
-                    for obj in relevant_objectives
-                ]
+                relevant_objective_names = hierarchy.get_top_objectives(limit=5)
+                analysis['objectives'] = []
+                for name in relevant_objective_names:
+                    obj = hierarchy.objectives.get(name)
+                    if obj and hasattr(obj, 'name') and hasattr(obj, 'priority'):
+                        analysis['objectives'].append({'name': obj.name, 'priority': obj.priority})
+                    else:
+                        # Fallback: use the name string directly with default priority
+                        analysis['objectives'].append({'name': name, 'priority': 0})
             except Exception as e:
                 logger.warning(f"[SelfRef] Failed to get objectives: {e}")
                 
