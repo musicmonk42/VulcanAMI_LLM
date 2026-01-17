@@ -1448,9 +1448,31 @@ class SymbolicToolWrapper:
     """
     
     def __init__(self, engine, config: Optional[Dict[str, Any]] = None):
+        # BUG FIX #1: Defensive Programming - Validate engine type at initialization
+        # FAIL-FAST: Raise explicit error if wrong type is passed instead of silent failure
+        if isinstance(engine, str):
+            raise TypeError(
+                f"SymbolicToolWrapper received string '{engine}' instead of SymbolicReasoner instance. "
+                f"This indicates a bug in the engine initialization code. "
+                f"Expected: SymbolicReasoner instance, Got: {type(engine).__name__}"
+            )
+        if engine is None:
+            raise ValueError(
+                "SymbolicToolWrapper received None as engine. "
+                "Cannot initialize wrapper with null engine. "
+                "Check engine initialization in _initialize_real_engines()."
+            )
+        # Type safety: Verify engine has required query() method
+        if not hasattr(engine, 'query'):
+            raise AttributeError(
+                f"SymbolicToolWrapper engine must have 'query()' method. "
+                f"Got type: {type(engine).__name__}, "
+                f"Available methods: {[m for m in dir(engine) if not m.startswith('_')]}"
+            )
         self.engine = engine
         self.name = "symbolic"
         self.config = config or {}
+        logger.debug(f"[SymbolicToolWrapper] Initialized with engine type: {type(engine).__name__}")
     
     def reason(self, problem: Any) -> Dict[str, Any]:
         """
@@ -1889,9 +1911,27 @@ class ProbabilisticToolWrapper:
     )
     
     def __init__(self, engine, config: Optional[Dict[str, Any]] = None):
+        # BUG FIX #1: Defensive Programming - Validate engine type at initialization
+        # FAIL-FAST: Raise explicit error if wrong type is passed
+        if isinstance(engine, str):
+            raise TypeError(
+                f"ProbabilisticToolWrapper received string '{engine}' instead of ProbabilisticReasoner instance. "
+                f"Expected: ProbabilisticReasoner instance, Got: {type(engine).__name__}"
+            )
+        if engine is None:
+            raise ValueError(
+                "ProbabilisticToolWrapper received None as engine. "
+                "Cannot initialize wrapper with null engine."
+            )
+        if not hasattr(engine, 'query'):
+            raise AttributeError(
+                f"ProbabilisticToolWrapper engine must have 'query()' method. "
+                f"Got type: {type(engine).__name__}"
+            )
         self.engine = engine
         self.name = "probabilistic"
         self.config = config or {}
+        logger.debug(f"[ProbabilisticToolWrapper] Initialized with engine type: {type(engine).__name__}")
     
     def reason(self, problem: Any) -> Dict[str, Any]:
         """
@@ -2380,9 +2420,28 @@ class CausalToolWrapper:
     """
     
     def __init__(self, engine, config: Optional[Dict[str, Any]] = None):
+        # BUG FIX #1: Defensive Programming - Validate engine type at initialization
+        # FAIL-FAST: Raise explicit error if wrong type is passed
+        if isinstance(engine, str):
+            raise TypeError(
+                f"CausalToolWrapper received string '{engine}' instead of CausalReasoner instance. "
+                f"Expected: CausalReasoner instance, Got: {type(engine).__name__}"
+            )
+        if engine is None:
+            raise ValueError(
+                "CausalToolWrapper received None as engine. "
+                "Cannot initialize wrapper with null engine."
+            )
+        # CausalReasoner may have different method names, so check for common ones
+        if not (hasattr(engine, 'query') or hasattr(engine, 'analyze') or hasattr(engine, 'reason')):
+            raise AttributeError(
+                f"CausalToolWrapper engine must have 'query()', 'analyze()', or 'reason()' method. "
+                f"Got type: {type(engine).__name__}"
+            )
         self.engine = engine
         self.name = "causal"
         self.config = config or {}
+        logger.debug(f"[CausalToolWrapper] Initialized with engine type: {type(engine).__name__}")
     
     def reason(self, problem: Any) -> Dict[str, Any]:
         """
@@ -2450,9 +2509,31 @@ class AnalogicalToolWrapper:
     """
     
     def __init__(self, engine, config: Optional[Dict[str, Any]] = None):
+        # BUG FIX #1: Defensive Programming - Validate engine type at initialization
+        # Industry Standard: Fail-fast with clear error messages
+        if isinstance(engine, str):
+            raise TypeError(
+                f"AnalogicalToolWrapper received string '{engine}' instead of AnalogicalReasoner instance. "
+                f"This indicates a bug in engine initialization. "
+                f"Expected: AnalogicalReasoner instance, Got: {type(engine).__name__}"
+            )
+        if engine is None:
+            raise ValueError(
+                "AnalogicalToolWrapper received None as engine. "
+                "Cannot initialize wrapper with null engine. "
+                "Check _initialize_real_engines() for proper engine instantiation."
+            )
+        # Verify engine has required methods
+        if not (hasattr(engine, 'find_analogies') or hasattr(engine, 'reason')):
+            raise AttributeError(
+                f"AnalogicalToolWrapper engine must have 'find_analogies()' or 'reason()' method. "
+                f"Got type: {type(engine).__name__}, "
+                f"Available methods: {[m for m in dir(engine) if not m.startswith('_')][:10]}"
+            )
         self.engine = engine
         self.name = "analogical"
         self.config = config or {}
+        logger.debug(f"[AnalogicalToolWrapper] Initialized with engine type: {type(engine).__name__}")
     
     def reason(self, problem: Any) -> Dict[str, Any]:
         """Execute analogical reasoning on the problem."""
@@ -2510,9 +2591,27 @@ class MultimodalToolWrapper:
     """
     
     def __init__(self, engine, config: Optional[Dict[str, Any]] = None):
+        # BUG FIX #1: Defensive Programming - Validate engine type at initialization
+        # Industry Standard: Type safety with comprehensive validation
+        if isinstance(engine, str):
+            raise TypeError(
+                f"MultimodalToolWrapper received string '{engine}' instead of MultimodalReasoner instance. "
+                f"Expected: MultimodalReasoner instance, Got: {type(engine).__name__}"
+            )
+        if engine is None:
+            raise ValueError(
+                "MultimodalToolWrapper received None as engine. "
+                "Cannot initialize wrapper with null engine."
+            )
+        if not (hasattr(engine, 'process') or hasattr(engine, 'reason')):
+            raise AttributeError(
+                f"MultimodalToolWrapper engine must have 'process()' or 'reason()' method. "
+                f"Got type: {type(engine).__name__}"
+            )
         self.engine = engine
         self.name = "multimodal"
         self.config = config or {}
+        logger.debug(f"[MultimodalToolWrapper] Initialized with engine type: {type(engine).__name__}")
     
     def reason(self, problem: Any) -> Dict[str, Any]:
         """Execute multimodal reasoning on the problem."""
@@ -3513,7 +3612,27 @@ class CryptographicToolWrapper:
             engine: CryptographicEngine instance
             config: Optional configuration dict (for warm pool compatibility).
         """
+        # BUG FIX #1: Defensive Programming - Validate engine type at initialization
+        # Industry Standard: Comprehensive input validation with clear error messages
+        if isinstance(engine, str):
+            raise TypeError(
+                f"CryptographicToolWrapper received string '{engine}' instead of CryptographicEngine instance. "
+                f"Expected: CryptographicEngine instance, Got: {type(engine).__name__}"
+            )
+        if engine is None:
+            raise ValueError(
+                "CryptographicToolWrapper received None as engine. "
+                "Cannot initialize wrapper with null engine."
+            )
+        if not (hasattr(engine, 'compute') or hasattr(engine, 'hash') or hasattr(engine, 'reason')):
+            raise AttributeError(
+                f"CryptographicToolWrapper engine must have 'compute()', 'hash()', or 'reason()' method. "
+                f"Got type: {type(engine).__name__}"
+            )
         self.engine = engine
+        self.name = "cryptographic"
+        self.config = config or {}
+        logger.debug(f"[CryptographicToolWrapper] Initialized with engine type: {type(engine).__name__}")
         self.name = "cryptographic"
         self.config = config or {}
     
@@ -3763,9 +3882,32 @@ class MathematicalToolWrapper:
             engine: MathematicalComputationTool instance
             config: Optional configuration dict (for warm pool compatibility).
         """
+        # BUG FIX #1: Defensive Programming - Validate engine type at initialization
+        # Industry Standard: Fail-fast principle with actionable error messages
+        if isinstance(engine, str):
+            raise TypeError(
+                f"MathematicalToolWrapper received string '{engine}' instead of MathematicalComputationTool instance. "
+                f"This indicates a bug in _initialize_real_engines(). "
+                f"Expected: MathematicalComputationTool instance, Got: {type(engine).__name__}"
+            )
+        if engine is None:
+            raise ValueError(
+                "MathematicalToolWrapper received None as engine. "
+                "Cannot initialize wrapper with null engine. "
+                "Ensure MathematicalComputationTool is properly instantiated."
+            )
+        # BUG FIX #4: Add gate check capability validation
+        # MathTool must be able to reject non-mathematical queries
+        if not (hasattr(engine, 'solve') or hasattr(engine, 'compute') or hasattr(engine, 'reason')):
+            raise AttributeError(
+                f"MathematicalToolWrapper engine must have 'solve()', 'compute()', or 'reason()' method. "
+                f"Got type: {type(engine).__name__}, "
+                f"Available methods: {[m for m in dir(engine) if not m.startswith('_')][:10]}"
+            )
         self.engine = engine
         self.name = "mathematical"
         self.config = config or {}
+        logger.debug(f"[MathematicalToolWrapper] Initialized with engine type: {type(engine).__name__}")
     
     def reason(self, problem: Any) -> Dict[str, Any]:
         """
