@@ -50,7 +50,7 @@ reasoning:
       enabled: true
       priority: 7
     philosophical:
-      enabled: true
+      enabled: false  # DEPRECATED: Philosophical queries now route to world_model
       priority: 3
     probabilistic:
       enabled: true
