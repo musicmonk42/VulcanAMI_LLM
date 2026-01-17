@@ -5707,6 +5707,12 @@ class ToolSelector:
             if llm_candidates:
                 # LLM classification succeeded with high confidence
                 # Build candidate list using LLM-suggested tools
+                # 
+                # INDUSTRY-STANDARD FIX: Mark that LLM classification was authoritative
+                # This allows downstream components to trust the LLM's classification
+                # and skip redundant per-engine gate checks
+                llm_authoritative = True  # LLM confidence >= 0.8
+                
                 for tool_name in llm_candidates:
                     cost_dist = self.cost_model.predict_cost(tool_name, features)
                     
@@ -5736,6 +5742,10 @@ class ToolSelector:
                         "cost": cost_dist,
                         "prior": 0.9,  # High prior for LLM selection
                         "source": "llm_classification",
+                        # INDUSTRY-STANDARD FIX: Add metadata for skip_gate_check
+                        "skip_gate_check": True,  # LLM was authoritative
+                        "llm_authoritative": True,
+                        "llm_confidence": 0.9,  # High confidence (>= 0.8)
                     })
                 
                 if candidates:

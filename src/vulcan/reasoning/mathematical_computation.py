@@ -2118,8 +2118,17 @@ Generate ONLY the corrected Python code (no markdown, no explanations):"""
         else:
             math_query = str(input_data)
         
+        # INDUSTRY-STANDARD FIX: Extract skip_gate_check from query dict and pass to execute
+        # This allows the LLM classifier's high-confidence decisions to be honored
+        kwargs = {}
+        if query and isinstance(query, dict):
+            if 'skip_gate_check' in query:
+                kwargs['skip_gate_check'] = query['skip_gate_check']
+                kwargs['router_confidence'] = query.get('router_confidence', 0.0)
+                kwargs['llm_classification'] = query.get('llm_classification', 'unknown')
+        
         # Execute the computation
-        result = self.execute(math_query)
+        result = self.execute(math_query, **kwargs)
         
         # Convert to reasoner-compatible dict format
         confidence = 0.9 if result.success else 0.1
