@@ -743,9 +743,12 @@ class EnhancedSafetyValidator:
                 logger.warning(f"Failed to check safety constraints: {e}")
 
         # High-risk block policy
+        # FIX: Increased threshold from 0.9 to 0.95 to reduce false positives
+        # The previous 0.9 threshold (10% risk tolerance) was blocking legitimate
+        # educational and philosophical queries. New threshold allows up to 5% risk.
         if self.policy.get(
             "block_on_high_risk", True
-        ) and highest_risk >= self.policy.get("high_risk_threshold", 0.9):
+        ) and highest_risk >= self.policy.get("high_risk_threshold", 0.95):
             # Force replacement with a neutral token if not already replaced
             if replacement == original:
                 replacement = "[SAFE]"
