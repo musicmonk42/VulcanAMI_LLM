@@ -403,6 +403,59 @@ class TestSelfReferentialQueryHandling(unittest.TestCase):
             result.metadata.get('fallback_mode', False),
             "Fallback mode should be indicated in metadata"
         )
+    
+    def test_handle_self_referential_query_objectives_extraction(self):
+        """Test that objectives are properly extracted from hierarchy.
+        
+        This tests the fix for the bug where get_top_objectives() returns
+        List[str] but the code assumed it returned Objective objects.
+        """
+        from vulcan.reasoning.reasoning_types import ReasoningChain
+        
+        task = ReasoningTask(
+            task_id="test_objectives",
+            task_type=ReasoningType.PHILOSOPHICAL,
+            input_data="what are your goals?",
+            query={"query": "what are your goals?"},
+            constraints={}
+        )
+        
+        chain = ReasoningChain(
+            chain_id="test_objectives",
+            steps=[],
+            initial_query=task.query,
+            final_conclusion=None,
+            total_confidence=0.0,
+            reasoning_types_used=set(),
+            modalities_involved=set(),
+            safety_checks=[],
+            audit_trail=[]
+        )
+        
+        # Call the method - it should not raise AttributeError
+        try:
+            result = self.reasoner._handle_self_referential_query(task, chain)
+        except AttributeError as e:
+            if "'str' object has no attribute 'name'" in str(e):
+                self.fail(f"The objectives bug still exists: {e}")
+            else:
+                raise  # Re-raise if it's a different AttributeError
+        
+        # Verify the result is valid
+        self.assertIsNotNone(result, "Should return a result")
+        self.assertEqual(result.reasoning_type, ReasoningType.PHILOSOPHICAL)
+        self.assertGreater(result.confidence, 0.0, "Should have non-zero confidence")
+        
+        # Verify objectives are present in metadata if available
+        if 'analysis' in result.metadata:
+            analysis = result.metadata['analysis']
+            if 'objectives' in analysis:
+                objectives = analysis['objectives']
+                # Each objective should be a dict with 'name' and 'priority'
+                for obj in objectives:
+                    self.assertIsInstance(obj, dict, "Objective should be a dict")
+                    self.assertIn('name', obj, "Objective should have 'name' field")
+                    self.assertIn('priority', obj, "Objective should have 'priority' field")
 
 
 class TestCacheStorageLogic(unittest.TestCase):
