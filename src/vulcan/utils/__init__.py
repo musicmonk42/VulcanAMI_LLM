@@ -13,18 +13,14 @@ from .safe_execution import (
 )
 
 from .numeric_utils import (
-    float_equals,
     is_close,
     clamp,
-    is_in_range,
     safe_divide,
     normalize_weights,
-    check_finite,
-    validate_probability,
     DEFAULT_EPSILON,
 )
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 __all__ = [
     # Safe execution
     "SafeCodeExecutor",
@@ -33,13 +29,9 @@ __all__ = [
     "is_safe_execution_available",
     "reset_executor",
     # Numeric utilities
-    "float_equals",
     "is_close",
     "clamp",
-    "is_in_range",
     "safe_divide",
     "normalize_weights",
-    "check_finite",
-    "validate_probability",
     "DEFAULT_EPSILON",
 ]
