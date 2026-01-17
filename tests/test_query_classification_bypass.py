@@ -478,6 +478,26 @@ def mock_benchmark():
 
 
 # ============================================================================
+# Helper Functions
+# ============================================================================
+
+def _is_pytest_benchmark_available() -> bool:
+    """
+    Check if pytest-benchmark is available.
+    
+    Industry Standard: Graceful feature detection for optional dependencies.
+    
+    Returns:
+        True if pytest-benchmark is installed, False otherwise
+    """
+    try:
+        import pytest_benchmark
+        return True
+    except ImportError:
+        return False
+
+
+# ============================================================================
 # Performance Tests (require pytest-benchmark)
 # ============================================================================
 
@@ -534,23 +554,3 @@ class TestPerformance:
         
         # Assert correctness
         assert result is True, "Calculation should be detected as reasoning"
-
-
-# ============================================================================
-# Helper Functions
-# ============================================================================
-
-def _is_pytest_benchmark_available() -> bool:
-    """
-    Check if pytest-benchmark is available.
-    
-    Industry Standard: Graceful feature detection for optional dependencies.
-    
-    Returns:
-        True if pytest-benchmark is installed, False otherwise
-    """
-    try:
-        import pytest_benchmark
-        return True
-    except ImportError:
-        return False
