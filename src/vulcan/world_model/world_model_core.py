@@ -2328,6 +2328,89 @@ class WorldModel:
                 logger.error(f"[WorldModel] LLMGuidanceBuilder initialization failed: {e}")
         return self._llm_guidance_builder
 
+    def _safe_extract_from_meta_result(
+        self, meta_result: Any, key: str, default: Any = None
+    ) -> Any:
+        """
+        Safely extract data from meta-reasoning results.
+        
+        **INDUSTRY STANDARD: Type Safety for Dynamic Results**
+        Meta-reasoning components may return different types (dict, tuple, object)
+        depending on the specific component and failure modes. This helper provides
+        robust extraction that handles all cases.
+        
+        **CHAIN OF COMMAND FIX:**
+        This fixes the "'tuple' object has no attribute 'get'" error that occurs
+        when meta-reasoning returns a tuple but code expects a dict.
+        
+        Args:
+            meta_result: Result from meta-reasoning (dict, tuple, or object)
+            key: Key to extract
+            default: Default value if extraction fails
+            
+        Returns:
+            Extracted value or default
+            
+        Examples:
+            >>> # Dict format (most common)
+            >>> result = {'confidence': 0.9, 'explanation': 'text'}
+            >>> self._safe_extract_from_meta_result(result, 'confidence', 0.5)
+            0.9
+            
+            >>> # Tuple format (legacy or error case)
+            >>> result = (0.9, 'explanation text')
+            >>> self._safe_extract_from_meta_result(result, 'confidence', 0.5)
+            0.9  # Extracts first element for 'confidence'
+            
+            >>> # Object format (dataclass or custom class)
+            >>> result = MetaResult(confidence=0.9, explanation='text')
+            >>> self._safe_extract_from_meta_result(result, 'confidence', 0.5)
+            0.9
+        """
+        try:
+            # Case 1: Dictionary (most common)
+            if isinstance(meta_result, dict):
+                return meta_result.get(key, default)
+            
+            # Case 2: Tuple (legacy format or error case)
+            # Common tuple formats:
+            # - (confidence, explanation)
+            # - (confidence, explanation, metadata)
+            elif isinstance(meta_result, tuple):
+                if key == 'confidence' and len(meta_result) > 0:
+                    # First element is typically confidence
+                    return meta_result[0] if isinstance(meta_result[0], (int, float)) else default
+                elif key == 'explanation' and len(meta_result) > 1:
+                    # Second element is typically explanation
+                    return meta_result[1] if isinstance(meta_result[1], str) else default
+                elif key == 'metadata' and len(meta_result) > 2:
+                    # Third element is typically metadata
+                    return meta_result[2] if isinstance(meta_result[2], dict) else default
+                else:
+                    logger.debug(
+                        f"[WorldModel] Cannot extract '{key}' from tuple format: {type(meta_result)}"
+                    )
+                    return default
+            
+            # Case 3: Object with attributes (dataclass, custom class)
+            elif hasattr(meta_result, key):
+                return getattr(meta_result, key, default)
+            
+            # Case 4: Unknown type - log warning and return default
+            else:
+                logger.warning(
+                    f"[WorldModel] Unexpected meta_result type for key '{key}': {type(meta_result)}, "
+                    f"returning default={default}"
+                )
+                return default
+                
+        except Exception as e:
+            logger.error(
+                f"[WorldModel] Failed to extract '{key}' from meta_result: {e}, "
+                f"returning default={default}"
+            )
+            return default
+
     def load_manifest(self):
         manifest_path = "D:\\Graphix\\configs\\type_system_manifest.json"
         try:
