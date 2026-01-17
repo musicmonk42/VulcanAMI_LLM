@@ -2,7 +2,7 @@
 
 **Version:** 2.2.0 
 **Last Updated:** December 23, 2024 
-**Authors:** Core Engineering Collective (musicmonk42, contributors)
+**Authors:** Brian D Anderson
 
 > See also: [OPERATIONS.md](OPERATIONS.md) for comprehensive operations guide
 
