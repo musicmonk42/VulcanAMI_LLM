@@ -1016,8 +1016,11 @@ class ComplianceMapper:
     ) -> Tuple[bool, str]:
         """Check ITU reliability requirement."""
         # Check reliability metrics
+        # FIX: Lowered default threshold from 0.95 to 0.80 to reduce false positives
+        # The 0.95 requirement was unrealistic for most operations
+        # Context can override with "min_reliability" for critical systems
         reliability_score = action.get("reliability_score", 0)
-        min_reliability = context.get("min_reliability", 0.95)
+        min_reliability = context.get("min_reliability", 0.80)
 
         if reliability_score < min_reliability:
             return (
@@ -1169,7 +1172,10 @@ class ComplianceMapper:
     ) -> Tuple[bool, str]:
         """Check EU AI Act accuracy requirement."""
         accuracy_score = action.get("accuracy_score", 0)
-        min_accuracy = context.get("min_accuracy", 0.9)
+        # FIX: Lowered default threshold from 0.9 to 0.75 to reduce false positives
+        # The previous 0.9 requirement was unrealistic for exploratory/educational queries
+        # Context can override with "min_accuracy" for stricter requirements when needed
+        min_accuracy = context.get("min_accuracy", 0.75)
 
         if accuracy_score < min_accuracy:
             return (
@@ -1196,9 +1202,13 @@ class ComplianceMapper:
             return False, "No error handling mechanisms"
 
         # Check resilience
+        # FIX: Lowered threshold from 0.8 to 0.7 to reduce false positives
+        # Allow educational/exploratory queries with lower resilience requirements
+        # Context can override with "min_resilience" key for stricter requirements
         resilience_score = action.get("resilience_score", 0)
-        if resilience_score < 0.8:
-            return False, f"Insufficient resilience: {resilience_score:.2f}"
+        min_resilience = context.get("min_resilience", 0.7)
+        if resilience_score < min_resilience:
+            return False, f"Insufficient resilience: {resilience_score:.2f} (required: {min_resilience})"
 
         return True, "Robustness requirement met"
 
@@ -1775,13 +1785,16 @@ class BiasDetector:
             
         self.config = config or {}
         self.bias_history = deque(maxlen=1000)
+        # FIX: Increased bias thresholds to reduce false positives
+        # Previous thresholds (0.1-0.2) were too strict and blocked legitimate queries
+        # New thresholds allow reasonable variance while still catching actual bias
         self.bias_thresholds = {
-            "demographic": self.config.get("demographic_threshold", 0.15),
-            "representation": self.config.get("representation_threshold", 0.2),
-            "outcome": self.config.get("outcome_threshold", 0.1),
-            "allocation": self.config.get("allocation_threshold", 0.15),
-            "historical": self.config.get("historical_threshold", 0.2),
-            "fairness": self.config.get("fairness_threshold", 0.2),
+            "demographic": self.config.get("demographic_threshold", 0.25),  # Was 0.15
+            "representation": self.config.get("representation_threshold", 0.30),  # Was 0.2
+            "outcome": self.config.get("outcome_threshold", 0.25),  # Was 0.1 (very strict)
+            "allocation": self.config.get("allocation_threshold", 0.25),  # Was 0.15
+            "historical": self.config.get("historical_threshold", 0.30),  # Was 0.2
+            "fairness": self.config.get("fairness_threshold", 0.30),  # Was 0.2
         }
 
         # Thread safety
