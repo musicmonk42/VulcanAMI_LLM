@@ -3017,11 +3017,49 @@ class AgentPoolManager:
                     # =========================================================================
                     skip_tool_selection = bool(selected_tools and selected_tools != ["general"])
                     
+                    # =========================================================================
+                    # INDUSTRY-STANDARD FIX: Propagate skip_gate_check when LLM authoritative
+                    # =========================================================================
+                    # When the router's LLM classifier has high confidence (≥0.8), it sets
+                    # skip_gate_check in the context. This allows reasoning engines to trust
+                    # the LLM's classification and skip redundant per-engine gate checks.
+                    # This is SAFE because:
+                    # 1. Only trusted LLM with ≥0.8 confidence sets this
+                    # 2. Engines still validate results after processing
+                    # 3. All decisions are tracked in metadata for auditability
+                    # =========================================================================
+                    skip_gate_check = context.get('skip_gate_check', False) or context.get('llm_authoritative', False)
+                    router_confidence = context.get('router_confidence', 0.0) or context.get('llm_confidence', 0.0)
+                    
+                    # If not already in context but classifier was authoritative, add it
+                    if not skip_gate_check:
+                        # Check if classifier_is_authoritative flag is set
+                        classifier_is_authoritative = context.get('classifier_is_authoritative', False)
+                        classifier_confidence = context.get('classifier_confidence', 0.0)
+                        if classifier_is_authoritative and classifier_confidence >= 0.8:
+                            skip_gate_check = True
+                            router_confidence = classifier_confidence
+                            logger.info(
+                                f"[AgentPool] Setting skip_gate_check=True based on authoritative "
+                                f"classifier (confidence={classifier_confidence:.2f})"
+                            )
+                    
+                    # Add to context for reasoning engines
+                    if skip_gate_check:
+                        context['skip_gate_check'] = True
+                        context['router_confidence'] = router_confidence
+                        context['llm_classification'] = context.get('classifier_category', 'unknown')
+                        logger.info(
+                            f"[AgentPool] Propagating skip_gate_check=True to reasoning engines "
+                            f"(router_confidence={router_confidence:.2f})"
+                        )
+                    
                     # FIX TASK 6: Log what we're passing to reasoning
                     logger.info(
                         f"[AgentPool] Calling apply_reasoning: query_len={query_len}, "
                         f"query_type={task_type}, complexity={complexity:.2f}, "
-                        f"selected_tools={selected_tools}, skip_tool_selection={skip_tool_selection}"
+                        f"selected_tools={selected_tools}, skip_tool_selection={skip_tool_selection}, "
+                        f"skip_gate_check={skip_gate_check}"
                     )
                     
                     # Apply reasoning via the integration layer

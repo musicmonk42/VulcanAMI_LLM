@@ -3960,9 +3960,29 @@ class UnifiedReasoner:
         start_time = time.time()
         try:
             if task.task_type == ReasoningType.PROBABILISTIC:
+                # Extract kwargs from task.query including skip_gate_check
+                # INDUSTRY-STANDARD FIX: Pass skip_gate_check to reasoning engine
+                query_dict = task.query if isinstance(task.query, dict) else {}
+                threshold = query_dict.get("threshold", 0.5)
+                
+                # Build kwargs for reasoning engine
+                reasoning_kwargs = {
+                    "threshold": threshold,
+                }
+                
+                # Propagate skip_gate_check if present
+                if "skip_gate_check" in query_dict:
+                    reasoning_kwargs["skip_gate_check"] = query_dict["skip_gate_check"]
+                    reasoning_kwargs["router_confidence"] = query_dict.get("router_confidence", 0.0)
+                    reasoning_kwargs["llm_classification"] = query_dict.get("llm_classification", "unknown")
+                    logger.info(
+                        f"[UnifiedReasoner] Passing skip_gate_check=True to probabilistic engine "
+                        f"(router_confidence={reasoning_kwargs['router_confidence']:.2f})"
+                    )
+                
                 raw_result = reasoner.reason_with_uncertainty(
                     input_data=task.input_data,
-                    threshold=task.query.get("threshold", 0.5),
+                    **reasoning_kwargs
                 )
 
                 if isinstance(raw_result, ReasoningResult):

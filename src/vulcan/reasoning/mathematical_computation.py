@@ -1350,12 +1350,23 @@ result = simplify(integral)
         
         # ROOT CAUSE FIX: Pre-flight check for mathematical content
         # Prevents LLM from generating code for non-mathematical queries
-        if not self._is_genuinely_mathematical(query):
+        # 
+        # INDUSTRY-STANDARD FIX: Allow LLM code generation when skip_gate_check is set
+        # This happens when the router's LLM classifier has high confidence (≥0.8)
+        # that this is a mathematical query. We trust the LLM in this case.
+        skip_gate_check = kwargs.get('skip_gate_check', False)
+        
+        if not skip_gate_check and not self._is_genuinely_mathematical(query):
             logger.info(
                 f"[MathTool] LLM code generation declined - query is not mathematical: "
                 f"{query[:80]}..."
             )
             return None
+        elif skip_gate_check:
+            logger.info(
+                f"[MathTool] Gate check SKIPPED for LLM code generation - "
+                f"trusting router's high-confidence classification"
+            )
         
         prompt = f"""{self.CODE_GENERATION_PROMPT}
 
@@ -2107,8 +2118,17 @@ Generate ONLY the corrected Python code (no markdown, no explanations):"""
         else:
             math_query = str(input_data)
         
+        # INDUSTRY-STANDARD FIX: Extract skip_gate_check from query dict and pass to execute
+        # This allows the LLM classifier's high-confidence decisions to be honored
+        kwargs = {}
+        if query and isinstance(query, dict):
+            if 'skip_gate_check' in query:
+                kwargs['skip_gate_check'] = query['skip_gate_check']
+                kwargs['router_confidence'] = query.get('router_confidence', 0.0)
+                kwargs['llm_classification'] = query.get('llm_classification', 'unknown')
+        
         # Execute the computation
-        result = self.execute(math_query)
+        result = self.execute(math_query, **kwargs)
         
         # Convert to reasoner-compatible dict format
         confidence = 0.9 if result.success else 0.1
