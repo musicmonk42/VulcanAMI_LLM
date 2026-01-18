@@ -1909,6 +1909,13 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
             agent_confidence = agent.get("confidence", 0.0) if isinstance(agent, dict) else 0.0
             agent_conclusion = agent.get("conclusion") if isinstance(agent, dict) else None
             
+            # BUG #3 FIX: Extract conclusion from nested structures if None
+            # The agent_pool may store conclusion in reasoning_output sub-dict
+            if not agent_conclusion and isinstance(agent, dict):
+                reasoning_output = agent.get("reasoning_output", {})
+                if isinstance(reasoning_output, dict):
+                    agent_conclusion = reasoning_output.get("conclusion")
+            
             # FIX ISSUE #1: Extract world_model response from agent_reasoning metadata
             agent_reasoning_type = agent.get("reasoning_type", "") if isinstance(agent, dict) else ""
             if agent_reasoning_type in ("PHILOSOPHICAL", "philosophical", "world_model"):
