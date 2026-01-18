@@ -135,7 +135,7 @@ jobs:
           POSTGRES_PASSWORD: test_password
           POSTGRES_DB: test_db
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U test_user"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -409,6 +409,10 @@ jobs:
           JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY || 'test-secret-key-at-least-32-chars-long-for-testing' }}
           REDIS_HOST: localhost
           POSTGRES_HOST: localhost
+          POSTGRES_PORT: 5432
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: test_db
           MINIO_ENDPOINT: http://localhost:9000
           # Configure test mode to prevent hanging on missing services
           CI: 'true'
