@@ -40,14 +40,13 @@ def client():
 
 
 @pytest.fixture
-def arena():
+def arena(monkeypatch):
     """Create arena instance with Ray disabled for testing."""
-    # Set environment variable to disable Ray for tests
-    os.environ['VULCAN_ENABLE_RAY'] = '0'
+    # Set environment variable to disable Ray for tests using monkeypatch
+    monkeypatch.setenv('VULCAN_ENABLE_RAY', '0')
     arena_instance = GraphixArena(port=8182)
     yield arena_instance
-    # Cleanup
-    os.environ.pop('VULCAN_ENABLE_RAY', None)
+    # monkeypatch automatically cleans up after test
 
 
 @pytest.fixture
@@ -189,17 +188,12 @@ class TestRebertPrune:
 class TestGraphixArena:
     """Test GraphixArena class."""
 
-    def test_initialization(self):
+    def test_initialization(self, arena):
         """Test arena initialization with Ray disabled."""
-        os.environ['VULCAN_ENABLE_RAY'] = '0'
-        try:
-            arena = GraphixArena(port=8183)
-
-            assert arena.port == 8183
-            assert len(arena.agents) > 0
-            assert arena.runtime is not None
-        finally:
-            os.environ.pop('VULCAN_ENABLE_RAY', None)
+        # Use the arena fixture which already has Ray disabled
+        assert arena.port == 8182
+        assert len(arena.agents) > 0
+        assert arena.runtime is not None
 
     def test_invalid_port(self):
         """Test initialization with invalid port."""
@@ -417,7 +411,7 @@ class TestGraphixArena:
         # Should not raise
         arena.send_slack_alert("Test message")
 
-    def test_llm_client_init_exception_logging(self):
+    def test_llm_client_init_exception_logging(self, monkeypatch):
         """Test that LLM client initialization exceptions are logged with traceback."""
         import logging
 
@@ -435,8 +429,8 @@ class TestGraphixArena:
         graphix_logger.addHandler(handler)
 
         try:
-            # Set env var to disable Ray for this test
-            os.environ['VULCAN_ENABLE_RAY'] = '0'
+            # Set env var to disable Ray for this test using monkeypatch
+            monkeypatch.setenv('VULCAN_ENABLE_RAY', '0')
             
             # Mock GraphixLLMClient to raise an exception with empty message
             with patch("graphix_arena.GraphixLLMClient") as mock_client:
@@ -464,7 +458,6 @@ class TestGraphixArena:
                 ), "Expected exc_info to be captured in error log"
         finally:
             graphix_logger.removeHandler(handler)
-            os.environ.pop('VULCAN_ENABLE_RAY', None)
 
 
 class TestExceptionHandlers:

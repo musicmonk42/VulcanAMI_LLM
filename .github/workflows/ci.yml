@@ -530,7 +530,7 @@ jobs:
           # Use pull: false to leverage buildkit config with mirror
           # This prevents TLS handshake timeout errors with Docker Hub
           pull: false
-          # Add no-cache to force fresh build and avoid stale layers consuming space
+          # Keep layer caching enabled (no-cache: false) for faster builds
           no-cache: false
 
       - name: Test Docker image
