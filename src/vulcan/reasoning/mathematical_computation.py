@@ -834,7 +834,7 @@ result = simplify(integral)
                     strategy = SolutionStrategy.TEMPLATE
                 
                 # Step 3: Generate code
-                code = self._generate_code(query, classification, strategy, llm)
+                code = self._generate_code(query, classification, strategy, llm, **kwargs)
                 
                 # Note: Handle None return when no math expression found
                 # Previously this assumed code was always a string. Now _generate_code
@@ -961,7 +961,8 @@ result = simplify(integral)
         query: str, 
         classification: ProblemClassification,
         strategy: SolutionStrategy,
-        llm
+        llm,
+        **kwargs
     ) -> Optional[str]:
         """
         Generate SymPy code to solve the problem.
@@ -972,6 +973,13 @@ result = simplify(integral)
         Previously, this always returned code (falling back to default expression).
         Now returns None if the query doesn't contain mathematical content,
         allowing callers to handle non-math queries appropriately.
+        
+        Args:
+            query: Mathematical problem description
+            classification: Problem classification
+            strategy: Solution strategy to use
+            llm: Language model for code generation (optional)
+            **kwargs: Additional options passed through to code generation
         
         Returns:
             Generated code string if mathematical content is found,
@@ -985,7 +993,8 @@ result = simplify(integral)
         
         # Use LLM for complex problems
         if llm is not None and strategy in [SolutionStrategy.LLM_GENERATED, SolutionStrategy.SYMBOLIC, SolutionStrategy.HYBRID]:
-            llm_code = self._generate_llm_code(query, llm)
+            # BUG #1 FIX: Pass kwargs to _generate_llm_code to avoid NameError
+            llm_code = self._generate_llm_code(query, llm, **kwargs)
             if llm_code:
                 return llm_code
         
@@ -1313,7 +1322,7 @@ result = simplify(integral)
         )
         return None
 
-    def _generate_llm_code(self, query: str, llm) -> Optional[str]:
+    def _generate_llm_code(self, query: str, llm, **kwargs) -> Optional[str]:
         """
         Generate code using LLM.
         
@@ -1334,6 +1343,7 @@ result = simplify(integral)
         Args:
             query: The mathematical problem to solve
             llm: LLM client object (NOT a model name string)
+            **kwargs: Additional options (e.g., skip_gate_check)
             
         Returns:
             Generated Python code string, or None if generation fails
