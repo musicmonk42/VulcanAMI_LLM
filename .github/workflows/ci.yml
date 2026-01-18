@@ -268,12 +268,8 @@ jobs:
           set -x
           mkdir -p $GITHUB_WORKSPACE/results
           mkdir -p $GITHUB_WORKSPACE/logs
-          exit_code=0
           ulimit -Sn 10240 || true
           
-          # Run pytest and capture output to file without using pipe/tee
-          # This prevents buffering issues that can cause hanging
-          # Removed -n 1 --dist=loadscope as they're not needed for single-worker execution
           pytest --cov=src -q \
             --cov-report=xml \
             --cov-report=html \
@@ -282,14 +278,7 @@ jobs:
             --timeout=600 \
             --maxfail=10 \
             -m "not slow and not load_test and not benchmark" \
-            -v > $GITHUB_WORKSPACE/logs/pytest-output.log 2>&1 || exit_code=$?
-          
-          # Display the log content to GitHub Actions console
-          cat $GITHUB_WORKSPACE/logs/pytest-output.log
-          
-          echo "PYTEST_EXIT=$exit_code" > $GITHUB_WORKSPACE/results/exitcode.txt
-          echo "Test exit code: $exit_code"
-          exit $exit_code
+            -v 2>&1 | tee $GITHUB_WORKSPACE/logs/pytest-output.log
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
