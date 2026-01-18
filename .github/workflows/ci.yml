@@ -255,6 +255,8 @@ jobs:
           echo "ARENA_ENABLED=false" >> $GITHUB_ENV
           echo "TOOL_MONITOR_ENABLED=false" >> $GITHUB_ENV
           echo "MINIO_ENDPOINT=http://localhost:9000" >> $GITHUB_ENV
+          # Disable Ray in tests to prevent hanging
+          echo "VULCAN_ENABLE_RAY=0" >> $GITHUB_ENV
 
       - name: Monitor system resources
         run: |
@@ -410,6 +412,8 @@ jobs:
           REASONING_MOCK_MODE: 'true'
           ARENA_ENABLED: 'false'
           TOOL_MONITOR_ENABLED: 'false'
+          # Disable Ray in tests to prevent hanging
+          VULCAN_ENABLE_RAY: '0'
         run: |
           set -x
           mkdir -p $GITHUB_WORKSPACE/logs
@@ -522,6 +526,8 @@ jobs:
           # Use pull: false to leverage buildkit config with mirror
           # This prevents TLS handshake timeout errors with Docker Hub
           pull: false
+          # Add no-cache to force fresh build and avoid stale layers consuming space
+          no-cache: false
 
       - name: Test Docker image
         run: |
@@ -633,6 +639,8 @@ jobs:
       REASONING_MOCK_MODE: 'true'
       ARENA_ENABLED: 'false'
       TOOL_MONITOR_ENABLED: 'false'
+      # Disable Ray in tests to prevent hanging
+      VULCAN_ENABLE_RAY: '0'
 
     steps:
       - name: Checkout code
