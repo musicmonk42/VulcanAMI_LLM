@@ -90,9 +90,9 @@ class TestWeightedVotingFixes(unittest.TestCase):
         
         # Should return boolean, not None
         self.assertIsInstance(result, bool)
-        # True has 0.3 + 0.2 = 0.5 weight (normalized to 0.625 after filtering)
-        # False has 0.2 weight (normalized to 0.25)
-        # 0.625 > 0.5, so should return True
+        # After filtering None: True has weights 0.3 + 0.2 = 0.5 (normalized to 5/7 ≈ 0.714)
+        # False has weight 0.2 (normalized to 2/7 ≈ 0.286)
+        # True weight 0.714 > 0.5 threshold, so should return True
         self.assertTrue(result)
 
     def test_weighted_voting_numeric_with_none(self):
@@ -108,10 +108,11 @@ class TestWeightedVotingFixes(unittest.TestCase):
         # Should return numeric average of valid values
         self.assertIsInstance(result, (int, float))
         self.assertIsNotNone(result)
-        # Weighted average of 10(0.3) + 20(0.2) + 30(0.2) normalized
-        # = (10*0.3 + 20*0.2 + 30*0.2) / 0.7 = 17.14...
-        self.assertGreater(result, 16.0)
-        self.assertLess(result, 18.0)
+        # After filtering None (weight 0.3), remaining weights [0.3, 0.2, 0.2] sum to 0.7
+        # Normalized weights are [3/7, 2/7, 2/7]
+        # Weighted average: 10*(3/7) + 20*(2/7) + 30*(2/7) = (30+40+60)/7 ≈ 18.57
+        self.assertGreater(result, 18.0)
+        self.assertLess(result, 19.0)
 
 
 # ==============================================================================

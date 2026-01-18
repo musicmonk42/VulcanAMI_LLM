@@ -632,13 +632,14 @@ def weighted_voting(conclusions: List[Any], weights: List[float]) -> Any:
         valid_conclusions = [c for c, w in valid_pairs]
         valid_weights = [w for c, w in valid_pairs]
         
-        # Normalize weights
+        # Normalize weights or use uniform if sum is zero
         total_weight = sum(valid_weights)
         if total_weight > 0:
             normalized_weights = [w / total_weight for w in valid_weights]
         else:
             # Industry Standard: Uniform fallback if all weights are zero
-            normalized_weights = [1.0 / len(valid_weights)] * len(valid_weights)
+            uniform_weights = [1.0 / len(valid_weights)] * len(valid_weights)
+            normalized_weights = uniform_weights
             logger.warning(
                 f"Weighted voting: all weights sum to zero, using uniform weights"
             )
@@ -674,8 +675,17 @@ def weighted_voting(conclusions: List[Any], weights: List[float]) -> Any:
     except Exception as e:
         logger.error(f"Weighted voting failed: {e}", exc_info=True)
         # Industry Standard: Return first valid conclusion as fallback
+        # Reuse the is_valid_conclusion logic defined above for consistency
+        def is_valid_for_fallback(c: Any) -> bool:
+            """Check if conclusion is valid for fallback."""
+            if c is None:
+                return False
+            if isinstance(c, str):
+                return c.strip() and c.strip().lower() != "none"
+            return True
+        
         for c in conclusions:
-            if c is not None and (not isinstance(c, str) or (c.strip() and c.strip().lower() != "none")):
+            if is_valid_for_fallback(c):
                 return c
         return None
 
