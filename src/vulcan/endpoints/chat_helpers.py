@@ -11,10 +11,14 @@ ReasoningType enums to strings.
 
 import itertools
 import logging
+import os
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union
 
 logger = logging.getLogger(__name__)
+
+# Industry Standard: Feature flag for diagnostic logging (default: enabled during fix rollout)
+_ENABLE_DIAGNOSTIC_LOGGING = os.environ.get("VULCAN_DIAGNOSTIC_LOGGING", "true").lower() in ("true", "1", "yes")
 
 
 def safe_reasoning_type_to_string(
@@ -578,6 +582,13 @@ def format_reasoning_results(reasoning_results: Dict[str, Any]) -> str:
         logger.debug("[format_reasoning_results] No valid reasoning results to format")
         return ""
     
+    # DIAGNOSTIC LOGGING: Log what we're about to format
+    if _ENABLE_DIAGNOSTIC_LOGGING:
+        logger.info(
+            f"[chat_helpers/DIAGNOSTIC] format_reasoning_results called with "
+            f"{len(reasoning_results)} engines: {list(reasoning_results.keys())}"
+        )
+    
     # Use list for efficient string building
     parts = ["Reasoning Analysis:\n"]
     formatted_count = 0
@@ -586,7 +597,15 @@ def format_reasoning_results(reasoning_results: Dict[str, Any]) -> str:
         try:
             # Skip None or empty results
             if result is None:
+                if _ENABLE_DIAGNOSTIC_LOGGING:
+                    logger.info(f"[chat_helpers/DIAGNOSTIC] Skipping {engine_name}: result is None")
                 continue
+            
+            if _ENABLE_DIAGNOSTIC_LOGGING:
+                logger.info(
+                    f"[chat_helpers/DIAGNOSTIC] Formatting {engine_name}: "
+                    f"type={type(result).__name__}, is_dict={isinstance(result, dict)}"
+                )
             
             # Handle different result types
             if isinstance(result, dict):
@@ -595,12 +614,22 @@ def format_reasoning_results(reasoning_results: Dict[str, Any]) -> str:
                 # Direct string result
                 formatted_section = f"\n{engine_name.replace('_', ' ').title()}:\n{result}\n"
             else:
-                # Other types - convert to string
+                # Other types - convert to string (includes ReasoningResult objects)
+                if _ENABLE_DIAGNOSTIC_LOGGING:
+                    logger.info(
+                        f"[chat_helpers/DIAGNOSTIC] {engine_name} is non-dict/non-string, "
+                        f"has_to_dict={hasattr(result, 'to_dict')}"
+                    )
                 formatted_section = f"\n{engine_name.replace('_', ' ').title()}:\n{str(result)[:MAX_REASONING_RESULT_LENGTH]}\n"
             
             if formatted_section:
                 parts.append(formatted_section)
                 formatted_count += 1
+                if _ENABLE_DIAGNOSTIC_LOGGING:
+                    logger.info(f"[chat_helpers/DIAGNOSTIC] Successfully formatted {engine_name}")
+            else:
+                if _ENABLE_DIAGNOSTIC_LOGGING:
+                    logger.warning(f"[chat_helpers/DIAGNOSTIC] {engine_name} produced no formatted section")
                 
         except Exception as e:
             logger.warning(
@@ -611,10 +640,18 @@ def format_reasoning_results(reasoning_results: Dict[str, Any]) -> str:
     
     # Return empty string if no results were formatted
     if formatted_count == 0:
-        logger.debug("[format_reasoning_results] No reasoning engines produced formattable results")
+        if _ENABLE_DIAGNOSTIC_LOGGING:
+            logger.warning("[chat_helpers/DIAGNOSTIC] No reasoning engines produced formattable results")
         return ""
     
-    return "".join(parts)
+    final_output = "".join(parts)
+    if _ENABLE_DIAGNOSTIC_LOGGING:
+        logger.info(
+            f"[chat_helpers/DIAGNOSTIC] format_reasoning_results output: "
+            f"formatted_count={formatted_count}, total_length={len(final_output)}"
+        )
+    
+    return final_output
 
 
 def _format_fol_formalization(result: Dict[str, Any]) -> str:

@@ -80,6 +80,30 @@ __author__ = "VULCAN-AGI Team"
 
 logger = logging.getLogger(__name__)
 
+# ============================================================
+# MODULE-LEVEL CONFIGURATION
+# Industry Standard: Parse environment variables once at module load time
+# ============================================================
+
+# Confidence threshold for hybrid executor formatting
+# Lowered from 0.5 to 0.01 to ensure reasoning results pass through
+# Configurable via VULCAN_HYBRID_MIN_REASONING_CONFIDENCE environment variable
+try:
+    HYBRID_MIN_REASONING_CONFIDENCE = float(
+        os.environ.get("VULCAN_HYBRID_MIN_REASONING_CONFIDENCE", "0.01")
+    )
+    # Industry Standard: Bounds checking - clamp to valid range [0.0, 1.0]
+    HYBRID_MIN_REASONING_CONFIDENCE = max(0.0, min(1.0, HYBRID_MIN_REASONING_CONFIDENCE))
+except (ValueError, TypeError) as e:
+    logger.warning(
+        f"[HybridExecutor] Invalid VULCAN_HYBRID_MIN_REASONING_CONFIDENCE, using default 0.01: {e}"
+    )
+    HYBRID_MIN_REASONING_CONFIDENCE = 0.01
+
+# Feature flag for diagnostic logging (default: enabled during fix rollout)
+# Set VULCAN_DIAGNOSTIC_LOGGING=false to disable in production if needed
+ENABLE_DIAGNOSTIC_LOGGING = os.environ.get("VULCAN_DIAGNOSTIC_LOGGING", "true").lower() in ("true", "1", "yes")
+
 
 # ============================================================
 # CUSTOM EXCEPTIONS
@@ -3029,8 +3053,27 @@ Make this human-readable. Nothing more."""
         # Issue #7 FIX: Check reasoning confidence BEFORE sending to OpenAI
         # BUT: Don't block OpenAI if reasoning engine says "not_applicable"
         # When engine declines (not_applicable=True), we should let OpenAI try
-        MIN_REASONING_CONFIDENCE = 0.5
-        reasoning_confidence = getattr(reasoning_output, 'confidence', None) or 0.0
+        # FIX (Jan 18 2026): Lowered from 0.5 to 0.01 to ensure reasoning results pass through
+        # Industry Standard: Use module-level configuration to avoid repeated parsing
+        MIN_REASONING_CONFIDENCE = HYBRID_MIN_REASONING_CONFIDENCE
+        
+        # Industry Standard: Safe attribute access with type validation
+        reasoning_confidence = getattr(reasoning_output, 'confidence', None)
+        if not isinstance(reasoning_confidence, (int, float)):
+            reasoning_confidence = 0.0
+        elif reasoning_confidence < 0.0:
+            # Industry Standard: Sanitize invalid negative confidence values
+            self.logger.warning(
+                f"[HybridExecutor] Invalid negative confidence {reasoning_confidence}, clamping to 0.0"
+            )
+            reasoning_confidence = 0.0
+        
+        # DIAGNOSTIC LOGGING: Log reasoning confidence and threshold
+        if ENABLE_DIAGNOSTIC_LOGGING:
+            self.logger.info(
+                f"[HybridExecutor/DIAGNOSTIC] Reasoning confidence check: "
+                f"confidence={reasoning_confidence:.2f}, threshold={MIN_REASONING_CONFIDENCE:.2f}"
+            )
         
         # Issue #7 FIX: Check if reasoning engine declined the query (not_applicable)
         # If so, don't treat this as a failure - let OpenAI attempt it
