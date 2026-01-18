@@ -369,33 +369,33 @@ except ImportError:
                 if not x:
                     return 0.0
                 return math.sqrt(sum(val ** 2 for val in x))
-        
-        @staticmethod
-        def lstsq(A, b, rcond=None):
-            """
-            Least squares solution (highly simplified fallback).
             
-            WARNING: This is a placeholder that returns zero coefficients.
-            Real numpy.linalg.lstsq performs actual least squares fitting.
-            Install numpy for correct behavior.
-            """
-            logger.warning(
-                "Using simplified lstsq fallback - results may be inaccurate. "
-                "Install numpy for correct least squares computation."
-            )
-            
-            if not A or not A[0]:
-                raise ValueError("Matrix A cannot be empty")
-            
-            num_cols = len(A[0]) if isinstance(A[0], list) else 1
-            
-            # Return mock result with correct structure
-            solution = [0.0] * num_cols
-            residuals = []
-            rank = min(len(A), num_cols)
-            singular_values = []
-            
-            return (solution, residuals, rank, singular_values)
+            @staticmethod
+            def lstsq(A, b, rcond=None):
+                """
+                Least squares solution (highly simplified fallback).
+                
+                WARNING: This is a placeholder that returns zero coefficients.
+                Real numpy.linalg.lstsq performs actual least squares fitting.
+                Install numpy for correct behavior.
+                """
+                logger.warning(
+                    "Using simplified lstsq fallback - results may be inaccurate. "
+                    "Install numpy for correct least squares computation."
+                )
+                
+                if not A or not A[0]:
+                    raise ValueError("Matrix A cannot be empty")
+                
+                num_cols = len(A[0]) if isinstance(A[0], list) else 1
+                
+                # Return mock result with correct structure
+                solution = [0.0] * num_cols
+                residuals = []
+                rank = min(len(A), num_cols)
+                singular_values = []
+                
+                return (solution, residuals, rank, singular_values)
         
         # --- Random number generation ---
         
