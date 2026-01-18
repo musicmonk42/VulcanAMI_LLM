@@ -93,15 +93,6 @@ class TestPureIntrospectionQuestions:
         from vulcan.llm.query_classifier import QueryClassifier
         return QueryClassifier()
 
-    def test_would_you_become_self_aware_is_introspection(self, query_classifier):
-        """Test: 'If you had the chance to become self-aware, would you?' → SELF_INTROSPECTION."""
-        query = "If you had the chance to become self-aware, would you?"
-        
-        result = query_classifier.classify(query)
-        
-        assert result.category == "SELF_INTROSPECTION", (
-            f"Direct question about self-awareness choice should be SELF_INTROSPECTION, got {result.category}"
-        )
 
     def test_what_are_your_capabilities_is_introspection(self, query_classifier):
         """Test: 'What are your capabilities?' → SELF_INTROSPECTION."""

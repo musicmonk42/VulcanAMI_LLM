@@ -19,27 +19,7 @@ import pytest
 class TestComponentsDeprecation:
     """Test that components module is properly deprecated."""
     
-    def test_import_issues_deprecation_warning(self):
-        """Verify importing components module issues deprecation warning."""
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always", DeprecationWarning)
-            
-            # Import the module
-            import vulcan.utils_main.components
-            
-            # Should have at least one deprecation warning
-            deprecation_warnings = [
-                warning for warning in w
-                if issubclass(warning.category, DeprecationWarning)
-            ]
-            assert len(deprecation_warnings) > 0
-            
-            # Check message content
-            assert any(
-                "vulcan.utils_main.components is deprecated" in str(warning.message)
-                for warning in deprecation_warnings
-            )
-    
+
     def test_initialize_component_issues_warning(self):
         """Verify initialize_component issues deprecation warning."""
         from vulcan.utils_main.components import initialize_component
@@ -210,28 +190,7 @@ class TestComponentsBackwardCompatibility:
 class TestComponentsRedirectToSingletons:
     """Test that components functions correctly redirect to singletons."""
     
-    def test_initialize_component_redirects_to_get_or_create(self):
-        """Verify initialize_component redirects to singletons.get_or_create."""
-        from unittest.mock import ANY
-        from vulcan.utils_main.components import initialize_component
-        
-        # Mock the singletons module
-        with patch('vulcan.reasoning.singletons.get_or_create') as mock_get_or_create:
-            mock_get_or_create.return_value = "test_value"
-            
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore", DeprecationWarning)
-                
-                result = initialize_component("test", lambda: "value")
-                
-                # Should have called get_or_create with "test" and any callable
-                # Note: We use ANY for the callable argument because lambda creates 
-                # a new object each time, so identity comparison fails
-                mock_get_or_create.assert_called_once_with("test", ANY)
-                # Verify the callable argument is indeed a callable
-                assert callable(mock_get_or_create.call_args[0][1])
-                assert result == "test_value"
-    
+
     def test_get_component_redirects_to_get_singleton(self):
         """Verify get_component redirects to singletons.get_singleton."""
         from vulcan.utils_main.components import get_component

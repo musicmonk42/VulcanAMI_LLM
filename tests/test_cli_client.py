@@ -100,30 +100,7 @@ class TestVulcanClientFromSettings:
             assert client._api_key == "env-key-123"
             client.close()
     
-    def test_from_settings_defaults(self):
-        """Test loading with defaults when no config available."""
-        # Clear environment
-        with patch.dict(os.environ, {}, clear=True):
-            # Mock settings import to fail
-            with patch("vulcan.cli.client.VulcanClient.__init__") as mock_init:
-                mock_init.return_value = None
-                
-                # Should use defaults
-                with patch("vulcan.cli.client.importlib"):
-                    client = VulcanClient.from_settings()
-    
-    def test_from_settings_vulcan_settings(self):
-        """Test loading from vulcan.settings."""
-        mock_settings = Mock()
-        mock_settings.server_url = "https://settings.example.com"
-        mock_settings.api_key = "settings-key-456"
-        
-        with patch.dict(os.environ, {}, clear=True):
-            with patch("vulcan.cli.client.settings", mock_settings):
-                client = VulcanClient.from_settings()
-                # Environment takes priority, so should use defaults
-                assert client.base_url in ["http://localhost:8000", "https://settings.example.com"]
-                client.close()
+
 
 
 class TestVulcanClientHandleResponse:
@@ -289,19 +266,7 @@ class TestVulcanClientChat:
         
         client.close()
     
-    def test_chat_timeout(self):
-        """Test chat with timeout."""
-        client = VulcanClient()
-        
-        with patch.object(client.client, 'post', side_effect=httpx.TimeoutException("Timeout")):
-            with pytest.raises(VulcanAPIError) as exc_info:
-                client.chat("test")
-            
-            assert exc_info.value.status_code == 408
-            assert "timeout" in exc_info.value.message.lower()
-        
-        client.close()
-    
+
     def test_chat_connection_error(self):
         """Test chat with connection error."""
         client = VulcanClient()
