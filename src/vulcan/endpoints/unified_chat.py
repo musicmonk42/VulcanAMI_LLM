@@ -74,6 +74,33 @@ logger.info(
     f"SINGLE_REASONING_PATH={SINGLE_REASONING_PATH}"
 )
 
+# ============================================================
+# CONFIDENCE THRESHOLD CONFIGURATION
+# Industry Standard: Parse environment variables once at module load time
+# ============================================================
+
+# Confidence threshold for reasoning result acceptance
+# Lowered from 0.10 to 0.01 to ensure reasoning results pass through
+# Configurable via VULCAN_MIN_REASONING_CONFIDENCE environment variable
+try:
+    MIN_REASONING_CONFIDENCE_THRESHOLD = float(os.environ.get("VULCAN_MIN_REASONING_CONFIDENCE", "0.01"))
+    # Industry Standard: Bounds checking - clamp to valid range [0.0, 1.0]
+    MIN_REASONING_CONFIDENCE_THRESHOLD = max(0.0, min(1.0, MIN_REASONING_CONFIDENCE_THRESHOLD))
+except (ValueError, TypeError) as e:
+    logger.warning(
+        f"[VULCAN] Invalid VULCAN_MIN_REASONING_CONFIDENCE value, using default 0.01: {e}"
+    )
+    MIN_REASONING_CONFIDENCE_THRESHOLD = 0.01
+
+# Feature flag for diagnostic logging (default: enabled during fix rollout)
+# Set VULCAN_DIAGNOSTIC_LOGGING=false to disable in production if needed
+ENABLE_DIAGNOSTIC_LOGGING = os.environ.get("VULCAN_DIAGNOSTIC_LOGGING", "true").lower() in ("true", "1", "yes")
+
+logger.info(
+    f"[VULCAN/v1/chat] Configuration: MIN_REASONING_CONFIDENCE_THRESHOLD={MIN_REASONING_CONFIDENCE_THRESHOLD:.2f}, "
+    f"ENABLE_DIAGNOSTIC_LOGGING={ENABLE_DIAGNOSTIC_LOGGING}"
+)
+
 # Request counter for GC
 _gc_request_counter = 0
 
@@ -1839,26 +1866,9 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
         # results, use them DIRECTLY instead of passing to OpenAI which may
         # ignore or override them. This prevents the "OpenAI always wins" problem.
         #
-        # Confidence threshold: 0.01 (lowered from 0.10 to ensure reasoning results pass through)
-        # Production logs showed reasoning confidence consistently 0.0-0.2, causing
-        # all queries to fall back to OpenAI. Lowering threshold to 0.01 allows reasoning
-        # results to be used directly even with low confidence - user can raise it later if needed.
-        # FIX (Jan 18 2026): Lowered from 0.10 to 0.01 to ensure reasoning results always pass through.
-        # This allows us to verify if poor responses are due to confidence filtering or other issues.
-        # Configurable via VULCAN_MIN_REASONING_CONFIDENCE environment variable.
-        # Industry Standard: Input validation with bounds checking and error handling
-        try:
-            MIN_REASONING_CONFIDENCE_THRESHOLD = float(os.environ.get("VULCAN_MIN_REASONING_CONFIDENCE", "0.01"))
-            # Clamp to valid range [0.0, 1.0]
-            MIN_REASONING_CONFIDENCE_THRESHOLD = max(0.0, min(1.0, MIN_REASONING_CONFIDENCE_THRESHOLD))
-        except (ValueError, TypeError) as e:
-            logger.warning(
-                f"[VULCAN] Invalid VULCAN_MIN_REASONING_CONFIDENCE value, using default 0.01: {e}"
-            )
-            MIN_REASONING_CONFIDENCE_THRESHOLD = 0.01
-        
-        # Industry Standard: Feature flag for diagnostic logging to reduce noise in production
-        ENABLE_DIAGNOSTIC_LOGGING = os.environ.get("VULCAN_DIAGNOSTIC_LOGGING", "true").lower() in ("true", "1", "yes")
+        # Industry Standard: Use module-level configuration (parsed once at startup)
+        # This avoids repeated environment variable parsing on every request
+        # Module-level constant MIN_REASONING_CONFIDENCE_THRESHOLD is defined at the top of this file
         
         # Check if we should use reasoning results directly
         use_reasoning_directly = False

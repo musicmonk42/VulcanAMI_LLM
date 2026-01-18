@@ -80,6 +80,30 @@ __author__ = "VULCAN-AGI Team"
 
 logger = logging.getLogger(__name__)
 
+# ============================================================
+# MODULE-LEVEL CONFIGURATION
+# Industry Standard: Parse environment variables once at module load time
+# ============================================================
+
+# Confidence threshold for hybrid executor formatting
+# Lowered from 0.5 to 0.01 to ensure reasoning results pass through
+# Configurable via VULCAN_HYBRID_MIN_REASONING_CONFIDENCE environment variable
+try:
+    HYBRID_MIN_REASONING_CONFIDENCE = float(
+        os.environ.get("VULCAN_HYBRID_MIN_REASONING_CONFIDENCE", "0.01")
+    )
+    # Industry Standard: Bounds checking - clamp to valid range [0.0, 1.0]
+    HYBRID_MIN_REASONING_CONFIDENCE = max(0.0, min(1.0, HYBRID_MIN_REASONING_CONFIDENCE))
+except (ValueError, TypeError) as e:
+    logger.warning(
+        f"[HybridExecutor] Invalid VULCAN_HYBRID_MIN_REASONING_CONFIDENCE, using default 0.01: {e}"
+    )
+    HYBRID_MIN_REASONING_CONFIDENCE = 0.01
+
+# Feature flag for diagnostic logging (default: enabled during fix rollout)
+# Set VULCAN_DIAGNOSTIC_LOGGING=false to disable in production if needed
+ENABLE_DIAGNOSTIC_LOGGING = os.environ.get("VULCAN_DIAGNOSTIC_LOGGING", "true").lower() in ("true", "1", "yes")
+
 
 # ============================================================
 # CUSTOM EXCEPTIONS
@@ -3030,19 +3054,8 @@ Make this human-readable. Nothing more."""
         # BUT: Don't block OpenAI if reasoning engine says "not_applicable"
         # When engine declines (not_applicable=True), we should let OpenAI try
         # FIX (Jan 18 2026): Lowered from 0.5 to 0.01 to ensure reasoning results pass through
-        # This allows us to verify if poor responses are due to confidence filtering or other issues.
-        # Industry Standard: Configurable threshold with environment variable override
-        try:
-            MIN_REASONING_CONFIDENCE = float(
-                os.environ.get("VULCAN_HYBRID_MIN_REASONING_CONFIDENCE", "0.01")
-            )
-            # Industry Standard: Bounds checking - clamp to valid range [0.0, 1.0]
-            MIN_REASONING_CONFIDENCE = max(0.0, min(1.0, MIN_REASONING_CONFIDENCE))
-        except (ValueError, TypeError) as e:
-            self.logger.warning(
-                f"[HybridExecutor] Invalid VULCAN_HYBRID_MIN_REASONING_CONFIDENCE, using default 0.01: {e}"
-            )
-            MIN_REASONING_CONFIDENCE = 0.01
+        # Industry Standard: Use module-level configuration to avoid repeated parsing
+        MIN_REASONING_CONFIDENCE = HYBRID_MIN_REASONING_CONFIDENCE
         
         # Industry Standard: Safe attribute access with type validation
         reasoning_confidence = getattr(reasoning_output, 'confidence', None)
@@ -3056,9 +3069,7 @@ Make this human-readable. Nothing more."""
             reasoning_confidence = 0.0
         
         # DIAGNOSTIC LOGGING: Log reasoning confidence and threshold
-        # Industry Standard: Feature flag to control diagnostic logging noise
-        enable_diagnostic_logging = os.environ.get("VULCAN_DIAGNOSTIC_LOGGING", "true").lower() in ("true", "1", "yes")
-        if enable_diagnostic_logging:
+        if ENABLE_DIAGNOSTIC_LOGGING:
             self.logger.info(
                 f"[HybridExecutor/DIAGNOSTIC] Reasoning confidence check: "
                 f"confidence={reasoning_confidence:.2f}, threshold={MIN_REASONING_CONFIDENCE:.2f}"
