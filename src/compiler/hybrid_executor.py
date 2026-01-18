@@ -149,13 +149,22 @@ class CompiledBinaryCache:
         return {}
 
     def _save_index(self):
-        """Save cache index"""
+        """Save cache index to disk."""
         index_file = self.cache_dir / "index.json"
         try:
+            # Ensure parent directory exists before writing
+            index_file.parent.mkdir(parents=True, exist_ok=True)
             with open(index_file, "w", encoding="utf-8") as f:
                 json.dump(self.cache_index, f)
         except Exception as e:
-            logger.warning(f"Failed to save cache index: {e}")
+            # Use print instead of logger to avoid I/O errors during cleanup
+            # when logging streams may already be closed
+            try:
+                logger.warning(f"Failed to save cache index: {e}")
+            except (ValueError, OSError):
+                # Logger stream is closed, silently ignore
+                # This can happen during interpreter shutdown
+                pass
 
     def get(self, graph_hash: str) -> Optional[bytes]:
         """Get compiled binary from cache"""

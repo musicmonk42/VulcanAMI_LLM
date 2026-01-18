@@ -212,6 +212,7 @@ class TestComponentsRedirectToSingletons:
     
     def test_initialize_component_redirects_to_get_or_create(self):
         """Verify initialize_component redirects to singletons.get_or_create."""
+        from unittest.mock import ANY
         from vulcan.utils_main.components import initialize_component
         
         # Mock the singletons module
@@ -223,8 +224,12 @@ class TestComponentsRedirectToSingletons:
                 
                 result = initialize_component("test", lambda: "value")
                 
-                # Should have called get_or_create
-                mock_get_or_create.assert_called_once_with("test", lambda: "value")
+                # Should have called get_or_create with "test" and any callable
+                # Note: We use ANY for the callable argument because lambda creates 
+                # a new object each time, so identity comparison fails
+                mock_get_or_create.assert_called_once_with("test", ANY)
+                # Verify the callable argument is indeed a callable
+                assert callable(mock_get_or_create.call_args[0][1])
                 assert result == "test_value"
     
     def test_get_component_redirects_to_get_singleton(self):

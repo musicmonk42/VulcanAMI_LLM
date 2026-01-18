@@ -1739,6 +1739,73 @@ class QueryClassifier:
             )
         
         # =============================================================================
+        # FIX: Early check for self-awareness choice questions BEFORE PHILOSOPHICAL
+        # =============================================================================
+        # Problem: "If you had the chance to become self-aware, would you?" was being
+        # classified as PHILOSOPHICAL because general consciousness/self-awareness patterns
+        # (lines 878-879 in SELF_INTROSPECTION_PATTERNS) match before reaching the
+        # main self-introspection logic.
+        #
+        # Root Cause: PHILOSOPHICAL_PATTERNS are checked before the main
+        # SELF_INTROSPECTION check (which includes domain keyword filtering).
+        # PHILOSOPHICAL_PATTERNS contain broad patterns like "self-awareness.*you" that
+        # catch self-directed questions meant for SELF_INTROSPECTION.
+        #
+        # Solution: Add a targeted early check specifically for self-awareness/consciousness
+        # choice questions directed at the AI. These are questions about what the AI
+        # would choose/want/prefer regarding self-awareness, NOT general philosophical
+        # questions about consciousness.
+        #
+        # This is a narrow, specific fix that:
+        # 1. Only catches direct questions TO the AI about its choices
+        # 2. Does NOT interfere with domain-specific routing (causal, logical, etc.)
+        # 3. Does NOT catch general philosophical questions about consciousness
+        #
+        # Examples that should match:
+        # - "If you had the chance to become self-aware, would you?"
+        # - "Would you choose to be conscious?"
+        # - "Given the opportunity to be self-aware, would you take it?"
+        #
+        # Examples that should NOT match (these remain PHILOSOPHICAL):
+        # - "What is consciousness?"
+        # - "Can AI be self-aware?"
+        # - "The nature of self-awareness"
+        # =============================================================================
+        
+        # Check if this is a direct question about AI's choice regarding self-awareness
+        # Pattern: (would/do you) + (choice verb) combined with (self-awareness term)
+        # This requires BOTH a choice element AND a self-awareness element
+        has_choice_verb = any(
+            re.search(pattern, query_original)
+            for pattern in [
+                re.compile(r"\bwould\s+you\s+(take|choose|want|prefer|accept)\b", re.IGNORECASE),
+                re.compile(r"\bdo\s+you\s+(want|prefer|choose)\b", re.IGNORECASE),
+                re.compile(r"\b(given|had|have)\s+(the\s+)?(chance|opportunity)\s+to\b", re.IGNORECASE),
+            ]
+        )
+        
+        has_self_awareness_term = any(
+            term in query_lower
+            for term in ['self-aware', 'self aware', 'conscious', 'sentient', 'consciousness', 'sentience']
+        )
+        
+        # Only route to SELF_INTROSPECTION if BOTH conditions are met
+        # This ensures we don't catch general philosophical questions
+        if has_choice_verb and has_self_awareness_term:
+            logger.info(
+                f"[QueryClassifier] Self-awareness choice question detected - "
+                f"routing to SELF_INTROSPECTION (NOT philosophical)"
+            )
+            return QueryClassification(
+                category=QueryCategory.SELF_INTROSPECTION.value,
+                complexity=0.3,  # Medium-low complexity - World Model can handle
+                suggested_tools=["world_model"],  # Route to World Model SelfModel
+                skip_reasoning=False,  # Use reasoning path but with world_model tool
+                confidence=0.95,  # High confidence for this specific pattern
+                source="keyword",
+            )
+        
+        # =============================================================================
         # Note: Check PHILOSOPHICAL_PATTERNS BEFORE conversational patterns
         # =============================================================================
         # "Explain the moral implications..." matches "^explain\s+" in CONVERSATIONAL_PATTERNS
