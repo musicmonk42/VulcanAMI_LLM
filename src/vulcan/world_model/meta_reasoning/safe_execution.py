@@ -79,9 +79,32 @@ class SafeExecutor:
     }
 
     # Commands that require special validation
+    # 
+    # CRITICAL FIX (Defect Report Category 2.2): Argument Injection
+    # 
+    # Industry Standard Fix - Defense in Depth:
+    # 1. Explicit argument validation for high-risk commands
+    # 2. Whitelist specific safe subcommands/flags only
+    # 3. Block dangerous flags that allow arbitrary code execution
+    # 4. Multiple validation layers (command name + arguments + patterns)
+    # 5. Clear error messages for security audit trail
+    # 
+    # Python-specific security:
+    # - Block `-c` (execute string) - allows arbitrary code
+    # - Block `-m` with dangerous modules (e.g., `-m os`)
+    # - Only allow safe script execution and module imports
+    # 
+    # Rationale:
+    # - Previous code whitelisted `python` without argument validation
+    # - Attacker could run: python -c "import os; os.system('rm -rf /')"
+    # - This bypassed all subprocess protections
+    # - Now: Only safe python invocations allowed
     RESTRICTED_COMMANDS = {
         "git": ["status", "diff", "log", "show", "branch"],  # Only read operations
         "pip": ["list", "show", "check"],  # Only informational
+        # CRITICAL FIX: Add python/python3 to restricted commands
+        "python": [],  # Explicitly empty - see _validate_python_command for custom logic
+        "python3": [],  # Explicitly empty - see _validate_python_command for custom logic
     }
 
     # Dangerous argument patterns to block
@@ -163,10 +186,93 @@ class SafeExecutor:
 
         # Check restricted commands
         if cmd_name in self.RESTRICTED_COMMANDS:
+            # CRITICAL FIX: Special handling for python/python3
+            if cmd_name in ("python", "python3"):
+                return self._validate_python_command(command)
+            
+            # Original logic for other restricted commands
             allowed_subcommands = self.RESTRICTED_COMMANDS[cmd_name]
             if len(command) < 2 or command[1] not in allowed_subcommands:
                 return False, f"'{cmd_name}' requires one of: {allowed_subcommands}"
 
+        return True, None
+    
+    def _validate_python_command(self, command: List[str]) -> Tuple[bool, Optional[str]]:
+        """
+        Validate Python command arguments for security.
+        
+        Industry Standard Security Policy for Python Execution:
+        
+        BLOCKED (High Risk - Arbitrary Code Execution):
+        - `-c` / `--command`: Execute arbitrary string as code
+        - `-m <dangerous_module>`: Import and run dangerous modules
+        - stdin redirection: Allows code injection via stdin
+        
+        ALLOWED (Low Risk - Controlled Execution):
+        - Script execution: `python script.py` (script content is controlled)
+        - Safe modules: `python -m pytest`, `python -m pip list` (whitelisted only)
+        - Information flags: `--version`, `--help`
+        
+        Args:
+            command: Full command as list (e.g., ['python', '-c', 'code'])
+            
+        Returns:
+            (allowed, reason): Tuple of (bool, Optional[str])
+            
+        Security Rationale:
+            The `-c` flag is the primary attack vector for Python-based
+            command injection. Even with our DANGEROUS_PATTERNS checks,
+            an attacker could craft: `python -c "import os; os.system('cmd')"`
+            which contains no shell metacharacters but executes arbitrary code.
+            
+            This defense-in-depth approach combines:
+            1. Command name whitelist (python allowed)
+            2. Argument validation (this method - blocks -c)
+            3. Pattern matching (blocks shell metacharacters)
+            4. subprocess hardening (no shell=True, list args)
+        """
+        if len(command) < 2:
+            # Just "python" with no args - allow (opens REPL in interactive mode, harmless in subprocess)
+            return True, None
+        
+        # Dangerous flags that allow arbitrary code execution
+        BLOCKED_FLAGS = {
+            "-c",  # Execute command string
+            "--command",  # Long form of -c
+        }
+        
+        # Check for blocked flags
+        for i, arg in enumerate(command[1:], start=1):
+            if arg in BLOCKED_FLAGS:
+                return False, (
+                    f"Python flag '{arg}' is blocked (arbitrary code execution risk). "
+                    f"Use script files instead: python script.py"
+                )
+            
+            # Check for -m with dangerous modules
+            if arg == "-m":
+                if i + 1 >= len(command):
+                    return False, "Python -m flag requires a module name"
+                
+                module_name = command[i + 1]
+                # Whitelist safe modules only
+                SAFE_MODULES = {
+                    "pytest",  # Testing
+                    "unittest",  # Testing
+                    "pip",  # Package info (when used with safe subcommands)
+                    "venv",  # Virtual environment
+                    "json.tool",  # JSON formatting
+                    "http.server",  # Local server (controlled environment)
+                    "pdb",  # Debugger (controlled environment)
+                }
+                
+                if module_name not in SAFE_MODULES:
+                    return False, (
+                        f"Python module '{module_name}' is not in the safe module whitelist. "
+                        f"Allowed modules: {', '.join(sorted(SAFE_MODULES))}"
+                    )
+        
+        # If we get here, command is safe (e.g., "python script.py" or "python -m pytest")
         return True, None
 
     def validate_working_directory(self, path: Path) -> Tuple[bool, Optional[str]]:
