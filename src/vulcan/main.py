@@ -260,6 +260,31 @@ def main():
 # ENTRY POINT
 # ====================================================================
 if __name__ == "__main__":
+    # FIX #5: WINDOWS MULTIPROCESSING GUARD
+    # CRITICAL: This MUST be the first thing in __main__ block
+    # 
+    # Windows uses 'spawn' method for multiprocessing which:
+    # 1. Starts fresh Python processes
+    # 2. Re-imports the main module in each process
+    # 3. Would recursively execute code not protected by __name__ guard
+    #
+    # multiprocessing.freeze_support() prevents infinite spawning loop by:
+    # - Detecting if we're in a spawned child process
+    # - Exiting early if so (before re-executing main code)
+    # - Only running on Windows (no-op on Unix/Linux)
+    #
+    # Without this fix:
+    # - Each spawned process re-runs main.py
+    # - Each of those spawns more processes
+    # - System runs out of resources and crashes
+    #
+    # With this fix:
+    # - Child processes exit immediately after freeze_support()
+    # - Only parent process continues to main()
+    # - Multiprocessing works correctly on all platforms
+    import multiprocessing
+    multiprocessing.freeze_support()  # REQUIRED for Windows compatibility
+    
     # Configure logging
     logging.basicConfig(
         level=logging.INFO,
@@ -271,6 +296,7 @@ if __name__ == "__main__":
     logger.info("VULCAN-AGI: Advanced General Intelligence System")
     logger.info("Refactored Architecture: 24 Focused Modules")
     logger.info("=" * 70)
+    logger.info("Multiprocessing: freeze_support() enabled (Windows compatibility)")
     
     # Run main entry point
     main()

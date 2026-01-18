@@ -556,50 +556,150 @@ class UserStore:
     async def verify_user(
         self, username: str, password: str
     ) -> Tuple[bool, Optional[Dict[str, Any]]]:
-        """Verify username/password and return user record if valid."""
+        """
+        Verify username/password and return user record if valid.
+        
+        FIX #2: Uses async password verification to prevent event loop blocking.
+        This prevents the API server from freezing during authentication under load.
+        """
         user = self._users.get(username)
 
-        # FIX: Prevent timing attack
+        # FIX: Prevent timing attack - always perform a hash operation
         if not user:
-            # Run dummy hash to prevent timing attack
+            # Run dummy hash to prevent timing attack (off main thread)
             if self.argon2:
                 try:
-                    self.argon2.hash("dummy_password_for_timing_attack")
+                    await asyncio.get_running_loop().run_in_executor(
+                        None,
+                        self.argon2.hash,
+                        "dummy_password_for_timing_attack"
+                    )
                 except Exception as e:
                     # Timing attack prevention - log but continue
                     logger.debug(f"Dummy hash for timing attack failed: {e}")
             elif BCRYPT_AVAILABLE:
                 try:
-                    BcryptLib.hashpw(
-                        "dummy_password_for_timing_attack".encode("utf-8"),
-                        BcryptLib.gensalt(rounds=4),
+                    await asyncio.get_running_loop().run_in_executor(
+                        None,
+                        lambda: BcryptLib.hashpw(
+                            "dummy_password_for_timing_attack".encode("utf-8"),
+                            BcryptLib.gensalt(rounds=4),
+                        )
                     )
                 except Exception as e:
                     # Timing attack prevention - log but continue
                     logger.debug(f"Dummy bcrypt for timing attack failed: {e}")
             else:
-                self._pbkdf2_hash(password, "dummy_salt_for_timing_attack")
+                # PBKDF2 fallback for timing attack prevention
+                await asyncio.get_running_loop().run_in_executor(
+                    None,
+                    self._pbkdf2_hash,
+                    password,
+                    "dummy_salt_for_timing_attack"
+                )
             return False, None
 
         algo = user["password_algo"]
         try:
+            # FIX #2: Use non-blocking password verification
             if algo == "argon2" and self.argon2:
-                self.argon2.verify(user["password_hash"], password)
-                return True, user
+                valid = await self.verify_password_safe(
+                    password,
+                    user["password_hash"],
+                    algo="argon2"
+                )
+                return (True, user) if valid else (False, None)
             elif algo == "bcrypt" and BCRYPT_AVAILABLE:
-                valid = BcryptLib.checkpw(
-                    password.encode("utf-8"), user["password_hash"].encode("utf-8")
+                valid = await self.verify_password_safe(
+                    password,
+                    user["password_hash"],
+                    algo="bcrypt"
                 )
                 return (True, user) if valid else (False, None)
             elif algo == "pbkdf2_sha256":
+                # PBKDF2 is also CPU-intensive with 200k iterations
                 expected = user["password_hash"]
-                calc = self._pbkdf2_hash(password, user["password_salt"])
+                calc = await asyncio.get_running_loop().run_in_executor(
+                    None,
+                    self._pbkdf2_hash,
+                    password,
+                    user["password_salt"]
+                )
                 valid = hmac.compare_digest(expected, calc)
                 return (True, user) if valid else (False, None)
             else:
                 return False, None
-        except Exception:
+        except Exception as e:
+            logger.debug(f"Password verification exception: {e}")
             return False, None
+
+    async def verify_password_safe(self, plain: str, hashed: bytes, algo: str = "bcrypt") -> bool:
+        """
+        FIX #2: Run expensive password hashing on a separate thread to avoid blocking the event loop.
+        
+        This method offloads CPU-intensive bcrypt/argon2 hashing to a ThreadPoolExecutor,
+        preventing the async event loop from freezing during authentication.
+        
+        Industry Best Practice: Never block the event loop with CPU-intensive operations.
+        Performance: Maintains server responsiveness under high authentication load.
+        Security: Maintains same security guarantees as synchronous verification.
+        
+        Args:
+            plain: Plain text password to verify
+            hashed: Hashed password (bytes or str)
+            algo: Algorithm used ('bcrypt', 'argon2', or 'pbkdf2_sha256')
+            
+        Returns:
+            bool: True if password matches, False otherwise
+            
+        Example:
+            is_valid = await user_store.verify_password_safe(
+                user_input_password,
+                stored_password_hash,
+                algo="bcrypt"
+            )
+        """
+        loop = asyncio.get_running_loop()
+        
+        try:
+            if algo == "bcrypt" and BCRYPT_AVAILABLE:
+                # Offload bcrypt.checkpw to thread pool (CPU-intensive operation)
+                # Uses run_in_executor(None) which uses the default ThreadPoolExecutor
+                if isinstance(hashed, str):
+                    hashed = hashed.encode('utf-8')
+                result = await loop.run_in_executor(
+                    None,  # Use default ThreadPoolExecutor
+                    BcryptLib.checkpw,
+                    plain.encode('utf-8'),
+                    hashed
+                )
+                return result
+            elif algo == "argon2" and self.argon2:
+                # Argon2 verification is also CPU-intensive
+                if isinstance(hashed, bytes):
+                    hashed = hashed.decode('utf-8')
+                result = await loop.run_in_executor(
+                    None,
+                    self.argon2.verify,
+                    hashed,
+                    plain
+                )
+                return True  # argon2.verify raises on failure, so if we get here it's valid
+            elif algo == "pbkdf2_sha256":
+                # PBKDF2 with 200k iterations is also CPU-intensive
+                if isinstance(hashed, bytes):
+                    hashed = hashed.decode('utf-8')
+                # Extract salt from user record (this should be passed separately in real usage)
+                # For now, we'll use the synchronous path for PBKDF2
+                logger.warning("PBKDF2 async verification not fully implemented, using sync path")
+                return False
+            else:
+                logger.warning(f"Unknown or unavailable password algorithm: {algo}")
+                return False
+        except Exception as e:
+            # Argon2 raises exceptions on verification failure, bcrypt returns False
+            logger.debug(f"Password verification failed: {e}")
+            return False
 
     def get_user(self, username: str) -> Optional[Dict[str, Any]]:
         return self._users.get(username)
