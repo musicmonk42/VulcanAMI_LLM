@@ -37,6 +37,7 @@ Usage:
 """
 
 import logging
+import math
 import random
 import threading
 import time
@@ -265,12 +266,18 @@ class EmbeddingCircuitBreaker:
         - Timeout = initial_timeout * (multiplier ^ consecutive_failures)
         - Capped at max_reset_timeout_s
         - Jitter added: +/- backoff_jitter percentage
+        - Uses math.pow() for efficiency and numerical stability
         
         Returns:
             Current timeout in seconds with jitter applied
         """
-        # Calculate exponential backoff
-        timeout = self.reset_timeout_s * (self.backoff_multiplier ** self._consecutive_failures)
+        # Cap consecutive failures to prevent overflow (2^20 = ~1 million)
+        # This ensures we never overflow even with large multipliers
+        capped_failures = min(self._consecutive_failures, 20)
+        
+        # Calculate exponential backoff using math.pow for efficiency
+        exponent = math.pow(self.backoff_multiplier, capped_failures)
+        timeout = self.reset_timeout_s * exponent
         
         # Cap at maximum
         timeout = min(timeout, self.max_reset_timeout_s)
@@ -404,7 +411,7 @@ class EmbeddingCircuitBreaker:
             self._failure_count = 0
             self._success_count = 0
             self._consecutive_failures = 0  # Reset exponential backoff
-            self.reset_timeout_s = self.initial_reset_timeout_s  # Reset timeout
+            # Note: Do NOT modify reset_timeout_s as it's the base configuration
             logger.info(f"{LOG_PREFIX} Circuit CLOSED - embeddings fully enabled, backoff reset")
         elif new_state == CircuitState.OPEN:
             self._success_count = 0
@@ -432,7 +439,7 @@ class EmbeddingCircuitBreaker:
             self._failure_count = 0
             self._success_count = 0
             self._consecutive_failures = 0
-            self.reset_timeout_s = self.initial_reset_timeout_s
+            # Note: Do NOT modify reset_timeout_s as it's the base configuration
             self._last_state_change = time.time()
             logger.info(f"{LOG_PREFIX} Circuit force reset to CLOSED with backoff cleared")
     

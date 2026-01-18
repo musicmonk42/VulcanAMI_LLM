@@ -237,6 +237,9 @@ class UnifiedReasoner:
         ReasoningType.SYMBOLIC,
         ReasoningType.CAUSAL,
     ]
+    
+    # CRITICAL FIX #4: Maximum recursion depth for preventing infinite loops
+    MAX_RECURSION_DEPTH = 5
 
     def __init__(
         self,
@@ -1462,14 +1465,13 @@ class UnifiedReasoner:
         """
         
         # CRITICAL FIX #4: Check recursion depth limit
-        MAX_RECURSION_DEPTH = 5
-        if _recursion_depth >= MAX_RECURSION_DEPTH:
+        if _recursion_depth >= self.MAX_RECURSION_DEPTH:
             logger.error(
-                f"[Recursion Guard] Maximum recursion depth ({MAX_RECURSION_DEPTH}) "
+                f"[Recursion Guard] Maximum recursion depth ({self.MAX_RECURSION_DEPTH}) "
                 f"exceeded. Preventing infinite loop."
             )
             return self._create_error_result(
-                f"Maximum reasoning recursion depth ({MAX_RECURSION_DEPTH}) exceeded. "
+                f"Maximum reasoning recursion depth ({self.MAX_RECURSION_DEPTH}) exceeded. "
                 f"Possible infinite loop detected."
             )
         

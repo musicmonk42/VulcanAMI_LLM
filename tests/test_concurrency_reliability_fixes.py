@@ -220,7 +220,10 @@ def test_recursion_depth_limit():
     - Error result returned at limit
     - No stack overflow
     """
-    MAX_RECURSION_DEPTH = 5
+    # Import the constant from production code
+    from src.vulcan.reasoning.unified.orchestrator import UnifiedReasoner
+    
+    MAX_RECURSION_DEPTH = UnifiedReasoner.MAX_RECURSION_DEPTH
     call_count = [0]
     
     def recursive_reason(depth=0):
