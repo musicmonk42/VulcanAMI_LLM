@@ -1933,6 +1933,11 @@ def is_self_improvement_enabled() -> bool:
 _config_manager = None
 _config_lock = threading.Lock()
 
+# FIX #3: Add dedicated initialization lock to prevent race conditions
+# This lock is used specifically for lazy initialization to ensure thread-safe
+# singleton creation during startup when multiple threads might call _ensure_initialized()
+_init_lock = threading.Lock()
+
 
 def _get_config_manager():
     """Get or create global configuration manager (thread-safe)."""
@@ -2119,10 +2124,36 @@ def _lazy_init():
 
 
 def _ensure_initialized():
-    """Ensure configuration is initialized."""
+    """
+    FIX #3: Ensure configuration is initialized thread-safely.
+    
+    This function implements double-checked locking to prevent race conditions
+    during lazy initialization. Without this fix, multiple threads calling this
+    function simultaneously during startup could create multiple ConfigurationManager
+    instances, leading to inconsistent state and startup errors.
+    
+    Thread Safety: Uses double-checked locking pattern (industry standard).
+    Performance: First check avoids lock acquisition after initialization.
+    Correctness: Second check inside lock ensures atomicity.
+    
+    Pattern:
+        1. Fast path: Check without lock (common case after init)
+        2. Acquire lock only if needed
+        3. Check again inside lock (handles race condition)
+        4. Initialize only if still None
+    """
     global _config_manager
+    
+    # Double-checked locking pattern for thread-safe lazy initialization
+    # First check (outside lock) - fast path for already initialized
     if _config_manager is None:
-        _lazy_init()
+        # Acquire initialization lock
+        with _init_lock:
+            # Second check (inside lock) - ensures only one thread initializes
+            if _config_manager is None:
+                logger.info("Initializing configuration manager (thread-safe lazy init)")
+                _lazy_init()
+                logger.info("Configuration manager initialized successfully")
 
 
 def _cleanup_on_exit():
