@@ -539,13 +539,43 @@ def execute_ensemble_reasoning(
     )
 
 
+def _is_valid_conclusion_for_voting(c: Any) -> bool:
+    """
+    Check if conclusion is valid for weighted voting.
+    
+    **Industry Standard**: Centralized validation logic to avoid duplication.
+    Used by both main voting logic and exception handler fallback.
+    
+    Args:
+        c: Conclusion value to check
+        
+    Returns:
+        True if conclusion is valid (not None, "None", or empty), False otherwise
+    """
+    if c is None:
+        return False
+    if isinstance(c, str):
+        # Empty string or whitespace-only
+        if not c.strip():
+            return False
+        # Literal string "None" (case-insensitive)
+        if c.strip().lower() == "none":
+            return False
+    return True
+
+
 def weighted_voting(conclusions: List[Any], weights: List[float]) -> Any:
     """
-    Weighted voting for ensemble conclusions.
+    Weighted voting for ensemble conclusions with robust None/empty filtering.
+    
+    **Industry Standard Fix**: Filters invalid conclusions (None, "None" string,
+    empty strings, whitespace-only) before voting to prevent content loss in
+    ensemble reasoning. This ensures high-confidence results always deliver
+    meaningful conclusions to users.
     
     Strategy depends on conclusion types:
     - All bools: Return True if weighted sum > 0.5
-    - All strings: Return string with highest total weight
+    - All strings: Return string with highest total weight (after filtering)
     - All numbers: Return weighted average
     - Otherwise: Return conclusion with highest weight
     
@@ -554,7 +584,7 @@ def weighted_voting(conclusions: List[Any], weights: List[float]) -> Any:
         weights: List of weights (same length as conclusions)
         
     Returns:
-        Combined conclusion using weighted voting.
+        Combined conclusion using weighted voting, or None if all invalid.
         
     Examples:
         >>> weighted_voting([True, False, True], [0.8, 0.1, 0.1])
@@ -565,35 +595,102 @@ def weighted_voting(conclusions: List[Any], weights: List[float]) -> Any:
         
         >>> weighted_voting([10, 20, 30], [0.5, 0.3, 0.2])
         17.0  # Weighted average
+        
+        >>> weighted_voting(["Valid", None, "None"], [0.3, 0.4, 0.3])
+        "Valid"  # Only valid conclusion after filtering
+    
+    Note:
+        **Bug Fix**: Previously included None/"None"/empty strings in voting,
+        causing valid conclusions to be replaced with invalid ones when None
+        had higher weight. Now filters invalid conclusions first.
     """
     if not conclusions:
         return None
 
     try:
-        total_weight = sum(weights)
+        # Industry Standard: Input validation
+        if len(conclusions) != len(weights):
+            logger.error(
+                f"Weighted voting: mismatched lengths "
+                f"(conclusions={len(conclusions)}, weights={len(weights)})"
+            )
+            return conclusions[0] if conclusions else None
+        
+        # **BUG FIX #2**: Filter out invalid conclusions before voting
+        # Uses centralized validation function to avoid duplication
+        valid_pairs = [
+            (c, w) for c, w in zip(conclusions, weights) 
+            if _is_valid_conclusion_for_voting(c)
+        ]
+        
+        if not valid_pairs:
+            # All conclusions were invalid - return None with warning
+            logger.warning(
+                f"Weighted voting: all {len(conclusions)} conclusions were invalid "
+                f"(None, 'None', or empty). Returning None."
+            )
+            return None
+        
+        # Log if we filtered any conclusions
+        if len(valid_pairs) < len(conclusions):
+            filtered_count = len(conclusions) - len(valid_pairs)
+            logger.info(
+                f"Weighted voting: filtered {filtered_count} invalid conclusion(s), "
+                f"using {len(valid_pairs)} valid conclusion(s)"
+            )
+        
+        # Unzip valid pairs back into separate lists
+        valid_conclusions = [c for c, w in valid_pairs]
+        valid_weights = [w for c, w in valid_pairs]
+        
+        # Normalize weights or use uniform if sum is zero
+        total_weight = sum(valid_weights)
         if total_weight > 0:
-            weights = [w / total_weight for w in weights]
+            normalized_weights = [w / total_weight for w in valid_weights]
         else:
-            weights = [1.0 / len(weights)] * len(weights)
+            # Industry Standard: Uniform fallback if all weights are zero
+            uniform_weights = [1.0 / len(valid_weights)] * len(valid_weights)
+            normalized_weights = uniform_weights
+            logger.warning(
+                f"Weighted voting: all weights sum to zero, using uniform weights"
+            )
 
-        if all(isinstance(c, bool) for c in conclusions):
-            true_weight = sum(w for c, w in zip(conclusions, weights) if c)
+        # Boolean conclusions
+        if all(isinstance(c, bool) for c in valid_conclusions):
+            true_weight = sum(
+                w for c, w in zip(valid_conclusions, normalized_weights) if c
+            )
             return true_weight > 0.5
 
-        if all(isinstance(c, str) for c in conclusions):
+        # String conclusions
+        if all(isinstance(c, str) for c in valid_conclusions):
             vote_weights = defaultdict(float)
-            for c, w in zip(conclusions, weights):
+            for c, w in zip(valid_conclusions, normalized_weights):
                 vote_weights[c] += w
+            
+            # Industry Standard: Defensive check before max()
+            if not vote_weights:
+                logger.warning("Weighted voting: no valid string votes")
+                return None
+            
             return max(vote_weights.items(), key=lambda x: x[1])[0]
 
-        if all(isinstance(c, (int, float)) for c in conclusions):
-            return sum(c * w for c, w in zip(conclusions, weights))
+        # Numeric conclusions
+        if all(isinstance(c, (int, float)) for c in valid_conclusions):
+            return sum(c * w for c, w in zip(valid_conclusions, normalized_weights))
 
-        max_idx = np.argmax(weights)
-        return conclusions[max_idx]
+        # Mixed types - return conclusion with highest weight
+        max_idx = np.argmax(normalized_weights)
+        return valid_conclusions[max_idx]
+        
     except Exception as e:
-        logger.error(f"Weighted voting failed: {e}")
-        return conclusions[0] if conclusions else None
+        logger.error(f"Weighted voting failed: {e}", exc_info=True)
+        # Industry Standard: Return first valid conclusion as fallback
+        # Reuse the centralized validation function
+        for c in conclusions:
+            if _is_valid_conclusion_for_voting(c):
+                return c
+        return None
 
 
 # ==============================================================================

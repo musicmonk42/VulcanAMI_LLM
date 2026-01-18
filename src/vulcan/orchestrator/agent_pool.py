@@ -543,6 +543,27 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+# ==============================================================================
+# Module-level constants for conclusion extraction (Bug #2 Fix)
+# ==============================================================================
+
+# Industry Standard: Define at module level to avoid recreation on every call
+# These keys are tried in priority order when extracting conclusions from dicts
+_CONCLUSION_EXTRACTION_KEYS = (
+    'world_model_response',  # World model specific
+    'conclusion',            # Standard key
+    'response',              # Common alternative
+    'output',                # Some engines use this
+    'result',                # Mathematical/computational engines
+    'answer',                # User-facing key
+    'content',               # Generic content key
+    'text',                  # Text-based responses
+)
+
+# Maximum recursion depth for nested dictionary extraction
+# Industry Standard: Prevent stack overflow from circular references
+_MAX_CONCLUSION_EXTRACTION_DEPTH = 3
+
 # ============================================================
 # SIMPLE MODE CONFIGURATION - Performance Optimization
 # ============================================================
@@ -4107,33 +4128,80 @@ class AgentPoolManager:
 
             raise
 
-    def _extract_conclusion_from_dict(self, data_dict: Dict[str, Any]) -> Optional[Any]:
+    def _extract_conclusion_from_dict(
+        self, 
+        data_dict: Dict[str, Any], 
+        _depth: int = 0
+    ) -> Optional[Any]:
         """
         Helper method to extract conclusion from a dictionary with multiple fallback keys.
+        
+        **Industry Standard Fix**: Enhanced extraction logic with:
+        - Recursive extraction for nested dictionaries (depth-limited)
+        - Multiple fallback keys for different engine formats
+        - Validation of extracted conclusions (not None/"None")
+        - Defensive handling of complex objects
+        - Circular reference protection
         
         BUG #2 FIX: Centralized extraction logic to avoid duplication.
         Tries multiple possible keys where reasoning engines store conclusions.
         
         Args:
             data_dict: Dictionary that may contain conclusion data
+            _depth: Internal parameter for recursion depth tracking (default: 0)
             
         Returns:
-            Conclusion value if found, None otherwise
+            Conclusion value if found and valid, None otherwise
         """
         if not isinstance(data_dict, dict):
             return None
+        
+        # Industry Standard: Prevent stack overflow from circular references
+        if _depth >= _MAX_CONCLUSION_EXTRACTION_DEPTH:
+            logger.warning(
+                f"[AgentPool] Max conclusion extraction depth ({_MAX_CONCLUSION_EXTRACTION_DEPTH}) "
+                f"reached - possible circular reference"
+            )
+            return None
             
         # Try multiple possible keys in priority order
-        for key in ('world_model_response', 'conclusion', 'response', 'output', 'result'):
+        # Industry Standard: Use module-level constant to avoid recreation
+        for key in _CONCLUSION_EXTRACTION_KEYS:
             value = data_dict.get(key)
-            if value is not None:
-                return value
+            
+            # Skip invalid values
+            if value is None:
+                continue
+            if isinstance(value, str):
+                # Skip empty strings or literal "None"
+                if not value.strip() or value.strip().lower() == "none":
+                    continue
+            
+            # **Industry Standard**: Handle nested dictionaries recursively
+            # Some engines wrap conclusions in additional metadata layers
+            if isinstance(value, dict):
+                # Check if this dict has its own conclusion key (recursive with depth tracking)
+                nested_conclusion = self._extract_conclusion_from_dict(value, _depth=_depth + 1)
+                if nested_conclusion is not None:
+                    return nested_conclusion
+                # Otherwise use the dict itself if it has meaningful content
+                if len(value) > 0:
+                    return value
+            
+            # Valid non-None, non-empty value found
+            return value
         
         return None
     
     def _is_valid_conclusion(self, conclusion: Any) -> bool:
         """
         Helper method to check if a conclusion is valid (not None or string "None").
+        
+        **Industry Standard Fix**: Enhanced validation with:
+        - None vs string "None" distinction
+        - Empty/whitespace string detection
+        - Complex object handling (dicts, lists)
+        - ReasoningResult object detection
         
         BUG #2 FIX: Centralized validation logic to avoid duplication.
         
@@ -4145,9 +4213,28 @@ class AgentPoolManager:
         """
         if conclusion is None:
             return False
+        
         if isinstance(conclusion, str):
             # Check for empty string or literal "None" string
-            return conclusion.strip() and conclusion != "None"
+            stripped = conclusion.strip()
+            if not stripped:
+                return False
+            if stripped.lower() == "none":
+                return False
+            return True
+        
+        # **Industry Standard**: Check for empty containers
+        if isinstance(conclusion, (dict, list, tuple)):
+            return len(conclusion) > 0
+        
+        # **Industry Standard**: Handle ReasoningResult objects
+        # These should be unwrapped, not treated as final conclusions
+        if hasattr(conclusion, 'conclusion'):
+            # This is a nested object - check its inner conclusion
+            inner = getattr(conclusion, 'conclusion', None)
+            return self._is_valid_conclusion(inner)
+        
+        # All other non-None values are considered valid
         return True
 
     def _complete_agent_task(self, agent_id: str, task_id: str, result: Any):
