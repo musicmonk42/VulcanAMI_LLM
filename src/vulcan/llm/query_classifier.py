@@ -1948,14 +1948,14 @@ class QueryClassifier:
                 f"[QueryClassifier] FIX: Detected CRYPTOGRAPHIC pattern - "
                 f"routing to cryptographic (NOT self-introspection)"
             )
-                return QueryClassification(
-                    category=QueryCategory.CRYPTOGRAPHIC.value,
-                    complexity=0.6,  # Technical complexity
-                    suggested_tools=["cryptographic"],  # Route to crypto reasoner
-                    skip_reasoning=False,  # Needs reasoning
-                    confidence=0.95,
-                    source="keyword",
-                )
+            return QueryClassification(
+                category=QueryCategory.CRYPTOGRAPHIC.value,
+                complexity=0.6,  # Technical complexity
+                suggested_tools=["cryptographic"],  # Route to crypto reasoner
+                skip_reasoning=False,  # Needs reasoning
+                confidence=0.95,
+                source="keyword",
+            )
         
         # Check cryptographic keywords using word-boundary matching (reuse helper method)
         crypto_count, regular_crypto_count_2, short_crypto_count_2 = self._count_crypto_keywords(query_lower)
@@ -1998,14 +1998,14 @@ class QueryClassifier:
                 f"[QueryClassifier] FIX: Detected value conflict pattern - "
                 f"routing to PHILOSOPHICAL (NOT self-introspection)"
             )
-                return QueryClassification(
-                    category=QueryCategory.PHILOSOPHICAL.value,
-                    complexity=0.5,  # Medium complexity - ethical reasoning
-                    suggested_tools=["philosophical", "world_model"],
-                    skip_reasoning=False,  # Needs ethical reasoning
-                    confidence=0.9,
-                    source="keyword",
-                )
+            return QueryClassification(
+                category=QueryCategory.PHILOSOPHICAL.value,
+                complexity=0.5,  # Medium complexity - ethical reasoning
+                suggested_tools=["philosophical", "world_model"],
+                skip_reasoning=False,  # Needs ethical reasoning
+                confidence=0.9,
+                source="keyword",
+            )
         
         # =============================================================================
         # SPECULATION FIX: Check speculation/counterfactual patterns
