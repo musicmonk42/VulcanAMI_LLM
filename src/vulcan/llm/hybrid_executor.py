@@ -3031,14 +3031,38 @@ Make this human-readable. Nothing more."""
         # When engine declines (not_applicable=True), we should let OpenAI try
         # FIX (Jan 18 2026): Lowered from 0.5 to 0.01 to ensure reasoning results pass through
         # This allows us to verify if poor responses are due to confidence filtering or other issues.
-        MIN_REASONING_CONFIDENCE = 0.01
-        reasoning_confidence = getattr(reasoning_output, 'confidence', None) or 0.0
+        # Industry Standard: Configurable threshold with environment variable override
+        try:
+            MIN_REASONING_CONFIDENCE = float(
+                os.environ.get("VULCAN_HYBRID_MIN_REASONING_CONFIDENCE", "0.01")
+            )
+            # Industry Standard: Bounds checking - clamp to valid range [0.0, 1.0]
+            MIN_REASONING_CONFIDENCE = max(0.0, min(1.0, MIN_REASONING_CONFIDENCE))
+        except (ValueError, TypeError) as e:
+            self.logger.warning(
+                f"[HybridExecutor] Invalid VULCAN_HYBRID_MIN_REASONING_CONFIDENCE, using default 0.01: {e}"
+            )
+            MIN_REASONING_CONFIDENCE = 0.01
+        
+        # Industry Standard: Safe attribute access with type validation
+        reasoning_confidence = getattr(reasoning_output, 'confidence', None)
+        if not isinstance(reasoning_confidence, (int, float)):
+            reasoning_confidence = 0.0
+        elif reasoning_confidence < 0.0:
+            # Industry Standard: Sanitize invalid negative confidence values
+            self.logger.warning(
+                f"[HybridExecutor] Invalid negative confidence {reasoning_confidence}, clamping to 0.0"
+            )
+            reasoning_confidence = 0.0
         
         # DIAGNOSTIC LOGGING: Log reasoning confidence and threshold
-        self.logger.info(
-            f"[HybridExecutor/DIAGNOSTIC] Reasoning confidence check: "
-            f"confidence={reasoning_confidence:.2f}, threshold={MIN_REASONING_CONFIDENCE:.2f}"
-        )
+        # Industry Standard: Feature flag to control diagnostic logging noise
+        enable_diagnostic_logging = os.environ.get("VULCAN_DIAGNOSTIC_LOGGING", "true").lower() in ("true", "1", "yes")
+        if enable_diagnostic_logging:
+            self.logger.info(
+                f"[HybridExecutor/DIAGNOSTIC] Reasoning confidence check: "
+                f"confidence={reasoning_confidence:.2f}, threshold={MIN_REASONING_CONFIDENCE:.2f}"
+            )
         
         # Issue #7 FIX: Check if reasoning engine declined the query (not_applicable)
         # If so, don't treat this as a failure - let OpenAI attempt it

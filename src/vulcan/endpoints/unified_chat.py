@@ -1846,7 +1846,19 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
         # FIX (Jan 18 2026): Lowered from 0.10 to 0.01 to ensure reasoning results always pass through.
         # This allows us to verify if poor responses are due to confidence filtering or other issues.
         # Configurable via VULCAN_MIN_REASONING_CONFIDENCE environment variable.
-        MIN_REASONING_CONFIDENCE_THRESHOLD = float(os.environ.get("VULCAN_MIN_REASONING_CONFIDENCE", "0.01"))
+        # Industry Standard: Input validation with bounds checking and error handling
+        try:
+            MIN_REASONING_CONFIDENCE_THRESHOLD = float(os.environ.get("VULCAN_MIN_REASONING_CONFIDENCE", "0.01"))
+            # Clamp to valid range [0.0, 1.0]
+            MIN_REASONING_CONFIDENCE_THRESHOLD = max(0.0, min(1.0, MIN_REASONING_CONFIDENCE_THRESHOLD))
+        except (ValueError, TypeError) as e:
+            logger.warning(
+                f"[VULCAN] Invalid VULCAN_MIN_REASONING_CONFIDENCE value, using default 0.01: {e}"
+            )
+            MIN_REASONING_CONFIDENCE_THRESHOLD = 0.01
+        
+        # Industry Standard: Feature flag for diagnostic logging to reduce noise in production
+        ENABLE_DIAGNOSTIC_LOGGING = os.environ.get("VULCAN_DIAGNOSTIC_LOGGING", "true").lower() in ("true", "1", "yes")
         
         # Check if we should use reasoning results directly
         use_reasoning_directly = False
@@ -1855,11 +1867,12 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
         best_reasoning_type = None
         
         # DIAGNOSTIC LOGGING: Log reasoning results receipt
-        logger.info(
-            f"[VULCAN/DIAGNOSTIC] Reasoning results received: {bool(reasoning_results)}, "
-            f"threshold: {MIN_REASONING_CONFIDENCE_THRESHOLD:.2f}, "
-            f"engines: {list(reasoning_results.keys()) if reasoning_results else []}"
-        )
+        if ENABLE_DIAGNOSTIC_LOGGING:
+            logger.info(
+                f"[VULCAN/DIAGNOSTIC] Reasoning results received: {bool(reasoning_results)}, "
+                f"threshold: {MIN_REASONING_CONFIDENCE_THRESHOLD:.2f}, "
+                f"engines: {list(reasoning_results.keys()) if reasoning_results else []}"
+            )
         
         if reasoning_results:
             # Check unified reasoning first (highest priority)
