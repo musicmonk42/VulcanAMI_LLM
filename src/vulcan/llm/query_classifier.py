@@ -355,7 +355,7 @@ def _compile_mega_pattern(patterns: Tuple[re.Pattern, ...], name: str) -> re.Pat
     return re.compile(combined, re.IGNORECASE)
 
 
-# NOTE: Mega-pattern compilation moved to after all pattern definitions (after line 1108)
+# NOTE: Mega-pattern compilation moved to after all pattern definitions (after line 1116)
 # to avoid NameError from forward references. See mega-pattern compilation block below.
 
 # Logical connective symbols (Unicode + ASCII representations) for SAT detection
@@ -1102,7 +1102,7 @@ SPECULATION_KEYWORDS: FrozenSet[str] = frozenset([
 # This provides maximum performance by avoiding recompilation on every classify() call
 #
 # NOTE: This section MUST be placed after all pattern definitions to avoid NameError
-# from forward references. Previously at line 358, moved here to fix import failure.
+# from forward references. Previously at lines 358-380, moved here to fix import failure.
 
 CHITCHAT_MEGA_PATTERN = _compile_mega_pattern(CHITCHAT_PATTERNS, "CHITCHAT")
 PHILOSOPHICAL_MEGA_PATTERN = _compile_mega_pattern(PHILOSOPHICAL_PATTERNS, "PHILOSOPHICAL")
