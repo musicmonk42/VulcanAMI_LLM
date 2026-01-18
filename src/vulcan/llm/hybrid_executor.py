@@ -3029,8 +3029,16 @@ Make this human-readable. Nothing more."""
         # Issue #7 FIX: Check reasoning confidence BEFORE sending to OpenAI
         # BUT: Don't block OpenAI if reasoning engine says "not_applicable"
         # When engine declines (not_applicable=True), we should let OpenAI try
-        MIN_REASONING_CONFIDENCE = 0.5
+        # FIX (Jan 18 2026): Lowered from 0.5 to 0.01 to ensure reasoning results pass through
+        # This allows us to verify if poor responses are due to confidence filtering or other issues.
+        MIN_REASONING_CONFIDENCE = 0.01
         reasoning_confidence = getattr(reasoning_output, 'confidence', None) or 0.0
+        
+        # DIAGNOSTIC LOGGING: Log reasoning confidence and threshold
+        self.logger.info(
+            f"[HybridExecutor/DIAGNOSTIC] Reasoning confidence check: "
+            f"confidence={reasoning_confidence:.2f}, threshold={MIN_REASONING_CONFIDENCE:.2f}"
+        )
         
         # Issue #7 FIX: Check if reasoning engine declined the query (not_applicable)
         # If so, don't treat this as a failure - let OpenAI attempt it

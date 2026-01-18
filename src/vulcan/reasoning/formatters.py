@@ -247,23 +247,42 @@ def format_direct_reasoning_response(
     if reasoning_results is None:
         reasoning_results = {}
     
+    # DIAGNOSTIC LOGGING: Log input to formatting function
+    logger.info(
+        f"[formatters/DIAGNOSTIC] format_direct_reasoning_response called: "
+        f"conclusion_type={type(conclusion).__name__}, "
+        f"has_conclusion_attr={hasattr(conclusion, 'conclusion')}, "
+        f"confidence={confidence:.2f}, reasoning_type={reasoning_type}"
+    )
+    
     response_parts = []
     
-    # Handle ReasoningResult dataclass objects
-    if hasattr(conclusion, 'conclusion') and hasattr(conclusion, 'confidence'):
-        # This is a ReasoningResult object - extract meaningful fields
+    # Handle ReasoningResult dataclass objects or similar nested structures
+    # Keep unwrapping until we get to the actual content
+    unwrap_depth = 0
+    while hasattr(conclusion, 'conclusion') and unwrap_depth < 5:  # Max 5 levels to prevent infinite loops
+        # This is a ReasoningResult object or similar - extract meaningful fields
         inner_conclusion = getattr(conclusion, 'conclusion', None)
         inner_explanation = getattr(conclusion, 'explanation', '')
         inner_confidence = getattr(conclusion, 'confidence', confidence)
         inner_reasoning_type = getattr(conclusion, 'reasoning_type', None)
+        
+        logger.info(
+            f"[formatters/DIAGNOSTIC] Unwrapping nested object (depth={unwrap_depth}): "
+            f"inner_conclusion_type={type(inner_conclusion).__name__}, "
+            f"inner_confidence={inner_confidence}"
+        )
         
         # Update confidence if the inner one is higher
         if isinstance(inner_confidence, (int, float)) and inner_confidence > confidence:
             confidence = inner_confidence
         
         # Get reasoning type value if it's an enum
-        if inner_reasoning_type and hasattr(inner_reasoning_type, 'value'):
-            reasoning_type = inner_reasoning_type.value
+        if inner_reasoning_type:
+            if hasattr(inner_reasoning_type, 'value'):
+                reasoning_type = inner_reasoning_type.value
+            elif not reasoning_type:
+                reasoning_type = str(inner_reasoning_type)
         
         # Use inner explanation if outer one is empty
         if inner_explanation and (not explanation or explanation == str(conclusion)):
@@ -271,6 +290,11 @@ def format_direct_reasoning_response(
         
         # Replace conclusion with the unwrapped inner conclusion
         conclusion = inner_conclusion
+        unwrap_depth += 1
+        
+        # If inner_conclusion is None or the same object, stop unwrapping
+        if inner_conclusion is None or inner_conclusion is conclusion:
+            break
     
     # Handle debug wrapper dicts that shouldn't be shown to users
     # Detect {"original": ..., "filtered": True, "reason": ...} pattern
@@ -289,8 +313,16 @@ def format_direct_reasoning_response(
     # Main conclusion (the answer)
     if conclusion:
         formatted_conclusion = format_conclusion_for_user(conclusion, reasoning_type)
+        logger.info(
+            f"[formatters/DIAGNOSTIC] Conclusion extracted and formatted: "
+            f"original_length={len(str(conclusion)) if conclusion else 0}, "
+            f"formatted_length={len(formatted_conclusion) if formatted_conclusion else 0}, "
+            f"has_content={bool(formatted_conclusion)}"
+        )
         if formatted_conclusion:
             response_parts.append(formatted_conclusion)
+    else:
+        logger.warning("[formatters/DIAGNOSTIC] No conclusion to format - conclusion is None/empty")
     
     # Add explanation if available and meaningful
     if explanation and explanation.strip():
@@ -322,7 +354,14 @@ def format_direct_reasoning_response(
         f"\nReasoning type: {reasoning_type_display} | Confidence: {confidence_pct}%"
     )
     
-    return "\n".join(response_parts)
+    final_response = "\n".join(response_parts)
+    logger.info(
+        f"[formatters/DIAGNOSTIC] Final formatted response: "
+        f"parts_count={len(response_parts)}, total_length={len(final_response)}, "
+        f"confidence={confidence_pct}%"
+    )
+    
+    return final_response
 
 
 def format_conclusion_for_user(conclusion: Any, reasoning_type: str = "") -> str:

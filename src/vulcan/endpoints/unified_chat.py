@@ -1839,20 +1839,27 @@ async def unified_chat(request: Request, body: UnifiedChatRequest) -> Dict[str, 
         # results, use them DIRECTLY instead of passing to OpenAI which may
         # ignore or override them. This prevents the "OpenAI always wins" problem.
         #
-        # Confidence threshold: 0.15 (lowered from 0.3 based on production analysis)
+        # Confidence threshold: 0.01 (lowered from 0.10 to ensure reasoning results pass through)
         # Production logs showed reasoning confidence consistently 0.0-0.2, causing
-        # all queries to fall back to OpenAI. Lowering threshold to 0.15 allows more reasoning
-        # results to be used directly when they have reasonable confidence.
-        # FIX (Jan 7 2026): Lowered from 0.3 to 0.15 to prevent unnecessary OpenAI fallbacks
-        # for queries that reasoning engines handle correctly but with moderate confidence.
+        # all queries to fall back to OpenAI. Lowering threshold to 0.01 allows reasoning
+        # results to be used directly even with low confidence - user can raise it later if needed.
+        # FIX (Jan 18 2026): Lowered from 0.10 to 0.01 to ensure reasoning results always pass through.
+        # This allows us to verify if poor responses are due to confidence filtering or other issues.
         # Configurable via VULCAN_MIN_REASONING_CONFIDENCE environment variable.
-        MIN_REASONING_CONFIDENCE_THRESHOLD = float(os.environ.get("VULCAN_MIN_REASONING_CONFIDENCE", "0.10"))
+        MIN_REASONING_CONFIDENCE_THRESHOLD = float(os.environ.get("VULCAN_MIN_REASONING_CONFIDENCE", "0.01"))
         
         # Check if we should use reasoning results directly
         use_reasoning_directly = False
         direct_reasoning_response = None
         best_confidence = 0.0  # Initialize to avoid NameError in warning message
         best_reasoning_type = None
+        
+        # DIAGNOSTIC LOGGING: Log reasoning results receipt
+        logger.info(
+            f"[VULCAN/DIAGNOSTIC] Reasoning results received: {bool(reasoning_results)}, "
+            f"threshold: {MIN_REASONING_CONFIDENCE_THRESHOLD:.2f}, "
+            f"engines: {list(reasoning_results.keys()) if reasoning_results else []}"
+        )
         
         if reasoning_results:
             # Check unified reasoning first (highest priority)
