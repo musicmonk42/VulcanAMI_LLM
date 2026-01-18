@@ -539,6 +539,31 @@ def execute_ensemble_reasoning(
     )
 
 
+def _is_valid_conclusion_for_voting(c: Any) -> bool:
+    """
+    Check if conclusion is valid for weighted voting.
+    
+    **Industry Standard**: Centralized validation logic to avoid duplication.
+    Used by both main voting logic and exception handler fallback.
+    
+    Args:
+        c: Conclusion value to check
+        
+    Returns:
+        True if conclusion is valid (not None, "None", or empty), False otherwise
+    """
+    if c is None:
+        return False
+    if isinstance(c, str):
+        # Empty string or whitespace-only
+        if not c.strip():
+            return False
+        # Literal string "None" (case-insensitive)
+        if c.strip().lower() == "none":
+            return False
+    return True
+
+
 def weighted_voting(conclusions: List[Any], weights: List[float]) -> Any:
     """
     Weighted voting for ensemble conclusions with robust None/empty filtering.
@@ -592,24 +617,10 @@ def weighted_voting(conclusions: List[Any], weights: List[float]) -> Any:
             return conclusions[0] if conclusions else None
         
         # **BUG FIX #2**: Filter out invalid conclusions before voting
-        # Invalid conclusions are: None, string "None", empty/whitespace strings
-        def is_valid_conclusion(c: Any) -> bool:
-            """Check if conclusion is valid (not None, "None", or empty)."""
-            if c is None:
-                return False
-            if isinstance(c, str):
-                # Empty string or whitespace-only
-                if not c.strip():
-                    return False
-                # Literal string "None" (case-insensitive)
-                if c.strip().lower() == "none":
-                    return False
-            return True
-        
-        # Filter conclusions and their corresponding weights
+        # Uses centralized validation function to avoid duplication
         valid_pairs = [
             (c, w) for c, w in zip(conclusions, weights) 
-            if is_valid_conclusion(c)
+            if _is_valid_conclusion_for_voting(c)
         ]
         
         if not valid_pairs:
@@ -675,17 +686,9 @@ def weighted_voting(conclusions: List[Any], weights: List[float]) -> Any:
     except Exception as e:
         logger.error(f"Weighted voting failed: {e}", exc_info=True)
         # Industry Standard: Return first valid conclusion as fallback
-        # Reuse the is_valid_conclusion logic defined above for consistency
-        def is_valid_for_fallback(c: Any) -> bool:
-            """Check if conclusion is valid for fallback."""
-            if c is None:
-                return False
-            if isinstance(c, str):
-                return c.strip() and c.strip().lower() != "none"
-            return True
-        
+        # Reuse the centralized validation function
         for c in conclusions:
-            if is_valid_for_fallback(c):
+            if _is_valid_conclusion_for_voting(c):
                 return c
         return None
 
