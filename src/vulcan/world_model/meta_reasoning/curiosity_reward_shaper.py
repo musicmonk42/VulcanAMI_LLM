@@ -1197,20 +1197,58 @@ class CuriosityRewardShaper(SerializationMixin):
             x = _np.arange(len(recent))  # Use fake numpy if needed
             y = _np.array(recent)  # Use fake numpy if needed
 
-            # Linear regression using np.vstack/np.ones/np.lstsq (or fake versions)
+            # Linear regression using np.vstack/np.ones/np.linalg.lstsq (or fake versions)
+            # 
+            # CRITICAL FIX (Defect Report Category 1.1): FakeNumpy Crash
+            # 
+            # Industry Standard Fix:
+            # 1. Fail-Fast Validation: Check NumPy availability before attempting computation
+            # 2. Graceful Degradation: Use simple fallback if NumPy unavailable
+            # 3. Clear Error Logging: Log specific failure reason for debugging
+            # 4. Safe Default: Return 0.0 trend rather than crashing
             try:
-                A = _np.vstack(
-                    [x, _np.ones(len(x))]
-                ).T  # Transpose happens automatically in FakeNumpy vstack
-                # lstsq returns tuple (solution, residuals, rank, s)
-                results = _np.lstsq(A, y, rcond=None)
-                slope = (
-                    results[0][0] if results and results[0] else 0.0
-                )  # Get slope from first element of solution tuple
-                self.statistics.novelty_trend = float(slope)
+                if not NUMPY_AVAILABLE:
+                    # INDUSTRY STANDARD: Graceful degradation with logging
+                    logger.warning(
+                        "NumPy not available - cannot compute accurate novelty trend. "
+                        "Install numpy for proper least squares regression. "
+                        "Using simple mean-based estimation as fallback."
+                    )
+                    # Simple fallback: compare first half to second half
+                    mid = len(recent) // 2
+                    first_half_mean = sum(recent[:mid]) / max(1, mid)
+                    second_half_mean = sum(recent[mid:]) / max(1, len(recent) - mid)
+                    self.statistics.novelty_trend = float(second_half_mean - first_half_mean)
+                else:
+                    # NumPy available - use proper least squares
+                    A = _np.vstack(
+                        [x, _np.ones(len(x))]
+                    ).T  # Create design matrix
+                    # CRITICAL FIX: Use _np.linalg.lstsq (not _np.lstsq)
+                    # lstsq is in the linalg submodule for both real and fake numpy
+                    results = _np.linalg.lstsq(A, y, rcond=None)
+                    slope = (
+                        results[0][0] if results and results[0] else 0.0
+                    )  # Get slope from first element of solution tuple
+                    self.statistics.novelty_trend = float(slope)
             except Exception as e:
-                logger.debug(f"Could not compute novelty trend: {e}")
-                self.statistics.novelty_trend = 0.0
+                # INDUSTRY STANDARD: Comprehensive error handling with context
+                logger.warning(
+                    f"Failed to compute novelty trend via least squares: {type(e).__name__}: {e}. "
+                    f"Using fallback estimation."
+                )
+                # Fallback: simple mean comparison
+                try:
+                    mid = len(recent) // 2
+                    if mid > 0:
+                        first_half_mean = sum(recent[:mid]) / mid
+                        second_half_mean = sum(recent[mid:]) / (len(recent) - mid)
+                        self.statistics.novelty_trend = float(second_half_mean - first_half_mean)
+                    else:
+                        self.statistics.novelty_trend = 0.0
+                except Exception as fallback_error:
+                    logger.error(f"Even fallback trend calculation failed: {fallback_error}")
+                    self.statistics.novelty_trend = 0.0
 
 
 # Module-level exports

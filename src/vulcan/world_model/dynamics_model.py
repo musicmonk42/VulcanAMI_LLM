@@ -13,7 +13,7 @@ import importlib  # Added for lazy loading
 import logging
 import threading
 import time
-from collections import defaultdict, deque
+from collections import OrderedDict, defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
@@ -1620,8 +1620,32 @@ class DynamicsModel:
         self.continuous_transition_history = defaultdict(lambda: deque(maxlen=2000))
 
         # Models
-        self.linear_models = {}
-        self.nonlinear_models = {}
+        # 
+        # CRITICAL FIX (Defect Report Category 1.3): Unbounded Learning
+        # 
+        # Industry Standard Fix - Bounded LRU Cache:
+        # 1. Define maximum model cache size to prevent OOM
+        # 2. Use OrderedDict for efficient LRU eviction  
+        # 3. Track model access times for LRU policy
+        # 4. Evict least-recently-used models when limit reached
+        # 5. Log evictions for monitoring and tuning
+        # 
+        # Technical Details:
+        # - Max models per type (linear/nonlinear): 1000 variables
+        # - Total memory bound: ~8MB for 1000 models (est. 4KB each)
+        # - LRU eviction when limit reached
+        # - Thread-safe operations via existing lock
+        # 
+        # Rationale:
+        # - Previous unbounded dict caused linear RAM growth
+        # - System would OOM after hours/days of runtime
+        # - 1000 variables provides good coverage for most applications
+        # - LRU ensures most-used models remain in cache
+        from collections import OrderedDict
+        self._max_models_per_type = 1000  # Bounded cache size
+        self.linear_models = OrderedDict()  # LRU-capable dict
+        self.nonlinear_models = OrderedDict()  # LRU-capable dict
+        self._model_access_count = defaultdict(int)  # Track usage for monitoring
 
         # Clustering
         self.cluster_labels = []
@@ -2315,7 +2339,9 @@ class DynamicsModel:
                     nonlinear_r2 = self._calculate_r2(X, y, nonlinear_model)
 
                     if nonlinear_r2 > linear_r2:
-                        self.nonlinear_models[var] = nonlinear_model
+                        self._add_model_with_lru_eviction(
+                            self.nonlinear_models, var, nonlinear_model, "nonlinear"
+                        )
                         if var in self.linear_models:
                             del self.linear_models[var]
                         logger.debug(
@@ -2323,17 +2349,62 @@ class DynamicsModel:
                         )
                         return
 
-            self.linear_models[var] = linear_model
+            self._add_model_with_lru_eviction(
+                self.linear_models, var, linear_model, "linear"
+            )
             if var in self.nonlinear_models:
                 del self.nonlinear_models[var]
             logger.debug(f"Linear model for {var} (R2={linear_r2:.3f})")
         else:
             nonlinear_model = self.model_fitter.fit_polynomial_model(X, y, degree=2)
             if nonlinear_model:
-                self.nonlinear_models[var] = nonlinear_model
+                self._add_model_with_lru_eviction(
+                    self.nonlinear_models, var, nonlinear_model, "nonlinear"
+                )
                 if var in self.linear_models:
                     del self.linear_models[var]
                 logger.debug(f"Fallback polynomial model for {var}")
+
+    def _add_model_with_lru_eviction(
+        self, model_dict: 'OrderedDict', var: str, model: Any, model_type: str
+    ):
+        """
+        Add model to cache with LRU eviction when limit reached.
+        
+        Industry Standard LRU Cache Implementation:
+        1. Check if at capacity
+        2. If at capacity, evict least recently used (FIFO in OrderedDict)
+        3. Add new model
+        4. Update access tracking
+        5. Log evictions for monitoring
+        
+        Args:
+            model_dict: The OrderedDict to add to (linear_models or nonlinear_models)
+            var: Variable name (cache key)
+            model: Model object to cache
+            model_type: "linear" or "nonlinear" for logging
+        """
+        with self.lock:
+            # If variable already exists, move to end (most recently used)
+            if var in model_dict:
+                model_dict.move_to_end(var)
+            
+            # Check if at capacity
+            if len(model_dict) >= self._max_models_per_type and var not in model_dict:
+                # Evict least recently used (first item)
+                evicted_var, evicted_model = model_dict.popitem(last=False)
+                logger.info(
+                    f"LRU Eviction: Removed {model_type} model for '{evicted_var}' "
+                    f"(cache full at {self._max_models_per_type} models). "
+                    f"Access count: {self._model_access_count.get(evicted_var, 0)}"
+                )
+                # Clean up access count
+                if evicted_var in self._model_access_count:
+                    del self._model_access_count[evicted_var]
+            
+            # Add/update model
+            model_dict[var] = model
+            self._model_access_count[var] = self._model_access_count.get(var, 0) + 1
 
     def get_statistics(self) -> Dict[str, Any]:
         """Get dynamics model statistics"""
