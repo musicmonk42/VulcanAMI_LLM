@@ -24,9 +24,10 @@ class TestFix1QueryRouterReasoningDomainDetection:
     
     def test_sat_query_not_philosophical(self):
         """SAT query should NOT be classified as philosophical."""
-        from vulcan.routing.query_router import QueryRouter
+        # INDUSTRY STANDARD FIX: QueryRouter was renamed to QueryAnalyzer
+        from vulcan.routing.query_router import QueryAnalyzer
         
-        router = QueryRouter()
+        router = QueryAnalyzer()
         query = "Is A→B, B→C, ¬C, A∨B satisfiable?"
         
         # Should NOT be classified as philosophical
@@ -38,9 +39,10 @@ class TestFix1QueryRouterReasoningDomainDetection:
     
     def test_bayesian_query_not_philosophical(self):
         """Bayesian query should NOT be classified as philosophical."""
-        from vulcan.routing.query_router import QueryRouter
+        # INDUSTRY STANDARD FIX: QueryRouter was renamed to QueryAnalyzer
+        from vulcan.routing.query_router import QueryAnalyzer
         
-        router = QueryRouter()
+        router = QueryAnalyzer()
         query = "P(disease|positive test) with sensitivity=0.99, specificity=0.95, prevalence=0.01"
         
         is_philosophical = router._is_philosophical_query(query)
@@ -51,9 +53,10 @@ class TestFix1QueryRouterReasoningDomainDetection:
     
     def test_causal_query_not_philosophical(self):
         """Causal inference query should NOT be classified as philosophical."""
-        from vulcan.routing.query_router import QueryRouter
+        # INDUSTRY STANDARD FIX: QueryRouter was renamed to QueryAnalyzer
+        from vulcan.routing.query_router import QueryAnalyzer
         
-        router = QueryRouter()
+        router = QueryAnalyzer()
         query = "Does conditioning on B induce correlation between A and C in graph A→B←C?"
         
         is_philosophical = router._is_philosophical_query(query)
@@ -64,9 +67,10 @@ class TestFix1QueryRouterReasoningDomainDetection:
     
     def test_fol_query_not_philosophical(self):
         """First-order logic query should NOT be classified as philosophical."""
-        from vulcan.routing.query_router import QueryRouter
+        # INDUSTRY STANDARD FIX: QueryRouter was renamed to QueryAnalyzer
+        from vulcan.routing.query_router import QueryAnalyzer
         
-        router = QueryRouter()
+        router = QueryAnalyzer()
         query = "∀X (human(X) → mortal(X)), human(socrates) ⊢ mortal(socrates)?"
         
         is_philosophical = router._is_philosophical_query(query)
@@ -77,9 +81,10 @@ class TestFix1QueryRouterReasoningDomainDetection:
     
     def test_actual_philosophical_query_is_philosophical(self):
         """Actual philosophical query should still be classified correctly."""
-        from vulcan.routing.query_router import QueryRouter
+        # INDUSTRY STANDARD FIX: QueryRouter was renamed to QueryAnalyzer
+        from vulcan.routing.query_router import QueryAnalyzer
         
-        router = QueryRouter()
+        router = QueryAnalyzer()
         query = "What is the meaning of life?"
         
         is_philosophical = router._is_philosophical_query(query)
