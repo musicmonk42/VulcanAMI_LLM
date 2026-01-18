@@ -971,8 +971,13 @@ SELF_AWARENESS_CHOICE_PATTERNS: Tuple[re.Pattern, ...] = (
 )
 
 # Self-awareness related terms that combine with choice patterns above
+# Note: This is a focused subset of terms from SELF_INTROSPECTION_KEYWORDS (line 924)
+# specifically for self-awareness/consciousness choice questions. We intentionally
+# duplicate these terms here rather than extracting to a shared constant because:
+# 1. This subset is semantically distinct (consciousness-related only)
+# 2. Keeps the early-check logic self-contained and easy to understand
+# 3. Avoids coupling between different pattern matching strategies
 # Includes all variations: hyphenated, spaced, and underscored for consistency
-# with SELF_INTROSPECTION_KEYWORDS (line 933)
 SELF_AWARENESS_TERMS: FrozenSet[str] = frozenset([
     'self-aware', 'self aware', 'self_aware',  # All variations of self-aware
     'conscious', 'consciousness',  # Consciousness terms
