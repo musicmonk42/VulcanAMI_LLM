@@ -3248,11 +3248,21 @@ class AgentPoolManager:
                         try:
                             from vulcan.reasoning.reasoning_types import ReasoningResult as UR_ReasoningResult
                             
-                            # Extract conclusion from metadata or rationale
-                            conclusion = integration_result.metadata.get(
-                                "conclusion",
-                                integration_result.metadata.get("world_model_response", _safe_get_attr(integration_result, "rationale", ""))
-                            )
+                            # INDUSTRY STANDARD FIX: Extract conclusion with correct priority
+                            # 1. Check direct .conclusion attribute FIRST (ReasoningResult dataclass)
+                            # 2. Fallback to metadata extraction if attribute is invalid
+                            # 3. Final fallback to rationale attribute
+                            conclusion = _safe_get_attr(integration_result, "conclusion", None)
+                            
+                            # Validate and fallback to metadata if needed
+                            if not self._is_valid_conclusion(conclusion):
+                                conclusion = self._extract_conclusion_from_dict(
+                                    getattr(integration_result, 'metadata', {})
+                                )
+                            
+                            # Final fallback to rationale if still invalid
+                            if not self._is_valid_conclusion(conclusion):
+                                conclusion = _safe_get_attr(integration_result, "rationale", "")
                             
                             reasoning_result = UR_ReasoningResult(
                                 conclusion=conclusion,
@@ -3276,10 +3286,21 @@ class AgentPoolManager:
                                     self.explanation = explanation
                                     self.metadata = metadata
                             
-                            conclusion = integration_result.metadata.get(
-                                "conclusion",
-                                integration_result.metadata.get("world_model_response", _safe_get_attr(integration_result, "rationale", ""))
-                            )
+                            # INDUSTRY STANDARD FIX: Extract conclusion with correct priority
+                            # 1. Check direct .conclusion attribute FIRST (ReasoningResult dataclass)
+                            # 2. Fallback to metadata extraction if attribute is invalid
+                            # 3. Final fallback to rationale attribute
+                            conclusion = _safe_get_attr(integration_result, "conclusion", None)
+                            
+                            # Validate and fallback to metadata if needed
+                            if not self._is_valid_conclusion(conclusion):
+                                conclusion = self._extract_conclusion_from_dict(
+                                    getattr(integration_result, 'metadata', {})
+                                )
+                            
+                            # Final fallback to rationale if still invalid
+                            if not self._is_valid_conclusion(conclusion):
+                                conclusion = _safe_get_attr(integration_result, "rationale", "")
                             
                             reasoning_result = PrivilegedReasoningResult(
                                 conclusion=conclusion,
@@ -3455,11 +3476,21 @@ class AgentPoolManager:
                                 )
                                 source_name = primary_engine
                             
-                            # Extract conclusion from metadata or rationale
-                            conclusion = integration_result.metadata.get(
-                                "conclusion",
-                                integration_result.metadata.get("world_model_response", _safe_get_attr(integration_result, "rationale", ""))
-                            )
+                            # INDUSTRY STANDARD FIX: Extract conclusion with correct priority
+                            # 1. Check direct .conclusion attribute FIRST (ReasoningResult dataclass)
+                            # 2. Fallback to metadata extraction if attribute is invalid
+                            # 3. Final fallback to rationale attribute
+                            conclusion = _safe_get_attr(integration_result, "conclusion", None)
+                            
+                            # Validate and fallback to metadata if needed
+                            if not self._is_valid_conclusion(conclusion):
+                                conclusion = self._extract_conclusion_from_dict(
+                                    getattr(integration_result, 'metadata', {})
+                                )
+                            
+                            # Final fallback to rationale if still invalid
+                            if not self._is_valid_conclusion(conclusion):
+                                conclusion = _safe_get_attr(integration_result, "rationale", "")
                             
                             reasoning_result = UR_ReasoningResult(
                                 conclusion=conclusion,
@@ -3507,10 +3538,21 @@ class AgentPoolManager:
                                 }
                                 rt_string = tool_to_rt_string.get(primary_engine.lower(), 'hybrid')
                             
-                            conclusion = integration_result.metadata.get(
-                                "conclusion",
-                                integration_result.metadata.get("world_model_response", _safe_get_attr(integration_result, "rationale", ""))
-                            )
+                            # INDUSTRY STANDARD FIX: Extract conclusion with correct priority
+                            # 1. Check direct .conclusion attribute FIRST (ReasoningResult dataclass)
+                            # 2. Fallback to metadata extraction if attribute is invalid
+                            # 3. Final fallback to rationale attribute
+                            conclusion = _safe_get_attr(integration_result, "conclusion", None)
+                            
+                            # Validate and fallback to metadata if needed
+                            if not self._is_valid_conclusion(conclusion):
+                                conclusion = self._extract_conclusion_from_dict(
+                                    getattr(integration_result, 'metadata', {})
+                                )
+                            
+                            # Final fallback to rationale if still invalid
+                            if not self._is_valid_conclusion(conclusion):
+                                conclusion = _safe_get_attr(integration_result, "rationale", "")
                             
                             reasoning_result = HighConfidenceReasoningResult(
                                 conclusion=conclusion,
