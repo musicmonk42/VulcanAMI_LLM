@@ -3077,13 +3077,20 @@ Make this human-readable. Nothing more."""
         # Note: Removed original question from prompt
         # OpenAI should ONLY see the reasoning output, not the original question
         # This prevents OpenAI from solving problems independently when reasoning fails
-        user_prompt = f"""Format this VULCAN reasoning output for the user.
+        user_prompt = f"""You are formatting VULCAN's reasoning output into a clear answer for the user.
 
-VULCAN's reasoning output (this is what VULCAN computed):
+VULCAN's structured output:
 {output_json}
 
-Write a natural, helpful response that explains VULCAN's results and conclusions.
-Do NOT add any analysis or reasoning beyond what is in VULCAN's output."""
+CRITICAL INSTRUCTIONS:
+1. Find the 'conclusion' field in the JSON (may be nested under 'result', 'agent_reasoning', 'unified', etc.)
+2. The conclusion IS the answer - present it clearly and directly
+3. If the conclusion contains 'result', 'answer', 'satisfiable', or similar fields, state that value explicitly
+4. If there's a 'proof', 'explanation', or 'reasoning_steps', include them to support the answer
+5. NEVER respond with just "VULCAN processed with confidence X" - that's not an answer
+6. Start your response with the actual answer/conclusion, then provide supporting details
+
+Format the answer naturally but ensure the actual conclusion is prominently stated."""
 
         try:
             # Use gpt-4o-mini for fast and cheap formatting
