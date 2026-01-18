@@ -44,7 +44,9 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 
 # Copy and install Python dependencies
 COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt && \
+    # Clean up pip cache after dependencies installation
+    rm -rf /root/.cache/pip /tmp/* /var/tmp/*
 
 # Copy setup.py for local package installation
 COPY setup.py ./
@@ -61,10 +63,14 @@ RUN if [ -f setup.py ]; then \
     fi
 
 # Download spacy language model if spacy is installed
-RUN python -m spacy download en_core_web_sm || echo "Spacy model download failed (non-critical)"
+RUN python -m spacy download en_core_web_sm || echo "Spacy model download failed (non-critical)" && \
+    # Clean up pip cache after spacy download
+    rm -rf /root/.cache/pip /tmp/* /var/tmp/*
 
 # Pre-compile Python bytecode
-RUN python -m compileall -q src app.py
+RUN python -m compileall -q src app.py && \
+    # Clean up Python cache files after compilation
+    find /app -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 
 # =============================================================================
 # Runtime Stage

@@ -150,13 +150,17 @@ RUN if [ -f requirements-hashed.txt ] && grep -qE '^[^#]' requirements-hashed.tx
         echo "Generate with: pip-compile --generate-hashes requirements.txt"; \
         pip install --no-cache-dir --root-user-action=ignore -r requirements.txt; \
         echo "HASHED_DEPS=FALLBACK_UNHASHED"; \
-    fi
+    fi && \
+    # Clean up pip cache and temporary files after dependencies installation
+    rm -rf /root/.cache/pip /tmp/* /var/tmp/*
 
 # Optional: Generate CycloneDX SBOM (can be skipped by removing lines)
 # This gives you an sbom.json artifact for compliance / scanning.
 # hadolint ignore=DL3013,SC2015
 RUN pip install --no-cache-dir --root-user-action=ignore cyclonedx-bom && \
-    cyclonedx-py requirements requirements.txt -o sbom.json || (echo "CycloneDX generation failed (continuing)"; touch sbom.json)
+    cyclonedx-py requirements requirements.txt -o sbom.json || (echo "CycloneDX generation failed (continuing)"; touch sbom.json) && \
+    # Clean up pip cache after SBOM generation
+    rm -rf /root/.cache/pip /tmp/* /var/tmp/*
 
 # Copy application source (builder keeps full code to run compile step)
 COPY src/ ./src
@@ -183,11 +187,16 @@ RUN if [ -f setup.py ]; then \
     fi
 
 # Download spacy language model if spacy is installed
-# Using en_core_web_lg for better accuracy (required for self-improvement features)
-RUN python -m spacy download en_core_web_lg || echo "Spacy model download failed (non-critical)"
+# Using en_core_web_sm (smaller model ~40MB vs ~400MB for lg) to reduce disk usage
+# Switch to en_core_web_lg only if self-improvement features require better accuracy
+RUN python -m spacy download en_core_web_sm || echo "Spacy model download failed (non-critical)" && \
+    # Clean up pip cache after spacy download
+    rm -rf /root/.cache/pip /tmp/* /var/tmp/*
 
 # Pre-compile Python bytecode (optional performance / tamper evidence)
-RUN python -m compileall -q src
+RUN python -m compileall -q src && \
+    # Clean up Python cache files after compilation
+    find /app -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 
 # -----------------------------
 # Stage 2: Runtime (slim)
