@@ -11,6 +11,7 @@ import copy
 import heapq
 import json
 import logging
+import os
 import threading
 import time
 from collections import OrderedDict, defaultdict, deque
@@ -1778,9 +1779,48 @@ class CausalDAG:
                     )
         else:
             self.safety_validator = None
+            # 
+            # ⚠️  CRITICAL SECURITY WARNING (Defect Report Category 2.3): Silent Safety Fail
+            #
+            # The Safety Validator failed to import or initialize, and this module is
+            # proceeding WITHOUT safety checks. This is logged as a WARNING but the system
+            # continues operating.
+            #
+            # SECURITY IMPLICATIONS:
+            # - Causal graph modifications are not validated for safety
+            # - System may create or modify causal relationships that violate safety constraints
+            # - No protection against dangerous state transitions
+            # - "God Mode" - AI operates with zero safety restrictions
+            #
+            # DEPLOYMENT REQUIREMENTS:
+            # For production systems using causal graph for:
+            # 1. Self-improvement or autonomous modifications
+            # 2. Safety-critical applications
+            # 3. Systems that can affect physical world
+            #
+            # YOU MUST:
+            # 1. Fix the safety validator import issue before deployment
+            # 2. Set REQUIRE_SAFETY_VALIDATOR=true in environment
+            # 3. Implement fail-fast behavior (raise exception) if validator unavailable
+            #
+            # For read-only or analysis use cases where the causal graph is not used
+            # for autonomous modifications, this warning can be accepted.
+            #
             logger.warning(
-                f"{self.__class__.__name__}: Safety validator not available - operating without safety checks"
+                f"⚠️  CRITICAL: {self.__class__.__name__} operating WITHOUT safety validator. "
+                f"This is UNSAFE for production use in self-improvement or autonomous modification scenarios. "
+                f"Safety checks are DISABLED. Fix safety validator import or set REQUIRE_SAFETY_VALIDATOR=false "
+                f"if this is intentional for read-only analysis."
             )
+            
+            # Industry Standard: Check for environment variable to enforce safety requirement
+            require_safety = os.environ.get("REQUIRE_SAFETY_VALIDATOR", "false").lower() == "true"
+            if require_safety:
+                raise RuntimeError(
+                    f"FATAL: {self.__class__.__name__} REQUIRES safety validator but it's unavailable. "
+                    f"Set REQUIRE_SAFETY_VALIDATOR=false to bypass (NOT recommended for production). "
+                    f"Import error details should be in logs above."
+                )
 
         # Initialize components with separation of concerns
         self.structure = GraphStructure()

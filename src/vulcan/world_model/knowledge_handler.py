@@ -529,8 +529,49 @@ class KnowledgeHandler:
         """
         Check if two facts contradict each other.
         
-        Industry Standard: Simple negation detection with keyword matching.
-        This is a heuristic - could be enhanced with semantic similarity.
+        ⚠️  CRITICAL LIMITATION (Defect Report Category 3.2): Keyword Negation Only
+        
+        Industry Standard Warning:
+        This is a HEURISTIC-BASED approach using keyword matching for negation patterns.
+        It DOES NOT perform semantic contradiction detection.
+        
+        KNOWN LIMITATIONS:
+        1. **Antonym Blindness**: Cannot detect semantic opposites
+           - Example: "Bullish" vs "Bearish" (NOT detected as contradiction)
+           - Example: "Hot" vs "Cold" (NOT detected as contradiction)
+           - Example: "Increase" vs "Decrease" (NOT detected as contradiction)
+        
+        2. **Context Blindness**: Cannot understand contextual negation
+           - Example: "Market is rising" vs "Market is not rising" (correctly detected)
+           - Example: "Market is strong" vs "Market is weak" (NOT detected)
+        
+        3. **Numeric Contradictions**: Cannot detect conflicting numerical claims
+           - Example: "Temperature is 100°F" vs "Temperature is 32°F" (NOT detected)
+        
+        PRODUCTION REQUIREMENTS:
+        For production systems requiring accurate contradiction detection, implement:
+        1. Semantic similarity models (e.g., sentence embeddings)
+        2. Antonym dictionaries or knowledge graphs
+        3. Numerical value extraction and comparison
+        4. LLM-based semantic analysis for complex cases
+        
+        SECURITY IMPACT:
+        This limitation can lead to hallucinations and incorrect reasoning:
+        - System may accept contradictory facts as consistent
+        - Reasoning may produce invalid conclusions
+        - DO NOT rely on this for safety-critical applications
+        
+        Args:
+            fact1: First fact to compare
+            fact2: Second fact to compare
+            
+        Returns:
+            bool: True if explicit negation pattern detected, False otherwise
+            
+        Note:
+            This method is intentionally simple for baseline functionality.
+            It provides basic safeguards against obvious contradictions but
+            should not be considered comprehensive.
         """
         negation_patterns = ['not', 'never', 'no', 'cannot', "doesn't", "isn't", "aren't"]
         
